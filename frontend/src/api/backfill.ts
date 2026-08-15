@@ -36,6 +36,17 @@ export interface BackfillEstimate {
   weather_subscriptions: number;
   /** Provider codes the farm is actually subscribed to, e.g. ["open_meteo"]. */
   weather_providers: string[];
+  /**
+   * Thermal (Landsat), counted on its own cadence — 8-day nominal revisit
+   * against Sentinel-2's 5. Zero means nothing to fetch.
+   */
+  thermal_subscriptions: number;
+  estimated_thermal_scenes: number;
+  /**
+   * Always 0, and that is the point: Planetary Computer serves this free and
+   * anonymously, so there is no bill to estimate.
+   */
+  estimated_thermal_units: number;
 }
 
 export type RunStatus = "queued" | "running" | "succeeded" | "partial" | "failed";
@@ -67,6 +78,12 @@ export interface RunPayload {
   window_to: string;
   imagery: boolean;
   weather: boolean;
+  /**
+   * Its own source rather than part of `imagery`: different satellite,
+   * cadence, cost and failure modes. Folded together, a thermal failure
+   * would hide inside the imagery counter.
+   */
+  thermal?: boolean;
   kind?: RunKind;
 }
 

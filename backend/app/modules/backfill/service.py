@@ -35,6 +35,18 @@ TASK_WEATHER_BACKFILL = "weather.backfill_weather"
 TASK_IMAGERY_INDICES = "imagery.backfill_farm_indices"
 TASK_WEATHER_INDICES = "weather.backfill_weather_indices"
 
+# Product codes, as literals. This module dispatches by task *name* to avoid
+# an import edge to the modules it drives (see the docstring); reaching into
+# `imagery` for a constant would undo that for one string.
+#
+# Thermal is its own console source rather than part of `imagery` because the
+# two behave nothing alike: different satellite, cadence, cost and failure
+# modes. Folded together, a thermal failure would hide inside the imagery
+# counter and the estimate could not show that thermal is free.
+THERMAL_PRODUCT_CODES = ["landsat_c2_l2_st"]
+SOURCE_IMAGERY = "imagery"
+SOURCE_THERMAL = "thermal"
+
 # Rough per-scene cost used for the pre-flight estimate. CDSE consumption
 # is not metered anywhere in the app, so this is an approximation and the
 # API says so explicitly (`units_estimated: true`) rather than presenting a
@@ -44,6 +56,16 @@ _UNITS_PER_SCENE = 1.0
 # usable. Deliberately conservative so the estimate over- rather than
 # under-states the spend.
 _SCENES_PER_SUB_PER_DAY = 1 / 5.0
+
+# Landsat 8 + 9 combined nominal revisit is 8 days. Measured over the
+# reference farm the mean gap is shorter (~4 d) because two WRS-2 paths
+# overlap it, but that is path-dependent, so the nominal is the honest
+# figure for an estimate.
+_THERMAL_SCENES_PER_SUB_PER_DAY = 1 / 8.0
+# Planetary Computer serves this anonymously and free: no account, no
+# metering, no quota to spend. Reporting the Sentinel-2 unit cost here
+# would invent a bill that does not exist.
+_THERMAL_UNITS_PER_SCENE = 0.0
 
 
 class FarmNotFoundError(Exception):
@@ -136,6 +158,7 @@ class BackfillService:
         window_to: date,
         imagery: bool,
         weather: bool,
+        thermal: bool = False,
     ) -> dict[str, Any]:
         """Pre-flight scale of a run. No side effects."""
         await self._set_search_path(tenant_schema)
@@ -152,6 +175,9 @@ class BackfillService:
                         WHERE b.farm_id = :fid
                           AND s.is_active = TRUE
                           AND s.deleted_at IS NULL
+                          AND s.product_id NOT IN (
+                              SELECT id FROM public.imagery_products
+                               WHERE code = ANY(:thermal_codes))
                           AND NOT EXISTS (
                               SELECT 1 FROM imagery_farm_subscriptions f
                               WHERE f.farm_id = b.farm_id
@@ -164,10 +190,21 @@ class BackfillService:
                         WHERE f.farm_id = :fid
                           AND f.is_active = TRUE
                           AND f.fetch_farm_aoi = TRUE
-                          AND f.deleted_at IS NULL) AS farm_aoi_subscriptions
+                          AND f.deleted_at IS NULL
+                          AND f.product_id NOT IN (
+                              SELECT id FROM public.imagery_products
+                               WHERE code = ANY(:thermal_codes))) AS farm_aoi_subscriptions,
+                      (SELECT count(*) FROM imagery_farm_subscriptions f
+                        WHERE f.farm_id = :fid
+                          AND f.is_active = TRUE
+                          AND f.fetch_farm_aoi = TRUE
+                          AND f.deleted_at IS NULL
+                          AND f.product_id IN (
+                              SELECT id FROM public.imagery_products
+                               WHERE code = ANY(:thermal_codes))) AS thermal_subscriptions
                     """
                     ),
-                    {"fid": str(farm_id)},
+                    {"fid": str(farm_id), "thermal_codes": THERMAL_PRODUCT_CODES},
                 )
             )
             .mappings()
@@ -189,6 +226,13 @@ class BackfillService:
         # saving the cutover exists to make, so the estimate has to show it.
         subs = block_subs + farm_subs
         scenes = int(round(subs * days * _SCENES_PER_SUB_PER_DAY)) if imagery else 0
+        # Thermal is counted on its own cadence and its own (zero) cost. Rolling
+        # it into `estimated_scenes` would have Landsat inherit Sentinel-2's
+        # 5-day revisit and a per-scene charge that nobody pays.
+        thermal_subs = int(row["thermal_subscriptions"])
+        thermal_scenes = (
+            int(round(thermal_subs * days * _THERMAL_SCENES_PER_SUB_PER_DAY)) if thermal else 0
+        )
         return {
             "days": days,
             "blocks": int(row["blocks"]),
@@ -208,6 +252,12 @@ class BackfillService:
             # nothing to fetch and reads as a silent no-op.
             "weather_subscriptions": wx_subs,
             "weather_providers": providers,
+            # Thermal, reported separately throughout. `thermal_units` is 0
+            # and stays 0: Planetary Computer serves this free and anonymously,
+            # so a non-zero number here would invent a bill.
+            "thermal_subscriptions": thermal_subs,
+            "estimated_thermal_scenes": thermal_scenes,
+            "estimated_thermal_units": round(thermal_scenes * _THERMAL_UNITS_PER_SCENE),
         }
 
     # ---- dispatch -------------------------------------------------------
@@ -224,6 +274,7 @@ class BackfillService:
         imagery: bool,
         weather: bool,
         kind: str,
+        thermal: bool = False,
         actor_id: UUID | None,
         actor_email: str | None,
     ) -> dict[str, Any]:
@@ -241,10 +292,19 @@ class BackfillService:
         # would dispatch a task that fetches nothing.
         weather_providers = await self._weather_providers(tenant_schema, farm_id)
         missing: list[str] = []
-        if imagery and not await self._has_imagery_subs(tenant_schema, farm_id):
+        if imagery and not await self._has_imagery_subs(
+            tenant_schema, farm_id, exclude_products=THERMAL_PRODUCT_CODES
+        ):
             missing.append("imagery")
         if weather and not weather_providers:
             missing.append("weather")
+        # Checked separately, so "thermal" is named in the error rather than
+        # a farm with Sentinel-2 but no thermal subscription passing the
+        # imagery check and then fetching nothing.
+        if thermal and not await self._has_imagery_subs(
+            tenant_schema, farm_id, only_products=THERMAL_PRODUCT_CODES
+        ):
+            missing.append("thermal")
         if missing:
             raise NoIntegrationConfigError(missing)
 
@@ -255,7 +315,7 @@ class BackfillService:
             farm_id=farm_id,
             farm_name=farm.get("name") or farm.get("code"),
             kind=kind,
-            sources={"imagery": imagery, "weather": weather},
+            sources={"imagery": imagery, "weather": weather, "thermal": thermal},
             window_from=window_from,
             window_to=window_to,
             created_by=actor_id,
@@ -274,6 +334,7 @@ class BackfillService:
             window_to=window_to,
             imagery=imagery,
             weather=weather,
+            thermal=thermal,
             weather_providers=weather_providers,
         )
         return run
@@ -289,6 +350,7 @@ class BackfillService:
         window_to: date,
         imagery: bool,
         weather: bool,
+        thermal: bool,
         weather_providers: list[str],
     ) -> None:
         app = celery_current_app
@@ -303,6 +365,24 @@ class BackfillService:
                         "from_iso": window_from.isoformat(),
                         "to_iso": window_to.isoformat(),
                         "run_id": rid,
+                        # Named explicitly so an imagery run never silently
+                        # recomputes thermal scenes under the imagery counter.
+                        "product_codes": None,
+                        "progress_source": SOURCE_IMAGERY,
+                    },
+                    queue="heavy",
+                )
+            if thermal:
+                app.send_task(
+                    TASK_IMAGERY_INDICES,
+                    kwargs={
+                        "farm_id": str(farm_id),
+                        "tenant_schema": tenant_schema,
+                        "from_iso": window_from.isoformat(),
+                        "to_iso": window_to.isoformat(),
+                        "run_id": rid,
+                        "product_codes": THERMAL_PRODUCT_CODES,
+                        "progress_source": SOURCE_THERMAL,
                     },
                     queue="heavy",
                 )
@@ -334,6 +414,26 @@ class BackfillService:
                     "to_iso": window_to.isoformat(),
                     "run_compute_indices": False,
                     "run_id": rid,
+                    "product_codes": None,
+                    "progress_source": SOURCE_IMAGERY,
+                },
+                queue="heavy",
+            )
+        if thermal:
+            # A whole-farm thermal acquisition computes its indices inline,
+            # exactly as the live path does, so `run_compute_indices` stays
+            # False here too — it only governs the block path.
+            app.send_task(
+                TASK_IMAGERY_BACKFILL,
+                kwargs={
+                    "farm_id": str(farm_id),
+                    "tenant_schema": tenant_schema,
+                    "from_iso": window_from.isoformat(),
+                    "to_iso": window_to.isoformat(),
+                    "run_compute_indices": False,
+                    "run_id": rid,
+                    "product_codes": THERMAL_PRODUCT_CODES,
+                    "progress_source": SOURCE_THERMAL,
                 },
                 queue="heavy",
             )
@@ -442,35 +542,65 @@ class BackfillService:
             await self._reset_search_path()
         return [r[0] for r in rows]
 
-    async def _has_imagery_subs(self, tenant_schema: str, farm_id: UUID) -> bool:
-        """Is there anything for an imagery run to fetch — in either shape?
+    async def _has_imagery_subs(
+        self,
+        tenant_schema: str,
+        farm_id: UUID,
+        *,
+        only_products: list[str] | None = None,
+        exclude_products: list[str] | None = None,
+    ) -> bool:
+        """Is there anything for this source to fetch — in either shape?
 
         A farm cut over to whole-farm fetching may have had its block
         subscriptions deactivated, so asking only about those would reject the
         run as unconfigured on exactly the farms the cutover is furthest along
         on.
+
+        The two product filters keep the console's sources honest. Without
+        them a farm subscribed to Sentinel-2 but not thermal would pass the
+        thermal pre-flight, dispatch a task, fetch nothing, and report a
+        green run — the silent-success failure this guard exists to prevent,
+        just relocated to a different source.
         """
+        product_sql = ""
+        params: dict[str, Any] = {"fid": str(farm_id)}
+        if only_products is not None:
+            product_sql = (
+                " AND {alias}.product_id IN"
+                " (SELECT id FROM public.imagery_products WHERE code = ANY(:codes))"
+            )
+            params["codes"] = only_products
+        elif exclude_products is not None:
+            product_sql = (
+                " AND {alias}.product_id NOT IN"
+                " (SELECT id FROM public.imagery_products WHERE code = ANY(:codes))"
+            )
+            params["codes"] = exclude_products
+
         await self._set_search_path(tenant_schema)
         row = (
             await self._s.execute(
                 text(
-                    """
+                    f"""
                     SELECT EXISTS (
                         SELECT 1 FROM imagery_aoi_subscriptions s
                           JOIN blocks b ON b.id = s.block_id
                          WHERE b.farm_id = :fid
                            AND s.is_active = TRUE
                            AND s.deleted_at IS NULL
+                           {product_sql.format(alias="s")}
                     ) OR EXISTS (
                         SELECT 1 FROM imagery_farm_subscriptions f
                          WHERE f.farm_id = :fid
                            AND f.is_active = TRUE
                            AND f.fetch_farm_aoi = TRUE
                            AND f.deleted_at IS NULL
+                           {product_sql.format(alias="f")}
                     ) AS present
-                    """
+                    """  # noqa: S608 - product_sql is a literal; codes are bound
                 ),
-                {"fid": str(farm_id)},
+                params,
             )
         ).one()
         await self._reset_search_path()

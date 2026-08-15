@@ -11,13 +11,14 @@ not reading shared schema rows the other module owns).
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import and_, bindparam, select, text, update
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Text, and_, bindparam, select, text, update
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1235,32 +1236,53 @@ class ImageryRepository:
             {"id": subscription_id},
         )
 
-    async def list_farm_subscriptions_fetching_aoi(self, farm_id: UUID) -> tuple[UUID, ...]:
+    async def list_farm_subscriptions_fetching_aoi(
+        self, farm_id: UUID, *, product_codes: Sequence[str] | None = None
+    ) -> tuple[UUID, ...]:
         """Farm subscriptions on one farm with the farm-AOI fetch switched ON.
 
         The backfill dispatcher's half of the cutover gate. Same predicate as
         `list_farm_subscriptions_due` minus the cadence clause: a backfill is
         operator-driven and takes an explicit window, so "is it due?" does not
         apply.
+
+        ``product_codes`` narrows to specific products. The backfill console
+        offers optical and thermal as separate sources — they have different
+        cadence, cost and failure modes — so a run for one must not quietly
+        fetch the other and report it under the wrong counter. None means
+        every product, which is what the live sweep wants.
         """
+        clauses = [
+            "farm_id = :farm",
+            "is_active = TRUE",
+            "fetch_farm_aoi = TRUE",
+            "deleted_at IS NULL",
+        ]
+        params: dict[str, Any] = {"farm": farm_id}
+        binds: list[Any] = [bindparam("farm", type_=PG_UUID(as_uuid=True))]
+        if product_codes is not None:
+            clauses.append(
+                "product_id IN (SELECT id FROM public.imagery_products" " WHERE code = ANY(:codes))"
+            )
+            params["codes"] = list(product_codes)
+            binds.append(bindparam("codes", type_=ARRAY(Text())))
         rows = (
             await self._session.execute(
                 text(
-                    """
+                    f"""
                     SELECT id FROM imagery_farm_subscriptions
-                    WHERE farm_id = :farm
-                      AND is_active = TRUE
-                      AND fetch_farm_aoi = TRUE
-                      AND deleted_at IS NULL
+                    WHERE {" AND ".join(clauses)}
                     ORDER BY created_at ASC
-                    """
-                ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
-                {"farm": farm_id},
+                    """  # noqa: S608 - clauses are literals, values are bound
+                ).bindparams(*binds),
+                params,
             )
         ).all()
         return tuple(r[0] for r in rows)
 
-    async def list_block_subscriptions_for_backfill(self, farm_id: UUID) -> tuple[UUID, ...]:
+    async def list_block_subscriptions_for_backfill(
+        self, farm_id: UUID, *, product_codes: Sequence[str] | None = None
+    ) -> tuple[UUID, ...]:
         """Block subscriptions on one farm that a backfill should still fetch.
 
         Mirrors the live sweep's exclusion in `list_active_subscriptions_due`
@@ -1274,16 +1296,11 @@ class ImageryRepository:
         block subscriptions, so the existence predicate would silently turn
         every backfill on the platform into a no-op.
         """
-        rows = (
-            await self._session.execute(
-                text(
-                    """
-                    SELECT s.id FROM imagery_aoi_subscriptions s
-                    JOIN blocks b ON b.id = s.block_id
-                    WHERE b.farm_id = :farm
-                      AND s.is_active = TRUE
-                      AND s.deleted_at IS NULL
-                      AND NOT EXISTS (
+        clauses = [
+            "b.farm_id = :farm",
+            "s.is_active = TRUE",
+            "s.deleted_at IS NULL",
+            """NOT EXISTS (
                           SELECT 1
                           FROM imagery_farm_subscriptions f
                           WHERE f.farm_id = b.farm_id
@@ -1291,11 +1308,28 @@ class ImageryRepository:
                             AND f.is_active
                             AND f.fetch_farm_aoi
                             AND f.deleted_at IS NULL
-                      )
+                      )""",
+        ]
+        params: dict[str, Any] = {"farm": farm_id}
+        binds: list[Any] = [bindparam("farm", type_=PG_UUID(as_uuid=True))]
+        if product_codes is not None:
+            clauses.append(
+                "s.product_id IN (SELECT id FROM public.imagery_products"
+                " WHERE code = ANY(:codes))"
+            )
+            params["codes"] = list(product_codes)
+            binds.append(bindparam("codes", type_=ARRAY(Text())))
+        rows = (
+            await self._session.execute(
+                text(
+                    f"""
+                    SELECT s.id FROM imagery_aoi_subscriptions s
+                    JOIN blocks b ON b.id = s.block_id
+                    WHERE {" AND ".join(clauses)}
                     ORDER BY s.created_at ASC
-                    """
-                ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
-                {"farm": farm_id},
+                    """  # noqa: S608 - clauses are literals, values are bound
+                ).bindparams(*binds),
+                params,
             )
         ).all()
         return tuple(r[0] for r in rows)

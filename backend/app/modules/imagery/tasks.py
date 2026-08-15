@@ -548,6 +548,8 @@ def backfill_farm_scenes(
     to_iso: str,
     run_compute_indices: bool = False,
     run_id: str | None = None,
+    product_codes: list[str] | None = None,
+    progress_source: str = "imagery",
 ) -> dict[str, int]:
     """Fan out a historical fetch over one farm's active imagery subscriptions.
 
@@ -559,6 +561,13 @@ def backfill_farm_scenes(
 
     Which shape the fan-out takes is decided per subscription, exactly as the
     live sweep decides it — see `_backfill_farm_scenes_async`.
+
+    ``product_codes`` narrows the fan-out; None means every product the farm
+    subscribes to. ``progress_source`` names the console counter this run
+    reports under. The two travel together: the console offers optical and
+    thermal as separate sources, so a thermal run must fetch only thermal
+    AND report only under `thermal`. Filtering without renaming the counter
+    would show a thermal run's scenes as imagery progress.
     """
     # Same guard as backfill_farm_indices: an unreported crash leaves the
     # run waiting on this source forever.
@@ -566,11 +575,18 @@ def backfill_farm_scenes(
     try:
         return _run_task(
             _backfill_farm_scenes_async(
-                UUID(farm_id), tenant_schema, from_iso, to_iso, run_compute_indices, run_id
+                UUID(farm_id),
+                tenant_schema,
+                from_iso,
+                to_iso,
+                run_compute_indices,
+                run_id,
+                product_codes=product_codes,
+                progress_source=progress_source,
             )
         )
     except Exception as exc:
-        backfill_progress.finish(run_id, "imagery", failed=True, error=str(exc)[:500])
+        backfill_progress.finish(run_id, progress_source, failed=True, error=str(exc)[:500])
         raise
 
 
@@ -581,6 +597,9 @@ async def _backfill_farm_scenes_async(
     to_iso: str,
     run_compute_indices: bool,
     run_id: str | None = None,
+    *,
+    product_codes: list[str] | None = None,
+    progress_source: str = "imagery",
 ) -> dict[str, int]:
     factory = AsyncSessionLocal()
     async with factory() as session, session.begin():
@@ -591,8 +610,12 @@ async def _backfill_farm_scenes_async(
         # it. The two lists are disjoint by product — a farm can be cut over
         # for Sentinel-2 and still fetch another product per block — so both
         # are dispatched rather than one branch winning outright.
-        farm_sub_ids = await repo.list_farm_subscriptions_fetching_aoi(farm_id)
-        block_sub_ids = await repo.list_block_subscriptions_for_backfill(farm_id)
+        farm_sub_ids = await repo.list_farm_subscriptions_fetching_aoi(
+            farm_id, product_codes=product_codes
+        )
+        block_sub_ids = await repo.list_block_subscriptions_for_backfill(
+            farm_id, product_codes=product_codes
+        )
 
     # This task only fans out — the per-subscription children do the real
     # work and finish long after it returns. So it reports the shape of the
@@ -612,7 +635,7 @@ async def _backfill_farm_scenes_async(
     )
     backfill_progress.finish(
         run_id,
-        "imagery",
+        progress_source,
         counters={
             "subscriptions": len(block_sub_ids),
             "farm_subscriptions": len(farm_sub_ids),
@@ -651,6 +674,8 @@ def backfill_farm_indices(
     from_iso: str,
     to_iso: str,
     run_id: str | None = None,
+    product_codes: list[str] | None = None,
+    progress_source: str = "imagery",
 ) -> dict[str, int]:
     """Recompute indices for every stored scene of a farm in a window.
 
@@ -665,10 +690,18 @@ def backfill_farm_indices(
     backfill_progress.mark_running(run_id)
     try:
         return _run_task(
-            _backfill_farm_indices_async(UUID(farm_id), tenant_schema, from_iso, to_iso, run_id)
+            _backfill_farm_indices_async(
+                UUID(farm_id),
+                tenant_schema,
+                from_iso,
+                to_iso,
+                run_id,
+                product_codes=product_codes,
+                progress_source=progress_source,
+            )
         )
     except Exception as exc:
-        backfill_progress.finish(run_id, "imagery", failed=True, error=str(exc)[:500])
+        backfill_progress.finish(run_id, progress_source, failed=True, error=str(exc)[:500])
         raise
 
 
@@ -678,6 +711,9 @@ async def _backfill_farm_indices_async(
     from_iso: str,
     to_iso: str,
     run_id: str | None = None,
+    *,
+    product_codes: list[str] | None = None,
+    progress_source: str = "imagery",
 ) -> dict[str, int]:
     factory = AsyncSessionLocal()
     async with factory() as session, session.begin():
@@ -686,10 +722,15 @@ async def _backfill_farm_indices_async(
         # (provider, product, scene, aoi_hash) and writes to that
         # deterministic path. Reconstruct the same inputs here rather than
         # guessing at a column that does not exist.
+        # Built in Python rather than bound as a nullable array: passing NULL
+        # for a text[] leaves asyncpg with nothing to infer the type from,
+        # which is the CAST-plus-bind family of failure this codebase has hit
+        # repeatedly. No codes means no clause at all.
+        product_clause = "                       AND p.code = ANY(:codes)" if product_codes else ""
         rows = (
             await session.execute(
                 text(
-                    """
+                    f"""
                     SELECT j.id, j.scene_id, b.aoi_hash,
                            p.code AS product_code, pr.code AS provider_code
                       FROM imagery_ingestion_jobs j
@@ -699,6 +740,7 @@ async def _backfill_farm_indices_async(
                      WHERE b.farm_id = :farm
                        AND j.status = 'succeeded'
                        AND b.aoi_hash IS NOT NULL
+{product_clause}
                        AND j.scene_datetime >= CAST(:window_from AS date)
                        AND j.scene_datetime <  CAST(:window_to AS date) + INTERVAL '1 day'
                      ORDER BY j.scene_datetime ASC
@@ -709,6 +751,7 @@ async def _backfill_farm_indices_async(
                 # killed the task on every run.
                 {
                     "farm": farm_id,
+                    **({"codes": list(product_codes)} if product_codes else {}),
                     "window_from": _as_date(from_iso),
                     "window_to": _as_date(to_iso),
                 },
@@ -725,18 +768,21 @@ async def _backfill_farm_indices_async(
         farm_rows = (
             await session.execute(
                 text(
-                    """
+                    f"""
                     SELECT j.id
                       FROM imagery_farm_ingestion_jobs j
+                      JOIN public.imagery_products p ON p.id = j.product_id
                      WHERE j.farm_id = :farm
                        AND j.status = 'succeeded'
+{product_clause}
                        AND j.scene_datetime >= CAST(:window_from AS date)
                        AND j.scene_datetime <  CAST(:window_to AS date) + INTERVAL '1 day'
                      ORDER BY j.scene_datetime ASC
-                    """
+                    """  # noqa: S608 - product_clause is a literal; codes are bound
                 ),
                 {
                     "farm": farm_id,
+                    **({"codes": list(product_codes)} if product_codes else {}),
                     "window_from": _as_date(from_iso),
                     "window_to": _as_date(to_iso),
                 },
@@ -767,7 +813,7 @@ async def _backfill_farm_indices_async(
     )
     backfill_progress.finish(
         run_id,
-        "imagery",
+        progress_source,
         counters={
             "scenes": len(rows),
             # Reported separately, not folded into `scenes`. A cut-over farm

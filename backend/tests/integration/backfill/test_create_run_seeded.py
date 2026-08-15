@@ -120,7 +120,9 @@ async def test_submitting_a_run_persists_it_and_dispatches(
         assert created.status_code == 201, created.text
         run = created.json()
         assert run["status"] == "queued"
-        assert run["sources"] == {"imagery": True, "weather": True}
+        # `thermal` is a third source, defaulting off: Landsat has its own
+        # cadence, cost and failure modes, so it gets its own counter.
+        assert run["sources"] == {"imagery": True, "weather": True, "thermal": False}
 
         # The row must be readable back — the console renders from this list.
         listed = (await client.get("/api/v1/admin/backfill/runs")).json()
