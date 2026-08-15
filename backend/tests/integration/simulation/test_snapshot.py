@@ -241,3 +241,89 @@ async def test_extract_refuses_a_tenant_with_no_farms(admin_session: AsyncSessio
     empty = await _tenant(admin_session, "snapempty")
     with pytest.raises(SnapshotError):
         await extract(admin_session, source_schema=empty.schema_name)
+
+
+@pytest.mark.asyncio
+async def test_forecast_horizon_does_not_set_the_rebase_offset(
+    admin_session: AsyncSession,
+) -> None:
+    """The offset comes from what was observed, never from what was predicted.
+
+    A real extract off production hit this: the forecast horizon ran seven days
+    past the newest reading, won the `max`, and became the snapshot's idea of
+    "now". Every observation then landed a further week in the past and every
+    forecast landed *behind* the run date — a tenant born with no weather ahead
+    of it, which is the one thing the forecast tables exist to provide.
+
+    The original seed carried no forecast rows at all, so nothing failed.
+    """
+    source = await _tenant(admin_session, "snapsrc")
+    farm_id, _ = await _seed_source(admin_session, source.schema_name)
+
+    newest_observation = datetime(2026, 3, 5, tzinfo=UTC)
+    await admin_session.execute(
+        text(
+            f'INSERT INTO "{source.schema_name}".weather_observations '
+            "(farm_id, time, provider_code, air_temp_c) "
+            "VALUES (:fid, :t, 'open_meteo', 30)"
+        ).bindparams(_FID),
+        {"fid": farm_id, "t": newest_observation},
+    )
+    # The horizon: seven days beyond anything actually observed.
+    horizon = newest_observation + timedelta(days=7)
+    await admin_session.execute(
+        text(
+            f'INSERT INTO "{source.schema_name}".weather_forecasts '
+            "(farm_id, time, forecast_issued_at, provider_code, air_temp_c) "
+            "VALUES (:fid, :t, :issued, 'open_meteo', 31)"
+        ).bindparams(_FID),
+        {"fid": farm_id, "t": horizon, "issued": newest_observation},
+    )
+    await admin_session.commit()
+
+    snapshot = await extract(admin_session, source_schema=source.schema_name)
+
+    # The snapshot's own notion of "now" is the observation, not the horizon.
+    assert snapshot["latest_observed_at"] == newest_observation.isoformat()
+
+    target = await _tenant(admin_session, "snaptgt")
+    as_of = datetime(2026, 8, 13, tzinfo=UTC)
+    await load(admin_session, target_schema=target.schema_name, snapshot=snapshot, as_of=as_of)
+    await admin_session.commit()
+
+    newest_loaded = (
+        await admin_session.execute(
+            text(f'SELECT max(time) FROM "{target.schema_name}".weather_observations')
+        )
+    ).scalar_one()
+    assert newest_loaded == as_of - timedelta(days=1)
+
+    # The point of the whole fix: the tenant is born with weather ahead of it.
+    # Under the bug this came out at `as_of - 1 day`, i.e. already in the past.
+    forecast_edge = (
+        await admin_session.execute(
+            text(f'SELECT max(time) FROM "{target.schema_name}".weather_forecasts')
+        )
+    ).scalar_one()
+    assert forecast_edge > as_of
+    assert forecast_edge == as_of + timedelta(days=6)
+
+
+@pytest.mark.asyncio
+async def test_load_refuses_a_snapshot_from_an_older_version(
+    admin_session: AsyncSession,
+) -> None:
+    """A v1 file's `latest_observed_at` is its forecast horizon.
+
+    It would load without error and quietly age the seed, so it has to be
+    refused rather than accepted and rebased.
+    """
+    source = await _tenant(admin_session, "snapsrc")
+    await _seed_source(admin_session, source.schema_name)
+    target = await _tenant(admin_session, "snaptgt")
+
+    snapshot = await extract(admin_session, source_schema=source.schema_name)
+    snapshot["snapshot_version"] = 1
+
+    with pytest.raises(SnapshotError, match="snapshot version"):
+        await load(admin_session, target_schema=target.schema_name, snapshot=snapshot)

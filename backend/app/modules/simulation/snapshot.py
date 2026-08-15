@@ -58,7 +58,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.db.session import sanitize_tenant_schema
 
-SNAPSHOT_VERSION = 1
+# 2: `latest_observed_at` excludes forward-looking tables. The file layout is
+# unchanged from 1, so the bump buys nothing structural -- it exists so a v1
+# file is REFUSED rather than loaded. A v1 snapshot's `latest_observed_at` is
+# its forecast horizon, and loading one rebases the whole seed days into the
+# past while leaving no forecast ahead of the run: a seed that looks fine,
+# loads without error, and quietly starves every tree of recent data. Re-run
+# `sim_snapshot.py extract` to get a v2 file.
+SNAPSHOT_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -85,6 +92,14 @@ class ClonedTable:
     #: no tree finds recent data. Guessing metadata column names by pattern
     #: is how that bug got written in the first place.
     history: str | None = None
+    #: This table's `history` column points *forward* of the extract date, so
+    #: it is rebased like any other but must never be what CHOOSES the offset.
+    #: A forecast horizon runs days ahead of the newest real observation;
+    #: letting it define "now" pushes the whole seed that far into the past and
+    #: lands every forecast row behind `as_of`, leaving the tenant with no
+    #: forward forecast at all. Same failure as the `inserted_at` trap above,
+    #: from the opposite direction.
+    forward_looking: bool = False
     note: str = ""
 
 
@@ -124,7 +139,13 @@ CLONE_TABLES: tuple[ClonedTable, ...] = (
     ),
     # --- observation history: what the pipeline reads -----------------------
     ClonedTable("weather_observations", order=50, history="time"),
-    ClonedTable("weather_forecasts", order=50, history="time"),
+    ClonedTable(
+        "weather_forecasts",
+        order=50,
+        history="time",
+        forward_looking=True,
+        note="horizon runs ahead of today; rebased by the offset, never sets it",
+    ),
     ClonedTable(
         "block_index_aggregates",
         order=50,
@@ -407,11 +428,17 @@ def _latest_timestamp(tables: dict[str, Any]) -> datetime | None:
     single offset. Rebasing each table against its own maximum would slide
     weather and imagery apart, and a tree comparing the two would then be
     reading a correlation the source never had.
+
+    Observation means observed: `forward_looking` tables are skipped. A
+    forecast horizon sits days ahead of the newest real reading, and it once
+    won this comparison outright -- which silently aged the whole seed by the
+    length of the horizon and left no forecast in front of the run.
     """
     latest: datetime | None = None
     for name, payload in tables.items():
-        column = _spec(name).history
-        if column is None:
+        spec = _spec(name)
+        column = spec.history
+        if column is None or spec.forward_looking:
             continue
         for row in payload["rows"]:
             parsed = _as_datetime(row.get(column))
