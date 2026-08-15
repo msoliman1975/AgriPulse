@@ -1707,11 +1707,65 @@ global:
   #   Watch after sync: Observer > a cut-over farm shows a non-zero acquired
   #   count and a scene range; its weather lane stops claiming the farm has no
   #   subscription.
+  # f7c70d2 - thermal indices land, INERT; plus #468 backfill and #474 console.
+  #
+  #   API AND WORKERS ONLY. frontend stays at cf5c2d7 and tileServer at
+  #   9d140cc.
+  #
+  #   NOTHING THERMAL IS VISIBLE AFTER THIS SYNC, BY DESIGN. Public 0066
+  #   seeds the landsat_pc provider, the landsat_c2_l2_st product and the
+  #   lst/cwsi/smi rows; 0067 adds indices_catalog.unit (degC for lst, empty
+  #   for the other eleven). But NO SUBSCRIPTION ROW POINTS AT THE THERMAL
+  #   PRODUCT, and the imagery gate keys on a subscription existing, so
+  #   nothing discovers, fetches or computes until somebody opts a farm in.
+  #   The frontend is deliberately held back for the same reason: the index
+  #   picker gains lst/cwsi/smi chips that would render an empty chart on
+  #   every farm until real scenes land.
+  #
+  #   Thermal is Landsat 8/9 C2 L2 via Microsoft Planetary Computer -
+  #   anonymous, free, and already EPSG:32636 over Egypt so the read needs
+  #   no reprojection. It is 100 m native on a 30 m delivery grid, which is
+  #   why the UI (when it ships) labels every thermal number farm-scale.
+  #
+  #   TWO OTHER SESSIONS' BACKEND CHANGES RIDE ALONG. They merged
+  #   interleaved with the thermal chain, so no SHA carries one without the
+  #   others:
+  #     #468 ac3c6c4b - backfill dispatches per PRODUCT for a cut-over farm
+  #       rather than block-shaped either/or.
+  #     #474 f2834fa4 - the Farm Console scene strip counts the farm
+  #       acquisition path, so a cut-over farm stops reading as dead.
+  #   Both are backend. Watch their own behaviour on sync as well as this.
+  #
+  #   Migrations run on PreSync: public reaches 0067. No tenant migration.
+  #   Both are additive - a seed and a NOT NULL column with a server
+  #   default - so the existing nine indices are untouched. CALC_VERSION is
+  #   deliberately NOT bumped: no existing index's numbers move, and a bump
+  #   would split nine healthy trend lines in two.
+  #
+  #   The one existing code path that changes shape is the raster IO. It
+  #   used to read every trailing quality band as Sentinel-2 SCL and always
+  #   call compute_all_indices; both now dispatch on product_code, with
+  #   s2_l2a as the default, so S2 scenes compute exactly as before and
+  #   still record mask_ruleset 's2_scl_v1'.
+  #
+  #   Images CONFIRMED in ghcr for this exact tag, digests distinct from
+  #   the f8708b8 pair they replace:
+  #     api@sha256:192cb67a (was e7cf32e8)
+  #     workers@sha256:8c8ad804 (was e23a003f)
+  #
+  #   Promoting f7c70d2 rather than main's tip 70d0e89: the tip is a
+  #   docs-only commit whose containers had not built, and `git diff
+  #   f7c70d2..70d0e89 -- backend/` is empty, so the backend is identical.
+  #
+  #   Watch after sync: alembic reaches public 0067; GET /api/v1/indices/
+  #   catalog returns 12 rows with a non-empty unit on lst only; imagery for every
+  #   existing farm behaves exactly as before. If anything thermal appears
+  #   in a log, something created a subscription that this promote did not.
   images:
     api:
-      tag: "f8708b8"
+      tag: "f7c70d2"
     workers:
-      tag: "f8708b8"
+      tag: "f7c70d2"
     frontend:
       tag: "cf5c2d7"
     tileServer:
