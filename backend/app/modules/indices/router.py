@@ -1,8 +1,7 @@
 """FastAPI routes for the indices module.
 
-One endpoint in PR-C:
-
   GET /api/v1/blocks/{block_id}/indices/{index_code}/timeseries
+  GET /api/v1/indices/catalog
 
 Per-farm RBAC: same pattern as imagery â€” block-only routes look up
 the block's farm_id, gate on `index.read`, and surface denial as 404.
@@ -16,7 +15,11 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.imagery.errors import BlockNotVisibleError
-from app.modules.indices.schemas import IndexTimeseriesResponse, TimeseriesGranularity
+from app.modules.indices.schemas import (
+    IndexCatalogEntry,
+    IndexTimeseriesResponse,
+    TimeseriesGranularity,
+)
 from app.modules.indices.service import IndicesService, get_indices_service
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
@@ -57,6 +60,31 @@ async def _resolve_farm_id(*, block_id: UUID, tenant_session: AsyncSession) -> U
     if block is None:
         raise BlockNotVisibleError(str(block_id))
     return block["farm_id"]
+
+
+@router.get(
+    "/indices/catalog",
+    response_model=list[IndexCatalogEntry],
+    summary="List the supported indices from public.indices_catalog.",
+)
+async def list_index_catalog(
+    context: RequestContext = Depends(get_current_context),
+    service: IndicesService = Depends(_service),
+) -> list[IndexCatalogEntry]:
+    """Catalog endpoint for the SPA's index labels, bounds and units.
+
+    Mirrors `GET /api/v1/weather/indices/catalog`: a tenant scope is
+    enough, because these rows are platform-wide curated data rather
+    than per-farm, so there is no farm to gate on.
+
+    The SPA previously hardcoded index metadata, which is how `msi`'s
+    [0, 3] range and `ndmi`'s existence both went missing from pickers
+    that had drifted from the backend. `unit` is the newest reason to
+    read it from here: `lst` is degrees Celsius and every other index is
+    dimensionless, so a hardcoded formatter cannot be right for both.
+    """
+    _ensure_tenant(context)
+    return list(await service.list_catalog())
 
 
 @router.get(

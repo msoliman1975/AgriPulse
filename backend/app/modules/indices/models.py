@@ -41,6 +41,10 @@ class IndicesCatalog(Base, TimestampedMixin):
     formula_text: Mapped[str] = mapped_column(Text, nullable=False)
     value_min: Mapped[Decimal] = mapped_column(Numeric(6, 3), nullable=False)
     value_max: Mapped[Decimal] = mapped_column(Numeric(6, 3), nullable=False)
+    # Display symbol, empty for the dimensionless majority. Mirrors
+    # `weather_indices_catalog.unit` — a single string, not a localised
+    # pair: these are symbols (`°C`), not prose.
+    unit: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("''"))
     physical_meaning: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_standard: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
 
