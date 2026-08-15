@@ -1786,11 +1786,30 @@ global:
   # NO "Whole farm" checkbox; Bashier Elkhier and testmeplz read "Fetched as
   # one farm area"; every other farm reads "Fetched per block". Any farm
   # reading "too large ... undefined" means the `=== false` guard regressed.
+  # api+workers f7c70d2 -> 800f3da (2026-08-15), closing the split left by the
+  # frontend-only bump above. This lands #472's backend half:
+  #   * PATCH .../imagery/subscriptions with fetch_farm_aoi on a farm over the
+  #     provider's 2500 px/side cap is now a 422 carrying the measurement,
+  #     instead of a change that silently stops that farm's imagery — the flag
+  #     also excludes the farm's blocks from the block sweep, so accepting it
+  #     left the farm fetching on NEITHER path;
+  #   * a farm that grows past the cap has fetch_farm_aoi switched back off by
+  #     discovery, so its blocks resume on the next sweep;
+  #   * the farm-subscription reads carry farm_aoi_fetchable + the measured
+  #     size, which the frontend already deployed above knows how to show.
+  #
+  # No migration in f7c70d2..800f3da. Image CONFIRMED by pulling it on the
+  # node. Forward-only: `git merge-base --is-ancestor f7c70d2 800f3dac`.
+  #
+  # Watch after sync: farms that read "Fetched per block" on the Farm tab now
+  # carry a real measurement, and Bashier Elkhier / testmeplz still read
+  # "Fetched as one farm area". No farm should flip path on its own — if one
+  # does, its boundary genuinely exceeds the cap and the self-heal fired.
   images:
     api:
-      tag: "f7c70d2"
+      tag: "800f3da"
     workers:
-      tag: "f7c70d2"
+      tag: "800f3da"
     frontend:
       tag: "800f3da"
     tileServer:
