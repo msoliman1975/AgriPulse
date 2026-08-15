@@ -1824,11 +1824,36 @@ global:
   # and weather subscription lists under the farm-edit form, with a
   # fetch-scope line per product. FarmZonesPanel is still v2-only — same
   # drift, not fixed here.
+  # api+workers 800f3da -> 9b36c83 (2026-08-15). BACKEND ONLY — frontend stays
+  # on 94a21fa, which is ahead of this SHA's frontend and unaffected by it.
+  #
+  # #484: GET /api/v1/admin/purge/orphans has been 500ing on prod with
+  # "out of shared memory / increase max_locks_per_transaction". A query against
+  # a TimescaleDB hypertable locks every chunk AND every chunk index the planner
+  # opens, and the scan ran every table of every tenant on ONE transaction:
+  # 1371 chunks + 8158 chunk indexes = ~9,500 relation locks, against a GLOBAL
+  # pool of max_locks_per_transaction * max_connections = 64 * 200 = 12,800
+  # shared by every backend. Counting now runs on a dedicated AUTOCOMMIT
+  # connection, and hypertables are counted in 25-chunk batches.
+  #
+  # Rides along: #477 (simulation snapshot rebase offset). That is the ONLY
+  # other backend commit in 800f3da..9b36c838 and it touches the sim clone tool
+  # alone, nothing in the request path.
+  #
+  # No migration in 800f3da..9b36c83 — `git diff --name-status 800f3dac
+  # 9b36c838 -- backend/migrations/` is empty. Image CONFIRMED by pulling
+  # ghcr.io/msoliman1975/agripulse/api:9b36c83 on the node BEFORE this bump.
+  # Forward-only: `git merge-base --is-ancestor 800f3dac 9b36c838`.
+  #
+  # Watch after sync: GET /api/v1/admin/purge/orphans returns 200 instead of
+  # 500. It is a read-only audit, so a wrong answer is the risk, not damage —
+  # sanity-check that orphan_rows is plausible rather than suspiciously 0, and
+  # that a purge receipt's `verification` block still populates.
   images:
     api:
-      tag: "800f3da"
+      tag: "9b36c83"
     workers:
-      tag: "800f3da"
+      tag: "9b36c83"
     frontend:
       tag: "94a21fa"
     tileServer:
