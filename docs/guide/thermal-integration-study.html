@@ -1,0 +1,1115 @@
+<title>Closing the Thermal Gap</title>
+<style>
+  :root {
+    --bg:        #EEF2F1;
+    --surface:   #FFFFFF;
+    --surface-2: #F5F9F8;
+    --ink:       #0F1A1C;
+    --ink-2:     #3B4D4F;
+    --ink-3:     #66787A;
+    --line:      #D2DEDC;
+    --line-2:    #B4C5C3;
+    --petrol:    #0B4A50;
+    --rust:      #A8452A;
+
+    --st-live:   #1D6B4E;
+    --st-done:   #145C86;
+    --st-part:   #8A5E0A;
+    --st-now:    #2C5B8C;
+    --st-sensor: #A8452A;
+    --st-cal:    #6B4270;
+
+    --tint-live:   #E4F1EA;
+    --tint-done:   #DDEAF4;
+    --tint-part:   #F6EEDB;
+    --tint-now:    #E4EDF6;
+    --tint-sensor: #F6E7E2;
+    --tint-cal:    #EFE6F1;
+
+    --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+    --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "Cascadia Mono", "Cascadia Code", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+    --measure: 68ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:        #0A1113;
+      --surface:   #10191B;
+      --surface-2: #162124;
+      --ink:       #E6EFED;
+      --ink-2:     #AEC0BF;
+      --ink-3:     #7C908F;
+      --line:      #223234;
+      --line-2:    #334A4D;
+      --petrol:    #56B6BB;
+      --rust:      #E37F62;
+
+      --st-live:   #55BC8B;
+      --st-done:   #63AEDC;
+      --st-part:   #DCA945;
+      --st-now:    #78ABE2;
+      --st-sensor: #E37F62;
+      --st-cal:    #BE96D2;
+
+      --tint-live:   #10261D;
+      --tint-done:   #0E2233;
+      --tint-part:   #2A2113;
+      --tint-now:    #14212F;
+      --tint-sensor: #2B1913;
+      --tint-cal:    #221729;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg:        #0A1113;
+    --surface:   #10191B;
+    --surface-2: #162124;
+    --ink:       #E6EFED;
+    --ink-2:     #AEC0BF;
+    --ink-3:     #7C908F;
+    --line:      #223234;
+    --line-2:    #334A4D;
+    --petrol:    #56B6BB;
+    --rust:      #E37F62;
+
+    --st-live:   #55BC8B;
+    --st-done:   #63AEDC;
+    --st-part:   #DCA945;
+    --st-now:    #78ABE2;
+    --st-sensor: #E37F62;
+    --st-cal:    #BE96D2;
+
+    --tint-live:   #10261D;
+    --tint-done:   #0E2233;
+    --tint-part:   #2A2113;
+    --tint-now:    #14212F;
+    --tint-sensor: #2B1913;
+    --tint-cal:    #221729;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page { max-width: 1520px; margin: 0 auto; padding: 0 32px 96px; }
+
+  /* ---- Masthead ---- */
+
+  .masthead {
+    padding: 56px 0 32px;
+    border-bottom: 2px solid var(--petrol);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--petrol);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2.1rem, 5vw, 3.1rem);
+    line-height: 1.1;
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    max-width: 22ch;
+  }
+
+  .standfirst {
+    font-family: var(--font-display);
+    font-size: clamp(1.05rem, 2vw, 1.28rem);
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 58ch;
+  }
+
+  .standfirst em { color: var(--rust); font-style: normal; }
+
+  .provenance {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+    font-size: 13px;
+    color: var(--ink-3);
+    padding-top: 8px;
+  }
+
+  .provenance b { color: var(--ink-2); font-weight: 600; }
+
+  /* ---- Scorecard ---- */
+
+  .scorecard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin: 40px 0 8px;
+  }
+
+  .tile {
+    background: var(--surface);
+    padding: 20px 20px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .tile .n {
+    font-family: var(--font-display);
+    font-size: 2.6rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tile .lbl {
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+
+  .tile .sub { font-size: 13px; color: var(--ink-3); line-height: 1.4; }
+
+  .tile.is-headline { background: var(--tint-live); }
+  .tile.is-headline .n { color: var(--st-live); }
+  .tile.is-headline .lbl { color: var(--st-live); }
+  .tile.is-caution { background: var(--tint-part); }
+  .tile.is-caution .n { color: var(--st-part); }
+  .tile.is-caution .lbl { color: var(--st-part); }
+
+  /* ---- Section nav ---- */
+
+  .sectionnav {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin: 40px 0 56px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 4px;
+    padding: 6px 0;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line-2);
+  }
+
+  .sectionnav a {
+    font-size: 12.5px;
+    line-height: 1.3;
+    color: var(--ink-3);
+    text-decoration: none;
+    padding: 8px 12px;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+  }
+
+  .sectionnav a .n { font-family: var(--font-mono); color: var(--petrol); margin-right: 7px; }
+  .sectionnav a:hover { color: var(--ink); border-bottom-color: var(--line-2); }
+  .sectionnav a:focus-visible { outline: 2px solid var(--petrol); outline-offset: -2px; }
+
+  main { display: flex; flex-direction: column; gap: 72px; min-width: 0; }
+  section { display: flex; flex-direction: column; gap: 20px; scroll-margin-top: 20px; }
+
+  h2 {
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 3vw, 1.95rem);
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line-2);
+  }
+
+  h2 .num {
+    font-family: var(--font-mono);
+    font-size: 0.62em;
+    color: var(--petrol);
+    margin-right: 12px;
+    vertical-align: 0.12em;
+  }
+
+  h3 {
+    font-family: var(--font-body);
+    font-size: 13px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--petrol);
+    margin-top: 8px;
+  }
+
+  p { max-width: var(--measure); color: var(--ink-2); }
+  p strong { color: var(--ink); font-weight: 650; }
+  main a { color: var(--petrol); }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    padding: 0.08em 0.36em;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  /* ---- Tables ---- */
+
+  .scroller { overflow-x: auto; border: 1px solid var(--line); background: var(--surface); }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+    font-size: 14.5px;
+  }
+
+  table.t-routes  { min-width: 1240px; }
+  table.t-close   { min-width: 1100px; }
+  table.t-scale   { min-width: 900px; }
+  table.t-cdse    { min-width: 820px; }
+
+  thead th {
+    text-align: left;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--ink-3);
+    padding: 13px 18px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--line-2);
+    vertical-align: bottom;
+  }
+
+  tbody td {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+    color: var(--ink-2);
+    line-height: 1.55;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: var(--surface-2); }
+  tbody tr.is-pick td { background: var(--tint-live); }
+
+  td.idx { font-weight: 650; color: var(--ink); overflow-wrap: break-word; }
+
+  td.idx span {
+    display: block;
+    font-weight: 400;
+    font-size: 12.5px;
+    line-height: 1.4;
+    color: var(--ink-3);
+    padding-top: 3px;
+  }
+
+  td.fm {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--ink-2);
+    overflow-wrap: break-word;
+  }
+
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ---- Status chips ---- */
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 3px 9px 3px 7px;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+  }
+
+  .chip::before { content: ""; width: 7px; height: 7px; background: currentColor; flex: none; }
+
+  td .chip { white-space: normal; align-items: flex-start; }
+  td .chip::before { margin-top: 4px; }
+
+  .chip-live   { color: var(--st-live);   background: var(--tint-live); }
+  .chip-done   { color: var(--st-done);   background: var(--tint-done); }
+  .chip-part   { color: var(--st-part);   background: var(--tint-part); }
+  .chip-now    { color: var(--st-now);    background: var(--tint-now); }
+  .chip-sensor { color: var(--st-sensor); background: var(--tint-sensor); }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    align-items: center;
+    font-size: 13px;
+    color: var(--ink-3);
+    padding: 4px 0;
+  }
+
+  .legend .item { display: flex; align-items: center; gap: 8px; }
+
+  /* ---- Findings ---- */
+
+  .findings { display: flex; flex-direction: column; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+
+  .finding {
+    background: var(--surface);
+    padding: 20px 22px;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr;
+  }
+
+  .finding > .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }
+
+  .finding .fid {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--petrol);
+    letter-spacing: 0.04em;
+  }
+
+  .finding .ftitle {
+    font-family: var(--font-display);
+    font-size: 1.12rem;
+    color: var(--ink);
+    line-height: 1.3;
+  }
+
+  .finding p { margin: 0; max-width: 78ch; font-size: 15px; }
+
+  .compare {
+    display: grid;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-top: 4px;
+  }
+
+  @media (min-width: 620px) { .compare { grid-template-columns: 1fr 1fr; } }
+
+  .compare > div { background: var(--surface-2); padding: 11px 14px; display: flex; flex-direction: column; gap: 5px; }
+
+  .compare .k {
+    font-size: 10.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--ink-3);
+  }
+
+  .compare .v {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ink);
+    overflow-x: auto;
+  }
+
+  .compare > div.mine { background: var(--tint-now); }
+
+  .verdict {
+    font-size: 14px;
+    color: var(--ink);
+    border-left: 3px solid var(--petrol);
+    padding-left: 12px;
+    max-width: 74ch;
+  }
+
+  .verdict b { color: var(--petrol); font-weight: 700; }
+
+  /* ---- Terminal proof block ---- */
+
+  .proof {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .proof .ptitle {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--ink-3);
+    padding: 11px 16px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .proof pre {
+    margin: 0;
+    padding: 16px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--ink-2);
+  }
+
+  .proof pre b { color: var(--st-live); font-weight: 700; }
+  .proof pre i { color: var(--rust); font-style: normal; font-weight: 700; }
+  .proof pre span.c { color: var(--ink-3); }
+
+  /* ---- Callout ---- */
+
+  .callout {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--rust);
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .callout.is-method { border-left-color: var(--petrol); }
+  .callout.is-method .k { color: var(--petrol); }
+  .callout.is-good { border-left-color: var(--st-live); }
+  .callout.is-good .k { color: var(--st-live); }
+
+  .callout .k {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--rust);
+  }
+
+  .callout p { margin: 0; max-width: 80ch; }
+
+  /* ---- Ordered build list ---- */
+
+  ol.build { list-style: none; display: flex; flex-direction: column; gap: 1px; background: var(--line); border: 1px solid var(--line); counter-reset: step; }
+
+  ol.build li {
+    background: var(--surface);
+    padding: 18px 22px;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 4px 16px;
+    align-items: baseline;
+    counter-increment: step;
+  }
+
+  ol.build li::before {
+    content: counter(step, decimal-leading-zero);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--petrol);
+  }
+
+  ol.build .t { font-weight: 650; color: var(--ink); font-size: 15px; }
+  ol.build .d { grid-column: 2; font-size: 14px; color: var(--ink-2); max-width: 76ch; }
+  ol.build .cost { grid-column: 2; font-size: 12.5px; color: var(--ink-3); font-family: var(--font-mono); }
+
+  ul.plain { list-style: none; display: flex; flex-direction: column; gap: 8px; max-width: var(--measure); }
+  ul.plain li { padding-left: 18px; position: relative; color: var(--ink-2); font-size: 15px; }
+  ul.plain li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 6px; height: 1px; background: var(--petrol); }
+
+  /* ---- Scale figure ---- */
+
+  .figure {
+    margin: 0;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    padding: 18px 20px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .figure .plot { overflow-x: auto; }
+  .figure svg { display: block; width: 100%; min-width: 620px; height: auto; }
+  .figure figcaption { font-size: 13px; line-height: 1.55; color: var(--ink-3); max-width: 84ch; }
+
+  .sc-farm   { fill: none; stroke: var(--petrol); stroke-width: 2; }
+  .sc-block  { fill: var(--st-live); opacity: 0.22; stroke: var(--st-live); stroke-width: 1; }
+  .sc-grid30 { fill: none; stroke: var(--line-2); stroke-width: 0.6; }
+  .sc-grid100{ fill: none; stroke: var(--st-part); stroke-width: 1.2; }
+  .sc-grid1k { fill: none; stroke: var(--rust); stroke-width: 2; stroke-dasharray: 6 4; }
+  .sc-lbl    { fill: var(--ink-3); font-family: var(--font-body); font-size: 11.5px; }
+  .sc-key    { fill: var(--ink-2); font-family: var(--font-body); font-size: 12px; font-weight: 600; }
+
+  footer {
+    margin-top: 72px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+    color: var(--ink-3);
+    max-width: var(--measure);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <div class="eyebrow">AgriPulse · Thermal source integration study</div>
+    <h1>Closing the thermal gap for the price of one adapter</h1>
+    <p class="standfirst">LST, CWSI and SMI are one missing input, not three problems. That input is available <em>free, anonymously, and already in our storage CRS</em> — but not from the source the gap analysis recommended, and not from the account we hold.</p>
+    <div class="provenance">
+      <span><b>Answers</b> agri-indices-gap-analysis.html § 04</span>
+      <span><b>Method</b> Live calls from the production node and API pod, 14 Aug 2026</span>
+      <span><b>Recommendation</b> Landsat C2 L2 ST via Planetary Computer</span>
+      <span><b>Data cost</b> <code>$0/month</code></span>
+    </div>
+  </header>
+
+  <div class="scorecard">
+    <div class="tile is-headline">
+      <div class="n">3</div>
+      <div class="lbl">Indices closed</div>
+      <div class="sub">LST, CWSI and SMI — from a single new product</div>
+    </div>
+    <div class="tile">
+      <div class="n">$0</div>
+      <div class="lbl">Recurring data cost</div>
+      <div class="sub">Anonymous, unauthenticated, no account, no quota drawn</div>
+    </div>
+    <div class="tile">
+      <div class="n">~7</div>
+      <div class="lbl">Looks per month</div>
+      <div class="sub">86 scenes over 12 months; median gap 7 days</div>
+    </div>
+    <div class="tile is-caution">
+      <div class="n">100 m</div>
+      <div class="lbl">Native thermal pixel</div>
+      <div class="sub">Honest at farm scale. Not at 3 ha block scale</div>
+    </div>
+  </div>
+
+  <nav class="sectionnav">
+    <a href="#verdict"><span class="n">00</span>The verdict</a>
+    <a href="#corrections"><span class="n">01</span>Two corrections</a>
+    <a href="#routes"><span class="n">02</span>The routes, priced</a>
+    <a href="#proof"><span class="n">03</span>What we proved</a>
+    <a href="#closing"><span class="n">04</span>How each index closes</a>
+    <a href="#scale"><span class="n">05</span>Resolution honesty</a>
+    <a href="#build"><span class="n">06</span>The build</a>
+    <a href="#risks"><span class="n">07</span>Risks and fallback</a>
+  </nav>
+
+  <main>
+
+    <!-- =============== 00 =============== -->
+    <section id="verdict">
+      <h2><span class="num">00</span>The verdict</h2>
+
+      <p><strong>Take Landsat 8/9 Collection-2 Level-2 Surface Temperature, and read it from Microsoft's Planetary Computer.</strong> It is free, it needs no account, and every one of its properties was verified against the live endpoints from our own production node rather than read off a datasheet.</p>
+
+      <p>The three gap indices collapse into one acquisition. LST <em>is</em> the product. CWSI is that product minus air temperature, which Open-Meteo already delivers hourly. SMI's primary route is the LST–NDVI triangle — and the red and near-infrared bands ride inside the very same Landsat scene, natively co-registered, so the triangle needs no cross-sensor resampling from our 10 m Sentinel-2 stack.</p>
+
+      <div class="callout is-good">
+        <div class="k">Why this is cheap in the way that matters</div>
+        <p>The recurring cost is zero, but the reason to prefer this route is that it costs almost nothing <em>structurally</em>. The scene arrives as a Cloud Optimized GeoTIFF in <code>EPSG:32636</code> — already our storage CRS for Egypt — with overviews, so a block-sized window is a single ranged HTTP read of a few kilobytes. There is no reprojection step, no new object store, no tasking queue, and no vendor contract. The pipeline it plugs into is already parameterised by product code end to end.</p>
+      </div>
+
+      <p>What it does not do is give honest <em>block-level</em> water stress. The thermal band is 100 m native, resampled to a 30 m grid, and our average block is 3.1 ha — about 158 m across. Section <a href="#scale">05</a> treats that squarely, because shipping this without saying so in the UI would be the one way to make it a liability rather than a feature.</p>
+    </section>
+
+    <!-- =============== 01 =============== -->
+    <section id="corrections">
+      <h2><span class="num">01</span>Two corrections to the gap analysis</h2>
+
+      <p>Section 04 of the gap analysis ends with a caveat: <em>"Worth confirming which collections our current Sentinel Hub tier actually serves before planning the work."</em> We confirmed it. The answer changes the recommendation.</p>
+
+      <div class="findings">
+
+        <div class="finding">
+          <div class="head">
+            <span class="fid">C1</span>
+            <span class="ftitle">Our account serves Landsat Level-1, not the Level-2 surface temperature product</span>
+            <span class="chip chip-sensor">Recommendation invalid</span>
+          </div>
+          <p>The gap analysis proposed Landsat "through the Sentinel Hub subscription we already hold", on the basis that it is "already in Sentinel Hub's catalog — no new vendor, no new contract". That is true of the <em>commercial</em> Sentinel Hub. It is not true of ours. The commercial trial expired and production was moved to the Copernicus Data Space Ecosystem free tier, and we enumerated exactly what those credentials return.</p>
+          <div class="compare">
+            <div>
+              <div class="k">Assumed</div>
+              <div class="v">landsat-ot-l2<br>Collection-2 Level-2<br>ST_B10 surface temperature</div>
+            </div>
+            <div class="mine">
+              <div class="k">Actually served by our CDSE credentials</div>
+              <div class="v">landsat-ot-l1<br>Collection-2 <b>Level-1</b><br>top-of-atmosphere radiance</div>
+            </div>
+          </div>
+          <p class="verdict"><b>Consequence.</b> Level-1 is not surface temperature. Taking that route means implementing the retrieval chain ourselves — radiance to at-sensor brightness temperature, NDVI-derived emissivity, then atmospheric correction against reanalysis profiles. Collection-2 Level-2 is precisely that chain, already run and validated by USGS, and it is free. Choosing L1 would be paying in scientific risk to avoid a dependency we do not actually have to take on.</p>
+        </div>
+
+        <div class="finding">
+          <div class="head">
+            <span class="fid">C2</span>
+            <span class="ftitle">Sentinel-3 SLSTR is not a coarse fallback here — it is sub-pixel</span>
+            <span class="chip chip-sensor">Rule out entirely</span>
+          </div>
+          <p>The gap analysis lists SLSTR as "usable only as a farm-wide thermal baseline or an anomaly reference". At 1 km that reads as a reasonable consolation prize. It is not, at our geometry. Bashier Elkhier — our largest farm, 36 blocks — has a total extent of <strong>786 m by 1085 m</strong>.</p>
+          <div class="compare">
+            <div>
+              <div class="k">One SLSTR pixel</div>
+              <div class="v">1000 m × 1000 m</div>
+            </div>
+            <div class="mine">
+              <div class="k">The entire farm</div>
+              <div class="v">786 m × 1085 m  <span class="c">(85.3 ha)</span></div>
+            </div>
+          </div>
+          <p class="verdict"><b>Consequence.</b> A single SLSTR pixel is larger than the whole farm. There is no "farm-level baseline" to be had — the measurement would be a blend of our canopy with the surrounding desert, and in Egypt that boundary carries a thermal contrast of many degrees. It would not be coarse-but-directionally-useful; it would be dominated by land we do not farm. SLSTR works with our credentials and costs almost nothing, and we should still not use it for this.</p>
+        </div>
+
+      </div>
+
+      <h3>What our CDSE credentials actually serve</h3>
+
+      <div class="scroller">
+        <table class="t-cdse">
+          <thead>
+            <tr>
+              <th style="width:34%">Collection</th>
+              <th style="width:22%">Thermal?</th>
+              <th style="width:44%">Relevance to this gap</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="idx"><code>landsat-ot-l1</code><span>Landsat 8/9 OLI-TIRS Level-1</span></td>
+              <td>Raw TIRS radiance</td>
+              <td>Carries the thermal band but not surface temperature. Usable only by writing the retrieval ourselves — see <a href="#corrections">C1</a>.</td>
+            </tr>
+            <tr>
+              <td class="idx"><code>sentinel-3-slstr-l2</code><span>SLSTR Level-2, includes LST</span></td>
+              <td>Yes, 1 km</td>
+              <td>Verified working: returns real LST for 0.0067 PU per request. Ruled out on geometry, not on cost — see <a href="#corrections">C2</a>.</td>
+            </tr>
+            <tr>
+              <td class="idx"><code>sentinel-2-l2a</code><span>What we ingest today</span></td>
+              <td>No</td>
+              <td>443–2190 nm. No thermal band exists on MSI at any processing level.</td>
+            </tr>
+            <tr>
+              <td class="idx"><code>sentinel-1-grd</code><span>C-band SAR</span></td>
+              <td>No</td>
+              <td>The alternative SMI route. Right resolution, cloud-independent, but the work is a backscatter-to-moisture retrieval model, not the acquisition.</td>
+            </tr>
+            <tr>
+              <td class="idx">Six others<span><code>sentinel-2-l1c</code>, <code>sentinel-3-olci</code>, <code>sentinel-3-olci-l2</code>, <code>sentinel-3-slstr</code>, <code>sentinel-3-synergy-l2</code>, <code>sentinel-5p-l2</code></span></td>
+              <td>SLSTR L1 only</td>
+              <td>None bear on the three gap indices.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p style="font-size:13.5px;color:var(--ink-3);">Ten collections in total, read from <code>sh.dataspace.copernicus.eu</code> with the production client credentials on 14 Aug 2026.</p>
+    </section>
+
+    <!-- =============== 02 =============== -->
+    <section id="routes">
+      <h2><span class="num">02</span>The routes, priced</h2>
+
+      <p>Five ways to get a surface temperature over an Egyptian mango block. Every row below was checked against a live endpoint, not a specification sheet — including the two that failed.</p>
+
+      <div class="legend">
+        <span class="item"><span class="chip chip-live">Recommended</span></span>
+        <span class="item"><span class="chip chip-part">Phase 2</span></span>
+        <span class="item"><span class="chip chip-sensor">Ruled out</span></span>
+      </div>
+
+      <div class="scroller">
+        <table class="t-routes">
+          <thead>
+            <tr>
+              <th style="width:17%">Route</th>
+              <th style="width:9%">Product</th>
+              <th style="width:9%">Native GSD</th>
+              <th style="width:11%">Cadence over our farm</th>
+              <th style="width:11%">Recurring cost</th>
+              <th style="width:11%">Auth</th>
+              <th style="width:32%">Finding</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="is-pick">
+              <td class="idx">Planetary Computer<span>landsat-c2-l2</span> <span class="chip chip-live" style="margin-top:6px">Recommended</span></td>
+              <td>C2 L2 ST</td>
+              <td class="num">100 m<br><span style="font-size:12px;color:var(--ink-3)">30 m grid</span></td>
+              <td class="num">~7/month<br><span style="font-size:12px;color:var(--ink-3)">median gap 7 d</span></td>
+              <td class="num"><b>$0</b></td>
+              <td>None<span style="display:block;font-size:12px;color:var(--ink-3)">anonymous SAS token</span></td>
+              <td>Verified end to end from the production node. COG in <code>EPSG:32636</code>, overviews present, 0.34 s to open and 0.05 s for a block-sized window. Red, NIR and the QA band ship in the same item.</td>
+            </tr>
+            <tr>
+              <td class="idx">USGS LandsatLook<span>landsat-c2l2-st</span> <span class="chip chip-sensor" style="margin-top:6px">Ruled out</span></td>
+              <td>C2 L2 ST</td>
+              <td class="num">100 m</td>
+              <td class="num">identical</td>
+              <td class="num">$0</td>
+              <td>ERS login</td>
+              <td>The STAC catalog is public, but the asset URLs are not: a ranged GET redirects to <code>ers.cr.usgs.gov</code> and returns an HTML login page under a <code>200</code>. Same files as the row above, gated.</td>
+            </tr>
+            <tr>
+              <td class="idx">AWS <code>usgs-landsat</code><span>requester-pays bucket</span> <span class="chip chip-part" style="margin-top:6px">Fallback</span></td>
+              <td>C2 L2 ST</td>
+              <td class="num">100 m</td>
+              <td class="num">identical</td>
+              <td class="num">Egress<br><span style="font-size:12px;color:var(--ink-3)">+ AWS account</span></td>
+              <td>AWS keys</td>
+              <td>Byte-identical files. Matters as insurance rather than as a choice: if Planetary Computer ever withdraws, this is a credentials change, not a rewrite.</td>
+            </tr>
+            <tr>
+              <td class="idx">ECOSTRESS<span>ECO_L2T_LSTE, ISS-mounted</span> <span class="chip chip-part" style="margin-top:6px">Phase 2</span></td>
+              <td>L2T LSTE</td>
+              <td class="num">70 m</td>
+              <td class="num">Irregular</td>
+              <td class="num">$0</td>
+              <td>NASA Earthdata</td>
+              <td>The best free resolution, and its varying overpass time is genuinely better for water stress. Not on Planetary Computer, so it is a second integration against a different authenticated API. Worth doing only once Landsat proves the demand.</td>
+            </tr>
+            <tr>
+              <td class="idx">Sentinel-3 SLSTR<span>via our CDSE account</span> <span class="chip chip-sensor" style="margin-top:6px">Ruled out</span></td>
+              <td>SLSTR L2 LST</td>
+              <td class="num">1 km</td>
+              <td class="num">~2/day</td>
+              <td class="num">0.0067 PU<br><span style="font-size:12px;color:var(--ink-3)">per request</span></td>
+              <td>Already held</td>
+              <td>Verified returning real LST. One pixel is larger than the entire farm — see <a href="#corrections">C2</a>. The cheapest option on paper and the least usable in fact.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout is-method">
+        <div class="k">On commercial thermal</div>
+        <p>SatVu, Hydrosat and Satellogic remain the only route to dependable per-block CWSI, and the gap analysis is right that they are worth pricing only after free thermal has proven the demand. This study does not change that conclusion — it just makes the proving step nearly free, which is what makes the eventual procurement conversation an evidence-based one.</p>
+      </div>
+    </section>
+
+    <!-- =============== 03 =============== -->
+    <section id="proof">
+      <h2><span class="num">03</span>What we proved, and where</h2>
+
+      <p>Everything below ran from the production node or inside the running API pod, so the network path, the TLS egress and the library versions are the real ones. Two results are negative, and they are the more useful two.</p>
+
+      <div class="proof">
+        <div class="ptitle">USGS LandsatLook — the asset URL is gated</div>
+        <pre><span class="c"># ranged GET on the ST_B10 asset href from the public STAC item</span>
+HTTP/2 <i>302</i>
+location: https://<i>ers.cr.usgs.gov</i>/?redirect_url=...ST_B10.TIF
+
+code=<i>200</i>  size=33171
+magic: 3c21 444f 4354 5950   <span class="c">→  "&lt;!DOCTYP"  — an HTML login page, not a TIFF</span></pre>
+      </div>
+
+      <p>A <code>200</code> carrying 33 KB of login HTML is exactly the failure mode that reads as success in a smoke test. The STAC catalog being public says nothing about the assets being public.</p>
+
+      <div class="proof">
+        <div class="ptitle">Planetary Computer — anonymous, and genuinely a COG</div>
+        <pre><span class="c"># 1. STAC search, no credentials</span>
+http=<b>200</b>   features: 3   LC09_L2SP_175040_20260808_02_T1  cloud=0.0
+
+<span class="c"># 2. anonymous SAS token, no account</span>
+http=<b>200</b>   {"msft:expiry":"2026-08-14T17:11:24Z","token":"st=...&sp=rl..."}
+
+<span class="c"># 3. ranged GET on the surface-temperature asset</span>
+code=<b>206</b>  size=8192  time=0.159s
+magic: 4949 2a00   <span class="c">→  "II*\0"  — little-endian TIFF</span></pre>
+      </div>
+
+      <div class="proof">
+        <div class="ptitle">Windowed read inside the production API pod</div>
+        <pre>rasterio 1.5.0   GDAL 3.12.1
+
+crs        <b>EPSG:32636</b>        <span class="c">← already our storage CRS. No reprojection.</span>
+shape      7791 × 7641
+dtype      uint16   nodata 0.0
+res        (30.0, 30.0)
+overviews  [2, 4, 8, 16, 32, 64]
+
+open_s              <b>0.34</b>
+window_read_s       <b>0.05</b>    <span class="c">(34 × 34 px ≈ one block)</span>
+
+<span class="c"># K = DN × 0.00341802 + 149.0</span>
+n_valid             1156
+LST °C  min/mean/max   <b>27.21 / 27.42 / 27.60</b>
+</pre>
+      </div>
+
+      <p>A plausible late-morning August surface temperature over irrigated ground near Suez, at 08:17 UTC. The narrow spread across 34 pixels is the expected signature of a 100 m native measurement resampled onto a 30 m grid — the neighbouring cells are not independent samples.</p>
+
+      <h3>Cadence, measured over the actual farm</h3>
+
+      <p>Twelve months of Landsat coverage over Bashier Elkhier's real bounding box, rather than the nominal 16-day repeat:</p>
+
+      <div class="scroller">
+        <table class="t-scale">
+          <thead>
+            <tr>
+              <th style="width:30%">Measure</th>
+              <th style="width:20%">Value</th>
+              <th style="width:50%">Reading</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="idx">Scenes, 12 months</td>
+              <td class="num">86</td>
+              <td>43 from Landsat-8 and 43 from Landsat-9. The farm sits under two overlapping WRS-2 paths, so it does considerably better than the nominal 8-day combined revisit.</td>
+            </tr>
+            <tr>
+              <td class="idx">Median gap</td>
+              <td class="num">7 days</td>
+              <td>Mean 4.2 days, worst observed gap 8 days. A dependable weekly rhythm — schedulable, unlike ECOSTRESS.</td>
+            </tr>
+            <tr>
+              <td class="idx">Scene cloud ≤ 10%</td>
+              <td class="num">58 of 86</td>
+              <td>67%, but this is a floor rather than an estimate. <code>eo:cloud_cover</code> describes a 185 km scene, not our 85 ha farm. Masking per-pixel on <code>qa_pixel</code> will recover usable days that a scene-level filter would discard. <strong>Now measured — see the row below.</strong></td>
+            </tr>
+            <tr>
+              <td class="idx">Farm ≥ 90% clear <em>(measured, per-pixel)</em></td>
+              <td class="num">19 of 22</td>
+              <td><strong>86%</strong>, against the 68% the scene-level filter gives on the same 22 sampled scenes. Median farm clear fraction is <strong>100%</strong>. Measured 14 Aug 2026 by reading <code>qa_pixel</code> over the real farm bbox and applying the <code>landsat_qa_pixel_v1</code> ruleset. <strong>4 of the 22 carry &gt;10% scene cloud yet are ≥90% clear over the farm</strong> — one at 37.8% scene cloud is 100% clear here. It cuts both ways: two scenes with modest scene cloud (16.6%, 43.0%) are 0% clear over the farm. <strong>Operational consequence: do not set a tight <code>cloud_cover_max_pct</code> on a thermal subscription.</strong> It discards usable scenes and does not protect against the converse. Per-pixel QA is the only honest filter.</td>
+            </tr>
+            <tr>
+              <td class="idx">Overpass time</td>
+              <td class="num">08:16–08:24 UTC</td>
+              <td>Roughly 10:20 local in winter, 11:20 in summer. Earlier than the early-afternoon peak that CWSI theory prefers — a real limitation, and the one thing ECOSTRESS would later improve on.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- =============== 04 =============== -->
+    <section id="closing">
+      <h2><span class="num">04</span>How each of the three indices closes</h2>
+
+      <div class="scroller">
+        <table class="t-close">
+          <thead>
+            <tr>
+              <th style="width:16%">Index</th>
+              <th style="width:26%">Computation</th>
+              <th style="width:22%">Inputs, and where they come from</th>
+              <th style="width:36%">Honest confidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="idx">LST<span>Land Surface Temperature</span></td>
+              <td class="fm">K = DN × 0.00341802 + 149.0<br>°C = K − 273.15</td>
+              <td>The <code>lwir11</code> asset alone. Nothing else.</td>
+              <td><span class="chip chip-live">High</span><br><span style="display:block;padding-top:8px">A direct read of a USGS-validated product. The only judgement call is masking, and <code>qa_pixel</code> ships in the same item.</span></td>
+            </tr>
+            <tr>
+              <td class="idx">CWSI<span>Crop Water Stress Index</span></td>
+              <td class="fm">(T_canopy − T_air) scaled<br>against wet / dry baselines</td>
+              <td>LST above, plus air temperature — already arriving hourly from Open-Meteo, interpolated to the overpass minute.</td>
+              <td><span class="chip chip-part">Medium</span><br><span style="display:block;padding-top:8px">The data is all present, but a rigorous CWSI needs a non-water-stressed baseline that is crop- and site-specific. Expect to ship the simplified temperature-difference form first and calibrate the baselines for Egyptian mango afterwards — the same species of local-calibration debt the guide flags for LAI.</span></td>
+            </tr>
+            <tr>
+              <td class="idx">SMI<span>Soil Moisture Index</span></td>
+              <td class="fm">(LST_max − LST) /<br>(LST_max − LST_min)</td>
+              <td>LST and NDVI. Both from the same scene: <code>red</code> and <code>nir08</code> are assets on the identical Landsat item.</td>
+              <td><span class="chip chip-part">Medium</span><br><span style="display:block;padding-top:8px">Structurally the strongest surprise in this study. The LST–NDVI triangle normally suffers from combining sensors at different resolutions and acquisition times; here both terms come from one 30 m acquisition, perfectly co-registered. The remaining difficulty is defining the dry and wet edges over an area this small.</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout is-method">
+        <div class="k">Why NDVI should come from Landsat, not our Sentinel-2 stack</div>
+        <p>We already compute NDVI at 10 m and it is better data. It is still the wrong input for SMI. The triangle method is a relationship between two surfaces, and it only holds if both are measured over the same ground at the same moment. Pairing a 10 m Sentinel-2 NDVI from Tuesday with a 100 m Landsat LST from Thursday introduces resampling and phenological drift into a formula that reads their ratio as physics. Use the Landsat NDVI for SMI, and keep the Sentinel-2 NDVI as the one we chart.</p>
+      </div>
+    </section>
+
+    <!-- =============== 05 =============== -->
+    <section id="scale">
+      <h2><span class="num">05</span>Resolution honesty</h2>
+
+      <p>This is the part that decides whether the feature is trusted. Our blocks average 3.1 ha — about 158 m on a side — with the smallest at 0.53 ha and the largest at 25 ha. The thermal measurement is 100 m native. Those two numbers have to be shown together.</p>
+
+      <figure class="figure">
+        <div class="plot">
+          <svg viewBox="0 0 900 300" role="img" aria-label="Scale comparison: the farm outline at 786 by 1085 metres, an average 158 metre block, against 30 metre, 100 metre and 1 kilometre sampling grids">
+            <!-- scale: 1 m = 0.2 px -->
+            <g transform="translate(60,30)">
+              <!-- 1km SLSTR pixel -->
+              <rect class="sc-grid1k" x="0" y="0" width="200" height="200"/>
+              <text class="sc-key" x="0" y="-10" fill="#A8452A">1 km — one SLSTR pixel</text>
+
+              <!-- farm 786 x 1085 => 157 x 217 px at 0.2, but we scale to fit: use 0.18 -->
+              <rect class="sc-farm" x="12" y="12" width="141" height="195"/>
+              <text class="sc-lbl" x="18" y="228">farm: 786 × 1085 m</text>
+
+              <!-- 100m grid over the farm -->
+              <g class="sc-grid100">
+                <rect x="12" y="12" width="141" height="195" fill="none"/>
+                <line x1="30" y1="12" x2="30" y2="207"/><line x1="48" y1="12" x2="48" y2="207"/>
+                <line x1="66" y1="12" x2="66" y2="207"/><line x1="84" y1="12" x2="84" y2="207"/>
+                <line x1="102" y1="12" x2="102" y2="207"/><line x1="120" y1="12" x2="120" y2="207"/>
+                <line x1="138" y1="12" x2="138" y2="207"/>
+                <line x1="12" y1="30" x2="153" y2="30"/><line x1="12" y1="48" x2="153" y2="48"/>
+                <line x1="12" y1="66" x2="153" y2="66"/><line x1="12" y1="84" x2="153" y2="84"/>
+                <line x1="12" y1="102" x2="153" y2="102"/><line x1="12" y1="120" x2="153" y2="120"/>
+                <line x1="12" y1="138" x2="153" y2="138"/><line x1="12" y1="156" x2="153" y2="156"/>
+                <line x1="12" y1="174" x2="153" y2="174"/><line x1="12" y1="192" x2="153" y2="192"/>
+              </g>
+
+              <!-- average block 158m => 28px -->
+              <rect class="sc-block" x="48" y="66" width="28" height="28"/>
+            </g>
+
+            <!-- key -->
+            <g transform="translate(340,40)">
+              <rect class="sc-grid1k" x="0" y="4" width="22" height="14"/>
+              <text class="sc-key" x="32" y="16">Sentinel-3 SLSTR, 1 km — swallows the farm whole</text>
+
+              <rect class="sc-grid100" x="0" y="40" width="22" height="14"/>
+              <text class="sc-key" x="32" y="52">Landsat thermal, 100 m native — 8 × 11 across the farm</text>
+
+              <rect class="sc-block" x="0" y="76" width="22" height="14"/>
+              <text class="sc-key" x="32" y="88">Average block, 3.1 ha — about 1.5 native pixels wide</text>
+
+              <rect class="sc-farm" x="0" y="112" width="22" height="14"/>
+              <text class="sc-key" x="32" y="124">Farm boundary, 85.3 ha</text>
+
+              <text class="sc-lbl" x="0" y="164">A 25 ha block spans roughly 5 × 5 native pixels and</text>
+              <text class="sc-lbl" x="0" y="182">carries a real signal. A 0.53 ha block is a fraction of</text>
+              <text class="sc-lbl" x="0" y="200">one pixel and can only inherit its farm's value.</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption>Drawn to scale from the production database: farm extent and block statistics for Bashier Elkhier, 36 blocks. The 30 m delivery grid is omitted because it would be misleading to draw — it is a resampling of the 100 m measurement, not a finer one.</figcaption>
+      </figure>
+
+      <h3>What follows for the product</h3>
+
+      <ul class="plain">
+        <li><strong>Ship LST and CWSI at farm scale by default.</strong> Across the whole farm there are roughly 8 × 11 independent thermal samples — a genuine map, and enough to see an irrigation sector failing.</li>
+        <li><strong>Offer block-level values, but qualify them by block size.</strong> The 25 ha blocks span about 5 × 5 native pixels and support a real number. The 0.53 ha blocks do not, and should visibly inherit the farm figure rather than display a false per-block precision.</li>
+        <li><strong>Label the resolution in the UI wherever a thermal number appears.</strong> Our optical indices are 10 m. A user who has learned to trust block-level NDVI will read block-level CWSI the same way unless we tell them otherwise.</li>
+        <li><strong>Do not let thermal drive per-block irrigation volumes yet.</strong> Anomaly detection and farm-level trend are what this resolution supports honestly.</li>
+      </ul>
+    </section>
+
+    <!-- =============== 06 =============== -->
+    <section id="build">
+      <h2><span class="num">06</span>The build</h2>
+
+      <p>The gap analysis predicted "the same shape of change as adding an index, not a procurement exercise". Having read the pipeline, that is close to right — with one hardcoded seam that has to open first.</p>
+
+      <ol class="build">
+        <li>
+          <span class="t">Open the provider seam</span>
+          <span class="d"><code>_make_provider()</code> in <code>imagery/tasks.py</code> unconditionally returns <code>SentinelHubProvider()</code>. Make it dispatch on provider code — which <code>_lookup_product()</code> already selects from the database and every call site already carries. This is the only place the pipeline assumes a single provider.</span>
+          <span class="cost">1 function · the test seam via set_provider_factory already exists</span>
+        </li>
+        <li>
+          <span class="t">Add the Planetary Computer adapter</span>
+          <span class="d">A new <code>providers/landsat_pc.py</code> satisfying the existing <code>ImageryProvider</code> protocol: <code>discover()</code> against the PC STAC search endpoint, <code>fetch()</code> as a windowed rasterio read over <code>/vsicurl</code>. The anonymous SAS token expires hourly and caches exactly like the Sentinel Hub OAuth token — the same in-process pattern, so it is a copy of a shape we already run.</span>
+          <span class="cost">~1 new module · no change to the protocol</span>
+        </li>
+        <li>
+          <span class="t">Seed the catalog</span>
+          <span class="d">A public migration adding the provider row, a <code>landsat_c2_l2_st</code> product row with its band list, and three rows in <code>indices_catalog</code> for LST, CWSI and SMI.</span>
+          <span class="cost">1 public migration · re-check the next free number immediately before pushing</span>
+        </li>
+        <li>
+          <span class="t">Add the formulas and a second mask ruleset</span>
+          <span class="d">Three functions in <code>indices/computation.py</code>, and a <code>qa_pixel</code> ruleset alongside the existing <code>s2_scl_v1</code> — Landsat's quality band is a different encoding, so the S2 class list does not transfer. Bump <code>CALC_VERSION</code>.</span>
+          <span class="cost">Formulas are pure numpy; the module has no I/O</span>
+        </li>
+        <li>
+          <span class="t">Teach the stack that an index can have a unit</span>
+          <span class="d">The one genuinely new concept. Every index we compute today is a dimensionless ratio bounded near −1 to 1. LST is degrees Celsius. Chart axes, tooltips, baselines and Arabic and English formatting all currently assume the ratio. This is small but it touches more files than the rest of the work combined.</span>
+          <span class="cost">Backend schema + frontend mirror + i18n</span>
+        </li>
+        <li>
+          <span class="t">Mirror the constants, with a lock-step test</span>
+          <span class="d">The frontend keeps its own copy of the index catalog. Constant drift here degrades the UI silently rather than failing, so the mirror lands with a test that fails when the two lists diverge.</span>
+          <span class="cost">en + ar locale entries · one lock-step test</span>
+        </li>
+      </ol>
+
+      <p>Storage keys, the pgstac collection identifiers, the aggregate tables and the tile server need no change at all: each is already keyed by product code, and a second product flows through them as-is.</p>
+    </section>
+
+    <!-- =============== 07 =============== -->
+    <section id="risks">
+      <h2><span class="num">07</span>Risks, and what we did not verify</h2>
+
+      <div class="findings">
+
+        <div class="finding">
+          <div class="head">
+            <span class="fid">R1</span>
+            <span class="ftitle">A free service with no contract behind it</span>
+            <span class="chip chip-part">Accepted, with a fallback</span>
+          </div>
+          <p>Planetary Computer offers no SLA, and its hosted Hub was retired in 2024 — the data APIs continued unchanged, but the precedent is there. The mitigation is that we are not depending on the service so much as on a file layout: the same Collection-2 scenes sit in the AWS <code>usgs-landsat</code> bucket with identical paths. Should PC withdraw, the adapter changes how it signs a request, not how it reads a COG.</p>
+        </div>
+
+        <div class="finding">
+          <div class="head">
+            <span class="fid">R2</span>
+            <span class="ftitle">Overpass time is earlier than CWSI would like</span>
+            <span class="chip chip-part">Structural</span>
+          </div>
+          <p>Water stress expresses itself most strongly in the early afternoon. Landsat crosses at roughly 10:20 to 11:20 local. This is the standard compromise in the literature rather than a defect, but it caps how sensitive our CWSI can be, and it is the specific limitation ECOSTRESS would later relieve.</p>
+        </div>
+
+        <div class="finding">
+          <div class="head">
+            <span class="fid">R3</span>
+            <span class="ftitle">Two things we deliberately did not test — one now closed</span>
+            <span class="chip chip-now">Open</span>
+          </div>
+          <p><s>We did not measure per-pixel cloud statistics over the farm from <code>qa_pixel</code>, so the usable-cadence figure in section <a href="#proof">03</a> is a floor derived from scene-level cloud cover rather than a measurement.</s> <strong>Closed 14 Aug 2026.</strong> Measured across 22 scenes sampled from the 12-month set: <strong>86% of scenes are ≥90% clear over the farm</strong>, against the 68% a scene-level ≤10% filter would allow, with a median farm clear fraction of 100%. See the row in section <a href="#proof">03</a>. The actionable part is that a tight <code>cloud_cover_max_pct</code> on a thermal subscription is actively harmful — it discards scenes that are clear over the AOI while failing to catch scenes that are cloudy over it.</p>
+          <p>We still have not read Planetary Computer's terms of use for sustained production polling — the volume involved is trivial, but the terms should be read before this becomes a scheduled task rather than after.</p>
+        </div>
+
+      </div>
+
+      <div class="callout is-good">
+        <div class="k">What this changes about the gap</div>
+        <p>The gap analysis closed on the observation that the remaining five indices had stopped being an engineering problem — three waiting on a sensor we do not buy, two on field and laboratory work. For the two calibration indices that still holds. For the thermal three it no longer does: <strong>the sensor turns out not to need buying, and the work is one provider adapter and a unit concept.</strong> What remains genuinely unresolved is not acquisition but resolution — and that is a question about how honestly we present a 100 m measurement to someone looking at a 3 hectare block, which is a product decision rather than a budget one.</p>
+      </div>
+    </section>
+
+    <footer>
+      Compiled 14 August 2026 by reading <code>imagery/providers/sentinel_hub.py</code>, <code>imagery/providers/protocol.py</code>, <code>imagery/tasks.py</code>, <code>imagery/storage.py</code>, <code>imagery/pgstac.py</code> and <code>indices/computation.py</code> against live endpoints. Collection lists, catalog searches, token exchanges, ranged reads and the windowed rasterio read were executed from the production node and from inside the running API pod; farm extent, block statistics and the live index catalog were read from the production database. Companion to <em>agri-indices-gap-analysis.html</em>, which this document answers at section 04.
+    </footer>
+
+  </main>
+</div>
