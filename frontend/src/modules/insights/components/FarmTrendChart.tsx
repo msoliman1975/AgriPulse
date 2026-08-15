@@ -18,12 +18,16 @@ import {
   type AnnotationSeverity,
   type FarmIndexTimeseriesPoint,
 } from "@/api/insights";
+import { getIndexCatalog } from "@/api/indices";
 import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { makeDateLabelFmt, makeDateTickFmt } from "@/lib/chartFormat";
+import { formatIndexTick, formatIndexValue } from "@/lib/indexFormat";
+import { isThermalIndex } from "@/lib/thermalResolution";
 
 import { toIsoRange, type TimeRange } from "../lib/timeRange";
 import { IndexPicker, SUPPORTED_INDICES, type IndexCode } from "./IndexPicker";
+import { ThermalResolutionNote } from "./ThermalResolutionNote";
 
 interface Props {
   farmId: string;
@@ -117,6 +121,21 @@ export function FarmTrendChart({
     enabled: Boolean(farmId),
     staleTime: 60_000,
   });
+  // The catalog carries each index's display unit. Its own query, and
+  // deliberately not `enabled`-gated on the farm: it is platform-wide
+  // curated data, cached across every farm and index the reader visits.
+  // If it fails the chart still renders — `unit` falls back to empty,
+  // which is the dimensionless case that was the only case until `lst`.
+  const catalogQ = useQuery({
+    queryKey: ["indices", "catalog"] as const,
+    queryFn: getIndexCatalog,
+    staleTime: 60 * 60_000,
+  });
+  const unit = useMemo(
+    () => catalogQ.data?.find((entry) => entry.code === indexCode)?.unit ?? "",
+    [catalogQ.data, indexCode],
+  );
+
   // B.3 annotations — independent query so a slow alerts join can't
   // delay the chart's first paint. The trend chart renders without
   // annotations if this fails or is still loading.
@@ -175,6 +194,10 @@ export function FarmTrendChart({
 
       <p className="mt-1 text-xs text-ap-muted">{t(`trend.indexDesc.${indexCode}`)}</p>
 
+      {/* Farm scale, so no per-block caveat — but the 100 m resolution
+          still travels with every thermal number on screen. */}
+      {isThermalIndex(indexCode) ? <ThermalResolutionNote className="mt-1" /> : null}
+
       <div className="mt-3 min-h-[260px]">
         {isLoading ? (
           <Skeleton className="h-64 w-full" />
@@ -204,10 +227,18 @@ export function FarmTrendChart({
                 tickFormatter={(v: string) => dateTickFmt.format(new Date(v))}
                 fontSize={11}
               />
-              <YAxis fontSize={11} />
+              <YAxis
+                fontSize={11}
+                tickFormatter={(v: number) => formatIndexTick(v, unit)}
+                label={
+                  unit
+                    ? { value: unit, angle: -90, position: "insideLeft", fontSize: 11 }
+                    : undefined
+                }
+              />
               <Tooltip
                 labelFormatter={(label: string) => dateLabelFmt.format(new Date(label))}
-                formatter={(value: number) => value.toFixed(3)}
+                formatter={(value: number) => formatIndexValue(value, unit)}
               />
               {/* No <Legend>: the selectable one below the plot replaces it,
                   so identity and visibility live in the same control. */}

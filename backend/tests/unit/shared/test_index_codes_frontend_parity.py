@@ -25,7 +25,7 @@ from pathlib import Path
 
 import pytest
 
-from app.modules.indices.computation import STANDARD_INDEX_CODES
+from app.modules.indices.computation import STANDARD_INDEX_CODES, THERMAL_INDEX_CODES
 
 # tests/unit/shared/<this file> → parents[3] is backend/, parents[4] the repo root.
 _FRONTEND = Path(__file__).resolve().parents[4] / "frontend" / "src"
@@ -134,6 +134,46 @@ def test_frontend_index_list_matches_backend(label, path, extract) -> None:
         f"{label} lists {sorted(extra)}, which the backend does not compute. "
         "Selecting one yields an index with no data behind it."
     )
+
+
+@_SKIP_IF_NO_FRONTEND
+def test_frontend_thermal_list_matches_backend() -> None:
+    """The thermal codes get their own list on both sides.
+
+    They come from a different product with a disjoint band set, so
+    folding them into `STANDARD_INDEX_CODES` / `INDEX_CODES` would offer
+    them on farms carrying only the optical product — a picker entry
+    with nothing behind it. The drift risk is identical though, so the
+    guard is too.
+    """
+    frontend = set(_array_members(_read(_API_INDICES_TS), "THERMAL_INDEX_CODES"))
+    backend = set(THERMAL_INDEX_CODES)
+
+    missing = backend - frontend
+    extra = frontend - backend
+    assert not missing, (
+        f"THERMAL_INDEX_CODES (api/indices.ts) is missing {sorted(missing)}. "
+        "The backend computes and stores these."
+    )
+    assert not extra, (
+        f"THERMAL_INDEX_CODES (api/indices.ts) lists {sorted(extra)}, which the "
+        "backend does not compute."
+    )
+
+
+@_SKIP_IF_NO_FRONTEND
+def test_the_two_index_lists_stay_disjoint_on_both_sides() -> None:
+    """A code in both lists would be ambiguous about which product it came from.
+
+    The spectral pickers are per-block at 10 m; thermal is farm-scale at
+    100 m native. A shared code would let a caller reach for the wrong
+    resolution story without noticing.
+    """
+    assert set(STANDARD_INDEX_CODES).isdisjoint(THERMAL_INDEX_CODES)
+    text = _read(_API_INDICES_TS)
+    spectral = set(_array_members(text, "INDEX_CODES"))
+    thermal = set(_array_members(text, "THERMAL_INDEX_CODES"))
+    assert spectral.isdisjoint(thermal), sorted(spectral & thermal)
 
 
 @_SKIP_IF_NO_FRONTEND
