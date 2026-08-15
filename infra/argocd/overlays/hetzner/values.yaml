@@ -1761,13 +1761,38 @@ global:
   #   catalog returns 12 rows with a non-empty unit on lst only; imagery for every
   #   existing farm behaves exactly as before. If anything thermal appears
   #   in a log, something created a subscription that this promote did not.
+  #
+  # frontend cf5c2d7 -> 800f3da (2026-08-15). FRONTEND ONLY; api and workers
+  # stay on f7c70d2. The chart had fallen three merges behind:
+  #   #468 ac3c6c4b - backfill console reports whole-farm fetches
+  #   #470 f7c70d2e - Insights shows thermal indices in their units
+  #   #472 800f3dac - the "Whole farm" checkbox becomes a fetch-scope line
+  # The first two have their backends live ALREADY (both are ancestors of
+  # f7c70d2), so they light up complete.
+  #
+  # #472 is the one crossing halves, and it is deliberately safe in this
+  # order: its panel tests `farm_aoi_fetchable === false`, not `!...`, so the
+  # field being absent from an older api reads as "not measured" and the farm
+  # renders "Fetched per block". Read as a bare falsy check it would have
+  # called EVERY farm too large, sized "undefined x undefined px". #472's
+  # backend half - the 422 guard and the too-large self-heal - is NOT live
+  # until api/workers move to 800f3da; both are backend-only behaviours with
+  # no UI surface, and no known farm is over the 2500 px/side cap today.
+  #
+  # No migration in cf5c2d7..800f3da. Image CONFIRMED in ghcr by pulling it
+  # on the node: frontend@sha256:fe70b72e.
+  #
+  # Watch after sync: the Farm tab's imagery rows show a fetch-scope line and
+  # NO "Whole farm" checkbox; Bashier Elkhier and testmeplz read "Fetched as
+  # one farm area"; every other farm reads "Fetched per block". Any farm
+  # reading "too large ... undefined" means the `=== false` guard regressed.
   images:
     api:
       tag: "f7c70d2"
     workers:
       tag: "f7c70d2"
     frontend:
-      tag: "cf5c2d7"
+      tag: "800f3da"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
