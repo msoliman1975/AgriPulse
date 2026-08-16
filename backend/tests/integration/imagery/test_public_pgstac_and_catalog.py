@@ -113,6 +113,9 @@ async def test_s2_l2a_product_seeded_with_correct_bands(
         # and 0029 had to undo.
         "bsi",
         "msi",
+        # msavi (0068) — same RED/NIR pair savi already reads, so no band
+        # change came with it either.
+        "msavi",
     }
     assert row.cost_tier == "medium"
 
@@ -130,14 +133,15 @@ async def test_standard_indices_seeded(admin_session: AsyncSession) -> None:
     codes = [r.code for r in rows]
     # ndmi added by 0027 (KB P2 moisture index); bsi + msi by 0061 (gap
     # audit); cwsi + lst + smi by 0066 (the thermal gap, a different
-    # product entirely). Sorted by code, so the three thermal ones scatter
-    # through the list rather than trailing it.
+    # product entirely); msavi by 0068. Sorted by code, so the three thermal
+    # ones scatter through the list rather than trailing it.
     assert codes == [
         "bsi",
         "cwsi",
         "evi",
         "gndvi",
         "lst",
+        "msavi",
         "msi",
         "ndmi",
         "ndre",
@@ -156,7 +160,7 @@ async def test_standard_indices_seeded(admin_session: AsyncSession) -> None:
     # blanket bounds assertion here would have to be relaxed into meaning
     # nothing. Assert the families separately instead.
     by_code = {r.code: r for r in rows}
-    for code in ("bsi", "evi", "gndvi", "ndmi", "ndre", "ndvi", "ndwi", "savi"):
+    for code in ("bsi", "evi", "gndvi", "msavi", "ndmi", "ndre", "ndvi", "ndwi", "savi"):
         assert float(by_code[code].value_min) == -1.0, code
         assert float(by_code[code].value_max) == 1.0, code
     assert float(by_code["msi"].value_min) == 0.0

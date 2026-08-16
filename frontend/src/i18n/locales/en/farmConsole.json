@@ -460,6 +460,7 @@
       "ndvi": "Overall canopy vigour",
       "evi": "Vigour, less soil & haze noise",
       "savi": "Vigour adjusted for bare soil",
+      "msavi": "Vigour, soil correction self-tuned",
       "ndre": "Canopy nitrogen (red-edge)",
       "gndvi": "Chlorophyll / greenness",
       "ndwi": "Standing surface water",
@@ -474,6 +475,7 @@
       "ndvi": "Compares near-infrared reflectance with red: (NIR − Red) / (NIR + Red). Healthy leaves reflect infrared strongly and absorb red, so the value rises with how much living, photosynthesising canopy covers the ground.",
       "evi": "A vigour index built to survive what breaks NDVI: it uses the blue band to cancel haze and aerosol, and a soil term to damp the background. It keeps separating dense canopies apart after NDVI has flattened near its ceiling.",
       "savi": "NDVI with a soil-brightness correction folded in (L = 0.5). Bare ground between rows inflates a plain NDVI reading, so SAVI is the more honest measure of vigour while cover is still patchy — early season, wide rows, or a thin stand.",
+      "msavi": "SAVI's soil correction, solved for each pixel instead of fixed at L = 0.5: (2·NIR + 1 − √((2·NIR + 1)² − 8·(NIR − Red))) / 2. One fixed correction can only be right at one amount of cover, so it over-corrects a closed canopy and under-corrects a sparse one. MSAVI lets the correction follow the cover, which matters most with widely spaced trees over bright soil.",
       "ndre": "Compares near-infrared with the red-edge band, the narrow slice where chlorophyll absorption starts to fall away. It tracks chlorophyll — and so nitrogen — deeper into the canopy than NDVI, and keeps responding at full cover once NDVI has saturated.",
       "gndvi": "NDVI with green in place of red: (NIR − Green) / (NIR + Green). Green reflectance is governed by chlorophyll concentration, so this leans towards leaf greenness and nitrogen rather than towards sheer canopy size.",
       "ndwi": "McFeeters' surface-water index, (Green − NIR) / (Green + NIR). Water reflects green and absorbs infrared, so open water sits above zero while canopy and dry soil stay negative. It finds standing water on the block — not moisture inside the leaves.",
@@ -485,6 +487,7 @@
       "ndvi": "Runs −1 to 1. Below 0.2 is effectively bare; 0.2–0.6 is a developing canopy; 0.6 and above is dense and actively growing.",
       "evi": "Runs −1 to 1, and over crops usually 0.1–0.8. Below 0.2 is near-bare; 0.2–0.55 is developing; above 0.55 is dense cover.",
       "savi": "Reads on roughly the same 0–1 scale as NDVI. Below 0.2 is near-bare; 0.2–0.55 developing; above 0.55 dense. Expect it to sit below NDVI wherever soil still shows.",
+      "msavi": "Runs −1 to 1 and reads within a few hundredths of SAVI: below 0.2 near-bare, 0.2–0.6 developing, above 0.6 dense. Like SAVI it sits below NDVI wherever soil still shows — the gap between the two is roughly how much of the block is bare ground.",
       "ndre": "Over crops it usually runs 0.1–0.6. Below 0.2 is a thin or nitrogen-short canopy; 0.3–0.45 is comfortable; above 0.45 is well fed.",
       "gndvi": "Usually 0.1–0.7 over crops. Below 0.2 is near-bare; 0.35–0.55 is a healthy green canopy; above 0.55 is dense and chlorophyll-rich.",
       "ndwi": "Runs −1 to 1, and the scale is inverted against the canopy indices: a healthy crop reads well below −0.15, and anything above 0 is standing water.",
@@ -516,6 +519,14 @@
         "developing": "Canopy developing over partly visible soil.",
         "dense": "Dense canopy — vigorous once the soil background is corrected out.",
         "veryDense": "Very dense canopy; the soil correction barely changes the answer at this much cover."
+      },
+      "msavi": {
+        "bare": "Bare ground. With the soil correction tuned to this much exposure, there is no canopy left to read.",
+        "verySparse": "Barely any canopy above the soil background — and this index is the one least likely to be flattering it.",
+        "sparse": "Sparse cover. Trust this over NDVI here: the correction is tuned to exactly this much visible soil.",
+        "developing": "Canopy developing over partly visible soil.",
+        "dense": "Dense, vigorous canopy once the soil background is corrected out.",
+        "veryDense": "Very dense canopy. At this much cover the soil correction barely changes the answer, so MSAVI, SAVI and NDVI converge."
       },
       "ndre": {
         "bare": "No meaningful red-edge signal — bare ground, or a canopy that has senesced.",

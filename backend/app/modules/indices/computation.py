@@ -7,12 +7,13 @@ and S3 writes live in the Celery task that calls these functions
 pure means the unit tests can pass tiny hand-crafted fixtures and
 assert exact expected values.
 
-Nine standard indices per ARCHITECTURE.md § 9 — the original six, plus
+Ten standard indices per ARCHITECTURE.md § 9 — the original six, plus
 ``ndmi`` (added for the KB water-stress catalog), plus ``bsi`` and ``msi``
-(added from the indices-guide gap audit). Their canonical formulas are
-seeded in ``public.indices_catalog`` (migration 0008 for the first six,
-0027 for ``ndmi``, 0061 for ``bsi``/``msi``); we restate them here as
-actual numpy operations.
+(added from the indices-guide gap audit), plus ``msavi`` (the self-adjusting
+successor to ``savi``). Their canonical formulas are seeded in
+``public.indices_catalog`` (migration 0008 for the first six, 0027 for
+``ndmi``, 0061 for ``bsi``/``msi``, 0068 for ``msavi``); we restate them
+here as actual numpy operations.
 
 Plus three **thermal** indices — ``lst``, ``cwsi``, ``smi`` — which come
 from a different product (`landsat_c2_l2_st`, public migration 0066) with
@@ -107,7 +108,9 @@ MASK_RULESET = "s2_scl_v1"
 # McFeeters ``ndwi`` (surface water). ``bsi`` and ``msi`` came from the
 # indices-guide gap audit: ``bsi`` measures exposed ground between trees,
 # which nothing else here measures; ``msi`` is a second view of the same
-# moisture signal as ``ndmi`` on an unbounded, inverted scale.
+# moisture signal as ``ndmi`` on an unbounded, inverted scale. ``msavi``
+# (0068) is ``savi`` with its soil factor solved per pixel instead of pinned
+# at L = 0.5.
 #
 # This tuple is mirrored in the frontend (``api/indices.ts``, ``conditionEdit
 # .ts``, ``MAP_INDEX_ORDER``) and the pairing is enforced by
@@ -122,6 +125,7 @@ STANDARD_INDEX_CODES: tuple[str, ...] = (
     "ndmi",
     "bsi",
     "msi",
+    "msavi",
 )
 
 
@@ -310,6 +314,43 @@ def savi(red: NDArray[Any], nir: NDArray[Any], soil_factor: float = 0.5) -> NDAr
     num = (1.0 + factor) * (nir - red)
     den = nir + red + factor
     return _safe_divide(num, den)
+
+
+def msavi(red: NDArray[Any], nir: NDArray[Any]) -> NDArray[np.float32]:
+    """Modified Soil-Adjusted Vegetation Index (MSAVI2, Qi et al. 1994):
+
+    ``(2·NIR + 1 - sqrt((2·NIR + 1)² - 8·(NIR - RED))) / 2``
+
+    ``savi`` above needs a soil factor chosen in advance, and L = 0.5 is only
+    right for moderate cover: at low cover the correct L is nearer 1, at full
+    canopy nearer 0. Picking one constant therefore under-corrects at one end
+    of the season and over-corrects at the other. MSAVI2 is the closed-form
+    solution for L at each pixel, folded back into the formula — so the soil
+    correction tracks the cover it is correcting for, with nothing to tune.
+
+    That makes it the more honest vigour reading exactly where our orchards
+    live: wide tree spacing over bright Egyptian sand, where a large and
+    *varying* fraction of every pixel is soil.
+
+    Numerically it tracks ``savi`` closely (within a few hundredths over real
+    reflectance) rather than ``ndvi``, which is why it shares SAVI's class
+    boundaries downstream and not NDVI's.
+
+    Note this is MSAVI**2**, the iteration-free form that is universally what
+    "MSAVI" means in practice — not Qi's original L-from-NDVI·WDVI version,
+    which needs a soil line fitted per site.
+
+    The discriminant is ``(2·NIR - 1)² + 8·RED`` after expansion, so it is
+    non-negative for any non-negative RED and the square root is real for
+    every physical pixel. It is still guarded: L2A surface reflectance can
+    come back very slightly negative over deep shadow, and ``sqrt`` of a
+    negative would produce a NaN with no explanation attached.
+    """
+    two_nir_plus_one = 2.0 * nir + 1.0
+    discriminant = two_nir_plus_one**2 - 8.0 * (nir - red)
+    with np.errstate(invalid="ignore"):
+        root = np.where(discriminant < 0, np.nan, np.sqrt(np.maximum(discriminant, 0.0)))
+    return ((two_nir_plus_one - root) / 2.0).astype(np.float32, copy=False)
 
 
 def ndre(red_edge_1: NDArray[Any], nir: NDArray[Any]) -> NDArray[np.float32]:
@@ -619,6 +660,7 @@ def compute_all_indices(
             bands[BAND_SWIR1],
         ),
         "msi": msi(bands[BAND_NIR], bands[BAND_SWIR1]),
+        "msavi": msavi(bands[BAND_RED], bands[BAND_NIR]),
     }
 
 

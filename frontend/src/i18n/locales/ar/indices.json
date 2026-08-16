@@ -30,6 +30,7 @@
     "gndvi": "GNDVI",
     "ndmi": "NDMI",
     "bsi": "BSI",
-    "msi": "MSI"
+    "msi": "MSI",
+    "msavi": "MSAVI"
   }
 }
