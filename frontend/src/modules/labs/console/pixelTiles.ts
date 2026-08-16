@@ -166,24 +166,37 @@ export function readBlockCounts(
   };
 }
 
+/** The UTC calendar day an instant falls in, or NaN if it will not parse. */
+function utcDay(iso: string): number {
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? Number.NaN : Math.floor(t / 86_400_000);
+}
+
 /**
  * The farm surface to draw for a pass, or null to fall back to per-block.
  *
  * A farm raster is only the right thing to draw when it is the SAME pass the
- * blocks resolved to. On prod, asking for a 2024 pass returns that pass's
- * block rasters alongside the LATEST farm raster — which paints today's
- * pixels under a timeline reading two years ago. That is a wrong answer
- * wearing the shape of a right one, and the seamed per-block path is the
- * better failure: ugly rather than untrue.
+ * blocks resolved to. An api that hands back the LATEST farm raster next to a
+ * historical pass's block rasters would paint today's pixels under a timeline
+ * reading two years ago — a wrong answer wearing the shape of a right one, and
+ * the seamed per-block path is the better failure: ugly rather than untrue.
+ *
+ * Agreement is judged on the acquisition DAY, not the instant. Blocks in
+ * different Sentinel tiles are sensed minutes apart for what a grower calls
+ * one pass, and the strip offers days; requiring identical instants threw away
+ * a correct surface whenever the first block by id happened to be the one
+ * sensed a minute later. Days are the unit both ends of this already speak.
  */
 export function farmRasterForPass<T extends { scene_datetime: string }>(
   farm: T | null | undefined,
   items: readonly { scene_datetime: string }[],
 ): T | null {
   if (!farm) return null;
-  // With no blocks there is no pass to disagree with.
+  // With no blocks there is no pass to disagree with — which is the normal
+  // shape for a cut-over farm, whose block table stopped gaining rows.
   if (items.length === 0) return farm;
-  return Date.parse(farm.scene_datetime) === Date.parse(items[0].scene_datetime) ? farm : null;
+  const day = utcDay(farm.scene_datetime);
+  return Number.isNaN(day) || day !== utcDay(items[0].scene_datetime) ? null : farm;
 }
 
 export interface ClassAreaSummary {

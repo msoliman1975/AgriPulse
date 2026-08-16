@@ -96,4 +96,24 @@ describe("the surface must be the pass the blocks resolved to", () => {
     const farm = { ...FARM, scene_datetime: "2026-08-10T08:41:47.000Z" };
     expect(farmRasterForPass(farm, [sameMoment])).toBe(farm);
   });
+
+  it("tolerates blocks sensed minutes apart within one pass", () => {
+    // Two Sentinel tiles, one grower's pass. `items` is ordered by block id,
+    // so which of the two instants lands first is arbitrary — requiring them
+    // to be identical threw the surface away on a coin flip.
+    const laterTile = { ...BLOCK, scene_datetime: "2026-08-10T08:44:12.000Z" };
+    expect(farmRasterForPass(FARM, [laterTile])).toBe(FARM);
+  });
+
+  it("still refuses a surface from the day before", () => {
+    // The cut-over failure this guard exists for: block rows stop being
+    // written, so an unbounded "latest at or before" resolves them to the
+    // last pre-cutover pass. A day apart is not one pass.
+    const yesterday = { ...BLOCK, scene_datetime: "2026-08-09T23:59:59.000Z" };
+    expect(farmRasterForPass(FARM, [yesterday])).toBeNull();
+  });
+
+  it("refuses an unparseable instant rather than guessing", () => {
+    expect(farmRasterForPass({ ...FARM, scene_datetime: "not a date" }, [BLOCK])).toBeNull();
+  });
 });

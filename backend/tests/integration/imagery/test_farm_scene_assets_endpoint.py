@@ -7,6 +7,8 @@ are load-bearing for what ends up painted on screen:
   * one row per block, never one per job — the layer draws each block once;
   * the ``at`` bound resolves PER BLOCK, because blocks in different tiles are
     sensed minutes apart for what a grower calls one pass;
+  * that per-block tolerance stops at the acquisition DAY, so a pass can never
+    be answered with rasters from another one;
   * a job that did not succeed is not an asset, however recent it is.
 """
 
@@ -237,3 +239,103 @@ async def test_scene_assets_skip_jobs_that_wrote_nothing(
 
     assert resp.status_code == 200
     assert resp.json()["items"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_cut_over_farm_is_not_answered_with_last_weeks_blocks(
+    admin_session: AsyncSession,
+) -> None:
+    """The defect that left three quarters of a farm grey on its newest pass.
+
+    Cutting a farm over to farm-AOI fetching stops the block job table from
+    gaining rows. "Each block's latest pass at or before ``at``" then keeps
+    answering — with the last PRE-CUTOVER pass, days or weeks older than the
+    date the timeline is parked on. The console reads a non-empty ``items``
+    as "the blocks resolved to a different pass than the farm surface did",
+    throws the surface away, and paints those stale block rasters instead: no
+    pixels outside a block, and the ones inside are not even the right day.
+
+    Bounding the lookup to the acquisition day is what makes ``items`` empty
+    here, which is what lets the farm surface be drawn.
+    """
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug="scene-assets-cutover",
+        name="Scene Assets Cutover",
+        contact_email="ops@cutover.test",
+    )
+    user_id = uuid4()
+    await create_user_in_tenant(admin_session, tenant_id=tenant.tenant_id, user_id=user_id)
+    context = make_context(
+        user_id=user_id,
+        tenant_id=tenant.tenant_id,
+        tenant_role=TenantRole.TENANT_ADMIN,
+    )
+    app = build_app(context)
+    pre_cutover = datetime(2026, 8, 10, 8, 41, 47, tzinfo=UTC)
+    farm_pass = datetime(2026, 8, 15, 8, 41, 47, tzinfo=UTC)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        farm_id, block_id = await _create_farm_and_block(client)
+        product_id = await _get_s2l2a_product_id(admin_session)
+        sub_id = UUID(
+            (
+                await client.post(
+                    f"/api/v1/blocks/{block_id}/imagery/subscriptions",
+                    json={"product_id": product_id},
+                )
+            ).json()["id"]
+        )
+        # The last pass fetched per block before the farm was cut over.
+        await _insert_job(
+            admin_session,
+            tenant_schema=tenant.schema_name,
+            block_id=UUID(block_id),
+            product_id=UUID(product_id),
+            subscription_id=sub_id,
+            scene_id="PRE_CUTOVER",
+            scene_datetime=pre_cutover,
+            stac_item_id="sentinel_hub/s2_l2a/PRE_CUTOVER/blockhash",
+        )
+        # Five days later the farm fetches its own AOI: one surface, and not a
+        # single new row in the block table.
+        await admin_session.execute(
+            text(
+                f'INSERT INTO "{tenant.schema_name}".farm_scene_rasters '
+                "(farm_id, product_id, scene_datetime, scene_id, stac_item_id, "
+                " aoi_hash, blocks_merged, indices, source) "
+                "SELECT :farm, :prod, :at, 'FARM_PASS', "
+                "       'sentinel_hub/s2_l2a/FARM_PASS/' || f.aoi_hash, "
+                "       f.aoi_hash, NULL, '[\"ndvi\"]'::jsonb, 'fetched' "
+                f'  FROM "{tenant.schema_name}".farms f WHERE f.id = :farm'
+            ).bindparams(
+                bindparam("farm", type_=PG_UUID(as_uuid=True)),
+                bindparam("prod", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"farm": UUID(farm_id), "prod": UUID(product_id), "at": farm_pass},
+        )
+        await admin_session.commit()
+
+        newest = await client.get(
+            f"/api/v1/farms/{farm_id}/scene-assets",
+            params={"at": (farm_pass + timedelta(hours=6)).isoformat()},
+        )
+        # The pre-cutover day itself must be unchanged: it really is a
+        # per-block pass, and it still has no surface of its own.
+        historical = await client.get(
+            f"/api/v1/farms/{farm_id}/scene-assets",
+            params={"at": (pre_cutover + timedelta(hours=6)).isoformat()},
+        )
+
+    assert newest.status_code == 200
+    body = newest.json()
+    assert body["items"] == [], "a five-day-old block raster is not this pass"
+    assert body["farm"] is not None, "the farm surface is what the layer draws"
+    assert body["farm"]["stac_item_id"].startswith("sentinel_hub/s2_l2a/FARM_PASS/")
+
+    assert historical.status_code == 200
+    old = historical.json()
+    assert [i["stac_item_id"] for i in old["items"]] == [
+        "sentinel_hub/s2_l2a/PRE_CUTOVER/blockhash"
+    ]
+    assert old["farm"] is None, "no surface was ever stitched for the older pass"
