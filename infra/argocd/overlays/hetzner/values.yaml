@@ -1962,11 +1962,21 @@ global:
   #
   #   Watch after sync: alembic reaches public 0068; Integrations lists
   #   landsat_pc for the thermal tenant; new S2 scenes write an msavi COG.
+  #
+  # 01bc3b9 = #492 integrations-health probes landsat_pc instead of reporting it
+  #   unknown. #490 made the provider APPEAR on the Integrations page; it then
+  #   sat there with no health because the probe dispatcher only knew
+  #   sentinel_hub, so the one provider the thermal tenant fetches every day
+  #   showed "unknown" on the page whose job is to say whether it is healthy.
+  #   Backend only — api + workers bumped, FRONTEND STAYS 5ebc56a (no FE delta).
+  #   No migrations; public stays 0068, tenant 0077.
+  #   Image CONFIRMED by pulling it on the node: api 01bc3b9 -> f38f9506598a.
+  #   Watch after sync: Integrations reports a real status for landsat_pc.
   images:
     api:
-      tag: "5ebc56a"
+      tag: "01bc3b9"
     workers:
-      tag: "5ebc56a"
+      tag: "01bc3b9"
     frontend:
       tag: "5ebc56a"
     tileServer:
