@@ -1921,13 +1921,54 @@ global:
   # Watch after sync: /labs/map -> settings -> Farm shows four labelled groups
   # with Save and Inactivate LAST, and a cell-size control under Zones. The v2
   # console at /labs/map-v2 must look identical — it is the same component.
+  # 5ebc56a - farm-level config visible where it was not (#490), plus MSAVI (#489).
+  #
+  #   api + workers + frontend. tileServer unchanged at 9d140cc. The frontend
+  #   was already on 8ed1598 (#487, the shared Farm settings tab), so that
+  #   refactor is ALREADY LIVE and is not part of this change.
+  #
+  #   PUBLIC MIGRATION 0068 RUNS ON PRESYNC. It is #489's, not #490's: an
+  #   INSERT into indices_catalog for `msavi` plus an UPDATE appending it to
+  #   the s2_l2a product's supported_indices. Additive, chains off 0067.
+  #   Tenant stays 0077.
+  #
+  #   #490 fixes two places that still keyed on per-block subscriptions after
+  #   0074/0076/0077 moved configuration to the farm. Both failed silently,
+  #   and both failed in the direction of looking HEALTHY:
+  #
+  #     - The Providers tab gated its list on `EXISTS (block subscriptions)`.
+  #       Measured on this cluster before the fix: the tenant fetching thermal
+  #       every day showed sentinel_hub + open_meteo and NO landsat_pc - on
+  #       the page whose whole job is to say whether a provider is healthy.
+  #       Thermal is farm-AOI only and has no block rows by construction, so
+  #       it could never have appeared.
+  #       EXPECT landsat_pc to show up on Integrations after this sync. That
+  #       is the fix landing, not a new integration appearing.
+  #
+  #     - The simulation clone manifest carried the two block subscription
+  #       tables and zero farm ones, so a cloned tenant lost the config of
+  #       every cut-over farm while looking configured. Both farm tables are
+  #       carried now with is_active forced FALSE, so a load still cannot
+  #       start a real provider fetching.
+  #
+  #   RIDING ALONG: #489 bf56888d - MSAVI, a tenth spectral index. New scenes
+  #   compute 10 index COGs rather than 9. CALC_VERSION deliberately not
+  #   bumped: adding a code leaves every existing series byte-identical.
+  #
+  #   Images CONFIRMED in ghcr for this tag, all digests distinct:
+  #     api      3791e628c7 (was 9e8a0c637b)
+  #     workers  da33e69187 (was 035197a95a)
+  #     frontend c78dff3f6e (was c1bc4fe8a5 @ 8ed1598)
+  #
+  #   Watch after sync: alembic reaches public 0068; Integrations lists
+  #   landsat_pc for the thermal tenant; new S2 scenes write an msavi COG.
   images:
     api:
-      tag: "b807c4c"
+      tag: "5ebc56a"
     workers:
-      tag: "b807c4c"
+      tag: "5ebc56a"
     frontend:
-      tag: "8ed1598"
+      tag: "5ebc56a"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
