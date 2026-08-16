@@ -1972,13 +1972,39 @@ global:
   #   No migrations; public stays 0068, tenant 0077.
   #   Image CONFIRMED by pulling it on the node: api 01bc3b9 -> f38f9506598a.
   #   Watch after sync: Integrations reports a real status for landsat_pc.
+  #
+  # 85e1bea = #494 the Farm Console draws the pass the timeline is parked on,
+  #   and labels it right. Two defects behind one report ("the latest date
+  #   shows the unblocked areas as grey"):
+  #
+  #     - `/farms/{id}/scene-assets` resolved each block to its latest job AT
+  #       OR BEFORE `at`, unbounded. A farm cut over to farm-AOI fetching
+  #       stops writing block jobs, so that kept answering with the last
+  #       PRE-CUTOVER pass forever. Measured on this cluster for Bashier
+  #       Elkhier's 2026-08-15 pass: `farm` carried the correct 08-15 surface
+  #       while `items` carried 36 block rows dated 08-10. The console reads a
+  #       non-empty `items` on another instant as "the blocks disagree about
+  #       the pass", discards the surface, and paints the stale blocks — so
+  #       three quarters of the farm went grey and the rest was five days old.
+  #       Both halves are now bounded to the acquisition DAY of `at`.
+  #       EXPECT Bashier Elkhier to paint edge to edge on 08-05, 08-07, 08-08,
+  #       08-10 and 08-15. Older passes have no stitched surface and stay
+  #       per-block by design — that is honest, not the bug returning.
+  #
+  #     - The scene strip formatted `scene_date` (a DATE) through the VIEWER's
+  #       timezone, so west of Greenwich every label slid back a day. There
+  #       was never an Aug-14 pass; that was Aug-15 mislabelled.
+  #
+  #   Backend + frontend — all three bumped. NO MIGRATIONS; public stays 0068,
+  #   tenant 0077.
+  #   Images CONFIRMED by pulling both on the node: api + frontend @ 85e1bea.
   images:
     api:
-      tag: "01bc3b9"
+      tag: "85e1bea"
     workers:
-      tag: "01bc3b9"
+      tag: "85e1bea"
     frontend:
-      tag: "5ebc56a"
+      tag: "85e1bea"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
