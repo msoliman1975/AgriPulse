@@ -1896,13 +1896,38 @@ global:
   #   run on Bashier Elkhier reports under `thermal` and not `imagery`; and
   #   "Compute indices" on that farm reports a non-zero `farm_scenes`, which
   #   it never could before.
+  # frontend b807c4c -> 8ed1598 (2026-08-16). FRONTEND ONLY; api and workers
+  # stay on b807c4c, which #487 does not touch — it changes no backend file.
+  # `git log b807c4c..8ed1598a` is exactly one commit, so this promote carries
+  # one change and nothing else.
+  #
+  # #487: the Farm settings tab existed TWICE — a private FarmEditTab in
+  # FarmConsolePage.tsx and a transcribed copy in the v2 drawer. That is why
+  # the tab lost features on one side twice over: farm imagery/weather
+  # subscriptions, then the farm-level CELL SIZE, were each added to v2 only
+  # and were unreachable from the default console. Both drawers now render one
+  # shared FarmSettingsTab, grouped: farm details, imagery, weather, zones
+  # (cell size), then Save + the danger zone.
+  #
+  # Save is scoped to the details form by id and labelled "Save farm details":
+  # it now sits below three sections that write on change, and a bare "Save"
+  # there would promise to save three things it cannot touch.
+  #
+  # No migration. Forward-only: `git merge-base --is-ancestor b807c4c 8ed1598a`
+  # — checked because the overlay tag moved under this session again, from
+  # 94a21fa to b807c4c, between one promote and the next. Image CONFIRMED by
+  # pulling it on the node before this bump.
+  #
+  # Watch after sync: /labs/map -> settings -> Farm shows four labelled groups
+  # with Save and Inactivate LAST, and a cell-size control under Zones. The v2
+  # console at /labs/map-v2 must look identical — it is the same component.
   images:
     api:
       tag: "b807c4c"
     workers:
       tag: "b807c4c"
     frontend:
-      tag: "b807c4c"
+      tag: "8ed1598"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
