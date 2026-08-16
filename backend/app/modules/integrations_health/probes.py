@@ -171,6 +171,20 @@ async def _probe_weather(code: str) -> dict[str, Any]:
 
 
 async def _probe_imagery(code: str) -> dict[str, Any]:
+    """Probe one imagery provider by catalog code.
+
+    Every provider in `public.imagery_providers` needs a branch here. A
+    missing one does not degrade quietly — it reports a hard `error`, so
+    the provider shows permanently unhealthy on the Integrations page
+    whatever the upstream is actually doing. `landsat_pc` sat in exactly
+    that state: fetching thermal scenes successfully every day while its
+    probe read "unknown imagery provider", which would equally have
+    masked a real Planetary Computer outage.
+
+    This is the third place that hardcoded `sentinel_hub` as the only
+    imagery provider. The others were `imagery.tasks._make_provider` and
+    the Providers-tab subscription gate.
+    """
     from app.modules.imagery.errors import SentinelHubNotConfiguredError
     from app.modules.imagery.providers.protocol import ProbeResult
     from app.modules.imagery.providers.sentinel_hub import SentinelHubProvider
@@ -179,6 +193,15 @@ async def _probe_imagery(code: str) -> dict[str, Any]:
     try:
         if code == "sentinel_hub":
             provider = SentinelHubProvider()
+        elif code == "landsat_pc":
+            # Imported lazily: this adapter pulls in rasterio/shapely, and
+            # probes run from the API process. Same discipline as
+            # `imagery.tasks._make_provider`.
+            from app.modules.imagery.providers.landsat_pc import (
+                LandsatPlanetaryComputerProvider,
+            )
+
+            provider = LandsatPlanetaryComputerProvider()
         else:
             return {
                 "status": "error",
