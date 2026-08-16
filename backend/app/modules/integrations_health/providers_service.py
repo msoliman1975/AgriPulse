@@ -8,7 +8,16 @@ Two scopes:
 - Tenant-scoped (TenantOwner / TenantAdmin): only the providers this
   tenant has at least one active subscription on. Computed by union-ing
   `weather_subscriptions.provider_code` + the resolved
-  `imagery_aoi_subscriptions.product_id → imagery_providers` join.
+  `imagery_aoi_subscriptions.product_id → imagery_providers` join,
+  and their FARM-level counterparts.
+
+  Both shapes are checked, not just the block one. A tenant that has cut
+  a farm over to whole-farm fetching may have deactivated its block
+  subscriptions, and a provider it actively uses would then vanish from
+  this page — the page whose entire job is to say whether a provider is
+  healthy. `landsat_pc` was the worst case: thermal is farm-AOI only, so
+  it has NO block subscriptions by construction and could never appear
+  here at all, however hard it was failing.
 
 This module reads only — the writer is `probes.py` which writes from
 the Celery beat task.
@@ -129,6 +138,12 @@ class ProviderHealthService:
                         WHERE ws.provider_code = wp.code
                           AND ws.is_active = TRUE
                           AND ws.deleted_at IS NULL
+                        UNION ALL
+                        SELECT 1
+                        FROM weather_farm_subscriptions wfs
+                        WHERE wfs.provider_code = wp.code
+                          AND wfs.is_active = TRUE
+                          AND wfs.deleted_at IS NULL
                       )
 
                     UNION ALL
@@ -156,6 +171,14 @@ class ProviderHealthService:
                         WHERE prod.provider_id = ip.id
                           AND ias.is_active = TRUE
                           AND ias.deleted_at IS NULL
+                        UNION ALL
+                        SELECT 1
+                        FROM imagery_farm_subscriptions ifs
+                        JOIN public.imagery_products fprod
+                          ON fprod.id = ifs.product_id
+                        WHERE fprod.provider_id = ip.id
+                          AND ifs.is_active = TRUE
+                          AND ifs.deleted_at IS NULL
                       )
 
                     ORDER BY provider_kind, provider_code

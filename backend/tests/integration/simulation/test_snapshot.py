@@ -327,3 +327,88 @@ async def test_load_refuses_a_snapshot_from_an_older_version(
 
     with pytest.raises(SnapshotError, match="snapshot version"):
         await load(admin_session, target_schema=target.schema_name, snapshot=snapshot)
+
+
+@pytest.mark.asyncio
+async def test_farm_level_subscriptions_are_carried(admin_session: AsyncSession) -> None:
+    """A cut-over farm's configuration lives on the FARM rows.
+
+    The manifest listed only the two block tables, so cloning a tenant
+    dropped the configuration of every farm that had cut over to
+    whole-farm fetching — and thermal entirely, since
+    `landsat_c2_l2_st` is farm-AOI only and has no block rows to fall
+    back on. The clone looked configured while describing a farm that
+    fetches nothing.
+    """
+    source = await _tenant(admin_session, "snapfarmsrc")
+    farm_id, _block_id = await _seed_source(admin_session, source.schema_name)
+    await admin_session.execute(
+        text(
+            f'INSERT INTO "{source.schema_name}".imagery_farm_subscriptions '
+            "(id, farm_id, product_id, is_active, fetch_farm_aoi) "
+            "SELECT :id, :fid, id, TRUE, TRUE FROM public.imagery_products "
+            "WHERE code = 'landsat_c2_l2_st'"
+        ),
+        {"id": uuid4(), "fid": farm_id},
+    )
+    await admin_session.execute(
+        text(
+            f'INSERT INTO "{source.schema_name}".weather_farm_subscriptions '
+            "(id, farm_id, provider_code, is_active) VALUES (:id, :fid, 'open_meteo', TRUE)"
+        ),
+        {"id": uuid4(), "fid": farm_id},
+    )
+    await admin_session.commit()
+    target = await _tenant(admin_session, "snapfarmtgt")
+
+    snapshot = await extract(admin_session, source_schema=source.schema_name)
+    await load(admin_session, target_schema=target.schema_name, snapshot=snapshot)
+    await admin_session.commit()
+
+    imagery = (
+        await admin_session.execute(
+            text(f'SELECT count(*) FROM "{target.schema_name}".imagery_farm_subscriptions')
+        )
+    ).scalar_one()
+    weather = (
+        await admin_session.execute(
+            text(f'SELECT count(*) FROM "{target.schema_name}".weather_farm_subscriptions')
+        )
+    ).scalar_one()
+    assert imagery == 1, "the farm's imagery configuration did not survive the clone"
+    assert weather == 1, "the farm's weather configuration did not survive the clone"
+
+
+@pytest.mark.asyncio
+async def test_loaded_farm_subscriptions_are_inactive(admin_session: AsyncSession) -> None:
+    """Same rule as the block rows: loading must not start a real fetch.
+
+    Carrying the farm tables without forcing `is_active = FALSE` would
+    have made this worse than the gap it fixes — a clone that starts
+    fetching from Planetary Computer on load.
+    """
+    source = await _tenant(admin_session, "snapfarmact")
+    farm_id, _block_id = await _seed_source(admin_session, source.schema_name)
+    await admin_session.execute(
+        text(
+            f'INSERT INTO "{source.schema_name}".weather_farm_subscriptions '
+            "(id, farm_id, provider_code, is_active) VALUES (:id, :fid, 'open_meteo', TRUE)"
+        ),
+        {"id": uuid4(), "fid": farm_id},
+    )
+    await admin_session.commit()
+    target = await _tenant(admin_session, "snapfarmacttgt")
+
+    snapshot = await extract(admin_session, source_schema=source.schema_name)
+    await load(admin_session, target_schema=target.schema_name, snapshot=snapshot)
+    await admin_session.commit()
+
+    active = (
+        await admin_session.execute(
+            text(
+                f'SELECT count(*) FROM "{target.schema_name}".weather_farm_subscriptions '
+                "WHERE is_active"
+            )
+        )
+    ).scalar_one()
+    assert active == 0
