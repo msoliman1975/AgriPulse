@@ -1849,13 +1849,60 @@ global:
   # 500. It is a read-only audit, so a wrong answer is the risk, not damage —
   # sanity-check that orphan_rows is plausible rather than suspiciously 0, and
   # that a purge receipt's `verification` block still populates.
+  # b807c4c - thermal backfill, and "Compute indices" stops lying (#481, #483).
+  #
+  #   api + workers + frontend. tileServer unchanged at 9d140cc.
+  #
+  #   THE BUG WORTH KNOWING ABOUT IS #481. `backfill_farm_indices` queried
+  #   `imagery_ingestion_jobs JOIN blocks` - the per-BLOCK table. A farm
+  #   fetched as one AOI writes to `imagery_farm_ingestion_jobs`, which that
+  #   query cannot reach. It did not fail: it found the farm's pre-cutover
+  #   block history, recomputed THAT, and reported success. Measured on
+  #   Bashier Elkhier before the fix: 1038 block jobs found, 0 of the 21
+  #   thermal ones. An operator asking to recompute a cut-over farm got a
+  #   green run that touched none of that farm's actual scenes.
+  #
+  #   So on this sync, "Compute indices" starts doing something different -
+  #   and correct - for every farm that has cut over, Sentinel-2 included.
+  #   Expect it to report two counters now (`scenes` and `farm_scenes`)
+  #   rather than one.
+  #
+  #   #483 makes thermal its own backfill source. It was riding inside
+  #   `imagery`, so an operator could not see it, could not fail it
+  #   independently, and was shown a Sentinel-2 estimate for a Landsat run.
+  #   The console gains a third checkbox; the estimate counts thermal on an
+  #   8-day revisit at ZERO units, because Planetary Computer serves it free.
+  #   No schema change - `backfill_progress._settle` already counted declared
+  #   sources generically.
+  #
+  #   Both products live in `imagery_farm_subscriptions`, so the fan-out is
+  #   now filtered by product AND renamed by counter. Without both, a thermal
+  #   run would also fetch Sentinel-2 and report it as thermal progress -
+  #   thermal "succeeding" having spent optical quota.
+  #
+  #   NO MIGRATIONS. Public stays 0067, tenant 0077.
+  #
+  #   Frontend moves too, and has to: the backend accepts `thermal` but the
+  #   console could not offer it without PlatformBackfillPage + its EN/AR
+  #   strings.
+  #
+  #   Images CONFIRMED in ghcr for this tag, all six digests distinct from
+  #   the ones they replace:
+  #     api      9e8a0c637b (was 478ba0fef3)
+  #     workers  035197a95a (was 71855dac3a)
+  #     frontend 7bb0c79634 (was f948955af7)
+  #
+  #   Watch after sync: the Backfill console shows a third source; a thermal
+  #   run on Bashier Elkhier reports under `thermal` and not `imagery`; and
+  #   "Compute indices" on that farm reports a non-zero `farm_scenes`, which
+  #   it never could before.
   images:
     api:
-      tag: "9b36c83"
+      tag: "b807c4c"
     workers:
-      tag: "9b36c83"
+      tag: "b807c4c"
     frontend:
-      tag: "94a21fa"
+      tag: "b807c4c"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
