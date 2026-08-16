@@ -137,6 +137,23 @@ CLONE_TABLES: tuple[ClonedTable, ...] = (
         force={"is_active": False},
         note="configuration only — an active row would start fetching on load",
     ),
+    # The farm-level halves. Without these a cloned tenant loses the
+    # configuration of every farm that has cut over to whole-farm fetching —
+    # and thermal entirely, since `landsat_c2_l2_st` is farm-AOI only and has
+    # no block rows to fall back on. The clone would look configured (block
+    # rows present) while describing a farm that fetches nothing.
+    ClonedTable(
+        "imagery_farm_subscriptions",
+        order=30,
+        force={"is_active": False},
+        note="configuration only — an active row would start fetching on load",
+    ),
+    ClonedTable(
+        "weather_farm_subscriptions",
+        order=30,
+        force={"is_active": False},
+        note="configuration only — an active row would start fetching on load",
+    ),
     # --- observation history: what the pipeline reads -----------------------
     ClonedTable("weather_observations", order=50, history="time"),
     ClonedTable(
