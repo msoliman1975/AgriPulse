@@ -30,8 +30,44 @@ const CONSOLES: { label: string; source: string }[] = [
 ];
 
 describe("both Farm Consoles expose farm-level configuration", () => {
-  it.each(CONSOLES)("$label mounts FarmSubscriptionsPanel", ({ source }) => {
-    expect(source).toContain("<FarmSubscriptionsPanel");
-    expect(source).toContain("FarmSubscriptionsPanel }");
+  // One shared component, mounted twice. Asserting on the SHARED tab rather
+  // than on each panel is what makes the guard hold as panels come and go:
+  // add a section to FarmSettingsTab and both consoles get it by construction.
+  it.each(CONSOLES)("$label mounts the shared FarmSettingsTab", ({ source }) => {
+    expect(source).toContain("<FarmSettingsTab");
+    expect(source).toContain("FarmSettingsTab }");
+  });
+
+  it.each(CONSOLES)("$label does not re-inline its own farm form", ({ source }) => {
+    // A transcribed copy is exactly how subscriptions and cell size went
+    // missing from one console; the copy drifted and nothing failed.
+    expect(source).not.toContain("function FarmEditTab");
+  });
+});
+
+describe("the shared farm tab carries every farm-level setting", () => {
+  const tab = read("./mapnext/FarmSettingsTab.tsx");
+
+  it("groups details, subscriptions and zones in that order", () => {
+    const details = tab.indexOf("settingsFarm.detailsTitle");
+    const subs = tab.indexOf("<FarmSubscriptionsPanel");
+    const zones = tab.indexOf("<FarmZonesPanel");
+    expect(details).toBeGreaterThan(-1);
+    expect(subs).toBeGreaterThan(details);
+    expect(zones).toBeGreaterThan(subs);
+  });
+
+  it("puts the save and danger-zone actions after every settings group", () => {
+    // The ask was explicit: groups first, then Save and Inactivate.
+    expect(tab.indexOf("dangerZone.title")).toBeGreaterThan(tab.indexOf("<FarmZonesPanel"));
+    expect(tab.indexOf("settingsFarm.saveDetails")).toBeGreaterThan(tab.indexOf("<FarmZonesPanel"));
+  });
+
+  it("scopes the save button to the details form only", () => {
+    // It sits below three sections that save on change. Submitting via the
+    // form id keeps it bound to the fields it can actually save, and the
+    // label names that scope rather than saying a bare "Save".
+    expect(tab).toContain("form={DETAILS_FORM_ID}");
+    expect(tab).toContain("settingsFarm.saveDetails");
   });
 });

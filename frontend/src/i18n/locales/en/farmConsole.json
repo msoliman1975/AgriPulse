@@ -205,6 +205,9 @@
     "tabFarm": "Farm"
   },
   "settingsFarm": {
+    "detailsTitle": "Farm details",
+    "detailsHint": "Where this farm is and what it is called. These fields are saved with the button at the bottom; the sections below save as you change them.",
+    "saveDetails": "Save farm details",
     "name": "Farm name",
     "governorate": "Governorate",
     "district": "District",
