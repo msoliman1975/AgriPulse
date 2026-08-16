@@ -29,6 +29,7 @@ export const MAP_INDEX_ORDER: ApiIndexCode[] = [
   "ndmi",
   "bsi",
   "msi",
+  "msavi",
 ];
 export const BLOCK_LEVEL_INDICES: IndexCode[] = ["ndvi", "ndre", "ndwi"];
 
@@ -54,7 +55,7 @@ export type IndexFamilyKey = "vigour" | "nutrition" | "moisture";
 // family would have had no series to plot until `blocks_summary_router`
 // grows a fourth fixed column.
 export const INDEX_FAMILIES: { key: IndexFamilyKey; indices: ApiIndexCode[] }[] = [
-  { key: "vigour", indices: ["ndvi", "evi", "savi", "bsi"] },
+  { key: "vigour", indices: ["ndvi", "evi", "savi", "msavi", "bsi"] },
   { key: "nutrition", indices: ["ndre", "gndvi"] },
   { key: "moisture", indices: ["ndwi", "ndmi", "msi"] },
 ];
@@ -76,6 +77,7 @@ export const INDEX_META: Record<ApiIndexCode, { label: string; family: IndexFami
   ndvi: { label: "NDVI", family: "vigour" },
   evi: { label: "EVI", family: "vigour" },
   savi: { label: "SAVI", family: "vigour" },
+  msavi: { label: "MSAVI", family: "vigour" },
   ndre: { label: "NDRE", family: "nutrition" },
   gndvi: { label: "GNDVI", family: "nutrition" },
   ndwi: { label: "NDWI", family: "moisture" },
@@ -138,6 +140,25 @@ export const INDEX_BANDS: Record<ApiIndexCode, IndexBand[]> = {
     { max: 0.35, key: "sparse", tone: "watch" },
     { max: 0.55, key: "developing", tone: "watch" },
     { max: 0.75, key: "dense", tone: "healthy" },
+    { max: Infinity, key: "veryDense", tone: "healthy" },
+  ],
+  // MSAVI2 — savi with the soil factor solved per pixel instead of pinned at
+  // L = 0.5. It tracks SAVI within a few hundredths over real reflectance, so
+  // it reads on the soil-adjusted scale and NOT on NDVI's.
+  //
+  // Cut points are deliberately identical to `console/indexClasses.ts`
+  // INDEX_CLASSES for msavi, so the dock's reading and the map's legend never
+  // name the same value differently — the discipline `bsi` set. They are
+  // therefore SAVI's *map* boundaries, which is why they do not match the
+  // `savi` row a few lines up: that row and its own map entry have disagreed
+  // since before the discipline existed, and reproducing that drift in a new
+  // index would be copying the wrong half.
+  msavi: [
+    { max: 0.1, key: "bare", tone: "unknown" },
+    { max: 0.2, key: "verySparse", tone: "critical" },
+    { max: 0.4, key: "sparse", tone: "watch" },
+    { max: 0.6, key: "developing", tone: "watch" },
+    { max: 0.8, key: "dense", tone: "healthy" },
     { max: Infinity, key: "veryDense", tone: "healthy" },
   ],
   ndre: [

@@ -68,6 +68,11 @@ export function visualizationDefaults(indexCode: IndexCode): {
       return { rescaleMin: -0.2, rescaleMax: 0.9, colormap: "greens" };
     case "savi":
       return { rescaleMin: -0.2, rescaleMax: 0.9, colormap: "greens" };
+    case "msavi":
+      // Same window as savi. MSAVI2 only replaces savi's fixed soil factor
+      // with a per-pixel one, so the two occupy the same range and reading
+      // them on different windows would make the pair incomparable.
+      return { rescaleMin: -0.2, rescaleMax: 0.9, colormap: "greens" };
     case "ndre":
       return { rescaleMin: -0.2, rescaleMax: 0.7, colormap: "greens" };
     case "gndvi":

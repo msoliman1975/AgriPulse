@@ -21,6 +21,7 @@
         "ndmi": "NDMI",
         "bsi": "BSI",
         "msi": "MSI",
+        "msavi": "MSAVI",
         "lst": "LST",
         "cwsi": "CWSI",
         "smi": "SMI"
@@ -42,6 +43,7 @@
       "ndmi": "NDMI — leaf and canopy water content. Falls as tissue dries, usually days before the canopy visibly wilts or NDVI reacts.",
       "bsi": "BSI — how much bare ground shows between plants. Inverted against the canopy indices: negative is closed canopy, positive is exposed soil.",
       "msi": "MSI — canopy moisture stress. The one index here where higher is worse: below 0.4 is well watered, above 1.0 is high stress.",
+      "msavi": "MSAVI — vigour with the soil background corrected out, and unlike SAVI the correction adapts to how much canopy is actually there. The vigour reading to trust while soil still shows between the trees.",
       "lst": "LST — land surface temperature in °C, read at about 10:20 local time. A canopy transpiring freely cools itself below air temperature; a water-stressed one closes up and heats. Sensed at 100 m and resampled to 30 m, so read it at farm scale — a small block is a fraction of one pixel.",
       "cwsi": "CWSI — how close the canopy is to shutting down transpiration, from 0 (transpiring freely) to 1 (fully stressed). Ships in a simplified form not yet calibrated for Egyptian mango, so read the direction of travel rather than the absolute number.",
       "smi": "SMI — relative surface wetness, from 0 on the dry edge to 1 on the wet edge. For a given amount of greenness, wetter ground runs cooler, and that spread is what this measures."

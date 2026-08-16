@@ -386,7 +386,8 @@
           "gndvi": "Green-band greenness; more sensitive to chlorophyll than NDVI.",
           "ndmi": "Leaf and canopy water content. Falls as the canopy dries — the water-stress index.",
           "bsi": "Bare ground between plants. Rises as canopy is lost — reads planting gaps and plant loss rather than greenness.",
-          "msi": "Canopy moisture stress, SWIR/NIR. Inverted: higher means drier. Same signal as NDMI on an unbounded scale."
+          "msi": "Canopy moisture stress, SWIR/NIR. Inverted: higher means drier. Same signal as NDMI on an unbounded scale.",
+          "msavi": "Vigour with the soil background corrected out, the correction adapting to how much canopy is there. Prefer it over SAVI for rules that fire while cover is still partial."
         },
         "indicesKey": {
           "mean": "The block's average on the latest scene. Absolute, so thresholds are crop-specific.",

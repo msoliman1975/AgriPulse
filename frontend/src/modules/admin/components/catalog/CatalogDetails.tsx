@@ -45,6 +45,7 @@ const INDEX_LABELS: Record<IndexCode, string> = {
   ndwi: "NDWI",
   evi: "EVI",
   savi: "SAVI",
+  msavi: "MSAVI",
   ndre: "NDRE",
   gndvi: "GNDVI",
   ndmi: "NDMI",

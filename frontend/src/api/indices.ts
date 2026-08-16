@@ -9,6 +9,7 @@ export type TimeseriesGranularity = "daily" | "weekly";
 // audit (migration 0056). All three are computed + stored per scene/cell for
 // SWIR-bearing products (Sentinel-2).
 // NB: SWIR-free products (future PlanetScope 3 m) won't carry ndmi/bsi/msi.
+// `msavi` (migration 0068) reads only RED/NIR, so it survives on those.
 //
 // ⚠️ `msi` is the odd one out: it is a plain SWIR1/NIR ratio, so its range is
 // roughly [0, 3] rather than [-1, 1], and it reads BACKWARDS (higher = more
@@ -32,6 +33,7 @@ export const INDEX_CODES = [
   "ndmi",
   "bsi",
   "msi",
+  "msavi",
 ] as const;
 
 export type IndexCode = (typeof INDEX_CODES)[number];

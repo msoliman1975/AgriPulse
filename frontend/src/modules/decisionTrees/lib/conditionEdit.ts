@@ -41,6 +41,7 @@ export const INDEX_CODES = [
   "ndmi",
   "bsi",
   "msi",
+  "msavi",
 ] as const;
 export const BLOCK_FIELDS = [
   // KB P3: the block's current phenological stage, resolved from the crop

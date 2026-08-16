@@ -53,8 +53,8 @@ async def test_catalog_lists_every_index_with_its_bounds(admin_session: AsyncSes
     assert response.status_code == 200
     rows = {r["code"]: r for r in response.json()}
 
-    # The nine spectral indices plus the three thermal ones (0066).
-    assert {"ndvi", "ndmi", "bsi", "msi"} <= set(rows)
+    # The ten spectral indices plus the three thermal ones (0066).
+    assert {"ndvi", "ndmi", "bsi", "msi", "msavi"} <= set(rows)
     assert {"lst", "cwsi", "smi"} <= set(rows)
 
     ndvi = rows["ndvi"]
@@ -80,7 +80,7 @@ async def test_lst_is_the_only_index_carrying_a_unit(admin_session: AsyncSession
     # Everything else is dimensionless. Empty string, not null — it
     # matches `weather_indices_catalog.unit` so the SPA's
     # `${value} ${unit}` shape needs no special case.
-    for code in ("ndvi", "ndwi", "evi", "savi", "ndre", "gndvi", "ndmi", "bsi", "msi"):
+    for code in ("ndvi", "ndwi", "evi", "savi", "ndre", "gndvi", "ndmi", "bsi", "msi", "msavi"):
         assert rows[code]["unit"] == "", code
     # cwsi and smi are 0-1 indices by construction, not measurements.
     assert rows["cwsi"]["unit"] == ""

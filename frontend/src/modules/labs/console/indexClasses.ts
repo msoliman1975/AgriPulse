@@ -82,6 +82,7 @@ export const CLASS_VOCAB: Record<ApiIndexCode, string> = {
   ndvi: "canopy",
   evi: "canopy",
   savi: "canopy",
+  msavi: "canopy",
   ndre: "chlorophyll",
   gndvi: "chlorophyll",
   ndwi: "surfaceWater",
@@ -130,6 +131,21 @@ export const INDEX_CLASSES: Record<ApiIndexCode, IndexClass[]> = {
   // same canopy — reading it on EVI's scale flattered every block by about one
   // class through the middle of the range.
   savi: CANOPY(0.1, 0.2, 0.4, 0.6, 0.8),
+
+  // (2·NIR + 1 − √((2·NIR + 1)² − 8·(NIR − RED))) / 2 — MSAVI2, Qi et al. 1994.
+  //
+  // Same boundaries as SAVI, on purpose. MSAVI2 is SAVI with L solved per
+  // pixel rather than fixed at 0.5, so the two land within a few hundredths
+  // of each other over real reflectance — they are the same reading of the
+  // same question, one with the soil correction tuned. Giving them different
+  // legends would make the pair incomparable, which is the only reason to
+  // carry both.
+  //
+  // (Whether the soil-adjusted pair should sit on NDVI's boundaries at all is
+  // a live question — measured against orchard-over-sand reflectance both read
+  // ~0.15 below NDVI at partial cover. That is SAVI's boundary decision,
+  // signed off 2026-08-12, and this row follows it rather than forking it.)
+  msavi: CANOPY(0.1, 0.2, 0.4, 0.6, 0.8),
 
   // (NIR − RedEdge₁) / (NIR + RedEdge₁), red_edge_1 = B5 at 705 nm.
   //

@@ -22,6 +22,7 @@ from app.modules.indices.computation import (
     compute_all_indices,
     evi,
     gndvi,
+    msavi,
     msi,
     ndmi,
     ndre,
@@ -85,6 +86,72 @@ def test_savi_default_l_factor() -> None:
     # 1.5 * (0.5 - 0.1) / (0.5 + 0.1 + 0.5) = 0.6 / 1.1 ≈ 0.5455
     expected = 1.5 * (0.5 - 0.1) / (0.5 + 0.1 + 0.5)
     assert np.isclose(result[0, 0], expected, atol=1e-5)
+
+
+def test_msavi_matches_the_msavi2_closed_form() -> None:
+    """MSAVI2 = (2*NIR + 1 - sqrt((2*NIR + 1)^2 - 8*(NIR - RED))) / 2."""
+    result = msavi(RED, NIR)
+
+    def expected(red: float, nir: float) -> float:
+        a = 2.0 * nir + 1.0
+        return (a - (a**2 - 8.0 * (nir - red)) ** 0.5) / 2.0
+
+    assert np.isclose(result[0, 0], expected(0.10, 0.50), atol=1e-5)
+    assert np.isclose(result[0, 1], expected(0.20, 0.30), atol=1e-5)
+    assert np.isclose(result[1, 0], expected(0.05, 0.02), atol=1e-5)
+
+
+def test_msavi_is_finite_where_ndvi_divides_by_zero() -> None:
+    """The fixture's red + NIR == 0 pixel is NaN for NDVI but 0.0 here.
+
+    MSAVI2 has no denominator that can vanish — the `/ 2` is a constant — so
+    the zero-reflectance pixel is a real reading of zero rather than a gap.
+    That is not a missing mask: nodata reaches these formulas as NaN (the
+    COG's nodata value, see `imagery/_rasterio_io.py`), never as 0.0, so
+    masking zeros here would discard honest dark pixels.
+    """
+    assert np.isnan(ndvi(RED, NIR)[1, 1])
+    assert np.isclose(msavi(RED, NIR)[1, 1], 0.0, atol=1e-6)
+    # A genuine gap still propagates.
+    gap = np.array([[np.nan]], dtype=np.float32)
+    assert np.isnan(msavi(gap, np.array([[0.4]], dtype=np.float32))[0, 0])
+
+
+def test_msavi_tracks_savi_rather_than_ndvi() -> None:
+    """Why it shares SAVI's class boundaries downstream and not NDVI's.
+
+    MSAVI2 solves for the soil factor per pixel instead of pinning L = 0.5,
+    so it lands near SAVI and materially below NDVI wherever soil is still
+    in the pixel. Downstream, `indexClasses.ts` reads MSAVI on the
+    soil-adjusted scale on the strength of this — if a formula edit ever
+    moved it onto NDVI's magnitude, every legend would silently mis-class.
+    """
+    rng = np.random.default_rng(20260816)
+    shape = (64, 64)
+    # Physical orchard-over-sand reflectance: red 0.02-0.32, NIR 0.05-0.55.
+    red = (rng.random(shape, dtype=np.float32) * 0.30 + 0.02).astype(np.float32)
+    nir = (rng.random(shape, dtype=np.float32) * 0.50 + 0.05).astype(np.float32)
+
+    m = msavi(red, nir)
+    s = savi(red, nir)
+    n = ndvi(red, nir)
+    vegetated = n > 0.2  # below that everything converges on zero and proves nothing
+
+    assert np.abs(m - s)[vegetated].max() < 0.10
+    assert np.abs(m - n)[vegetated].mean() > np.abs(m - s)[vegetated].mean()
+
+
+def test_msavi_stays_within_the_normalized_range() -> None:
+    """Bounded to [-1, 1] like the normalized differences, unlike `msi`."""
+    rng = np.random.default_rng(20260816)
+    shape = (64, 64)
+    red = rng.random(shape, dtype=np.float32)
+    nir = rng.random(shape, dtype=np.float32)
+    result = msavi(red, nir)
+    finite = result[np.isfinite(result)]
+    assert finite.size == result.size  # the discriminant cannot go negative here
+    assert finite.min() >= -1.0
+    assert finite.max() <= 1.0
 
 
 def test_ndre_uses_red_edge() -> None:
@@ -188,7 +255,18 @@ def test_compute_all_indices_returns_every_standard_code() -> None:
     # Tied to the constant rather than a literal list, so adding an index in
     # one place and forgetting the other fails here.
     assert set(result.keys()) == set(STANDARD_INDEX_CODES)
-    assert {"ndvi", "ndwi", "evi", "savi", "ndre", "gndvi", "ndmi", "bsi", "msi"} == set(result)
+    assert {
+        "ndvi",
+        "ndwi",
+        "evi",
+        "savi",
+        "ndre",
+        "gndvi",
+        "ndmi",
+        "bsi",
+        "msi",
+        "msavi",
+    } == set(result)
     for arr in result.values():
         assert arr.shape == (2, 2)
         assert arr.dtype == np.float32
