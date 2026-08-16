@@ -50,12 +50,25 @@ export function SceneTimeline({
   // (and right-to-left under RTL, which the browser handles for us).
   const ordered = useMemo(() => [...scenes].reverse(), [scenes]);
 
+  // Formatted in UTC, deliberately. `scene_date` is a DATE, not an instant —
+  // the day the satellite passed over, which the api derives as
+  // `(scene_datetime AT TIME ZONE 'UTC')::date`. Reading it back through the
+  // viewer's timezone turns midnight UTC into the evening before for anyone
+  // west of Greenwich, and the whole strip slides a day: a user on a
+  // negative-offset clock read the 15 Aug pass as "14 Aug" and reasonably
+  // concluded the console was showing them the wrong scene. An acquisition
+  // day is the same day in Cairo and in Honolulu.
   const fmtDay = useMemo(
-    () => new Intl.DateTimeFormat(i18n.language, { day: "2-digit", month: "short" }),
+    () =>
+      new Intl.DateTimeFormat(i18n.language, {
+        day: "2-digit",
+        month: "short",
+        timeZone: "UTC",
+      }),
     [i18n.language],
   );
   const fmtFull = useMemo(
-    () => new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" }),
+    () => new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium", timeZone: "UTC" }),
     [i18n.language],
   );
 

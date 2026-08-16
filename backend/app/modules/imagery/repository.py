@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -31,6 +31,23 @@ from app.modules.imagery.models import (
     ImageryAoiSubscription,
     ImageryIngestionJob,
 )
+
+
+def _utc_day_start(at: datetime) -> datetime:
+    """Midnight UTC of the acquisition day ``at`` falls in.
+
+    The scene strip groups passes by ``(scene_datetime AT TIME ZONE 'UTC')
+    ::date`` and hands back one instant per day, so UTC is the only day
+    boundary that agrees with the dates the console is showing. Computed in
+    Python and bound as a real datetime rather than expressed as a SQL cast,
+    because a postfix cast on a bind parameter inside ``text()`` is how this
+    codebase has broken production three times over.
+    """
+    return (
+        (at if at.tzinfo else at.replace(tzinfo=UTC))
+        .astimezone(UTC)
+        .replace(hour=0, minute=0, second=0, microsecond=0)
+    )
 
 
 class ImageryRepository:
@@ -411,11 +428,21 @@ class ImageryRepository:
         find it: the same 36-request fan-out that ``/farms/{id}/scenes`` and
         ``/farms/{id}/grid-cells`` both exist to avoid.
 
-        ``at`` is the timeline's scene bound (end of the acquisition day), so
-        each block resolves to ITS OWN latest pass at or before that instant.
-        Blocks in different tiles are sensed minutes apart for what a grower
-        calls one pass, and pinning every block to a single timestamp would
-        drop whichever block was sensed a minute later.
+        ``at`` is the timeline's scene bound, so each block resolves to ITS
+        OWN latest pass at or before that instant. Blocks in different tiles
+        are sensed minutes apart for what a grower calls one pass, and pinning
+        every block to a single timestamp would drop whichever block was
+        sensed a minute later.
+
+        That tolerance is bounded to the acquisition DAY, and the bound is the
+        whole point. Unbounded, "latest at or before" answers a question the
+        caller did not ask: on a farm that has been cut over to farm-AOI
+        fetching, the block table stops gaining rows, so every pass after the
+        cutover resolved to the LAST PRE-CUTOVER PASS — 36 rows dated five
+        days before the date on the timeline. The console then drew those
+        stale rasters under today's label and left every acre outside a block
+        grey, on a farm whose own surface for that exact pass was sitting in
+        the same response. Minutes are one pass; days are not.
 
         Only ``succeeded`` jobs are eligible, and that is the whole guard:
         ``mark_succeeded`` is what sets ``stac_item_id`` in the first place,
@@ -432,7 +459,9 @@ class ImageryRepository:
         params: dict[str, Any] = {"farm": farm_id}
         if at is not None:
             clauses.append("j.scene_datetime <= :at")
+            clauses.append("j.scene_datetime >= :day_start")
             params["at"] = at
+            params["day_start"] = _utc_day_start(at)
         rows = (
             (
                 await self._session.execute(
@@ -634,12 +663,21 @@ class ImageryRepository:
         Matched against the farm's CURRENT aoi_hash: a farm reshaped since the
         raster was stitched falls back to the per-block path rather than
         drawing a surface cut to a boundary that no longer exists.
+
+        Bounded to the acquisition day of ``at`` for the same reason the block
+        assets are: asking for a 2024 pass and being handed the LATEST surface
+        paints today's pixels under a timeline reading two years ago — a wrong
+        answer wearing the shape of a right one. A pass with no surface of its
+        own now returns None and falls back to the per-block path, which is
+        merely seamed rather than untrue.
         """
         clauses = ["r.farm_id = :farm", "r.aoi_hash = f.aoi_hash"]
         params: dict[str, Any] = {"farm": farm_id}
         if at is not None:
             clauses.append("r.scene_datetime <= :at")
+            clauses.append("r.scene_datetime >= :day_start")
             params["at"] = at
+            params["day_start"] = _utc_day_start(at)
         rows = (
             (
                 await self._session.execute(
