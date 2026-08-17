@@ -2202,11 +2202,46 @@ global:
   #   BACKEND ONLY — api + workers bump, FRONTEND STAYS 0981f7f.
   #   NO MIGRATIONS; public 0068, tenant 0078.
   #   Images CONFIRMED by pulling both on the node: api + workers @ d918c0e.
+  #
+  # 99ed384 = #510 — the thermal indices reach the map, and both console
+  #   scene reads become PRODUCT-SCOPED.
+  #
+  #   ALL THREE MUST MOVE TOGETHER. The frontend now sends `?index=` on
+  #   /farms/{id}/scenes and /farms/{id}/scene-assets, and an api that
+  #   ignores it answers for ndvi — which is exactly the bug being fixed. A
+  #   frontend-ahead rollout would offer LST/CWSI/SMI chips and hand them
+  #   Sentinel-2 passes; an api-ahead rollout is harmless (the param is
+  #   optional and defaults to ndvi, the old hardcoded behaviour).
+  #
+  #   FIXES A LIVE BUG, not just a new feature. `get_farm_scene_raster` and
+  #   `list_farm_scene_assets` ordered by scene_datetime with NO product
+  #   filter, and the caller builds its tile URL as
+  #   `<stac_item_id>/<index>.tif`. Bashier Elkhier fetches thermal every
+  #   24 h against S2's ~5 days, so most days the newest row is a Landsat
+  #   job and the v2 pixel layer asked for an ndvi.tif that was never
+  #   written — every tile 404s, block blank, under a timeline claiming a
+  #   pass. Mirror image in the strip: drawability was tested against a
+  #   hardcoded 'ndvi' aggregate, which a thermal pass never writes, so
+  #   every thermal date greyed out as unprocessed.
+  #
+  #   #509's set-based `farm_agg` is PRESERVED — the index scoping adds an
+  #   equality inside branches that were already grouped, so the 32 s -> 400 ms
+  #   fix stands. Its plan-shape tests still pass, with the new binds.
+  #
+  #   WATCH AFTER SYNC: /labs/map-v2 on Bashier Elkhier — the scene strip
+  #   should now show the thermal cadence when a thermal index is picked,
+  #   and the optical cadence otherwise. /labs/map is deliberately UNCHANGED
+  #   (it renders indices only as sub-block grid cells, and thermal has none
+  #   — grid_configs are per-product).
+  #
+  #   NO MIGRATIONS; public 0068, tenant 0078 unchanged.
+  #   Images CONFIRMED by pulling all three on the node:
+  #   api + workers + frontend @ 99ed384.
   images:
     api:
-      tag: "d918c0e"
+      tag: "99ed384"
     workers:
-      tag: "d918c0e"
+      tag: "99ed384"
     frontend:
       # 8002b2d = #505. `visualizationDefaults` is a switch with NO default
       #   arm over the OPTICAL index union, so lst/cwsi/smi returned
@@ -2228,7 +2263,12 @@ global:
       #   that has no block. Both now key on the scene's own product and
       #   scope. FRONTEND ONLY; api + workers stay a615cb8.
       #   Image CONFIRMED by pulling it on the node: frontend @ 0981f7f.
-      tag: "0981f7f"
+      #
+      # 99ed384 = #510, together with api + workers above — see the note
+      #   there. The picker gains LST/CWSI/SMI on /labs/map-v2 only, and the
+      #   scene reads carry `?index=`, which is why this cannot ship ahead
+      #   of the api.
+      tag: "99ed384"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
