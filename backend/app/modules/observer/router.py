@@ -41,6 +41,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.observer.pixels import PixelOutsideRasterError
 from app.modules.observer.repository import JOB_STATUSES
 from app.modules.observer.service import (
+    BlockScopedSceneRequiredError,
     CellNotFoundError,
     DecisionNotFoundError,
     IndexNotSupportedError,
@@ -151,7 +152,10 @@ class HistogramBucket(BaseModel):
 class SceneRow(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     job_id: UUID
-    block_id: UUID
+    # 'block' | 'farm'. A farm acquisition covers every block of the farm in
+    # one fetch, so it has no block of its own — see tenant 0076.
+    scope: str = "block"
+    block_id: UUID | None = None
     block_name: str | None
     block_code: str | None
     product_id: UUID
@@ -174,6 +178,10 @@ class SceneRow(BaseModel):
 
 class IndexRow(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+    # Populated only for the whole-farm form, which returns one row per
+    # (block, index) because one fetch wrote an aggregate on every block.
+    block_id: UUID | None = None
+    block_name: str | None = None
     index_code: str
     mean: float | None
     min: float | None
@@ -231,7 +239,8 @@ class SceneDetail(BaseModel):
     tile_server_base_url: str
     s3_bucket: str
     job_id: UUID
-    block_id: UUID
+    scope: str = "block"
+    block_id: UUID | None = None
     product_id: UUID
     block_code: str | None
     block_name: str | None
@@ -259,8 +268,13 @@ class SceneDetail(BaseModel):
     area_m2: float
     raw_asset_key: str | None
     index_asset_keys: dict[str, str]
+    # Resolved from the scene's product. `mask_classes` is Sentinel-2's SCL
+    # class enum; `mask_bits` is Landsat's QA_PIXEL bit positions. Exactly
+    # one of the two is populated — they are different encodings, not two
+    # spellings of the same thing.
     mask_ruleset: str
     mask_classes: list[int]
+    mask_bits: list[int] = []
     grid: GridSnapshot | None
     # Every recorded execution for this scene, newest first. Two entries with
     # different calc_versions means an aggregate row was overwritten by a
@@ -288,7 +302,13 @@ class PixelExplainResponse(BaseModel):
     job_id: UUID
     scene_id: str
     scene_datetime: datetime
-    block_id: UUID
+    scope: str = "block"
+    block_id: UUID | None = None
+    product_code: str = ""
+    # The air temperature CWSI was explained against (thermal only). Null
+    # means the weather feed had no usable reading for this overpass, which
+    # is why CWSI appears under `unavailable_indices`.
+    air_temp_c: float | None = None
     raw_asset_key: str
     row: int
     col: int
@@ -296,6 +316,9 @@ class PixelExplainResponse(BaseModel):
     lat: float
     inside_aoi: bool
     band_values: dict[str, float | None]
+    # The quality band's value at this pixel and its human reading. The
+    # field name is Sentinel-2's; on `landsat_c2_l2_st` it carries QA_PIXEL,
+    # whose label names every flag bit that is set.
     scl_value: int | None
     scl_label: str | None
     masked: bool
@@ -741,20 +764,31 @@ async def list_scenes(
 @router.get("/tenants/{tenant_id}/scenes/indices", response_model=list[IndexRow])
 async def scene_indices(
     tenant_id: UUID,
-    block_id: UUID,
     product_id: UUID,
     scene_time: datetime,
+    block_id: UUID | None = None,
+    farm_id: UUID | None = None,
     context: RequestContext = Depends(requires_capability(_CAP)),
     service: ObserverService = Depends(_service),
 ) -> list[dict[str, Any]]:
-    """Per-index aggregates behind one scene — the expanded scene-table row."""
+    """Per-index aggregates behind one scene — the expanded scene-table row.
+
+    Pass `block_id` for a block acquisition, `farm_id` for a whole-farm one.
+    A farm scene has no block of its own, so requiring `block_id` made its
+    expanded row unopenable — which on thermal meant the stored lst/cwsi/smi
+    values had no surface anywhere in the product.
+    """
     del context
-    return await service.scene_indices(
-        tenant_schema=await _schema(service, tenant_id),
-        block_id=block_id,
-        product_id=product_id,
-        scene_time=scene_time,
-    )
+    try:
+        return await service.scene_indices(
+            tenant_schema=await _schema(service, tenant_id),
+            block_id=block_id,
+            farm_id=farm_id,
+            product_id=product_id,
+            scene_time=scene_time,
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
 
 # --- L2: scene detail + pixel explain ---------------------------------------
@@ -862,6 +896,15 @@ async def verify_scene(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "scene not found") from exc
     except SceneRasterUnavailableError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    except BlockScopedSceneRequiredError as exc:
+        # 422, not 404: the scene is real and the id is right — the
+        # operation just needs a block-scoped one. Say which, so the
+        # operator opens a block scene rather than hunting a missing row.
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "this scene is a whole-farm acquisition; open one of the farm's "
+            "block scenes to run this",
+        ) from exc
     await _audit_verify(
         tenant_schema=schema,
         context=context,
@@ -1249,6 +1292,14 @@ async def pixel_grid(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "scene not found") from exc
     except CellNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "cell not found") from exc
+    except BlockScopedSceneRequiredError as exc:
+        # Cells belong to a block. A whole-farm acquisition wrote a row on
+        # every block of the farm, so there is no single cell grid to draw.
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "this scene is a whole-farm acquisition; cells belong to a block, "
+            "so open one of the farm's block scenes",
+        ) from exc
     except IndexNotSupportedError as exc:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,

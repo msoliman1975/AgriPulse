@@ -22,6 +22,7 @@ const s2Detail: SceneDetail = {
   tile_server_base_url: "https://tiles.example",
   s3_bucket: "imagery",
   job_id: "j1",
+  scope: "block" as const,
   block_id: "b1",
   product_id: "p1",
   block_code: "B-07",
@@ -51,6 +52,7 @@ const s2Detail: SceneDetail = {
   raw_asset_key: "sentinel_hub/s2_l2a/S2B_MSIL2A_20260614T083709/a41f9c/raw_bands.tif",
   index_asset_keys: {},
   mask_ruleset: "s2_scl_v1",
+  mask_bits: [],
   mask_classes: [0, 1, 3, 8, 9, 10, 11],
   grid: {
     grid_config_id: "g1",

@@ -320,6 +320,7 @@ export function PlatformObserverPage(): ReactNode {
           >
             <SceneTable
               tenantId={tenantId as string}
+              farmId={farmId}
               scenes={scenes.data ?? []}
               isLoading={scenes.isPending}
               isError={scenes.isError}

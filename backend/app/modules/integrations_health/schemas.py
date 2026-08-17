@@ -73,9 +73,19 @@ class QueueEntry(BaseModel):
 
     kind: str  # 'weather' | 'imagery'
     state: str  # 'overdue' | 'running' | 'stuck'
+    # 'block' — one subscription per block, the original shape.
+    # 'farm'  — the farm subscribes on its own behalf and `block_id` is
+    #           NULL. Key on this rather than on the null: a farm-scoped
+    #           row has no block by design, not by omission.
+    scope: str = "block"
     subscription_id: UUID
-    block_id: UUID
+    # Nullable since 0077/0076. It was `UUID` here while the queue scan was
+    # already emitting farm rows, so every response containing one failed
+    # response validation and the Queue tab returned 500.
+    block_id: UUID | None = None
     farm_id: UUID | None
+    farm_name: str | None = None
+    block_code: str | None = None
     provider_code: str | None
     # For overdue: last_successful_ingest_at (may be null on never-synced).
     # For running/stuck: the attempt/job's started_at.
@@ -139,8 +149,15 @@ class IntegrationAttemptRow(BaseModel):
 
     attempt_id: UUID
     kind: str  # 'weather' | 'imagery'
+    # 'block' | 'farm' — which acquisition path recorded this attempt. A
+    # farm-path attempt covers every block of the farm at once, so it
+    # carries no block_id; see the view in tenant migration 0078.
+    scope: str = "block"
     subscription_id: UUID
-    block_id: UUID
+    # Nullable since 0077 (farm-scoped weather attempts) and 0078 (farm
+    # imagery jobs). Declaring it required 500'd the Runs tab as soon as
+    # the first farm-scoped attempt landed.
+    block_id: UUID | None = None
     farm_id: UUID | None
     provider_code: str | None
     started_at: datetime

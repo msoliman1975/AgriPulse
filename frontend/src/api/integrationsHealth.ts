@@ -40,11 +40,21 @@ export interface BlockIntegrationHealth {
 export type AttemptKind = "weather" | "imagery";
 export type AttemptStatus = "running" | "succeeded" | "failed" | "skipped";
 
+/**
+ * Which acquisition path recorded a row.
+ *
+ * `farm` means one fetch covered the whole farm, so there is no block to
+ * name — `block_id` is null by design, not by omission. Key on this rather
+ * than on the null.
+ */
+export type AttemptScope = "block" | "farm";
+
 export interface IntegrationAttempt {
   attempt_id: string;
   kind: AttemptKind;
+  scope: AttemptScope;
   subscription_id: string;
-  block_id: string;
+  block_id: string | null;
   farm_id: string | null;
   provider_code: string | null;
   started_at: string;
@@ -107,9 +117,13 @@ export type QueueState = "overdue" | "running" | "stuck";
 export interface QueueEntry {
   kind: AttemptKind;
   state: QueueState;
+  scope: AttemptScope;
   subscription_id: string;
-  block_id: string;
+  block_id: string | null;
   farm_id: string | null;
+  /** Resolved server-side so the queue can name a farm instead of a UUID. */
+  farm_name: string | null;
+  block_code: string | null;
   provider_code: string | null;
   since: string | null;
   attempt_id: string | null;

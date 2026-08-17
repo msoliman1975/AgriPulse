@@ -89,6 +89,7 @@ const overview: ObserverOverview = {
 const scenes: ObserverScene[] = [
   {
     job_id: "j1",
+    scope: "block" as const,
     block_id: "b1",
     block_name: "North Mango",
     block_code: "B-07",
@@ -111,6 +112,7 @@ const scenes: ObserverScene[] = [
   },
   {
     job_id: "j2",
+    scope: "block" as const,
     block_id: "b2",
     block_name: "South Citrus",
     block_code: "B-12",

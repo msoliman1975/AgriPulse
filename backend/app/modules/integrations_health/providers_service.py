@@ -269,21 +269,39 @@ class ProviderHealthService:
                         # Imagery jobs key on product_id, and products key on
                         # provider_id — there is no `imagery_products.provider_code`.
                         # Join out to the provider catalog to match on its `code`.
+                        #
+                        # Both job tables, because a provider's failures can
+                        # live in either. `landsat_pc` is the case that
+                        # forces it: thermal is farm-AOI only, so it has no
+                        # rows in `imagery_ingestion_jobs` at all and this
+                        # histogram was empty however hard it was failing —
+                        # "no known causes" reported as though it were
+                        # health.
                         rows = (
                             await self._pub.execute(
                                 text(
                                     """
-                                    SELECT COALESCE(ij.error_code, 'uncategorized') AS code,
+                                    WITH failures AS (
+                                        SELECT ij.error_code, ij.product_id
+                                        FROM imagery_ingestion_jobs ij
+                                        WHERE ij.status = 'failed'
+                                          AND ij.requested_at >
+                                              now() - make_interval(hours => :h)
+                                        UNION ALL
+                                        SELECT fj.error_code, fj.product_id
+                                        FROM imagery_farm_ingestion_jobs fj
+                                        WHERE fj.status = 'failed'
+                                          AND fj.requested_at >
+                                              now() - make_interval(hours => :h)
+                                    )
+                                    SELECT COALESCE(f.error_code, 'uncategorized') AS code,
                                            COUNT(*)::int AS n
-                                    FROM imagery_ingestion_jobs ij
+                                    FROM failures f
                                     JOIN public.imagery_products prod
-                                      ON prod.id = ij.product_id
+                                      ON prod.id = f.product_id
                                     JOIN public.imagery_providers prov
                                       ON prov.id = prod.provider_id
-                                    WHERE ij.status = 'failed'
-                                      AND prov.code = :p
-                                      AND ij.requested_at >
-                                          now() - make_interval(hours => :h)
+                                    WHERE prov.code = :p
                                     GROUP BY 1
                                     """
                                 ),

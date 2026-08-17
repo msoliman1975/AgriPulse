@@ -19,7 +19,13 @@ from pathlib import Path
 
 import pytest
 
-from app.modules.observer.repository import BUCKETS, JOB_STATUSES, _d, _ts
+from app.modules.observer.repository import (
+    BUCKETS,
+    FARM_ONLY_JOB_STATUSES,
+    JOB_STATUSES,
+    _d,
+    _ts,
+)
 
 _MIGRATION = (
     Path(__file__).resolve().parents[4]
@@ -143,8 +149,16 @@ def test_job_status_constant_matches_the_migration_check_constraint() -> None:
     start = source.index(marker)
     end = source.index('name="ck_imagery_ingestion_jobs_status"', start)
     declared = set(re.findall(r"'([a-z_]+)'", source[start:end]))
-    assert declared == set(JOB_STATUSES), (
+    # `JOB_STATUSES` now spans both job tables, so the block CHECK is
+    # exactly its non-farm half rather than the whole thing. Comparing that
+    # half exactly keeps the guard as tight as it was — a status added to
+    # the block CHECK still fails here — while letting the farm table
+    # contribute its own vocabulary.
+    assert declared == set(JOB_STATUSES) - FARM_ONLY_JOB_STATUSES, (
         "JOB_STATUSES has drifted from the migration's CHECK constraint: "
         f"migration-only={declared - set(JOB_STATUSES)}, "
-        f"constant-only={set(JOB_STATUSES) - declared}"
+        f"constant-only={set(JOB_STATUSES) - FARM_ONLY_JOB_STATUSES - declared}"
     )
+    # And the farm half must not silently overlap the block one, or a
+    # future rename would leave the guard comparing a set against itself.
+    assert not (FARM_ONLY_JOB_STATUSES & declared)

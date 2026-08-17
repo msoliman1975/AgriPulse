@@ -92,11 +92,27 @@ export type JobStatus =
   | "succeeded"
   | "failed"
   | "skipped_cloud"
-  | "skipped_duplicate";
+  | "skipped_duplicate"
+  // The farm job table has its own vocabulary: it skips as plain "skipped"
+  // where a block job says which reason. Read from the CHECK, not inferred —
+  // a status missing here renders a raw key.
+  | "skipped";
+
+/**
+ * Which acquisition produced a scene.
+ *
+ * `farm` is one fetch of the whole farm boundary, covering every block at
+ * once — so it has no `block_id`, and its counts are rolled up across the
+ * farm. Thermal (`landsat_c2_l2_st`) is farm-only by construction.
+ */
+export type SceneScope = "block" | "farm";
 
 export interface ObserverScene {
   job_id: string;
-  block_id: string;
+  scope: SceneScope;
+  /** Null on a farm acquisition — see `SceneScope`. */
+  block_id: string | null;
+  /** The block's name, or the farm's when `scope` is "farm". */
   block_name: string | null;
   block_code: string | null;
   product_id: string;
@@ -119,6 +135,9 @@ export interface ObserverScene {
 }
 
 export interface ObserverIndexRow {
+  /** Set only on the whole-farm form: one row per (block, index). */
+  block_id: string | null;
+  block_name: string | null;
   index_code: string;
   mean: number | null;
   min: number | null;
@@ -230,13 +249,21 @@ export async function listObserverScenes(
 
 export async function getSceneIndices(
   tenantId: string,
-  args: { blockId: string; productId: string; sceneTime: string },
+  args: {
+    blockId: string | null;
+    farmId: string | null;
+    productId: string;
+    sceneTime: string;
+  },
 ): Promise<ObserverIndexRow[]> {
   const { data } = await apiClient.get<ObserverIndexRow[]>(
     `${BASE}/tenants/${tenantId}/scenes/indices`,
     {
       params: {
-        block_id: args.blockId,
+        // Exactly one of these. A farm acquisition has no block, so asking
+        // for one returned nothing and its stored indices had no surface.
+        block_id: args.blockId ?? undefined,
+        farm_id: args.blockId ? undefined : (args.farmId ?? undefined),
         product_id: args.productId,
         scene_time: args.sceneTime,
       },
@@ -261,7 +288,9 @@ export interface SceneDetail {
   tile_server_base_url: string;
   s3_bucket: string;
   job_id: string;
-  block_id: string;
+  scope: SceneScope;
+  /** Null on a whole-farm acquisition — see `SceneScope`. */
+  block_id: string | null;
   product_id: string;
   block_code: string | null;
   block_name: string | null;
@@ -290,7 +319,10 @@ export interface SceneDetail {
   raw_asset_key: string | null;
   index_asset_keys: Record<string, string>;
   mask_ruleset: string;
+  /** Sentinel-2 SCL class values. Empty on a product masked by bitmask. */
   mask_classes: number[];
+  /** Landsat QA_PIXEL bit positions. Empty on a product masked by class. */
+  mask_bits: number[];
   /** Null when no grid config governed this scene's time. */
   grid: GridSnapshot | null;
   /**

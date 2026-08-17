@@ -125,6 +125,7 @@ async def _check_one_tenant(tenant_id: UUID, schema: str, threshold: int) -> int
                         SELECT
                             attempt_id,
                             kind,
+                            scope,
                             subscription_id,
                             block_id,
                             provider_code,
@@ -221,6 +222,7 @@ async def _check_one_tenant(tenant_id: UUID, schema: str, threshold: int) -> int
                 kind=c["kind"],
                 provider_code=c["provider_code"],
                 block_id=c["block_id"],
+                scope=c["scope"],
                 streak_length=c["failed_streak_position"],
                 error_code=c["error_code"],
                 streak_started_at=streak_started_at,
@@ -237,7 +239,8 @@ async def _fanout_inbox(
     schema: str,
     kind: str,
     provider_code: str | None,
-    block_id: UUID,
+    block_id: UUID | None,
+    scope: str,
     streak_length: int,
     error_code: str | None,
     streak_started_at: datetime,
@@ -271,8 +274,12 @@ async def _fanout_inbox(
         return
 
     title = f"{kind.title()} integration failing" + (f" ({provider_code})" if provider_code else "")
+    # A farm-path subscription covers the whole farm in one fetch, so
+    # "on this block" would name a scope the failure does not have — and
+    # would send the reader looking for a block that has no attempts.
+    subject = "on this block" if scope == "block" else "on this farm"
     body = (
-        f"{streak_length} consecutive failures on this block "
+        f"{streak_length} consecutive failures {subject} "
         f"since {streak_started_at:%Y-%m-%d %H:%M UTC}."
         + (f" Most recent error: {error_code}." if error_code else "")
     )
@@ -298,7 +305,8 @@ async def _fanout_inbox(
         tenant_id=str(tenant_id),
         kind=kind,
         provider_code=provider_code,
-        block_id=str(block_id),
+        scope=scope,
+        block_id=str(block_id) if block_id else None,
         streak_length=streak_length,
         recipients=len(rows),
     )

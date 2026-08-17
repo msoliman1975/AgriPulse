@@ -8,8 +8,13 @@
     "queue": "قائمة الانتظار",
     "providers": "الموردون"
   },
-  "tabs": { "farms": "المزارع", "blocks": "القطع" },
-  "overviewScope": { "label": "نطاق النظرة العامة" },
+  "tabs": {
+    "farms": "المزارع",
+    "blocks": "القطع"
+  },
+  "overviewScope": {
+    "label": "نطاق النظرة العامة"
+  },
   "col": {
     "farm": "المزرعة",
     "block": "القطعة",
@@ -55,9 +60,12 @@
       "duration": "المدة",
       "wait": "الانتظار",
       "run": "التنفيذ",
-      "detail": "التفاصيل"
+      "detail": "التفاصيل",
+      "scope": "النطاق"
     },
-    "summary": { "rows": "{{n}} صف" },
+    "summary": {
+      "rows": "{{n}} صف"
+    },
     "attemptN": "المحاولة #{{n}}"
   },
   "detail": {
@@ -92,7 +100,8 @@
       "overdue": "لا شيء متأخر.",
       "stuck": "لا توجد محاولات عالقة."
     },
-    "stuckThreshold": "تعتبر عالقة بعد {{minutes}} دقيقة."
+    "stuckThreshold": "تعتبر عالقة بعد {{minutes}} دقيقة.",
+    "wholeFarm": "المزرعة كاملة · {{farm}}"
   },
   "providers": {
     "placeholder": "عرض الموردين — قريبًا.",
@@ -131,5 +140,10 @@
     "pickFarm": "اختر مزرعة...",
     "pickPrompt": "اختر مزرعة لعرض حالة المزامنة لكل قطعة.",
     "empty": "لا توجد قطع في هذه المزرعة."
+  },
+  "scope": {
+    "block": "قطعة",
+    "farm": "المزرعة كاملة",
+    "wholeFarmNoBlock": "لا يوجد — جلب للمزرعة كاملة"
   }
 }

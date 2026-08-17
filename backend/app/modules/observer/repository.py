@@ -31,10 +31,16 @@ from uuid import UUID
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Job statuses, from the CHECK on `imagery_ingestion_jobs` (tenant 0003).
-# Mirrored here because Observer groups by them; a new status added upstream
-# without updating this constant would silently vanish from the histogram,
-# so `test_job_status_constant_matches_check_constraint` pins the pair.
+# Every job status Observer can be asked to filter on, across BOTH job
+# tables. Mirrored here because Observer groups by them; a status added
+# upstream without updating this constant would silently vanish from the
+# histogram and become unselectable in the scene filter, so
+# `test_job_status_constant_matches_check_constraint` pins it.
+#
+# The first six are the CHECK on `imagery_ingestion_jobs` (tenant 0003).
+# `skipped` belongs to `imagery_farm_ingestion_jobs` (tenant 0076), which
+# skips without saying why — the farm path is the only writer of it, and
+# leaving it out made every skipped thermal scene unfilterable.
 JOB_STATUSES: tuple[str, ...] = (
     "pending",
     "running",
@@ -42,7 +48,13 @@ JOB_STATUSES: tuple[str, ...] = (
     "failed",
     "skipped_cloud",
     "skipped_duplicate",
+    "skipped",
 )
+
+# The farm table's own vocabulary — the part of `JOB_STATUSES` that the
+# block CHECK does not declare. Split out so the drift guard can still
+# compare the block half against the migration exactly.
+FARM_ONLY_JOB_STATUSES: frozenset[str] = frozenset({"skipped"})
 
 # Buckets the histogram supports. Closed set — interpolated into a
 # `date_trunc` call, so it must never accept caller input directly.
@@ -341,6 +353,7 @@ class ObserverRepository:
     async def cell_aggregate_coverage(
         self,
         *,
+        farm_id: UUID,
         block_ids: list[UUID],
         product_id: UUID | None,
         window_from: datetime,
@@ -356,9 +369,19 @@ class ObserverRepository:
         grid today". Gridding a 2025 scene on a 2026 geometry is precisely the
         bug that migration exists to prevent, and an Observer that used the
         current geometry would report those scenes as healthy.
+
+        Both acquisition paths contribute to the denominator. A farm job
+        covers every block in scope, so it is expected to produce one
+        (scene, block, product) cell-aggregate group per *gridded* block —
+        which is why the farm arm joins out to the blocks rather than
+        counting the job once. Left out, a cut-over farm's produced count
+        stayed high while its expected count fell to zero, and the stage
+        reported `not_applicable` on a farm whose cells were being written
+        every day.
         """
         prod_a = "AND a.product_id = :pid" if product_id else ""
         prod_j = "AND j.product_id = :pid" if product_id else ""
+        prod_f = "AND f.product_id = :pid" if product_id else ""
         sql = f"""
             SELECT
               (SELECT count(*) FROM (
@@ -386,9 +409,26 @@ class ObserverRepository:
                              AND tstzrange(cfg.effective_from, cfg.effective_to)
                                  @> j.scene_datetime
                     )
+
+                 UNION
+
+                 SELECT DISTINCT f.scene_datetime, cfg.block_id, f.product_id
+                   FROM imagery_farm_ingestion_jobs f
+                   JOIN grid_configs cfg
+                     ON cfg.block_id IN :bids
+                    AND cfg.product_id = f.product_id
+                    AND cfg.deleted_at IS NULL
+                    AND cfg.superseded_at IS NULL
+                    AND tstzrange(cfg.effective_from, cfg.effective_to)
+                        @> f.scene_datetime
+                  WHERE f.farm_id = :fid
+                    {prod_f}
+                    AND f.status = 'succeeded'
+                    AND f.scene_datetime >= {_ts(window_from)}
+                    AND f.scene_datetime < {_ts(window_to)}
                ) e) AS expected
         """  # noqa: S608
-        row = await self._one(sql, block_ids=block_ids, product_id=product_id)
+        row = await self._one(sql, block_ids=block_ids, product_id=product_id, farm_id=farm_id)
         return {"produced": int(row["produced"]), "expected": int(row["expected"])}
 
     async def trend_coverage(
@@ -514,9 +554,10 @@ class ObserverRepository:
     async def scene_calc_history(
         self,
         *,
-        block_id: UUID,
+        block_id: UUID | None,
         product_id: UUID,
         scene_time: datetime,
+        farm_id: UUID | None = None,
     ) -> list[dict[str, Any]]:
         """Every recorded execution for one scene, newest first.
 
@@ -524,7 +565,24 @@ class ObserverRepository:
         upserted on their composite key, so a recompute replaces the numbers
         with no trace; the run rows accumulate instead, and two of them with
         different `calc_version` values is the signature of exactly that.
+
+        Pass `farm_id` instead of `block_id` for a whole-farm acquisition.
+        The runs are still written per block — only the *fetch* is farm-wide
+        — so this returns every block's run for that scene, which is what the
+        one acquisition actually caused.
         """
+        if block_id is not None:
+            scope_clause = "r.block_id = :bid"
+            params = {"bid": str(block_id), "pid": str(product_id)}
+        elif farm_id is not None:
+            scope_clause = """r.block_id IN (
+                SELECT b.id FROM blocks b
+                 WHERE b.farm_id = :fid AND b.deleted_at IS NULL
+            )"""
+            params = {"fid": str(farm_id), "pid": str(product_id)}
+        else:
+            raise ValueError("scene_calc_history needs a block_id or a farm_id")
+
         sql = f"""
             SELECT r.id, r.job_id, r.calc_version, r.mask_ruleset,
                    r.trigger, r.outcome, r.error,
@@ -533,7 +591,7 @@ class ObserverRepository:
                    r.per_index, r.started_at, r.completed_at, r.duration_ms,
                    r.created_at
               FROM indices_calc_runs r
-             WHERE r.block_id = :bid
+             WHERE {scope_clause}
                AND r.product_id = :pid
                AND r.scene_time = {_ts(scene_time)}
              -- `id` breaks the tie: `created_at` defaults to now(), which is
@@ -542,9 +600,7 @@ class ObserverRepository:
              -- time-ordered, which makes this ordering total.
              ORDER BY r.created_at DESC, r.id DESC
         """
-        rows = (
-            await self._s.execute(text(sql), {"bid": str(block_id), "pid": str(product_id)})
-        ).mappings()
+        rows = (await self._s.execute(text(sql), params)).mappings()
         return [dict(r) for r in rows]
 
     # ---- L0: histogram ---------------------------------------------------
@@ -552,6 +608,7 @@ class ObserverRepository:
     async def scene_histogram(
         self,
         *,
+        farm_id: UUID,
         block_ids: list[UUID],
         product_id: UUID | None,
         window_from: datetime,
@@ -565,43 +622,74 @@ class ObserverRepository:
         computation died reads as succeeded in `imagery_ingestion_jobs`, which
         is exactly the failure #335 hid. Splitting the two here is what makes
         the histogram show the gap.
+
+        Counts BOTH acquisition paths, like `job_stage_counts` above. A farm
+        fetching its own AOI writes nothing to `imagery_ingestion_jobs`, so
+        reading only that table left the histogram empty for a cut-over farm
+        while the ribbon over it counted the same scenes — the two disagreeing
+        on one screen. `landsat_c2_l2_st` is the extreme case: thermal is
+        farm-AOI only by construction, so it has never had a single bar here.
+
+        A farm job's `computed` test asks whether ANY block in scope got
+        aggregates at that (product, time). One farm acquisition fans out to
+        every block, so per-block presence is not the question — "did this
+        acquisition produce indices at all" is.
         """
         trunc = BUCKETS[bucket]  # KeyError is a programmer error; router validates
-        prod = "AND j.product_id = :pid" if product_id else ""
+        prod_block = "AND j.product_id = :pid" if product_id else ""
+        prod_farm = "AND f.product_id = :pid" if product_id else ""
         sql = f"""
+            WITH acquisitions AS (
+                SELECT j.status, j.scene_datetime,
+                       EXISTS (
+                         SELECT 1 FROM block_index_aggregates a
+                          WHERE a.block_id = j.block_id
+                            AND a.product_id = j.product_id
+                            AND a.time = j.scene_datetime
+                            AND a.time >= {_ts(window_from)}
+                            AND a.time < {_ts(window_to)}
+                       ) AS computed
+                  FROM imagery_ingestion_jobs j
+                 WHERE j.block_id IN :bids
+                   {prod_block}
+                   AND j.scene_datetime >= {_ts(window_from)}
+                   AND j.scene_datetime < {_ts(window_to)}
+
+                UNION ALL
+
+                SELECT f.status, f.scene_datetime,
+                       EXISTS (
+                         SELECT 1 FROM block_index_aggregates a
+                          WHERE a.block_id IN :bids
+                            AND a.product_id = f.product_id
+                            AND a.time = f.scene_datetime
+                            AND a.time >= {_ts(window_from)}
+                            AND a.time < {_ts(window_to)}
+                       ) AS computed
+                  FROM imagery_farm_ingestion_jobs f
+                 WHERE f.farm_id = :fid
+                   {prod_farm}
+                   AND f.scene_datetime >= {_ts(window_from)}
+                   AND f.scene_datetime < {_ts(window_to)}
+            )
             SELECT
-              date_trunc('{trunc}', j.scene_datetime) AS bucket,
+              date_trunc('{trunc}', scene_datetime) AS bucket,
+              count(*) FILTER (WHERE status = 'succeeded' AND computed) AS computed,
+              count(*) FILTER (WHERE status = 'succeeded' AND NOT computed)
+                AS acquired_only,
+              -- A block job skips as 'skipped_cloud'/'skipped_duplicate', a
+              -- farm job as plain 'skipped'. Same event to a reader of a bar.
               count(*) FILTER (
-                WHERE j.status = 'succeeded' AND agg.present
-              ) AS computed,
-              count(*) FILTER (
-                WHERE j.status = 'succeeded' AND NOT agg.present
-              ) AS acquired_only,
-              count(*) FILTER (
-                WHERE j.status IN ('skipped_cloud', 'skipped_duplicate')
+                WHERE status IN ('skipped_cloud', 'skipped_duplicate', 'skipped')
               ) AS skipped,
-              count(*) FILTER (WHERE j.status = 'failed') AS failed,
-              count(*) FILTER (WHERE j.status IN ('pending', 'running')) AS pending,
+              count(*) FILTER (WHERE status = 'failed') AS failed,
+              count(*) FILTER (WHERE status IN ('pending', 'running')) AS pending,
               count(*) AS total
-              FROM imagery_ingestion_jobs j
-              CROSS JOIN LATERAL (
-                SELECT EXISTS (
-                  SELECT 1 FROM block_index_aggregates a
-                   WHERE a.block_id = j.block_id
-                     AND a.product_id = j.product_id
-                     AND a.time = j.scene_datetime
-                     AND a.time >= {_ts(window_from)}
-                     AND a.time < {_ts(window_to)}
-                ) AS present
-              ) agg
-             WHERE j.block_id IN :bids
-               {prod}
-               AND j.scene_datetime >= {_ts(window_from)}
-               AND j.scene_datetime < {_ts(window_to)}
+              FROM acquisitions
              GROUP BY 1
              ORDER BY 1
         """  # noqa: S608
-        rows = await self._all(sql, block_ids=block_ids, product_id=product_id)
+        rows = await self._all(sql, block_ids=block_ids, product_id=product_id, farm_id=farm_id)
         return [dict(r) for r in rows]
 
     # ---- L1: scene table -------------------------------------------------
@@ -609,6 +697,7 @@ class ObserverRepository:
     async def list_scenes(
         self,
         *,
+        farm_id: UUID,
         block_ids: list[UUID],
         product_id: UUID | None,
         window_from: datetime,
@@ -619,24 +708,46 @@ class ObserverRepository:
         limit: int,
         offset: int,
     ) -> list[dict[str, Any]]:
-        """One row per (scene, block), with what each stage produced.
+        """One row per acquisition, with what each stage produced.
 
-        `indices_written` and `cells_written` are correlated subqueries rather
-        than joins: a job with no aggregates must appear with a zero, and an
-        inner join would drop exactly the rows an operator opens this table to
-        find.
+        An acquisition is a block job OR a farm job — the same union the
+        ribbon and the histogram count. Without the farm arm this table was
+        empty for a cut-over farm while the ribbon above it reported dozens of
+        scenes acquired, and thermal (`landsat_c2_l2_st`, farm-AOI only) had
+        no row here at any time in its life.
+
+        A farm row carries `scope = 'farm'` and a NULL `block_id`: one
+        acquisition covers every block, so naming one of them would be a
+        fiction. Its `indices_written` / `cells_written` are therefore summed
+        across the farm's blocks in scope, where a block row counts only its
+        own.
+
+        `indices_written` and `cells_written` come from LEFT JOINs, never
+        inner ones: a job with no aggregates must appear with a zero, since
+        that is exactly the row an operator opens this table to find.
+
+        `max_valid_pct` filters block rows only. `imagery_farm_ingestion_jobs`
+        records no `valid_pixel_pct`, and treating "not measured" as 0 would
+        put every farm scene at the top of a "worst valid pixels" filter.
         """
         prod = "AND j.product_id = :pid" if product_id else ""
+        prod_farm = "AND fj.product_id = :pid" if product_id else ""
         filters = ""
+        farm_filters = ""
         params: dict[str, Any] = {}
         if statuses:
             filters += " AND j.status IN :statuses"
+            farm_filters += " AND fj.status IN :statuses"
             params["statuses"] = statuses
         if max_valid_pct is not None:
             filters += " AND j.valid_pixel_pct IS NOT NULL AND j.valid_pixel_pct < :maxvp"
+            # No such column on the farm table — see the docstring. Excluding
+            # the arm outright beats inventing a value for it.
+            farm_filters += " AND FALSE"
             params["maxvp"] = max_valid_pct
         if with_error:
             filters += " AND (j.error_code IS NOT NULL OR j.error_message IS NOT NULL)"
+            farm_filters += " AND (fj.error_code IS NOT NULL OR fj.error_message IS NOT NULL)"
 
         # Page FIRST, then aggregate once per hypertable.
         #
@@ -662,6 +773,7 @@ class ObserverRepository:
             WITH page AS (
               SELECT
                 j.id AS job_id,
+                'block'::text AS scope,
                 j.block_id,
                 b.name AS block_name,
                 b.code AS block_code,
@@ -675,7 +787,8 @@ class ObserverRepository:
                 j.error_message,
                 j.stac_item_id,
                 j.started_at,
-                j.completed_at
+                j.completed_at,
+                b.name AS sort_label
                 FROM imagery_ingestion_jobs j
                 JOIN blocks b ON b.id = j.block_id
                WHERE j.block_id IN :bids
@@ -683,7 +796,38 @@ class ObserverRepository:
                  {filters}
                  AND j.scene_datetime >= {_ts(window_from)}
                  AND j.scene_datetime < {_ts(window_to)}
-               ORDER BY j.scene_datetime DESC, b.name
+
+              UNION ALL
+
+              -- The farm acquisition path (0076). `block_name` carries the
+              -- farm's own name so the column still says what was fetched;
+              -- `scope` is what a reader keys on.
+              SELECT
+                fj.id AS job_id,
+                'farm'::text AS scope,
+                NULL::uuid AS block_id,
+                f.name AS block_name,
+                f.code AS block_code,
+                fj.product_id,
+                fj.scene_id,
+                fj.scene_datetime,
+                fj.status,
+                fj.cloud_cover_pct,
+                NULL::numeric AS valid_pixel_pct,
+                fj.error_code,
+                fj.error_message,
+                fj.stac_item_id,
+                fj.started_at,
+                fj.completed_at,
+                f.name AS sort_label
+                FROM imagery_farm_ingestion_jobs fj
+                JOIN farms f ON f.id = fj.farm_id
+               WHERE fj.farm_id = :fid
+                 {prod_farm}
+                 {farm_filters}
+                 AND fj.scene_datetime >= {_ts(window_from)}
+                 AND fj.scene_datetime < {_ts(window_to)}
+               ORDER BY scene_datetime DESC, sort_label
                LIMIT :limit OFFSET :offset
             ),
             idx AS (
@@ -693,7 +837,8 @@ class ObserverRepository:
                  AND a.time < {_ts(window_to)}
                  AND EXISTS (
                        SELECT 1 FROM page p
-                        WHERE p.block_id = a.block_id
+                        WHERE p.scope = 'block'
+                          AND p.block_id = a.block_id
                           AND p.product_id = a.product_id
                           AND p.scene_datetime = a.time)
                GROUP BY 1, 2, 3
@@ -705,13 +850,44 @@ class ObserverRepository:
                  AND a.time < {_ts(window_to)}
                  AND EXISTS (
                        SELECT 1 FROM page p
-                        WHERE p.block_id = a.block_id
+                        WHERE p.scope = 'block'
+                          AND p.block_id = a.block_id
                           AND p.product_id = a.product_id
                           AND p.scene_datetime = a.time)
                GROUP BY 1, 2, 3
+            ),
+            -- Farm rows roll up across every block in scope: one acquisition
+            -- produced all of them, so attributing the total to a block would
+            -- both understate the row and invent an owner.
+            farm_idx AS (
+              SELECT a.product_id, a.time, count(*) AS n
+                FROM block_index_aggregates a
+               WHERE a.block_id IN :bids
+                 AND a.time >= {_ts(window_from)}
+                 AND a.time < {_ts(window_to)}
+                 AND EXISTS (
+                       SELECT 1 FROM page p
+                        WHERE p.scope = 'farm'
+                          AND p.product_id = a.product_id
+                          AND p.scene_datetime = a.time)
+               GROUP BY 1, 2
+            ),
+            farm_cells AS (
+              SELECT a.product_id, a.time, count(DISTINCT a.cell_id) AS n
+                FROM block_grid_aggregates a
+               WHERE a.block_id IN :bids
+                 AND a.time >= {_ts(window_from)}
+                 AND a.time < {_ts(window_to)}
+                 AND EXISTS (
+                       SELECT 1 FROM page p
+                        WHERE p.scope = 'farm'
+                          AND p.product_id = a.product_id
+                          AND p.scene_datetime = a.time)
+               GROUP BY 1, 2
             )
             SELECT
               j.job_id,
+              j.scope,
               j.block_id,
               j.block_name,
               j.block_code,
@@ -742,16 +918,30 @@ class ObserverRepository:
               -- The symptom is bistable and that is what makes it confusing: the
               -- first calls get a custom plan and succeed, then every window fails
               -- until the pod restarts. Do not "verify" this with a single request.
-              COALESCE(idx.n, 0) AS indices_written,
-              COALESCE(cells.n, 0) AS cells_written,
-              (SELECT count(*) FROM grid_cells gc
-                 JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
-                WHERE cfg.block_id = j.block_id
-                  AND cfg.product_id = j.product_id
-                  AND cfg.deleted_at IS NULL
-                  AND cfg.superseded_at IS NULL
-                  AND tstzrange(cfg.effective_from, cfg.effective_to)
-                      @> j.scene_datetime) AS cells_expected
+              COALESCE(idx.n, farm_idx.n, 0) AS indices_written,
+              COALESCE(cells.n, farm_cells.n, 0) AS cells_written,
+              -- A farm acquisition is expected to fill every governed cell
+              -- on every block in scope, so its denominator is the farm's,
+              -- not one block's.
+              CASE WHEN j.scope = 'farm' THEN (
+                SELECT count(*) FROM grid_cells gc
+                  JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
+                 WHERE cfg.block_id IN :bids
+                   AND cfg.product_id = j.product_id
+                   AND cfg.deleted_at IS NULL
+                   AND cfg.superseded_at IS NULL
+                   AND tstzrange(cfg.effective_from, cfg.effective_to)
+                       @> j.scene_datetime
+              ) ELSE (
+                SELECT count(*) FROM grid_cells gc
+                  JOIN grid_configs cfg ON cfg.id = gc.grid_config_id
+                 WHERE cfg.block_id = j.block_id
+                   AND cfg.product_id = j.product_id
+                   AND cfg.deleted_at IS NULL
+                   AND cfg.superseded_at IS NULL
+                   AND tstzrange(cfg.effective_from, cfg.effective_to)
+                       @> j.scene_datetime
+              ) END AS cells_expected
               FROM page j
               LEFT JOIN idx
                      ON idx.block_id = j.block_id
@@ -761,9 +951,17 @@ class ObserverRepository:
                      ON cells.block_id = j.block_id
                     AND cells.product_id = j.product_id
                     AND cells.time = j.scene_datetime
+              LEFT JOIN farm_idx
+                     ON j.scope = 'farm'
+                    AND farm_idx.product_id = j.product_id
+                    AND farm_idx.time = j.scene_datetime
+              LEFT JOIN farm_cells
+                     ON j.scope = 'farm'
+                    AND farm_cells.product_id = j.product_id
+                    AND farm_cells.time = j.scene_datetime
              ORDER BY j.scene_datetime DESC, j.block_name
         """  # noqa: S608
-        params.update({"limit": limit, "offset": offset})
+        params.update({"limit": limit, "offset": offset, "fid": str(farm_id)})
         stmt = text(sql).bindparams(bindparam("bids", expanding=True))
         if statuses:
             stmt = stmt.bindparams(bindparam("statuses", expanding=True))
@@ -797,6 +995,45 @@ class ObserverRepository:
         ).mappings()
         return [dict(r) for r in rows]
 
+    async def farm_scene_index_rows(
+        self,
+        *,
+        farm_id: UUID,
+        product_id: UUID,
+        scene_time: datetime,
+    ) -> list[dict[str, Any]]:
+        """The same rows for a whole-farm acquisition, one per (block, index).
+
+        Deliberately NOT averaged into one row per index. One fetch produced
+        a distinct aggregate on every block, and a mean of means over blocks
+        of different sizes is a number no part of the pipeline computed and
+        nothing else in the product would agree with. Listing them is longer
+        and true.
+
+        `block_name` falls back to the code the way every other block-labelling
+        query does — `blocks.name` is nullable and bulk-created blocks have
+        none.
+        """
+        sql = f"""
+            SELECT a.block_id,
+                   COALESCE(b.name, b.code) AS block_name,
+                   a.index_code, a.mean, a.min, a.max, a.p10, a.p50, a.p90,
+                   a.std_dev, a.valid_pixel_count, a.total_pixel_count,
+                   a.valid_pixel_pct, a.cloud_cover_pct, a.baseline_deviation,
+                   a.stac_item_id, a.inserted_at
+              FROM block_index_aggregates a
+              JOIN blocks b ON b.id = a.block_id
+             WHERE b.farm_id = :fid
+               AND b.deleted_at IS NULL
+               AND a.product_id = :pid
+               AND a.time = {_ts(scene_time)}
+             ORDER BY a.index_code, block_name
+        """
+        rows = (
+            await self._s.execute(text(sql), {"fid": str(farm_id), "pid": str(product_id)})
+        ).mappings()
+        return [dict(r) for r in rows]
+
     # ---- L2: scene detail -------------------------------------------------
 
     async def scene_context(self, job_id: UUID) -> dict[str, Any] | None:
@@ -810,13 +1047,25 @@ class ObserverRepository:
         does not carry one. The grid config is resolved by the **scene's own
         time**, not "the current grid", so a 2025 scene reports the geometry
         it was actually computed against.
+
+        Tries the block table first, then the farm one. The two are separate
+        tables (0076) but a job id is unique across both, so the caller hands
+        in one id and gets back whichever acquisition owns it — which is what
+        lets a farm scene open in the same detail page as a block scene.
         """
+        row = await self._block_scene_context(job_id)
+        if row is None:
+            row = await self._farm_scene_context(job_id)
+        return row
+
+    async def _block_scene_context(self, job_id: UUID) -> dict[str, Any] | None:
         row = (
             (
                 await self._s.execute(
                     text(
                         """
                     SELECT
+                      'block'::text AS scope,
                       j.id AS job_id, j.block_id, j.product_id, j.scene_id,
                       j.scene_datetime, j.status, j.stac_item_id,
                       j.cloud_cover_pct, j.valid_pixel_pct,
@@ -848,6 +1097,70 @@ class ObserverRepository:
                                 @> j.scene_datetime
                      WHERE j.id = :jid
                        AND b.deleted_at IS NULL
+                    """
+                    ),
+                    {"jid": str(job_id)},
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return dict(row) if row is not None else None
+
+    async def _farm_scene_context(self, job_id: UUID) -> dict[str, Any] | None:
+        """The same context for a whole-farm acquisition.
+
+        Column-for-column identical to the block shape so every caller —
+        the detail payload, the pixel inspector, verification — works on
+        either without branching. The differences are all real ones:
+
+        * The AOI is the farm boundary, and `aoi_hash` is the farm's (0073).
+          That pairing is what makes `raw_bands_key` resolve to the object
+          the farm fetch actually wrote; using a block's hash here would
+          point the inspector at a path nothing has ever written.
+        * `block_id` is NULL and `block_code`/`block_name` carry the farm's,
+          because the acquisition has no single block.
+        * No grid config: a grid belongs to a block, and this scene spans
+          all of them. The detail payload renders `grid: null`, which is
+          honest — the per-block grids are reachable from each block's own
+          scene rows.
+        * `valid_pixel_pct` is NULL — the farm job table does not record it.
+        """
+        row = (
+            (
+                await self._s.execute(
+                    text(
+                        """
+                    SELECT
+                      'farm'::text AS scope,
+                      fj.id AS job_id,
+                      NULL::uuid AS block_id,
+                      fj.product_id, fj.scene_id,
+                      fj.scene_datetime, fj.status, fj.stac_item_id,
+                      fj.cloud_cover_pct,
+                      NULL::numeric AS valid_pixel_pct,
+                      fj.error_code, fj.error_message,
+                      fj.requested_at, fj.started_at, fj.completed_at,
+                      fj.assets_written,
+                      fj.farm_id, f.code AS block_code, f.name AS block_name,
+                      f.aoi_hash, f.area_m2,
+                      ST_AsGeoJSON(f.boundary)::text AS boundary_geojson,
+                      ST_AsGeoJSON(f.boundary_utm)::text AS boundary_utm_geojson,
+                      p.code AS product_code, p.name AS product_name,
+                      p.bands, p.supported_indices, p.resolution_m,
+                      pr.code AS provider_code, pr.name AS provider_name,
+                      NULL::uuid AS grid_config_id,
+                      NULL::numeric AS cell_size_m,
+                      NULL::int AS utm_srid,
+                      NULL::timestamptz AS effective_from,
+                      NULL::timestamptz AS effective_to,
+                      NULL::bigint AS cell_count
+                      FROM imagery_farm_ingestion_jobs fj
+                      JOIN farms f ON f.id = fj.farm_id
+                      JOIN public.imagery_products p ON p.id = fj.product_id
+                      JOIN public.imagery_providers pr ON pr.id = p.provider_id
+                     WHERE fj.id = :jid
+                       AND f.deleted_at IS NULL
                     """
                     ),
                     {"jid": str(job_id)},

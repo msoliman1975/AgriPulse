@@ -120,6 +120,7 @@ function RunsTable({
         <Thead>
           <Tr>
             <Th>{t("runs.col.kind")}</Th>
+            <Th>{t("runs.col.scope")}</Th>
             <Th>{t("runs.col.provider")}</Th>
             <Th>{t("runs.col.status")}</Th>
             <Th>{t("runs.col.startedAt")}</Th>
@@ -138,6 +139,14 @@ function RunsTable({
                   onClick={() => onToggle(r.attempt_id)}
                 >
                   <Td className="text-ap-ink">{t(`kind.${r.kind}`)}</Td>
+                  <Td>
+                    {/* A whole-farm fetch and a per-block one are different
+                        events with the same provider and status; without this
+                        column they are indistinguishable in the list. */}
+                    <Pill kind={r.scope === "farm" ? "info" : "neutral"}>
+                      {t(`scope.${r.scope}`)}
+                    </Pill>
+                  </Td>
                   <Td>{r.provider_code ?? "—"}</Td>
                   <Td>
                     <div className="flex flex-wrap items-center gap-1">
@@ -171,7 +180,7 @@ function RunsTable({
                 </Tr>
                 {isOpen ? (
                   <Tr className="bg-ap-bg/30">
-                    <Td colSpan={7} className="py-3">
+                    <Td colSpan={8} className="py-3">
                       <DetailBlock row={r} />
                     </Td>
                   </Tr>
@@ -191,7 +200,9 @@ function DetailBlock({ row }: { row: IntegrationAttempt }): ReactNode {
     <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
       <DetailLine label={t("detail.attemptId")} value={row.attempt_id} />
       <DetailLine label={t("detail.subscriptionId")} value={row.subscription_id} />
-      <DetailLine label={t("detail.blockId")} value={row.block_id} />
+      {/* A farm-scoped attempt has no block. Printing an empty value read
+          as missing data rather than as "this covered the whole farm". */}
+      <DetailLine label={t("detail.blockId")} value={row.block_id ?? t("scope.wholeFarmNoBlock")} />
       <DetailLine label={t("detail.farmId")} value={row.farm_id ?? "—"} />
       {row.queued_at && row.queued_at !== row.started_at ? (
         <DetailLine label={t("detail.queuedAt")} value={row.queued_at} />

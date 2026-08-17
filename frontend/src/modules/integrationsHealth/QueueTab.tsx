@@ -94,7 +94,7 @@ function QueueSection({
                 <span className="font-mono text-ap-muted">{r.provider_code ?? "—"}</span>
               </div>
               <div className="mt-0.5 flex items-center justify-between gap-2 text-ap-muted">
-                <span className="truncate font-mono">{r.block_id}</span>
+                <span className="truncate">{subjectOf(r, t)}</span>
                 <span>
                   {r.since
                     ? formatDistanceToNow(parseISO(r.since), {
@@ -112,4 +112,22 @@ function QueueSection({
       {footer ? <p className="text-[10px] text-ap-muted">{footer}</p> : null}
     </Card>
   );
+}
+
+/**
+ * What this queue entry is waiting on, in words.
+ *
+ * A farm-scoped subscription has no block, so the old raw `block_id` cell
+ * rendered empty for exactly the rows the farm cutover created — and a bare
+ * UUID was never readable for the block ones either. The server resolves
+ * both names, so say which farm, and which block within it when there is
+ * one.
+ */
+function subjectOf(
+  r: QueueEntry,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string {
+  const farm = r.farm_name ?? r.farm_id ?? "—";
+  if (r.scope === "farm") return t("queue.wholeFarm", { farm });
+  return r.block_code ? `${r.block_code} · ${farm}` : farm;
 }

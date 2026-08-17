@@ -1,4 +1,4 @@
-﻿{
+{
   "nav": {
     "section": "Platform",
     "tenants": "Tenants",
@@ -650,7 +650,8 @@
       "succeeded": "Succeeded",
       "failed": "Failed",
       "skipped_cloud": "Skipped — cloud",
-      "skipped_duplicate": "Skipped — duplicate"
+      "skipped_duplicate": "Skipped — duplicate",
+      "skipped": "Skipped"
     },
     "scenes": {
       "title": "Scenes",
@@ -677,7 +678,8 @@
       "std": "Std dev",
       "validPx": "Valid / total px",
       "baselineZ": "Baseline z",
-      "open": "Open"
+      "open": "Open",
+      "wholeFarm": "Whole farm"
     },
     "tooltip": {
       "cloudPct": "Cloud cover across the whole scene as reported by the provider — not measured for this block specifically.",
@@ -747,7 +749,11 @@
       "calcVersion": "Calc version",
       "maskedPx": "Masked px",
       "durationMs": "Duration (ms)",
-      "outcome": "Outcome"
+      "outcome": "Outcome",
+      "maskClasses": "classes",
+      "maskBits": "bits",
+      "wholeFarmTitle": "Whole-farm acquisition",
+      "wholeFarmNote": "One fetch covered the whole farm boundary, so this scene wrote an aggregate on every block. Verification and lineage compare against a single block's stored rows — open one of the farm's block scenes to run them."
     },
     "verify": {
       "title": "Verify this scene",
