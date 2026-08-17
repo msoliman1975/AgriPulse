@@ -39,8 +39,8 @@ from app.core.logging import get_logger
 from app.modules.imagery._rasterio_io import _gdal_s3_env
 from app.modules.indices.computation import (
     compute_aggregates,
-    compute_all_indices,
-    scl_cloud_mask,
+    compute_indices_for_product,
+    quality_band_mask,
 )
 
 # How far a recomputed mean may sit from the stored one before it is drift.
@@ -113,11 +113,13 @@ def _worst(verdicts: list[str]) -> str:
 
 def verify_scene_full(
     *,
+    product_code: str,
     raw_uri: str,
     band_names: tuple[str, ...],
     supported_indices: tuple[str, ...],
     aoi_geojson_utm: dict[str, Any],
     stored: dict[str, dict[str, Any]],
+    air_temp_c: float | None = None,
 ) -> SceneVerification:
     """Re-run masking and every formula from the raw bands, then diff.
 
@@ -125,6 +127,13 @@ def verify_scene_full(
     masks, same `compute_aggregates` — minus the COG writes. Any divergence
     between this and the pipeline is a bug in one of them, which is precisely
     what the mode is for.
+
+    Which means the dispatch has to mirror it too. Hardcoding Sentinel-2's
+    mask and index set here would have made a verification of a Landsat
+    thermal scene recompute it under another product's rules and then
+    report the disagreement as *drift in the stored data* — the one verdict
+    this mode exists to make trustworthy. Unreachable today (thermal is
+    farm-AOI only and verify is block-scoped), latent regardless.
     """
     from rasterio.features import geometry_mask
 
@@ -135,7 +144,9 @@ def verify_scene_full(
             for idx, name in enumerate(band_names)
         }
         if ds.count == n_science + 1:
-            cloud_mask = scl_cloud_mask(ds.read(n_science + 1).astype(np.float32, copy=False))
+            cloud_mask = quality_band_mask(
+                product_code, ds.read(n_science + 1).astype(np.float32, copy=False)
+            )
         else:
             cloud_mask = np.zeros((ds.height, ds.width), dtype=bool)
         aoi_mask = ~geometry_mask(
@@ -147,7 +158,7 @@ def verify_scene_full(
         )
 
     try:
-        computed = compute_all_indices(arrays)
+        computed = compute_indices_for_product(product_code, arrays, air_temp_c=air_temp_c)
     except KeyError as exc:
         return SceneVerification(
             verdict="error",

@@ -778,6 +778,8 @@ class ObserverService:
 
         if mode == "full":
             result = verify_scene_full(
+                product_code=ctx["product_code"],
+                air_temp_c=ctx["air_temp_c"],
                 raw_uri=_raw_bands_uri(ctx),
                 band_names=tuple(ctx["bands"]),
                 supported_indices=supported,
@@ -950,6 +952,8 @@ class ObserverService:
             raise CellNotFoundError(str(cell_id))
 
         grid = build_pixel_grid(
+            product_code=ctx["product_code"],
+            air_temp_c=ctx["air_temp_c"],
             raw_uri=_raw_bands_uri(ctx),
             band_names=tuple(ctx["bands"]),
             aoi_geojson_utm=json.loads(ctx["boundary_utm_geojson"]),
