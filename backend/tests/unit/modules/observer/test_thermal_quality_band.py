@@ -24,6 +24,9 @@ dispatch and the labels the inspector adds around it.
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -139,3 +142,39 @@ def test_every_product_with_an_index_set_has_a_mask_ruleset() -> None:
     describe something the pipeline is not doing.
     """
     assert set(PRODUCT_INDEX_CODES) == set(PRODUCT_MASK_RULESETS)
+
+
+def test_no_observer_module_reaches_for_the_sentinel_only_helpers() -> None:
+    """Structural guard: Observer must dispatch on the product, never assume S2.
+
+    `compute_all_indices` and `scl_cloud_mask` are the Sentinel-2-only
+    entry points. Any Observer module that calls one has re-introduced the
+    assumption that broke thermal — and each time it did, the symptom was
+    different and none of them failed a test:
+
+      * `pixels.explain_pixel` masked a cloudy Landsat pixel as CLEAR and
+        offered no thermal indices at all;
+      * `pixels.compute_pixel_budget` returned an empty budget, because the
+        KeyError was swallowed;
+      * `pixel_grid.build_pixel_grid` died on `KeyError: 'nir'` — invisible
+        until a farm scene became openable and the map tried to draw.
+
+    Three modules, three failure modes, one cause. The product-dispatching
+    pair (`compute_indices_for_product`, `quality_band_mask`) is the only
+    correct entry point, so pin the import surface rather than trusting
+    each new call site to remember.
+    """
+    observer_dir = Path(__file__).resolve().parents[4] / "app" / "modules" / "observer"
+    offenders: list[str] = []
+    for module in sorted(observer_dir.glob("*.py")):
+        source = module.read_text(encoding="utf-8")
+        for banned in ("compute_all_indices", "scl_cloud_mask"):
+            # Mentioning one in prose is fine; importing or calling it is not.
+            if re.search(rf"\b{banned}\s*\(", source) or re.search(
+                rf"^from .+ import .*\b{banned}\b", source, re.M
+            ):
+                offenders.append(f"{module.name}: {banned}")
+    assert offenders == [], (
+        "Observer modules must call compute_indices_for_product / "
+        f"quality_band_mask instead: {offenders}"
+    )

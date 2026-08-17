@@ -35,7 +35,7 @@ from shapely.geometry import mapping, shape
 
 from app.core.logging import get_logger
 from app.modules.imagery._rasterio_io import _gdal_s3_env
-from app.modules.indices.computation import compute_all_indices, scl_cloud_mask
+from app.modules.indices.computation import compute_indices_for_product, quality_band_mask
 
 _log = get_logger(__name__)
 
@@ -90,6 +90,8 @@ def _pixel_polygon_wgs84(
 
 def build_pixel_grid(
     *,
+    product_code: str,
+    air_temp_c: float | None = None,
     raw_uri: str,
     band_names: tuple[str, ...],
     aoi_geojson_utm: dict[str, Any],
@@ -97,13 +99,22 @@ def build_pixel_grid(
     cell_polygon_wkt: str | None = None,
     max_pixels: int = DEFAULT_MAX_PIXELS,
 ) -> PixelGrid:
-    """Every pixel the block (or one cell) is made of, with its value.
+    """Every pixel the AOI (or one cell) is made of, with its value.
 
     ``cell_polygon_wkt`` narrows to a single cell and switches the membership
     rule from the block's ``all_touched=True`` to the cell's
     ``all_touched=False`` — matching `grid.zonal.compute_cell_aggregates`
     exactly, so the pixels shown are the pixels the stored cell mean was
     actually computed from.
+
+    ``product_code`` decides the mask ruleset and the index set, through the
+    pipeline's own dispatchers. This module assumed Sentinel-2 twice over —
+    `scl_cloud_mask` on whatever trailing band it found, and
+    `compute_all_indices` on the band dict — so a Landsat thermal scene died
+    on `KeyError: 'nir'`. That was unreachable while no thermal scene could
+    be opened at all; making one openable is what surfaced it.
+
+    ``air_temp_c`` is CWSI's second input, absent for every other product.
     """
     with _gdal_s3_env(), rasterio.open(raw_uri) as ds:
         n_science = len(band_names)
@@ -112,7 +123,9 @@ def build_pixel_grid(
             for idx, name in enumerate(band_names)
         }
         if ds.count == n_science + 1:
-            cloud_mask = scl_cloud_mask(ds.read(n_science + 1).astype(np.float32, copy=False))
+            cloud_mask = quality_band_mask(
+                product_code, ds.read(n_science + 1).astype(np.float32, copy=False)
+            )
         else:
             cloud_mask = np.zeros((ds.height, ds.width), dtype=bool)
 
@@ -142,7 +155,7 @@ def build_pixel_grid(
         src_crs = ds.crs
         resolution = float(abs(transform.a))
 
-    computed = compute_all_indices(arrays)
+    computed = compute_indices_for_product(product_code, arrays, air_temp_c=air_temp_c)
     if index_code not in computed:
         raise KeyError(index_code)
     raster = computed[index_code]
