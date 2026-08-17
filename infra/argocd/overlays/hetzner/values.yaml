@@ -2055,13 +2055,67 @@ global:
   #   Backend only — api + workers bumped, FRONTEND STAYS 85e1bea (no FE
   #   delta). NO MIGRATIONS; public stays 0068, tenant 0077.
   #   Image CONFIRMED by pulling it on the node: api @ 2c0e5ec.
+  #
+  # 762d5a2 = #501. Integration Health and the Observer both stopped
+  #   describing reality once farms gained subscriptions of their own, and
+  #   TWO OF FOUR HEALTH TABS WERE RETURNING 500 IN PRODUCTION.
+  #
+  #   THE 500: `block_id` was declared a required UUID on
+  #     `IntegrationAttemptRow` / `QueueEntry` while farm-scoped rows carry
+  #     NULL by design (0077 weather attempts, 0076 farm imagery jobs), so
+  #     response validation failed on every payload containing one.
+  #     /integrations/health/recent and /queue — the Runs and Queue tabs —
+  #     have been dead since the first farm-scoped attempt landed. The
+  #     Overview tab kept 200ing, which is why nobody noticed.
+  #
+  #   BOTH FAILURE DIRECTIONS AT ONCE, measured on agrosina 2026-08-17:
+  #     Green Farm [Demo-01] — 3 active farm subs all synced within the
+  #       hour, 65 farm ingestion jobs, zero block subs — reported 0 subs,
+  #       NULL last-sync, 0 failures. Ingesting continuously, read as never
+  #       configured.
+  #     Bashier Elkhier — weather synced 06:17 that morning; the page said
+  #       2026-08-13 17:38, because `v_farm_integration_health` is a pure
+  #       rollup of the BLOCK view (0056) and maxed only over the abandoned
+  #       per-block rows. A false alarm on a healthy farm.
+  #
+  #   THERMAL WAS INVISIBLE END TO END. `landsat_c2_l2_st` is farm-AOI only
+  #     BY CONSTRUCTION — 30 succeeded farm jobs, 2,372 lst/cwsi/smi rows,
+  #     and ZERO rows in `imagery_ingestion_jobs`, ever. The Observer's
+  #     scene table and histogram read only that table, so the screen
+  #     contradicted itself: the ribbon read 21 discovered / 21 acquired /
+  #     756 indices above a table returning 0 rows.
+  #
+  #   AND THE THERMAL MASK WAS WRONG, not merely mislabelled. The pixel
+  #     inspector ran Sentinel-2's SCL membership test — `IN (0,1,3,8,9,
+  #     10,11)` — over Landsat's QA_PIXEL BITMASK. A cloudy pixel (22280)
+  #     is not in that set, so it read UNMASKED; the failure flags live in
+  #     bits 0-5 where a membership test cannot see them. It now dispatches
+  #     through the pipeline's own `quality_band_mask` /
+  #     `compute_indices_for_product`, which already existed and were
+  #     simply not being called.
+  #
+  #   TENANT MIGRATION 0078 — rebuilds `v_farm_integration_health` (block
+  #     rollup PLUS the farm's own rows) and `v_integration_recent_attempts`
+  #     (third UNION arm for `imagery_farm_ingestion_jobs`); both attempt
+  #     views gain `scope`. `v_block_integration_health` is deliberately
+  #     UNTOUCHED. Verified before merge: nothing in either tenant schema
+  #     depends on the two views being dropped, and both tenants sit at
+  #     0077. Public stays 0068. The view body was dry-run against live
+  #     prod data first — Green Farm goes 0 -> 1 weather / 2 imagery subs,
+  #     Bashier's weather sync moves 08-13 -> 08-17 06:17, and agrosina-suez
+  #     (no weather farm sub, fetch_farm_aoi=false) is correctly unchanged.
+  #
+  #   Full stack — api + workers + FRONTEND all bump (health tabs render a
+  #   scope column, the Observer scene table renders whole-farm rows).
+  #   Images CONFIRMED by pulling both on the node: api + frontend @
+  #   762d5a2.
   images:
     api:
-      tag: "2c0e5ec"
+      tag: "762d5a2"
     workers:
-      tag: "2c0e5ec"
+      tag: "762d5a2"
     frontend:
-      tag: "85e1bea"
+      tag: "762d5a2"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
