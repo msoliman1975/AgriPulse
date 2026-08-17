@@ -2019,11 +2019,47 @@ global:
   #   Note: this governs WRITES. greenFarm_Test's two existing rows are healed
   #   separately by setting fetch_farm_aoi — which is what the new code
   #   computes for that farm (no block history, 84 px at 10 m vs a 2500 cap).
+  #
+  # 2c0e5ec = #498 + #499, three map/pipeline defects found on greenFarm_Test.
+  #
+  #   #498a The index COG's AOI mask used `all_touched=True`, keeping every
+  #     pixel the boundary merely CLIPS — so the farm surface painted a full
+  #     pixel of colour past the border (10 m S2, 30 m Landsat) and inflated
+  #     the legend's covered area by ~2%. The FARM surface now uses the centre
+  #     rule. The per-block path deliberately keeps the touched rule: every
+  #     block aggregate was measured under it, and a block narrower than one
+  #     pixel would vanish. EXISTING COGs keep the old mask — the border only
+  #     tightens on rasters written after this.
+  #
+  #   #498b `list_farm_grid_rows` resolved a block's product from
+  #     `imagery_aoi_subscriptions` alone, so on a farm-AOI farm every block
+  #     had a NULL product: apply-preview said 0, "apply cell size" was a
+  #     silent no-op, `grid_product_id` stayed null and the console DISABLED
+  #     the grid overlay. greenFarm_Test: 20 m template saved, 0 grid configs,
+  #     0 cells. Both subscription shapes count now, and saving a cell size
+  #     grids blocks that have none (creating a grid retires nothing, so it
+  #     needs no confirmation; rezoning keeps all of its).
+  #
+  #   #499 The cloud cap was handed to the PROVIDER's search as
+  #     `eo:cloud_cover<=N`, which does not reject a pass — it makes it never
+  #     have existed. greenFarm_Test's cap is 0, and `eo:cloud_cover` is
+  #     TILE-level (110 km), so one cloud anywhere deleted the whole pass: 16
+  #     scenes in three months with 12- and 20-day gaps, every one reading
+  #     exactly 0.0%. Discovery is unfiltered now and the cap decides what is
+  #     FETCHED, leaving a `skipped_cloud` row with the real percentage.
+  #     The platform setting stays a CEILING, so the fetched set is identical
+  #     to the old `min(cap, setting)` — this CANNOT raise provider spend.
+  #     EXPECT more scene rows on the strip, marked cloudy. That is the fix
+  #     landing, not new failures.
+  #
+  #   Backend only — api + workers bumped, FRONTEND STAYS 85e1bea (no FE
+  #   delta). NO MIGRATIONS; public stays 0068, tenant 0077.
+  #   Image CONFIRMED by pulling it on the node: api @ 2c0e5ec.
   images:
     api:
-      tag: "897a0f2"
+      tag: "2c0e5ec"
     workers:
-      tag: "897a0f2"
+      tag: "2c0e5ec"
     frontend:
       tag: "85e1bea"
     tileServer:
