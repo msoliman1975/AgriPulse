@@ -107,6 +107,9 @@ const s2Detail: SceneDetail = {
 };
 
 const clearPixel: PixelExplain = {
+  scope: "block" as const,
+  product_code: "s2_l2a",
+  air_temp_c: null,
   job_id: "j1",
   scene_id: s2Detail.scene_id,
   scene_datetime: s2Detail.scene_datetime,
