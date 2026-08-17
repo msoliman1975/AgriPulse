@@ -336,18 +336,81 @@ class ImageryServiceImpl:
     async def upsert_farm_subscription(
         self, *, farm_id: UUID, payload: FarmSubscriptionCreate, actor_user_id: UUID | None
     ) -> FarmSubscriptionRead:
-        if payload.fetch_farm_aoi:
+        fetch_farm_aoi = payload.fetch_farm_aoi
+        if fetch_farm_aoi:
             await self._require_fetchable(farm_id=farm_id, product_id=payload.product_id)
+        else:
+            fetch_farm_aoi = await self._resolve_block_scope(
+                farm_id=farm_id,
+                product_id=payload.product_id,
+                cadence_hours=payload.cadence_hours,
+                cloud_cover_max_pct=payload.cloud_cover_max_pct,
+                actor_user_id=actor_user_id,
+            )
         row = await self._repo.upsert_farm_subscription(
             subscription_id=uuid7(),
             farm_id=farm_id,
             product_id=payload.product_id,
             cadence_hours=payload.cadence_hours,
             cloud_cover_max_pct=payload.cloud_cover_max_pct,
-            fetch_farm_aoi=payload.fetch_farm_aoi,
+            fetch_farm_aoi=fetch_farm_aoi,
             actor_user_id=actor_user_id,
         )
         return await self._read_with_fit(row)
+
+    async def _resolve_block_scope(
+        self,
+        *,
+        farm_id: UUID,
+        product_id: UUID,
+        cadence_hours: int | None,
+        cloud_cover_max_pct: int | None,
+        actor_user_id: UUID | None,
+    ) -> bool:
+        """Give a per-block subscription a path that actually fetches.
+
+        A farm row with `fetch_farm_aoi` false means "this farm is fetched one
+        block at a time" — and the block sweep is driven by
+        `imagery_aoi_subscriptions` and by nothing else. Subscribe a farm that
+        has no such rows and the result is a subscription that is active,
+        listed, reported as per-block, and **fetches nothing, ever**. Measured
+        on prod: greenFarm_Test carried two active farm subscriptions with zero
+        block rows, zero jobs on either path, and `last_attempted_at` NULL
+        since the day it was created. The only surface that noticed was the
+        backfill console's pre-flight, which the user reasonably read as the
+        pre-flight being wrong.
+
+        So resolve it here, at the write, where the farm's shape is known:
+
+        * blocks already subscribed — nothing to do, the phrase is true;
+        * no blocks, no per-block history, and the boundary fits in one
+          request — take the whole-farm path. Nothing is reading a per-block
+          series that a stitched surface would put a step in, and this is the
+          direction the platform is moving anyway;
+        * otherwise — subscribe the blocks, which is what the row said all
+          along. That covers a farm too large to fetch whole, and a farm whose
+          block subscriptions were revoked but whose history is still on
+          screen.
+
+        Returns the `fetch_farm_aoi` the row should be written with.
+        """
+        if await self._repo.count_active_block_subscriptions(
+            farm_id=farm_id, product_id=product_id
+        ):
+            return False
+        fit = await self._fit_for(farm_id=farm_id, product_id=product_id)
+        if fit.fits and not await self._repo.has_block_imagery_history(
+            farm_id=farm_id, product_id=product_id
+        ):
+            return True
+        await self._repo.subscribe_farm_blocks(
+            farm_id=farm_id,
+            product_id=product_id,
+            cadence_hours=cadence_hours,
+            cloud_cover_max_pct=cloud_cover_max_pct,
+            actor_user_id=actor_user_id,
+        )
+        return False
 
     async def update_farm_subscription(
         self,
