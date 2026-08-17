@@ -2268,32 +2268,14 @@ global:
     workers:
       tag: "86faf0b"
     frontend:
-      # 8002b2d = #505. `visualizationDefaults` is a switch with NO default
-      #   arm over the OPTICAL index union, so lst/cwsi/smi returned
-      #   `undefined` — and every caller reads `.rescaleMin` off it. Not a
-      #   missing colour: a TypeError that renders the whole scene page
-      #   blank, and this page has no error boundary.
-      #   Invisible until #502 made the page select the scene's OWN index;
-      #   it then asked for `lst` and crashed on prod.
-      #   Windows come from the catalog's own value_min/value_max, read off
-      #   prod: lst 0-60 degC (the only index with a UNIT), cwsi/smi 0-1.
-      #   The [-1,1] of the normalized differences would clamp every real
-      #   pixel — the farm reads ~50 degC — to one end of the ramp.
-      #   FRONTEND ONLY; api + workers stay a615cb8. No migrations.
-      #   Image CONFIRMED by pulling it on the node: frontend @ 8002b2d.
-      #
-      # 0981f7f = #506, the last of the chain. Cosmetic labels only: the
-      #   pixel inspector printed "SCL = 21824" over a Landsat QA_PIXEL
-      #   value, and "Inside the block boundary" on a whole-farm scene
-      #   that has no block. Both now key on the scene's own product and
-      #   scope. FRONTEND ONLY; api + workers stay a615cb8.
-      #   Image CONFIRMED by pulling it on the node: frontend @ 0981f7f.
-      #
-      # 99ed384 = #510, together with api + workers above — see the note
-      #   there. The picker gains LST/CWSI/SMI on /labs/map-v2 only, and the
-      #   scene reads carry `?index=`, which is why this cannot ship ahead
-      #   of the api.
-      tag: "86faf0b"
+      # ceaa572 = #512, the last block-vs-farm wording from #506. On a
+      #   whole-farm scene the pixel-cap notice read "the BLOCK is larger
+      #   than the map cap" — a whole-farm acquisition is clipped to the
+      #   FARM boundary and has no block. The pixel-grid payload already
+      #   carried `scope`; the notice was not reading it.
+      #   FRONTEND ONLY; api + workers stay 86faf0b. No migrations.
+      #   Image CONFIRMED by pulling it on the node: frontend @ ceaa572.
+      tag: "ceaa572"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
