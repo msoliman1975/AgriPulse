@@ -356,13 +356,22 @@ export function useIndexLineage(
 export function usePixelGrid(
   tenantId: string | null,
   jobId: string | null,
-  indexCode: string,
+  /**
+   * Null until the scene's product is known. The index set belongs to the
+   * product — a thermal scene has no NDVI — so firing before it resolves
+   * asks for a raster that cannot exist and 422s.
+   */
+  indexCode: string | null,
   cellId: string | null,
 ): UseQueryResult<PixelGrid> {
   return useQuery({
-    queryKey: [ROOT, "pixelGrid", tenantId, jobId, indexCode, cellId ?? ""],
-    queryFn: () => getPixelGrid(tenantId as string, jobId as string, { indexCode, cellId }),
-    enabled: Boolean(tenantId && jobId),
+    queryKey: [ROOT, "pixelGrid", tenantId, jobId, indexCode ?? "", cellId ?? ""],
+    queryFn: () =>
+      getPixelGrid(tenantId as string, jobId as string, {
+        indexCode: indexCode as string,
+        cellId,
+      }),
+    enabled: Boolean(tenantId && jobId && indexCode),
     staleTime: Infinity,
     retry: false,
   });
