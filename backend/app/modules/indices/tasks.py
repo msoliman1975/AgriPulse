@@ -55,10 +55,17 @@ async def _set_tenant_context(session: Any, tenant_schema: str) -> None:
     )
 
 
+# Result KEPT, deliberately against the module's convention: this task is on the
+# `platform.run_tasks` allowlist, and the only way an operator or the simulation
+# harness can tell a triggered run apart from one that never started is to read
+# its return value back through GET /admin/tasks/runs/{id}. With
+# `ignore_result=True` Celery stores nothing, so that endpoint reports PENDING
+# forever even for a task that succeeded — measured at 0.16 s against 480 s of
+# polling. Do not "restore consistency" here without also giving the trigger
+# endpoint another way to observe completion.
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
     name="indices.recompute_baselines_for_tenant",
     bind=False,
-    ignore_result=True,
 )
 def recompute_baselines_for_tenant(tenant_schema: str) -> dict[str, int]:
     """Recompute every (block, index) baseline pair in one tenant."""
@@ -146,10 +153,11 @@ async def _recompute_baselines_sweep_async() -> dict[str, int]:
 # rather than trying to detect which windows went stale.
 
 
+# Result KEPT — allowlisted for on-demand triggering; see the note on
+# `recompute_baselines_for_tenant` above.
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
     name="indices.refresh_index_caggs_for_tenant",
     bind=False,
-    ignore_result=True,
 )
 def refresh_index_caggs_for_tenant(tenant_schema: str) -> dict[str, Any]:
     """Materialize both index continuous aggregates for one tenant."""

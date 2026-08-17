@@ -47,10 +47,15 @@ async def _set_tenant_context(session: Any, tenant_schema: str) -> None:
     )
 
 
+# Result KEPT, deliberately against this module's convention: the task is on the
+# `platform.run_tasks` allowlist, and GET /admin/tasks/runs/{id} reads Celery's
+# AsyncResult. Under `ignore_result=True` nothing is stored, so a triggered run
+# reports PENDING forever even after it succeeds — indistinguishable from one
+# that never started. Do not remove without giving that endpoint another way to
+# observe completion.
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
     name="irrigation.generate_for_tenant",
     bind=False,
-    ignore_result=True,
 )
 def generate_for_tenant(tenant_schema: str) -> dict[str, int]:
     return _run_task(_generate_for_tenant_async(tenant_schema))
@@ -130,10 +135,11 @@ async def _generate_sweep_async() -> dict[str, int]:
 # --- Daily crop water balance (indices gap audit, finding D7) ---------------
 
 
+# Result KEPT — allowlisted for on-demand triggering; see the note on
+# `generate_for_tenant` above.
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
     name="irrigation.water_balance_for_tenant",
     bind=False,
-    ignore_result=True,
 )
 def water_balance_for_tenant(tenant_schema: str, target_iso: str | None = None) -> dict[str, int]:
     return _run_task(_water_balance_for_tenant_async(tenant_schema, target_iso))
