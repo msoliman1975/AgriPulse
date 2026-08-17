@@ -17,6 +17,8 @@ const STATUS_KIND: Record<JobStatus, "ok" | "warn" | "crit" | "neutral"> = {
   failed: "crit",
   skipped_cloud: "warn",
   skipped_duplicate: "warn",
+  // A farm acquisition skips without saying why — same event to a reader.
+  skipped: "warn",
 };
 
 function fmtPct(v: number | null): string {
@@ -30,14 +32,21 @@ function fmtDuration(seconds: number | null): string {
 
 function ExpandedIndices({
   tenantId,
+  farmId,
   scene,
 }: {
   tenantId: string;
+  farmId: string;
   scene: ObserverScene;
 }): ReactNode {
   const { t } = useTranslation("admin");
+  // A farm acquisition wrote an aggregate on every block, so it is asked for
+  // by farm and comes back one row per (block, index). Asking by block would
+  // send a null and return nothing — which is how a thermal scene's stored
+  // values ended up with no surface in the product at all.
   const { data, isPending } = useSceneIndices(tenantId, {
     blockId: scene.block_id,
+    farmId,
     productId: scene.product_id,
     sceneTime: scene.scene_datetime,
   });
@@ -87,6 +96,7 @@ function ExpandedIndices({
 
 export function SceneTable({
   tenantId,
+  farmId,
   scenes,
   isLoading,
   isError = false,
@@ -94,6 +104,8 @@ export function SceneTable({
   onToggleExpand,
 }: {
   tenantId: string;
+  /** Needed to expand a whole-farm row, which has no block to ask by. */
+  farmId: string;
   scenes: ObserverScene[];
   isLoading: boolean;
   /** The scenes query failed. Must be distinguished from an empty result. */
@@ -167,7 +179,16 @@ export function SceneTable({
                     timeStyle: "short",
                   })}
                 </Td>
-                <Td>{s.block_name ?? s.block_code ?? "—"}</Td>
+                <Td>
+                  <div className="flex items-center gap-1.5">
+                    <span>{s.block_name ?? s.block_code ?? "—"}</span>
+                    {/* Otherwise a whole-farm row is indistinguishable from a
+                        block row that happens to share the farm's name. */}
+                    {s.scope === "farm" ? (
+                      <Pill kind="info">{t("observer.scenes.wholeFarm")}</Pill>
+                    ) : null}
+                  </div>
+                </Td>
                 <Td className="max-w-[16rem] truncate font-mono text-xs" title={s.scene_id}>
                   {s.scene_id}
                 </Td>
@@ -213,7 +234,7 @@ export function SceneTable({
               {isOpen ? (
                 <Tr>
                   <Td colSpan={12} className="bg-ap-bg/40">
-                    <ExpandedIndices tenantId={tenantId} scene={s} />
+                    <ExpandedIndices tenantId={tenantId} farmId={farmId} scene={s} />
                   </Td>
                 </Tr>
               ) : null}

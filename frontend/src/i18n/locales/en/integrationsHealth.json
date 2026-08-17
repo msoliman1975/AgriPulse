@@ -8,8 +8,13 @@
     "queue": "Queue",
     "providers": "Providers"
   },
-  "tabs": { "farms": "Farms", "blocks": "Blocks" },
-  "overviewScope": { "label": "Overview scope" },
+  "tabs": {
+    "farms": "Farms",
+    "blocks": "Blocks"
+  },
+  "overviewScope": {
+    "label": "Overview scope"
+  },
   "col": {
     "farm": "Farm",
     "block": "Block",
@@ -55,9 +60,12 @@
       "duration": "Duration",
       "wait": "Wait",
       "run": "Run",
-      "detail": "Detail"
+      "detail": "Detail",
+      "scope": "Scope"
     },
-    "summary": { "rows": "{{n}} rows" },
+    "summary": {
+      "rows": "{{n}} rows"
+    },
     "attemptN": "Attempt #{{n}}"
   },
   "detail": {
@@ -92,7 +100,8 @@
       "overdue": "Nothing overdue.",
       "stuck": "No stuck attempts."
     },
-    "stuckThreshold": "Considered stuck after {{minutes}} minutes."
+    "stuckThreshold": "Considered stuck after {{minutes}} minutes.",
+    "wholeFarm": "Whole farm · {{farm}}"
   },
   "providers": {
     "placeholder": "Providers view — coming soon.",
@@ -131,5 +140,10 @@
     "pickFarm": "Choose a farm…",
     "pickPrompt": "Choose a farm to see per-block sync status.",
     "empty": "No blocks in this farm."
+  },
+  "scope": {
+    "block": "Block",
+    "farm": "Whole farm",
+    "wholeFarmNoBlock": "none — whole-farm fetch"
   }
 }

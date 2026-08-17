@@ -63,7 +63,10 @@ export function ObserverSceneDetailPage(): ReactNode {
     tenantId,
     detail.data
       ? {
+          // A whole-farm scene carries no block; its aggregates are asked
+          // for by farm and come back one row per (block, index).
           blockId: detail.data.block_id,
+          farmId: detail.data.farm_id,
           productId: detail.data.product_id,
           sceneTime: detail.data.scene_datetime,
         }
@@ -186,7 +189,15 @@ export function ObserverSceneDetailPage(): ReactNode {
             <dd className="font-mono">{d.aoi_hash}</dd>
             <dt className="text-ap-muted">{t("observer.detail.maskRuleset")}</dt>
             <dd className="font-mono">
-              {d.mask_ruleset} ({d.mask_classes.join(", ")})
+              {/* Classes for Sentinel-2's SCL enum, bit positions for
+                  Landsat's QA_PIXEL bitmask. Exactly one is populated, and
+                  printing an empty "()" on thermal read as "masks nothing". */}
+              {d.mask_ruleset}
+              {d.mask_classes.length > 0
+                ? ` (${t("observer.detail.maskClasses")}: ${d.mask_classes.join(", ")})`
+                : d.mask_bits.length > 0
+                  ? ` (${t("observer.detail.maskBits")}: ${d.mask_bits.join(", ")})`
+                  : ""}
             </dd>
             <dt className="text-ap-muted">{t("observer.detail.grid")}</dt>
             <dd>
@@ -221,22 +232,38 @@ export function ObserverSceneDetailPage(): ReactNode {
         </Card>
       </div>
 
-      <VerifyPanel tenantId={tenantId as string} jobId={jobId as string} />
+      {/*
+        Verification and lineage are both keyed on one block: they diff
+        against, and trace forward from, that block's stored rows. A
+        whole-farm acquisition wrote a row on EVERY block of the farm, so
+        there is no single block to name — and silently picking one would
+        report a verdict about a scene the operator did not ask about.
+        Say so and point at the block scenes instead.
+      */}
+      {d.block_id === null ? (
+        <Card title={t("observer.detail.wholeFarmTitle")}>
+          <p className="text-sm text-ap-muted">{t("observer.detail.wholeFarmNote")}</p>
+        </Card>
+      ) : (
+        <>
+          <VerifyPanel tenantId={tenantId as string} jobId={jobId as string} />
 
-      <LineagePanel
-        tenantId={tenantId as string}
-        blockId={d.block_id}
-        indexCode={selectedIndex}
-        productId={d.product_id}
-        sceneTime={d.scene_datetime}
-        // A scene's consumers are what fired in the days after it, so the
-        // window opens at the scene and runs a fortnight forward rather than
-        // spanning the operator's whole selection.
-        windowFrom={d.scene_datetime}
-        windowTo={new Date(
-          new Date(d.scene_datetime).getTime() + 14 * 24 * 3600 * 1000,
-        ).toISOString()}
-      />
+          <LineagePanel
+            tenantId={tenantId as string}
+            blockId={d.block_id}
+            indexCode={selectedIndex}
+            productId={d.product_id}
+            sceneTime={d.scene_datetime}
+            // A scene's consumers are what fired in the days after it, so the
+            // window opens at the scene and runs a fortnight forward rather
+            // than spanning the operator's whole selection.
+            windowFrom={d.scene_datetime}
+            windowTo={new Date(
+              new Date(d.scene_datetime).getTime() + 14 * 24 * 3600 * 1000,
+            ).toISOString()}
+          />
+        </>
+      )}
 
       <Card
         title={t("observer.detail.history")}

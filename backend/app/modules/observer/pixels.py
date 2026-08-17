@@ -3,8 +3,9 @@
 The point of this module is that it must be *impossible* for it to disagree
 with the pipeline. It therefore borrows rather than reimplements:
 
-  * the index maths comes from ``indices.computation.compute_all_indices``;
-  * the mask decision comes from ``indices.computation.scl_cloud_mask``;
+  * the index maths comes from
+    ``indices.computation.compute_indices_for_product``;
+  * the mask decision comes from ``indices.computation.quality_band_mask``;
   * the asset path comes from ``imagery.storage.build_asset_key``;
   * the GDAL/S3 credential wiring comes from imagery's rasterio helper.
 
@@ -37,9 +38,10 @@ from shapely.geometry import box, shape
 # exactly the silent drift Observer exists to surface.
 from app.modules.imagery._rasterio_io import _gdal_s3_env
 from app.modules.indices.computation import (
+    PRODUCT_INDEX_CODES,
     STANDARD_INDEX_CODES,
-    compute_all_indices,
-    scl_cloud_mask,
+    compute_indices_for_product,
+    quality_band_mask,
 )
 
 # Sentinel-2 SCL class meanings, for the mask verdict. Values match
@@ -59,6 +61,40 @@ SCL_LABELS: dict[int, str] = {
     10: "thin cirrus",
     11: "snow or ice",
 }
+
+# Landsat Collection-2 QA_PIXEL bit meanings, for the same purpose. The
+# band is a BITMASK, not a class enum, so a value is described by the bits
+# that are set rather than by a single label — feeding it to `SCL_LABELS`
+# produced "SCL = 21824 (unknown class)" on a perfectly clear pixel, and
+# on a fill pixel it read "saturated or defective", which is a different
+# product's vocabulary applied to this one's numbers.
+#
+# `LANDSAT_QA_MASKED_BITS` in indices.computation stays the authority on
+# which bits drop a pixel; this table only supplies the human label.
+QA_PIXEL_BIT_LABELS: dict[int, str] = {
+    0: "fill",
+    1: "dilated cloud",
+    2: "cirrus",
+    3: "cloud",
+    4: "cloud shadow",
+    5: "snow",
+    6: "clear",
+    7: "water",
+}
+
+
+def _qa_pixel_label(code: int) -> str:
+    """Name every set flag bit in a QA_PIXEL value, low bit first.
+
+    Bits 8-15 are per-class confidence pairs and are deliberately not
+    named: they qualify the flags above rather than standing alone, and
+    listing them would bury the ones that decide the mask.
+    """
+    set_bits = [bit for bit, _ in sorted(QA_PIXEL_BIT_LABELS.items()) if code & (1 << bit)]
+    if not set_bits:
+        return "no flags set"
+    return ", ".join(QA_PIXEL_BIT_LABELS[bit] for bit in set_bits)
+
 
 # Catalog `formula_text` writes bands in prose ("NIR", "RedEdge"); the arrays
 # are keyed by the product's band names. This is the only mapping between the
@@ -155,6 +191,27 @@ def _exclusion_reason(
     return None
 
 
+def _read_quality_band(
+    raw: Any, product_code: str
+) -> tuple[int | None, str | None, bool, str | None]:
+    """Value, label, mask verdict and reason for one quality-band pixel.
+
+    Two products, two encodings of the same trailing band: Sentinel-2's SCL
+    is a class enum, Landsat's QA_PIXEL a bitmask. The verdict itself comes
+    from `quality_band_mask`, the pipeline's own dispatcher, so this cannot
+    mask differently from the aggregate it is explaining — only the human
+    label is decided here.
+    """
+    is_thermal = product_code == "landsat_c2_l2_st"
+    value = int(np.rint(float(raw)))
+    label = _qa_pixel_label(value) if is_thermal else SCL_LABELS.get(value, "unknown class")
+    masked = bool(quality_band_mask(product_code, np.array([[raw]]))[0, 0])
+    if not masked:
+        return value, label, False, None
+    band_label = "QA_PIXEL" if is_thermal else "SCL"
+    return value, label, True, f"{band_label} = {value} ({label})"
+
+
 def explain_pixel(
     *,
     raw_uri: str,
@@ -164,12 +221,27 @@ def explain_pixel(
     lon: float,
     lat: float,
     formulas: dict[str, str],
+    product_code: str,
+    air_temp_c: float | None = None,
 ) -> PixelExplanation:
     """Read one pixel from the raw-bands COG and explain every index on it.
 
     ``supported_indices`` comes from ``imagery_products``, so a product with
     no SWIR simply never offers NDMI rather than offering it and failing —
     the inspector degrades with the product instead of assuming Sentinel-2.
+
+    ``product_code`` decides both the mask rules and the index set, via the
+    pipeline's own dispatchers. Before it existed this function assumed
+    Sentinel-2 twice over: it ran ``scl_cloud_mask`` on whatever trailing
+    quality band it found — which for Landsat is a bit-packed QA_PIXEL and
+    produces a plausible-looking mask that is entirely wrong — and it only
+    ever iterated ``STANDARD_INDEX_CODES``, so ``lst``/``cwsi``/``smi``
+    could not be explained at all. A thermal scene's inspector showed an
+    empty index panel next to stored aggregates it could not account for.
+
+    ``air_temp_c`` is CWSI's second input. Absent, CWSI is reported
+    unavailable rather than computed from a guess — the same choice
+    ``compute_thermal_indices`` makes.
     """
     with _gdal_s3_env(), rasterio.open(raw_uri) as ds:
         # The COG is in a metre-based projection; a map click is lon/lat.
@@ -190,18 +262,11 @@ def explain_pixel(
         raw = float(stack[idx, 0, 0])
         values[name] = None if not np.isfinite(raw) else raw
 
-    scl_value: int | None = None
-    scl_label: str | None = None
-    masked = False
-    mask_reason: str | None = None
-    if has_scl:
-        scl_raw = stack[n_science, 0, 0]
-        scl_value = int(np.rint(float(scl_raw)))
-        scl_label = SCL_LABELS.get(scl_value, "unknown class")
-        # Ask the pipeline's own predicate rather than re-listing the classes.
-        masked = bool(scl_cloud_mask(np.array([[scl_raw]]))[0, 0])
-        if masked:
-            mask_reason = f"SCL = {scl_value} ({scl_label})"
+    scl_value, scl_label, masked, mask_reason = (
+        _read_quality_band(stack[n_science, 0, 0], product_code)
+        if has_scl
+        else (None, None, False, None)
+    )
 
     # `all_touched=True` is what the pipeline rasterises the AOI with, so a
     # pixel counts as inside when its footprint *intersects* the boundary —
@@ -216,22 +281,44 @@ def explain_pixel(
         name: np.array([[values[name] if values[name] is not None else np.nan]], dtype=np.float32)
         for name in band_names
     }
-    computable = [c for c in supported_indices if c in STANDARD_INDEX_CODES]
+    # The index set belongs to the product, not to Sentinel-2. Unknown
+    # products fall back to the standard set, which is what the pipeline's
+    # own dispatcher would refuse — reporting every index unavailable beats
+    # computing the wrong maths.
+    product_codes = PRODUCT_INDEX_CODES.get(product_code, STANDARD_INDEX_CODES)
+    computable = [c for c in supported_indices if c in product_codes]
     try:
-        computed = compute_all_indices(arrays)
-    except KeyError:
-        # The product is missing a band one of the standard formulas needs.
+        computed = compute_indices_for_product(product_code, arrays, air_temp_c=air_temp_c)
+    except (KeyError, ValueError):
+        # KeyError: the product is missing a band one of its formulas needs.
+        # ValueError: no index set is defined for this product at all.
         # Fall back to per-index reporting so the ones that *can* be computed
         # still are, instead of the whole panel failing.
         computed = {}
 
-    for code in STANDARD_INDEX_CODES:
+    for code in product_codes:
         formula = formulas.get(code)
         if code not in computable:
             unavailable[code] = "not offered by this product"
             continue
+        if code == "smi":
+            # SMI is scene-relative: it normalises this pixel against the dry
+            # and wet edges fitted across the WHOLE scene's LST-NDVI cloud.
+            # Handed one pixel the span is zero, the edges collapse, and the
+            # fallback returns a flat 0.5 for every pixel on earth. Printing
+            # that next to a formula would assert a per-pixel derivation the
+            # index does not have.
+            unavailable[code] = "scene-relative — not derivable from one pixel"
+            continue
         if code not in computed:
-            unavailable[code] = "requires a band this product does not carry"
+            # CWSI is the live case: it needs an air temperature the weather
+            # feed may not have for this overpass, and the pipeline omits it
+            # rather than inventing one.
+            unavailable[code] = (
+                "needs an air temperature for this overpass"
+                if code == "cwsi"
+                else "requires a band this product does not carry"
+            )
             continue
         raw_value = float(computed[code][0, 0])
         value = None if not np.isfinite(raw_value) else raw_value
@@ -287,8 +374,18 @@ def compute_pixel_budget(
     band_names: tuple[str, ...],
     supported_indices: tuple[str, ...],
     aoi_geojson_utm: dict[str, Any],
+    product_code: str,
+    air_temp_c: float | None = None,
 ) -> PixelBudget:
-    """Reconcile AOI footprint → SCL-masked → no-data → valid, per index."""
+    """Reconcile AOI footprint → quality-masked → no-data → valid, per index.
+
+    Both the mask and the index set are resolved from `product_code`, for
+    the reasons spelled out on `explain_pixel`. On thermal this used to
+    return an empty `per_index` — `compute_all_indices` raises KeyError on
+    a Landsat band set and the except swallowed it — so the panel reported
+    no budget at all for the one product whose valid-pixel counts are
+    hardest to reason about.
+    """
     from rasterio.features import geometry_mask
 
     with _gdal_s3_env(), rasterio.open(raw_uri) as ds:
@@ -298,7 +395,9 @@ def compute_pixel_budget(
             for idx, name in enumerate(band_names)
         }
         if ds.count == n_science + 1:
-            cloud_mask = scl_cloud_mask(ds.read(n_science + 1).astype(np.float32, copy=False))
+            cloud_mask = quality_band_mask(
+                product_code, ds.read(n_science + 1).astype(np.float32, copy=False)
+            )
         else:
             cloud_mask = np.zeros((ds.height, ds.width), dtype=bool)
         aoi_mask = ~geometry_mask(
@@ -314,8 +413,8 @@ def compute_pixel_budget(
 
     per_index: dict[str, dict[str, int]] = {}
     try:
-        computed = compute_all_indices(arrays)
-    except KeyError:
+        computed = compute_indices_for_product(product_code, arrays, air_temp_c=air_temp_c)
+    except (KeyError, ValueError):
         computed = {}
 
     for code, raster in computed.items():

@@ -72,6 +72,17 @@ class SceneRasterUnavailableError(Exception):
     """The scene never produced a raster, so there is nothing to read."""
 
 
+class BlockScopedSceneRequiredError(Exception):
+    """The operation needs one block, and this scene covers a whole farm.
+
+    Verification and the cell drill-down both compare against `block_*`
+    rows keyed on a single block. A farm acquisition has none of its own —
+    it produced a row on every block of the farm — so running either
+    against it would silently pick a block or return nothing and call it a
+    result. Saying which block to open instead is the honest answer.
+    """
+
+
 class WindowTooWideError(Exception):
     """Requested window exceeds MAX_WINDOW_DAYS."""
 
@@ -197,6 +208,7 @@ class ObserverService:
                 window_to=window_to,
             )
             cells = await self._repo.cell_aggregate_coverage(
+                farm_id=farm_id,
                 block_ids=blocks,
                 product_id=product_id,
                 window_from=window_from,
@@ -253,6 +265,7 @@ class ObserverService:
             if not blocks:
                 return []
             return await self._repo.scene_histogram(
+                farm_id=farm_id,
                 block_ids=blocks,
                 product_id=product_id,
                 window_from=window_from,
@@ -286,6 +299,7 @@ class ObserverService:
             if not blocks:
                 return []
             rows = await self._repo.list_scenes(
+                farm_id=farm_id,
                 block_ids=blocks,
                 product_id=product_id,
                 window_from=window_from,
@@ -309,13 +323,20 @@ class ObserverService:
     # ---- L2 --------------------------------------------------------------
 
     async def scene_detail(self, *, tenant_schema: str, job_id: UUID) -> dict[str, Any]:
-        """Inputs, resolved grid geometry and asset keys for one scene."""
+        """Inputs, resolved grid geometry and asset keys for one scene.
+
+        Accepts a block job id or a farm job id — `scene_context` resolves
+        either. A farm acquisition's calc runs are recorded per block (the
+        zonal pass still runs block by block), so its history is gathered
+        across the farm rather than for one block that does not exist.
+        """
         await self._scope(tenant_schema)
         try:
             ctx = await self._repo.scene_context(job_id)
             history = (
                 await self._repo.scene_calc_history(
                     block_id=ctx["block_id"],
+                    farm_id=ctx["farm_id"] if ctx["block_id"] is None else None,
                     product_id=ctx["product_id"],
                     scene_time=ctx["scene_datetime"],
                 )
@@ -348,6 +369,7 @@ class ObserverService:
         from app.modules.observer.pixels import explain_pixel as _explain
 
         ctx, formulas = await self._scene_context_and_formulas(tenant_schema, job_id)
+        air_temp_c = ctx["air_temp_c"]
         raw_uri = _raw_bands_uri(ctx)
         result = _explain(
             raw_uri=raw_uri,
@@ -357,12 +379,22 @@ class ObserverService:
             lon=lon,
             lat=lat,
             formulas=formulas,
+            # Decides the mask ruleset and the index set. Without it the
+            # inspector read a Landsat QA_PIXEL band with Sentinel-2's SCL
+            # rules and offered only the optical indices.
+            product_code=ctx["product_code"],
+            air_temp_c=air_temp_c,
         )
         return {
             "job_id": job_id,
             "scene_id": ctx["scene_id"],
             "scene_datetime": ctx["scene_datetime"],
             "block_id": ctx["block_id"],
+            "scope": ctx["scope"],
+            "product_code": ctx["product_code"],
+            # The reading CWSI was explained against, so a reader can see
+            # which number drove it rather than take the index on faith.
+            "air_temp_c": air_temp_c,
             "raw_asset_key": _raw_bands_key(ctx),
             "row": result.row,
             "col": result.col,
@@ -398,6 +430,8 @@ class ObserverService:
             band_names=tuple(ctx["bands"]),
             supported_indices=tuple(ctx["supported_indices"]),
             aoi_geojson_utm=json.loads(ctx["boundary_utm_geojson"]),
+            product_code=ctx["product_code"],
+            air_temp_c=ctx["air_temp_c"],
         )
         return {
             "job_id": job_id,
@@ -407,6 +441,27 @@ class ObserverService:
             "recomputed_live": True,
         }
 
+    async def _air_temp_at(self, farm_id: UUID, scene_time: datetime) -> float | None:
+        """Air temperature at the overpass minute, or None.
+
+        CWSI is a canopy-to-air difference, so explaining it needs the same
+        reading the pipeline used. Borrowed from the weather module rather
+        than re-derived, for the reason every other borrow in Observer
+        exists: a second interpolation would eventually disagree with the
+        one that produced the stored numbers.
+
+        Never raises. Weather is the input to one of three thermal indices;
+        losing it costs CWSI's explanation, not the whole panel.
+        """
+        from app.modules.weather.service import get_weather_service
+
+        try:
+            return await get_weather_service(tenant_session=self._s).air_temp_at(
+                farm_id=farm_id, at=scene_time
+            )
+        except Exception:  # see docstring; CWSI degrades, the panel does not
+            return None
+
     async def _scene_context_and_formulas(
         self, tenant_schema: str, job_id: UUID
     ) -> tuple[dict[str, Any], dict[str, str]]:
@@ -414,6 +469,12 @@ class ObserverService:
         try:
             ctx = await self._repo.scene_context(job_id)
             formulas = await self._repo.index_formulas()
+            # Resolved inside the tenant scope, and only for the product
+            # that needs it — every other product ignores the argument.
+            if ctx is not None and ctx["product_code"] == "landsat_c2_l2_st":
+                ctx["air_temp_c"] = await self._air_temp_at(ctx["farm_id"], ctx["scene_datetime"])
+            elif ctx is not None:
+                ctx["air_temp_c"] = None
         finally:
             await self._unscope()
         if ctx is None:
@@ -687,6 +748,8 @@ class ObserverService:
 
         started = datetime.now(UTC)
         ctx, _ = await self._scene_context_and_formulas(tenant_schema, job_id)
+        if ctx["scope"] != "block":
+            raise BlockScopedSceneRequiredError(str(job_id))
 
         await self._scope(tenant_schema)
         try:
@@ -838,6 +901,8 @@ class ObserverService:
         from app.modules.observer.pixel_grid import build_pixel_grid
 
         ctx, _ = await self._scene_context_and_formulas(tenant_schema, job_id)
+        if ctx["scope"] != "block":
+            raise BlockScopedSceneRequiredError(str(job_id))
         if index_code not in ctx["supported_indices"]:
             raise IndexNotSupportedError(index_code)
 
@@ -932,14 +997,28 @@ class ObserverService:
         self,
         *,
         tenant_schema: str,
-        block_id: UUID,
+        block_id: UUID | None,
         product_id: UUID,
         scene_time: datetime,
+        farm_id: UUID | None = None,
     ) -> list[dict[str, Any]]:
+        """Per-index aggregates behind one scene.
+
+        Takes a block for a block acquisition, a farm for a whole-farm one.
+        The farm form returns a row per (block, index) rather than one per
+        index — see `farm_scene_index_rows` for why it does not average.
+        """
+        if block_id is None and farm_id is None:
+            raise ValueError("scene_indices needs a block_id or a farm_id")
         await self._scope(tenant_schema)
         try:
-            return await self._repo.scene_index_rows(
-                block_id=block_id, product_id=product_id, scene_time=scene_time
+            if block_id is not None:
+                return await self._repo.scene_index_rows(
+                    block_id=block_id, product_id=product_id, scene_time=scene_time
+                )
+            assert farm_id is not None  # narrowed by the guard above
+            return await self._repo.farm_scene_index_rows(
+                farm_id=farm_id, product_id=product_id, scene_time=scene_time
             )
         finally:
             await self._unscope()
@@ -1107,7 +1186,12 @@ def _index_uris(ctx: dict[str, Any]) -> dict[str, str]:
 def _scene_detail_payload(ctx: dict[str, Any]) -> dict[str, Any]:
     from app.core.settings import get_settings
     from app.modules.imagery.storage import build_asset_key
-    from app.modules.indices.computation import S2_SCL_MASKED_CLASSES
+    from app.modules.indices.computation import (
+        LANDSAT_QA_MASKED_BITS,
+        MASK_RULESET,
+        PRODUCT_MASK_RULESETS,
+        S2_SCL_MASKED_CLASSES,
+    )
 
     has_raster = bool(ctx["stac_item_id"]) and ctx["status"] == "succeeded"
     index_assets = (
@@ -1125,6 +1209,22 @@ def _scene_detail_payload(ctx: dict[str, Any]) -> dict[str, Any]:
         else {}
     )
     settings = get_settings()
+    # Which rules actually masked this scene, resolved from its product.
+    # Hardcoding the Sentinel-2 pair here told every Landsat thermal scene
+    # it had been masked by `s2_scl_v1` against SCL classes — a ruleset that
+    # cannot even be applied to a bit-packed QA_PIXEL band. The panel is
+    # supposed to be incapable of describing rules the pipeline is not
+    # running, and on thermal it was doing exactly that.
+    product_code = ctx["product_code"]
+    mask_ruleset = PRODUCT_MASK_RULESETS.get(product_code, MASK_RULESET)
+    if mask_ruleset == "landsat_qa_pixel_v1":
+        # Bits, not classes — a different encoding, so the field is named
+        # for what it holds rather than reusing `mask_classes`.
+        mask_classes: list[int] = []
+        mask_bits: list[int] = list(LANDSAT_QA_MASKED_BITS)
+    else:
+        mask_classes = list(S2_SCL_MASKED_CLASSES)
+        mask_bits = []
     return {
         # The tenant /v1/config endpoint carries these, but it requires a
         # tenant scope and an Observer user has none — so the scene that
@@ -1162,9 +1262,15 @@ def _scene_detail_payload(ctx: dict[str, Any]) -> dict[str, Any]:
         "index_asset_keys": index_assets,
         # Named and versioned so a stored row can be attributed to the rules
         # that produced it. OBS-5 persists this per run; until then it is the
-        # current ruleset, which is only the truth for freshly-computed rows.
-        "mask_ruleset": "s2_scl_v1",
-        "mask_classes": list(S2_SCL_MASKED_CLASSES),
+        # current ruleset for this scene's PRODUCT, which is only the truth
+        # for freshly-computed rows.
+        "mask_ruleset": mask_ruleset,
+        "mask_classes": mask_classes,
+        "mask_bits": mask_bits,
+        # 'block' | 'farm'. A farm acquisition covers every block at once,
+        # so `block_id` is null and the grid is not resolvable — the UI
+        # needs to know which it is looking at rather than infer it.
+        "scope": ctx["scope"],
         "grid": (
             {
                 "grid_config_id": ctx["grid_config_id"],

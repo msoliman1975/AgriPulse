@@ -144,10 +144,23 @@ export function useObserverScenes(
 
 export function useSceneIndices(
   tenantId: string | null,
-  args: { blockId: string; productId: string; sceneTime: string } | null,
+  args: {
+    blockId: string | null;
+    farmId: string | null;
+    productId: string;
+    sceneTime: string;
+  } | null,
 ): UseQueryResult<ObserverIndexRow[]> {
   return useQuery({
-    queryKey: [ROOT, "sceneIndices", tenantId, args?.blockId, args?.productId, args?.sceneTime],
+    queryKey: [
+      ROOT,
+      "sceneIndices",
+      tenantId,
+      args?.blockId,
+      args?.farmId,
+      args?.productId,
+      args?.sceneTime,
+    ],
     queryFn: () => getSceneIndices(tenantId as string, args as NonNullable<typeof args>),
     enabled: Boolean(tenantId && args),
     staleTime: STALE,

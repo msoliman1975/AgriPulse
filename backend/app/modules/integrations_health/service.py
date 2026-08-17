@@ -39,7 +39,7 @@ _BLOCK_COLUMNS = (
     "v.weather_overdue_count, v.imagery_overdue_count"
 )
 _ATTEMPT_COLUMNS = (
-    "attempt_id, kind, subscription_id, block_id, farm_id, provider_code, "
+    "attempt_id, kind, scope, subscription_id, block_id, farm_id, provider_code, "
     "started_at, queued_at, completed_at, status, "
     "duration_ms, wait_ms, run_ms, rows_ingested, "
     "error_code, error_message, scene_id, failed_streak_position"
@@ -101,8 +101,22 @@ class IntegrationsHealthService:
         """Recent ingestion attempts for one block, newest first.
 
         `kind` filters 'weather'|'imagery'; None returns both interleaved.
+
+        Includes the farm-scoped attempts of the block's own farm. A block
+        covered by a whole-farm subscription has no attempt rows of its own
+        — that is the entire point of the farm path — so matching on
+        `block_id` alone returns an empty run log for a block that is being
+        ingested every day. The farm rows carry `scope = 'farm'`, so a
+        reader can still tell which acquisition covered it.
         """
-        clauses = ["block_id = :block_id"]
+        clauses = [
+            """(
+                block_id = :block_id
+                OR (scope = 'farm'
+                    AND farm_id = (SELECT b.farm_id FROM blocks b
+                                    WHERE b.id = :block_id))
+            )"""
+        ]
         params: dict[str, Any] = {"block_id": block_id, "limit": max(1, min(limit, 500))}
         if kind is not None:
             clauses.append("kind = :kind")
@@ -164,9 +178,13 @@ class IntegrationsHealthService:
                         -- skipped so one stale farm does not report once per
                         -- block. Farms with no farm row still report per
                         -- block, which is what keeps the cutover gradual.
-                        SELECT ws.id AS subscription_id,
+                        SELECT 'block'::text AS scope,
+                               ws.id AS subscription_id,
                                ws.block_id,
+                               b.code AS block_code,
                                b.farm_id,
+                               (SELECT f2.name FROM farms f2
+                                 WHERE f2.id = b.farm_id) AS farm_name,
                                ws.provider_code,
                                ws.last_successful_ingest_at AS since
                         FROM weather_subscriptions ws
@@ -188,9 +206,12 @@ class IntegrationsHealthService:
 
                         UNION ALL
 
-                        SELECT wfs.id AS subscription_id,
+                        SELECT 'farm'::text AS scope,
+                               wfs.id AS subscription_id,
                                NULL::uuid AS block_id,
+                               NULL::text AS block_code,
                                wfs.farm_id,
+                               f.name AS farm_name,
                                wfs.provider_code,
                                wfs.last_successful_ingest_at AS since
                         FROM weather_farm_subscriptions wfs
@@ -224,9 +245,18 @@ class IntegrationsHealthService:
                         text(
                             """
                         SELECT wa.id AS attempt_id,
+                               -- 0077: a farm-scoped attempt leaves
+                               -- block_id NULL. Naming it here keeps the
+                               -- UI off a null-check.
+                               CASE WHEN wa.block_id IS NULL
+                                    THEN 'farm' ELSE 'block' END AS scope,
                                wa.subscription_id,
                                wa.block_id,
+                               (SELECT b.code FROM blocks b
+                                 WHERE b.id = wa.block_id) AS block_code,
                                wa.farm_id,
+                               (SELECT f.name FROM farms f
+                                 WHERE f.id = wa.farm_id) AS farm_name,
                                wa.provider_code,
                                wa.started_at AS since
                         FROM weather_ingestion_attempts wa
@@ -267,9 +297,13 @@ class IntegrationsHealthService:
                         -- replaces them, and the farm reads as healthy while
                         -- its imagery quietly stops. A monitoring blind spot
                         -- is worse than a false alarm.
-                        SELECT ias.id AS subscription_id,
+                        SELECT 'block'::text AS scope,
+                               ias.id AS subscription_id,
                                ias.block_id,
+                               b.code AS block_code,
                                b.farm_id,
+                               (SELECT f2.name FROM farms f2
+                                 WHERE f2.id = b.farm_id) AS farm_name,
                                (SELECT ip.code FROM public.imagery_products ip
                                 WHERE ip.id = ias.product_id) AS provider_code,
                                ias.last_successful_ingest_at AS since
@@ -286,9 +320,12 @@ class IntegrationsHealthService:
 
                         UNION ALL
 
-                        SELECT ifs.id AS subscription_id,
+                        SELECT 'farm'::text AS scope,
+                               ifs.id AS subscription_id,
                                NULL::uuid AS block_id,
+                               NULL::text AS block_code,
                                ifs.farm_id,
+                               f.name AS farm_name,
                                (SELECT ip.code FROM public.imagery_products ip
                                 WHERE ip.id = ifs.product_id) AS provider_code,
                                ifs.last_successful_ingest_at AS since
@@ -324,9 +361,13 @@ class IntegrationsHealthService:
                         text(
                             """
                         SELECT ij.id AS attempt_id,
+                               'block'::text AS scope,
                                ij.subscription_id,
                                ij.block_id,
+                               b.code AS block_code,
                                b.farm_id,
+                               (SELECT f2.name FROM farms f2
+                                 WHERE f2.id = b.farm_id) AS farm_name,
                                (SELECT ip.code FROM public.imagery_products ip
                                 WHERE ip.id = ij.product_id) AS provider_code,
                                COALESCE(ij.started_at, ij.requested_at) AS since
@@ -334,7 +375,30 @@ class IntegrationsHealthService:
                         JOIN blocks b ON b.id = ij.block_id
                         WHERE ij.status IN ('pending', 'requested', 'running')
                           AND b.deleted_at IS NULL
-                        ORDER BY COALESCE(ij.started_at, ij.requested_at) ASC
+
+                        UNION ALL
+
+                        -- The farm path has its own job table (0076). Left
+                        -- out, a farm whose whole-AOI fetches are wedged
+                        -- shows an EMPTY queue — the one state the queue
+                        -- exists to make visible. On prod 2026-08-17 that
+                        -- was 51 pending/running farm jobs invisible here,
+                        -- all of the tenant's thermal work among them.
+                        SELECT fj.id AS attempt_id,
+                               'farm'::text AS scope,
+                               fj.subscription_id,
+                               NULL::uuid AS block_id,
+                               NULL::text AS block_code,
+                               fj.farm_id,
+                               f.name AS farm_name,
+                               (SELECT ip.code FROM public.imagery_products ip
+                                WHERE ip.id = fj.product_id) AS provider_code,
+                               COALESCE(fj.started_at, fj.requested_at) AS since
+                        FROM imagery_farm_ingestion_jobs fj
+                        JOIN farms f ON f.id = fj.farm_id
+                        WHERE fj.status IN ('pending', 'requested', 'running')
+                          AND f.deleted_at IS NULL
+                        ORDER BY since ASC
                         """
                         )
                     )

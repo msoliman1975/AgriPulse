@@ -18,6 +18,7 @@ function renderTable(props: Partial<Parameters<typeof SceneTable>[0]> = {}) {
     <QueryClientProvider client={qc}>
       <SceneTable
         tenantId="t1"
+        farmId="f1"
         scenes={[]}
         isLoading={false}
         expanded={null}
