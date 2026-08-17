@@ -2171,7 +2171,20 @@ global:
     workers:
       tag: "a615cb8"
     frontend:
-      tag: "1ed728f"
+      # 8002b2d = #505. `visualizationDefaults` is a switch with NO default
+      #   arm over the OPTICAL index union, so lst/cwsi/smi returned
+      #   `undefined` — and every caller reads `.rescaleMin` off it. Not a
+      #   missing colour: a TypeError that renders the whole scene page
+      #   blank, and this page has no error boundary.
+      #   Invisible until #502 made the page select the scene's OWN index;
+      #   it then asked for `lst` and crashed on prod.
+      #   Windows come from the catalog's own value_min/value_max, read off
+      #   prod: lst 0-60 degC (the only index with a UNIT), cwsi/smi 0-1.
+      #   The [-1,1] of the normalized differences would clamp every real
+      #   pixel — the farm reads ~50 degC — to one end of the ramp.
+      #   FRONTEND ONLY; api + workers stay a615cb8. No migrations.
+      #   Image CONFIRMED by pulling it on the node: frontend @ 8002b2d.
+      tag: "8002b2d"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
