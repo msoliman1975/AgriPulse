@@ -2122,13 +2122,31 @@ global:
   #   FRONTEND ONLY — api + workers stay on 762d5a2 (no backend delta).
   #   NO MIGRATIONS; public 0068, tenant 0078.
   #   Image CONFIRMED by pulling it on the node: frontend @ d926cdc.
+  # 1ed728f = #503, the second defect the #501 smoke test surfaced.
+  #   #501's pixel-grid guard was too broad: it refused the whole call
+  #   because a whole-farm acquisition has no CELLS. True of cells, false
+  #   of PIXELS — the raster covers the farm boundary and is perfectly
+  #   readable, and the map is what a pixel is clicked ON. So the raster
+  #   panel stayed blank on a thermal scene and the pixel explanation was
+  #   unreachable through the UI, even though the endpoint behind it works
+  #   (prod: lst = 53.11 degC from 326.2585 - 273.15, QA_PIXEL 21824 =
+  #   clear, cwsi 1.0 against air_temp_c 30.81).
+  #   Pixels are served now, `cells` comes back empty, and the payload
+  #   names its `scope`. Asking a farm scene for one specific cell is
+  #   STILL a 422 — attributing a block's cell to a fetch that covered
+  #   every block would be a fiction.
+  #
+  #   api + frontend bump (workers unchanged in behaviour but kept in
+  #   lockstep with api, which they share an image with).
+  #   NO MIGRATIONS; public 0068, tenant 0078.
+  #   Images CONFIRMED by pulling both on the node: api + frontend @ 1ed728f.
   images:
     api:
-      tag: "762d5a2"
+      tag: "1ed728f"
     workers:
-      tag: "762d5a2"
+      tag: "1ed728f"
     frontend:
-      tag: "d926cdc"
+      tag: "1ed728f"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
