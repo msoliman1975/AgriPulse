@@ -1998,11 +1998,32 @@ global:
   #   Backend + frontend — all three bumped. NO MIGRATIONS; public stays 0068,
   #   tenant 0077.
   #   Images CONFIRMED by pulling both on the node: api + frontend @ 85e1bea.
+  #
+  # 897a0f2 = #496 a farm imagery subscription must actually fetch something.
+  #   `fetch_farm_aoi` false means "fetch this farm one block at a time", and
+  #   the block sweep is driven by `imagery_aoi_subscriptions` and by nothing
+  #   else. Subscribe a farm with no block rows and BOTH paths decline — the
+  #   farm sweep on the flag, the block sweep on having nothing to sweep — so
+  #   the row sits there active, listed and reported as "per block" while
+  #   fetching nothing, ever. Measured here: greenFarm_Test, 2 active farm
+  #   subscriptions, 0 block subscriptions, 0 jobs on either path,
+  #   `last_attempted_at` NULL since it was created. Weather is unaffected
+  #   (farm rows are authoritative there), which is why one tab had two
+  #   settings that worked and one that silently did not.
+  #   The path is now resolved at the write: blocks already subscribed ->
+  #   nothing moves; no blocks + no history + fits in one request -> whole-farm
+  #   path; otherwise -> subscribe the blocks.
+  #   Backend only — api + workers bumped, FRONTEND STAYS 85e1bea (no FE
+  #   delta). NO MIGRATIONS; public stays 0068, tenant 0077.
+  #   Image CONFIRMED by pulling it on the node: api @ 897a0f2.
+  #   Note: this governs WRITES. greenFarm_Test's two existing rows are healed
+  #   separately by setting fetch_farm_aoi — which is what the new code
+  #   computes for that farm (no block history, 84 px at 10 m vs a 2500 cap).
   images:
     api:
-      tag: "85e1bea"
+      tag: "897a0f2"
     workers:
-      tag: "85e1bea"
+      tag: "897a0f2"
     frontend:
       tag: "85e1bea"
     tileServer:
