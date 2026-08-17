@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildTileUrlTemplate, indexAssetKey, visualizationDefaults } from "./tileUrl";
+import { INDEX_CODES, THERMAL_INDEX_CODES } from "@/api/indices";
 
 const TILE_URL = "http://localhost:8001";
 const BUCKET = "agripulse-uploads";
@@ -70,5 +71,34 @@ describe("indexAssetKey", () => {
         indexCode: "ndvi",
       }),
     ).toBe("sentinel_hub/s2_l2a/S2A_TEST/deadbeef/ndvi.tif");
+  });
+});
+
+describe("visualizationDefaults covers every index code", () => {
+  // `visualizationDefaults` is a switch with no default arm, so a code it
+  // does not name returns `undefined` — and every caller reads
+  // `.rescaleMin` straight off it. That is not a missing colour, it is a
+  // TypeError that takes down the whole page.
+  //
+  // It happened: the thermal codes were absent, which was invisible for as
+  // long as no thermal scene could be opened. The moment one could, and the
+  // page correctly selected `lst` as its own default index, the Observer
+  // scene page rendered blank with
+  // `TypeError: Cannot read properties of undefined (reading 'rescaleMin')`.
+  it.each([...INDEX_CODES, ...THERMAL_INDEX_CODES])("has a window for %s", (code) => {
+    const vis = visualizationDefaults(code);
+    expect(vis).toBeDefined();
+    expect(Number.isFinite(vis.rescaleMin)).toBe(true);
+    expect(Number.isFinite(vis.rescaleMax)).toBe(true);
+    // An inverted or empty window renders every pixel one colour.
+    expect(vis.rescaleMax).toBeGreaterThan(vis.rescaleMin);
+    expect(vis.colormap).toBeTruthy();
+  });
+
+  it("uses the catalog's own range for lst, not the [-1,1] of the others", () => {
+    // lst is degrees Celsius (catalog value_min/value_max = 0/60). Reusing
+    // a normalized-difference window would clamp every real pixel — the
+    // farm reads ~50 degC — to one end of the ramp.
+    expect(visualizationDefaults("lst")).toMatchObject({ rescaleMin: 0, rescaleMax: 60 });
   });
 });

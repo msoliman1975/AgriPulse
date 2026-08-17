@@ -13,7 +13,7 @@
 // MapLibre / deck.gl XYZ consumption, we leave `{z}/{x}/{y}` as
 // placeholders for the rendering library to interpolate.
 
-import type { IndexCode } from "@/api/indices";
+import type { AnyIndexCode, IndexCode } from "@/api/indices";
 
 interface BuildTileUrlInput {
   tileServerBaseUrl: string;
@@ -54,7 +54,7 @@ export function buildTileUrlTemplate(input: BuildTileUrlInput): string {
  * code to `IndexCode` fails the build here rather than silently rendering
  * a new index with NDVI's window.
  */
-export function visualizationDefaults(indexCode: IndexCode): {
+export function visualizationDefaults(indexCode: AnyIndexCode): {
   rescaleMin: number;
   rescaleMax: number;
   colormap: string;
@@ -94,6 +94,23 @@ export function visualizationDefaults(indexCode: IndexCode): {
       //      reversal a parched block renders in the same colour a healthy
       //      one does under NDVI.
       return { rescaleMin: 0.2, rescaleMax: 2.0, colormap: "rdylgn_r" };
+
+    // --- Thermal (`landsat_c2_l2_st`) -------------------------------
+    // Ranges are the catalog's own `value_min`/`value_max`, not the
+    // [-1, 1] the normalized differences share. Omitting these returned
+    // `undefined` here, and the caller read `.rescaleMin` off it — which
+    // took down the whole scene page the moment a thermal scene became
+    // openable and its own index was selected.
+    case "lst":
+      // Degrees Celsius, 0-60 — the only index in either set with a UNIT.
+      // Hot is bad, so the ramp runs green (cool) -> red (hot).
+      return { rescaleMin: 0, rescaleMax: 60, colormap: "rdylgn_r" };
+    case "cwsi":
+      // 0 = freely transpiring, 1 = fully stressed. High is bad.
+      return { rescaleMin: 0, rescaleMax: 1, colormap: "rdylgn_r" };
+    case "smi":
+      // 0 = dry edge, 1 = wet edge. Wetter reads blue, like ndwi/ndmi.
+      return { rescaleMin: 0, rescaleMax: 1, colormap: "blues" };
   }
 }
 
