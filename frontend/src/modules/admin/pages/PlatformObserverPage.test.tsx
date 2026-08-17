@@ -82,6 +82,7 @@ const overview: ObserverOverview = {
     },
   ],
   calc_versions: [],
+  problems: [],
   trend_product_ambiguous: false,
   consumers_are_window_proxy: true,
 };
