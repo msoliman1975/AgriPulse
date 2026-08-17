@@ -358,11 +358,7 @@ async def _discover_scenes_async(
             window_end_override=window_end_override,
         )
 
-        cloud_cap = (
-            subscription["cloud_cover_max_pct"]
-            if subscription["cloud_cover_max_pct"] is not None
-            else settings.imagery_cloud_cover_visualization_max_pct
-        )
+        cloud_cap = _effective_cloud_cap(subscription, settings)
 
         # SentinelHubProvider raises SentinelHubNotConfiguredError from
         # its constructor when credentials are empty, so the factory
@@ -378,7 +374,10 @@ async def _discover_scenes_async(
                     product_code=product["code"],
                     from_datetime=window_start,
                     to_datetime=window_end,
-                    max_cloud_cover_pct=cloud_cap,
+                    # No cloud filter here on purpose — see
+                    # `_effective_cloud_cap`. Every pass is discovered so
+                    # every pass can be shown; the cap decides what is
+                    # FETCHED, a few lines below.
                 )
             except SentinelHubNotConfiguredError:
                 # Configuration failure â€” record one synthetic failed
@@ -472,10 +471,7 @@ async def _discover_scenes_async(
                 },
             )
 
-            if (
-                scene.cloud_cover_pct is not None
-                and scene.cloud_cover_pct > settings.imagery_cloud_cover_visualization_max_pct
-            ):
+            if scene.cloud_cover_pct is not None and scene.cloud_cover_pct > cloud_cap:
                 await repo.mark_skipped(job_id=new_id, completed_at=now, reason="cloud")
                 bus.publish(SceneSkippedV1(job_id=new_id, reason="cloud"))
                 await _record_audit(
@@ -1737,11 +1733,38 @@ async def _fail_farm_job(
     )
 
 
+def _effective_cloud_cap(subscription: dict[str, Any], settings: Any) -> int:
+    """The cloud percentage above which a pass is recorded but not fetched.
+
+    Deliberately NOT handed to the provider's search. A server-side
+    ``eo:cloud_cover<=N`` filter does not reject scenes — it makes them
+    **never have existed**: no job row, no timeline entry, no reason. The
+    scene strip is built to say "cloudy" over a gap precisely so an operator
+    can tell weather from a broken pipeline, and it cannot say anything about
+    a scene it was never told about.
+
+    Measured on prod: greenFarm_Test's subscriptions carry a cap of **0**, so
+    a single cloud anywhere in a 110 km Sentinel-2 tile deleted the whole
+    pass. Sixteen scenes survived three months, with unexplained gaps of 12
+    and 20 days, on a farm under an almost cloudless sky. Every surviving job
+    reads exactly `0.0%` cloud, which is the tell: nothing else could ever
+    have been discovered.
+
+    The platform setting stays a CEILING as well as the default. A per-farm
+    cap can therefore lower what is pulled but not raise it, so this change
+    cannot spend more at the provider than the previous behaviour did —
+    raising a farm above the platform ceiling stays a deliberate act.
+    """
+    ceiling = int(settings.imagery_cloud_cover_visualization_max_pct)
+    own = subscription["cloud_cover_max_pct"]
+    return ceiling if own is None else min(int(own), ceiling)
+
+
 async def _queue_farm_jobs(
     repo: ImageryRepository,
     *,
     bus: Any,
-    settings: Any,
+    cloud_cap: int,
     scenes: tuple[Any, ...],
     subscription: dict[str, Any],
     farm_id: UUID,
@@ -1751,6 +1774,9 @@ async def _queue_farm_jobs(
 
     Same shape as the block path: a scene already seen is created=False and
     contributes to neither count, which is what makes re-discovery free.
+
+    Over-cap scenes are RECORDED, then skipped. That is the whole point of
+    writing a row for them — see `_effective_cloud_cap`.
     """
     queued = 0
     skipped_cloud = 0
@@ -1766,10 +1792,7 @@ async def _queue_farm_jobs(
         )
         if not created:
             continue
-        too_cloudy = (
-            scene.cloud_cover_pct is not None
-            and scene.cloud_cover_pct > settings.imagery_cloud_cover_visualization_max_pct
-        )
+        too_cloudy = scene.cloud_cover_pct is not None and scene.cloud_cover_pct > cloud_cap
         if too_cloudy:
             await repo.set_farm_job_status(
                 job_id=new_id,
@@ -1888,11 +1911,7 @@ async def _discover_farm_scenes_async(
             window_start_override=window_start_override,
             window_end_override=window_end_override,
         )
-        cloud_cap = (
-            subscription["cloud_cover_max_pct"]
-            if subscription["cloud_cover_max_pct"] is not None
-            else settings.imagery_cloud_cover_visualization_max_pct
-        )
+        cloud_cap = _effective_cloud_cap(subscription, settings)
 
         provider: ImageryProvider | None = None
         try:
@@ -1903,7 +1922,8 @@ async def _discover_farm_scenes_async(
                     product_code=product["code"],
                     from_datetime=window_start,
                     to_datetime=window_end,
-                    max_cloud_cover_pct=cloud_cap,
+                    # Unfiltered, as on the block path — see
+                    # `_effective_cloud_cap`.
                 )
             except SentinelHubNotConfiguredError:
                 # No synthetic marker row here: the block path already writes
@@ -1924,7 +1944,7 @@ async def _discover_farm_scenes_async(
         queued, skipped_cloud = await _queue_farm_jobs(
             repo,
             bus=bus,
-            settings=settings,
+            cloud_cap=cloud_cap,
             scenes=scenes,
             subscription=subscription,
             farm_id=farm_id,
