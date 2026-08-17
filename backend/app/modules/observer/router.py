@@ -571,7 +571,11 @@ class CellFeatureRow(BaseModel):
 
 class PixelGridResponse(BaseModel):
     job_id: UUID
-    block_id: UUID
+    # 'block' | 'farm'. A whole-farm acquisition has pixels but no cells —
+    # a grid belongs to a block — so `cells` is empty and the block roll-up
+    # is null by design rather than because the data is missing.
+    scope: str = "block"
+    block_id: UUID | None = None
     index_code: str
     scene_datetime: datetime
     resolution_m: float

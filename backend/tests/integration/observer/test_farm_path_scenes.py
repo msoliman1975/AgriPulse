@@ -35,6 +35,10 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.observer.service import (
+    BlockScopedSceneRequiredError,
+    get_observer_service,
+)
 from app.shared.auth.context import PlatformRole
 from app.shared.db.ids import uuid7
 
@@ -353,6 +357,58 @@ async def test_verifying_a_farm_scene_is_refused_with_a_reason(
         resp = await client.post(
             f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{job_ids[0]}:verify",
             params={"mode": "fast"},
+        )
+    assert resp.status_code == 422, resp.text
+    assert "whole-farm" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_a_farm_scene_gets_past_the_scope_check_to_its_raster(
+    admin_session: AsyncSession, scenario: Scenario
+) -> None:
+    """The map is what a pixel is clicked ON.
+
+    Refusing the whole pixel-grid call because a farm scene has no cells
+    left the raster panel blank, which made the thermal pixel explanation
+    unreachable through the UI even though the endpoint behind it worked.
+    Pixels are well-defined over the farm boundary; only the cells are not.
+
+    Asserted at the service boundary rather than over HTTP: the seeded
+    scene has no COG in object storage, so the call is *expected* to fail
+    at the raster read. What matters is WHICH failure — reaching the read
+    at all means the scope check let a farm scene through.
+    """
+    _, job_ids = await _seed_thermal_farm_path(admin_session, scenario)
+    service = get_observer_service(admin_session)
+
+    with pytest.raises(Exception) as caught:  # noqa: PT011 - see docstring
+        await service.pixel_grid(
+            tenant_schema=scenario.tenant_schema,
+            job_id=job_ids[0],
+            index_code="lst",
+            cell_id=None,
+            max_pixels=100,
+        )
+    assert not isinstance(caught.value, BlockScopedSceneRequiredError)
+    # And specifically: it died reading the raster, which is the next step.
+    assert "rasterio" in type(caught.value).__module__
+
+
+@pytest.mark.asyncio
+async def test_asking_a_farm_scene_for_one_cell_is_still_refused(
+    admin_session: AsyncSession, scenario: Scenario
+) -> None:
+    """Naming a cell on a scene that has none is a different request.
+
+    Serving pixels is right; pretending a cell belongs to this acquisition
+    would attribute one block's grid to a fetch that covered every block.
+    """
+    _, job_ids = await _seed_thermal_farm_path(admin_session, scenario)
+
+    async with _platform_client() as client:
+        resp = await client.get(
+            f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{job_ids[0]}/pixel-grid",
+            params={"index_code": "lst", "cell_id": str(uuid4())},
         )
     assert resp.status_code == 422, resp.text
     assert "whole-farm" in resp.text

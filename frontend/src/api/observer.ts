@@ -757,7 +757,9 @@ export interface CellFeature {
 
 export interface PixelGrid {
   job_id: string;
-  block_id: string;
+  scope: SceneScope;
+  /** Null on a whole-farm acquisition, whose `cells` is always empty. */
+  block_id: string | null;
   index_code: string;
   scene_datetime: string;
   resolution_m: number;
