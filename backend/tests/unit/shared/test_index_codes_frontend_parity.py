@@ -57,11 +57,24 @@ def _union_members(text: str, name: str) -> list[str]:
     return _quoted(match.group(1))
 
 
-def _array_members(text: str, name: str) -> list[str]:
-    """Members of an exported array constant, e.g. `export const X = [...]`."""
+def _array_members(text: str, name: str, _seen: frozenset[str] = frozenset()) -> list[str]:
+    """Members of an exported array constant, e.g. `export const X = [...]`.
+
+    Spread elements are resolved against the other exported arrays in the same
+    file, so `[...OPTICAL_INDEX_ORDER, ...THERMAL_INDEX_ORDER]` yields the
+    codes of both rather than nothing. Without that this guard fails OPEN: a
+    list built by spreading reads as an empty list, and an empty frontend list
+    would report every backend index as missing — noisy, but the same regex
+    silently passes any assertion phrased as "no extras".
+    """
     match = re.search(rf"export const {name}[^=]*=\s*\[(.*?)\]", text, re.DOTALL)
     assert match, f"array {name} not found — did the file move or get renamed?"
-    return _quoted(match.group(1))
+    body = match.group(1)
+    members = _quoted(body)
+    for spread in re.findall(r"\.\.\.([A-Z][A-Z0-9_]*)", body):
+        assert spread not in _seen, f"circular spread through {spread}"
+        members.extend(_array_members(text, spread, _seen | {name}))
+    return members
 
 
 def _record_keys(text: str, name: str) -> list[str]:
@@ -79,50 +92,81 @@ def _record_keys(text: str, name: str) -> list[str]:
     return re.findall(r"^\s{2}([a-z0-9_]+)\s*:", flattened, re.MULTILINE)
 
 
+_OPTICAL = frozenset(STANDARD_INDEX_CODES)
+_THERMAL = frozenset(THERMAL_INDEX_CODES)
+# Sites that describe an index however it was acquired — a colour ramp, a
+# family, a set of value bands — cover BOTH products. Sites that populate a
+# picker for the optical product alone cover only the first.
+_BOTH = _OPTICAL | _THERMAL
+
+
 @_SKIP_IF_NO_FRONTEND
 @pytest.mark.parametrize(
-    ("label", "path", "extract"),
+    ("label", "path", "extract", "expected"),
     [
         (
             "INDEX_CODES (api/indices.ts)",
             _API_INDICES_TS,
             lambda t: _array_members(t, "INDEX_CODES"),
+            _OPTICAL,
         ),
         (
             "INDEX_CODES (conditionEdit.ts)",
             _CONDITION_EDIT_TS,
             lambda t: _array_members(t, "INDEX_CODES"),
+            _OPTICAL,
+        ),
+        # The live console (/labs/map) draws an index as sub-block grid cells,
+        # and thermal has none — `grid_configs` are per-product and only the
+        # optical product has one. So this list stays optical while the tables
+        # below, which merely describe an index, cover all thirteen.
+        (
+            "OPTICAL_INDEX_ORDER (mapnext/constants.ts)",
+            _MAPNEXT_CONSTANTS_TS,
+            lambda t: _array_members(t, "OPTICAL_INDEX_ORDER"),
+            _OPTICAL,
+        ),
+        (
+            "THERMAL_INDEX_ORDER (mapnext/constants.ts)",
+            _MAPNEXT_CONSTANTS_TS,
+            lambda t: _array_members(t, "THERMAL_INDEX_ORDER"),
+            _THERMAL,
         ),
         (
             "MAP_INDEX_ORDER (mapnext/constants.ts)",
             _MAPNEXT_CONSTANTS_TS,
             lambda t: _array_members(t, "MAP_INDEX_ORDER"),
+            _BOTH,
         ),
         (
             "INDEX_META (mapnext/constants.ts)",
             _MAPNEXT_CONSTANTS_TS,
             lambda t: _record_keys(t, "INDEX_META"),
+            _BOTH,
         ),
         (
             "INDEX_BANDS (mapnext/constants.ts)",
             _MAPNEXT_CONSTANTS_TS,
             lambda t: _record_keys(t, "INDEX_BANDS"),
+            _BOTH,
         ),
         (
             "CLASS_VOCAB (console/indexClasses.ts)",
             _INDEX_CLASSES_TS,
             lambda t: _record_keys(t, "CLASS_VOCAB"),
+            _BOTH,
         ),
         (
             "INDEX_CLASSES (console/indexClasses.ts)",
             _INDEX_CLASSES_TS,
             lambda t: _record_keys(t, "INDEX_CLASSES"),
+            _BOTH,
         ),
     ],
 )
-def test_frontend_index_list_matches_backend(label, path, extract) -> None:
+def test_frontend_index_list_matches_backend(label, path, extract, expected) -> None:
     frontend = set(extract(_read(path)))
-    backend = set(STANDARD_INDEX_CODES)
+    backend = set(expected)
 
     missing = backend - frontend
     extra = frontend - backend
@@ -182,6 +226,11 @@ def test_extraction_actually_found_something() -> None:
     found = _array_members(_read(_API_INDICES_TS), "INDEX_CODES")
     assert len(found) >= 7, found
     assert "ndvi" in found
+    # Spread resolution: MAP_INDEX_ORDER is composed rather than listed, and a
+    # regex that only reads quoted tokens would return [] and pass vacuously.
+    composed = _array_members(_read(_MAPNEXT_CONSTANTS_TS), "MAP_INDEX_ORDER")
+    assert "ndvi" in composed, composed
+    assert "lst" in composed, composed
     # The nested-brace stripping in _record_keys is the fiddly part: assert it
     # returns index codes and not the class keys inside each index's array.
     classes = _record_keys(_read(_INDEX_CLASSES_TS), "INDEX_CLASSES")

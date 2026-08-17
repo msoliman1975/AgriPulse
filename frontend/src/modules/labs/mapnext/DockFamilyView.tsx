@@ -16,7 +16,7 @@ import clsx from "clsx";
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { getTimeseries, type IndexCode as ApiIndexCode } from "@/api/indices";
+import { getTimeseries, type AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import type { IndexCode, IndexSeries } from "../map/types";
 import {
   FAMILY_PRIMARY,
@@ -198,11 +198,21 @@ export function DockFamilyView({
   // The tab decides what is charted — its one block-level index — while
   // `activeIndex` stays the map's business. Reading Nutrition therefore never
   // silently repaints the map; clicking a card does that, explicitly.
+  //
+  // Null for the thermal family, which has no block-level member at all:
+  // `/blocks/{id}/indices/{code}/timeseries` serves the three fixed columns
+  // `blocks_summary_router` publishes and none of them is thermal. The tab
+  // then shows its cards and its reference column with the chart replaced by
+  // a statement of why — charting a neighbouring index under a thermal
+  // heading would be a plausible-looking lie, and an empty chart frame reads
+  // as a failed request.
   const charted = FAMILY_PRIMARY[family];
 
   const seriesQ = useQuery({
     queryKey: ["labs/mapnext/dockSeries", blockId, charted, from, to],
-    queryFn: () => getTimeseries(blockId, charted, { granularity: "daily", from, to }),
+    queryFn: () =>
+      getTimeseries(blockId, charted as IndexCode, { granularity: "daily", from, to }),
+    enabled: charted !== null,
     staleTime: 60_000,
   });
 
@@ -225,7 +235,7 @@ export function DockFamilyView({
     current != null && earlier != null && earlier !== 0
       ? ((current - earlier) / Math.abs(earlier)) * 100
       : null;
-  const chartedBand = bandFor(charted, current);
+  const chartedBand = charted === null ? null : bandFor(charted, current);
 
   return (
     <div className="grid h-full grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
@@ -282,7 +292,11 @@ export function DockFamilyView({
           ))}
         </div>
 
-        {seriesQ.isLoading ? (
+        {charted === null ? (
+          <div className="flex h-[168px] items-center justify-center rounded-xl border border-dashed border-ap-line px-6 text-center text-sm text-ap-muted">
+            {t("dock.index.noBlockSeries")}
+          </div>
+        ) : seriesQ.isLoading ? (
           <div className="h-[168px] animate-pulse rounded-xl bg-ap-line/40" />
         ) : seriesQ.isError ? (
           <div className="flex h-[168px] items-center justify-center rounded-xl border border-ap-line text-sm text-ap-muted">
@@ -292,8 +306,9 @@ export function DockFamilyView({
           <Chart points={points} />
         )}
         <div className="text-xs text-ap-muted">
-          {t("dock.index.charting", { code: INDEX_META[charted].label })} ·{" "}
-          {t("dock.index.footer", { count: points.length })}
+          {charted === null
+            ? t("dock.index.readOnMap")
+            : `${t("dock.index.charting", { code: INDEX_META[charted].label })} · ${t("dock.index.footer", { count: points.length })}`}
         </div>
       </div>
 

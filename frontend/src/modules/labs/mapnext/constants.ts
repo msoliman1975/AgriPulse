@@ -1,6 +1,7 @@
 // Non-component constants for the Farm Console, kept out of the component
 // files so react-refresh (fast refresh) stays happy.
-import type { IndexCode as ApiIndexCode } from "@/api/indices";
+import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
+import { THERMAL_INDEX_CODES } from "@/api/indices";
 import type { Health, IndexCode } from "../map/types";
 
 // Last farm the user looked at, so /labs/map with no :farmId can restore it.
@@ -16,10 +17,30 @@ export const HEALTH_DOT: Record<Health, string> = {
   unknown: "#9c9c9c",
 };
 
-// The full index set the sub-block grid pipeline supports (what the map can
-// colour by). The block-level time-series API only serves three of these —
-// see BLOCK_LEVEL_INDICES — so only those can be charted for a whole block.
-export const MAP_INDEX_ORDER: ApiIndexCode[] = [
+// What the map can colour by, in two lists because the two consoles can draw
+// different things.
+//
+// `MAP_INDEX_ORDER` is everything, and it is what the tables below are keyed
+// on — INDEX_META, INDEX_BANDS and console/indexClasses.ts all cover all
+// thirteen, enforced by indexFamilies.test.ts.
+//
+// But the PICKER's options are a per-console decision, passed in rather than
+// read from here, because the two consoles render an index by different
+// means. The pixel console (/labs/map-v2) draws the index COG itself, which
+// exists for thermal exactly as it does for optical. The live console
+// (/labs/map) draws only the sub-block grid mesh, and thermal has no cells in
+// it: `grid_configs` are per-product and only the optical product has one, so
+// `list_cells_for_scene` returns nothing for a Landsat scene and no thermal
+// cell row is ever written. Offering LST there would be a chip that paints an
+// empty farm — which is why `OPTICAL_INDEX_ORDER` exists as its own export
+// rather than the callers slicing this one by a magic number.
+//
+// The thermal three come from `landsat_c2_l2_st` rather than `s2_l2a`: a
+// different satellite on a different cadence at a tenth the resolution. The
+// console reads them through the same routes by naming the index it is about
+// to draw (`?index=`), so each product's stream answers for itself.
+// `isThermalIndex` is what everything downstream branches on.
+export const OPTICAL_INDEX_ORDER: ApiIndexCode[] = [
   "ndvi",
   "ndre",
   "ndwi",
@@ -31,6 +52,25 @@ export const MAP_INDEX_ORDER: ApiIndexCode[] = [
   "msi",
   "msavi",
 ];
+
+export const THERMAL_INDEX_ORDER: ApiIndexCode[] = ["lst", "cwsi", "smi"];
+
+export const MAP_INDEX_ORDER: ApiIndexCode[] = [...OPTICAL_INDEX_ORDER, ...THERMAL_INDEX_ORDER];
+
+const THERMAL_SET: ReadonlySet<string> = new Set<string>(THERMAL_INDEX_CODES);
+
+/**
+ * Whether an index comes from the thermal product.
+ *
+ * Derived from the API module's own list rather than restated, so adding a
+ * thermal index there cannot leave this predicate behind — the failure that
+ * would produce is silent and total: the index would be drawn as though it
+ * were 10 m Sentinel-2, against the wrong scene stream.
+ */
+export function isThermalIndex(code: ApiIndexCode): boolean {
+  return THERMAL_SET.has(code);
+}
+
 export const BLOCK_LEVEL_INDICES: IndexCode[] = ["ndvi", "ndre", "ndwi"];
 
 export function isBlockLevel(c: ApiIndexCode): c is IndexCode {
@@ -45,7 +85,7 @@ export function isBlockLevel(c: ApiIndexCode): c is IndexCode {
 // (#228); the grouping was dropped when the four grid-only indices arrived and
 // broke the one-index-per-family symmetry (#234), leaving a flat grid and then
 // a flat pill row. The dock restores it as one tab per family.
-export type IndexFamilyKey = "vigour" | "nutrition" | "moisture";
+export type IndexFamilyKey = "vigour" | "nutrition" | "moisture" | "thermal";
 
 // `bsi` files under vigour and `msi` under moisture rather than earning a
 // fourth "soil" tab. The family question vigour answers is "is the canopy
@@ -54,18 +94,40 @@ export type IndexFamilyKey = "vigour" | "nutrition" | "moisture";
 // block-level index to chart, and block-level is only ndvi/ndre/ndwi. A soil
 // family would have had no series to plot until `blocks_summary_router`
 // grows a fourth fixed column.
+//
+// The thermal three get their OWN family rather than being filed under
+// moisture, where two of them arguably belong by subject. Two reasons, and
+// the second is the deciding one:
+//
+//   * they answer a different question — not "how much water is in the leaf"
+//     but "is the canopy cooling itself", which is transpiration rather than
+//     content;
+//   * they come from a different SENSOR at a tenth the resolution and on a
+//     different cadence. Mixing a 100 m reading into a tab of 10 m ones
+//     presents them as interchangeable evidence about the same patch of
+//     ground, and they are not. The tab boundary is where the resolution
+//     caveat can be stated once instead of per index.
 export const INDEX_FAMILIES: { key: IndexFamilyKey; indices: ApiIndexCode[] }[] = [
   { key: "vigour", indices: ["ndvi", "evi", "savi", "msavi", "bsi"] },
   { key: "nutrition", indices: ["ndre", "gndvi"] },
   { key: "moisture", indices: ["ndwi", "ndmi", "msi"] },
+  { key: "thermal", indices: ["lst", "cwsi", "smi"] },
 ];
 
 // The one block-level index in each family — what that family's tab charts,
 // since the grid-only members have no block-wide series to plot.
-export const FAMILY_PRIMARY: Record<IndexFamilyKey, IndexCode> = {
+//
+// Thermal has NONE. `/blocks/{id}/indices/{code}/timeseries` serves the three
+// fixed optical columns `blocks_summary_router` publishes, and no thermal
+// index is among them — so the thermal tab has no series to chart and says so
+// rather than plotting a neighbouring index under a thermal heading. `null`
+// is the honest value; every consumer already has to handle a family whose
+// primary is absent because `isBlockLevel` was always allowed to be false.
+export const FAMILY_PRIMARY: Record<IndexFamilyKey, IndexCode | null> = {
   vigour: "ndvi",
   nutrition: "ndre",
   moisture: "ndwi",
+  thermal: null,
 };
 
 // Family names, definitions, scales and band readings are i18n keys
@@ -84,6 +146,9 @@ export const INDEX_META: Record<ApiIndexCode, { label: string; family: IndexFami
   ndmi: { label: "NDMI", family: "moisture" },
   bsi: { label: "BSI", family: "vigour" },
   msi: { label: "MSI", family: "moisture" },
+  lst: { label: "LST", family: "thermal" },
+  cwsi: { label: "CWSI", family: "thermal" },
+  smi: { label: "SMI", family: "thermal" },
 };
 
 // ---- value bands ----------------------------------------------------------
@@ -218,5 +283,40 @@ export const INDEX_BANDS: Record<ApiIndexCode, IndexBand[]> = {
     { max: 1.0, key: "moderateStress", tone: "watch" },
     { max: 1.6, key: "highStress", tone: "critical" },
     { max: Infinity, key: "severeStress", tone: "critical" },
+  ],
+
+  // ---- thermal ------------------------------------------------------------
+  //
+  // Cut points and tones are IDENTICAL to `console/indexClasses.ts`
+  // INDEX_CLASSES for the same three codes — the discipline `bsi` and `msavi`
+  // set, and a strict requirement here rather than a nicety: on the pixel
+  // console the dock's reading and the map legend describe the very same
+  // number taken from the very same raster, so naming it `hot` in one place
+  // and `warm` in the other is a visible contradiction on one screen.
+  //
+  // ⚠️ `lst` is in DEGREES CELSIUS. Every other row in this table is a ratio
+  // bounded near [-1, 1]; anything that formats or scales a band value has to
+  // read the unit rather than assume one. See `dockFormat`.
+  lst: [
+    { max: 20, key: "cool", tone: "healthy" },
+    { max: 30, key: "mild", tone: "healthy" },
+    { max: 38, key: "warm", tone: "watch" },
+    { max: 45, key: "hot", tone: "watch" },
+    { max: 52, key: "veryHot", tone: "critical" },
+    { max: Infinity, key: "extreme", tone: "critical" },
+  ],
+  cwsi: [
+    { max: 0.2, key: "unstressed", tone: "healthy" },
+    { max: 0.4, key: "mild", tone: "healthy" },
+    { max: 0.6, key: "moderate", tone: "watch" },
+    { max: 0.8, key: "high", tone: "critical" },
+    { max: Infinity, key: "severe", tone: "critical" },
+  ],
+  smi: [
+    { max: 0.2, key: "veryDry", tone: "critical" },
+    { max: 0.4, key: "dry", tone: "critical" },
+    { max: 0.6, key: "moderate", tone: "watch" },
+    { max: 0.8, key: "moist", tone: "healthy" },
+    { max: Infinity, key: "wet", tone: "watch" },
   ],
 };

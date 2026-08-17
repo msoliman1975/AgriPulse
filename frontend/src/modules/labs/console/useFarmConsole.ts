@@ -21,7 +21,7 @@ import type { FeatureCollection, Polygon } from "geojson";
 import type { Block } from "@/api/blocks";
 import { getFarmGridCells, getGridCells } from "@/api/grid";
 import { listFarmScenes, listSubscriptions } from "@/api/imagery";
-import type { IndexCode as ApiIndexCode } from "@/api/indices";
+import { getIndexCatalog, type AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
 import { useAlerts } from "@/queries/alerts";
 import { useRecommendations } from "@/queries/recommendations";
@@ -36,7 +36,7 @@ import {
 import type { GridCellProps } from "../map/MapCanvas";
 import { blockCentroidsFromGeojson, buildSignalOverlay } from "../map/signalOverlay";
 import { griddedBlocks } from "../mapnext/gridOverlay";
-import { LAST_FARM_KEY } from "../mapnext/constants";
+import { isThermalIndex, LAST_FARM_KEY } from "../mapnext/constants";
 import { CONSOLE_QK } from "./constants";
 import { classify } from "./indexClasses";
 import { useIndexPixels } from "./useIndexPixels";
@@ -53,11 +53,23 @@ export function useFarmConsole(farmId: string) {
   // strip is grouped by; it resolves to an instant via the scene list.
   const sceneDate = search.get("scene");
 
+  // One index drives the map pixel layer, the block fill, the legend and the
+  // dock's featured card. Declared before the scene queries because it scopes
+  // them: an index names a product, and the two products this farm may carry
+  // are acquired independently.
+  const [activeIndex, setActiveIndex] = useState<ApiIndexCode>("ndvi");
+
   // Acquisition days across the farm. Degrades to "no timeline" rather than
   // erroring when the API predates the route.
+  //
+  // Scoped to the active index. The strip is what SELECTS a pass, so an
+  // unscoped one is worse than cosmetic in both directions: it offers optical
+  // dates while thermal is being drawn (no `lst.tif` behind them) and marks
+  // every thermal date undrawable, because drawability used to be tested
+  // against an `ndvi` aggregate a thermal pass will never write.
   const scenesQ = useQuery({
-    queryKey: CONSOLE_QK.scenes(farmId),
-    queryFn: () => listFarmScenes(farmId),
+    queryKey: CONSOLE_QK.scenes(farmId, activeIndex),
+    queryFn: () => listFarmScenes(farmId, activeIndex),
     staleTime: 5 * 60_000,
   });
   const scenes = useMemo(() => scenesQ.data?.items ?? [], [scenesQ.data]);
@@ -69,8 +81,6 @@ export function useFarmConsole(farmId: string) {
   // does when `at` is omitted — so send nothing rather than pinning to today.
   const sceneAt = selectedScene?.at ?? null;
 
-  // One index drives both the map grid overlay and the dock's featured card.
-  const [activeIndex, setActiveIndex] = useState<ApiIndexCode>("ndvi");
   const [layers, setLayers] = useState<LayerState>({
     aoi: true,
     blocks: true,
@@ -201,9 +211,37 @@ export function useFarmConsole(farmId: string) {
         return { blockId, productId, cells: res.cells };
       });
     },
-    enabled: Boolean(showGrid && gridded.length > 0),
+    // Never issued for a thermal index, because it could only ever come back
+    // empty: `grid_configs` are per-product, only the optical product has
+    // one, and `list_cells_for_scene` filters on `cfg.product_id` — so the
+    // write path never produces a thermal cell row and the read path could
+    // not return one if it did. Sending the request anyway would spend a
+    // round trip to draw nothing and leave the mesh looking broken rather
+    // than inapplicable; `gridUnavailableForIndex` is what says which it is.
+    enabled: Boolean(showGrid && gridded.length > 0 && !isThermalIndex(activeIndex)),
     staleTime: 30_000,
   });
+
+  // The active index's display unit, for the legend and anything else that
+  // renders a raw value. Platform-wide curated data, so it is cached across
+  // every farm and index the reader visits and never gated on the farm; a
+  // failure degrades to the dimensionless case, which was the only case
+  // before `lst`. Read rather than hardcoded — a local code-to-unit table is
+  // the mirror that drifts.
+  const catalogQ = useQuery({
+    queryKey: ["indices", "catalog"] as const,
+    queryFn: getIndexCatalog,
+    staleTime: 60 * 60_000,
+  });
+  const activeIndexUnit = useMemo(
+    () => catalogQ.data?.find((entry) => entry.code === activeIndex)?.unit ?? "",
+    [catalogQ.data, activeIndex],
+  );
+
+  // Sub-block zoning exists on this farm, but not for what is being drawn.
+  // A distinct state from "no grid configured": the toggle stays meaningful,
+  // it is this index that cannot honour it.
+  const gridUnavailableForIndex = isThermalIndex(activeIndex) && gridded.length > 0;
 
   // Index pixels + the statistics that feed the legend and the block fill.
   // Not gated on `showPixels`: the block fill and the legend read the same
@@ -477,6 +515,8 @@ export function useFarmConsole(farmId: string) {
     setLayers,
     showGrid,
     setShowGrid,
+    gridUnavailableForIndex,
+    activeIndexUnit,
     showPixels,
     setShowPixels,
     selectedCellId,

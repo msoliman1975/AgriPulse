@@ -4,8 +4,8 @@
 import { useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { IndexCode as ApiIndexCode } from "@/api/indices";
-import { INDEX_META, MAP_INDEX_ORDER } from "./constants";
+import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
+import { INDEX_META, isThermalIndex } from "./constants";
 import { Popover, PopHeading, PopItem, PopDivider } from "./ui";
 
 export interface LayerState {
@@ -20,6 +20,16 @@ export interface LayerState {
 interface Props {
   activeIndex: ApiIndexCode;
   onIndexChange: (c: ApiIndexCode) => void;
+  /**
+   * Which indices this console can actually draw, in menu order.
+   *
+   * Required rather than defaulted to the full list, because the two consoles
+   * genuinely differ and a default would silently give the wrong one to
+   * whichever caller forgot. The live console renders indices as sub-block
+   * grid cells, which do not exist for the thermal product; the pixel console
+   * renders the index COG, which does. See `constants.ts`.
+   */
+  indexOptions: ApiIndexCode[];
   layers: LayerState;
   onLayersChange: (patch: Partial<LayerState>) => void;
   onOpenSettings: () => void;
@@ -83,6 +93,7 @@ function Chip({
 export function ViewBar({
   activeIndex,
   onIndexChange,
+  indexOptions,
   layers,
   onLayersChange,
   onOpenSettings,
@@ -106,6 +117,11 @@ export function ViewBar({
   const addRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState<null | "index" | "layers" | "signals" | "add">(null);
   const close = () => setOpen(null);
+  // Where the optical run ends, or -1 on a console that offers no thermal
+  // index at all — in which case no heading is ever rendered. Found rather
+  // than hardcoded to a count, so adding an optical index cannot leave the
+  // thermal heading sitting one row too high.
+  const firstThermal = indexOptions.findIndex(isThermalIndex);
   const activeSignalName = signalDefs.find((d) => d.id === signalDefId)?.name ?? null;
 
   return (
@@ -140,21 +156,36 @@ export function ViewBar({
         ⚙
       </Chip>
 
-      {/* Index selector — drives the map grid overlay + the inspector featured */}
+      {/* Index selector — drives the map pixel layer, the grid overlay and the
+          inspector's featured card.
+
+          The thermal three are separated by a heading of their own rather than
+          listed on after MSI. They come from another satellite at a tenth the
+          resolution, and a flat list says the opposite: that picking LST after
+          NDVI changes only which number is drawn. The heading is the cheapest
+          place to say "different sensor" once, instead of on every row or —
+          the alternative that was live until now — nowhere at all. */}
       <Popover open={open === "index"} onClose={close} anchorRef={indexRef}>
         <PopHeading>{t("viewbar.vegIndex")}</PopHeading>
-        {MAP_INDEX_ORDER.map((code) => (
-          <PopItem
-            key={code}
-            icon={code === activeIndex ? "✓" : ""}
-            onClick={() => {
-              close();
-              onIndexChange(code);
-            }}
-            hint={t(`dock.family.${INDEX_META[code].family}`)}
-          >
-            {INDEX_META[code].label}
-          </PopItem>
+        {indexOptions.map((code, i) => (
+          <span key={code} className="contents">
+            {i === firstThermal ? (
+              <>
+                <PopDivider />
+                <PopHeading>{t("viewbar.thermalIndex")}</PopHeading>
+              </>
+            ) : null}
+            <PopItem
+              icon={code === activeIndex ? "✓" : ""}
+              onClick={() => {
+                close();
+                onIndexChange(code);
+              }}
+              hint={t(`dock.family.${INDEX_META[code].family}`)}
+            >
+              {INDEX_META[code].label}
+            </PopItem>
+          </span>
         ))}
       </Popover>
 

@@ -14,7 +14,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Block } from "@/api/blocks";
-import type { IndexCode as ApiIndexCode } from "@/api/indices";
+import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import type { UnitSummary } from "../map/types";
 import { HEALTH_DOT, INDEX_META } from "../mapnext/constants";
 import { Dot } from "../mapnext/ui";

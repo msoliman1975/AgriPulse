@@ -46,15 +46,22 @@ describe("index families", () => {
     }
   });
 
-  it("gives each family exactly one block-level index to chart", () => {
+  it("gives each family at most one block-level index, and charts exactly it", () => {
     for (const family of INDEX_FAMILIES) {
       const blockLevel = family.indices.filter(isBlockLevel);
-      // More than one and the tab would have to choose; none and it would have
-      // nothing to plot at all.
-      expect(blockLevel).toHaveLength(1);
-      expect(FAMILY_PRIMARY[family.key]).toBe(blockLevel[0]);
+      // More than one and the tab would have to choose which to plot.
+      expect(blockLevel.length, family.key).toBeLessThanOrEqual(1);
+      // NONE is allowed, and `thermal` is the case: the block-level timeseries
+      // route serves the three fixed optical columns `blocks_summary_router`
+      // publishes, and no thermal index is among them. The tab then says so
+      // rather than charting a neighbour under a thermal heading — which is
+      // why the primary is nullable and why this asserts the two agree in
+      // BOTH directions rather than just that a primary exists.
+      expect(FAMILY_PRIMARY[family.key] ?? null, family.key).toBe(blockLevel[0] ?? null);
     }
-    expect(Object.values(FAMILY_PRIMARY).sort()).toEqual([...BLOCK_LEVEL_INDICES].sort());
+    expect(Object.values(FAMILY_PRIMARY).filter(Boolean).sort()).toEqual(
+      [...BLOCK_LEVEL_INDICES].sort(),
+    );
   });
 });
 

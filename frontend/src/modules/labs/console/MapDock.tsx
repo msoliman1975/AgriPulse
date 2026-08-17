@@ -22,6 +22,14 @@ interface Props {
   showGrid: boolean;
   onToggleGrid: () => void;
   gridAvailable: boolean;
+  /**
+   * The farm HAS sub-block zoning, but the index being drawn cannot use it —
+   * true only for the thermal indices, whose product has no grid config and
+   * therefore no cells. A separate flag from `gridAvailable` because the two
+   * need different hints: "this farm has no zones" sends the reader to grid
+   * configuration, which would not help here.
+   */
+  gridUnavailableForIndex?: boolean;
   onFullscreen: () => void;
   isFullscreen: boolean;
   className?: string;
@@ -46,6 +54,7 @@ export function MapDock({
   showGrid,
   onToggleGrid,
   gridAvailable,
+  gridUnavailableForIndex = false,
   onFullscreen,
   isFullscreen,
   className,
@@ -66,11 +75,15 @@ export function MapDock({
     {
       key: "grid",
       glyph: "⌗",
-      on: showGrid,
-      disabled: !gridAvailable,
+      on: showGrid && !gridUnavailableForIndex,
+      disabled: !gridAvailable || gridUnavailableForIndex,
       onClick: onToggleGrid,
       labelKey: "grid",
-      hintKey: gridAvailable ? undefined : "gridUnavailable",
+      hintKey: gridUnavailableForIndex
+        ? "gridNotForThisIndex"
+        : gridAvailable
+          ? undefined
+          : "gridUnavailable",
     },
     { key: "anomaly", glyph: "◔", disabled: true, labelKey: "anomaly", hintKey: "comingSoon" },
     { key: "contrast", glyph: "◐", disabled: true, labelKey: "contrast", hintKey: "comingSoon" },

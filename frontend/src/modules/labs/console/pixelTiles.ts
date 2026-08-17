@@ -7,7 +7,7 @@
 //
 // Everything here is a pure function of (config, asset, index). No fetching,
 // so it can be unit-tested; the queries live in useIndexPixels.
-import type { IndexCode as ApiIndexCode } from "@/api/indices";
+import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import { histogramBins, titilerColormap } from "./indexClasses";
 
 /**

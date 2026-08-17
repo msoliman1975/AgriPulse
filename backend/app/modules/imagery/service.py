@@ -46,8 +46,18 @@ from app.modules.imagery.schemas import (
     SubscriptionCreate,
     SubscriptionRead,
 )
+from app.modules.indices.computation import products_for_index
 from app.shared.db.ids import uuid7
 from app.shared.eventbus import EventBus, get_default_bus
+
+# The index the console's scene reads assume when the caller names none.
+#
+# Both farm-scene routes are index-scoped now, but the parameter is optional
+# so a client that predates it keeps the behaviour it was written against:
+# the Sentinel-2 stream, tested for drawability on `ndvi`, which is exactly
+# what both queries hardcoded before. New callers always send the index they
+# are about to draw.
+DEFAULT_CONSOLE_INDEX = "ndvi"
 
 
 class ImageryService(Protocol):
@@ -100,10 +110,16 @@ class ImageryService(Protocol):
 
     async def get_config(self) -> ConfigResponse: ...
 
-    async def list_farm_scenes(self, *, farm_id: UUID, limit: int = 120) -> FarmScenesResponse: ...
+    async def list_farm_scenes(
+        self, *, farm_id: UUID, limit: int = 120, index_code: str = DEFAULT_CONSOLE_INDEX
+    ) -> FarmScenesResponse: ...
 
     async def list_farm_scene_assets(
-        self, *, farm_id: UUID, at: datetime | None = None
+        self,
+        *,
+        farm_id: UUID,
+        at: datetime | None = None,
+        index_code: str = DEFAULT_CONSOLE_INDEX,
     ) -> FarmSceneAssetsResponse: ...
 
     async def list_farm_subscriptions(
@@ -284,8 +300,15 @@ class ImageryServiceImpl:
         next_cursor = _encode_scene_cursor(next_cursor_dt) if next_cursor_dt else None
         return items, next_cursor
 
-    async def list_farm_scenes(self, *, farm_id: UUID, limit: int = 120) -> FarmScenesResponse:
-        rows = await self._repo.list_farm_scene_days(farm_id=farm_id, limit=limit)
+    async def list_farm_scenes(
+        self, *, farm_id: UUID, limit: int = 120, index_code: str = DEFAULT_CONSOLE_INDEX
+    ) -> FarmScenesResponse:
+        rows = await self._repo.list_farm_scene_days(
+            farm_id=farm_id,
+            limit=limit,
+            index_code=index_code,
+            product_codes=products_for_index(index_code),
+        )
         items = tuple(FarmSceneRead.model_validate(r) for r in rows)
         return FarmScenesResponse(
             farm_id=farm_id,
@@ -294,13 +317,26 @@ class ImageryServiceImpl:
         )
 
     async def list_farm_scene_assets(
-        self, *, farm_id: UUID, at: datetime | None = None
+        self,
+        *,
+        farm_id: UUID,
+        at: datetime | None = None,
+        index_code: str = DEFAULT_CONSOLE_INDEX,
     ) -> FarmSceneAssetsResponse:
-        rows = await self._repo.list_farm_scene_assets(farm_id=farm_id, at=at)
+        # One index, one product family, for both halves of the answer. The
+        # farm raster and the per-block items are alternative sources for the
+        # SAME pixels, so scoping only one of them would let the response
+        # disagree with itself: a Landsat surface over Sentinel-2 blocks.
+        product_codes = products_for_index(index_code)
+        rows = await self._repo.list_farm_scene_assets(
+            farm_id=farm_id, at=at, product_codes=product_codes
+        )
         # The farm-wide raster wins when there is one: same ground, one file,
         # no seam. The per-block items still ride along so a client that
         # predates the field keeps working unchanged.
-        farm_row = await self._repo.get_farm_scene_raster(farm_id=farm_id, at=at)
+        farm_row = await self._repo.get_farm_scene_raster(
+            farm_id=farm_id, at=at, product_codes=product_codes
+        )
         return FarmSceneAssetsResponse(
             farm_id=farm_id,
             at=at,

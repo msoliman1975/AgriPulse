@@ -26,7 +26,7 @@
 // three tables being kept in step by hand.
 import type { ExpressionSpecification } from "maplibre-gl";
 
-import type { IndexCode as ApiIndexCode } from "@/api/indices";
+import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import { NO_DATA_COLOR, classesFor } from "../console/indexClasses";
 
 /**

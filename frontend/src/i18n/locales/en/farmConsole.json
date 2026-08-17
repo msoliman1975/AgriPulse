@@ -52,7 +52,8 @@
     "vegIndex": "Vegetation index",
     "mapLayers": "Map layers",
     "addToFarm": "Add to farm",
-    "addNew": "Add new"
+    "addNew": "Add new",
+    "thermalIndex": "Thermal (Landsat, 100 m)"
   },
   "layers": {
     "aoi": "Farm AOI",
@@ -423,7 +424,9 @@
       "footer": "{{count}} clear passes in range",
       "footer_one": "{{count}} clear pass in range",
       "over14d": "over last 14 days",
-      "charting": "Charting {{code}}"
+      "charting": "Charting {{code}}",
+      "noBlockSeries": "No block-level series for the thermal indices — they are read on the map, at farm scale.",
+      "readOnMap": "Thermal is a farm-scale reading. Compare across the farm on the map rather than block by block."
     },
     "conditions": {
       "treesHeading": "Decision trees",
@@ -454,7 +457,8 @@
     "family": {
       "vigour": "Vigour & canopy",
       "nutrition": "Nutrition",
-      "moisture": "Moisture"
+      "moisture": "Moisture",
+      "thermal": "Heat & water stress"
     },
     "meaning": {
       "ndvi": "Overall canopy vigour",
@@ -481,7 +485,10 @@
       "ndwi": "McFeeters' surface-water index, (Green − NIR) / (Green + NIR). Water reflects green and absorbs infrared, so open water sits above zero while canopy and dry soil stay negative. It finds standing water on the block — not moisture inside the leaves.",
       "ndmi": "Compares near-infrared with shortwave infrared: (NIR − SWIR1) / (NIR + SWIR1). Leaf water absorbs shortwave infrared, so the value falls as tissue dries — usually days before the canopy visibly wilts or NDVI reacts.",
       "bsi": "Weighs the two bands soil reflects strongly — shortwave infrared and red — against the two vegetation reflects: ((SWIR1 + Red) − (NIR + Blue)) / ((SWIR1 + Red) + (NIR + Blue)). It measures the ground rather than the crop, so it reads planting gaps, plant loss and thin establishment that NDVI can only show as “less green”.",
-      "msi": "The ratio SWIR1 / NIR. Because a well-hydrated leaf soaks up shortwave infrared, the ratio climbs as the canopy dries out. It carries the same signal as NDMI — the two are a monotone transform of each other — but on an unbounded scale that keeps separating dry readings after NDMI has compressed them."
+      "msi": "The ratio SWIR1 / NIR. Because a well-hydrated leaf soaks up shortwave infrared, the ratio climbs as the canopy dries out. It carries the same signal as NDMI — the two are a monotone transform of each other — but on an unbounded scale that keeps separating dry readings after NDMI has compressed them.",
+      "lst": "Land surface temperature — how hot the ground and canopy actually are, in °C, measured in thermal infrared at about 10:20 local time.",
+      "cwsi": "Crop water stress index — how close the canopy is to shutting its stomata, derived from how far its temperature sits above or below the air's.",
+      "smi": "Soil moisture index — relative surface wetness, read from the fact that wetter ground runs cooler than drier ground at the same greenness."
     },
     "scale": {
       "ndvi": "Runs −1 to 1. Below 0.2 is effectively bare; 0.2–0.6 is a developing canopy; 0.6 and above is dense and actively growing.",
@@ -493,7 +500,10 @@
       "ndwi": "Runs −1 to 1, and the scale is inverted against the canopy indices: a healthy crop reads well below −0.15, and anything above 0 is standing water.",
       "ndmi": "Runs −1 to 1. Below 0.2 is a dry, stressed canopy; 0.2–0.4 is moderate; 0.4–0.6 is well watered; above 0.6 is a very wet canopy.",
       "bsi": "Runs −1 to 1, inverted against the canopy indices: a closed canopy reads below −0.1 and exposed ground sits above 0. Read it against the growth stage — bare ground just after planting is expected, the same value at full canopy is plant loss.",
-      "msi": "A ratio, not a −1 to 1 index — real readings run about 0.2 to 2.0. It is the one index here where higher is worse: below 0.4 is well watered, 0.4–1.0 is moderate stress, above 1.0 is high stress."
+      "msi": "A ratio, not a −1 to 1 index — real readings run about 0.2 to 2.0. It is the one index here where higher is worse: below 0.4 is well watered, 0.4–1.0 is moderate stress, above 1.0 is high stress.",
+      "lst": "Degrees Celsius, roughly 0–60 here. A canopy transpiring freely cools itself below air temperature; a stressed one heats up. Sensed at 100 m and resampled to 30 m, so read the pattern across the farm rather than a single block's number.",
+      "cwsi": "0 to 1. 0 is transpiring freely, 1 is fully closed down. Not yet calibrated for mango here, so read which way it is moving rather than the absolute figure. Ground with no crop on it pins at 1.00 — that is bare, not dying.",
+      "smi": "0 to 1, dry edge to wet edge. The edges are fitted to this scene over this farm, so the scale is not comparable between two dates or two farms — it ranks wet against dry within one pass."
     },
     "band": {
       "ndvi": {
@@ -572,6 +582,28 @@
         "moderateStress": "Moderate water stress. Check the irrigation schedule for this block.",
         "highStress": "High water stress — the canopy is materially dry. Irrigate, or confirm why it has not been.",
         "severeStress": "Severe reading. Usually a badly stressed canopy, but standing water also lands here — open water drives near-infrared toward zero and sends the ratio up. Read it alongside NDMI, which separates the two."
+      },
+      "lst": {
+        "cool": "Cool surface. Well below the air on a summer day — dense, freely transpiring canopy or recently irrigated ground.",
+        "mild": "Comfortable surface temperature. Nothing here suggests heat stress.",
+        "warm": "Warming. Normal for midday in season, but worth reading against CWSI before calling it fine.",
+        "hot": "Hot surface. Either a thin canopy letting the ground show through, or one that has stopped cooling itself.",
+        "veryHot": "Very hot. At this level the surface is mostly bare soil or a canopy that is no longer transpiring.",
+        "extreme": "Extreme surface heat. Almost always exposed ground rather than a crop — bare sand at midday reads here routinely."
+      },
+      "cwsi": {
+        "unstressed": "Transpiring freely. The canopy is cooling itself and water is not limiting.",
+        "mild": "Mild stress. Early, and ahead of anything visible on the ground.",
+        "moderate": "Moderate water stress. Check this block's irrigation against its schedule.",
+        "high": "High water stress. The canopy is closing down. Irrigate, or establish why it has not been.",
+        "severe": "Severe reading. Read it with NDVI first: ground with little or no canopy on it pins here by construction, because nothing is transpiring to cool it."
+      },
+      "smi": {
+        "veryDry": "Driest ground in this pass. On the fitted dry edge of the farm.",
+        "dry": "Dry relative to the rest of the farm on this date.",
+        "moderate": "Mid-range wetness for this pass.",
+        "moist": "Wetter than most of the farm on this date.",
+        "wet": "At the wet edge. Recently irrigated, or holding more water than it should — worth checking drainage rather than reading as simply the best."
       }
     },
     "openFamily": "Open {{family}} →",
@@ -683,7 +715,8 @@
     "fullscreen": "Full screen",
     "exitFullscreen": "Exit full screen",
     "pixels": "Index pixels",
-    "pixelsUnavailable": "no block has an image for this date"
+    "pixelsUnavailable": "no block has an image for this date",
+    "gridNotForThisIndex": "Sub-block zones are computed from the optical product. Thermal has none — read it across the farm instead."
   },
   "legend": {
     "title": "Index legend",
@@ -747,12 +780,35 @@
         "moderateStress": "Moderate stress",
         "highStress": "High stress",
         "severeStress": "Severe — or standing water"
+      },
+      "surfaceTemp": {
+        "cool": "Cool (≤ 20 °C)",
+        "mild": "Mild",
+        "warm": "Warm",
+        "hot": "Hot",
+        "veryHot": "Very hot",
+        "extreme": "Extreme"
+      },
+      "waterStress": {
+        "unstressed": "Transpiring freely",
+        "mild": "Mild stress",
+        "moderate": "Moderate stress",
+        "high": "High stress",
+        "severe": "Severe — or bare ground"
+      },
+      "soilMoisture": {
+        "veryDry": "Very dry",
+        "dry": "Dry",
+        "moderate": "Moderate",
+        "moist": "Moist",
+        "wet": "Wet edge"
       }
     },
     "pixelsOffNote": "Index pixels are off — blocks are filled by their own average for this date.",
     "relativeCaveat": "NDRE shifts with sensor and crop — compare blocks against each other on one date rather than against fixed thresholds.",
     "emptyNoSceneTitle": "Nothing for this date",
-    "emptyNoSceneBody": "No block has a usable image for the selected pass — cloud, or an ingest that has not run. Pick another date on the timeline."
+    "emptyNoSceneBody": "No block has a usable image for the selected pass — cloud, or an ingest that has not run. Pick another date on the timeline.",
+    "thermalCaveat": "Thermal is sensed at {{metres}} m and resampled to 30 m — one pixel covers a hectare. Read the pattern across the farm; a block smaller than that is inheriting its surroundings' value."
   },
   "farmSubs": {
     "loading": "Loading subscriptions…",

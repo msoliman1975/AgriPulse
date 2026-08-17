@@ -1,6 +1,6 @@
 import { apiClient } from "./client";
 
-import type { IndexCode } from "./indices";
+import type { AnyIndexCode as IndexCode } from "./indices";
 
 // Mirrors backend/app/modules/grid/schemas.py — keep in lock-step.
 

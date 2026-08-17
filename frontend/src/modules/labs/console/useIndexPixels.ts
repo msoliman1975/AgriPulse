@@ -12,7 +12,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { listFarmSceneAssets, type FarmRaster, type FarmSceneAsset } from "@/api/imagery";
-import type { IndexCode as ApiIndexCode } from "@/api/indices";
+import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import type { ConfigResponse } from "@/api/config";
 import { mapWithConcurrency } from "../map/api";
 import type { PixelLayer } from "../map/MapCanvas";
@@ -123,8 +123,8 @@ export function useIndexPixels(input: {
   const { farmId, code, sceneAt, config, boundsByBlockId, farmBounds, farmAreaM2 } = input;
 
   const assetsQ = useQuery({
-    queryKey: CONSOLE_QK.sceneAssets(farmId, sceneAt),
-    queryFn: () => listFarmSceneAssets(farmId, sceneAt ?? undefined),
+    queryKey: CONSOLE_QK.sceneAssets(farmId, sceneAt, code),
+    queryFn: () => listFarmSceneAssets(farmId, sceneAt ?? undefined, code),
     enabled: Boolean(farmId) && input.enabled,
     staleTime: 5 * 60_000,
   });
