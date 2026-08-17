@@ -73,6 +73,11 @@ class _FakeProvider:
         pass
 
 
+#: Every ``all_touched`` the stubbed loader was called with, newest last.
+#: Cleared by `_stub_rasterio`, so a test reads only its own calls.
+SEEN_ALL_TOUCHED: list[bool] = []
+
+
 def _stub_rasterio(
     monkeypatch: pytest.MonkeyPatch,
     *,
@@ -92,6 +97,7 @@ def _stub_rasterio(
 
     seen_hashes: list[str] = []
     seen_product_codes: list[str] = []
+    SEEN_ALL_TOUCHED.clear()
     profile: dict[str, Any] = grid or {"transform": None}
     if grid is not None:
         rasters = {
@@ -107,12 +113,16 @@ def _stub_rasterio(
         band_names: tuple[str, ...],
         aoi_geojson_utm36n: dict,
         product_code: str = "s2_l2a",
+        all_touched: bool = True,
     ) -> tuple:
         # `product_code` mirrors the real signature: it selects which
         # masking rules the trailing quality band follows. Accepting it
         # here rather than swallowing kwargs keeps this double honest —
-        # see the note on `fake_compute` below.
+        # see the note on `fake_compute` below. `all_touched` is here for
+        # the same reason, and `SEEN_ALL_TOUCHED` is what lets a test assert
+        # the farm path cuts at the boundary rather than a pixel past it.
         seen_product_codes.append(product_code)
+        SEEN_ALL_TOUCHED.append(all_touched)
         return ({b: None for b in band_names}, None, None, profile)
 
     def fake_compute(**kwargs: Any) -> tuple:
@@ -315,6 +325,12 @@ async def test_an_acquired_pass_is_recorded_as_fetched_under_the_farm_hash(
 
         # The fetch asked for the farm boundary, not a block's.
         assert len(provider.fetched_aois) == 1
+
+        # And it was cut AT that boundary. Under the touched rule this
+        # surface paints every pixel the border clips through — a full
+        # pixel of colour outside the farm, 10 m on Sentinel-2 and 30 m on
+        # Landsat, which is what a farm outline on a map makes obvious.
+        assert SEEN_ALL_TOUCHED == [False]
 
         row = (
             (

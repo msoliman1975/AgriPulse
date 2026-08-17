@@ -91,6 +91,7 @@ def load_raw_bands_and_aggregate(
     band_names: tuple[str, ...],
     aoi_geojson_utm36n: dict[str, Any],
     product_code: str = "s2_l2a",
+    all_touched: bool = True,
 ) -> tuple[
     dict[str, NDArray[np.float32]],
     NDArray[np.bool_],
@@ -115,6 +116,22 @@ def load_raw_bands_and_aggregate(
     encodings are not interchangeable: SCL is a class enum and QA_PIXEL is a
     bitmask, so reading one with the other's rules produces a
     plausible-looking mask that is entirely wrong.
+
+    ``all_touched`` picks the rule for "is this pixel inside the AOI".
+
+    True — the default and what the per-block path has always used — keeps
+    any pixel whose footprint TOUCHES the boundary. It loses no edge data,
+    and the block aggregates in the database were all measured under it, so
+    changing it there would put a step in every block's history.
+
+    False keeps only pixels whose CENTRE falls inside, which is what the FARM
+    surface uses. That raster is drawn on a map against the farm's own
+    outline, and under the touched rule it paints up to a full pixel of
+    colour past the border — 10 m for Sentinel-2, 30 m for Landsat, a visible
+    staircase around a smooth boundary, and the same fringe that inflates the
+    legend's covered area by ~2%. A farm is never thinner than a pixel, so
+    the centre rule cannot empty it; a narrow BLOCK could vanish under it,
+    which is the other half of why the default stays True.
     """
     n_science = len(band_names)
     with _gdal_s3_env(), rasterio.open(raw_uri) as ds:
@@ -139,7 +156,7 @@ def load_raw_bands_and_aggregate(
             out_shape=(ds.height, ds.width),
             transform=ds.transform,
             invert=False,
-            all_touched=True,
+            all_touched=all_touched,
         )
         base_profile = ds.profile.copy()
 
