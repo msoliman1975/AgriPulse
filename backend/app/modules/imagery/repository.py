@@ -31,6 +31,7 @@ from app.modules.imagery.models import (
     ImageryAoiSubscription,
     ImageryIngestionJob,
 )
+from app.shared.db.ids import uuid7
 
 
 def _utc_day_start(at: datetime) -> datetime:
@@ -1071,6 +1072,123 @@ class ImageryRepository:
             .all()
         )
         return tuple(dict(r) for r in rows)
+
+    async def count_active_block_subscriptions(self, *, farm_id: UUID, product_id: UUID) -> int:
+        """Live blocks of this farm actually subscribed to this product.
+
+        "The farm is subscribed, per block" is only true if some block is. A
+        farm row on its own fetches nothing unless `fetch_farm_aoi` is set —
+        the block sweep is driven by these rows and by nothing else.
+        """
+        row = await self._session.execute(
+            text(
+                """
+                SELECT count(*) FROM imagery_aoi_subscriptions s
+                  JOIN blocks b ON b.id = s.block_id
+                 WHERE b.farm_id = :farm
+                   AND b.deleted_at IS NULL
+                   AND s.product_id = :product
+                   AND s.is_active = TRUE
+                   AND s.deleted_at IS NULL
+                """
+            ).bindparams(
+                bindparam("farm", type_=PG_UUID(as_uuid=True)),
+                bindparam("product", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"farm": farm_id, "product": product_id},
+        )
+        return int(row.scalar_one())
+
+    async def has_block_imagery_history(self, *, farm_id: UUID, product_id: UUID) -> bool:
+        """Has this farm ever been fetched per block for this product?
+
+        The question behind it is whether moving the farm onto the whole-farm
+        path would put a STEP in a series somebody is already reading. Block
+        means measured off a stitched farm surface differ from the same block
+        fetched on its own by around 0.7% — nothing on a farm with no history,
+        a visible discontinuity on one with months of it.
+        """
+        row = await self._session.execute(
+            text(
+                """
+                SELECT EXISTS (
+                    SELECT 1 FROM imagery_ingestion_jobs j
+                      JOIN blocks b ON b.id = j.block_id
+                     WHERE b.farm_id = :farm
+                       AND j.product_id = :product
+                )
+                """
+            ).bindparams(
+                bindparam("farm", type_=PG_UUID(as_uuid=True)),
+                bindparam("product", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"farm": farm_id, "product": product_id},
+        )
+        return bool(row.scalar_one())
+
+    async def subscribe_farm_blocks(
+        self,
+        *,
+        farm_id: UUID,
+        product_id: UUID,
+        cadence_hours: int | None,
+        cloud_cover_max_pct: int | None,
+        actor_user_id: UUID | None,
+    ) -> int:
+        """Give every live block of the farm an active subscription.
+
+        Used when the farm's own row says "per block" but no block carries the
+        subscription that phrase describes. Blocks that already have one are
+        left exactly as they are — including their watermarks, so this cannot
+        re-fetch history.
+
+        Ids are generated here rather than in SQL: `uuid7` is the platform's
+        ordering guarantee and a `gen_random_uuid()` would break it.
+        """
+        block_ids = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT b.id FROM blocks b
+                         WHERE b.farm_id = :farm
+                           AND b.deleted_at IS NULL
+                           AND (b.active_to IS NULL OR b.active_to > now())
+                           AND NOT EXISTS (
+                               SELECT 1 FROM imagery_aoi_subscriptions s
+                                WHERE s.block_id = b.id
+                                  AND s.product_id = :product
+                                  AND s.is_active = TRUE
+                                  AND s.deleted_at IS NULL
+                           )
+                        ORDER BY b.id
+                        """
+                    ).bindparams(
+                        bindparam("farm", type_=PG_UUID(as_uuid=True)),
+                        bindparam("product", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {"farm": farm_id, "product": product_id},
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for block_id in block_ids:
+            self._session.add(
+                ImageryAoiSubscription(
+                    id=uuid7(),
+                    block_id=block_id,
+                    product_id=product_id,
+                    cadence_hours=cadence_hours,
+                    cloud_cover_max_pct=cloud_cover_max_pct,
+                    is_active=True,
+                    created_by=actor_user_id,
+                    updated_by=actor_user_id,
+                )
+            )
+        if block_ids:
+            await self._session.flush()
+        return len(block_ids)
 
     async def upsert_farm_subscription(
         self,
