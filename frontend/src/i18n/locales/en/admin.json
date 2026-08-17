@@ -885,7 +885,8 @@
       "cell": "Cell",
       "block": "Block",
       "membership": "Cell and block counts do not sum, by design: a cell claims a pixel when the pixel's centre falls inside it, while the block claims a pixel when its footprint touches the boundary. Edge pixels therefore count for the block but for no cell.",
-      "legend": "Pixel fill shows the index value; grey pixels carry no usable value. Blue outlines are grid cells — dashed where the cell has no stored aggregate. The red outline is the block boundary."
+      "legend": "Pixel fill shows the index value; grey pixels carry no usable value. Blue outlines are grid cells — dashed where the cell has no stored aggregate. The red outline is the block boundary.",
+      "truncatedFarm": "Showing {{shown}} of {{total}} pixels — the farm is larger than the map cap, so this is a prefix, not the whole field."
     },
     "stageWhat": {
       "generic": "What this stage counts.",

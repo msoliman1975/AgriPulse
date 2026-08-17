@@ -82,10 +82,16 @@ export function CellDrillPanel({
           </dl>
           {grid.truncated ? (
             <p className="mt-3 border-s-2 border-ap-warn ps-3 text-xs">
-              {t("observer.cells.truncated", {
-                shown: grid.returned_pixel_count,
-                total: grid.aoi_pixel_count,
-              })}
+              {/* A whole-farm acquisition is clipped to the FARM boundary —
+                  it has no block, so naming one here was the last of the
+                  block-vs-farm wording fixed in #506. */}
+              {t(
+                grid.scope === "farm" ? "observer.cells.truncatedFarm" : "observer.cells.truncated",
+                {
+                  shown: grid.returned_pixel_count,
+                  total: grid.aoi_pixel_count,
+                },
+              )}
             </p>
           ) : null}
         </>
