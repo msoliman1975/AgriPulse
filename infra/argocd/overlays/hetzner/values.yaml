@@ -2109,13 +2109,26 @@ global:
   #   scope column, the Observer scene table renders whole-farm rows).
   #   Images CONFIRMED by pulling both on the node: api + frontend @
   #   762d5a2.
+  # d926cdc = #502, a defect the #501 smoke test surfaced on prod.
+  #   The scene detail page defaulted the `index` param to "ndvi". Harmless
+  #   for as long as every openable scene was Sentinel-2 — but #501 made
+  #   whole-farm THERMAL scenes openable for the first time, and
+  #   `landsat_c2_l2_st` offers only lst/cwsi/smi. So opening one asked for
+  #   an NDVI raster that cannot exist: the map rendered blank and
+  #   /pixel-grid 422'd. The index now comes from the scene's own
+  #   `supported_indices`, and the grid query waits for the product rather
+  #   than firing on a guess.
+  #
+  #   FRONTEND ONLY — api + workers stay on 762d5a2 (no backend delta).
+  #   NO MIGRATIONS; public 0068, tenant 0078.
+  #   Image CONFIRMED by pulling it on the node: frontend @ d926cdc.
   images:
     api:
       tag: "762d5a2"
     workers:
       tag: "762d5a2"
     frontend:
-      tag: "762d5a2"
+      tag: "d926cdc"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
