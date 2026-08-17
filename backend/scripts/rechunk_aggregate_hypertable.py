@@ -146,6 +146,9 @@ class Preflight:
     caggs: list[CaggSpec] = field(default_factory=list)
     table_fp: Fingerprint | None = None
     cagg_fps: dict[str, Fingerprint] = field(default_factory=dict)
+    # shape-key -> original index name, so the rebuild can put the names back
+    index_names: dict[str, str] = field(default_factory=dict)
+    constraint_names: dict[str, str] = field(default_factory=dict)
 
 
 def _q(ident: str) -> str:
@@ -283,6 +286,144 @@ def _require_known_schema(conn: Connection, schema: str) -> None:
         logger.warning("%s is not a live tenant schema — assuming this is a rehearsal", schema)
 
 
+def _index_key(indexdef: str) -> str:
+    """A name-free, table-free identity for an index.
+
+    `CREATE TABLE ... (LIKE ... INCLUDING INDEXES)` rebuilds every index but
+    names them after the table it copied INTO — so they all come out as
+    `block_index_aggregates__rechunk_new_*`. Matching on the shape (unique
+    or not, plus everything from USING onwards) is what lets the original
+    names be restored afterwards.
+    """
+    unique = "CREATE UNIQUE INDEX" in indexdef
+    tail = indexdef[indexdef.index(" USING ") :] if " USING " in indexdef else indexdef
+    return f"{'u' if unique else 'i'}:{' '.join(tail.split())}"
+
+
+def _read_relation_names(
+    conn: Connection, schema: str, table: str
+) -> tuple[dict[str, str], dict[str, str]]:
+    indexes = {
+        _index_key(r.indexdef): r.indexname
+        for r in conn.execute(
+            text(
+                """
+                SELECT indexname, indexdef FROM pg_indexes
+                 WHERE schemaname = :schema AND tablename = :table
+                """
+            ),
+            {"schema": schema, "table": table},
+        ).all()
+    }
+    constraints = {
+        " ".join(r.definition.split()): r.conname
+        for r in conn.execute(
+            text(
+                """
+                SELECT conname, pg_get_constraintdef(oid) AS definition
+                  FROM pg_constraint
+                 WHERE conrelid = CAST(format('%I.%I', CAST(:schema AS text), CAST(:table AS text)) AS regclass)
+                """
+            ),
+            {"schema": schema, "table": table},
+        ).all()
+    }
+    return indexes, constraints
+
+
+def _park_old_names(conn: Connection, schema: str, old: str) -> None:
+    """Move the retained old table's index/constraint names out of the way.
+
+    Index names are unique per SCHEMA, not per table, so while
+    `<table>__rechunk_old` is kept for rollback it is still sitting on every
+    original name and the restore below fails with:
+
+        ERROR: relation "uq_block_index_aggregates_..." already exists
+
+    Renaming rather than dropping keeps the rollback intact — the old table
+    still has all its data and indexes, just under parked names.
+    """
+    for r in conn.execute(
+        text(
+            """
+            SELECT indexname FROM pg_indexes
+             WHERE schemaname = :schema AND tablename = :old
+            """
+        ),
+        {"schema": schema, "old": old},
+    ).all():
+        if r.indexname.endswith(_PARKED_SUFFIX):
+            continue
+        conn.execute(
+            text(
+                f"ALTER INDEX {_q(schema)}.{_q(r.indexname)} "
+                f"RENAME TO {_q(_parked(r.indexname))}"
+            )
+        )
+    for r in conn.execute(
+        text(
+            """
+            SELECT conname FROM pg_constraint
+             WHERE conrelid = CAST(format('%I.%I', CAST(:schema AS text), CAST(:old AS text)) AS regclass)
+            """
+        ),
+        {"schema": schema, "old": old},
+    ).all():
+        # A UNIQUE constraint and its backing index share a name, so the
+        # loop above has already parked this one. Renaming it again would
+        # be `RENAME x TO x`, which Postgres rejects as a duplicate.
+        if r.conname.endswith(_PARKED_SUFFIX):
+            continue
+        conn.execute(
+            text(
+                f"ALTER TABLE {_q(schema)}.{_q(old)} "
+                f"RENAME CONSTRAINT {_q(r.conname)} TO {_q(_parked(r.conname))}"
+            )
+        )
+
+
+_PARKED_SUFFIX = "__old"
+
+
+def _parked(name: str) -> str:
+    """`name` with an `__old` marker, inside Postgres's 63-char identifier cap."""
+    return name[: 63 - len(_PARKED_SUFFIX)] + _PARKED_SUFFIX
+
+
+def _restore_names(conn: Connection, pf: Preflight, old: str) -> None:
+    """Put the original index and constraint names back.
+
+    Nothing in the app targets them by name today, but the SQLAlchemy model
+    declares `uq_block_index_aggregates_time_block_index_product` and a
+    later migration doing `DROP CONSTRAINT <that name>` would fail against a
+    rebuilt table. Leaving `__rechunk_new` in the schema is also just a lie
+    about how the table got there.
+    """
+    _park_old_names(conn, pf.schema, old)
+    now_idx, _ = _read_relation_names(conn, pf.schema, pf.table)
+    for key, current in now_idx.items():
+        original = pf.index_names.get(key)
+        if original and original != current:
+            conn.execute(
+                text(f"ALTER INDEX {_q(pf.schema)}.{_q(current)} RENAME TO {_q(original)}")
+            )
+            logger.info("  index %s -> %s", current, original)
+    # Re-read: renaming a UNIQUE constraint's backing index renames the
+    # constraint with it, so anything captured before the loop above may
+    # already be gone under that name.
+    _, now_con = _read_relation_names(conn, pf.schema, pf.table)
+    for key, current in now_con.items():
+        original = pf.constraint_names.get(key)
+        if original and original != current:
+            conn.execute(
+                text(
+                    f"ALTER TABLE {_q(pf.schema)}.{_q(pf.table)} "
+                    f"RENAME CONSTRAINT {_q(current)} TO {_q(original)}"
+                )
+            )
+            logger.info("  constraint %s -> %s", current, original)
+
+
 def _preflight(conn: Connection, schema: str, table: str) -> Preflight:
     _require_known_schema(conn, schema)
     conn.execute(text(f"SET search_path TO {_q(schema)}, public"))
@@ -339,6 +480,7 @@ def _preflight(conn: Connection, schema: str, table: str) -> Preflight:
         segmentby=segmentby,
         compress_after=compress_after,
     )
+    pf.index_names, pf.constraint_names = _read_relation_names(conn, schema, table)
     pf.caggs = _read_caggs(conn, schema, table)
     pf.table_fp = _fingerprint(conn, schema, table)
     pf.rows = pf.table_fp.rows
@@ -572,8 +714,9 @@ def _rechunk(engine: Engine, schema: str, table: str, *, drop_old: bool) -> int:
         conn.commit()
         _refresh_caggs(engine, pf)
         _restore_policies(conn, pf)
+        _restore_names(conn, pf, old)
         conn.commit()
-        logger.info("caggs + policies restored")
+        logger.info("caggs + policies restored, original index names put back")
 
         problems = _verify(conn, pf)
         if problems:
