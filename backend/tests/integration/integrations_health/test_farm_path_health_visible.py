@@ -94,8 +94,10 @@ async def _farm_health(admin_session: AsyncSession, schema: str) -> dict[str, An
     """The single row the Overview tab renders for this farm."""
     await admin_session.execute(text(f'SET LOCAL search_path TO "{schema}", public'))
     row = (
-        await admin_session.execute(text("SELECT * FROM v_farm_integration_health"))
-    ).mappings().one()
+        (await admin_session.execute(text("SELECT * FROM v_farm_integration_health")))
+        .mappings()
+        .one()
+    )
     await admin_session.execute(text("SET LOCAL search_path TO public"))
     return dict(row)
 
@@ -103,10 +105,14 @@ async def _farm_health(admin_session: AsyncSession, schema: str) -> dict[str, An
 async def _attempts(admin_session: AsyncSession, schema: str) -> list[dict[str, Any]]:
     await admin_session.execute(text(f'SET LOCAL search_path TO "{schema}", public'))
     rows = (
-        await admin_session.execute(
-            text("SELECT * FROM v_integration_recent_attempts ORDER BY started_at DESC")
+        (
+            await admin_session.execute(
+                text("SELECT * FROM v_integration_recent_attempts ORDER BY started_at DESC")
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
     await admin_session.execute(text("SET LOCAL search_path TO public"))
     return [dict(r) for r in rows]
 

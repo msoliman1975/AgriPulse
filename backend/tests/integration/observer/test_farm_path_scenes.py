@@ -77,8 +77,7 @@ async def _seed_thermal_farm_path(
             (
                 await session.execute(
                     text(
-                        "SELECT id FROM public.imagery_products "
-                        "WHERE code = 'landsat_c2_l2_st'"
+                        "SELECT id FROM public.imagery_products " "WHERE code = 'landsat_c2_l2_st'"
                     )
                 )
             ).scalar_one()
@@ -165,9 +164,7 @@ async def _seed_thermal_farm_path(
     return product_id, job_ids
 
 
-async def _scenes(
-    scenario: Scenario, product_id: UUID | None = None
-) -> list[dict[str, Any]]:
+async def _scenes(scenario: Scenario, product_id: UUID | None = None) -> list[dict[str, Any]]:
     params: dict[str, Any] = {
         "farm_id": str(scenario.farm_id),
         **_window(),
@@ -176,9 +173,7 @@ async def _scenes(
     if product_id is not None:
         params["product"] = str(product_id)
     async with _platform_client() as client:
-        resp = await client.get(
-            f"{_BASE}/tenants/{scenario.tenant_id}/scenes", params=params
-        )
+        resp = await client.get(f"{_BASE}/tenants/{scenario.tenant_id}/scenes", params=params)
     assert resp.status_code == 200, resp.text
     return list(resp.json())
 
@@ -192,9 +187,7 @@ async def test_thermal_scenes_are_listed_at_all(
 
     rows = await _scenes(scenario, product_id)
     assert len(rows) == _THERMAL_SCENES
-    assert {r["scene_id"] for r in rows} == {
-        f"LC09_OBS_{i:02d}" for i in range(_THERMAL_SCENES)
-    }
+    assert {r["scene_id"] for r in rows} == {f"LC09_OBS_{i:02d}" for i in range(_THERMAL_SCENES)}
 
 
 @pytest.mark.asyncio
@@ -226,9 +219,7 @@ async def test_a_farm_rows_index_count_rolls_up_across_the_farm(
 
 
 @pytest.mark.asyncio
-async def test_block_scenes_are_unchanged(
-    admin_session: AsyncSession, scenario: Scenario
-) -> None:
+async def test_block_scenes_are_unchanged(admin_session: AsyncSession, scenario: Scenario) -> None:
     """The regression guard: the block path must not gain or lose a row.
 
     The seeded Sentinel-2 scenario is 8 block jobs across two blocks; the
@@ -263,9 +254,7 @@ async def test_the_ribbon_and_the_table_agree(
             },
         )
     assert overview.status_code == 200, overview.text
-    discovered = next(
-        s for s in overview.json()["stages"] if s["key"] == "discovered"
-    )["count"]
+    discovered = next(s for s in overview.json()["stages"] if s["key"] == "discovered")["count"]
 
     assert discovered == len(await _scenes(scenario, product_id)) == _THERMAL_SCENES
 
@@ -303,9 +292,7 @@ async def test_a_farm_scene_opens_in_the_detail_view(
     _, job_ids = await _seed_thermal_farm_path(admin_session, scenario)
 
     async with _platform_client() as client:
-        resp = await client.get(
-            f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{job_ids[0]}"
-        )
+        resp = await client.get(f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{job_ids[0]}")
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["scope"] == "farm"
@@ -330,9 +317,7 @@ async def test_a_thermal_scene_reports_the_landsat_mask_ruleset(
     _, job_ids = await _seed_thermal_farm_path(admin_session, scenario)
 
     async with _platform_client() as client:
-        resp = await client.get(
-            f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{job_ids[0]}"
-        )
+        resp = await client.get(f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{job_ids[0]}")
     body = resp.json()
     assert body["mask_ruleset"] == "landsat_qa_pixel_v1"
     # Bits, not classes — different encodings, so only one is populated.
@@ -346,9 +331,7 @@ async def test_a_block_scene_still_reports_the_sentinel_ruleset(
 ) -> None:
     rows = await _scenes(scenario, scenario.product_id)
     async with _platform_client() as client:
-        resp = await client.get(
-            f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{rows[0]['job_id']}"
-        )
+        resp = await client.get(f"{_BASE}/tenants/{scenario.tenant_id}/scenes/{rows[0]['job_id']}")
     body = resp.json()
     assert body["mask_ruleset"] == "s2_scl_v1"
     assert body["mask_classes"] == [0, 1, 3, 8, 9, 10, 11]
