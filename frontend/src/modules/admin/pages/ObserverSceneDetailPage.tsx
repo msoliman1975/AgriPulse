@@ -49,13 +49,26 @@ export function ObserverSceneDetailPage(): ReactNode {
   const [params, setParams] = useSearchParams();
 
   const tenantId = params.get("tenant");
-  const selectedIndex = params.get("index") ?? "ndvi";
+  const requestedIndex = params.get("index");
 
   const [picked, setPicked] = useState<{ lon: number; lat: number } | null>(null);
   const [budgetRequested, setBudgetRequested] = useState(false);
   const [selectedCell, setSelectedCell] = useState<string | null>(null);
 
   const detail = useSceneDetail(tenantId, jobId ?? null);
+  // The index set belongs to the PRODUCT. Defaulting to "ndvi" asked a
+  // Landsat thermal scene — which offers only lst/cwsi/smi — for a raster
+  // that cannot exist, so the map came back blank and the request 422'd.
+  // Null until the product is known, which is what keeps the grid query
+  // from firing on a guess.
+  const supported = detail.data?.supported_indices;
+  const selectedIndex =
+    supported === undefined
+      ? null
+      : requestedIndex && supported.includes(requestedIndex)
+        ? requestedIndex
+        : (supported[0] ?? null);
+
   const pixel = usePixelExplain(tenantId, jobId ?? null, picked);
   const budget = usePixelBudget(tenantId, jobId ?? null, budgetRequested);
   const grid = usePixelGrid(tenantId, jobId ?? null, selectedIndex, selectedCell);
@@ -78,7 +91,10 @@ export function ObserverSceneDetailPage(): ReactNode {
 
   const d = detail.data;
   const blockLabel = d.block_name ?? d.block_code ?? d.block_id;
-  const aggregateRow = indices.data?.find((r) => r.index_code === selectedIndex);
+  // Narrowed: `supported_indices` is resolved now that `detail.data` is, so
+  // the index is a concrete one belonging to THIS scene's product.
+  const indexCode = selectedIndex ?? d.supported_indices[0] ?? "ndvi";
+  const aggregateRow = indices.data?.find((r) => r.index_code === indexCode);
 
   return (
     <Page>
@@ -98,7 +114,7 @@ export function ObserverSceneDetailPage(): ReactNode {
         actions={
           <select
             className="rounded border border-ap-line bg-ap-panel px-2 py-1.5 text-sm"
-            value={selectedIndex}
+            value={indexCode}
             onChange={(e) => {
               const merged = new URLSearchParams(params);
               merged.set("index", e.target.value);
@@ -138,7 +154,7 @@ export function ObserverSceneDetailPage(): ReactNode {
                     selectedCellId={selectedCell}
                     onSelectCell={setSelectedCell}
                     onPickPixel={setPicked}
-                    rescale={rescaleFor(selectedIndex)}
+                    rescale={rescaleFor(indexCode)}
                     className="h-[28rem] w-full"
                   />
                   <p className="border-t border-ap-line p-3 text-xs text-ap-muted">
@@ -165,7 +181,7 @@ export function ObserverSceneDetailPage(): ReactNode {
             data={pixel.data}
             isPending={pixel.isFetching}
             error={pixel.error}
-            selectedIndex={selectedIndex}
+            selectedIndex={indexCode}
           />
         </div>
       </div>
@@ -176,7 +192,7 @@ export function ObserverSceneDetailPage(): ReactNode {
           isPending={budget.isPending}
           requested={budgetRequested}
           onRequest={() => setBudgetRequested(true)}
-          selectedIndex={selectedIndex}
+          selectedIndex={indexCode}
         />
 
         <Card title={t("observer.detail.inputs")}>
@@ -251,7 +267,7 @@ export function ObserverSceneDetailPage(): ReactNode {
           <LineagePanel
             tenantId={tenantId as string}
             blockId={d.block_id}
-            indexCode={selectedIndex}
+            indexCode={indexCode}
             productId={d.product_id}
             sceneTime={d.scene_datetime}
             // A scene's consumers are what fired in the days after it, so the
@@ -327,7 +343,7 @@ export function ObserverSceneDetailPage(): ReactNode {
           <RollupChip
             label={t("observer.detail.pixel")}
             value={
-              pixel.data?.indices[selectedIndex]?.raw_value?.toFixed(4) ??
+              pixel.data?.indices[indexCode]?.raw_value?.toFixed(4) ??
               t("observer.detail.clickPixel")
             }
           />
