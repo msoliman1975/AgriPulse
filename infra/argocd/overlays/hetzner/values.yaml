@@ -2237,11 +2237,36 @@ global:
   #   NO MIGRATIONS; public 0068, tenant 0078 unchanged.
   #   Images CONFIRMED by pulling all three on the node:
   #   api + workers + frontend @ 99ed384.
+  # 86faf0b = #511, an Observer readability + performance pass.
+  #   THE MAP TOOK 50 SECONDS. `build_pixel_grid` called `transform_geom`
+  #   once PER PIXEL, and each call builds a fresh PROJ transformer —
+  #   measured on prod at ~12 ms/px, so the default 4,000-pixel grid took
+  #   50 s and often never painted (2.3 s @ 50 px, 7.4 s @ 500 px, 50.3 s
+  #   @ 4,000 px — linear in pixels, which is the tell). One batched
+  #   `warp_transform` over all corners replaces 4,000 GDAL setups.
+  #   Corners come out BIT-IDENTICAL; centres move 6 mm, inside a 10 m px.
+  #
+  #   THE RIBBON ASSERTED A CAUSE IT HAD NOT CHECKED: "discovered but never
+  #   downloaded — check the provider errors" when both scenes were
+  #   `running` and stuck with NO error at all. The overview now returns
+  #   the offending rows with their real status/error and renders them
+  #   inline under the stage they explain.
+  #
+  #   Also: stage tiles explain what they count and their denominator;
+  #   every date labelled in the daily histogram (was ~1 in 8); legend
+  #   outcomes described on screen; "not gridded" and "Valid / total px"
+  #   explain themselves; expanded rows name their block (4 rows per index
+  #   = 4 BLOCKS, not duplication); verify blurb drops Bashier's hardcoded
+  #   "36 blocks / 2,500". Removed the trend-ambiguity + consumers-proxy
+  #   notes. Shortfall WARNINGS stay on screen, not behind a click.
+  #
+  #   api + frontend. NO MIGRATIONS; public 0068, tenant 0078.
+  #   Images CONFIRMED by pulling both on the node: api + frontend @ 86faf0b.
   images:
     api:
-      tag: "99ed384"
+      tag: "86faf0b"
     workers:
-      tag: "99ed384"
+      tag: "86faf0b"
     frontend:
       # 8002b2d = #505. `visualizationDefaults` is a switch with NO default
       #   arm over the OPTICAL index union, so lst/cwsi/smi returned
@@ -2268,7 +2293,7 @@ global:
       #   there. The picker gains LST/CWSI/SMI on /labs/map-v2 only, and the
       #   scene reads carry `?index=`, which is why this cannot ship ahead
       #   of the api.
-      tag: "99ed384"
+      tag: "86faf0b"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
