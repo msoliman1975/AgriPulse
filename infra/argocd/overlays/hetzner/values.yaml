@@ -2140,11 +2140,36 @@ global:
   #   lockstep with api, which they share an image with).
   #   NO MIGRATIONS; public 0068, tenant 0078.
   #   Images CONFIRMED by pulling both on the node: api + frontend @ 1ed728f.
+  # a615cb8 = #504. #503 relaxed the pixel-grid guard so a farm scene's
+  #   raster could draw — and it immediately 500'd on prod with
+  #   `KeyError: 'nir'`. The guard had been MASKING a second copy of the
+  #   Sentinel-2 assumption #501 fixed in pixels.py. Landsat carries
+  #   lwir11/red/nir08; there is no `nir`.
+  #
+  #   FOUR modules made the same mistake independently, each failing
+  #   differently and NONE caught by a test:
+  #     pixels.explain_pixel ......... cloudy pixel read as CLEAR (#501)
+  #     pixels.compute_pixel_budget .. empty budget, KeyError swallowed (#501)
+  #     pixel_grid.build_pixel_grid .. KeyError: 'nir' -> 500 (this one)
+  #     verify.verify_scene_full ..... would recompute thermal under another
+  #       product's rules and report the disagreement as DRIFT IN THE STORED
+  #       DATA — the one verdict that mode exists to make trustworthy.
+  #       Unreachable today (thermal is farm-AOI only, verify is
+  #       block-scoped), latent regardless.
+  #
+  #   Both remaining ones now go through compute_indices_for_product /
+  #   quality_band_mask. A structural test walks every module under
+  #   app/modules/observer and fails on any import or call of the
+  #   Sentinel-2-only helpers — it found verify.py on its first correct run.
+  #
+  #   BACKEND ONLY — api + workers bump, FRONTEND STAYS 1ed728f.
+  #   NO MIGRATIONS; public 0068, tenant 0078.
+  #   Image CONFIRMED by pulling it on the node: api @ a615cb8.
   images:
     api:
-      tag: "1ed728f"
+      tag: "a615cb8"
     workers:
-      tag: "1ed728f"
+      tag: "a615cb8"
     frontend:
       tag: "1ed728f"
     tileServer:
