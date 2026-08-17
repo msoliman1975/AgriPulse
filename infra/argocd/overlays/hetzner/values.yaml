@@ -2165,11 +2165,48 @@ global:
   #   BACKEND ONLY — api + workers bump, FRONTEND STAYS 1ed728f.
   #   NO MIGRATIONS; public 0068, tenant 0078.
   #   Image CONFIRMED by pulling it on the node: api @ a615cb8.
+  # d918c0e = #509. The v2 console's scene strip — the date bar under the
+  #   map — took 32 SECONDS on prod for Green Farm [Demo-01]: 4 blocks, 52
+  #   rows out. `GET /farms/{id}/scenes`.
+  #
+  #   `farm_days` computed `computed_count` with a CORRELATED subquery over
+  #   `block_index_aggregates`, once per farm-pass day. The correlated
+  #   `a.time = p.at` is only known at run time, so TimescaleDB cannot
+  #   exclude chunks at PLAN time and falls back to RUNTIME exclusion —
+  #   re-done on every loop:
+  #       Custom Scan (ChunkAppend) ...  (loops=208)
+  #         Chunks excluded during runtime: 491
+  #   52 pass days x 495 chunks is ~26k chunk-exclusion evaluations for 52
+  #   rows. Plan: 3,629 lines, 964 chunk scan nodes. Only 462 ms of the 32 s
+  #   was real row work, on 2,985 buffers that were ALL cache hits.
+  #
+  #   THE TELL: `Limit` at 31,543 ms sitting directly above a
+  #   `GroupAggregate` at 462 ms. That gap is per-chunk executor overhead
+  #   charged to no child.
+  #
+  #   COST SCALES WITH PASS DAYS, NOT BLOCKS — the 4-block farm was 47x
+  #   slower than the 36-block one (Bashier, 685 ms).
+  #
+  #   Grouped into a CTE and joined back, so the hypertable is read once:
+  #     Green Farm [Demo-01]  32,004 ms -> 399 ms
+  #     Bashier Elkhier          685 ms -> 420 ms
+  #   No time window, so nothing is truncated — equivalence proved on prod
+  #   with EXCEPT ALL BOTH WAYS on a farm-path and a block-path farm, 0 rows
+  #   differing either way.
+  #
+  #   Residual ~380 ms is a SEPARATE unbounded scan of the same 495 chunks
+  #   in `block_days`. Root cause under both: `block_index_aggregates` holds
+  #   62k rows in 495 chunks (~125/chunk) because tenant 0057 widened the
+  #   interval for NEW CHUNKS ONLY.
+  #
+  #   BACKEND ONLY — api + workers bump, FRONTEND STAYS 0981f7f.
+  #   NO MIGRATIONS; public 0068, tenant 0078.
+  #   Images CONFIRMED by pulling both on the node: api + workers @ d918c0e.
   images:
     api:
-      tag: "a615cb8"
+      tag: "d918c0e"
     workers:
-      tag: "a615cb8"
+      tag: "d918c0e"
     frontend:
       # 8002b2d = #505. `visualizationDefaults` is a switch with NO default
       #   arm over the OPTICAL index union, so lst/cwsi/smi returned
