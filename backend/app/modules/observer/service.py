@@ -897,28 +897,51 @@ class ObserverService:
         draw it and the panel can show the arithmetic rather than asserting
         it. Passing `cell_id` narrows the pixels to that cell using the
         pipeline's own cell membership rule.
+
+        On a whole-farm acquisition the chain stops at the pixels: the
+        raster covers the farm boundary and is perfectly readable, but a
+        grid belongs to a block, so `cells` comes back empty and the block
+        roll-up is null. `scope` says which of the two the caller is
+        looking at rather than leaving them to infer it from the emptiness.
         """
         from app.modules.observer.pixel_grid import build_pixel_grid
 
         ctx, _ = await self._scene_context_and_formulas(tenant_schema, job_id)
-        if ctx["scope"] != "block":
-            raise BlockScopedSceneRequiredError(str(job_id))
         if index_code not in ctx["supported_indices"]:
             raise IndexNotSupportedError(index_code)
 
+        # A whole-farm acquisition has pixels — the raster covers the farm
+        # boundary — but no cells of its own, because a grid belongs to a
+        # block. Refusing the whole call over the cell half left the map
+        # blank, and the map is what a pixel is clicked ON: it made the
+        # thermal pixel explanation unreachable through the UI even though
+        # the endpoint behind it works. Serve the pixels, return no cells,
+        # and say which it is.
+        is_block = ctx["scope"] == "block"
+        if not is_block and cell_id is not None:
+            raise BlockScopedSceneRequiredError(str(job_id))
+
         await self._scope(tenant_schema)
         try:
-            cells = await self._repo.cells_for_scene(
-                block_id=ctx["block_id"],
-                product_id=ctx["product_id"],
-                index_code=index_code,
-                scene_time=ctx["scene_datetime"],
+            cells = (
+                await self._repo.cells_for_scene(
+                    block_id=ctx["block_id"],
+                    product_id=ctx["product_id"],
+                    index_code=index_code,
+                    scene_time=ctx["scene_datetime"],
+                )
+                if is_block
+                else []
             )
             selected = await self._repo.cell_by_id(cell_id) if cell_id else None
-            block_rows = await self._repo.scene_index_rows(
-                block_id=ctx["block_id"],
-                product_id=ctx["product_id"],
-                scene_time=ctx["scene_datetime"],
+            block_rows = (
+                await self._repo.scene_index_rows(
+                    block_id=ctx["block_id"],
+                    product_id=ctx["product_id"],
+                    scene_time=ctx["scene_datetime"],
+                )
+                if is_block
+                else []
             )
         finally:
             await self._unscope()
@@ -942,6 +965,7 @@ class ObserverService:
 
         return {
             "job_id": job_id,
+            "scope": ctx["scope"],
             "block_id": ctx["block_id"],
             "index_code": index_code,
             "scene_datetime": ctx["scene_datetime"],
