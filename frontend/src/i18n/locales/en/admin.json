@@ -701,7 +701,9 @@
       "formula": "Formula — {{index}}",
       "unavailable": "Not available on this product: {{reason}}.",
       "excluded": "Excluded from every statistic on this scene: {{reason}}.",
-      "contributes": "This pixel contributes to the cell and block aggregates."
+      "contributes": "This pixel contributes to the cell and block aggregates.",
+      "insideFarmAoi": "Inside the farm boundary.",
+      "outsideFarmAoi": "Outside the farm boundary — this pixel is not aggregated."
     },
     "budget": {
       "title": "Pixel budget",

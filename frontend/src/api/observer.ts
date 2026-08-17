@@ -367,7 +367,13 @@ export interface PixelExplain {
   job_id: string;
   scene_id: string;
   scene_datetime: string;
-  block_id: string;
+  scope: SceneScope;
+  /** Null on a whole-farm acquisition. */
+  block_id: string | null;
+  /** Decides how the quality band is labelled — SCL vs QA_PIXEL. */
+  product_code: string;
+  /** The air temperature CWSI was explained against; thermal only. */
+  air_temp_c: number | null;
   raw_asset_key: string;
   row: number;
   col: number;

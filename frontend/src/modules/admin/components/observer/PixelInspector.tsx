@@ -81,7 +81,11 @@ export function PixelInspector({
           </p>
           {data.masking_available ? (
             <p className="text-xs">
-              SCL = <strong>{data.scl_value}</strong> ({data.scl_label}) →{" "}
+              {/* Same field, two encodings. Printing "SCL" over a Landsat
+                  QA_PIXEL value is one product's vocabulary on another's
+                  numbers — the exact mislabel the backend stopped doing. */}
+              {data.product_code === "landsat_c2_l2_st" ? "QA_PIXEL" : "SCL"} ={" "}
+              <strong>{data.scl_value}</strong> ({data.scl_label}) →{" "}
               {data.masked ? (
                 <span className="font-semibold text-ap-crit">{t("observer.pixel.masked")}</span>
               ) : (
@@ -100,7 +104,19 @@ export function PixelInspector({
             <p className="text-xs text-ap-muted">{t("observer.pixel.noMaskBand")}</p>
           )}
           <p className="mt-1 text-xs">
-            {data.inside_aoi ? t("observer.pixel.insideAoi") : t("observer.pixel.outsideAoi")}
+            {/* A whole-farm acquisition is clipped to the FARM boundary; only
+                a block scene has a block one. */}
+            {data.inside_aoi
+              ? t(
+                  data.scope === "farm"
+                    ? "observer.pixel.insideFarmAoi"
+                    : "observer.pixel.insideAoi",
+                )
+              : t(
+                  data.scope === "farm"
+                    ? "observer.pixel.outsideFarmAoi"
+                    : "observer.pixel.outsideAoi",
+                )}
           </p>
         </section>
 
