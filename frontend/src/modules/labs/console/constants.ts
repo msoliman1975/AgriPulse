@@ -17,11 +17,17 @@ export const CONSOLE_QK = {
   // serve whichever scene happened to be cached first.
   farmGrid: (farmId: string, index: string, overlayKey: string, at: string | null) =>
     ["labs/console/farmGrid", farmId, index, overlayKey, at] as const,
-  scenes: (farmId: string) => ["labs/console/scenes", farmId] as const,
+  // The index is in the key because it is in the REQUEST: the timeline is
+  // scoped to the products that produce it, and a Sentinel-2 farm and a
+  // Landsat one have different acquisition days. A key that omitted it would
+  // paint the optical strip over a thermal reading, and the dates on it would
+  // resolve to passes with no thermal raster behind them.
+  scenes: (farmId: string, index: string) => ["labs/console/scenes", farmId, index] as const,
   // Which raster each block draws for a pass. Keyed on `at` for the same
-  // reason farmGrid is: the same farm at two scenes is two different answers.
-  sceneAssets: (farmId: string, at: string | null) =>
-    ["labs/console/sceneAssets", farmId, at] as const,
+  // reason farmGrid is: the same farm at two scenes is two different answers —
+  // and on the index, which decides which product's raster is returned at all.
+  sceneAssets: (farmId: string, at: string | null, index: string) =>
+    ["labs/console/sceneAssets", farmId, at, index] as const,
   // Pixel statistics per class. `assetCount` is in the key so the query
   // re-runs when a block's raster appears or disappears — the asset list is
   // the query's real input, and a stable key would serve a stale farm-wide

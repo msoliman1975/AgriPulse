@@ -6,7 +6,7 @@
 //
 // Pure functions in a .ts file so they can be tested without a DOM.
 import type { Block } from "@/api/blocks";
-import type { IndexCode as ApiIndexCode } from "@/api/indices";
+import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import type { Health, UnitSummary } from "../map/types";
 
 export type RailSort = "name" | "health" | "alerts" | "value";

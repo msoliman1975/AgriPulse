@@ -1,7 +1,7 @@
 // Pure helpers for the Block Dock. Kept out of the component files so the
 // tricky bits — reading a condition step back into "actual vs. threshold" —
 // are unit-testable without rendering anything.
-import type { IndexCode as ApiIndexCode } from "@/api/indices";
+import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import type { ExplainStep } from "@/api/recommendations";
 import { chartDateLocale } from "@/lib/chartFormat";
 

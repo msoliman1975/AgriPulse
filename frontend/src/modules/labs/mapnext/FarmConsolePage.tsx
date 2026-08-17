@@ -29,7 +29,7 @@ import { getFarmGridCells, getGridCells } from "@/api/grid";
 import { mapWithConcurrency } from "@/modules/labs/map/api";
 import { griddedBlocks } from "./gridOverlay";
 import { listSubscriptions } from "@/api/imagery";
-import type { IndexCode as ApiIndexCode } from "@/api/indices";
+import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
 import { loadBlockHealth, loadMapSummary, loadUnitDetail, toUnitIntegration } from "../map/api";
 import { MapCanvas, type GridCellProps, type DrawProgress } from "../map/MapCanvas";
@@ -44,7 +44,7 @@ import { BlockDefaultsPanel } from "./BlockDefaultsPanel";
 import { FarmSettingsTab } from "./FarmSettingsTab";
 import { usePrefs } from "@/prefs/PrefsContext";
 import { useCapability } from "@/rbac/useCapability";
-import { LAST_FARM_KEY } from "./constants";
+import { LAST_FARM_KEY, OPTICAL_INDEX_ORDER } from "./constants";
 import { AutoBlockPanel, CreateBlockPanel, CreatePivotPanel, DrawHintBar } from "./createFlows";
 import { CreateFarmFlow } from "./CreateFarmFlow";
 import { BulkAoiUploadPanel } from "./BulkAoiUploadPanel";
@@ -689,6 +689,11 @@ function Console({ farmId }: { farmId: string }): ReactNode {
       <ViewBar
         activeIndex={activeIndex}
         onIndexChange={setActiveIndex}
+        // Optical only. This console draws an index as sub-block grid cells
+        // and nothing else, and no thermal cell row exists — grid configs are
+        // per-product and only the optical product has one. Thermal is on the
+        // pixel console, which draws the index raster directly.
+        indexOptions={OPTICAL_INDEX_ORDER}
         layers={layers}
         onLayersChange={(patch) => setLayers((l) => ({ ...l, ...patch }))}
         onOpenSettings={() => setSettingsOpen(true)}

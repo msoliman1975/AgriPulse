@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { IndexCode as ApiIndexCode } from "@/api/indices";
+import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import {
   classesFor,
   classify,
   histogramBins,
-  HISTOGRAM_CEILING,
-  HISTOGRAM_FLOOR,
+  histogramCeiling,
+  histogramFloor,
   INDEX_CLASSES,
   lowerBound,
   titilerColormap,
@@ -88,8 +88,8 @@ describe("histogramBins", () => {
     const bins = histogramBins(code);
     expect(bins).toHaveLength(classesFor(code).length + 1);
     expect(bins).toEqual([...bins].sort((a, b) => a - b));
-    expect(bins[0]).toBe(HISTOGRAM_FLOOR);
-    expect(bins[bins.length - 1]).toBe(HISTOGRAM_CEILING);
+    expect(bins[0]).toBe(histogramFloor(code));
+    expect(bins[bins.length - 1]).toBe(histogramCeiling(code));
   });
 
   it("keeps EVI's out-of-range pixels inside the end bins", () => {
@@ -99,14 +99,39 @@ describe("histogramBins", () => {
     expect(bins[0]).toBeLessThan(-1);
     expect(bins[bins.length - 1]).toBeGreaterThan(1);
   });
+
+  it.each(CODES)("%s clamps outside its own class boundaries", (code) => {
+    // The failure this catches is silent and total. A clamp that does not
+    // reach an index's real values leaves its pixels outside every interval,
+    // and TiTiler renders those TRANSPARENT — so the map goes blank and the
+    // legend reports the ground as unread rather than mis-coloured.
+    //
+    // `lst` is why this is a per-index question at all: degrees Celsius
+    // against a module-wide ceiling of 3, which every real pixel on the
+    // reference farm exceeds by an order of magnitude.
+    const finite = classesFor(code)
+      .map((c) => c.max)
+      .filter((m) => Number.isFinite(m));
+    expect(histogramFloor(code)).toBeLessThan(Math.min(...finite));
+    expect(histogramCeiling(code)).toBeGreaterThan(Math.max(...finite));
+  });
+
+  it("reaches the temperatures LST actually reads", () => {
+    // Measured on the reference farm: 42.9-56.6 °C over bare sand in August,
+    // and the catalog's own bound for the index is 0-60. A clamp that stopped
+    // at either end of that would erase the hottest ground on the map, which
+    // is the ground a reader opens LST to find.
+    expect(histogramFloor("lst")).toBeLessThan(0);
+    expect(histogramCeiling("lst")).toBeGreaterThan(60);
+  });
 });
 
 describe("titilerColormap", () => {
   it.each(CODES)("%s covers the range with contiguous intervals", (code) => {
     const cm = JSON.parse(titilerColormap(code)) as [[number, number], number[]][];
     expect(cm).toHaveLength(classesFor(code).length);
-    expect(cm[0][0][0]).toBe(HISTOGRAM_FLOOR);
-    expect(cm[cm.length - 1][0][1]).toBe(HISTOGRAM_CEILING);
+    expect(cm[0][0][0]).toBe(histogramFloor(code));
+    expect(cm[cm.length - 1][0][1]).toBe(histogramCeiling(code));
     // No gaps and no overlaps: every value in range gets exactly one colour.
     for (let i = 1; i < cm.length; i += 1) {
       expect(cm[i][0][0]).toBe(cm[i - 1][0][1]);

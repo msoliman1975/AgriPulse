@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import type { AnyIndexCode } from "./indices";
 import type { CursorPage } from "./pagination";
 
 // Mirrors backend/app/modules/imagery/schemas.py — keep in lock-step.
@@ -130,11 +131,18 @@ export interface FarmScenesResponse {
  */
 export async function listFarmScenes(
   farmId: string,
+  /**
+   * The index the caller is about to draw. Scopes the timeline to the products
+   * that produce it — a farm carrying both Sentinel-2 and Landsat has two
+   * independent acquisition streams — and decides which aggregate proves a
+   * pass is drawable. Omitted, the api answers for `ndvi` as it always did.
+   */
+  indexCode?: AnyIndexCode,
   limit = 120,
 ): Promise<FarmScenesResponse | null> {
   try {
     const { data } = await apiClient.get<FarmScenesResponse>(`/v1/farms/${farmId}/scenes`, {
-      params: { limit },
+      params: { limit, index: indexCode ?? undefined },
     });
     return data;
   } catch (err: unknown) {
@@ -211,11 +219,19 @@ export interface FarmSceneAssetsResponse {
 export async function listFarmSceneAssets(
   farmId: string,
   at?: string,
+  /**
+   * The index the caller is about to draw, so the rows returned are the ones
+   * whose product actually carries it. Without it a farm on two products
+   * answers with whichever pass is newest, and the `${stac_item_id}/${index}
+   * .tif` key the caller then builds points at an object that was never
+   * written.
+   */
+  indexCode?: AnyIndexCode,
 ): Promise<FarmSceneAssetsResponse | null> {
   try {
     const { data } = await apiClient.get<FarmSceneAssetsResponse>(
       `/v1/farms/${farmId}/scene-assets`,
-      { params: { at: at ?? undefined } },
+      { params: { at: at ?? undefined, index: indexCode ?? undefined } },
     );
     return data;
   } catch (err: unknown) {

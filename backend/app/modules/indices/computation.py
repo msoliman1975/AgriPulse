@@ -246,6 +246,26 @@ PRODUCT_MASK_RULESETS: dict[str, str] = {
 }
 
 
+def products_for_index(index_code: str) -> tuple[str, ...]:
+    """Which product codes can produce ``index_code``.
+
+    The inverse of :data:`PRODUCT_INDEX_CODES`, derived rather than restated
+    so the two cannot drift. Empty for an unknown code, which callers treat
+    as "no product answers this" rather than as "every product does" — the
+    latter is how a typo would quietly widen a filter to the whole farm.
+
+    This exists because the console reads are keyed on an INDEX (the thing
+    the user picked) while the imagery rows are keyed on a PRODUCT. A farm
+    carrying both `s2_l2a` and `landsat_c2_l2_st` has two independent
+    acquisition streams, and answering "which pass draws `lst`?" with the
+    newest row of either one hands the caller a Sentinel-2 scene that has
+    no `lst.tif` behind it.
+    """
+    return tuple(
+        product_code for product_code, codes in PRODUCT_INDEX_CODES.items() if index_code in codes
+    )
+
+
 # --- Aggregate result -----------------------------------------------------
 
 

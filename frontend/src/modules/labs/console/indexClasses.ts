@@ -26,7 +26,7 @@
 // off 2026-08-12. Sources per index are named on each table below. They are
 // emphatically not interchangeable between indices, because the formulas are
 // not.
-import type { IndexCode as ApiIndexCode } from "@/api/indices";
+import type { AnyIndexCode } from "@/api/indices";
 import type { Health } from "../map/types";
 
 // ---- the verdict scale ----------------------------------------------------
@@ -78,7 +78,7 @@ export interface IndexClass {
  * rather than the index keeps one wording per concept instead of three copies
  * that drift.
  */
-export const CLASS_VOCAB: Record<ApiIndexCode, string> = {
+export const CLASS_VOCAB: Record<AnyIndexCode, string> = {
   ndvi: "canopy",
   evi: "canopy",
   savi: "canopy",
@@ -89,6 +89,9 @@ export const CLASS_VOCAB: Record<ApiIndexCode, string> = {
   ndmi: "leafMoisture",
   bsi: "bareSoil",
   msi: "moistureStress",
+  lst: "surfaceTemp",
+  cwsi: "waterStress",
+  smi: "soilMoisture",
 };
 
 // Canopy-cover indices. Boundaries per the USGS remote-sensing-phenology and
@@ -116,7 +119,7 @@ const CHLOROPHYLL = (bare: number, low: number, moderate: number, good: number):
   { max: Infinity, key: "high", tone: "healthy", color: HEALTHY_HIGH },
 ];
 
-export const INDEX_CLASSES: Record<ApiIndexCode, IndexClass[]> = {
+export const INDEX_CLASSES: Record<AnyIndexCode, IndexClass[]> = {
   // (NIR − RED) / (NIR + RED).
   ndvi: CANOPY(0.1, 0.2, 0.4, 0.6, 0.8),
 
@@ -248,10 +251,105 @@ export const INDEX_CLASSES: Record<ApiIndexCode, IndexClass[]> = {
     { max: 1.6, key: "highStress", tone: "critical", color: CRITICAL_LOW },
     { max: Infinity, key: "severeStress", tone: "critical", color: CRITICAL },
   ],
+
+  // ---- thermal (`landsat_c2_l2_st`) ---------------------------------------
+  //
+  // Three things separate these three tables from the ten above, and every one
+  // of them breaks an assumption something in this file used to make:
+  //
+  //   1. `lst` carries a UNIT (°C) and a range of 0–60, not [-1, 1]. The
+  //      fixed ±3 histogram clamp this module used to apply would have put
+  //      every real pixel outside every interval — a transparent map, not a
+  //      wrong colour. Hence `histogramFloor`/`histogramCeiling` per index.
+  //   2. The reading is 100 m native resampled to 30 m. A block smaller than
+  //      a hectare is a fraction of one pixel, so the block fill these classes
+  //      drive is a farm-scale statement wearing a block-scale shape.
+  //      `legend.thermalCaveat` says so on screen.
+  //   3. Only `cwsi` has a published class table that transfers. The other
+  //      two are descriptive bands, and both are in READ_RELATIVELY.
+
+  // Surface temperature in °C, from `lwir11` via the Collection-2 scale
+  // factors. Hot is bad, so the verdict ramp descends as the number climbs —
+  // the same construction as `msi`.
+  //
+  // ⚠️ These cut points are DESCRIPTIVE, not agronomic thresholds. There is
+  // no universal LST band table: what counts as hot depends on air
+  // temperature, crop, growth stage and time of overpass (~10:20 local here),
+  // and the physically meaningful quantity is canopy-MINUS-air, which is what
+  // `cwsi` computes. They exist so a farm's own spread is visible — read
+  // WHERE the field is hot relative to the rest of it, not which band it
+  // lands in. Anchored so that the reference farm's observed 43–57 °C over
+  // bare sand spans three classes rather than saturating in one.
+  lst: [
+    { max: 20, key: "cool", tone: "healthy", color: HEALTHY_HIGH },
+    { max: 30, key: "mild", tone: "healthy", color: HEALTHY },
+    { max: 38, key: "warm", tone: "watch", color: WATCH_HIGH },
+    { max: 45, key: "hot", tone: "watch", color: WATCH },
+    { max: 52, key: "veryHot", tone: "critical", color: CRITICAL_LOW },
+    { max: Infinity, key: "extreme", tone: "critical", color: CRITICAL },
+  ],
+
+  // Crop water stress index, 0 (transpiring freely) to 1 (stomata shut).
+  // Cut points are Idso's conventional reading — <0.2 unstressed, 0.2–0.4
+  // mild, 0.4–0.6 moderate, 0.6–0.8 high, >0.8 severe — which is the one
+  // published table here that genuinely transfers.
+  //
+  // ⚠️ But the INPUT does not, yet. The backend computes a simplified CWSI
+  // against constant wet/dry bounds (CWSI_DT_WET_C/CWSI_DT_DRY_C) rather than
+  // a crop-specific non-water-stressed baseline, and those constants have not
+  // been calibrated for Egyptian mango. So the classes are right and the
+  // values feeding them are provisional — which is why `cwsi` is in
+  // READ_RELATIVELY despite having the best-founded table of the three.
+  //
+  // Over ground that is not transpiring at all the index pins at exactly
+  // 1.000 everywhere, which is arithmetically correct and agronomically
+  // empty. A uniformly `severe` farm is far more likely to be bare than dying.
+  cwsi: [
+    { max: 0.2, key: "unstressed", tone: "healthy", color: HEALTHY_HIGH },
+    { max: 0.4, key: "mild", tone: "healthy", color: HEALTHY },
+    { max: 0.6, key: "moderate", tone: "watch", color: WATCH },
+    { max: 0.8, key: "high", tone: "critical", color: CRITICAL_LOW },
+    { max: Infinity, key: "severe", tone: "critical", color: CRITICAL },
+  ],
+
+  // Soil moisture index, 0 on the fitted dry edge to 1 on the wet edge of the
+  // LST–NDVI triangle. Reads the same direction as NDMI — low is dry — and
+  // like NDMI its top class leaves the verdict ramp: the wet edge is where
+  // over-irrigation and waterlogging live, which is a problem rather than the
+  // best possible outcome.
+  //
+  // ⚠️ RELATIVE BY CONSTRUCTION, not merely uncalibrated. The edges are
+  // fitted to the pixels of THIS scene over THIS AOI, so 0.4 on one farm and
+  // 0.4 on another are not the same amount of water, and neither are 0.4 on
+  // two different dates. And when the AOI's NDVI span is too narrow to fit a
+  // triangle at all (SMI_MIN_NDVI_SPAN) the backend falls back to a plain LST
+  // normalisation — still a valid ordering of wet to dry, but no longer the
+  // index the name implies.
+  smi: [
+    { max: 0.2, key: "veryDry", tone: "critical", color: CRITICAL },
+    { max: 0.4, key: "dry", tone: "critical", color: CRITICAL_LOW },
+    { max: 0.6, key: "moderate", tone: "watch", color: WATCH },
+    { max: 0.8, key: "moist", tone: "healthy", color: HEALTHY },
+    { max: Infinity, key: "wet", tone: "watch", color: SATURATED },
+  ],
 };
 
-/** Indices whose classes should be read relatively, not as absolutes. */
-export const READ_RELATIVELY: ReadonlySet<ApiIndexCode> = new Set<ApiIndexCode>(["ndre"]);
+/**
+ * Indices whose classes should be read relatively, not as absolutes.
+ *
+ * NDRE because its published tables assume a different red-edge band than the
+ * B5 we compute. All three thermal indices because each is provisional in its
+ * own way: `lst`'s bands are descriptive rather than agronomic, `cwsi`'s wet
+ * and dry bounds are uncalibrated constants, and `smi`'s edges are fitted per
+ * scene so its scale is not even comparable between two dates of the same
+ * farm.
+ */
+export const READ_RELATIVELY: ReadonlySet<AnyIndexCode> = new Set<AnyIndexCode>([
+  "ndre",
+  "lst",
+  "cwsi",
+  "smi",
+]);
 
 /**
  * Where our own class copy tells the reader to switch index, surface it on
@@ -259,12 +357,12 @@ export const READ_RELATIVELY: ReadonlySet<ApiIndexCode> = new Set<ApiIndexCode>(
  * NDRE separates a good canopy from an excellent one. Do not invent entries —
  * add one only when the agronomy copy says so.
  */
-export const CLASS_HINT: Partial<Record<ApiIndexCode, { classKey: string; suggest: string }>> = {
+export const CLASS_HINT: Partial<Record<AnyIndexCode, { classKey: string; suggest: string }>> = {
   ndvi: { classKey: "veryDense", suggest: "NDRE" },
 };
 
 /** Classes for an index, lowest first — the order the boundaries are defined in. */
-export function classesFor(code: ApiIndexCode): IndexClass[] {
+export function classesFor(code: AnyIndexCode): IndexClass[] {
   return INDEX_CLASSES[code] ?? [];
 }
 
@@ -273,7 +371,7 @@ export function classesFor(code: ApiIndexCode): IndexClass[] {
  * inclusive-upper-bound convention above, so a value exactly on a boundary
  * belongs to the LOWER class — the same rule the tile colormap applies.
  */
-export function classify(code: ApiIndexCode, value: number | null): IndexClass | null {
+export function classify(code: AnyIndexCode, value: number | null): IndexClass | null {
   if (value === null || !Number.isFinite(value)) return null;
   return classesFor(code).find((c) => value <= c.max) ?? null;
 }
@@ -283,28 +381,66 @@ export function classify(code: ApiIndexCode, value: number | null): IndexClass |
  * Kept as a function rather than a second field so the boundaries live in
  * exactly one place and cannot be edited into disagreement.
  */
-export function lowerBound(code: ApiIndexCode, index: number): number | null {
+export function lowerBound(code: AnyIndexCode, index: number): number | null {
   if (index <= 0) return null;
   return classesFor(code)[index - 1].max;
 }
 
 /**
+ * Clamps for the open ends of an index's scale — where the first bin starts
+ * and the last one stops.
+ *
+ * These are NOT cosmetic. They terminate both the histogram the legend counts
+ * areas from and the interval colormap the tiles are painted with, and a pixel
+ * outside every interval renders TRANSPARENT rather than in the nearest
+ * colour. So a clamp that does not reach the data does not merely mis-colour
+ * it — it erases it, and the legend then reports the erased ground as
+ * unread.
+ *
+ * The ten optical indices are normalised differences bounded by [-1, 1],
+ * except EVI/SAVI whose gain terms push slightly outside it over bright soil
+ * and MSI which is an unbounded ratio — ±3 covers all of them with room to
+ * spare, and that single pair of constants was the whole story until thermal.
+ *
+ * `lst` broke it. Degrees Celsius, not a ratio: every real pixel on the
+ * reference farm reads 43–57, which is an order of magnitude past a ceiling
+ * of 3. Hence a range per index rather than one for the module.
+ */
+const DEFAULT_HISTOGRAM_FLOOR = -3;
+const DEFAULT_HISTOGRAM_CEILING = 3;
+
+/**
+ * Per-index overrides. Only the indices whose real values live outside the
+ * default clamp appear here; `cwsi` and `smi` are 0–1 by construction and are
+ * covered by it.
+ *
+ * The `lst` ceiling is well above the catalog's own 0–60 bound: the catalog
+ * range is what the UI rescales for, while this is the "no pixel can be
+ * outside this" backstop, and a bare desert surface at local noon is a
+ * genuine 60+ in high summer. Clamping tight to the catalog would erase
+ * exactly the hottest ground the reader is looking for.
+ */
+const HISTOGRAM_RANGE: Partial<Record<AnyIndexCode, { floor: number; ceiling: number }>> = {
+  lst: { floor: -20, ceiling: 90 },
+};
+
+export function histogramFloor(code: AnyIndexCode): number {
+  return HISTOGRAM_RANGE[code]?.floor ?? DEFAULT_HISTOGRAM_FLOOR;
+}
+
+export function histogramCeiling(code: AnyIndexCode): number {
+  return HISTOGRAM_RANGE[code]?.ceiling ?? DEFAULT_HISTOGRAM_CEILING;
+}
+
+/**
  * Bin edges for a pixel histogram, ascending, as TiTiler's `histogram_bins`
  * wants them: N+1 edges for N classes.
- *
- * The open ends are clamped to values no real index reaches. Every index here
- * is a normalised difference bounded by [-1, 1] EXCEPT EVI and SAVI, whose
- * gain terms can push slightly outside it over bright soil, so the clamp is
- * wide enough to keep those pixels inside the first and last bins instead of
- * silently dropping them from the totals.
  */
-export const HISTOGRAM_FLOOR = -3;
-export const HISTOGRAM_CEILING = 3;
-
-export function histogramBins(code: ApiIndexCode): number[] {
+export function histogramBins(code: AnyIndexCode): number[] {
   const classes = classesFor(code);
-  const edges = [HISTOGRAM_FLOOR];
-  for (const c of classes) edges.push(Number.isFinite(c.max) ? c.max : HISTOGRAM_CEILING);
+  const edges = [histogramFloor(code)];
+  const ceiling = histogramCeiling(code);
+  for (const c of classes) edges.push(Number.isFinite(c.max) ? c.max : ceiling);
   return edges;
 }
 
@@ -323,11 +459,12 @@ export function histogramBins(code: ApiIndexCode): number[] {
  * at the wrong data. Pixels outside every interval (no-data) render
  * transparent, so the satellite base shows through where there is no reading.
  */
-export function titilerColormap(code: ApiIndexCode): string {
+export function titilerColormap(code: AnyIndexCode): string {
   const classes = classesFor(code);
+  const ceiling = histogramCeiling(code);
   const intervals = classes.map((c, i) => {
-    const min = i === 0 ? HISTOGRAM_FLOOR : classes[i - 1].max;
-    const max = Number.isFinite(c.max) ? c.max : HISTOGRAM_CEILING;
+    const min = i === 0 ? histogramFloor(code) : classes[i - 1].max;
+    const max = Number.isFinite(c.max) ? c.max : ceiling;
     return [[min, max], rgba(c.color)];
   });
   return JSON.stringify(intervals);

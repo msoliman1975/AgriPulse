@@ -51,6 +51,17 @@ pytestmark = [pytest.mark.integration]
 _PASS_DAYS = 8
 
 
+# Everything the strip SQL binds except the farm. The query is scoped to the
+# index the caller is about to draw, and through it to the products that can
+# produce it — `ndvi` on `s2_l2a` is what the correlated version hardcoded, so
+# these values keep this test measuring the same plan it was written against.
+_STRIP_PARAMS: dict = {
+    "limit": 120,
+    "index_code": "ndvi",
+    "product_codes": ["s2_l2a"],
+}
+
+
 async def _explain(
     admin_session: AsyncSession,
     *,
@@ -65,9 +76,10 @@ async def _explain(
     await admin_session.execute(text(f'SET search_path TO "{tenant_schema}", public'))
     result = await admin_session.execute(
         text(f"EXPLAIN (ANALYZE, FORMAT JSON) {_FARM_SCENE_DAYS_SQL}").bindparams(
-            bindparam("farm", type_=PG_UUID(as_uuid=True))
+            bindparam("farm", type_=PG_UUID(as_uuid=True)),
+            bindparam("product_codes", expanding=True),
         ),
-        {"farm": farm_id, "limit": 120},
+        _STRIP_PARAMS | {"farm": farm_id},
     )
     plan = result.scalar_one()
     # asyncpg hands back a JSON string; psycopg already decodes it.
@@ -228,21 +240,24 @@ async def test_the_grouped_form_still_returns_the_correlated_form_s_rows(
             "   FROM block_index_aggregates a\n"
             "   JOIN blocks ab ON ab.id = a.block_id\n"
             "  WHERE ab.farm_id = :farm\n"
-            "    AND a.index_code = 'ndvi'\n"
+            "    AND a.index_code = :index_code\n"
             "    AND a.time = p.at) AS computed_count",
         )
         assert correlated != _FARM_SCENE_DAYS_SQL, "the COALESCE branch moved — retarget this test"
 
         await admin_session.execute(text(f'SET search_path TO "{schema}", public'))
-        params = {"farm": farm_id, "limit": 120}
-        binds = bindparam("farm", type_=PG_UUID(as_uuid=True))
+        params = _STRIP_PARAMS | {"farm": farm_id}
+        binds = (
+            bindparam("farm", type_=PG_UUID(as_uuid=True)),
+            bindparam("product_codes", expanding=True),
+        )
         shipped = (
-            (await admin_session.execute(text(_FARM_SCENE_DAYS_SQL).bindparams(binds), params))
+            (await admin_session.execute(text(_FARM_SCENE_DAYS_SQL).bindparams(*binds), params))
             .mappings()
             .all()
         )
         reference = (
-            (await admin_session.execute(text(correlated).bindparams(binds), params))
+            (await admin_session.execute(text(correlated).bindparams(*binds), params))
             .mappings()
             .all()
         )

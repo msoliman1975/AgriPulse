@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { setupTestI18n } from "@/i18n/testing";
@@ -87,6 +87,35 @@ describe("IndexLegend", () => {
   it("warns that NDRE is a relative reading, and does not for NDVI", () => {
     renderLegend({ code: "ndre", areas: areas([0, 0, 12, 4, 0]) });
     expect(screen.getByText(/compare blocks against each other/i)).toBeInTheDocument();
+  });
+
+  it("reads LST in degrees, at the precision a 100 m pixel earns", () => {
+    // Two things a dimensionless legend gets wrong for a temperature: it
+    // prints no unit, and it prints `20.00` off a sensor whose native pixel is
+    // 100 m across. The unit sits in the heading rather than on every row —
+    // six repetitions of "°C" say nothing the heading cannot say once, and the
+    // range column is too narrow to carry it without truncating the numbers.
+    const { container } = renderLegend({
+      code: "lst",
+      indexUnit: "°C",
+      areas: areas([0, 0, 0, 2.4, 88.3, 74.2]),
+    });
+    expect(screen.getByText("°C")).toBeInTheDocument();
+    const ranges = [...container.querySelectorAll("li span[dir='ltr']")].map((r) => r.textContent);
+    expect(ranges).toContain("38.0 – 45.0");
+    expect(ranges.some((r) => r?.includes("38.00"))).toBe(false);
+  });
+
+  it("says a thermal reading is farm-scale, and does not for an optical one", () => {
+    // Both caveats apply to thermal — the scale is provisional AND the pixel
+    // is larger than most blocks on this farm. Saying only the first would
+    // leave a reader trusting detail the sensor cannot resolve.
+    renderLegend({ code: "cwsi", indexUnit: "", areas: areas([0, 0, 1, 4, 160]) });
+    expect(screen.getByText(/one pixel covers a hectare/i)).toBeInTheDocument();
+
+    cleanup();
+    renderLegend();
+    expect(screen.queryByText(/one pixel covers a hectare/i)).not.toBeInTheDocument();
   });
 
   it("keeps ranges left-to-right so RTL cannot reverse them", () => {

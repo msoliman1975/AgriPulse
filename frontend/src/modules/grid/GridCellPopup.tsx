@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { AnchoredPopup } from "@/components/AnchoredPopup";
 
 import { getGridCellHistory } from "../../api/grid";
-import type { IndexCode } from "../../api/indices";
+import type { AnyIndexCode as IndexCode } from "../../api/indices";
 
 interface Props {
   open: boolean;

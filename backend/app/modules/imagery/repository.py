@@ -93,11 +93,21 @@ block_days AS (
     -- An aggregate row is written by `compute_indices` and by nothing else,
     -- so its presence is the only honest answer to "can this pass be drawn?".
     -- Without it the console offers a date that renders nothing.
+    --
+    -- Tested against the index the caller is ABOUT TO DRAW, not a hardcoded
+    -- `ndvi`. A thermal pass writes lst/cwsi/smi and never ndvi, so the
+    -- hardcoded form marked every thermal pass unprocessed forever — and the
+    -- strip is what SELECTS a pass, so the index could not be drawn at all.
     LEFT JOIN block_index_aggregates a
            ON a.block_id = j.block_id
           AND a.time = j.scene_datetime
-          AND a.index_code = 'ndvi'
+          AND a.index_code = :index_code
+    -- public, and INNER: the product code is what scopes this pass to the
+    -- index being drawn, so a product row we cannot read must drop the pass
+    -- rather than admit it unscoped.
+    JOIN public.imagery_products jp ON jp.id = j.product_id
     WHERE b.farm_id = :farm
+      AND jp.code IN :product_codes
     GROUP BY 1
 ),
 farm_passes AS (
@@ -108,7 +118,9 @@ farm_passes AS (
         bool_or(fj.status = 'skipped')               AS any_skipped,
         avg(fj.cloud_cover_pct)                      AS cloud_cover_pct
     FROM imagery_farm_ingestion_jobs fj
+    JOIN public.imagery_products fp ON fp.id = fj.product_id
     WHERE fj.farm_id = :farm
+      AND fp.code IN :product_codes
     GROUP BY 1
 ),
 -- Matched on the exact instant, the same way the block branch is, and
@@ -141,7 +153,7 @@ farm_agg AS (
     FROM block_index_aggregates a
     JOIN blocks ab ON ab.id = a.block_id
     WHERE ab.farm_id = :farm
-      AND a.index_code = 'ndvi'
+      AND a.index_code = :index_code
       AND a.time IN (SELECT at FROM farm_passes)
     GROUP BY a.time
 ),
@@ -392,6 +404,8 @@ class ImageryRepository:
         *,
         farm_id: UUID,
         limit: int,
+        index_code: str,
+        product_codes: Sequence[str],
     ) -> tuple[dict[str, Any], ...]:
         """Acquisition days for a whole farm, newest first, in one statement.
 
@@ -438,14 +452,41 @@ class ImageryRepository:
         Both branches read `block_index_aggregates` set-based, never once per
         day: a correlated per-day read of that hypertable measured 32 s on
         prod where the grouped one measures 380 ms, for identical rows.
+
+        Scoped to ONE index, and through it to the products that can produce
+        it. A farm subscribed to both `s2_l2a` and `landsat_c2_l2_st` has two
+        independent acquisition streams on different cadences — 5 days and 1
+        day on the reference farm — and merging them into one strip offers a
+        date whose pass carries no raster for the index being drawn. Worse,
+        the drawability test below is the SAME index the caller will render,
+        so an unscoped strip marks a thermal pass undrawable (it has no
+        `ndvi` aggregate, and never will) while marking a Sentinel-2 pass
+        drawable for `lst` (which it cannot draw). Both errors point the
+        console at a blank map, and the second one looks like a data gap
+        rather than a bug.
+
+        The index scoping does NOT reintroduce the correlated read: it adds
+        an equality on `a.index_code` inside branches that were already
+        grouped, which narrows the same single pass over the hypertable.
         """
+        if not product_codes:
+            # No product produces this index, so no pass can draw it. An
+            # empty strip is the honest answer; an unfiltered query here
+            # would offer every date the farm has ever seen.
+            return ()
         rows = (
             (
                 await self._session.execute(
                     text(_FARM_SCENE_DAYS_SQL).bindparams(
-                        bindparam("farm", type_=PG_UUID(as_uuid=True))
+                        bindparam("farm", type_=PG_UUID(as_uuid=True)),
+                        bindparam("product_codes", expanding=True),
                     ),
-                    {"farm": farm_id, "limit": limit},
+                    {
+                        "farm": farm_id,
+                        "limit": limit,
+                        "index_code": index_code,
+                        "product_codes": list(product_codes),
+                    },
                 )
             )
             .mappings()
@@ -458,6 +499,7 @@ class ImageryRepository:
         *,
         farm_id: UUID,
         at: datetime | None,
+        product_codes: Sequence[str],
     ) -> tuple[dict[str, Any], ...]:
         """One row per block: the index asset to render for a given pass.
 
@@ -494,9 +536,27 @@ class ImageryRepository:
         ``resolution_m`` rides along because the legend turns a pixel COUNT
         into an AREA, and fetching the product's resolution separately would
         be one more request for a number this row already knows.
+
+        ``product_codes`` scopes the answer to the products that can produce
+        the index being drawn. The caller turns a row into a tile URL by
+        appending ``<index>.tif`` to the key it derives from
+        ``stac_item_id``, so handing back the newest job REGARDLESS of
+        product hands back a key with no such object behind it — every tile
+        404s and the block goes blank. That is not hypothetical on a farm
+        carrying both products: thermal fetches daily against Sentinel-2's
+        five, so the unscoped ``DISTINCT ON ... ORDER BY scene_datetime
+        DESC`` lands on a Landsat job most days of the week.
         """
-        clauses = ["b.farm_id = :farm", "j.stac_item_id IS NOT NULL", "j.status = 'succeeded'"]
-        params: dict[str, Any] = {"farm": farm_id}
+        clauses = [
+            "b.farm_id = :farm",
+            "j.stac_item_id IS NOT NULL",
+            "j.status = 'succeeded'",
+            "p.code IN :product_codes",
+        ]
+        if not product_codes:
+            # Nothing produces this index, so no row can draw it.
+            return ()
+        params: dict[str, Any] = {"farm": farm_id, "product_codes": list(product_codes)}
         if at is not None:
             clauses.append("j.scene_datetime <= :at")
             clauses.append("j.scene_datetime >= :day_start")
@@ -515,15 +575,22 @@ class ImageryRepository:
                             p.resolution_m
                         FROM imagery_ingestion_jobs j
                         JOIN blocks b ON b.id = j.block_id
-                        -- public, and LEFT: products are cross-schema (the
-                        -- tenant carries only a logical id), and a product row
-                        -- we cannot read must cost the caller a resolution,
-                        -- not the whole block's imagery.
-                        LEFT JOIN public.imagery_products p ON p.id = j.product_id
+                        -- public, and INNER since the product scopes the row
+                        -- to the index being drawn. It used to be LEFT, so a
+                        -- product row we could not read cost the caller a
+                        -- resolution rather than the block's imagery. That
+                        -- trade no longer holds: without the product code we
+                        -- cannot tell whether this pass carries the index at
+                        -- all, and drawing the wrong product's raster is a
+                        -- worse outcome than drawing none.
+                        JOIN public.imagery_products p ON p.id = j.product_id
                         WHERE {" AND ".join(clauses)}
                         ORDER BY j.block_id, j.scene_datetime DESC
                         """
-                    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                    ).bindparams(
+                        bindparam("farm", type_=PG_UUID(as_uuid=True)),
+                        bindparam("product_codes", expanding=True),
+                    ),
                     params,
                 )
             )
@@ -697,6 +764,7 @@ class ImageryRepository:
         *,
         farm_id: UUID,
         at: datetime | None,
+        product_codes: Sequence[str],
     ) -> dict[str, Any] | None:
         """The farm-wide raster to draw for a pass, or None if there is none.
 
@@ -710,9 +778,20 @@ class ImageryRepository:
         answer wearing the shape of a right one. A pass with no surface of its
         own now returns None and falls back to the per-block path, which is
         merely seamed rather than untrue.
+
+        And scoped to the products that can produce the index being drawn.
+        There is one surface per (farm, pass, boundary) but no uniqueness
+        across PRODUCTS, so a farm fetching both Sentinel-2 and Landsat holds
+        two independent series of rows here. Ordering by ``scene_datetime``
+        alone therefore answered "the newest surface of any product", and the
+        caller appended ``<index>.tif`` to whatever came back — asking a
+        Landsat surface for `ndvi` on every day the daily thermal pass
+        out-ran the five-day optical one.
         """
-        clauses = ["r.farm_id = :farm", "r.aoi_hash = f.aoi_hash"]
-        params: dict[str, Any] = {"farm": farm_id}
+        if not product_codes:
+            return None
+        clauses = ["r.farm_id = :farm", "r.aoi_hash = f.aoi_hash", "p.code IN :product_codes"]
+        params: dict[str, Any] = {"farm": farm_id, "product_codes": list(product_codes)}
         if at is not None:
             clauses.append("r.scene_datetime <= :at")
             clauses.append("r.scene_datetime >= :day_start")
@@ -727,12 +806,17 @@ class ImageryRepository:
                                r.blocks_merged, r.source, p.resolution_m
                         FROM farm_scene_rasters r
                         JOIN farms f ON f.id = r.farm_id
-                        LEFT JOIN public.imagery_products p ON p.id = r.product_id
+                        -- INNER, not LEFT: the product code is what tells us
+                        -- whether this surface carries the index at all.
+                        JOIN public.imagery_products p ON p.id = r.product_id
                         WHERE {" AND ".join(clauses)}
                         ORDER BY r.scene_datetime DESC
                         LIMIT 1
                         """
-                    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                    ).bindparams(
+                        bindparam("farm", type_=PG_UUID(as_uuid=True)),
+                        bindparam("product_codes", expanding=True),
+                    ),
                     params,
                 )
             )

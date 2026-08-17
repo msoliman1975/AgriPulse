@@ -26,7 +26,7 @@ import clsx from "clsx";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { IndexCode as ApiIndexCode } from "@/api/indices";
+import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import { useCapability } from "@/rbac/useCapability";
 import { WaterBalanceCard } from "./WaterBalanceCard";
 import { clearDetailCache } from "../map/api";
@@ -50,16 +50,22 @@ export type DockTab =
   | "vigour"
   | "nutrition"
   | "moisture"
+  | "thermal"
   | "environment"
   | "conditions"
   | "field"
   | "manage";
 
+// `thermal` sits after the three optical families and immediately before
+// `environment`, which is where the weather station's air temperature is
+// read. That adjacency is deliberate: canopy temperature only means anything
+// against air temperature, and the two tabs are the pair a reader needs.
 const TABS: DockTab[] = [
   "overview",
   "vigour",
   "nutrition",
   "moisture",
+  "thermal",
   "environment",
   "conditions",
   "field",

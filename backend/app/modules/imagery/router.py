@@ -43,7 +43,11 @@ from app.modules.imagery.schemas import (
     SubscriptionCreate,
     SubscriptionRead,
 )
-from app.modules.imagery.service import ImageryService, get_imagery_service
+from app.modules.imagery.service import (
+    DEFAULT_CONSOLE_INDEX,
+    ImageryService,
+    get_imagery_service,
+)
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
 from app.shared.db.session import get_db_session
@@ -266,6 +270,12 @@ async def list_scenes(
 async def list_farm_scenes(
     farm_id: UUID,
     limit: int = Query(default=120, ge=1, le=500),
+    index_code: str = Query(
+        default=DEFAULT_CONSOLE_INDEX,
+        alias="index",
+        description="Index the caller is about to draw. Scopes the timeline to the products "
+        "that produce it, and tests drawability against that index rather than ndvi.",
+    ),
     context: RequestContext = Depends(requires_capability("imagery.read", farm_id_param="farm_id")),
     service: ImageryService = Depends(_service),
 ) -> FarmScenesResponse:
@@ -281,7 +291,7 @@ async def list_farm_scenes(
     farm-level routes declare it, rather than resolved block-by-block.
     """
     del context  # the capability check's side-effect is the only consumer
-    return await service.list_farm_scenes(farm_id=farm_id, limit=limit)
+    return await service.list_farm_scenes(farm_id=farm_id, limit=limit, index_code=index_code)
 
 
 # --- Farm-level subscriptions ----------------------------------------------
@@ -365,6 +375,12 @@ async def list_farm_scene_assets(
         description="Scene bound; each block resolves to its own latest pass at or before it. "
         "Omit for the latest pass per block.",
     ),
+    index_code: str = Query(
+        default=DEFAULT_CONSOLE_INDEX,
+        alias="index",
+        description="Index the caller is about to draw. The returned rows are the ones whose "
+        "product actually carries it, so the derived <index>.tif key exists.",
+    ),
     context: RequestContext = Depends(requires_capability("imagery.read", farm_id_param="farm_id")),
     service: ImageryService = Depends(_service),
 ) -> FarmSceneAssetsResponse:
@@ -380,7 +396,7 @@ async def list_farm_scene_assets(
     silently showing an older pass under a timeline that says otherwise.
     """
     del context  # the capability check's side-effect is the only consumer
-    return await service.list_farm_scene_assets(farm_id=farm_id, at=at)
+    return await service.list_farm_scene_assets(farm_id=farm_id, at=at, index_code=index_code)
 
 
 # --- Tenant config --------------------------------------------------------

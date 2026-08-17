@@ -18,11 +18,13 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { IndexCode as ApiIndexCode } from "@/api/indices";
+import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import { Card } from "@/components/Card";
+import { indexDecimals } from "@/lib/indexFormat";
+import { THERMAL_NATIVE_RESOLUTION_M } from "@/lib/thermalResolution";
 import { formatAreaValue, m2ToUnit } from "@/lib/units";
 import { usePrefs } from "@/prefs/PrefsContext";
-import { INDEX_META } from "../mapnext/constants";
+import { INDEX_META, isThermalIndex } from "../mapnext/constants";
 import {
   CLASS_HINT,
   CLASS_VOCAB,
@@ -48,6 +50,17 @@ interface Props {
   /** Active imagery subscriptions across the farm; null while unknown. */
   imagerySubCount: number | null;
   loading: boolean;
+  /**
+   * The index's display unit from `public.indices_catalog` — `°C` for `lst`,
+   * empty for the dimensionless rest.
+   *
+   * A prop rather than a query of this component's own: the legend fetches
+   * nothing else, and the catalog is platform-wide curated data the console
+   * already reads once and caches for every farm and index the reader visits.
+   * Not hardcoded either — a local code-to-unit table is exactly the mirror
+   * that drifted and left `ndmi` uncheckable in Insights for a year.
+   */
+  indexUnit?: string;
   onOpenImagerySettings?: () => void;
   className?: string;
 }
@@ -61,6 +74,7 @@ export function IndexLegend({
   assetCount,
   imagerySubCount,
   loading,
+  indexUnit = "",
   onOpenImagerySettings,
   className,
 }: Props): ReactNode {
@@ -75,7 +89,18 @@ export function IndexLegend({
   const area = (m2: number): string =>
     formatAreaValue(m2ToUnit(m2, unit), { locale: i18n.language, fractionDigits: 1 });
   const unitLabel = t(`farms:area.${unit}`);
-  const num = (n: number): string => n.toFixed(2);
+
+  // Class boundaries at the precision the reading carries.
+  //
+  // Two decimals for the dimensionless indices, which is what these rows have
+  // always shown and is exactly right for boundaries that are round numbers
+  // like 0.20 and 0.40 — `indexFormat`'s three is for a CHART VALUE, where the
+  // extra digit is real, and a third zero here would be noise on ten legends.
+  // A unit overrides it: `20.00 – 30.00 °C` off a sensor whose native pixel is
+  // 100 m across is false precision wearing the shape of rigour.
+  const LEGEND_DIMENSIONLESS_DECIMALS = 2;
+  const num = (n: number): string =>
+    n.toFixed(indexUnit ? indexDecimals(indexUnit) : LEGEND_DIMENSIONLESS_DECIMALS);
 
   const scopeLabel =
     scopeBlockId && scopeBlockName
@@ -85,6 +110,14 @@ export function IndexLegend({
   const header = (
     <div className="flex items-center gap-2">
       <span className="text-card-title font-bold text-ap-ink">{INDEX_META[code].label}</span>
+      {/* The unit sits here rather than on every row: a range column repeating
+          "°C" six times says nothing the heading cannot say once, and the
+          column is too narrow to carry it without truncating the numbers. */}
+      {indexUnit ? (
+        <span dir="ltr" className="text-meta font-semibold text-ap-muted">
+          {indexUnit}
+        </span>
+      ) : null}
       <span className="text-meta text-ap-muted">
         {t(`farmConsole:dock.family.${INDEX_META[code].family}`)}
       </span>
@@ -214,6 +247,18 @@ export function IndexLegend({
             {!showPixels ? (
               <span className="text-meta leading-snug text-ap-muted">
                 {t("farmConsole:legend.pixelsOffNote")}
+              </span>
+            ) : null}
+            {/* Resolution first, then the relative caveat. A thermal reading
+                carries BOTH — its scale is provisional AND its pixel is 100 m
+                across, which is larger than most blocks on this farm. Saying
+                only the second would let a reader trust the shape of the map
+                at a detail the sensor cannot resolve. */}
+            {isThermalIndex(code) ? (
+              <span className="text-meta leading-snug text-ap-muted">
+                {t("farmConsole:legend.thermalCaveat", {
+                  metres: THERMAL_NATIVE_RESOLUTION_M,
+                })}
               </span>
             ) : null}
             {READ_RELATIVELY.has(code) ? (

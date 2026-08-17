@@ -39,7 +39,7 @@ import {
   CreatePivotPanel,
   DrawHintBar,
 } from "../mapnext/createFlows";
-import { LAST_FARM_KEY } from "../mapnext/constants";
+import { LAST_FARM_KEY, MAP_INDEX_ORDER } from "../mapnext/constants";
 import { CONSOLE_QK } from "./constants";
 import { ConsoleUnitsRail } from "./ConsoleUnitsRail";
 import { FarmIdentityStrip } from "./FarmIdentityStrip";
@@ -190,6 +190,10 @@ function Console({ farmId }: { farmId: string }): ReactNode {
       <ViewBar
         activeIndex={c.activeIndex}
         onIndexChange={c.setActiveIndex}
+        // Everything, thermal included: this console paints the index COG
+        // itself, and `lst.tif`/`cwsi.tif`/`smi.tif` are written by the same
+        // pipeline step that writes `ndvi.tif`.
+        indexOptions={MAP_INDEX_ORDER}
         layers={c.layers}
         onLayersChange={(patch) => c.setLayers((l) => ({ ...l, ...patch }))}
         onOpenSettings={() => setSettingsOpen(true)}
@@ -283,6 +287,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               onTogglePixels={() => c.setShowPixels((s) => !s)}
               showGrid={c.showGrid}
               gridAvailable={c.gridded.length > 0}
+              gridUnavailableForIndex={c.gridUnavailableForIndex}
               onToggleGrid={() => {
                 c.setShowGrid((s) => !s);
                 c.setSelectedCellId(null);
@@ -301,6 +306,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               scopeBlockName={c.selectedId ? (c.blockNameById.get(c.selectedId) ?? null) : null}
               showPixels={c.showPixels}
               assetCount={c.pixels.assetCount}
+              indexUnit={c.activeIndexUnit}
               imagerySubCount={c.imagerySubCount}
               loading={c.pixels.assetsLoading || c.pixels.statsLoading}
               onOpenImagerySettings={() => navigate(`/config/imagery/${farmId}`)}
