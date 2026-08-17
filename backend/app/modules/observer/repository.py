@@ -31,10 +31,16 @@ from uuid import UUID
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Job statuses, from the CHECK on `imagery_ingestion_jobs` (tenant 0003).
-# Mirrored here because Observer groups by them; a new status added upstream
-# without updating this constant would silently vanish from the histogram,
-# so `test_job_status_constant_matches_check_constraint` pins the pair.
+# Every job status Observer can be asked to filter on, across BOTH job
+# tables. Mirrored here because Observer groups by them; a status added
+# upstream without updating this constant would silently vanish from the
+# histogram and become unselectable in the scene filter, so
+# `test_job_status_constant_matches_check_constraint` pins it.
+#
+# The first six are the CHECK on `imagery_ingestion_jobs` (tenant 0003).
+# `skipped` belongs to `imagery_farm_ingestion_jobs` (tenant 0076), which
+# skips without saying why — the farm path is the only writer of it, and
+# leaving it out made every skipped thermal scene unfilterable.
 JOB_STATUSES: tuple[str, ...] = (
     "pending",
     "running",
@@ -42,7 +48,13 @@ JOB_STATUSES: tuple[str, ...] = (
     "failed",
     "skipped_cloud",
     "skipped_duplicate",
+    "skipped",
 )
+
+# The farm table's own vocabulary — the part of `JOB_STATUSES` that the
+# block CHECK does not declare. Split out so the drift guard can still
+# compare the block half against the migration exactly.
+FARM_ONLY_JOB_STATUSES: frozenset[str] = frozenset({"skipped"})
 
 # Buckets the histogram supports. Closed set — interpolated into a
 # `date_trunc` call, so it must never accept caller input directly.
