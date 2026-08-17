@@ -123,6 +123,33 @@ class Stage(BaseModel):
     detail: dict[str, Any]
 
 
+class ProblemScene(BaseModel):
+    """One acquisition behind a stage shortfall, with its actual cause.
+
+    Exists so the ribbon can show the failing rows rather than assert a
+    cause and send the reader hunting. `problem` is derived server-side
+    because it depends on which job table the row came from and how that
+    table's status vocabulary maps.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+    scope: str  # 'block' | 'farm'
+    job_id: UUID
+    label: str | None
+    scene_id: str
+    scene_datetime: datetime
+    status: str
+    # 'failed' | 'in_flight' | 'skipped' | 'no_aggregates'
+    problem: str
+    error_code: str | None
+    error_message: str | None
+    block_id: UUID | None
+    requested_at: datetime | None
+    started_at: datetime | None
+    completed_at: datetime | None
+    has_aggregates: bool
+
+
 class OverviewResponse(BaseModel):
     farm_id: UUID
     block_count: int
@@ -130,6 +157,9 @@ class OverviewResponse(BaseModel):
     window_to: datetime
     stages: list[Stage]
     calc_versions: list[dict[str, Any]]
+    # Every acquisition in the window that did not end clean. Capped
+    # server-side; the ribbon renders them under the stage they explain.
+    problems: list[ProblemScene] = []
     # True when the blocks in scope hold aggregates from more than one
     # product: `block_index_daily` has no product dimension, so trend
     # coverage cannot be attributed to the selected product alone.

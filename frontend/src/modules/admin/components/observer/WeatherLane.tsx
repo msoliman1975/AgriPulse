@@ -82,6 +82,7 @@ export function WeatherLane({
               window_to: w.window_to,
               stages: w.stages,
               calc_versions: [],
+              problems: [],
               trend_product_ambiguous: false,
               consumers_are_window_proxy: false,
             }}

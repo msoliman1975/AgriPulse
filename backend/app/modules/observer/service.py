@@ -229,6 +229,16 @@ class ObserverService:
                 window_from=window_from,
                 window_to=window_to,
             )
+            # The rows behind any shortfall, so the ribbon can SHOW the
+            # cause instead of asserting one and sending the reader to the
+            # scene list to look for it.
+            problems = await self._repo.stage_problem_scenes(
+                farm_id=farm_id,
+                block_ids=blocks,
+                product_id=product_id,
+                window_from=window_from,
+                window_to=window_to,
+            )
         finally:
             await self._unscope()
 
@@ -239,6 +249,7 @@ class ObserverService:
             "window_to": window_to,
             "stages": _build_stages(jobs, indices, cells, trend, consumers),
             "calc_versions": calc_versions,
+            "problems": problems,
             "trend_product_ambiguous": trend["product_ambiguous"],
             # Named so the UI never presents it as proven lineage — the true
             # per-number edge is OBS-8.
@@ -1489,6 +1500,7 @@ def _empty_overview(farm_id: UUID, window_from: datetime, window_to: datetime) -
             {"alerts": 0, "recommendations": 0},
         ),
         "calc_versions": [],
+        "problems": [],
         "trend_product_ambiguous": False,
         "consumers_are_window_proxy": True,
     }

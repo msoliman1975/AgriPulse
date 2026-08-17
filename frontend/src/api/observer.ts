@@ -56,6 +56,26 @@ export interface ObserverStage {
   detail: Record<string, unknown>;
 }
 
+/** Why one acquisition did not end clean. Derived server-side. */
+export type SceneProblem = "failed" | "in_flight" | "skipped" | "no_aggregates";
+
+export interface ProblemScene {
+  scope: SceneScope;
+  job_id: string;
+  label: string | null;
+  scene_id: string;
+  scene_datetime: string;
+  status: JobStatus;
+  problem: SceneProblem;
+  error_code: string | null;
+  error_message: string | null;
+  block_id: string | null;
+  requested_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  has_aggregates: boolean;
+}
+
 export interface ObserverOverview {
   farm_id: string;
   block_count: number;
@@ -63,6 +83,8 @@ export interface ObserverOverview {
   window_to: string;
   stages: ObserverStage[];
   calc_versions: Array<Record<string, unknown>>;
+  /** Acquisitions that did not end clean, so the ribbon can show the cause. */
+  problems: ProblemScene[];
   /**
    * `block_index_daily` has no product dimension, so with two products on a
    * block the trend-coverage count cannot be attributed to the selected one.

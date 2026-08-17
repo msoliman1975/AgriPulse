@@ -257,6 +257,108 @@ class ObserverRepository:
 
     # ---- L0: stage counts ------------------------------------------------
 
+    async def stage_problem_scenes(
+        self,
+        *,
+        farm_id: UUID,
+        block_ids: list[UUID],
+        product_id: UUID | None,
+        window_from: datetime,
+        window_to: datetime,
+        limit: int = 25,
+    ) -> list[dict[str, Any]]:
+        """The acquisitions behind a shortfall, with what actually went wrong.
+
+        The ribbon could say "2 scenes were discovered but never downloaded"
+        and then send the reader to hunt through the scene list for a cause.
+        Worse, it *asserted* the cause — "check the provider errors" — when
+        on the farm that prompted this the two scenes carried no error at
+        all: they were still `running`, requested hours earlier and stuck.
+        A diagnosis that names the wrong cause is worse than one that names
+        none.
+
+        So this returns the rows themselves: every non-succeeded acquisition
+        in the window, from both paths, with its status, error code and
+        message. Succeeded-but-computed-nothing is included too — that is
+        the `indices` shortfall, and it is invisible in the job status.
+
+        `blocked_reason` is derived here rather than in the UI because it
+        depends on which table the row came from and how its status maps.
+        """
+        prod_block = "AND j.product_id = :pid" if product_id else ""
+        prod_farm = "AND f.product_id = :pid" if product_id else ""
+        sql = f"""
+            WITH acquisitions AS (
+                SELECT 'block'::text AS scope,
+                       j.id AS job_id,
+                       COALESCE(b.name, b.code) AS label,
+                       j.scene_id, j.scene_datetime, j.status,
+                       j.error_code, j.error_message,
+                       j.block_id, j.product_id,
+                       j.requested_at, j.started_at, j.completed_at
+                  FROM imagery_ingestion_jobs j
+                  JOIN blocks b ON b.id = j.block_id
+                 WHERE j.block_id IN :bids
+                   {prod_block}
+                   AND j.scene_datetime >= {_ts(window_from)}
+                   AND j.scene_datetime < {_ts(window_to)}
+
+                UNION ALL
+
+                SELECT 'farm'::text AS scope,
+                       f.id AS job_id,
+                       fm.name AS label,
+                       f.scene_id, f.scene_datetime, f.status,
+                       f.error_code, f.error_message,
+                       NULL::uuid AS block_id, f.product_id,
+                       f.requested_at, f.started_at, f.completed_at
+                  FROM imagery_farm_ingestion_jobs f
+                  JOIN farms fm ON fm.id = f.farm_id
+                 WHERE f.farm_id = :fid
+                   {prod_farm}
+                   AND f.scene_datetime >= {_ts(window_from)}
+                   AND f.scene_datetime < {_ts(window_to)}
+            ),
+            judged AS (
+                SELECT a.*,
+                       EXISTS (
+                         SELECT 1 FROM block_index_aggregates agg
+                          WHERE agg.block_id IN :bids
+                            AND agg.product_id = a.product_id
+                            AND agg.time = a.scene_datetime
+                            AND agg.time >= {_ts(window_from)}
+                            AND agg.time < {_ts(window_to)}
+                       ) AS has_aggregates
+                  FROM acquisitions a
+            )
+            SELECT scope, job_id, label, scene_id, scene_datetime, status,
+                   error_code, error_message, block_id,
+                   requested_at, started_at, completed_at, has_aggregates,
+                   CASE
+                     WHEN status = 'failed' THEN 'failed'
+                     WHEN status IN ('pending', 'requested', 'running') THEN 'in_flight'
+                     WHEN status IN ('skipped_cloud', 'skipped_duplicate', 'skipped')
+                       THEN 'skipped'
+                     WHEN status = 'succeeded' AND NOT has_aggregates
+                       THEN 'no_aggregates'
+                     ELSE 'ok'
+                   END AS problem
+              FROM judged
+             WHERE status <> 'succeeded' OR NOT has_aggregates
+             ORDER BY scene_datetime DESC
+             LIMIT :limit
+        """  # noqa: S608
+        stmt = text(sql).bindparams(bindparam("bids", expanding=True))
+        params: dict[str, Any] = {
+            "bids": [str(b) for b in block_ids],
+            "fid": str(farm_id),
+            "limit": max(1, min(limit, 200)),
+        }
+        if product_id:
+            params["pid"] = str(product_id)
+        rows = (await self._s.execute(stmt, params)).mappings()
+        return [dict(r) for r in rows]
+
     async def job_stage_counts(
         self,
         *,

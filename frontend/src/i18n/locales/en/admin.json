@@ -588,8 +588,6 @@
     "ofExpected": "{{pct}}% of {{expected}}",
     "yes": "Yes",
     "no": "No",
-    "trendAmbiguous": "This farm holds aggregates from more than one product. The daily trend rollup has no product dimension, so trend coverage cannot be attributed to the selected product alone.",
-    "consumersProxy": "Consumers are counted by creation time in this window, not by proven descent from these scenes.",
     "mixedCalcVersions": "Two calculation versions in this window — the trend line mixes methodologies",
     "rail": {
       "title": "Selection",
@@ -612,7 +610,9 @@
     "ribbon": {
       "title": "Pipeline stages",
       "blocks_one": "{{count}} block in scope",
-      "blocks_other": "{{count}} blocks in scope"
+      "blocks_other": "{{count}} blocks in scope",
+      "hint": "Select a stage to see what it counts and any scenes behind a shortfall.",
+      "showScenes": "show the scenes"
     },
     "stage": {
       "discovered": "Discovered",
@@ -624,7 +624,7 @@
     },
     "diagnosis": {
       "generic": "{{count}} of {{expected}} expected outputs are missing at this stage.",
-      "acquired": "{{count}} scene(s) were discovered but never downloaded. Check the provider errors in the scene list.",
+      "acquired": "{{count}} scene(s) were discovered but never produced a stored raster. Some may still be running rather than failed — open the stage to see each one's actual status and error.",
       "indices": "{{count}} scene(s) downloaded successfully but wrote no aggregates — the job reads as succeeded because the download succeeded, so index computation is where they died.",
       "cells": "{{count}} scene(s) on gridded blocks produced no cell aggregates. Blocks with no grid governing the scene's time are already excluded from this count.",
       "trend": "{{count}} block-day(s) have aggregates but no daily-trend bucket. The trend rollup refreshes on a rolling window, so history written outside it stays invisible until a manual refresh."
@@ -642,6 +642,13 @@
         "skipped": "Skipped",
         "failed": "Failed",
         "pending": "Pending"
+      },
+      "legendWhat": {
+        "computed": "Downloaded and wrote index numbers. The healthy outcome.",
+        "acquired_only": "Downloaded, but wrote no index numbers — the job reads succeeded because the download did. This is a silent failure.",
+        "skipped": "Never downloaded, on purpose: too cloudy, or a duplicate of a pass already held.",
+        "failed": "The download itself errored. Select the stage tile above to see the error.",
+        "pending": "Queued or still running — not an outcome yet."
       }
     },
     "status": {
@@ -679,12 +686,17 @@
       "validPx": "Valid / total px",
       "baselineZ": "Baseline z",
       "open": "Open",
-      "wholeFarm": "Whole farm"
+      "wholeFarm": "Whole farm",
+      "perBlockNote_one": "One whole-farm fetch wrote an aggregate on {{count}} block, so every index appears once per block.",
+      "perBlockNote_other": "One whole-farm fetch wrote an aggregate on each of {{count}} blocks, so every index appears once per block.",
+      "validPxExplain": "Valid / total px: pixels that produced a usable number, over every pixel inside the AOI. The difference is cloud-masked pixels and sensor gaps."
     },
     "tooltip": {
       "cloudPct": "Cloud cover across the whole scene as reported by the provider — not measured for this block specifically.",
       "validPct": "Valid pixels divided by the block's pixel footprint. A low value means the number came from a fraction of the field.",
-      "indices": "How many of the product's supported indices wrote an aggregate row for this scene."
+      "indices": "How many of the product's supported indices wrote an aggregate row for this scene.",
+      "validTotalPx": "Pixels inside the AOI that produced a usable number, over every pixel the AOI covers. The gap is cloud-masked pixels plus sensor gaps.",
+      "ungridded": "No sub-block grid governed this scene's time, so no cell aggregates were expected. Grids are configured per block AND per product — only the optical product (s2_l2a) has one, so thermal scenes are never gridded."
     },
     "pixel": {
       "title": "Pixel inspector",
@@ -783,7 +795,7 @@
       "neverRepairs": "Observer never repairs. Nothing was written to the pipeline's tables — a drift verdict is a signal, and the fix is a re-run from the Backfill Console, which owns provider quota and progress reporting.",
       "runs": {
         "title": "Verification runs",
-        "explain": "Anything wider than one scene is a named run: a year across 36 blocks is roughly 2,500 recomputations. One run per farm, with progress and a cancel.",
+        "explain": "Anything wider than one scene is a named run — one run per farm, with progress and a cancel. Cost scales with scenes x blocks, so a long window on a large farm is thousands of recomputations.",
         "start": "New verification run",
         "starting": "Queuing…",
         "conflict": "This farm already has a verification in progress. Cancel it first, or wait for it to finish.",
@@ -874,6 +886,36 @@
       "block": "Block",
       "membership": "Cell and block counts do not sum, by design: a cell claims a pixel when the pixel's centre falls inside it, while the block claims a pixel when its footprint touches the boundary. Edge pixels therefore count for the block but for no cell.",
       "legend": "Pixel fill shows the index value; grey pixels carry no usable value. Blue outlines are grid cells — dashed where the cell has no stored aggregate. The red outline is the block boundary."
+    },
+    "stageWhat": {
+      "generic": "What this stage counts.",
+      "discovered": "Satellite passes the provider offered for this farm and window, and that we created a job for. This is the ceiling — nothing downstream can exceed it.",
+      "acquired": "Passes whose rasters actually downloaded and stored. Counted against discovered-minus-skipped, because a pass skipped on cloud was never meant to download.",
+      "indices": "Passes that went on to write per-block index numbers. A download can succeed and the maths still die — the job status only reports the download, which is why this is counted separately.",
+      "cells": "Passes that also filled in the sub-block grid. Only blocks that had a grid governing that scene's own time are counted, so an ungridded farm reads not-applicable rather than broken.",
+      "trend": "Block-days present in the daily trend rollup. The rollup refreshes on a rolling window, so history written by a backfill can sit in the aggregates and still be missing here.",
+      "consumers": "Alerts and recommendations created on these blocks during the window. A volume check, not a lineage claim — a scene and an alert in the same window are not proof one caused the other."
+    },
+    "stageDenominator": {
+      "acquired": "Denominator: discovered minus skipped.",
+      "indices": "Denominator: the passes that acquired.",
+      "cells": "Denominator: acquired passes on blocks with a grid governing that scene's time.",
+      "trend": "Denominator: the block-days that have aggregates."
+    },
+    "noDenominator": "No denominator — this stage is a count, not a conversion, so there is nothing to be short of.",
+    "problems": {
+      "title_one": "{{count}} scene needs attention",
+      "title_other": "{{count}} scenes need attention",
+      "failed": "Failed",
+      "in_flight": "Still running",
+      "skipped": "Skipped",
+      "no_aggregates": "No aggregates",
+      "noError": {
+        "failed": "no error recorded",
+        "in_flight": "no error — the job has not finished",
+        "skipped": "skipped before download",
+        "no_aggregates": "downloaded cleanly; index computation wrote nothing"
+      }
     }
   },
   "signals": {

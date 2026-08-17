@@ -56,41 +56,60 @@ function ExpandedIndices({
     return <p className="text-xs text-ap-muted">{t("observer.scenes.noAggregates")}</p>;
   }
 
+  // A whole-farm fetch wrote an aggregate on EVERY block, so this comes back
+  // one row per (block, index) — three thermal codes on a four-block farm is
+  // twelve rows. Without the block column that reads as unexplained
+  // duplication, which is exactly how it was reported.
+  const perBlock = scene.scope === "farm";
+  const blockCount = perBlock ? new Set(data.map((r) => r.block_id)).size : 0;
+
   return (
-    <Table className="text-xs">
-      <Thead>
-        <Tr>
-          <Th>{t("observer.scenes.index")}</Th>
-          <Th className="text-end">{t("observer.scenes.mean")}</Th>
-          <Th className="text-end">{t("observer.scenes.min")}</Th>
-          <Th className="text-end">P10</Th>
-          <Th className="text-end">P50</Th>
-          <Th className="text-end">P90</Th>
-          <Th className="text-end">{t("observer.scenes.max")}</Th>
-          <Th className="text-end">{t("observer.scenes.std")}</Th>
-          <Th className="text-end">{t("observer.scenes.validPx")}</Th>
-          <Th className="text-end">{t("observer.scenes.baselineZ")}</Th>
-        </Tr>
-      </Thead>
-      <Tbody>
-        {data.map((row) => (
-          <Tr key={row.index_code}>
-            <Td className="font-medium uppercase">{row.index_code}</Td>
-            <Td className="text-end tabular-nums">{row.mean ?? "—"}</Td>
-            <Td className="text-end tabular-nums">{row.min ?? "—"}</Td>
-            <Td className="text-end tabular-nums">{row.p10 ?? "—"}</Td>
-            <Td className="text-end tabular-nums">{row.p50 ?? "—"}</Td>
-            <Td className="text-end tabular-nums">{row.p90 ?? "—"}</Td>
-            <Td className="text-end tabular-nums">{row.max ?? "—"}</Td>
-            <Td className="text-end tabular-nums">{row.std_dev ?? "—"}</Td>
-            <Td className="text-end tabular-nums">
-              {row.valid_pixel_count.toLocaleString()} / {row.total_pixel_count.toLocaleString()}
-            </Td>
-            <Td className="text-end tabular-nums">{row.baseline_deviation ?? "—"}</Td>
+    <>
+      {perBlock ? (
+        <p className="mb-2 text-xs text-ap-muted">
+          {t("observer.scenes.perBlockNote", { count: blockCount })}
+        </p>
+      ) : null}
+      <Table className="text-xs">
+        <Thead>
+          <Tr>
+            {perBlock ? <Th>{t("observer.scenes.block")}</Th> : null}
+            <Th>{t("observer.scenes.index")}</Th>
+            <Th className="text-end">{t("observer.scenes.mean")}</Th>
+            <Th className="text-end">{t("observer.scenes.min")}</Th>
+            <Th className="text-end">P10</Th>
+            <Th className="text-end">P50</Th>
+            <Th className="text-end">P90</Th>
+            <Th className="text-end">{t("observer.scenes.max")}</Th>
+            <Th className="text-end">{t("observer.scenes.std")}</Th>
+            <Th className="text-end" title={t("observer.tooltip.validTotalPx")}>
+              {t("observer.scenes.validPx")}
+            </Th>
+            <Th className="text-end">{t("observer.scenes.baselineZ")}</Th>
           </Tr>
-        ))}
-      </Tbody>
-    </Table>
+        </Thead>
+        <Tbody>
+          {data.map((row) => (
+            <Tr key={`${row.block_id ?? "farm"}-${row.index_code}`}>
+              {perBlock ? <Td className="whitespace-nowrap">{row.block_name ?? "—"}</Td> : null}
+              <Td className="font-medium uppercase">{row.index_code}</Td>
+              <Td className="text-end tabular-nums">{row.mean ?? "—"}</Td>
+              <Td className="text-end tabular-nums">{row.min ?? "—"}</Td>
+              <Td className="text-end tabular-nums">{row.p10 ?? "—"}</Td>
+              <Td className="text-end tabular-nums">{row.p50 ?? "—"}</Td>
+              <Td className="text-end tabular-nums">{row.p90 ?? "—"}</Td>
+              <Td className="text-end tabular-nums">{row.max ?? "—"}</Td>
+              <Td className="text-end tabular-nums">{row.std_dev ?? "—"}</Td>
+              <Td className="text-end tabular-nums">
+                {row.valid_pixel_count.toLocaleString()} / {row.total_pixel_count.toLocaleString()}
+              </Td>
+              <Td className="text-end tabular-nums">{row.baseline_deviation ?? "—"}</Td>
+            </Tr>
+          ))}
+        </Tbody>
+      </Table>
+      <p className="mt-2 text-[0.6875rem] text-ap-muted">{t("observer.scenes.validPxExplain")}</p>
+    </>
   );
 }
 
@@ -215,7 +234,19 @@ export function SceneTable({
                   {s.gridded ? (
                     `${s.cells_written} / ${s.cells_expected}`
                   ) : (
-                    <span className="text-ap-muted">{t("observer.scenes.ungridded")}</span>
+                    /*
+                     * "not gridded" is correct but reads as a fault. Grid
+                     * configs are per (block, PRODUCT), and only s2_l2a has
+                     * any — thermal has never had a grid or a cell aggregate
+                     * anywhere on the platform. Say which it is on hover
+                     * rather than leaving the reader to guess at a defect.
+                     */
+                    <span
+                      className="cursor-help text-ap-muted underline decoration-dotted"
+                      title={t("observer.tooltip.ungridded")}
+                    >
+                      {t("observer.scenes.ungridded")}
+                    </span>
                   )}
                 </Td>
                 <Td className="text-end tabular-nums">{fmtDuration(s.duration_s)}</Td>

@@ -28,9 +28,8 @@ from typing import Any
 import numpy as np
 import rasterio
 from rasterio.features import geometry_mask
-from rasterio.warp import transform_geom
+from rasterio.warp import transform as warp_transform
 from shapely import wkt as shapely_wkt
-from shapely.geometry import box as shapely_box
 from shapely.geometry import mapping, shape
 
 from app.core.logging import get_logger
@@ -71,21 +70,64 @@ class PixelGrid:
     recomputed_valid: int
 
 
-def _pixel_polygon_wgs84(
-    row: int, col: int, transform: Any, src_crs: Any
-) -> tuple[dict[str, Any], float, float]:
-    """One pixel's ground footprint, reprojected for the map.
+# Degrees, ~1 cm at the equator. The pixels are 10-30 m across, so more
+# precision than this only inflates the payload — 4,000 polygons carry
+# 40,000 coordinate pairs.
+_COORD_DP = 7
 
-    Built from the affine transform rather than by sampling, so the polygon is
-    the pixel's true extent — the thing that decides AOI membership under
+
+def _pixel_polygons_wgs84(
+    rows: Any, cols: Any, transform: Any, src_crs: Any
+) -> tuple[list[dict[str, Any]], list[float], list[float]]:
+    """Every pixel's ground footprint, reprojected for the map — in ONE pass.
+
+    Built from the affine transform rather than by sampling, so each polygon
+    is the pixel's true extent — the thing that decides AOI membership under
     `all_touched`, not an approximation of it.
+
+    Vectorised deliberately. The previous shape called `transform_geom` once
+    per pixel, which builds a fresh PROJ transformer every time: measured on
+    prod at ~12 ms per pixel, so the default 4,000-pixel grid took **50
+    seconds** and the map read as broken. One `warp_transform` over all the
+    corners at once is the same arithmetic with one setup.
     """
-    x0, y0 = transform * (col, row)
-    x1, y1 = transform * (col + 1, row + 1)
-    footprint = shapely_box(min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
-    geom = transform_geom(src_crs, "EPSG:4326", mapping(footprint))
-    centre = shape(geom).centroid
-    return geom, float(centre.x), float(centre.y)
+    c = np.asarray(cols, dtype=np.float64)
+    r = np.asarray(rows, dtype=np.float64)
+    # Affine applied directly: x = c + a*col + b*row, y = f + d*col + e*row.
+    # North-up rasters have b = d = 0, but carrying them keeps this correct
+    # for a rotated transform rather than quietly wrong.
+    x0 = transform.c + transform.a * c + transform.b * r
+    y0 = transform.f + transform.d * c + transform.e * r
+    x1 = transform.c + transform.a * (c + 1) + transform.b * (r + 1)
+    y1 = transform.f + transform.d * (c + 1) + transform.e * (r + 1)
+
+    xmin, xmax = np.minimum(x0, x1), np.maximum(x0, x1)
+    ymin, ymax = np.minimum(y0, y1), np.maximum(y0, y1)
+
+    # Four corners plus the centre, all transformed in a single call.
+    xs = np.concatenate([xmin, xmax, xmax, xmin, (xmin + xmax) / 2.0])
+    ys = np.concatenate([ymin, ymin, ymax, ymax, (ymin + ymax) / 2.0])
+    lon, lat = warp_transform(src_crs, "EPSG:4326", xs.tolist(), ys.tolist())
+
+    n = len(c)
+    lon_a = np.round(np.asarray(lon, dtype=np.float64), _COORD_DP)
+    lat_a = np.round(np.asarray(lat, dtype=np.float64), _COORD_DP)
+
+    geoms: list[dict[str, Any]] = []
+    for i in range(n):
+        ring = [
+            [float(lon_a[i]), float(lat_a[i])],
+            [float(lon_a[n + i]), float(lat_a[n + i])],
+            [float(lon_a[2 * n + i]), float(lat_a[2 * n + i])],
+            [float(lon_a[3 * n + i]), float(lat_a[3 * n + i])],
+        ]
+        # GeoJSON rings close explicitly.
+        ring.append(list(ring[0]))
+        geoms.append({"type": "Polygon", "coordinates": [ring]})
+
+    centres_lon = [float(v) for v in lon_a[4 * n :]]
+    centres_lat = [float(v) for v in lat_a[4 * n :]]
+    return geoms, centres_lon, centres_lat
 
 
 def build_pixel_grid(
@@ -155,6 +197,12 @@ def build_pixel_grid(
         src_crs = ds.crs
         resolution = float(abs(transform.a))
 
+    # Every index for the product gets computed, then nine tenths of it is
+    # thrown away — s2_l2a has ten. Each one is a full-raster ufunc chain, so
+    # the waste is real; but the maths must stay the pipeline's own, and
+    # there is no per-index entry point. Discarding after the fact is the
+    # honest trade: correct numbers first, and the dominant cost was never
+    # here (it was the per-pixel CRS transform, see `_pixel_polygons_wgs84`).
     computed = compute_indices_for_product(product_code, arrays, air_temp_c=air_temp_c)
     if index_code not in computed:
         raise KeyError(index_code)
@@ -172,26 +220,33 @@ def build_pixel_grid(
         )
         rows, cols = rows[:max_pixels], cols[:max_pixels]
 
-    pixels: list[PixelFeature] = []
-    values: list[float] = []
-    for r, c in zip(rows.tolist(), cols.tolist(), strict=True):
-        raw = float(clouded[r, c])
-        masked = bool(cloud_mask[r, c])
-        finite = np.isfinite(raw)
-        geom, lon, lat = _pixel_polygon_wgs84(r, c, transform, src_crs)
-        pixels.append(
-            PixelFeature(
-                row=r,
-                col=c,
-                value=raw if finite else None,
-                masked=masked,
-                geometry=geom,
-                lon=lon,
-                lat=lat,
-            )
+    geoms, lons, lats = _pixel_polygons_wgs84(rows, cols, transform, src_crs)
+
+    # Pull the per-pixel scalars out of the arrays in one vectorised gather
+    # rather than indexing a numpy array 4,000 times in Python.
+    raw_vals = clouded[rows, cols].astype(np.float64, copy=False)
+    masked_flags = cloud_mask[rows, cols]
+    finite_flags = np.isfinite(raw_vals)
+
+    row_list = rows.tolist()
+    col_list = cols.tolist()
+    raw_list = raw_vals.tolist()
+    masked_list = masked_flags.tolist()
+    finite_list = finite_flags.tolist()
+
+    pixels: list[PixelFeature] = [
+        PixelFeature(
+            row=row_list[i],
+            col=col_list[i],
+            value=raw_list[i] if finite_list[i] else None,
+            masked=bool(masked_list[i]),
+            geometry=geoms[i],
+            lon=lons[i],
+            lat=lats[i],
         )
-        if finite:
-            values.append(raw)
+        for i in range(len(row_list))
+    ]
+    values = [raw_list[i] for i in range(len(row_list)) if finite_list[i]]
 
     return PixelGrid(
         index_code=index_code,
