@@ -549,6 +549,29 @@ def _offset_for(snapshot: dict[str, Any], as_of: datetime) -> timedelta:
     return (as_of - timedelta(days=1)) - parsed
 
 
+def _rebase(value: datetime, offset: timedelta) -> datetime:
+    """Shift an observation — but leave an open-ended valid-time bound alone.
+
+    The valid-time columns use the extremes of the datetime range as sentinels:
+    ``grid_configs.effective_from`` is ``0001-01-01`` for "has always applied",
+    and the matching upper bounds sit at the maximum for "still applies". Those
+    are markers, not observations. Rebasing one says nothing — "always" does
+    not move when the season does — and rebasing the lower one raises
+    ``OverflowError: date value out of range`` outright, which is how this was
+    found: the first real load died on `grid_configs` with a negative offset.
+
+    The try/except is a backstop, not the rule. Any timestamp close enough to
+    either extreme to overflow is a sentinel by construction; nothing that
+    describes a real observation lives within days of year 1 or year 9999.
+    """
+    if value.date() in (datetime.min.date(), datetime.max.date()):
+        return value
+    try:
+        return value + offset
+    except OverflowError:
+        return value
+
+
 async def _insert_rows(
     session: AsyncSession,
     *,
@@ -579,7 +602,7 @@ async def _insert_rows(
             if column not in spec.force:
                 shifted = _as_datetime(value)
                 if shifted is not None:
-                    value = shifted + offset
+                    value = _rebase(shifted, offset)
             if column in date_columns and isinstance(value, str):
                 value = date.fromisoformat(value)
             if column in json_columns and isinstance(value, dict | list):
