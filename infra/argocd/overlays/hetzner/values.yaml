@@ -2184,7 +2184,14 @@ global:
       #   pixel — the farm reads ~50 degC — to one end of the ramp.
       #   FRONTEND ONLY; api + workers stay a615cb8. No migrations.
       #   Image CONFIRMED by pulling it on the node: frontend @ 8002b2d.
-      tag: "8002b2d"
+      #
+      # 0981f7f = #506, the last of the chain. Cosmetic labels only: the
+      #   pixel inspector printed "SCL = 21824" over a Landsat QA_PIXEL
+      #   value, and "Inside the block boundary" on a whole-farm scene
+      #   that has no block. Both now key on the scene's own product and
+      #   scope. FRONTEND ONLY; api + workers stay a615cb8.
+      #   Image CONFIRMED by pulling it on the node: frontend @ 0981f7f.
+      tag: "0981f7f"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
