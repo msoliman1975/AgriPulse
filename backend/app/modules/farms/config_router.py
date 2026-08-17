@@ -575,6 +575,24 @@ async def put_grid_template(
     await config_template.replace_grid_template(
         session, farm_id=farm_id, tpl=tpl, updated_by=context.user_id
     )
+    # Blocks with NO grid are gridded here, on the save. Storing the number
+    # and waiting for a separate confirmed apply left a farm reading
+    # "cell size 20 m" with zero grid configs and an overlay that drew
+    # nothing — the first step of a two-step flow looks exactly like the
+    # whole thing. Creating a grid where there is none retires no geometry,
+    # so it needs no confirmation; blocks that already have one are left for
+    # the rezone flow, which keeps every bit of its ceremony.
+    #
+    # The response shape stays exactly as it was: `GridTemplateSchema` is
+    # `extra="forbid"` and doubles as the REQUEST body, and the panel saves
+    # `{...tpl}` read back from here — so a field added to the reply comes
+    # straight back on the next save as a 422.
+    await config_template.grid_blocks_that_have_none(
+        session,
+        farm_id=farm_id,
+        created_by=context.user_id,
+        tenant_schema=context.tenant_schema,
+    )
     return {
         "cell_size_m": payload.cell_size_m,
         "anomaly_z_threshold": payload.anomaly_z_threshold,

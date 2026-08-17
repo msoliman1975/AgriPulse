@@ -24,6 +24,7 @@ from .test_grid_template import (
     _make_farm_with_block,
     _s2_product_id,
     _seed_grid,
+    _square_polygon,
 )
 
 pytestmark = [pytest.mark.integration]
@@ -127,13 +128,19 @@ async def test_preview_blocks_a_size_the_product_cannot_take(
 
 
 @pytest.mark.asyncio
-async def test_first_grid_is_a_create_and_needs_no_confirmation(
+async def test_saving_the_cell_size_grids_a_block_that_has_none(
     admin_session: AsyncSession,
 ) -> None:
-    """Gridding a farm for the first time destroys nothing.
+    """Gridding a farm for the first time destroys nothing — so it happens.
 
-    Demanding the destructive confirmation here would teach operators to
-    type past it, which is how the confirmation stops working.
+    Storing the number and waiting for a separate confirmed apply made the
+    first step of a two-step flow look like the whole thing. On prod,
+    greenFarm_Test sat with a 20 m template, four blocks, zero grid configs
+    and zero cells, and the map's grid toggle drew nothing without saying
+    why.
+
+    Demanding the destructive confirmation here would also teach operators
+    to type past it, which is how the confirmation stops working.
     """
     tenant, context = await _bootstrap(admin_session, "cs-create")
     app = build_app(context, with_config=True)
@@ -156,6 +163,73 @@ async def test_first_grid_is_a_create_and_needs_no_confirmation(
         await admin_session.commit()
         await _set_template(c, farm_id, 20)
 
+        # The save did it. Nothing was retired, so nothing was confirmed.
+        rows = await _configs(admin_session, schema=tenant.schema_name, block_id=UUID(block_id))
+        assert len(rows) == 1, "the cell size the user typed is now a real grid"
+        assert float(rows[0]["cell_size_m"]) == 20.0
+        assert rows[0]["retired_at"] is None
+
+        # And the apply flow agrees there is nothing left to do.
+        body = (
+            await c.post(
+                f"/api/v1/farms/{farm_id}/config/grid/apply-preview",
+                json={"scope": "cell_size"},
+            )
+        ).json()
+        assert body["create_rows"] == 0
+        assert body["rezone_rows"] == 0
+        assert body["requires_confirmation"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_cut_over_farm_can_be_gridded_at_all(admin_session: AsyncSession) -> None:
+    """A grid needs a product, and a farm-AOI farm has no BLOCK subscription.
+
+    The plan used to look for one only in `imagery_aoi_subscriptions`, so
+    every block of a cut-over farm came back with a NULL product: nothing to
+    create a grid against, "apply cell size" a silent no-op, and the map's
+    grid toggle drawing nothing on a farm whose imagery was landing fine.
+    Measured on prod: greenFarm_Test, 4 blocks, a 20 m template, zero grid
+    configs.
+
+    The second half is the flow this used to be: a block drawn after the
+    template was saved is a pending create, which destroys nothing and so
+    still needs no confirmation.
+    """
+    tenant, context = await _bootstrap(admin_session, "cs-farm-aoi")
+    app = build_app(context, with_config=True)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        farm_id, block_id = await _make_farm_with_block(c)
+        product_id = await _s2_product_id(admin_session)
+        await admin_session.execute(
+            text(f'SET LOCAL search_path TO "{tenant.schema_name}", public')
+        )
+        # Farm-level only — exactly what a cut-over farm carries.
+        await admin_session.execute(
+            text(
+                "INSERT INTO imagery_farm_subscriptions "
+                "(farm_id, product_id, is_active, fetch_farm_aoi) "
+                "VALUES (:f, :p, TRUE, TRUE)"
+            ).bindparams(
+                bindparam("f", type_=PG_UUID(as_uuid=True)),
+                bindparam("p", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"f": UUID(farm_id), "p": product_id},
+        )
+        await admin_session.commit()
+
+        await _set_template(c, farm_id, 20)
+
+        rows = await _configs(admin_session, schema=tenant.schema_name, block_id=UUID(block_id))
+        assert len(rows) == 1, "a farm subscription is a product too"
+        assert float(rows[0]["cell_size_m"]) == 20.0
+
+        later = await c.post(
+            f"/api/v1/farms/{farm_id}/blocks",
+            json={"code": "B2", "boundary": _square_polygon(31.215, 30.001)},
+        )
+        assert later.status_code in (200, 201), later.text
+
         body = (
             await c.post(
                 f"/api/v1/farms/{farm_id}/config/grid/apply-preview",
@@ -171,6 +245,10 @@ async def test_first_grid_is_a_create_and_needs_no_confirmation(
         )
         assert applied.status_code == 200, applied.text
         assert applied.json()["blocks_touched"] == 1
+        rows = await _configs(
+            admin_session, schema=tenant.schema_name, block_id=UUID(later.json()["id"])
+        )
+        assert len(rows) == 1
 
 
 # ---- Confirmation ----------------------------------------------------------

@@ -262,16 +262,32 @@ class GridRepository:
     async def list_farm_grid_rows(
         self, *, block_ids: tuple[UUID, ...]
     ) -> tuple[dict[str, Any], ...]:
-        """One row per (block, active imagery subscription) for a block set.
+        """One row per (block, product the block is fetched for) for a block set.
 
         Single statement on purpose: the farm-wide preview runs over every
         block of a farm, and a per-block fan-out here is exactly the N+1
         that exhausted the pool on the map endpoints (#311).
 
-        Blocks with no active subscription still yield one row with NULL
+        Blocks with no subscription at all still yield one row with NULL
         product columns, so the preview can show *why* they were left out
         instead of dropping them. Blocks whose subscription has no grid
         config yield NULL config columns.
+
+        **Both subscription shapes count.** A grid needs a product, and this
+        read used to find one only in `imagery_aoi_subscriptions`. A farm cut
+        over to farm-AOI fetching has no such rows by construction, so every
+        one of its blocks came back with a NULL product — the plan had
+        nothing to create a grid against, "apply cell size" was a silent
+        no-op, and the map's grid toggle drew nothing on a farm whose imagery
+        was landing perfectly. Measured on prod: greenFarm_Test, 4 blocks, a
+        20 m template, **zero grid configs**.
+
+        A farm subscribed to two products yields two rows per block, exactly
+        as a block subscribed to two would. That is not a special case worth
+        avoiding: the cell-size arithmetic already rejects a size that is not
+        an integer multiple of the product's native pixel, so a 20 m template
+        grids the 10 m optical product and declines the 30 m thermal one with
+        a stated reason.
         """
         if not block_ids:
             return ()
@@ -293,9 +309,23 @@ class GridRepository:
                             cfg.cell_size_m         AS current_cell_size_m,
                             cfg.anomaly_z_threshold AS current_anomaly_z_threshold
                         FROM blocks b
-                        LEFT JOIN imagery_aoi_subscriptions s
-                               ON s.block_id = b.id
-                              AND s.is_active = TRUE
+                        LEFT JOIN LATERAL (
+                            SELECT sub.product_id
+                              FROM imagery_aoi_subscriptions sub
+                             WHERE sub.block_id = b.id
+                               AND sub.is_active = TRUE
+                            UNION
+                            -- The farm path. Gated on `fetch_farm_aoi`, not
+                            -- on a farm row existing: 0074 gave every farm
+                            -- one, so the existence predicate would attach a
+                            -- product to blocks nothing fetches.
+                            SELECT fs.product_id
+                              FROM imagery_farm_subscriptions fs
+                             WHERE fs.farm_id = b.farm_id
+                               AND fs.is_active = TRUE
+                               AND fs.fetch_farm_aoi = TRUE
+                               AND fs.deleted_at IS NULL
+                        ) s ON TRUE
                         LEFT JOIN public.imagery_products p
                                ON p.id = s.product_id
                               AND p.is_active = TRUE

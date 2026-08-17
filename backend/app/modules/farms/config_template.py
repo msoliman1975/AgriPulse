@@ -30,7 +30,8 @@ from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
-from sqlalchemy import and_, delete, select, update
+from sqlalchemy import and_, bindparam, delete, select, text, update
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.farms.errors import (
@@ -1013,6 +1014,81 @@ async def apply_grid_template(
         "blocks_touched": written,
         "total_blocks": len(plan),
     }
+
+
+async def _ungridded_block_ids(session: AsyncSession, *, farm_id: UUID) -> tuple[UUID, ...]:
+    """Live blocks of the farm carrying no grid at all.
+
+    "No grid" is the only state where creating one destroys nothing, which
+    is what lets it happen without the rezone confirmation.
+    """
+    rows = (
+        await session.execute(
+            text(
+                """
+                SELECT b.id FROM blocks b
+                 WHERE b.farm_id = :farm
+                   AND b.deleted_at IS NULL
+                   AND NOT EXISTS (
+                       SELECT 1 FROM grid_configs g
+                        WHERE g.block_id = b.id
+                          AND g.deleted_at IS NULL
+                          AND g.retired_at IS NULL
+                          AND g.superseded_at IS NULL
+                   )
+                 ORDER BY b.id
+                """
+            ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+            {"farm": farm_id},
+        )
+    ).all()
+    return tuple(r.id for r in rows)
+
+
+async def grid_blocks_that_have_none(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    created_by: UUID | None,
+    tenant_schema: str | None,
+) -> dict[str, int]:
+    """Materialise the farm's cell size on blocks that have no grid yet.
+
+    Saving a cell size was a two-step flow whose first step looked like the
+    whole thing: the number landed on `farms.default_grid_cell_size_m` and
+    nothing else happened until an explicit apply was confirmed. On prod,
+    greenFarm_Test sat with a 20 m template, four blocks, **zero grid
+    configs and zero cells** — so the map's grid toggle had nothing to draw
+    and said nothing about why.
+
+    Only ungridded blocks are touched, and that restriction is what makes
+    this safe to do on a save. Creating a grid where there is none retires
+    no geometry and strands no history, so `apply_grid_cell_size` finds
+    nothing destructive to plan and never asks for the typed confirmation.
+    **Rezoning a block that already has a grid keeps every bit of that
+    ceremony** — it is a different act with a different cost.
+
+    Returns zeroed counts when there is no cell size to apply or no block
+    lacking a grid, so the caller can report it without a special case.
+    """
+    tpl = await get_grid_template(session, farm_id=farm_id)
+    if tpl.cell_size_m is None:
+        return {"blocks_touched": 0, "total_blocks": 0, "scenes_queued": 0, "scenes_stranded": 0}
+    targets = await _ungridded_block_ids(session, farm_id=farm_id)
+    if not targets:
+        return {"blocks_touched": 0, "total_blocks": 0, "scenes_queued": 0, "scenes_stranded": 0}
+    return await apply_grid_cell_size(
+        session,
+        farm_id=farm_id,
+        target_block_ids=targets,
+        created_by=created_by,
+        # Not passed through from the caller: with nothing destructive in the
+        # plan there is nothing to confirm, and accepting a name here would
+        # invite someone to route a real rezone through this door.
+        confirm_farm_name=None,
+        backfill_budget_scenes=None,
+        tenant_schema=tenant_schema,
+    )
 
 
 class RezoneConfirmationError(ValueError):

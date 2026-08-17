@@ -244,3 +244,67 @@ def test_lst_aggregates_are_a_temperature_not_a_ratio(tmp_path: Path) -> None:
 
     mean = float(aggregates["lst"].mean)
     assert 0.0 < mean < 60.0, "LST must be stored in degC, matching the catalog bounds"
+
+
+# A boundary that cuts THROUGH the outer ring of pixels rather than running
+# along their edges: inset 20 m into a 30 m grid, so the first and last pixel
+# of each axis is clipped without containing its own centre. That is the only
+# geometry where the two masking rules can disagree, and the whole farm-border
+# complaint lives in the disagreement.
+_CLIPPING_AOI = {
+    "type": "Polygon",
+    "coordinates": [
+        [
+            [300020.0, 3329980.0],
+            [300280.0, 3329980.0],
+            [300280.0, 3329720.0],
+            [300020.0, 3329720.0],
+            [300020.0, 3329980.0],
+        ]
+    ],
+}
+
+
+def _aoi_mask_for(cog: Path, *, all_touched: bool) -> np.ndarray:
+    return load_raw_bands_and_aggregate(
+        str(cog),
+        band_names=("lwir11", "red", "nir08"),
+        aoi_geojson_utm36n=_CLIPPING_AOI,
+        product_code="landsat_c2_l2_st",
+        all_touched=all_touched,
+    )[1]
+
+
+def test_the_touched_rule_keeps_pixels_the_boundary_only_clips(tmp_path: Path) -> None:
+    """The default, and what every block raster in the database was cut with.
+
+    Kept as the default deliberately: the block aggregates were all measured
+    under it, and a block narrower than one pixel would vanish under the
+    centre rule.
+    """
+    cog = tmp_path / "raw.tif"
+    _write_cog(cog, _thermal_bands(_QA_CLEAR_LAND))
+
+    mask = _aoi_mask_for(cog, all_touched=True)
+
+    assert mask.all(), "a pixel the boundary merely clips is still inside"
+
+
+def test_the_centre_rule_stops_at_the_boundary(tmp_path: Path) -> None:
+    """What the FARM surface uses, because it is drawn over the farm outline.
+
+    Under the touched rule the raster paints a full pixel past the border —
+    30 m here, a visible staircase of colour outside the farm.
+    """
+    cog = tmp_path / "raw.tif"
+    _write_cog(cog, _thermal_bands(_QA_CLEAR_LAND))
+
+    mask = _aoi_mask_for(cog, all_touched=False)
+
+    # The 8x8 interior: the clipped outer ring is gone on all four sides.
+    assert mask.sum() == 64
+    assert not mask[0].any()
+    assert not mask[-1].any()
+    assert not mask[:, 0].any()
+    assert not mask[:, -1].any()
+    assert mask[1:-1, 1:-1].all(), "and nothing inside the boundary was lost"

@@ -1507,6 +1507,12 @@ async def _compute_farm_scene_indices(
             band_names=tuple(product["bands"]),
             aoi_geojson_utm36n=farm["boundary_utm_geojson"],
             product_code=product["code"],
+            # Cut at the boundary, not one pixel past it. This surface is
+            # DRAWN, over the farm's own outline, and the touched rule paints
+            # every pixel the border clips through — a staircase of colour
+            # outside the farm, 10 m wide on Sentinel-2 and 30 m on Landsat.
+            # The block path keeps the touched rule; see the parameter's note.
+            all_touched=False,
         )
         _aggregates, index_keys, index_rasters = compute_and_write_indices(
             bands_arrays=bands_arrays,
