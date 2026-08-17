@@ -11,7 +11,7 @@ import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { visualizationDefaults } from "@/modules/imagery/components/tileUrl";
-import type { IndexCode } from "@/api/indices";
+import type { AnyIndexCode } from "@/api/indices";
 import { PixelBudgetCard } from "@/modules/admin/components/observer/PixelBudgetCard";
 import { CellDrillPanel } from "@/modules/admin/components/observer/CellDrillPanel";
 import { LineagePanel } from "@/modules/admin/components/observer/LineagePanel";
@@ -39,7 +39,7 @@ const ObserverSceneMap = lazy(() =>
  */
 /** Value window for the pixel ramp — imagery's own per-index defaults. */
 function rescaleFor(indexCode: string): [number, number] {
-  const vis = visualizationDefaults(indexCode as IndexCode);
+  const vis = visualizationDefaults(indexCode as AnyIndexCode);
   return [vis.rescaleMin, vis.rescaleMax];
 }
 
