@@ -2293,6 +2293,18 @@ global:
     workers:
       tag: "6207ee3"
     frontend:
+      # 5e84dd6 = #515, the thermal indices reach the decision-tree condition
+      #   builder. `lst`/`cwsi`/`smi` were computed and stored per block —
+      #   796 `lst` rows in prod — but the builder's index picker mirrored
+      #   STANDARD_INDEX_CODES alone, so no rule could branch on canopy
+      #   temperature or crop water stress. The `indices` source now offers
+      #   both products as two <optgroup>s; the `grid` source stays optical
+      #   because grid cells are cut per product and only the optical one has
+      #   a grid config.
+      #   FRONTEND ONLY — nothing on the backend needed changing (the
+      #   condition parser takes any index_code and the loader has no product
+      #   filter), so api + workers stay 6207ee3. No migrations.
+      #   Image CONFIRMED by pulling it on the node: frontend @ 5e84dd6.
       # ceaa572 = #512, the last block-vs-farm wording from #506. On a
       #   whole-farm scene the pixel-cap notice read "the BLOCK is larger
       #   than the map cap" — a whole-farm acquisition is clipped to the
@@ -2300,7 +2312,7 @@ global:
       #   carried `scope`; the notice was not reading it.
       #   FRONTEND ONLY; api + workers stay 86faf0b. No migrations.
       #   Image CONFIRMED by pulling it on the node: frontend @ ceaa572.
-      tag: "ceaa572"
+      tag: "5e84dd6"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
