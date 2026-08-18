@@ -20,6 +20,7 @@ gap this closes.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -110,11 +111,23 @@ _BOTH = _OPTICAL | _THERMAL
             lambda t: _array_members(t, "INDEX_CODES"),
             _OPTICAL,
         ),
+        # The decision-tree builder has two index pickers with different
+        # answers. `grid` branches on sub-block cells, which are cut per
+        # product and exist only for the optical one, so it stays optical.
+        # `indices` reads block_index_aggregates through a loader keyed on
+        # index_code alone — thermal rows resolve there exactly like optical
+        # ones — so it offers both.
         (
             "INDEX_CODES (conditionEdit.ts)",
             _CONDITION_EDIT_TS,
             lambda t: _array_members(t, "INDEX_CODES"),
             _OPTICAL,
+        ),
+        (
+            "THERMAL_INDEX_CODES (conditionEdit.ts)",
+            _CONDITION_EDIT_TS,
+            lambda t: _array_members(t, "THERMAL_INDEX_CODES"),
+            _THERMAL,
         ),
         # The live console (/labs/map) draws an index as sub-block grid cells,
         # and thermal has none — `grid_configs` are per-product and only the
@@ -263,3 +276,27 @@ def test_weather_index_codes_match_the_catalog_migrations() -> None:
         "lists this one is load-bearing at runtime: parseValueRef rejects an "
         "unknown code and drops the whole tree editor to the YAML fallback."
     )
+
+
+@_SKIP_IF_NO_FRONTEND
+def test_every_pickable_index_has_a_hint_in_both_locales() -> None:
+    """A code in the dropdown with no description reads as unfinished.
+
+    The builder looks the hint up by code (`hint.indexCode.<code>`) and renders
+    nothing when it is missing, so adding an index to the picker without adding
+    its line degrades silently — the same failure shape this file exists for,
+    one level down. Arabic is checked too: a missing key there falls back to
+    the English string, which is worse than a gap because it looks translated.
+    """
+    locales = _FRONTEND / "i18n" / "locales"
+    for locale in ("en", "ar"):
+        catalogue = json.loads(
+            (locales / locale / "decisionTrees.json").read_text(encoding="utf-8")
+        )
+        hints = catalogue["editor"]["condition"]["hint"]["indexCode"]
+        missing = _BOTH - set(hints)
+        assert (
+            not missing
+        ), f"{locale}/decisionTrees.json has no indexCode hint for {sorted(missing)}"
+        groups = catalogue["editor"]["condition"]["indexGroup"]
+        assert set(groups) == {"optical", "thermal"}, groups
