@@ -53,6 +53,7 @@ import sys
 import time
 import uuid
 import warnings
+from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -617,7 +618,13 @@ def main() -> int:
         with plat:
             act_0_preflight(run, plat)
             owner = act_1_provision(run, plat, password)
-            with owner:
+            # `closing`, not `with`. Act 1 issues the invites through this very
+            # client before handing it back, which moves httpx out of UNOPENED,
+            # and `__enter__` on an already-opened client raises
+            # "Cannot open a client instance more than once". `plat` survives
+            # the same pattern only because nothing has used it yet at the
+            # `with` above. All we ever wanted here was the close.
+            with closing(owner):
                 act_2_org(run, owner, Path(args.snapshot), as_of)
                 act_3_history(run, plat, owner)
     except SpineFailure as exc:
