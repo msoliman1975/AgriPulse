@@ -17,7 +17,7 @@ from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import bindparam, select, text
+from sqlalchemy import Text, bindparam, select, text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import IntegrityError
@@ -49,7 +49,7 @@ class RecommendationsRepository:
     # ---- Decision-tree catalog (public) -------------------------------
 
     async def list_active_trees_with_current_version(
-        self, *, visible_to_tenant_id: UUID
+        self, *, visible_to_tenant_id: UUID, only_code: str | None = None
     ) -> tuple[dict[str, Any], ...]:
         """Every active tree visible to the given tenant, paired with its
         current published version.
@@ -58,6 +58,14 @@ class RecommendationsRepository:
         tenant's own authored trees (tenant_id = :tid). Other tenants'
         trees are excluded. Trees without a published version yet are
         skipped (PR-A).
+
+        ``only_code`` narrows the result to one tree. That is the whole
+        mechanism behind the authoring "run this tree now" path: the
+        evaluation walks the *same* code the sweep does, with the tree set
+        cut to one, so a targeted run cannot drift from the nightly one.
+        Filtered in SQL rather than in Python because the caller runs this
+        once per block, and the per-tree parameter-override bulk load
+        downstream keys off whatever this returns.
         """
         rows = (
             (
@@ -85,10 +93,17 @@ class RecommendationsRepository:
                       AND t.deleted_at IS NULL
                       AND v.published_at IS NOT NULL
                       AND (t.tenant_id IS NULL OR t.tenant_id = :tid)
+                      AND (:only_code IS NULL OR t.code = :only_code)
                     ORDER BY t.code
                     """
-                    ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
-                    {"tid": visible_to_tenant_id},
+                    ).bindparams(
+                        bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                        # Typed explicitly: an untyped NULL bind leaves
+                        # Postgres unable to infer the parameter's type and
+                        # the whole statement fails, not just the branch.
+                        bindparam("only_code", type_=Text()),
+                    ),
+                    {"tid": visible_to_tenant_id, "only_code": only_code},
                 )
             )
             .mappings()
@@ -1175,18 +1190,64 @@ class RecommendationsRepository:
         ).all()
         return {r.code for r in rows}
 
-    async def list_active_block_ids(self) -> tuple[UUID, ...]:
+    async def list_active_block_ids(self, *, farm_id: UUID | None = None) -> tuple[UUID, ...]:
+        """Active block ids, tenant-wide or for one farm.
+
+        ``farm_id`` narrows to a single farm for the authoring "run this tree
+        on this farm" path. Ordered by code so a run's per-block report reads
+        in the same order the farm's block list does.
+        """
         rows = (
             await self._tenant.execute(
                 text(
                     "SELECT id FROM blocks "
                     "WHERE deleted_at IS NULL "
                     "  AND active_from <= current_date "
-                    "  AND (active_to IS NULL OR active_to > current_date)"
-                )
+                    "  AND (active_to IS NULL OR active_to > current_date) "
+                    "  AND (:farm_id IS NULL OR farm_id = :farm_id) "
+                    "ORDER BY code"
+                ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                {"farm_id": farm_id},
             )
         ).all()
         return tuple(r.id for r in rows)
+
+    async def get_block_labels(self, *, block_ids: tuple[UUID, ...]) -> dict[UUID, str]:
+        """``{block_id: "Block name"}`` for the run report.
+
+        Returns the code when a block is unnamed, so every row in the report
+        carries something a human recognises rather than a bare UUID.
+        """
+        if not block_ids:
+            return {}
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        "SELECT id, COALESCE(NULLIF(name, ''), code) AS label "
+                        "FROM blocks WHERE id = ANY(:ids)"
+                    ).bindparams(bindparam("ids", type_=postgresql.ARRAY(PG_UUID(as_uuid=True)))),
+                    {"ids": list(block_ids)},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return {r["id"]: r["label"] for r in rows}
+
+    async def farm_exists(self, *, farm_id: UUID) -> bool:
+        """Whether the farm is live in this tenant. The run endpoint checks
+        before opening a run row, so an unknown farm 404s instead of
+        recording an empty evaluation that looks like "nothing matched"."""
+        found = (
+            await self._tenant.execute(
+                text("SELECT 1 FROM farms WHERE id = :fid AND deleted_at IS NULL").bindparams(
+                    bindparam("fid", type_=PG_UUID(as_uuid=True))
+                ),
+                {"fid": farm_id},
+            )
+        ).scalar_one_or_none()
+        return found is not None
 
     async def list_blocks_for_targeting(self) -> list[dict[str, Any]]:
         """Every active block with the attributes the targeting matcher reads
@@ -1205,6 +1266,7 @@ class RecommendationsRepository:
                            b.name        AS block_name,
                            b.code        AS block_code,
                            b.soil_texture,
+                           f.id          AS farm_id,
                            f.name        AS farm_name,
                            f.country_code,
                            bc.crop_id,

@@ -37,6 +37,8 @@ from app.modules.recommendations.schemas import (
     DecisionTreeDryRunRequest,
     DecisionTreeDryRunResponse,
     DecisionTreeResponse,
+    DecisionTreeRunRequest,
+    DecisionTreeRunResponse,
     DecisionTreeUpdateRequest,
     DecisionTreeVersionCreateRequest,
     DecisionTreeVersionPublishResponse,
@@ -53,6 +55,7 @@ from app.modules.recommendations.schemas import (
     TreeParameterOverrideResponse,
     TreeParameterOverridesResponse,
     TreeParameterOverrideUpsertRequest,
+    TreeRunCandidateFarm,
 )
 
 # Importing the private authoring errors to map them at the route layer is
@@ -858,6 +861,75 @@ async def dry_run_decision_tree(
         if mapped is not None:
             raise mapped from exc
         raise
+
+
+# ---------- On-demand tree run (authoring) --------------------------------
+#
+# The dry-run's counterpart. `:dry-run` answers "what would this decide
+# here?" and writes nothing; `:run` decides it and puts the result in the
+# Action Center. Both live in the authoring surface because they are the two
+# halves of testing a tree — preview, then commit.
+
+
+@router.get(
+    "/decision-trees/{code}/candidate-farms",
+    response_model=list[TreeRunCandidateFarm],
+    summary="Farms this tree targets, with targeted-block counts (run picker).",
+)
+async def list_tree_run_candidate_farms(
+    code: str,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: DecisionTreesAuthorService = Depends(_author_service),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    try:
+        return await service.candidate_farms(code=code, tenant_session=tenant_session)
+    except Exception as exc:
+        mapped = _map_authoring_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.post(
+    "/decision-trees/{code}:run",
+    response_model=DecisionTreeRunResponse,
+    summary="Run this tree's published version across one farm, for real.",
+)
+async def run_decision_tree_on_farm(
+    code: str,
+    payload: DecisionTreeRunRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: RecommendationsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    """Evaluate one tree over every active block of ``farm_id`` and open the
+    recommendations it produces.
+
+    Gated on ``decision_tree.manage``, not the ``decision_tree.read`` its
+    neighbours use: this writes rows that reach the whole farm team through
+    the Action Center and the notification pipeline. Reading a tree and
+    dispatching work from it are different privileges.
+
+    Not farm-scoped via ``farm_id_param``. ``decision_tree.manage`` is a
+    tenant-scoped capability held only by TenantOwner / TenantAdmin, so
+    there is no farm-scope grant for it to resolve against — adding the
+    parameter would imply an authorization path that does not exist.
+
+    Synchronous by design. A farm is a bounded number of blocks and the
+    author needs the verdict while they still have the tree in front of
+    them; handing back a task id would put the one result that matters
+    behind a poll.
+    """
+    schema = _ensure_tenant(context)
+    assert context.tenant_id is not None  # _ensure_tenant guarantees
+    return await service.run_tree_on_farm(
+        tree_code=code,
+        farm_id=payload.farm_id,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+        tenant_id=context.tenant_id,
+    )
 
 
 # =====================================================================
