@@ -539,10 +539,15 @@ async def _persist_day(
     return indices_written
 
 
+# Result KEPT, deliberately against this module's convention: the task is on
+# the `platform.run_tasks` allowlist, and GET /admin/tasks/runs/{id} reads
+# Celery's AsyncResult. Under `ignore_result=True` nothing is stored, so a
+# triggered run reports PENDING forever even after it succeeds —
+# indistinguishable from one that never started. Do not remove without giving
+# that endpoint another way to observe completion.
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
     name="weather.derive_weather_daily",
     bind=False,
-    ignore_result=True,
 )
 def derive_weather_daily(farm_id: str, tenant_schema: str) -> dict[str, Any]:
     """Recompute today + yesterday `weather_derived_daily` rows for a farm,
@@ -876,10 +881,10 @@ async def _backfill_weather_async(
 # --- weather-index climatology baselines (PR-W3) ---------------------------
 
 
+# Result KEPT — allowlisted for on-demand triggering; see the note above.
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
     name="weather.recompute_baselines_for_tenant",
     bind=False,
-    ignore_result=True,
 )
 def recompute_weather_baselines_for_tenant(tenant_schema: str) -> dict[str, int]:
     """Recompute every (farm, index) climatology baseline in one tenant."""
@@ -1050,10 +1055,10 @@ async def _discover_due_subscriptions_async() -> dict[str, int]:
 _RISK_WINDOW_DAYS = 14
 
 
+# Result KEPT — allowlisted for on-demand triggering; see the note above.
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
     name="weather.compute_risk_for_tenant",
     bind=False,
-    ignore_result=True,
 )
 def compute_weather_risk_for_tenant(tenant_schema: str) -> dict[str, Any]:
     """Score every active crop block in one tenant and upsert weather_risk_daily."""
@@ -1188,10 +1193,10 @@ async def _compute_weather_risk_daily_sweep_async() -> dict[str, int]:
 _SPI_WINDOW_DAYS = 90
 
 
+# Result KEPT — allowlisted for on-demand triggering; see the note above.
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
     name="weather.compute_spi_for_tenant",
     bind=False,
-    ignore_result=True,
 )
 def compute_spi_for_tenant(tenant_schema: str, target_iso: str | None = None) -> dict[str, int]:
     return _run_task(_compute_spi_for_tenant_async(tenant_schema, target_iso))

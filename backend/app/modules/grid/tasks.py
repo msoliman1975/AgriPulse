@@ -268,10 +268,15 @@ async def _open_anomaly_alert(
     return True
 
 
+# Result KEPT, deliberately against this module's convention: the task is on the
+# `platform.run_tasks` allowlist, and GET /admin/tasks/runs/{id} reads Celery's
+# AsyncResult. Under `ignore_result=True` nothing is stored, so a triggered run
+# reports PENDING forever even after it succeeds — indistinguishable from one
+# that never started. Do not remove without giving that endpoint another way to
+# observe completion.
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
     name="grid.detect_anomalies_for_tenant",
     bind=False,
-    ignore_result=True,
 )
 def detect_anomalies_for_tenant(tenant_schema: str) -> dict[str, int]:
     return _run_task(_detect_for_tenant_async(tenant_schema))

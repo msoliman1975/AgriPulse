@@ -27,26 +27,56 @@ def test_names_are_unique() -> None:
     assert len(BY_NAME) == len(TRIGGERABLE)
 
 
-def test_every_triggerable_task_is_a_registered_celery_task() -> None:
-    """A typo'd name would dispatch into a queue nothing consumes and the
-    caller would see an accepted 202 for work that never happens."""
+# Importing each module is what registers its tasks with the Celery app. Done
+# through importlib rather than plain imports so a linter cannot decide the
+# bindings are unused and strip the registration away.
+_TASK_MODULES = (
+    "app.modules.farms.phenology_tasks",
+    "app.modules.grid.tasks",
+    "app.modules.indices.tasks",
+    "app.modules.irrigation.tasks",
+    "app.modules.recommendations.tasks",
+    "app.modules.weather.tasks",
+)
+
+
+def _registered_tasks() -> dict[str, object]:
     import importlib
 
     from celery import current_app
 
-    # Importing each module is what registers its tasks with the Celery app.
-    # Done through importlib rather than plain imports so a linter cannot
-    # decide the bindings are unused and strip the registration away.
-    for module in (
-        "app.modules.farms.phenology_tasks",
-        "app.modules.grid.tasks",
-        "app.modules.indices.tasks",
-        "app.modules.irrigation.tasks",
-        "app.modules.recommendations.tasks",
-        "app.modules.weather.tasks",
-    ):
+    for module in _TASK_MODULES:
         importlib.import_module(module)
+    return dict(current_app.tasks)
 
-    registered = set(current_app.tasks)
+
+def test_every_triggerable_task_is_a_registered_celery_task() -> None:
+    """A typo'd name would dispatch into a queue nothing consumes and the
+    caller would see an accepted 202 for work that never happens."""
+    registered = _registered_tasks()
     missing = sorted(t.name for t in TRIGGERABLE if t.name not in registered)
     assert not missing, f"not registered with Celery: {missing}"
+
+
+def test_every_triggerable_task_stores_its_result() -> None:
+    """Being triggerable is only half of it — the run has to be observable.
+
+    ``GET /admin/tasks/runs/{id}`` reads Celery's ``AsyncResult``. A task
+    carrying ``ignore_result=True`` stores nothing, so that endpoint reports
+    PENDING forever even after the task has succeeded, which is
+    indistinguishable from a task that never started. Measured on production:
+    ``indices.refresh_index_caggs_for_tenant`` succeeded in 0.16 s while the
+    caller polled it as PENDING for 480 s and then gave up.
+
+    Most tasks in this codebase set ``ignore_result=True`` on purpose and
+    should keep it. The allowlisted ones are the exception, and this is what
+    stops the next task added to the allowlist arriving unobservable.
+    """
+    registered = _registered_tasks()
+    unobservable = sorted(
+        t.name for t in TRIGGERABLE if getattr(registered.get(t.name), "ignore_result", False)
+    )
+    assert not unobservable, (
+        "triggerable but the result is never stored, so a run reports PENDING "
+        f"forever: {unobservable}"
+    )
