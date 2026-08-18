@@ -26,6 +26,7 @@ import {
   GRID_FIELDS,
   INDEX_CODES,
   INDICES_KEYS,
+  THERMAL_INDEX_CODES,
   MAX_GROUP_DEPTH,
   SIGNAL_KEYS,
   TERM_OPS,
@@ -689,11 +690,24 @@ function SourceSpecificFields({
           aria-label={t("editor.condition.indexCode")}
         >
           <option value="">—</option>
-          {INDEX_CODES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
+          {/* Grouped, not merged into one flat list: the thermal three come
+              from a different satellite at 100 m, and a rule author picking
+              `lst` next to `ndvi` should see that before they set a
+              threshold. Both groups resolve through the same loader. */}
+          <optgroup label={t("editor.condition.indexGroup.optical")}>
+            {INDEX_CODES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label={t("editor.condition.indexGroup.thermal")}>
+            {THERMAL_INDEX_CODES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </optgroup>
         </select>
         <FieldHint text={hint("indexCode", value.index_code)} />
         <select
@@ -962,6 +976,9 @@ function SourceSpecificFields({
           aria-label={t("editor.condition.indexCode")}
         >
           <option value="">—</option>
+          {/* Optical only, unlike the `indices` source above: grid cells are
+              cut per product and only the optical one has a grid config, so a
+              thermal code here would never resolve to a cell. */}
           {INDEX_CODES.map((c) => (
             <option key={c} value={c}>
               {c}

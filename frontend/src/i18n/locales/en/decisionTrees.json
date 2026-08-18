@@ -338,6 +338,10 @@
       "right": "Threshold",
       "operator": "Operator",
       "indexCode": "Index code",
+      "indexGroup": {
+        "optical": "Spectral (Sentinel-2, 10 m)",
+        "thermal": "Thermal (Landsat, 100 m)"
+      },
       "outOfRange": "Outside the recorded range ({{min}}–{{max}}). This will still save.",
       "unknownParamRef": "This tree doesn't declare a parameter with that name — saving will fail until you add it or pick a declared one.",
       "weatherField": "Weather field",
@@ -387,7 +391,10 @@
           "ndmi": "Leaf and canopy water content. Falls as the canopy dries — the water-stress index.",
           "bsi": "Bare ground between plants. Rises as canopy is lost — reads planting gaps and plant loss rather than greenness.",
           "msi": "Canopy moisture stress, SWIR/NIR. Inverted: higher means drier. Same signal as NDMI on an unbounded scale.",
-          "msavi": "Vigour with the soil background corrected out, the correction adapting to how much canopy is there. Prefer it over SAVI for rules that fire while cover is still partial."
+          "msavi": "Vigour with the soil background corrected out, the correction adapting to how much canopy is there. Prefer it over SAVI for rules that fire while cover is still partial.",
+          "lst": "Land surface temperature in °C — a physical temperature, not a ratio, so thresholds are absolute degrees. Landsat: one pass every 16 days at 100 m, coarser and less frequent than the spectral indices.",
+          "cwsi": "Crop water stress, 0 (freely transpiring) to 1 (stomata closed), from canopy-minus-air temperature. Rises with stress — the opposite direction to the greenness indices. Uncalibrated for local crops, so read it as a relative signal over time.",
+          "smi": "Soil moisture from the temperature-greenness relationship, 0 (dry) to 1 (wet). Needs a spread of greenness across the block; a uniform canopy falls back to a plain temperature reading."
         },
         "indicesKey": {
           "mean": "The block's average on the latest scene. Absolute, so thresholds are crop-specific.",

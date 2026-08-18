@@ -59,6 +59,54 @@ def test_parse_indices_value_ref_unknown_key_raises() -> None:
         parse_value_ref({"source": "indices", "index_code": "ndvi", "key": "median"})
 
 
+def test_a_thermal_index_resolves_like_any_other() -> None:
+    """`lst` / `cwsi` / `smi` are ordinary terms to this evaluator.
+
+    They come from a different product (Landsat, not Sentinel-2), which is why
+    they live in their own list everywhere a picker enumerates indices — but
+    the context is keyed on index_code alone and `block_index_aggregates`
+    stores both products' rows in the same table. So nothing here needed
+    changing when thermal shipped, and the gap was only ever the authoring
+    dropdown. This asserts that, so a whitelist added later fails loudly
+    instead of quietly making every thermal rule unfireable.
+    """
+    ctx = ConditionContext(
+        block_id="00000000-0000-0000-0000-000000000001",
+        indices={
+            "lst": IndicesEntry(
+                time=datetime.now(UTC),
+                mean=Decimal("47.5"),
+                baseline_deviation=Decimal("2.1"),
+            )
+        },
+    )
+    # Degrees Celsius, so the threshold is an absolute temperature.
+    hot = {
+        "op": "gt",
+        "left": {"source": "indices", "index_code": "lst", "key": "mean"},
+        "right": 45,
+    }
+    matched, snapshot = evaluate(hot, ctx)
+    assert matched
+    # The trace records it under the same dotted key as any optical index.
+    assert snapshot["values"]["indices.lst.mean"] == "47.5"
+
+    cool = {
+        "op": "lt",
+        "left": {"source": "indices", "index_code": "lst", "key": "mean"},
+        "right": 45,
+    }
+    assert evaluate(cool, ctx)[0] is False
+
+    # An index the block has no row for fails closed rather than raising.
+    missing = {
+        "op": "gt",
+        "left": {"source": "indices", "index_code": "cwsi", "key": "mean"},
+        "right": 0,
+    }
+    assert evaluate(missing, ctx)[0] is False
+
+
 def test_parse_block_value_ref_rejects_the_crop_identity_fields() -> None:
     # crop_category / crop_path / crop_strain all restate the tree's targeting,
     # which already declares the crop paths it runs on. Rejecting them at parse

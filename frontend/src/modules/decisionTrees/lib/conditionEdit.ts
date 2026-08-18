@@ -27,10 +27,13 @@ export const INDICES_KEYS = [
   "delta",
   "trend_direction",
 ] as const;
-// The canonical imagery index codes (block_index_aggregates / grid
-// aggregates). Closed list so the author picks from a dropdown rather than
-// guessing; mirrors STANDARD_INDEX_CODES in
+// The optical (Sentinel-2) index codes. Closed list so the author picks from
+// a dropdown rather than guessing; mirrors STANDARD_INDEX_CODES in
 // backend/app/modules/indices/computation.py and IndexCode in api/indices.ts.
+//
+// This list alone is what the `grid` source may branch on: grid cells are cut
+// per PRODUCT, and only the optical product has a `grid_configs` row, so a
+// thermal code there is a predicate that can never resolve.
 export const INDEX_CODES = [
   "ndvi",
   "ndwi",
@@ -43,6 +46,18 @@ export const INDEX_CODES = [
   "msi",
   "msavi",
 ] as const;
+// The thermal (Landsat) index codes. Their own list, mirroring
+// THERMAL_INDEX_CODES on both the backend and api/indices.ts, because they
+// come from a different product with a disjoint band set and a much coarser
+// native resolution (100 m vs 10 m).
+//
+// The `indices` source offers these ALONGSIDE the optical list above: it
+// reads `block_index_aggregates` through a loader keyed on index_code alone,
+// which has always returned the latest row per code whatever product wrote
+// it. A thermal term evaluates exactly like an optical one — only this picker
+// was optical-only, which is why lst/cwsi/smi looked unavailable to trees
+// while the rows sat in the table.
+export const THERMAL_INDEX_CODES = ["lst", "cwsi", "smi"] as const;
 export const BLOCK_FIELDS = [
   // KB P3: the block's current phenological stage, resolved from the crop
   // taxonomy and auto-advanced daily.

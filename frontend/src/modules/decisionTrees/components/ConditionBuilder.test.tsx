@@ -295,6 +295,42 @@ describe("<ConditionBuilder>", () => {
     expect(screen.getByText(/Standard deviations from this block/)).toBeInTheDocument();
   });
 
+  it("offers the thermal indices on the indices source, grouped apart", () => {
+    // They were computed, stored per block and charted everywhere except
+    // here, so a rule could never branch on canopy temperature.
+    renderBuilder(NDVI_LT_0);
+    const picker = screen.getByLabelText("Index code");
+    for (const code of ["lst", "cwsi", "smi"]) {
+      expect(within(picker).getByRole("option", { name: code })).toBeInTheDocument();
+    }
+    // Grouped, because they are a coarser satellite: the label is what tells
+    // the author a threshold here is a 100 m reading, not a 10 m one.
+    expect(picker.querySelector('optgroup[label="Thermal (Landsat, 100 m)"]')).not.toBeNull();
+    expect(picker.querySelector('optgroup[label="Spectral (Sentinel-2, 10 m)"]')).not.toBeNull();
+  });
+
+  it("keeps the grid source optical-only", () => {
+    // Grid cells are cut per product and only the optical product has a grid
+    // config, so a thermal code here is a term that can never resolve.
+    renderBuilder({
+      op: "ge",
+      left: { source: "grid", index_code: "ndvi", field: "flagged_count" },
+      right: 5,
+    });
+    const picker = screen.getByLabelText("Index code");
+    expect(within(picker).getByRole("option", { name: "ndvi" })).toBeInTheDocument();
+    expect(within(picker).queryByRole("option", { name: "lst" })).not.toBeInTheDocument();
+  });
+
+  it("explains a thermal index, including that it is degrees not a ratio", () => {
+    renderBuilder({
+      op: "gt",
+      left: { source: "indices", index_code: "lst", key: "mean" },
+      right: 45,
+    });
+    expect(screen.getByText(/Land surface temperature/)).toBeInTheDocument();
+  });
+
   it("explains a weather field, which differs per scope", () => {
     renderBuilder({
       op: "gt",
