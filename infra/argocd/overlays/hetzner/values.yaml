@@ -2304,11 +2304,31 @@ global:
   #   frontend-only roll would ship a button that 404s.
   #   NO MIGRATIONS — the `on_demand` eval-run kind already existed (0062).
   #   Images CONFIRMED by pulling both on the node: api + frontend @ 3113d58.
+  # 0986027 = #519, a cell-scoped tree stops bombarding the Action Center.
+  #   A tree with scope `cell` evaluates once per grid cell and every dedup
+  #   key it hits is per cell, so one finding on a 36-cell block put 36 rows
+  #   on the queue saying the same sentence. Cell output now attaches to a
+  #   GROUP PARENT keyed on (block_id, <tree>:<leaf>:<action>:<severity>);
+  #   the per-cell rows become its members and drop out of every list, and
+  #   acting on the group cascades to all of them. A re-fire against a still
+  #   open item used to write nothing at all — it now moves occurrence_count
+  #   / day_streak / last_seen_at, and `previous_member_count` (rolled once
+  #   per TENANT-day) gives the card a baseline so a group that grew from 12
+  #   cells to 20 stops reading identically to one holding steady.
+  #   TENANT MIGRATION 0079 runs on PreSync. It also BACK-GROUPS the open
+  #   cell-scoped backlog, so the noise already in the queue collapses on
+  #   this deploy; closed/applied/dismissed rows are untouched.
+  #   BACKEND + FRONTEND -> api + workers + frontend promoted together off
+  #   0986027. The frontend reads `aggregation`/`recurrence` and calls
+  #   GET /action-items/{id}/members, none of which exist on 3113d58, and the
+  #   engine that writes the groups runs in workers — a partial promote
+  #   either 404s the drill-down or keeps generating one row per cell.
+  #   Images CONFIRMED by pulling both on the node: api + frontend @ 0986027.
   images:
     api:
-      tag: "3113d58"
+      tag: "0986027"
     workers:
-      tag: "3113d58"
+      tag: "0986027"
     frontend:
       # 5e84dd6 = #515, the thermal indices reach the decision-tree condition
       #   builder. `lst`/`cwsi`/`smi` were computed and stored per block —
@@ -2329,7 +2349,7 @@ global:
       #   carried `scope`; the notice was not reading it.
       #   FRONTEND ONLY; api + workers stay 86faf0b. No migrations.
       #   Image CONFIRMED by pulling it on the node: frontend @ ceaa572.
-      tag: "3113d58"
+      tag: "0986027"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
