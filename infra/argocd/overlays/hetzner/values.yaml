@@ -2287,11 +2287,28 @@ global:
   # GET /admin/tasks/runs/{id} should reach SUCCESS with a result body instead
   # of sitting on PENDING. Results now occupy Redis db 2 under the default
   # 24-hour expiry — only for tasks someone actually triggers.
+  # 3113d58 = #516, run one decision tree on one farm on demand. The tree
+  #   editor could only ever PREVIEW: `:dry-run` walks a tree against one
+  #   block and writes nothing, and the only writing paths were the nightly
+  #   sweep (every tree x every block) or the single-block debug endpoint.
+  #   An author who had just published a rule had to wait for the sweep to
+  #   see it act. Adds POST /decision-trees/{code}:run + a candidate-farms
+  #   picker: it cuts the tree set to one and drives the SAME evaluate_block
+  #   the sweep drives over the farm's active blocks, so the recommendations
+  #   land in the Action Center with the same targeting, dedup, traces, audit
+  #   rows and notifications a sweep produces. Published versions only.
+  #   Gated on decision_tree.manage (it dispatches work to a farm team), not
+  #   the decision_tree.read its neighbours use.
+  #   BACKEND + FRONTEND -> api + workers + frontend promoted together off
+  #   3113d58; the panel calls two routes that do not exist on 6207ee3, so a
+  #   frontend-only roll would ship a button that 404s.
+  #   NO MIGRATIONS — the `on_demand` eval-run kind already existed (0062).
+  #   Images CONFIRMED by pulling both on the node: api + frontend @ 3113d58.
   images:
     api:
-      tag: "6207ee3"
+      tag: "3113d58"
     workers:
-      tag: "6207ee3"
+      tag: "3113d58"
     frontend:
       # 5e84dd6 = #515, the thermal indices reach the decision-tree condition
       #   builder. `lst`/`cwsi`/`smi` were computed and stored per block —
@@ -2312,7 +2329,7 @@ global:
       #   carried `scope`; the notice was not reading it.
       #   FRONTEND ONLY; api + workers stay 86faf0b. No migrations.
       #   Image CONFIRMED by pulling it on the node: frontend @ ceaa572.
-      tag: "5e84dd6"
+      tag: "3113d58"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
