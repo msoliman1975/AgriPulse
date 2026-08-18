@@ -472,7 +472,10 @@ class RecommendationsServiceImpl:
             # single-block on-demand route.
             alerts_opened=0,
             traces_written=totals["traces_written"],
-            outcome="error" if outcomes["error"] else "ok",
+            # 'failed', not 'error' — the run row's CHECK constraint admits
+            # only 'ok' | 'failed' (tenant 0062), and the trace rows are where
+            # the per-tree 'error' status lives.
+            outcome="failed" if outcomes["error"] else "ok",
         )
 
         self._log.info(

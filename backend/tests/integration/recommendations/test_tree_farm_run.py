@@ -283,6 +283,98 @@ async def test_run_records_a_closed_eval_run(admin_session: AsyncSession) -> Non
     assert traces == 2
 
 
+BROKEN_TREE_YAML = """
+code: {code}
+name_en: Broken on purpose
+root: root
+nodes:
+  root:
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndvi
+          key: baseline_deviation
+        right: -0.5
+    on_match: leaf
+    on_miss: leaf
+  leaf:
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.5
+      text_en: fired
+"""
+
+
+@pytest.mark.asyncio
+async def test_a_tree_that_blows_up_closes_the_run_as_failed(
+    admin_session: AsyncSession,
+) -> None:
+    """The error path has to survive contact with the run row.
+
+    ``decision_tree_eval_runs.outcome`` admits only 'ok' | 'failed' (tenant
+    0062). Passing anything else raises a constraint violation while closing
+    the run — turning "one tree errored" into "the whole request 500s", on
+    exactly the run that already had something go wrong. No happy-path test
+    reaches this branch, so it needs a tree that genuinely breaks.
+    """
+    tenant = await _make_tenant(admin_session, "tree-run-broken")
+    farm_id, _ = await _seed_farm(
+        admin_session, tenant.schema_name, code="BRK", block_count=1, deviation=Decimal("-2.0")
+    )
+    code = f"broken_tree_{uuid4().hex[:8]}"
+
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
+        # The authoring service writes the catalog through the *public*
+        # session, so that one needs its own transaction — without begin() the
+        # tree is never committed and the run below cannot see it.
+        async with factory() as public_session, public_session.begin():
+            author = get_decision_trees_author_service(
+                public_session=public_session, tenant_id=tenant.tenant_id
+            )
+            await author.create_tree(
+                code=code,
+                crop_code=None,
+                tree_yaml=BROKEN_TREE_YAML.format(code=code),
+                actor_user_id=None,
+            )
+            await author.publish_version(code=code, version=1, actor_user_id=None)
+
+    # Break it *after* publish: the loader would reject a dangling root at
+    # compile time, which is the point — only a stored tree can reach the
+    # engine's own error branch.
+    await admin_session.execute(
+        text(
+            "UPDATE public.decision_tree_versions v "
+            "   SET tree_compiled = jsonb_set(v.tree_compiled, '{root}', '\"missing_node\"') "
+            "  FROM public.decision_trees t "
+            " WHERE t.id = v.tree_id AND t.code = :code"
+        ),
+        {"code": code},
+    )
+    await admin_session.commit()
+
+    result = await _run(tenant.schema_name, tenant.tenant_id, farm_id=farm_id, tree_code=code)
+
+    assert result["errors"] == 1
+    assert result["recommendations_opened"] == 0
+
+    await admin_session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
+    outcome = (
+        await admin_session.execute(
+            text("SELECT outcome FROM decision_tree_eval_runs WHERE id = :rid").bindparams(
+                bindparam("rid", type_=PG_UUID(as_uuid=True))
+            ),
+            {"rid": result["run_id"]},
+        )
+    ).scalar_one()
+    assert outcome == "failed"
+
+
 @pytest.mark.asyncio
 async def test_run_on_unknown_farm_is_rejected(admin_session: AsyncSession) -> None:
     tenant = await _make_tenant(admin_session, "tree-run-nofarm")
