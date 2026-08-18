@@ -32,6 +32,14 @@ const item = (over: Partial<ActionItem> = {}): ActionItem => ({
   scheduled_date: null,
   why: null,
   reasoning: {},
+  aggregation: { is_group: false, member_count: 0, previous_member_count: 0, trend: "unknown" },
+  recurrence: {
+    state: "new",
+    occurrence_count: 1,
+    day_streak: 1,
+    first_seen_at: null,
+    last_seen_at: null,
+  },
   ...over,
 });
 

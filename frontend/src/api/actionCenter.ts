@@ -15,6 +15,25 @@ export type DueBucket = "overdue" | "today" | "week" | "later" | "monitoring" | 
 export type GroupBy = "none" | "action_type" | "block" | "due";
 export type ItemSeverity = "info" | "warning" | "critical";
 
+/**
+ * How loudly the queue says "this again".
+ *
+ * `new` is the absence of a badge, not a badge. Severity is deliberately NOT
+ * derived from this — the decision tree decided the agronomy, and how long a
+ * supervisor has left an item alone is a different fact that must not be
+ * allowed to rewrite the first.
+ */
+export type RecurrenceState = "new" | "recurring" | "persistent";
+
+/**
+ * Which way an aggregated finding is moving between evaluation days.
+ *
+ * `unknown` is a group with no yesterday to compare against — the first day,
+ * or a backfilled one. It is deliberately not `steady`: claiming stability
+ * nobody has observed is worse than admitting there is no baseline yet.
+ */
+export type SpreadTrend = "unknown" | "steady" | "spreading" | "receding";
+
 /** Named windows the toolbar offers; `custom` is expressed as explicit bounds. */
 export type DateRange = "1d" | "7d" | "30d" | "90d" | "all" | "custom";
 
@@ -29,6 +48,66 @@ export interface CellLocation {
   lat: number | null;
   lon: number | null;
   area_m2: string | null;
+}
+
+/**
+ * How many cells one row stands for.
+ *
+ * `is_group` false with `member_count` 0 is an ordinary block-scoped item —
+ * one place, one finding. `is_group` true means the row aggregates
+ * `member_count` grid cells that all hit the same leaf of the same tree at the
+ * same severity on the same block; the cells themselves are one request away
+ * at `/action-items/{id}/members`.
+ */
+export interface Aggregation {
+  is_group: boolean;
+  member_count: number;
+  /** What the count was at the end of the previous evaluation day. Without a
+   *  baseline the card cannot distinguish a 12-cell finding from a 20-cell
+   *  one — a count with no baseline is not a trend. */
+  previous_member_count: number;
+  trend: SpreadTrend;
+}
+
+/** How long this finding has been true, and whether anyone has moved. */
+export interface Recurrence {
+  state: RecurrenceState;
+  /** Distinct days this item has fired, first day included. */
+  occurrence_count: number;
+  /** Consecutive firing days. 6 means six mornings in a row. */
+  day_streak: number;
+  first_seen_at: string | null;
+  last_seen_at: string | null;
+}
+
+/**
+ * One cell under a group. Never actionable on its own — the group is the unit
+ * a supervisor decides about; this is what the map colours and the drill-down
+ * lists.
+ */
+export interface ActionItemMember {
+  id: string;
+  cell: CellLocation | null;
+  severity: ItemSeverity;
+  native_status: string;
+  text_en: string | null;
+  text_ar: string | null;
+  created_at: string;
+  last_seen_at: string | null;
+  /** Set once this cell stopped firing. Kept, not dropped: a receding
+   *  outbreak and one that never spread look identical otherwise. */
+  cleared_at: string | null;
+  occurrence_count: number;
+  day_streak: number;
+}
+
+export interface ActionItemMembersResponse {
+  item_id: string;
+  kind: ItemKind;
+  total: number;
+  /** Members still firing as of the last evaluation. */
+  active: number;
+  members: ActionItemMember[];
 }
 
 export interface ActionItem {
@@ -70,6 +149,10 @@ export interface ActionItem {
 
   why: string | null;
   reasoning: Record<string, unknown>;
+
+  /** Both always present, so no consumer has to branch on absence. */
+  aggregation: Aggregation;
+  recurrence: Recurrence;
 }
 
 export interface ActionItemGroup {
@@ -78,7 +161,15 @@ export interface ActionItemGroup {
   count: number;
   critical_count: number;
   block_count: number;
+  /** Cells covered, not rows shown: a group of 14 contributes 14. */
   cell_count: number;
+  /** Rows in this group that are themselves aggregates of several cells. */
+  aggregate_count: number;
+  /** Rows firing on consecutive days with nobody acting on them. */
+  recurring_count: number;
+  /** Aggregates covering materially more cells today than yesterday. The count
+   *  to read first — a spreading finding outranks a merely persistent one. */
+  spreading_count: number;
   responsible_membership_id: string | null;
   items: ActionItem[];
 }
@@ -111,6 +202,17 @@ export async function listActionItems(
   params: ListActionItemsParams,
 ): Promise<ActionItemListResponse> {
   const { data } = await apiClient.get<ActionItemListResponse>("/v1/action-items", { params });
+  return data;
+}
+
+export async function listActionItemMembers(
+  farmId: string,
+  itemId: string,
+): Promise<ActionItemMembersResponse> {
+  const { data } = await apiClient.get<ActionItemMembersResponse>(
+    `/v1/action-items/${itemId}/members`,
+    { params: { farm_id: farmId } },
+  );
   return data;
 }
 

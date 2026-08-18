@@ -66,6 +66,33 @@ class InvalidRecommendationTransitionError(APIError):
         )
 
 
+class GroupMemberNotActionableError(APIError):
+    """Caller addressed a per-cell member of a group instead of the group.
+
+    Members are evidence, not work items: they carry a cell's own snapshot so
+    the map can colour it and the drill-down can list it, but the thing a
+    supervisor decides about is the whole group. Acting on one member would
+    leave the group open with a hole in it and the other cells' dedup keys
+    still occupied. The parent's id travels on the error so a client that
+    followed a stale link can retry against the right row rather than guess.
+    """
+
+    def __init__(self, *, recommendation_id: UUID, parent_id: UUID) -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Recommendation is part of a group",
+            detail=(
+                f"Recommendation {recommendation_id} is one cell of an aggregated "
+                f"item. Act on the group ({parent_id}) instead."
+            ),
+            type_=f"{_TYPE_BASE}/group-member-not-actionable",
+            extras={
+                "recommendation_id": str(recommendation_id),
+                "group_parent_id": str(parent_id),
+            },
+        )
+
+
 class DecisionTreeParseError(APIError):
     """A YAML decision tree *shipped with the server* is malformed or
     references unknown fields — a deployment problem, hence 5xx.

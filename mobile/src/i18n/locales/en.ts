@@ -45,6 +45,18 @@ export const en = {
   "visits.empty": "Nothing to walk right now.",
   "visits.loadFailed": "Could not load your visits.",
   "visits.claim": "I'll take it",
+  // One visit can now stand for several grid cells of one block, and it
+  // can have been true for days before anyone walked it. Both change what
+  // a scout does on arrival, so both are on the row rather than buried in
+  // the detail screen.
+  "visits.zones": "{n} zones",
+  "visits.zonesOne": "1 zone",
+  "visits.daysRunning": "{n} days running",
+  // A count with no baseline is not a trend: a scout walking a spreading
+  // outbreak needs to know that before they arrive, not after.
+  "visits.spreading": "spreading",
+  "visits.receding": "receding",
+  "visits.sinceYesterday": "since yesterday",
   "visits.signOut": "Sign out",
   "visits.signingOut": "Signing out…",
   "farms.none": "You are not assigned to a farm yet. Ask your supervisor to add you.",

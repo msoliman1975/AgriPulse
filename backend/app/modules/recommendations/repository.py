@@ -12,7 +12,7 @@ Two sessions:
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID
@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.indices.trends import compute_trend
 from app.modules.recommendations.models import DecisionTree, DecisionTreeVersion
+from app.shared.action_items import REC_SQL
 
 
 def _serialize_jsonb(value: Any) -> str | None:
@@ -698,10 +699,20 @@ class RecommendationsRepository:
         valid_until: datetime | None,
         evaluation_snapshot: dict[str, Any],
         actor_user_id: UUID | None,
+        group_key: str | None = None,
+        group_parent_id: UUID | None = None,
+        is_group: bool = False,
+        today: date | None = None,
     ) -> bool:
         """Open one recommendation. Returns True if a row was inserted,
         False if the partial UNIQUE on (block_id, tree_id) blocked it
-        (an open recommendation already exists)."""
+        (an open recommendation already exists).
+
+        The grouping arguments (0079) decide which row this is: a group parent
+        (`is_group`, no cell), a per-cell child (`group_parent_id` set), or a
+        block-scoped item that is neither. `today` seeds the recurrence clock
+        in the tenant's timezone so the first firing is already day one of its
+        own streak rather than an unset row a later bump has to guess about."""
         # Savepoint so an idempotent conflict (an open rec already exists for
         # this block[/cell] + tree) rolls back just this insert instead of
         # poisoning the surrounding sweep transaction — the cell-scoped sweep
@@ -717,7 +728,9 @@ class RecommendationsRepository:
                         block_crop_id, action_type, severity, parameters, actions,
                         confidence, tree_path, text_en, text_ar,
                         valid_until, evaluation_snapshot, state,
-                        created_by, updated_by
+                        created_by, updated_by,
+                        group_key, group_parent_id, is_group,
+                        first_seen_at, last_seen_at, last_seen_day
                     ) VALUES (
                         :id, :block_id, :cell_id, :farm_id, :tree_id, :tree_code,
                         :tree_version,
@@ -726,7 +739,9 @@ class RecommendationsRepository:
                         :confidence,
                         CAST(:tree_path AS jsonb), :text_en, :text_ar,
                         :valid_until, CAST(:snapshot AS jsonb), 'open',
-                        :actor, :actor
+                        :actor, :actor,
+                        :group_key, :group_parent_id, :is_group,
+                        now(), now(), CAST(:today AS date)
                     )
                     """
                 ).bindparams(
@@ -737,6 +752,7 @@ class RecommendationsRepository:
                     bindparam("tree_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("block_crop_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                    bindparam("group_parent_id", type_=PG_UUID(as_uuid=True)),
                 ),
                 {
                     "id": recommendation_id,
@@ -758,6 +774,10 @@ class RecommendationsRepository:
                     "valid_until": valid_until,
                     "snapshot": _serialize_jsonb(evaluation_snapshot),
                     "actor": actor_user_id,
+                    "group_key": group_key,
+                    "group_parent_id": group_parent_id,
+                    "is_group": is_group,
+                    "today": today,
                 },
             )
             await savepoint.commit()
@@ -769,11 +789,298 @@ class RecommendationsRepository:
             if (
                 "uq_recommendations_block_tree_open" in msg
                 or "uq_recommendations_cell_tree_open" in msg
+                or "uq_recommendations_group_open" in msg
             ):
                 return False
             raise
         await self._tenant.flush()
         return True
+
+    # ---- Grouping + recurrence (tenant migration 0079) ------------------
+
+    async def tenant_today(self, *, tenant_schema: str) -> date:
+        """Today in the tenant's own timezone.
+
+        The day boundary decides whether a firing extends a streak or starts a
+        new one, so a UTC day would mis-slice every tenant that is not on UTC —
+        an evening sweep in Cairo would count as tomorrow, splitting a run of
+        consecutive days into two runs of one.
+        """
+        row = await self._public.execute(
+            text(
+                "SELECT (now() AT TIME ZONE default_timezone)::date "
+                "FROM public.tenants WHERE schema_name = :s"
+            ),
+            {"s": tenant_schema},
+        )
+        return cast(date, row.scalar_one_or_none() or datetime.now(UTC).date())
+
+    async def find_open_group_parent(self, *, block_id: UUID, group_key: str) -> UUID | None:
+        return (
+            await self._tenant.execute(
+                text(
+                    "SELECT id FROM recommendations "
+                    " WHERE block_id = :b AND group_key = :k AND is_group = TRUE "
+                    "   AND state = 'open' AND deleted_at IS NULL"
+                ).bindparams(bindparam("b", type_=PG_UUID(as_uuid=True))),
+                {"b": block_id, "k": group_key},
+            )
+        ).scalar_one_or_none()
+
+    async def find_open_recommendation(
+        self, *, block_id: UUID, tree_id: UUID, cell_id: UUID | None
+    ) -> UUID | None:
+        """The row the open-state dedup index just refused to duplicate.
+
+        Two indexes can block the insert and they key on different things, so
+        the lookup has to mirror whichever one applies rather than guessing.
+        """
+        clause = "cell_id = :c" if cell_id is not None else "cell_id IS NULL AND is_group = FALSE"
+        binds = [
+            bindparam("b", type_=PG_UUID(as_uuid=True)),
+            bindparam("t", type_=PG_UUID(as_uuid=True)),
+        ]
+        params: dict[str, Any] = {"b": block_id, "t": tree_id}
+        if cell_id is not None:
+            # Declared only when the clause above actually mentions it.
+            # `bindparams()` raises ArgumentError for any parameter the
+            # statement does not name, so binding `c` unconditionally turns the
+            # block-scoped branch — the common one — into a hard 500.
+            binds.append(bindparam("c", type_=PG_UUID(as_uuid=True)))
+            params["c"] = cell_id
+        return (
+            await self._tenant.execute(
+                text(
+                    "SELECT id FROM recommendations "  # noqa: S608
+                    " WHERE block_id = :b AND tree_id = :t AND state = 'open' "
+                    "   AND deleted_at IS NULL AND " + clause
+                ).bindparams(*binds),
+                params,
+            )
+        ).scalar_one_or_none()
+
+    async def bump_recurrence(
+        self, *, row_id: UUID, today: date, actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        """Count one more firing of a row that already exists."""
+        row = (
+            (
+                await self._tenant.execute(
+                    text(REC_SQL.bump).bindparams(
+                        bindparam("id", type_=PG_UUID(as_uuid=True)),
+                        bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {"id": row_id, "today": today, "actor": actor_user_id},
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return dict(row) if row is not None else {}
+
+    async def attach_child(
+        self,
+        *,
+        child_id: UUID,
+        parent_id: UUID,
+        group_key: str,
+        tree_version: int,
+        text_en: str,
+        text_ar: str | None,
+        evaluation_snapshot: dict[str, Any],
+        today: date,
+        actor_user_id: UUID | None,
+    ) -> None:
+        """Re-point an already-open per-cell row at its group and refresh it.
+
+        A cell that fires again is the same finding with newer evidence, so the
+        snapshot and the text are overwritten rather than left at whatever the
+        first firing saw — the drill-down would otherwise show last week's
+        numbers under this morning's card. `cleared_at` is reset because the
+        cell is firing again, which is exactly what un-clears it.
+        """
+        await self._tenant.execute(
+            text(
+                """
+                UPDATE recommendations
+                   SET group_parent_id = :parent, group_key = :key,
+                       tree_version = :version,
+                       text_en = :text_en, text_ar = :text_ar,
+                       evaluation_snapshot = CAST(:snapshot AS jsonb),
+                       cleared_at = NULL,
+                       updated_at = now(), updated_by = :actor
+                 WHERE id = :id
+                """
+            ).bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True)),
+                bindparam("parent", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {
+                "id": child_id,
+                "parent": parent_id,
+                "key": group_key,
+                "version": tree_version,
+                "text_en": text_en,
+                "text_ar": text_ar,
+                "snapshot": _serialize_jsonb(evaluation_snapshot),
+                "actor": actor_user_id,
+            },
+        )
+        await self.bump_recurrence(row_id=child_id, today=today, actor_user_id=actor_user_id)
+
+    async def refresh_member_count(self, *, parent_id: UUID, today: date) -> int:
+        """Recount one group and roll its day-over-day baseline."""
+        return (
+            await self._tenant.execute(
+                text(REC_SQL.refresh_member_count).bindparams(
+                    bindparam("parent_id", type_=PG_UUID(as_uuid=True))
+                ),
+                {"parent_id": parent_id, "today": today},
+            )
+        ).scalar_one_or_none() or 0
+
+    async def clear_stale_children(
+        self, *, block_id: UUID, tree_id: UUID, fired_ids: list[UUID]
+    ) -> tuple[UUID, ...]:
+        """Mark this tree's cells that did NOT fire in the pass just finished.
+
+        Runs once per (block, tree) after the whole cell sweep, including when
+        the tree fired nowhere — that zero case is the one a per-firing loop
+        cannot see, and it is what makes a group's count decay honestly instead
+        of freezing at its high-water mark.
+        """
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(REC_SQL.clear_stale_children("tree_id = :tree_id")).bindparams(
+                        bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                        bindparam("tree_id", type_=PG_UUID(as_uuid=True)),
+                        bindparam("fired", type_=postgresql.ARRAY(PG_UUID(as_uuid=True))),
+                    ),
+                    {"block_id": block_id, "tree_id": tree_id, "fired": fired_ids},
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return tuple(r for r in rows if r is not None)
+
+    async def refresh_member_counts_for_tree(
+        self, *, block_id: UUID, tree_id: UUID, today: date
+    ) -> None:
+        """Recount every group this tree owns on this block."""
+        await self._tenant.execute(
+            text(REC_SQL.refresh_member_counts_scoped("p.tree_id = :tree_id")).bindparams(
+                bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                bindparam("tree_id", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"block_id": block_id, "tree_id": tree_id, "today": today},
+        )
+
+    async def open_group_parent_ids(self, *, block_id: UUID, tree_id: UUID) -> tuple[UUID, ...]:
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(REC_SQL.open_parent_ids("tree_id = :tree_id")).bindparams(
+                        bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                        bindparam("tree_id", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {"block_id": block_id, "tree_id": tree_id},
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return tuple(rows)
+
+    async def list_group_members(self, *, parent_id: UUID) -> tuple[dict[str, Any], ...]:
+        """The per-cell rows behind one group card, cleared ones included.
+
+        Cleared members travel with a `cleared_at` rather than being dropped:
+        "this corner stopped three days ago" is the shape of a problem
+        receding, and hiding it would make a shrinking outbreak look identical
+        to one that never spread.
+        """
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        """
+                        SELECT r.id, r.cell_id, r.severity, r.state,
+                               r.text_en, r.text_ar,
+                               r.created_at, r.last_seen_at, r.cleared_at,
+                               r.occurrence_count, r.day_streak,
+                               gc.row_idx, gc.col_idx, gc.area_m2,
+                               ST_Y(gc.centroid::geometry) AS lat,
+                               ST_X(gc.centroid::geometry) AS lon
+                          FROM recommendations r
+                          LEFT JOIN grid_cells gc ON gc.id = r.cell_id
+                         WHERE r.group_parent_id = :p AND r.deleted_at IS NULL
+                         ORDER BY r.cleared_at NULLS FIRST, gc.row_idx, gc.col_idx
+                        """
+                    ).bindparams(bindparam("p", type_=PG_UUID(as_uuid=True))),
+                    {"p": parent_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def cascade_children(
+        self,
+        *,
+        parent_id: UUID,
+        new_state: str,
+        actor_user_id: UUID | None,
+        dismissal_reason: str | None = None,
+        deferred_until: datetime | None = None,
+        outcome_notes: str | None = None,
+    ) -> tuple[UUID, ...]:
+        """Carry a parent's transition down to every open child, in one write.
+
+        The group is the actionable unit, so a child left `open` under an
+        applied parent would keep its cell's dedup key occupied and quietly
+        block the next real firing there.
+        """
+        sets = [
+            "state = :state",
+            "updated_at = now()",
+            "updated_by = :actor",
+            "dismissal_reason = :reason",
+            "deferred_until = :deferred",
+            "outcome_notes = :notes",
+        ]
+        if new_state == "applied":
+            sets += ["applied_at = now()", "applied_by = :actor"]
+        elif new_state == "dismissed":
+            sets += ["dismissed_at = now()", "dismissed_by = :actor"]
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        f"UPDATE recommendations SET {', '.join(sets)} "  # noqa: S608
+                        " WHERE group_parent_id = :p AND state = 'open' AND deleted_at IS NULL"
+                        " RETURNING id"
+                    ).bindparams(
+                        bindparam("p", type_=PG_UUID(as_uuid=True)),
+                        bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {
+                        "p": parent_id,
+                        "state": new_state,
+                        "actor": actor_user_id,
+                        "reason": dismissal_reason,
+                        "deferred": deferred_until,
+                        "notes": outcome_notes,
+                    },
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return tuple(rows)
 
     async def get_recommendation(self, *, recommendation_id: UUID) -> dict[str, Any] | None:
         row = (
@@ -792,6 +1099,9 @@ class RecommendationsRepository:
                            valid_until, state, applied_at, applied_by,
                            dismissed_at, dismissed_by, dismissal_reason,
                            deferred_until, outcome_notes, evaluation_snapshot,
+                           group_key, group_parent_id, is_group, member_count,
+                           occurrence_count, day_streak, first_seen_at,
+                           last_seen_at, last_seen_day, cleared_at,
                            created_at, updated_at
                     FROM recommendations
                     WHERE id = :id AND deleted_at IS NULL
@@ -814,7 +1124,11 @@ class RecommendationsRepository:
         action_type_filter: tuple[str, ...] = (),
         limit: int = 100,
     ) -> tuple[dict[str, Any], ...]:
-        clauses = ["deleted_at IS NULL"]
+        # Per-cell members of a group are excluded: the group parent is the row
+        # that represents them, and listing both would put the same finding on
+        # the screen thirteen times — the defect this whole mechanism removes.
+        # `list_group_members` is how a caller asks for the cells behind one.
+        clauses = ["deleted_at IS NULL", "group_parent_id IS NULL"]
         params: dict[str, Any] = {"limit": limit}
         if farm_id is not None:
             clauses.append("farm_id = :farm_id")
@@ -843,6 +1157,9 @@ class RecommendationsRepository:
             "       valid_until, state, applied_at, applied_by, "
             "       dismissed_at, dismissed_by, dismissal_reason, "
             "       deferred_until, outcome_notes, "
+            "       group_key, group_parent_id, is_group, member_count, "
+            "       occurrence_count, day_streak, first_seen_at, "
+            "       last_seen_at, last_seen_day, cleared_at, "
             "       created_at, updated_at "
             "FROM recommendations "
             "WHERE " + where_sql + " "

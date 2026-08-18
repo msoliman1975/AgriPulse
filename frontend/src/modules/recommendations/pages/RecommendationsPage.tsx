@@ -104,6 +104,15 @@ export function RecommendationsPage(): ReactNode {
                 {t("row.zone", { zone: cellLabel(rec.cell_row, rec.cell_col) })}
               </Pill>
             ) : null}
+            {/* A group has no single zone label to show — it stands for
+                several. Without this the row looks block-scoped, which is a
+                different thing entirely. */}
+            {rec.is_group ? (
+              <Pill kind="info">{t("row.zones", { count: rec.member_count })}</Pill>
+            ) : null}
+            {rec.day_streak > 1 ? (
+              <Pill kind="warn">{t("row.recurring", { count: rec.day_streak })}</Pill>
+            ) : null}
           </>
         )}
         meta={(rec) => (

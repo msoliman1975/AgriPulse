@@ -22,6 +22,19 @@ export interface Alert {
   prescription_ar: string | null;
   prescription_activity_id: string | null;
   signal_snapshot: Record<string, unknown> | null;
+  /**
+   * Aggregation + recurrence (tenant migration 0079).
+   *
+   * A cell-scoped tree that fires on many cells of one block produces ONE row
+   * here — the group — standing for `member_count` cells; the members are
+   * never listed. `day_streak` is how many consecutive days it has fired.
+   */
+  is_group: boolean;
+  member_count: number;
+  occurrence_count: number;
+  day_streak: number;
+  first_seen_at: string | null;
+  last_seen_at: string | null;
   created_at: string;
   updated_at: string;
   acknowledged_at: string | null;

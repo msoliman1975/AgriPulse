@@ -381,6 +381,19 @@ export function ActionCenterPage(): ReactNode {
                   {group.critical_count > 0
                     ? ` · ${t("group.critical", { count: group.critical_count })}`
                     : ""}
+                  {/* Rows vs cells: `count` is what is on screen, `cell_count`
+                      is what is in the field. They diverge as soon as anything
+                      aggregates, and the header has to say both or it looks
+                      like the farm got quieter. */}
+                  {group.aggregate_count > 0
+                    ? ` · ${t("group.aggregated", { count: group.aggregate_count })}`
+                    : ""}
+                  {group.recurring_count > 0
+                    ? ` · ${t("group.recurring", { count: group.recurring_count })}`
+                    : ""}
+                  {group.spreading_count > 0
+                    ? ` · ${t("group.spreading", { count: group.spreading_count })}`
+                    : ""}
                 </span>
                 {groupBy === "block" ? (
                   <Pill kind={group.responsible_membership_id === null ? "warn" : "ok"}>

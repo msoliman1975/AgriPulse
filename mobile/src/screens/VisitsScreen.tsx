@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { claimVisit, listMyWork, listVisits, type Visit, type WorkItem } from "@/api/client";
 import { signOut } from "@/auth/session";
-import { dueIn, t, type Lang } from "@/i18n";
+import { dueIn, t, tCount, type Lang } from "@/i18n";
 import { WorkDetailScreen } from "@/screens/WorkDetailScreen";
 import { resetLangOnSignOut } from "@/i18n/preference";
 import { releaseDevice } from "@/push/register";
@@ -64,6 +64,35 @@ function VisitRow({
         {visit.instruction ? <div className="instruction">{visit.instruction}</div> : null}
         <div className="meta">
           <span className={`origin origin-${visit.origin}`}>{visit.origin}</span>
+          {/* One visit, several zones. Without this the scout walks to a block
+              knowing only that "something" fired, and has no idea whether they
+              are checking one corner or half the field. */}
+          {visit.source.is_group && visit.source.member_count > 0 ? (
+            <span className="zones">
+              {visit.source.member_count === 1
+                ? t(lang, "visits.zonesOne")
+                : tCount(lang, "visits.zones", visit.source.member_count)}
+            </span>
+          ) : null}
+          {/* Direction, when there is a yesterday to compare against. Nine
+              zones holding steady and nine zones up from four are different
+              walks. */}
+          {visit.source.trend === "spreading" || visit.source.trend === "receding" ? (
+            <span className={`trend trend-${visit.source.trend}`}>
+              {visit.source.trend === "spreading"
+                ? `▲ ${t(lang, "visits.spreading")}`
+                : `▼ ${t(lang, "visits.receding")}`}
+            </span>
+          ) : null}
+          {/* How long it has been true. A six-day-old problem presented as this
+              morning's news is how a scout learns to distrust the queue. */}
+          {visit.source.day_streak > 1 ? (
+            <span className="streak">
+              {visit.source.day_streak === 2
+                ? t(lang, "visits.sinceYesterday")
+                : tCount(lang, "visits.daysRunning", visit.source.day_streak)}
+            </span>
+          ) : null}
         </div>
       </div>
       {onClaim ? (

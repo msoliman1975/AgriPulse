@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from time import perf_counter
 from typing import Any, Protocol
@@ -43,6 +43,7 @@ from app.modules.recommendations.errors import (
     BlockNotInFarmError,
     DecisionTreeNotRunnableError,
     FarmNotFoundError,
+    GroupMemberNotActionableError,
     InvalidRecommendationTransitionError,
     RecommendationNotFoundError,
 )
@@ -58,6 +59,7 @@ from app.modules.weather.snapshot import load_index_snapshot as load_weather_ind
 from app.modules.weather.snapshot import load_risk_snapshot as load_weather_risk_snapshot
 from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
 from app.modules.weather.snapshot import load_water_balance_snapshot
+from app.shared.action_items import build_group_key
 from app.shared.conditions import ConditionContext
 from app.shared.crop_taxonomy import path_matches
 from app.shared.db.ids import uuid7
@@ -250,9 +252,65 @@ class RecommendationsServiceImpl:
         self._repo = RecommendationsRepository(
             tenant_session=tenant_session, public_session=public_session
         )
+        # The engine writes into `alerts` as well as `recommendations` (a leaf
+        # picks which), so the grouping bookkeeping has to reach both tables.
+        # Imported lazily inside the method that opens an alert; held here for
+        # the sweep-level clear/recount, which runs whether or not this block
+        # happened to raise an alert.
+        from app.modules.alerts.repository import AlertsRepository
+
+        self._alert_repo = AlertsRepository(
+            tenant_session=tenant_session, public_session=public_session
+        )
         self._audit = audit_service or get_audit_service()
         self._bus = event_bus or get_default_bus()
         self._log = get_logger(__name__)
+        # Resolved once per service instance. A sweep walks thousands of
+        # (block, cell, tree) triples and the tenant's calendar day does not
+        # move under it; re-reading public.tenants for each would be one
+        # cross-schema round trip per evaluation to learn the same date.
+        self._today_cache: date | None = None
+
+    async def _today(self, tenant_schema: str) -> date:
+        """Today in the tenant's timezone — the boundary streaks are cut on."""
+        if self._today_cache is None:
+            self._today_cache = await self._repo.tenant_today(tenant_schema=tenant_schema)
+        return self._today_cache
+
+    async def _ensure_rec_group_parent(
+        self,
+        *,
+        block_id: UUID,
+        group_key: str,
+        today: date,
+        actor_user_id: UUID | None,
+        insert: Any,
+    ) -> tuple[UUID | None, bool]:
+        """The single row a block's firing cells aggregate into.
+
+        Returns ``(parent_id, created)``. Every cell of the block calls this,
+        so the bump inside it runs many times per pass — harmless by
+        construction, because the counters move on a change of calendar day and
+        not on a call.
+        """
+        existing = await self._repo.find_open_group_parent(block_id=block_id, group_key=group_key)
+        if existing is not None:
+            await self._repo.bump_recurrence(
+                row_id=existing, today=today, actor_user_id=actor_user_id
+            )
+            return existing, False
+
+        parent_id = uuid7()
+        if await insert(row_id=parent_id, row_cell_id=None, is_group=True, parent_id=None):
+            return parent_id, True
+
+        # Another cell of this same block created the group between the read
+        # and the write. The unique index is what makes that safe; the loser
+        # simply joins the winner rather than opening a second card.
+        found = await self._repo.find_open_group_parent(block_id=block_id, group_key=group_key)
+        if found is not None:
+            await self._repo.bump_recurrence(row_id=found, today=today, actor_user_id=actor_user_id)
+        return found, False
 
     @property
     def repo(self) -> RecommendationsRepository:
@@ -339,23 +397,25 @@ class RecommendationsServiceImpl:
         # Block-scoped path.
         for tree in block_trees:
             overrides = param_overrides_per_tree.get(tree["tree_id"], {})
-            if (
-                await self._evaluate_and_record(
-                    tree=tree,
-                    eval_ctx=ctx,
-                    overrides=overrides,
-                    block_id=block_id,
-                    cell_id=None,
-                    farm_id=farm_id,
-                    block_crop_id=block_crop_id,
-                    crop_path=crop_path,
-                    actor_user_id=actor_user_id,
-                    tenant_schema=tenant_schema,
-                    trace=trace,
-                    tally=tally,
-                )
-                is not None
-            ):
+            outcome = await self._evaluate_and_record(
+                tree=tree,
+                eval_ctx=ctx,
+                overrides=overrides,
+                block_id=block_id,
+                cell_id=None,
+                farm_id=farm_id,
+                block_crop_id=block_crop_id,
+                crop_path=crop_path,
+                actor_user_id=actor_user_id,
+                tenant_schema=tenant_schema,
+                trace=trace,
+                tally=tally,
+            )
+            # A re-fire into a still-open item now returns a result instead of
+            # None, because something WAS written — its recurrence counters.
+            # Counting that as an opening would inflate every sweep's headline
+            # number with work nobody has to look at.
+            if outcome is not None and outcome.get("opened"):
                 recommendations_opened += 1
         return await self._record_cell_scoped(
             setup=setup,
@@ -654,6 +714,10 @@ class RecommendationsServiceImpl:
         tally: dict[str, int] | None = None,
     ) -> dict[str, int]:
         """Run the cell-scoped trees and emit their digest notifications."""
+        # Cached on the service, so this is a dict lookup after the first call
+        # in a sweep. Needed here as well as in the per-firing path because the
+        # end-of-sweep recount rolls the day-over-day baseline.
+        today = await self._today(tenant_schema)
         farm_id = setup.farm_id
         block_crop_id = setup.block_crop_id
         crop_path = setup.crop_path
@@ -663,9 +727,20 @@ class RecommendationsServiceImpl:
         # Cell-scoped path (PR-C3): one evaluation per grid cell, with the
         # cell's own imagery means swapped into an otherwise block-level
         # context. Empty when the block has no grid, so cell trees no-op there.
-        # Per (cell-scoped tree) tally of opened recommendations, so we can emit
-        # one digest notification per (tree, block) instead of one per cell.
-        cell_rec_digest: dict[UUID, dict[str, Any]] = {}
+        #
+        # Every firing cell now attaches to a group parent (0079) instead of
+        # standing on the board in its own right. Two things therefore have to
+        # be tracked across the whole sweep rather than per cell:
+        #
+        #   `fired_members` — which child rows fired this pass, per tree, so
+        #   the ones that did NOT can be marked cleared afterwards. That
+        #   bookkeeping cannot happen inside the loop: the interesting case is
+        #   a cell the loop never reaches because the tree went quiet there.
+        #
+        #   `new_groups`    — the parents this pass created, so each can be
+        #   announced exactly once with its final member count.
+        fired_members: dict[UUID, list[UUID]] = {t["tree_id"]: [] for t in cell_trees}
+        new_groups: dict[UUID, dict[str, Any]] = {}
         if cell_trees:
             cell_aggs = await self._repo.get_latest_cell_aggregates(block_id=block_id)
             for cid, cell_means in cell_aggs.items():
@@ -688,32 +763,52 @@ class RecommendationsServiceImpl:
                     )
                     if opened is None:
                         continue
+                    if opened.get("member_id") is not None:
+                        fired_members[tree["tree_id"]].append(opened["member_id"])
+                    if not opened.get("opened"):
+                        # The cell fired into a group that already existed. Real
+                        # work — it kept the group alive and refreshed this
+                        # cell — but nothing new was opened, so it must not be
+                        # counted as an opening or announced as one.
+                        continue
                     recommendations_opened += 1
                     if opened["kind"] == "recommendation":
-                        # First opened rec per tree is the digest's representative
-                        # (notification links to it); track count + worst severity.
-                        agg = cell_rec_digest.setdefault(
-                            tree["tree_id"],
-                            {"tree": tree, "count": 0, "first": opened},
-                        )
-                        agg["count"] += 1
-                        if _SEVERITY_RANK.get(opened["severity"], 0) > _SEVERITY_RANK.get(
-                            agg["first"]["severity"], 0
-                        ):
-                            agg["first"] = {**agg["first"], "severity": opened["severity"]}
+                        new_groups[opened["item_id"]] = {"tree": tree, "info": opened}
 
-        # One aggregated notification per cell-scoped tree that opened ≥1 rec on
-        # this block: publish a single synthetic *block-level* (cell_id=None)
-        # RecommendationOpenedV1 with digest text. The notifications module
-        # suppresses the per-cell events and fans this out through the normal
-        # rec pipeline — one "N zones flagged" notification instead of N.
-        for agg in cell_rec_digest.values():
+            # Cells that stopped firing, and the recount that follows. Run per
+            # tree rather than per firing so a tree that fired nowhere today
+            # still retires yesterday's members — the case a loop over results
+            # cannot see at all.
+            for tree in cell_trees:
+                await self._repo.clear_stale_children(
+                    block_id=block_id,
+                    tree_id=tree["tree_id"],
+                    fired_ids=fired_members[tree["tree_id"]],
+                )
+                await self._repo.refresh_member_counts_for_tree(
+                    block_id=block_id, tree_id=tree["tree_id"], today=today
+                )
+                await self._alert_repo.clear_stale_children(
+                    block_id=block_id,
+                    tree_code=tree["tree_code"],
+                    fired_ids=fired_members[tree["tree_id"]],
+                )
+                await self._alert_repo.refresh_member_counts_for_tree(
+                    block_id=block_id, tree_code=tree["tree_code"], today=today
+                )
+
+        # One notification per group opened on this block. The group parent is
+        # already block-level (cell_id=None) and already carries the count, so
+        # this is no longer a synthetic digest standing in for N per-cell
+        # events — it is the one event the one row deserves, published here
+        # rather than at insert time because the member count is only final now.
+        for parent_id, agg in new_groups.items():
             tree = agg["tree"]
-            first = agg["first"]
-            count = agg["count"]
+            first = agg["info"]
+            count = await self._repo.refresh_member_count(parent_id=parent_id, today=today) or 1
             self._bus.publish(
                 RecommendationOpenedV1(
-                    recommendation_id=first["recommendation_id"],
+                    recommendation_id=parent_id,
                     block_id=block_id,
                     cell_id=None,
                     farm_id=farm_id,
@@ -725,13 +820,21 @@ class RecommendationsServiceImpl:
                     confidence=Decimal("1.0"),
                     created_at=datetime.now(UTC),
                     tenant_schema=tenant_schema,
+                    # Lead with what the tree concluded, not with the
+                    # aggregation. "12 zones flagged" tells a supervisor how
+                    # much, never what — and what is the part they act on.
                     text_en=(
-                        f"{count} zones flagged in this block — "
-                        "review per-zone recommendations on the map."
+                        first["text_en"]
+                        if count <= 1
+                        else f"{first['text_en']} — {count} zones affected in this block."
                     ),
                     text_ar=(
-                        f"تم وضع علامة على {count} منطقة في هذا الحقل — "
-                        "راجع التوصيات لكل منطقة على الخريطة."
+                        first.get("text_ar")
+                        if count <= 1
+                        else (
+                            f"{first.get('text_ar') or first['text_en']} — "
+                            f"{count} منطقة متأثرة في هذا الحقل."
+                        )
                     ),
                     zone_count=count,
                 )
@@ -831,7 +934,7 @@ class RecommendationsServiceImpl:
             "trees": trees,
         }
 
-    async def _evaluate_and_record(
+    async def _evaluate_and_record(  # noqa: PLR0911 - one return per outcome kind
         self,
         *,
         tree: dict[str, Any],
@@ -914,6 +1017,16 @@ class RecommendationsServiceImpl:
             "leaf_node_id": result.path[-1].node_id if result.path else None,
         }
 
+        # The aggregation identity of this finding (0079). Cell-scoped output
+        # collapses onto it; block-scoped output uses it only as a label.
+        group_key = build_group_key(
+            tree_code=tree["tree_code"],
+            leaf_node_id=leaf_outcome["leaf_node_id"],
+            action_type=result.outcome.action_type,
+            severity=result.outcome.severity,
+        )
+        today = await self._today(tenant_schema)
+
         # PR-E: dispatch on leaf kind. "alert" leaves write to tenant.alerts;
         # "recommendation" leaves take the path below.
         if result.outcome.kind == "alert":
@@ -923,69 +1036,83 @@ class RecommendationsServiceImpl:
                 farm_id=farm_id,
                 tree=tree,
                 result=result,
+                group_key=group_key,
+                today=today,
                 actor_user_id=actor_user_id,
                 tenant_schema=tenant_schema,
             )
-            if opened is None:
-                # The tree still fired — an open alert for this (block, rule)
-                # already existed and deduped it away. Recording this as
-                # anything but `fired` would misattribute the silence to the
-                # conditions rather than to the dedup.
+            if opened["item_id"] is None:
                 _trace("fired", outcome={**leaf_outcome, "deduped": True})
                 return None
-            _trace("fired", outcome=leaf_outcome, alert_id=opened)
+            # `deduped` still means "this firing opened nothing new". It is no
+            # longer the same as "nothing was written": the existing item's
+            # recurrence counters just moved, which is the whole point.
+            _trace(
+                "fired",
+                outcome=leaf_outcome if opened["created"] else {**leaf_outcome, "deduped": True},
+                alert_id=opened["item_id"],
+            )
             return {
                 "kind": "alert",
+                "opened": opened["created"],
+                "item_id": opened["item_id"],
+                "member_id": opened["member_id"],
                 # Was the literal string "alert" — a placeholder from when the
                 # alert row had nowhere to keep the leaf's verb. It does now.
                 "action_type": result.outcome.action_type,
                 "severity": result.outcome.severity,
             }
 
-        recommendation_id = uuid7()
-        valid_until: datetime | None = None
-        if result.outcome.valid_for_hours is not None:
-            valid_until = datetime.now(UTC) + timedelta(hours=result.outcome.valid_for_hours)
-
-        # Snapshot the block's crop path (+ cell id when cell-scoped) alongside
-        # the evaluated signals so the recommendation stays self-describing.
-        snapshot: dict[str, Any] = {**result.evaluation_snapshot, "crop_path": crop_path}
-        if cell_id is not None:
-            snapshot["cell_id"] = str(cell_id)
-
-        inserted = await self._repo.insert_recommendation(
-            recommendation_id=recommendation_id,
+        written = await self._persist_recommendation(
+            tree=tree,
+            result=result,
             block_id=block_id,
             cell_id=cell_id,
             farm_id=farm_id,
-            tree_id=tree["tree_id"],
-            tree_code=tree["tree_code"],
-            tree_version=tree["version"],
             block_crop_id=block_crop_id,
-            action_type=result.outcome.action_type,
-            severity=result.outcome.severity,
-            parameters=result.outcome.parameters,
-            actions=result.outcome.actions,
-            confidence=result.outcome.confidence,
-            tree_path=_serialize_path(result.path),
-            text_en=result.outcome.text_en,
-            text_ar=result.outcome.text_ar,
-            valid_until=valid_until,
-            evaluation_snapshot=snapshot,
+            crop_path=crop_path,
+            group_key=group_key,
+            today=today,
             actor_user_id=actor_user_id,
         )
-        if not inserted:
-            # An open recommendation for (block[/cell], tree) already exists.
-            # Same reasoning as the alert dedup above: the tree fired, the
-            # idempotency index absorbed it.
+        if written is None:
+            # Lost a race and the winner has since been closed. There is
+            # nothing to attribute this firing to, and inventing a row would
+            # duplicate whatever closed it; tomorrow's sweep opens it cleanly.
             _trace("fired", outcome={**leaf_outcome, "deduped": True})
             return None
-        _trace("fired", outcome=leaf_outcome, recommendation_id=recommendation_id)
+        recommendation_id = written["item_id"]
+        member_id = written["member_id"]
+        created = written["created"]
+
+        _trace(
+            "fired",
+            outcome=leaf_outcome if created else {**leaf_outcome, "deduped": True},
+            recommendation_id=recommendation_id,
+        )
+        if not created:
+            # Nothing new to announce. The notification went out when the item
+            # opened and the scouting visit it raised is still on somebody's
+            # phone; re-publishing would put a second card there for a finding
+            # they are already looking at.
+            return {
+                "kind": "recommendation",
+                "opened": False,
+                "item_id": recommendation_id,
+                "member_id": member_id,
+                "recommendation_id": recommendation_id,
+                "action_type": result.outcome.action_type,
+                "severity": result.outcome.severity,
+                "text_en": result.outcome.text_en,
+                "text_ar": result.outcome.text_ar,
+            }
 
         await self._repo.insert_history(
             recommendation_id=recommendation_id,
             block_id=block_id,
-            cell_id=cell_id,
+            # The row this history belongs to is the group parent, and a parent
+            # spans cells rather than sitting in one.
+            cell_id=None,
             farm_id=farm_id,
             from_state=None,
             to_state="open",
@@ -1013,34 +1140,175 @@ class RecommendationsServiceImpl:
                 "severity": result.outcome.severity,
             },
         )
-        self._bus.publish(
-            RecommendationOpenedV1(
-                recommendation_id=recommendation_id,
-                block_id=block_id,
-                cell_id=cell_id,
-                farm_id=farm_id,
-                tree_id=tree["tree_id"],
-                tree_code=tree["tree_code"],
-                tree_version=tree["version"],
-                action_type=result.outcome.action_type,
-                severity=result.outcome.severity,
-                confidence=result.outcome.confidence,
-                created_at=datetime.now(UTC),
-                tenant_schema=tenant_schema,
-                text_en=result.outcome.text_en,
-                text_ar=result.outcome.text_ar,
-                parameters=result.outcome.parameters,
-                evaluation_snapshot=result.evaluation_snapshot,
+        if cell_id is None:
+            self._bus.publish(
+                RecommendationOpenedV1(
+                    recommendation_id=recommendation_id,
+                    block_id=block_id,
+                    cell_id=None,
+                    farm_id=farm_id,
+                    tree_id=tree["tree_id"],
+                    tree_code=tree["tree_code"],
+                    tree_version=tree["version"],
+                    action_type=result.outcome.action_type,
+                    severity=result.outcome.severity,
+                    confidence=result.outcome.confidence,
+                    created_at=datetime.now(UTC),
+                    tenant_schema=tenant_schema,
+                    text_en=result.outcome.text_en,
+                    text_ar=result.outcome.text_ar,
+                    parameters=result.outcome.parameters,
+                    evaluation_snapshot=result.evaluation_snapshot,
+                )
             )
-        )
+        # A cell-scoped group announces itself once, at the end of the block's
+        # sweep, when its member count is final — see _record_cell_scoped.
+        # Publishing here would tell the farm "1 zone" about a group that is
+        # about to have fourteen.
         return {
             "kind": "recommendation",
+            "opened": True,
+            "item_id": recommendation_id,
+            "member_id": member_id,
             "recommendation_id": recommendation_id,
             "action_type": result.outcome.action_type,
             "severity": result.outcome.severity,
             "text_en": result.outcome.text_en,
             "text_ar": result.outcome.text_ar,
         }
+
+    async def _persist_recommendation(
+        self,
+        *,
+        tree: dict[str, Any],
+        result: Any,
+        block_id: UUID,
+        cell_id: UUID | None,
+        farm_id: UUID,
+        block_crop_id: UUID | None,
+        crop_path: str | None,
+        group_key: str,
+        today: date,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any] | None:
+        """Write the rows one firing of a recommendation leaf implies.
+
+        Returns ``{item_id, member_id, created}``:
+
+        * ``item_id``  — the row a supervisor acts on. The group parent for a
+          cell-scoped tree, the recommendation itself for a block-scoped one.
+        * ``member_id`` — this cell's own row, or None when block-scoped.
+        * ``created``  — False when the firing landed in something that was
+          already open. That is a recurrence, not silence: the counters moved.
+
+        None means a race left nothing to attach to — rare, and deliberately
+        not papered over with a fresh row that would duplicate whatever the
+        winner became.
+        """
+        valid_until: datetime | None = None
+        if result.outcome.valid_for_hours is not None:
+            valid_until = datetime.now(UTC) + timedelta(hours=result.outcome.valid_for_hours)
+
+        # Snapshot the block's crop path (+ cell id when cell-scoped) alongside
+        # the evaluated signals so the recommendation stays self-describing.
+        snapshot: dict[str, Any] = {**result.evaluation_snapshot, "crop_path": crop_path}
+        if cell_id is not None:
+            snapshot["cell_id"] = str(cell_id)
+
+        async def _insert(
+            *,
+            row_id: UUID,
+            row_cell_id: UUID | None,
+            is_group: bool,
+            parent_id: UUID | None,
+        ) -> bool:
+            return await self._repo.insert_recommendation(
+                recommendation_id=row_id,
+                block_id=block_id,
+                cell_id=row_cell_id,
+                farm_id=farm_id,
+                tree_id=tree["tree_id"],
+                tree_code=tree["tree_code"],
+                tree_version=tree["version"],
+                block_crop_id=block_crop_id,
+                action_type=result.outcome.action_type,
+                severity=result.outcome.severity,
+                parameters=result.outcome.parameters,
+                actions=result.outcome.actions,
+                confidence=result.outcome.confidence,
+                tree_path=_serialize_path(result.path),
+                text_en=result.outcome.text_en,
+                text_ar=result.outcome.text_ar,
+                valid_until=valid_until,
+                evaluation_snapshot=snapshot,
+                actor_user_id=actor_user_id,
+                group_key=group_key,
+                group_parent_id=parent_id,
+                is_group=is_group,
+                today=today,
+            )
+
+        member_id: UUID | None = None
+        if cell_id is None:
+            # Block-scoped: the item is already its own unit, so there is no
+            # parent to make. A refused insert is the recurrence case — the
+            # same finding, still open, true again today.
+            recommendation_id = uuid7()
+            created = await _insert(
+                row_id=recommendation_id, row_cell_id=None, is_group=False, parent_id=None
+            )
+            if not created:
+                existing = await self._repo.find_open_recommendation(
+                    block_id=block_id, tree_id=tree["tree_id"], cell_id=None
+                )
+                if existing is None:
+                    # Lost the race and the winner has since been closed.
+                    # Reported as None so the caller records the firing without
+                    # inventing a row that would duplicate whatever closed it.
+                    return None
+                recommendation_id = existing
+                await self._repo.bump_recurrence(
+                    row_id=recommendation_id, today=today, actor_user_id=actor_user_id
+                )
+        else:
+            # Cell-scoped: the parent is what the queue shows and what anybody
+            # acts on. This cell becomes one of its members and is never listed
+            # in its own right.
+            parent_id, created = await self._ensure_rec_group_parent(
+                block_id=block_id,
+                group_key=group_key,
+                today=today,
+                actor_user_id=actor_user_id,
+                insert=_insert,
+            )
+            if parent_id is None:
+                return None
+            recommendation_id = parent_id
+            member_id = uuid7()
+            if not await _insert(
+                row_id=member_id, row_cell_id=cell_id, is_group=False, parent_id=parent_id
+            ):
+                # This cell already had an open row — from before the group
+                # existed, or from yesterday. Re-point it at the parent and
+                # refresh its evidence rather than leaving an orphan the queue
+                # can no longer reach.
+                member_id = await self._repo.find_open_recommendation(
+                    block_id=block_id, tree_id=tree["tree_id"], cell_id=cell_id
+                )
+                if member_id is not None:
+                    await self._repo.attach_child(
+                        child_id=member_id,
+                        parent_id=parent_id,
+                        group_key=group_key,
+                        tree_version=tree["version"],
+                        text_en=result.outcome.text_en,
+                        text_ar=result.outcome.text_ar,
+                        evaluation_snapshot=snapshot,
+                        today=today,
+                        actor_user_id=actor_user_id,
+                    )
+
+        return {"item_id": recommendation_id, "member_id": member_id, "created": created}
 
     async def _open_alert_from_tree(
         self,
@@ -1050,23 +1318,28 @@ class RecommendationsServiceImpl:
         farm_id: UUID,
         tree: dict[str, Any],
         result: Any,
+        group_key: str,
+        today: date,
         actor_user_id: UUID | None,
         tenant_schema: str,
-    ) -> UUID | None:
-        """Open an alert produced by a tree-leaf with ``kind: alert``.
+    ) -> dict[str, Any]:
+        """Open (or re-fire) an alert produced by a tree-leaf with ``kind: alert``.
 
-        PR-E: trees can now emit alerts as well as recommendations.
-        We synthesise a ``rule_code`` of the form
-        ``f"tree:{tree_code}:{leaf_node_id}"`` so the existing
-        ``alerts`` partial-UNIQUE on ``(block_id, rule_code)`` keeps
-        dedup semantics intact across re-evaluations. PR-F retires
-        rule-sourced alerts entirely, at which point all rows in
-        ``tenant.alerts`` carry tree-shaped rule_codes.
+        The ``rule_code`` is synthesised as ``tree:<tree_code>:<leaf_node_id>``
+        — the shape the Action Center splits provenance out of, and the shape
+        the partial UNIQUE on ``(block_id, rule_code)`` dedups on.
 
-        Returns the new alert's id iff a row was newly inserted, else None
-        (the partial UNIQUE blocked a duplicate while a prior alert is still
-        open/acknowledged/snoozed). The id is what lets an evaluation trace
-        link to the alert it produced.
+        Cell-scoped output no longer smuggles the cell id into the *listed*
+        row's rule_code. The group parent holds the plain rule_code and is what
+        the queue shows; the per-cell children keep the ``:cell:<uuid>`` suffix,
+        which is what still gives each cell its own idempotency without putting
+        each cell on the board.
+
+        Returns ``{item_id, member_id, created}``. ``item_id`` is the row a
+        supervisor acts on — the parent for a cell-scoped tree, the alert itself
+        otherwise — and is None only when a race left nothing to attach to.
+        ``created`` is False when this firing landed in an item that already
+        existed, which is a recurrence and not silence.
         """
         from app.modules.alerts.events import AlertOpenedV1
         from app.modules.alerts.repository import AlertsRepository
@@ -1074,32 +1347,115 @@ class RecommendationsServiceImpl:
         outcome = result.outcome
         leaf_node_id = outcome.leaf_node_id or "leaf"
         rule_code = f"tree:{tree['tree_code']}:{leaf_node_id}"
-        # Cell-scoped alerts embed the cell id so the existing
-        # (block_id, rule_code) dedup keeps each cell's alert distinct (PR-C3).
-        if cell_id is not None:
-            rule_code = f"{rule_code}:cell:{cell_id}"
-        alert_id = uuid7()
         alert_repo = AlertsRepository(tenant_session=self._tenant, public_session=self._public)
-        inserted = await alert_repo.insert_alert(
-            alert_id=alert_id,
-            block_id=block_id,
-            cell_id=cell_id,
-            rule_code=rule_code,
-            severity=outcome.severity,
-            # The leaf picked a verb even on the alert branch; 0063 gave the
-            # alert row somewhere to keep it so the Action Center can group
-            # alerts by task type alongside recommendations.
-            action_type=outcome.action_type,
-            diagnosis_en=outcome.text_en,
-            diagnosis_ar=outcome.text_ar,
-            prescription_en=None,
-            prescription_ar=None,
-            prescription_activity_id=None,
-            signal_snapshot=result.evaluation_snapshot,
-            actor_user_id=actor_user_id,
-        )
-        if not inserted:
-            return None
+
+        async def _insert(
+            *,
+            row_id: UUID,
+            row_cell_id: UUID | None,
+            row_rule_code: str,
+            is_group: bool,
+            parent_id: UUID | None,
+        ) -> bool:
+            return await alert_repo.insert_alert(
+                alert_id=row_id,
+                block_id=block_id,
+                cell_id=row_cell_id,
+                rule_code=row_rule_code,
+                severity=outcome.severity,
+                # The leaf picked a verb even on the alert branch; 0063 gave the
+                # alert row somewhere to keep it so the Action Center can group
+                # alerts by task type alongside recommendations.
+                action_type=outcome.action_type,
+                diagnosis_en=outcome.text_en,
+                diagnosis_ar=outcome.text_ar,
+                prescription_en=None,
+                prescription_ar=None,
+                prescription_activity_id=None,
+                signal_snapshot=result.evaluation_snapshot,
+                actor_user_id=actor_user_id,
+                group_key=group_key,
+                group_parent_id=parent_id,
+                is_group=is_group,
+                today=today,
+            )
+
+        member_id: UUID | None = None
+        alert_id: UUID | None = None
+        if cell_id is None:
+            fresh_id = uuid7()
+            created = await _insert(
+                row_id=fresh_id,
+                row_cell_id=None,
+                row_rule_code=rule_code,
+                is_group=False,
+                parent_id=None,
+            )
+            alert_id = fresh_id if created else None
+            if not created:
+                alert_id = await alert_repo.find_open_alert(block_id=block_id, rule_code=rule_code)
+                if alert_id is None:
+                    return {"item_id": None, "member_id": None, "created": False}
+                await alert_repo.bump_recurrence(
+                    row_id=alert_id, today=today, actor_user_id=actor_user_id
+                )
+        else:
+            alert_id = await alert_repo.find_open_group_parent(
+                block_id=block_id, group_key=group_key
+            )
+            created = False
+            if alert_id is not None:
+                await alert_repo.bump_recurrence(
+                    row_id=alert_id, today=today, actor_user_id=actor_user_id
+                )
+            else:
+                candidate = uuid7()
+                created = await _insert(
+                    row_id=candidate,
+                    row_cell_id=None,
+                    row_rule_code=rule_code,
+                    is_group=True,
+                    parent_id=None,
+                )
+                if created:
+                    alert_id = candidate
+                else:
+                    # Another cell of this block opened the group first.
+                    alert_id = await alert_repo.find_open_group_parent(
+                        block_id=block_id, group_key=group_key
+                    )
+                    if alert_id is None:
+                        return {"item_id": None, "member_id": None, "created": False}
+                    await alert_repo.bump_recurrence(
+                        row_id=alert_id, today=today, actor_user_id=actor_user_id
+                    )
+
+            child_rule = f"{rule_code}:cell:{cell_id}"
+            member_id = uuid7()
+            if not await _insert(
+                row_id=member_id,
+                row_cell_id=cell_id,
+                row_rule_code=child_rule,
+                is_group=False,
+                parent_id=alert_id,
+            ):
+                member_id = await alert_repo.find_open_alert(
+                    block_id=block_id, rule_code=child_rule
+                )
+                if member_id is not None:
+                    await alert_repo.attach_child(
+                        child_id=member_id,
+                        parent_id=alert_id,
+                        group_key=group_key,
+                        diagnosis_en=outcome.text_en,
+                        diagnosis_ar=outcome.text_ar,
+                        signal_snapshot=result.evaluation_snapshot,
+                        today=today,
+                        actor_user_id=actor_user_id,
+                    )
+
+        if not created:
+            return {"item_id": alert_id, "member_id": member_id, "created": False}
 
         await self._audit.record(
             tenant_schema=tenant_schema,
@@ -1111,20 +1467,24 @@ class RecommendationsServiceImpl:
             farm_id=farm_id,
             details={
                 "block_id": str(block_id),
-                "cell_id": str(cell_id) if cell_id else None,
+                # The parent spans cells; the cell that happened to open it is
+                # recorded on its own child row, not here.
+                "cell_id": None,
                 "rule_code": rule_code,
                 "severity": outcome.severity,
                 "action_type": outcome.action_type,
                 "tree_code": tree["tree_code"],
                 "tree_version": tree["version"],
                 "leaf_node_id": leaf_node_id,
+                "group_key": group_key,
+                "is_group": cell_id is not None,
             },
         )
         self._bus.publish(
             AlertOpenedV1(
                 alert_id=alert_id,
                 block_id=block_id,
-                cell_id=cell_id,
+                cell_id=None,
                 rule_code=rule_code,
                 severity=outcome.severity,
                 created_at=datetime.now(UTC),
@@ -1137,7 +1497,7 @@ class RecommendationsServiceImpl:
                 signal_snapshot=result.evaluation_snapshot,
             )
         )
-        return alert_id
+        return {"item_id": alert_id, "member_id": member_id, "created": True}
 
     # ---- Tree parameter overrides (tenant) ----------------------------
 
@@ -1307,6 +1667,14 @@ class RecommendationsServiceImpl:
         before = await self._repo.get_recommendation(recommendation_id=recommendation_id)
         if before is None:
             raise RecommendationNotFoundError(recommendation_id)
+        if before.get("group_parent_id") is not None:
+            # A member is one cell's evidence under a group, not a decision
+            # anyone makes on its own. Applying it alone would leave the group
+            # open with a hole in it, and the caller is almost certainly acting
+            # on a stale id — so name the parent instead of half-obeying.
+            raise GroupMemberNotActionableError(
+                recommendation_id=recommendation_id, parent_id=before["group_parent_id"]
+            )
         current = before["state"]
 
         if action == "apply":
@@ -1336,6 +1704,19 @@ class RecommendationsServiceImpl:
             deferred_until=deferred_until,
             outcome_notes=outcome_notes,
         )
+        # The group is what was acted on, so its cells move with it. Leaving a
+        # member open under an applied parent would keep that cell's dedup key
+        # occupied and swallow the next genuine firing there.
+        cascaded: tuple[UUID, ...] = ()
+        if before.get("is_group"):
+            cascaded = await self._repo.cascade_children(
+                parent_id=recommendation_id,
+                new_state=new_state,
+                actor_user_id=actor_user_id,
+                dismissal_reason=dismissal_reason,
+                deferred_until=deferred_until,
+                outcome_notes=outcome_notes,
+            )
         after = await self._repo.get_recommendation(recommendation_id=recommendation_id)
         if after is None:
             raise RecommendationNotFoundError(recommendation_id)
@@ -1353,6 +1734,7 @@ class RecommendationsServiceImpl:
                 "dismissal_reason": dismissal_reason,
                 "deferred_until": deferred_until.isoformat() if deferred_until else None,
                 "outcome_notes": outcome_notes,
+                "cascaded_members": len(cascaded),
             },
         )
         await self._audit.record(

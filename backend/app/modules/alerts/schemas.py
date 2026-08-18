@@ -46,6 +46,16 @@ class AlertResponse(BaseModel):
     resolved_at: datetime | None
     resolved_by: UUID | None
     snoozed_until: datetime | None
+    # Aggregation + recurrence (0079). Mirrors RecommendationResponse field for
+    # field: the Action Center reads both tables through one union, so a field
+    # present on one side and not the other becomes a NULL literal in that
+    # query and then a silent asymmetry in the UI.
+    is_group: bool = False
+    member_count: int = 0
+    occurrence_count: int = 1
+    day_streak: int = 1
+    first_seen_at: datetime | None = None
+    last_seen_at: datetime | None = None
 
 
 class AlertTransitionRequest(BaseModel):

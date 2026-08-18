@@ -2,8 +2,9 @@
 
 Mounted under /api/v1 by the app factory:
 
-  GET  /action-items            — unified, filtered, grouped queue
-  POST /action-items:dispatch   — assign items to a member as board activities
+  GET  /action-items                  — unified, filtered, grouped queue
+  GET  /action-items/{id}/members     — the cells behind one aggregated item
+  POST /action-items:dispatch         — assign items to a member as board activities
 
 RBAC: reads need BOTH ``recommendation.read`` and ``alert.read`` — the response
 mixes the two, so holding one capability must not leak the other's rows. A
@@ -25,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import APIError
 from app.modules.action_center.schemas import (
     ActionItemListResponse,
+    ActionItemMembersResponse,
     DispatchRequest,
     DispatchResponse,
 )
@@ -126,6 +128,40 @@ async def list_action_items(
         group_by=group_by,
         limit=limit,
     )
+
+
+@router.get(
+    "/action-items/{item_id}/members",
+    response_model=ActionItemMembersResponse,
+    summary="The per-cell rows behind one aggregated action item.",
+)
+async def list_action_item_members(
+    item_id: UUID,
+    farm_id: UUID,
+    context: RequestContext = Depends(get_current_context),
+    service: ActionCenterServiceImpl = Depends(_service),
+) -> ActionItemMembersResponse:
+    """Drill-down for a group card.
+
+    Both capabilities are required, as on the list: the parent's kind is not
+    known until it is read, so checking only one of them would let a caller
+    holding `alert.read` enumerate the cells of a recommendation by id.
+    """
+    _ensure_tenant(context)
+    if not has_capability(context, "recommendation.read", farm_id=farm_id) or not has_capability(
+        context, "alert.read", farm_id=farm_id
+    ):
+        raise _forbidden("Reading an item's cells needs both recommendation.read and alert.read.")
+
+    members = await service.list_members(farm_id=farm_id, item_id=item_id)
+    if members is None:
+        raise APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Action item not found",
+            detail=f"No action item {item_id} on farm {farm_id}.",
+            type_="https://agripulse.cloud/problems/action-item-not-found",
+        )
+    return members
 
 
 @router.post(

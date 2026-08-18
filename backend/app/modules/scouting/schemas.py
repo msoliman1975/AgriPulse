@@ -8,6 +8,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.shared.action_items import SpreadTrend
+
 Origin = Literal["recommendation", "alert", "routine", "ad_hoc", "self_initiated"]
 Status = Literal[
     "queued", "assigned", "accepted", "in_progress", "completed", "declined", "cancelled", "expired"
@@ -16,6 +18,37 @@ Outcome = Literal["resolved", "inconclusive", "blocked"]
 Severity = Literal["info", "warning", "critical"]
 Priority = Literal["low", "medium", "high"]
 Mode = Literal["triage", "auto"]
+
+
+class VisitSource(BaseModel):
+    """What the item that raised this visit has become since.
+
+    A visit is written once; the finding behind it goes on being re-evaluated
+    every morning. Two facts change after the visit exists and both change what
+    a scout should do when they arrive:
+
+    * how many grid cells the finding now covers (`member_count` on a group),
+      so one visit can honestly say "check these nine zones";
+    * how long it has been true (`day_streak`), so a scout is not told a
+      six-day-old problem is this morning's news.
+
+    Read live off the source row rather than snapshotted into
+    `reason_snapshot`, because a snapshot of a moving number is a stale number.
+    Every field is None for a visit with no decision-engine source — routine,
+    ad-hoc and self-initiated visits have nothing to read.
+    """
+
+    is_group: bool = False
+    member_count: int = 0
+    previous_member_count: int = 0
+    # Whether the finding covered more ground today than yesterday. A scout
+    # walking a spreading outbreak needs to know that before they arrive; a
+    # bare count cannot tell them.
+    trend: SpreadTrend = "unknown"
+    occurrence_count: int = 1
+    day_streak: int = 1
+    first_seen_at: datetime | None = None
+    last_seen_at: datetime | None = None
 
 
 class ScoutingVisitResponse(BaseModel):
@@ -58,6 +91,7 @@ class ScoutingVisitResponse(BaseModel):
     summary_note: str | None = None
     created_at: datetime
     updated_at: datetime
+    source: VisitSource = Field(default_factory=VisitSource)
 
 
 class VisitDispatchRequest(BaseModel):

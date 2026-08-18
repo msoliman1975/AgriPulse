@@ -14,6 +14,12 @@ The two tables are not symmetric and the query has to bridge that:
   columns; an alert's provenance is encoded in ``rule_code`` as
   ``tree:<code>:<leaf>`` and is split out here.
 * cell geometry lives in ``grid_cells``; both tables carry only ``cell_id``.
+
+Since tenant migration 0079 both tables also carry a group parent and its
+per-cell members. Only parents and ungrouped items are listed here: a member is
+one cell's evidence under a finding the parent already states, and listing both
+would put the same sentence on the screen once per cell — the noise the
+grouping exists to remove. `list_members` is how the drill-down asks for them.
 """
 
 from __future__ import annotations
@@ -101,9 +107,16 @@ items AS (
         r.actions                     AS actions,
         r.tree_path                   AS reasoning_path,
         NULL::jsonb                   AS signal_snapshot,
-        NULL::text                    AS rule_code
+        NULL::text                    AS rule_code,
+        r.is_group                    AS is_group,
+        r.member_count                AS member_count,
+        r.previous_member_count       AS previous_member_count,
+        r.occurrence_count            AS occurrence_count,
+        r.day_streak                  AS day_streak,
+        r.first_seen_at               AS first_seen_at,
+        r.last_seen_at                AS last_seen_at
     FROM recommendations r
-    WHERE r.deleted_at IS NULL
+    WHERE r.deleted_at IS NULL AND r.group_parent_id IS NULL
     UNION ALL
     SELECT
         a.id                          AS id,
@@ -129,10 +142,17 @@ items AS (
         '{}'::jsonb                   AS actions,
         NULL::jsonb                   AS reasoning_path,
         a.signal_snapshot             AS signal_snapshot,
-        a.rule_code                   AS rule_code
+        a.rule_code                   AS rule_code,
+        a.is_group                    AS is_group,
+        a.member_count                AS member_count,
+        a.previous_member_count       AS previous_member_count,
+        a.occurrence_count            AS occurrence_count,
+        a.day_streak                  AS day_streak,
+        a.first_seen_at               AS first_seen_at,
+        a.last_seen_at                AS last_seen_at
     FROM alerts a
     JOIN blocks b ON b.id = a.block_id
-    WHERE a.deleted_at IS NULL
+    WHERE a.deleted_at IS NULL AND a.group_parent_id IS NULL
 )
 SELECT
     i.*,
@@ -238,6 +258,64 @@ class ActionCenterRepository:
             .one_or_none()
         )
         return dict(row) if row is not None else None
+
+    # One statement per table rather than a UNION: the caller has already
+    # resolved which kind the parent is (it came off a listed row), so unioning
+    # would read the other table for nothing on every drill-down.
+    _MEMBERS = {
+        "recommendation": """
+            SELECT r.id, r.cell_id, r.severity, r.state AS native_status,
+                   r.text_en, r.text_ar, r.created_at, r.last_seen_at,
+                   r.cleared_at, r.occurrence_count, r.day_streak,
+                   gc.row_idx, gc.col_idx, gc.area_m2,
+                   ST_Y(gc.centroid::geometry) AS lat,
+                   ST_X(gc.centroid::geometry) AS lon,
+                   ROW_NUMBER() OVER (ORDER BY gc.row_idx, gc.col_idx) AS ordinal,
+                   COUNT(*) OVER () AS total
+              FROM recommendations r
+              LEFT JOIN grid_cells gc ON gc.id = r.cell_id
+             WHERE r.group_parent_id = :parent_id AND r.deleted_at IS NULL
+             ORDER BY (r.cleared_at IS NOT NULL), gc.row_idx, gc.col_idx
+        """,
+        "alert": """
+            SELECT a.id, a.cell_id, a.severity, a.status AS native_status,
+                   a.diagnosis_en AS text_en, a.diagnosis_ar AS text_ar,
+                   a.created_at, a.last_seen_at,
+                   a.cleared_at, a.occurrence_count, a.day_streak,
+                   gc.row_idx, gc.col_idx, gc.area_m2,
+                   ST_Y(gc.centroid::geometry) AS lat,
+                   ST_X(gc.centroid::geometry) AS lon,
+                   ROW_NUMBER() OVER (ORDER BY gc.row_idx, gc.col_idx) AS ordinal,
+                   COUNT(*) OVER () AS total
+              FROM alerts a
+              LEFT JOIN grid_cells gc ON gc.id = a.cell_id
+             WHERE a.group_parent_id = :parent_id AND a.deleted_at IS NULL
+             ORDER BY (a.cleared_at IS NOT NULL), gc.row_idx, gc.col_idx
+        """,
+    }
+
+    async def list_members(self, *, kind: str, parent_id: UUID) -> tuple[dict[str, Any], ...]:
+        """The per-cell rows behind one group card.
+
+        Cleared members are returned too, sorted after the live ones and
+        carrying their `cleared_at`. A shrinking outbreak and one that never
+        spread look identical if the cells that have gone quiet are simply
+        dropped.
+        """
+        sql = self._MEMBERS.get(kind)
+        if sql is None:
+            return ()
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(sql).bindparams(bindparam("parent_id", type_=PG_UUID(as_uuid=True))),
+                    {"parent_id": parent_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
 
     async def membership_subject(self, *, membership_id: UUID) -> UUID | None:
         """The Keycloak subject behind a membership.

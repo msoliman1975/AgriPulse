@@ -1250,6 +1250,9 @@ async def _select_ops_alerts(
         FROM alerts a
         JOIN blocks b ON b.id = a.block_id AND b.deleted_at IS NULL
         WHERE b.farm_id = :farm_id
+          -- A grouped alert is one finding; its per-cell members would repeat
+          -- the same sentence down the page.
+          AND a.group_parent_id IS NULL
           AND (
               (a.created_at >= :since AND a.created_at <= :until)
               OR (a.resolved_at >= :since AND a.resolved_at <= :until)
@@ -1277,6 +1280,7 @@ async def _select_ops_recommendations(
         FROM recommendations r
         JOIN blocks b ON b.id = r.block_id AND b.deleted_at IS NULL
         WHERE r.farm_id = :farm_id
+          AND r.group_parent_id IS NULL
           AND r.created_at >= :since AND r.created_at <= :until
         ORDER BY r.created_at DESC
         """

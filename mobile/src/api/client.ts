@@ -55,6 +55,33 @@ export type VisitOrigin =
   | "ad_hoc"
   | "self_initiated";
 
+/**
+ * What the item that raised a visit has become since.
+ *
+ * A visit is written once; the finding behind it is re-evaluated every
+ * morning. `member_count` is how many grid cells it now covers — one visit for
+ * nine zones instead of nine visits — and `day_streak` is how long it has been
+ * true. Read live by the API rather than snapshotted, because a snapshot of a
+ * moving number is a stale number.
+ *
+ * Defaults (`is_group` false, one occurrence) for a visit with no
+ * decision-engine source: routine, ad-hoc and self-initiated ones.
+ */
+/** Which way the finding is moving between evaluation days. `unknown` means
+ *  there is no yesterday to compare against — deliberately not `steady`. */
+export type SpreadTrend = "unknown" | "steady" | "spreading" | "receding";
+
+export interface VisitSource {
+  is_group: boolean;
+  member_count: number;
+  previous_member_count: number;
+  trend: SpreadTrend;
+  occurrence_count: number;
+  day_streak: number;
+  first_seen_at: string | null;
+  last_seen_at: string | null;
+}
+
 export interface Visit {
   id: string;
   farm_id: string;
@@ -68,6 +95,7 @@ export interface Visit {
   due_by: string | null;
   status: string;
   assigned_to: string | null;
+  source: VisitSource;
 }
 
 /** One item of work, whatever surface assigned it. Mirrors WorkItemResponse. */

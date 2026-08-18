@@ -222,6 +222,10 @@ async def get_blocks_summary(
                     JOIN blocks b ON b.id = a.block_id
                     WHERE b.farm_id = :farm_id
                       AND a.status = 'open'
+                      -- Findings, not rows. A grouped alert is one finding
+                      -- stored as a parent plus one child per cell; counting
+                      -- both would badge a 12-cell outbreak as 13 alerts.
+                      AND a.group_parent_id IS NULL
                     GROUP BY a.block_id
                     """
                 ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),

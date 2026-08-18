@@ -7,6 +7,7 @@ import type { ActionItem } from "@/api/actionCenter";
 import { Button } from "@/components/Button";
 import { LinkButton } from "@/components/LinkButton";
 import { Pill } from "@/components/Pill";
+import { GroupMembers } from "@/modules/actionCenter/components/GroupMembers";
 import {
   cellOrdinal,
   confidencePercent,
@@ -25,6 +26,23 @@ const SEV_PILL: Record<string, "info" | "warn" | "crit"> = {
   info: "info",
   warning: "warn",
   critical: "crit",
+};
+// Recurrence is loud but never red-for-agronomy: `persistent` means nobody has
+// acted for days, which is a queue problem, not a worse diagnosis. Keeping it
+// off the severity palette is why it uses `warn` rather than `crit`.
+const RECURRENCE_PILL: Record<string, "warn" | "crit"> = {
+  recurring: "warn",
+  persistent: "crit",
+};
+// A spreading finding is worse news than a steady one and better news than
+// nothing — but it is still not a severity, so it borrows the recurrence
+// palette rather than the severity rail. `receding` is genuinely good news and
+// is the only place a green pill appears on this row.
+const TREND_PILL: Record<string, "info" | "warn" | "ok"> = {
+  unknown: "info",
+  steady: "info",
+  spreading: "warn",
+  receding: "ok",
 };
 
 interface Props {
@@ -57,6 +75,18 @@ export function ItemRow({
   const confidence = confidencePercent(item.confidence);
   const ordinal = item.cell === null ? null : cellOrdinal(item.cell);
   const detail = itemDetail(item, isAr);
+  const { is_group: isGroup, member_count: memberCount, trend } = item.aggregation;
+  const recurrence = item.recurrence;
+  // "12 zones" alone cannot say whether this is getting worse. When there is a
+  // baseline to compare against, the pill carries the direction and the number
+  // it moved from; when there is not, it stays a plain count rather than
+  // implying a stability nobody has measured.
+  const zonesKey =
+    trend === "spreading"
+      ? "aggregate.zonesSpreading"
+      : trend === "receding"
+        ? "aggregate.zonesReceding"
+        : "aggregate.zones";
 
   const ago = (iso: string): string =>
     formatDistanceToNow(parseISO(iso), { addSuffix: true, locale: dateLocale });
@@ -81,6 +111,22 @@ export function ItemRow({
           </Pill>
           <span className="text-card-title font-semibold">{itemTitle(item, isAr)}</span>
           <Pill kind={SEV_PILL[item.severity] ?? "neutral"}>{t(`severity.${item.severity}`)}</Pill>
+          {/* What makes this row different from a single finding: it stands for
+              N cells that all hit the same leaf at the same severity. Shown
+              next to the severity because the two are read together. */}
+          {isGroup ? (
+            <Pill kind={TREND_PILL[trend] ?? "info"}>
+              {t(zonesKey, {
+                count: memberCount,
+                previous: item.aggregation.previous_member_count,
+              })}
+            </Pill>
+          ) : null}
+          {recurrence.state === "new" ? null : (
+            <Pill kind={RECURRENCE_PILL[recurrence.state] ?? "warn"}>
+              {t(`recurrence.${recurrence.state}`, { count: recurrence.day_streak })}
+            </Pill>
+          )}
           <Pill kind="neutral">
             {item.action_type === null
               ? t("action.unclassified")
@@ -93,7 +139,14 @@ export function ItemRow({
             code it used to show is an index into a grid config and means
             nothing to someone standing in the field. */}
         <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
-          {coords === null ? (
+          {isGroup ? (
+            // A group has no single coordinate to lead with, so it leads with
+            // its extent instead. "Whole block" would be a lie — the finding is
+            // in some of the block's cells, not all of it.
+            <span className="text-ap-muted">
+              {t("aggregate.acrossBlock", { count: memberCount, block: item.block_code })}
+            </span>
+          ) : coords === null ? (
             <span className="text-ap-muted">{t("row.wholeBlock", { block: item.block_code })}</span>
           ) : (
             <>
@@ -133,7 +186,16 @@ export function ItemRow({
             </span>
           )}
           <span>·</span>
-          <span>{t("row.raised", { when: ago(item.created_at) })}</span>
+          <span>{t("row.raised", { when: ago(recurrence.first_seen_at ?? item.created_at) })}</span>
+          {recurrence.occurrence_count > 1 && recurrence.last_seen_at !== null ? (
+            <>
+              <span>·</span>
+              {/* "Raised 6 days ago" alone reads as stale. It is not stale — it
+                  fired again this morning, and that is the fact that decides
+                  whether it still needs doing. */}
+              <span>{t("row.lastSeen", { when: ago(recurrence.last_seen_at) })}</span>
+            </>
+          ) : null}
           <span>·</span>
           <span
             className={
@@ -167,7 +229,24 @@ export function ItemRow({
               ) : confidence === null ? null : (
                 <span>{t("why.confidence", { percent: confidence })}</span>
               )}
+              {recurrence.occurrence_count > 1 ? (
+                <span>
+                  ·{" "}
+                  {t("recurrence.summary", {
+                    days: recurrence.occurrence_count,
+                    streak: recurrence.day_streak,
+                  })}
+                </span>
+              ) : null}
             </div>
+            {isGroup ? (
+              <GroupMembers
+                farmId={item.farm_id}
+                itemId={item.id}
+                isAr={isAr}
+                previousCount={item.aggregation.previous_member_count}
+              />
+            ) : null}
           </div>
         ) : null}
       </div>

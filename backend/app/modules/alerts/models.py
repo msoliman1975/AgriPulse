@@ -23,10 +23,11 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.shared.action_items import GroupingMixin
 from app.shared.db.base import UUID_V7_DEFAULT, Base, TimestampedMixin
 
 
-class Alert(Base, TimestampedMixin):
+class Alert(Base, TimestampedMixin, GroupingMixin):
     """`tenant_<id>.alerts` — fired alerts."""
 
     __tablename__ = "alerts"

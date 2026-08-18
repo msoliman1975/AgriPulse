@@ -34,3 +34,25 @@ class InvalidAlertTransitionError(APIError):
             type_=f"{_TYPE_BASE}/invalid-transition",
             extras={"current_status": current_status, "action": action},
         )
+
+
+class GroupMemberNotActionableError(APIError):
+    """Caller addressed a per-cell member of a group instead of the group.
+
+    Mirror of the recommendations error of the same name — the reasoning is
+    identical and the two must stay in step, because the Action Center offers
+    one set of buttons over both tables and cannot have one kind quietly accept
+    what the other refuses.
+    """
+
+    def __init__(self, *, alert_id: UUID, parent_id: UUID) -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Alert is part of a group",
+            detail=(
+                f"Alert {alert_id} is one cell of an aggregated item. "
+                f"Act on the group ({parent_id}) instead."
+            ),
+            type_=f"{_TYPE_BASE}/group-member-not-actionable",
+            extras={"alert_id": str(alert_id), "group_parent_id": str(parent_id)},
+        )

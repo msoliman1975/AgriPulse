@@ -97,6 +97,9 @@ async def preview_block_cascade(
             SELECT count(*) FROM alerts
             WHERE block_id = ANY(:block_ids)
               AND status IN ('open', 'acknowledged', 'snoozed')
+              -- The preview has to match what the user can see and act on in
+              -- the Action Center, which lists groups and not their cells.
+              AND group_parent_id IS NULL
             """
         ).bindparams(bindparam("block_ids", type_=ARRAY(PG_UUID(as_uuid=True)))),
         {"block_ids": ids},

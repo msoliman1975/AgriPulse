@@ -33,9 +33,7 @@ export interface RecommendationActionItem {
 }
 
 // Horizons with no items are omitted by the server, so every key is optional.
-export type RecommendationActions = Partial<
-  Record<ActionHorizon, RecommendationActionItem[]>
->;
+export type RecommendationActions = Partial<Record<ActionHorizon, RecommendationActionItem[]>>;
 
 export interface Recommendation {
   id: string;
@@ -57,6 +55,19 @@ export interface Recommendation {
   // confidence is serialised as a string by Pydantic's Decimal handling.
   confidence: string;
   tree_path: TreePathStepDTO[];
+  /**
+   * Aggregation + recurrence (tenant migration 0079).
+   *
+   * A cell-scoped tree that fires on many cells of one block produces ONE row
+   * here — the group — standing for `member_count` cells; the members are
+   * never listed. `day_streak` is how many consecutive days it has fired.
+   */
+  is_group: boolean;
+  member_count: number;
+  occurrence_count: number;
+  day_streak: number;
+  first_seen_at: string | null;
+  last_seen_at: string | null;
   text_en: string;
   text_ar: string | null;
   valid_until: string | null;
@@ -218,10 +229,7 @@ export interface ExplainBlockResponse {
 // `farmId` is required: it is what the request is authorized against, so a
 // farm-scoped user (Agronomist, Scout, Viewer) resolves. The server verifies
 // the block actually belongs to it.
-export async function explainBlock(
-  blockId: string,
-  farmId: string,
-): Promise<ExplainBlockResponse> {
+export async function explainBlock(blockId: string, farmId: string): Promise<ExplainBlockResponse> {
   const { data } = await apiClient.get<ExplainBlockResponse>(
     `/v1/blocks/${blockId}/decision-trees:explain`,
     { params: { farm_id: farmId } },
