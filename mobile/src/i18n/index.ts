@@ -19,6 +19,7 @@
 import { ar } from "@/i18n/locales/ar";
 import { en } from "@/i18n/locales/en";
 import type { LocaleDef, MessageKey } from "@/i18n/types";
+import { dueAtMs } from "@/time";
 
 export type { MessageKey } from "@/i18n/types";
 
@@ -74,8 +75,9 @@ export function tCount(lang: Lang, key: MessageKey, n: number): string {
  * and "23h" reads as if the scout has already lost an hour.
  */
 export function dueIn(lang: Lang, dueBy: string | null): string {
-  if (!dueBy) return "";
-  const ms = new Date(dueBy).getTime() - Date.now();
+  const due = dueAtMs(dueBy);
+  if (due === null) return "";
+  const ms = due - Date.now();
   if (ms < 0) return t(lang, "due.overdue");
   const hours = Math.round(ms / 3_600_000);
   return hours < 48 ? `${Math.max(hours, 1)}h` : `${Math.round(hours / 24)}d`;

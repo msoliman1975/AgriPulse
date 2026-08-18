@@ -5,8 +5,11 @@ import { currentSession } from "@/auth/session";
 import { dirOf, t, type Lang } from "@/i18n";
 import { adoptServerLang, initialLang } from "@/i18n/preference";
 import { ensureDeviceRegistered } from "@/push/register";
+import { MeScreen } from "@/screens/MeScreen";
+import { RecordSheet } from "@/screens/RecordSheet";
+import { RecordsScreen } from "@/screens/RecordsScreen";
 import { SignInScreen } from "@/screens/SignInScreen";
-import { VisitsScreen } from "@/screens/VisitsScreen";
+import { TasksScreen } from "@/screens/TasksScreen";
 
 /**
  * Build-time farm, kept only as a development override. It used to be the only
@@ -20,10 +23,21 @@ const FALLBACK_FARM_ID = import.meta.env.VITE_FARM_ID ?? "";
 /** Remembered across launches so a two-farm scout is not asked every time. */
 const PICKED_FARM_KEY = "agripulse.scout.farm";
 
+/** The three places a scout can be. Capture is a button, not a tab: it is an
+ *  action taken from wherever you are, not a place you go. */
+type Tab = "tasks" | "records" | "me";
+
 export function App(): ReactNode {
   const [signedIn, setSignedIn] = useState(() => currentSession() !== null);
   const [lang, setLang] = useState<Lang>(initialLang);
+  const [tab, setTab] = useState<Tab>("tasks");
+  const [recording, setRecording] = useState(false);
+  // A work item open full-screen owns the whole viewport: the tab bar would
+  // otherwise sit under a capture form and take a scout out of it mid-reading.
+  const [fullScreen, setFullScreen] = useState(false);
 
+  const [userId, setUserId] = useState<string | null>(null);
+  const [name, setName] = useState<string | null>(null);
   const [farms, setFarms] = useState<FarmScope[] | null>(null);
   const [farmId, setFarmId] = useState<string>(
     () => localStorage.getItem(PICKED_FARM_KEY) ?? "",
@@ -46,6 +60,8 @@ export function App(): ReactNode {
     void fetchMe().then((me) => {
       if (!live) return;
       setFarms(me.farms);
+      setUserId(me.userId);
+      setName(me.name);
       // A choice made on this device wins — `adoptServerLang` enforces that,
       // not this call site.
       if (me.language) setLang(adoptServerLang(me.language));
@@ -90,11 +106,61 @@ export function App(): ReactNode {
   // `farms === null` is "still asking"; an empty array is a real answer.
   const resolved = farmId || (farms === null ? FALLBACK_FARM_ID : "");
 
+  if (resolved) {
+    return (
+      <div className="app" dir={dirOf(lang)} lang={lang}>
+        {tab === "tasks" ? (
+          <TasksScreen lang={lang} farmId={resolved} onFullScreen={setFullScreen} />
+        ) : tab === "records" ? (
+          <RecordsScreen lang={lang} farmId={resolved} userId={userId} />
+        ) : (
+          <MeScreen
+            lang={lang}
+            onLangChange={setLang}
+            name={name}
+            farms={farms ?? []}
+            farmId={resolved}
+            onPickFarm={(id) => {
+              localStorage.setItem(PICKED_FARM_KEY, id);
+              setFarmId(id);
+            }}
+          />
+        )}
+
+        {recording ? (
+          <RecordSheet lang={lang} farmId={resolved} onClose={() => setRecording(false)} />
+        ) : null}
+
+        {!fullScreen && !recording ? (
+          <>
+            {/* Recording is reachable from both list screens, because the
+                thing worth recording is noticed while reading either one. */}
+            {tab !== "me" ? (
+              <button type="button" className="fab" onClick={() => setRecording(true)}>
+                {t(lang, "record.fab")}
+              </button>
+            ) : null}
+            <nav className="tabs">
+              {(["tasks", "records", "me"] as Tab[]).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  className={k === tab ? "on" : ""}
+                  onClick={() => setTab(k)}
+                >
+                  {t(lang, `tab.${k}` as never)}
+                </button>
+              ))}
+            </nav>
+          </>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="app" dir={dirOf(lang)} lang={lang}>
-      {resolved ? (
-        <VisitsScreen lang={lang} farmId={resolved} />
-      ) : farms && farms.length === 0 ? (
+      {farms && farms.length === 0 ? (
         // A real state, not an error: enrolled, signed in, and not yet put on
         // a farm. Saying so beats a generic failure the scout cannot act on.
         <p className="empty">{t(lang, "farms.none")}</p>

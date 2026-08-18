@@ -39,4 +39,16 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Position on an observation. Requested at the moment the scout taps
+         "use my position", never at launch: capture works without a fix, and
+         a permission prompt on first open is how people learn to refuse. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Photographs on an observation. Capacitor's WebChromeClient answers the
+         file chooser and asks for this at the moment the camera is opened, so
+         no plugin and no native code of ours is involved. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>

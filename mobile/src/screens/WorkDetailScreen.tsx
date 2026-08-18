@@ -3,15 +3,13 @@ import { useEffect, useState, type ReactNode } from "react";
 import {
   acceptVisit,
   completeActivity,
-  getSignalTemplate,
-  listSignalDefinitions,
-  recordObservation,
+  getVisit,
   startVisit,
   submitVisit,
-  type SignalDefinition,
   type VisitOutcome,
   type WorkItem,
 } from "@/api/client";
+import { CaptureForm } from "@/components/CaptureForm";
 import { dueIn, t, type Lang } from "@/i18n";
 
 /**
@@ -61,7 +59,9 @@ export function WorkDetailScreen({
   }
 
   return (
-    <div className="screen detail">
+    // `overlay` so a round started from the capture sheet covers the tab
+    // content it was opened from, rather than stacking below it.
+    <div className="screen detail overlay">
       <header>
         <button type="button" className="link" onClick={onClose}>
           {t(lang, "work.back")}
@@ -70,11 +70,16 @@ export function WorkDetailScreen({
       </header>
 
       <h1>{item.title}</h1>
+      {/* Where, before why: a scout reads this to decide whether to start
+          walking, and a block id they cannot resolve is worse than nothing. */}
+      {item.block_name ? <p className="where">{item.block_name}</p> : null}
       {item.detail ? <p className="instruction">{item.detail}</p> : null}
       <p className="meta">
         <span className="ring">{dueIn(lang, item.due_at)}</span>
         {item.category ? <span className="origin">{item.category}</span> : null}
       </p>
+
+      {isVisit ? <WhyBlock lang={lang} farmId={farmId} visitId={item.id} /> : null}
 
       {error ? <p className="error">{error}</p> : null}
 
@@ -303,139 +308,63 @@ function BoardActions({
 }
 
 /**
- * Record one reading against the block.
+ * Why this job exists.
  *
- * When the visit carries a signal template, the form shows *that* form —
- * the supervisor already said which signals this visit is about, and putting
- * the full catalogue in front of the scout is how the wrong ones get
- * recorded. Without a template it falls back to everything available.
+ * `reason_snapshot` is untyped JSON written by whichever rule raised the
+ * visit, so this renders it defensively: primitive key/value pairs, keys
+ * turned back into words, and nothing at all when the shape is unrecognisable.
+ * A scout who is told *why* records something useful; one who is only told
+ * "go and look" records what they happen to notice.
+ *
+ * Fetched here rather than carried on the work item because `/me/work` is a
+ * merged list across two kinds and does not send it. One extra request on a
+ * screen the scout opened deliberately is a fair price.
  */
-function CaptureForm({
+function WhyBlock({
   lang,
   farmId,
-  blockId,
-  templateId,
-  onClose,
-  onRecorded,
+  visitId,
 }: {
   lang: Lang;
   farmId: string;
-  blockId: string | null;
-  templateId: string | null;
-  onClose: () => void;
-  onRecorded: (observationId: string) => void;
+  visitId: string;
 }): ReactNode {
-  const [defs, setDefs] = useState<SignalDefinition[]>([]);
-  const [defId, setDefId] = useState("");
-  const [value, setValue] = useState("");
-  const [notes, setNotes] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [reason, setReason] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     let live = true;
-    async function load(): Promise<SignalDefinition[]> {
-      const all = await listSignalDefinitions(farmId);
-      if (!templateId) return all;
-      // Narrow to the template, keeping its order — position is the sequence
-      // the form was designed to be filled in.
-      try {
-        const { members } = await getSignalTemplate(templateId);
-        const order = new Map(members.map((m) => [m.signal_definition_id, m.position]));
-        const picked = all
-          .filter((d) => order.has(d.id))
-          .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
-        // A template naming nothing this farm can record is a misconfiguration,
-        // not a reason to give the scout an empty form.
-        return picked.length > 0 ? picked : all;
-      } catch {
-        return all;
-      }
-    }
-    void load()
-      .then((d) => {
-        if (!live) return;
-        setDefs(d);
-        if (d.length > 0) setDefId(d[0].id);
+    // A missing reason is normal — ad-hoc visits carry a human instruction
+    // instead — so a failure here shows nothing rather than an error.
+    void getVisit(visitId, farmId)
+      .then((v) => {
+        if (live) setReason(v.reason_snapshot);
       })
-      .catch(() => setError(t(lang, "work.loadDefsFailed")));
+      .catch(() => undefined);
     return () => {
       live = false;
     };
-  }, [farmId, lang, templateId]);
+  }, [farmId, visitId]);
 
-  const chosen = defs.find((d) => d.id === defId);
-  const numeric = chosen?.value_type === "numeric";
-
-  async function save(): Promise<void> {
-    if (!defId) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const created = await recordObservation(defId, {
-        farm_id: farmId,
-        block_id: blockId,
-        value_numeric: numeric && value !== "" ? Number(value) : null,
-        value_categorical: !numeric && value !== "" ? value : null,
-        notes: notes || null,
-      });
-      onRecorded(created.id);
-      // Cleared, not closed: a scout usually records several readings in one
-      // visit, and making them reopen the form each time is friction in a
-      // field with one hand free.
-      setValue("");
-      setNotes("");
-    } catch {
-      setError(t(lang, "work.recordFailed"));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const lines = readableReason(reason);
+  if (lines.length === 0) return null;
 
   return (
-    <div className="capture">
-      <h2>{t(lang, "work.record")}</h2>
-      {error ? <p className="error">{error}</p> : null}
-
-      <label htmlFor="def">{t(lang, "work.what")}</label>
-      <select id="def" value={defId} onChange={(e) => setDefId(e.target.value)}>
-        {defs.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.name}
-          </option>
-        ))}
-      </select>
-
-      <label htmlFor="val">{t(lang, "work.value")}</label>
-      {chosen?.allowed_values && chosen.allowed_values.length > 0 ? (
-        <select id="val" value={value} onChange={(e) => setValue(e.target.value)}>
-          <option value="">—</option>
-          {chosen.allowed_values.map((v) => (
-            <option key={v} value={v}>
-              {v}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <input
-          id="val"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          inputMode={numeric ? "decimal" : "text"}
-        />
-      )}
-
-      <label htmlFor="obsnotes">{t(lang, "work.notes")}</label>
-      <textarea id="obsnotes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
-
-      <div className="row">
-        <button type="button" disabled={busy || !defId} onClick={() => void save()}>
-          {busy ? t(lang, "work.saving") : t(lang, "work.save")}
-        </button>
-        <button type="button" className="link" onClick={onClose}>
-          {t(lang, "work.done")}
-        </button>
-      </div>
+    <div className="why">
+      <h2>{t(lang, "work.why")}</h2>
+      {lines.map(([label, value]) => (
+        <p key={label}>
+          <span className="k">{label}</span> <span className="v">{value}</span>
+        </p>
+      ))}
     </div>
   );
+}
+
+/** At most four primitive pairs, in the order the rule wrote them. */
+function readableReason(reason: Record<string, unknown> | null): [string, string][] {
+  if (!reason) return [];
+  return Object.entries(reason)
+    .filter(([, v]) => typeof v === "string" || typeof v === "number" || typeof v === "boolean")
+    .slice(0, 4)
+    .map(([k, v]) => [k.replace(/_/g, " "), String(v)]);
 }

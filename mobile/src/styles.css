@@ -129,3 +129,122 @@ body { background: var(--field); color: var(--ink); }
 .outcomes { display: flex; flex-direction: column; gap: 8px; }
 .outcomes button { padding: 14px; font-size: 15px; border-radius: 10px;
   border: 1px solid var(--line); background: var(--field); color: var(--ink); }
+
+/* --- Shell: three tabs and one button --------------------------------------
+   Tabs sit under the thumb; the capture button floats above them because it
+   is an action taken from wherever you are, not a place you go. Both are
+   fixed, so `.screen` has to reserve room or the last row hides behind them. */
+.screen { padding-bottom: 96px; }
+.tabs { position: fixed; inset-inline: 0; bottom: 0; display: grid;
+  grid-template-columns: repeat(3, 1fr); background: var(--field2);
+  border-top: 1px solid var(--line); }
+.tabs button { padding: 14px 0 18px; background: none; border: 0;
+  color: var(--muted); font-size: 13px; }
+.tabs button.on { color: var(--ink); font-weight: 650;
+  box-shadow: inset 0 2px 0 var(--sage); }
+.fab { position: fixed; inset-inline-end: 16px; bottom: 74px; z-index: 2;
+  padding: 13px 20px; border: 0; border-radius: 999px; background: var(--sage);
+  color: #fff; font-size: 15px; font-weight: 650;
+  box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+
+/* Segmented control. Three states of the same list, not three screens. */
+.seg { display: flex; gap: 3px; padding: 3px; border-radius: 11px;
+  background: var(--field2); margin-bottom: 6px; }
+.seg button { flex: 1; padding: 10px 0; border: 0; border-radius: 9px;
+  background: none; color: var(--muted); font-size: 14px; }
+.seg button.on { background: var(--field); color: var(--ink); font-weight: 650; }
+
+/* Regroup toggle. Quiet until used — it changes the meaning of every heading
+   below it, so its state has to be readable at a glance. */
+.grouper { margin: 12px 0 0; padding: 9px 14px; border-radius: 999px;
+  border: 1px solid var(--line); background: none; color: var(--muted); font-size: 13px; }
+.grouper.on { border-color: var(--sage); color: var(--ink); background: var(--field2); }
+
+.section .count { color: var(--muted); font-weight: 400; }
+.visit .src { font-size: 13px; }
+.visit .where { font-size: 12px; color: var(--muted); }
+.visit .meta { display: flex; gap: 8px; align-items: center; }
+.detail .where { color: var(--muted); font-size: 14px; margin: -6px 0 0; }
+
+/* Why the job exists. Ahead of the actions because a scout decides whether to
+   walk on this, and behind the title because they already know the what. */
+.why { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+  background: var(--field2); }
+.why h2 { font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 6px; }
+.why p { font-size: 14px; margin-top: 4px; }
+.why .k { color: var(--muted); }
+
+/* Photos. Square thumbnails with the remove control on the image itself —
+   a separate delete button beside each one is a mis-tap in gloves. */
+.thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
+.thumb { position: relative; width: 62px; height: 62px; padding: 0; border: 0;
+  border-radius: 10px; overflow: hidden; background: var(--field); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb .x { position: absolute; top: 2px; inset-inline-end: 2px; width: 18px;
+  height: 18px; border-radius: 50%; background: rgba(0,0,0,.62); color: #fff;
+  font-size: 11px; line-height: 18px; text-align: center; }
+
+/* Position. Opt-in, and always showing its accuracy: a fix presented without
+   one reads as exact when it may be 40 m out. */
+.gps { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 11px 12px; border-radius: 10px; border: 1px dashed var(--line);
+  color: var(--muted); font-size: 13px; }
+.gps.on { border-style: solid; border-color: var(--sage); color: var(--ink); }
+.gps .link { background: none; border: 0; color: var(--sage); font-size: 13px; }
+
+/* The capture chooser, as a bottom sheet: it is reached with a thumb. */
+.sheet-wrap { position: fixed; inset: 0; z-index: 3; background: rgba(0,0,0,.55);
+  display: flex; align-items: flex-end; }
+.sheet { width: 100%; background: var(--field); border-radius: 18px 18px 0 0;
+  padding: 12px 16px 26px; display: flex; flex-direction: column; gap: 10px; }
+.sheet .grab { width: 38px; height: 4px; border-radius: 2px; background: var(--line);
+  align-self: center; }
+.sheet h2 { font-size: 17px; }
+.sheet label { font-size: 13px; color: var(--muted); }
+.sheet select { font-size: 16px; padding: 13px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--field2); color: var(--ink); }
+.sheet > button { padding: 15px; font-size: 16px; border: 0; border-radius: 11px;
+  background: var(--sage); color: #fff; }
+.sheet > button.link { background: none; color: var(--muted); }
+/* Each choice is named by the situation that produces it, with the
+   explanation underneath — a scout should not have to learn the data model. */
+.sheet .opt { display: flex; flex-direction: column; gap: 3px; text-align: start;
+  padding: 14px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--field2); color: var(--ink); }
+.sheet .opt b { font-size: 15px; font-weight: 650; }
+.sheet .opt span { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+
+/* Records: the scout's own filings, proof of a day's work. */
+.records ul { list-style: none; }
+.record .thumb { flex: 0 0 46px; height: 46px; }
+.record .ring { font-size: 15px; }
+
+.me h1 { font-size: 21px; }
+.me .farms { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.me .farms button { width: 100%; display: flex; justify-content: space-between;
+  padding: 14px; border-radius: 11px; border: 1px solid var(--line);
+  background: var(--field2); color: var(--ink); font-size: 14px; }
+.me .farms button.on { border-color: var(--sage); }
+.me .farms .fid { color: var(--muted); font-family: monospace; }
+/* Sign-out is destructive and rarely wanted: it reads as an exit, not a
+   primary action, and it sits at the bottom of a screen nobody opens by
+   accident. */
+.me .signout { margin-top: 28px; width: 100%; padding: 15px; border-radius: 11px;
+  border: 1px solid var(--crit); background: none; color: var(--crit); font-size: 15px; }
+
+/* A screen that replaces everything under it. The capture sheet renders
+   alongside the tab content rather than instead of it, so a detail opened
+   from the sheet has to cover the list it came from. */
+.screen.overlay { position: fixed; inset: 0; z-index: 4; overflow-y: auto;
+  background: var(--field); }
+
+/* A secondary action in a capture row. Without this it inherits the browser
+   default — a white block in a dark app — because only the first button in
+   the row is styled as the primary one. */
+.capture .row button.link { flex: 0 0 auto; padding: 13px 10px; border: 0;
+  background: none; color: var(--muted); font-size: 14px; }
+
+/* Clear the floating Record button as well as the tab bar: 96px cleared the
+   tabs but left the button sitting on top of the last row. */
+.screen { padding-bottom: 140px; }

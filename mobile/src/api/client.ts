@@ -90,12 +90,15 @@ export interface Visit {
   origin: VisitOrigin;
   title: string;
   instruction: string | null;
+  /** Why the engine raised this. Free-shaped JSON — render defensively. */
+  reason_snapshot: Record<string, unknown> | null;
   severity: "info" | "warning" | "critical";
   priority: "low" | "medium" | "high";
   due_by: string | null;
   status: string;
   assigned_to: string | null;
   source: VisitSource;
+  template_id: string | null;
 }
 
 /** One item of work, whatever surface assigned it. Mirrors WorkItemResponse. */
@@ -113,6 +116,12 @@ export interface WorkItem {
   due_at: string | null;
   /** The form the supervisor asked for. Null means the whole catalogue. */
   template_id: string | null;
+  /** Filled in by the client from the block list — `/me/work` sends only the
+   *  id, and a scout cannot walk to a UUID. */
+  block_name?: string | null;
+  /** Zone count, spread and streak. `/me/work` does not send these either, so
+   *  the Tasks list joins them on from the visit list. Board work has none. */
+  source?: VisitSource | null;
 }
 
 /**
@@ -127,10 +136,15 @@ export function listMyWork(farmId: string) {
   return request<WorkItem[]>(`/me/work?farm_id=${encodeURIComponent(farmId)}`);
 }
 
-export function listVisits(farmId: string, params: { mine?: boolean; claimable?: boolean } = {}) {
+export function listVisits(
+  farmId: string,
+  params: { mine?: boolean; claimable?: boolean; status?: string[] } = {},
+) {
   const q = new URLSearchParams({ farm_id: farmId });
   if (params.mine) q.set("mine", "true");
   if (params.claimable) q.set("claimable", "true");
+  // Repeated `status=` params, which is what FastAPI reads as a list.
+  for (const s of params.status ?? []) q.append("status", s);
   return request<Visit[]>(`/scouting/visits?${q}`);
 }
 
@@ -229,13 +243,22 @@ export function listSignalDefinitions(farmId: string) {
   );
 }
 
+/** WGS84, matching the API's GeopointModel field names exactly. */
+export interface Geopoint {
+  latitude: number;
+  longitude: number;
+}
+
 /**
  * Record one observation.
  *
- * `location_mode` stays at the default `entity`: `point_in_entity` is enforced
- * by a database ST_Within trigger, so GPS drift at a block edge would reject
- * the write AFTER the scout did the work. Attaching the reading to the block
- * is honest and always succeeds.
+ * `location_mode` is `entity` when there is no fix and **`free_point`** when
+ * there is — never `point_in_entity`. That third mode is enforced by a
+ * database ST_Within trigger, so a GPS fix a few metres outside the block
+ * boundary rejects the write AFTER the scout has done the work, in a field,
+ * with no way to correct it. `free_point` keeps the reading and the position
+ * and cannot fail on drift; being inside the block is not a promise this app
+ * is in a position to make.
  */
 export function recordObservation(
   definitionId: string,
@@ -246,12 +269,125 @@ export function recordObservation(
     value_categorical?: string | null;
     value_boolean?: boolean | null;
     notes?: string | null;
+    attachment_s3_key?: string | null;
+    location_mode?: "entity" | "free_point";
+    location_point?: Geopoint | null;
   },
 ) {
   return request<{ id: string }>(`/signals/definitions/${definitionId}/observations`, {
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+export interface AttachmentUpload {
+  attachment_s3_key: string;
+  upload_url: string;
+  upload_headers: Record<string, string>;
+  expires_at: string;
+}
+
+/**
+ * Ask for a presigned PUT to upload one photo to.
+ *
+ * Two steps, not one: the file goes straight to object storage rather than
+ * through the API, so a 4 MB photo on a field connection never occupies an
+ * API worker. The key comes back before the upload so the caller can put it
+ * on the observation once the PUT lands.
+ */
+export function initAttachmentUpload(body: {
+  signal_definition_id: string;
+  farm_id: string;
+  content_type: string;
+  content_length: number;
+  filename: string;
+}) {
+  return request<AttachmentUpload>(`/signals/observations:upload-init`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * PUT the bytes to object storage.
+ *
+ * Deliberately not `request()`: the presigned URL is absolute, carries its own
+ * authorization in the query string, and must NOT receive our bearer token —
+ * some S3-compatible backends reject a request that is signed twice.
+ */
+export async function uploadAttachment(upload: AttachmentUpload, file: Blob): Promise<void> {
+  const resp = await fetch(upload.upload_url, {
+    method: "PUT",
+    headers: upload.upload_headers,
+    body: file,
+  });
+  if (!resp.ok) throw new ApiError(resp.status, `upload failed (${resp.status})`);
+}
+
+/** One observation as the API returns it. */
+export interface Observation {
+  id: string;
+  time: string;
+  signal_code: string;
+  block_id: string | null;
+  value_numeric: number | null;
+  value_categorical: string | null;
+  notes: string | null;
+  recorded_by: string;
+  attachment_download_url: string | null;
+}
+
+/**
+ * Recent observations on this farm.
+ *
+ * There is no `recorded_by` filter on the API, so the Records screen asks for
+ * the farm's recent rows and keeps its own. That is honest about what the
+ * endpoint can do; the alternative is a screen that silently shows other
+ * people's readings as yours.
+ */
+export function listObservations(farmId: string, params: { since?: string; limit?: number } = {}) {
+  const q = new URLSearchParams({ farm_id: farmId, limit: String(params.limit ?? 100) });
+  if (params.since) q.set("since", params.since);
+  return request<Observation[]>(`/signals/observations?${q}`);
+}
+
+/**
+ * Log a round the scout chose to do.
+ *
+ * Opens straight into `in_progress` — there is nothing to accept, because
+ * nobody assigned it. It closes through the same submit path as a dispatched
+ * visit, so a self-started round and an assigned one end up the same shape in
+ * the visit history.
+ */
+export function createSelfInitiatedVisit(
+  farmId: string,
+  body: { block_id: string; title?: string | null; template_id?: string | null },
+) {
+  return request<Visit>(`/scouting/visits?farm_id=${encodeURIComponent(farmId)}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** A block, as far as the phone needs to know about one. */
+export interface Block {
+  id: string;
+  code: string;
+  name: string | null;
+  is_active: boolean;
+}
+
+/**
+ * The farm's blocks, for naming a work item and for the block picker.
+ *
+ * One page of 200 covers every farm in production and the endpoint exists
+ * precisely so a client does not fetch blocks one at a time.
+ */
+export async function listBlocks(farmId: string): Promise<Block[]> {
+  const page = await request<{ items: Block[] }>(
+    `/farms/${encodeURIComponent(farmId)}/blocks?limit=200`,
+  );
+  return page.items.filter((b) => b.is_active);
 }
 
 // `farm_id` rides along for the same reason every scouting call carries it: a
