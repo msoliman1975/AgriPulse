@@ -407,6 +407,80 @@ class DecisionTreeDryRunResponse(BaseModel):
 
 
 # =====================================================================
+# On-demand tree run (authoring)
+# =====================================================================
+
+
+class TreeRunCandidateFarm(BaseModel):
+    """One farm the tree targets, with the size of the run it implies.
+
+    ``blocks_targeted`` is the number the tree would actually walk;
+    ``blocks_total`` is the farm's active block count. The gap is what a
+    targeting filter excluded — shown so an author picking a farm knows
+    beforehand that only part of it is in scope.
+    """
+
+    farm_id: UUID
+    name: str
+    blocks_total: int
+    blocks_targeted: int
+
+
+class DecisionTreeRunRequest(BaseModel):
+    """POST /api/v1/decision-trees/{code}:run — evaluate the tree's published
+    version across one farm and open real recommendations.
+
+    Carries no ``tree_yaml`` counterpart to the dry-run's, on purpose: a
+    recommendation records the tree version that produced it, so a run from
+    unsaved YAML would leave rows nothing can explain.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    farm_id: UUID
+
+
+class TreeRunBlockResult(BaseModel):
+    """What the run did on one block of the farm."""
+
+    block_id: UUID
+    label: str
+    # 0 when this block's crop / country / soil excluded the tree.
+    trees_evaluated: int
+    skipped_targeting: bool
+    recommendations_opened: int
+    # Fired and opened something vs fired and hit the open-recommendation
+    # dedup. Separated because "0 opened" alone reads as a failed run.
+    fired: int
+    deduped: int
+    errors: int
+
+
+class DecisionTreeRunResponse(BaseModel):
+    """Result of an on-demand tree run over a farm.
+
+    ``recommendations_opened`` counts rows that reached the Action Center on
+    this run. ``deduped`` counts blocks where the tree fired but an open
+    recommendation from it already existed — the re-run case, and the reason
+    a second click reports zero opened without anything having gone wrong.
+    """
+
+    run_id: UUID
+    farm_id: UUID
+    tree_code: str
+    tree_version: int
+    scope: str = "block"
+    blocks_evaluated: int
+    blocks_targeted: int
+    recommendations_opened: int
+    deduped: int
+    cleared: int
+    errors: int
+    traces_written: int
+    blocks: list[TreeRunBlockResult] = Field(default_factory=list)
+
+
+# =====================================================================
 # Evaluation lineage (tenant 0062)
 # =====================================================================
 

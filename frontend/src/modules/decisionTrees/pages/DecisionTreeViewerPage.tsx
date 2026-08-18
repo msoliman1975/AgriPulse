@@ -41,18 +41,22 @@ import {
   readTreeProvenance,
   type DecisionTreeVersion,
   type DryRunResponse,
+  type TreeRunResponse,
 } from "@/api/decisionTrees";
 import {
   useAppendDecisionTreeVersion,
   useDecisionTree,
   useDecisionTreeCandidateBlocks,
+  useDecisionTreeCandidateFarms,
   useDryRunDecisionTree,
   usePublishDecisionTreeVersion,
+  useRunDecisionTreeOnFarm,
   useUpdateDecisionTree,
 } from "@/queries/decisionTrees";
 
 import { AddChildDialog } from "../components/AddChildDialog";
 import { CanvasDryRunPanel } from "../components/CanvasDryRunPanel";
+import { CanvasTreeRunPanel } from "../components/CanvasTreeRunPanel";
 import { MutationErrorBanner } from "../components/MutationErrorBanner";
 import { NodeDetailsPanel } from "../components/NodeDetailsPanel";
 import { ParameterOverridesPanel } from "../components/ParameterOverridesPanel";
@@ -120,6 +124,8 @@ export function DecisionTreeViewerPage(): ReactNode {
   const publish = usePublishDecisionTreeVersion();
   const dryRun = useDryRunDecisionTree();
   const candidateBlocks = useDecisionTreeCandidateBlocks(code);
+  const treeRun = useRunDecisionTreeOnFarm();
+  const candidateFarms = useDecisionTreeCandidateFarms(code);
   const update = useUpdateDecisionTree();
   const dateLocale = useDateLocale();
 
@@ -169,6 +175,14 @@ export function DecisionTreeViewerPage(): ReactNode {
   const [dryRunBlockId, setDryRunBlockId] = useState("");
   const [dryRunMode, setDryRunMode] = useState<"draft" | "current">("draft");
   const [dryRunResult, setDryRunResult] = useState<DryRunResponse | null>(null);
+
+  // Real-run state. Deliberately NOT cleared alongside the dry-run below: a
+  // dry-run result is a claim about the YAML in front of you and goes stale
+  // the moment it changes, whereas a run already happened and its rows are in
+  // the Action Center. Hiding that report on the next edit would erase the
+  // only record the author has of what they just dispatched.
+  const [runFarmId, setRunFarmId] = useState("");
+  const [runResult, setRunResult] = useState<TreeRunResponse | null>(null);
 
   // The version the editor hydrates from is always the LATEST one —
   // `versions` comes back newest-first, so that is `versions[0]`.
@@ -421,6 +435,19 @@ export function DecisionTreeViewerPage(): ReactNode {
   };
   const onClearDryRun = (): void => {
     setDryRunResult(null);
+  };
+
+  // The real run. Always the published version — no draft mode, because the
+  // recommendations it opens record the version that produced them.
+  const onRunOnFarm = (): void => {
+    if (!runFarmId.trim()) return;
+    treeRun.mutate(
+      { code: tree.code, payload: { farm_id: runFarmId.trim() } },
+      { onSuccess: (res) => setRunResult(res) },
+    );
+  };
+  const onClearRun = (): void => {
+    setRunResult(null);
   };
 
   // PR-D4 structural ops.
@@ -766,6 +793,23 @@ export function DecisionTreeViewerPage(): ReactNode {
                 onRun={onDryRun}
                 onClear={onClearDryRun}
               />
+              {/* Authoring-only: the endpoint is gated on decision_tree.manage
+                  because it dispatches work to the whole farm team. */}
+              {canManage ? (
+                <CanvasTreeRunPanel
+                  farmId={runFarmId}
+                  onFarmIdChange={setRunFarmId}
+                  candidateFarms={candidateFarms.data ?? []}
+                  candidatesLoading={candidateFarms.isLoading}
+                  canRun={tree.current_version != null}
+                  hasUnsavedDraft={dirty}
+                  isRunning={treeRun.isPending}
+                  result={runResult}
+                  errorMessage={treeRun.isError ? (treeRun.error?.message ?? "") : undefined}
+                  onRun={onRunOnFarm}
+                  onClear={onClearRun}
+                />
+              ) : null}
               <TreeCanvas
                 layout={layout}
                 selectedNodeId={selectedNodeId}

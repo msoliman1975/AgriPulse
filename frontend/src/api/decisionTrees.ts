@@ -210,6 +210,57 @@ export interface DryRunResponse {
   cells: DryRunCell[];
 }
 
+// --- On-demand tree run (authoring) ----------------------------------------
+//
+// The dry-run's counterpart: `:dry-run` previews, `:run` commits. A run
+// evaluates the tree's *published* version across a whole farm and opens
+// real recommendations in the Action Center — there is deliberately no
+// draft-YAML mode, because a recommendation names the version that produced
+// it.
+
+/** One farm the tree targets. `blocks_targeted` is what the run would walk. */
+export interface TreeRunCandidateFarm {
+  farm_id: string;
+  name: string;
+  blocks_total: number;
+  blocks_targeted: number;
+}
+
+export interface TreeRunPayload {
+  farm_id: string;
+}
+
+/** What the run did on one block of the farm. */
+export interface TreeRunBlockResult {
+  block_id: string;
+  label: string;
+  /** 0 when this block's crop / country / soil excluded the tree. */
+  trees_evaluated: number;
+  skipped_targeting: boolean;
+  recommendations_opened: number;
+  fired: number;
+  /** Fired, but an open recommendation from this tree already existed. */
+  deduped: number;
+  errors: number;
+}
+
+export interface TreeRunResponse {
+  run_id: string;
+  farm_id: string;
+  tree_code: string;
+  tree_version: number;
+  scope: "block" | "cell";
+  blocks_evaluated: number;
+  blocks_targeted: number;
+  recommendations_opened: number;
+  /** Why a re-run legitimately opens nothing. Never let this read as failure. */
+  deduped: number;
+  cleared: number;
+  errors: number;
+  traces_written: number;
+  blocks: TreeRunBlockResult[];
+}
+
 // --- Evaluation lineage (tenant 0062) --------------------------------------
 
 export type EvalRunKind = "sweep" | "on_demand";
@@ -403,5 +454,25 @@ export async function getDecisionTreeCandidateBlocks(
   const { data } = await apiClient.get<DryRunCandidateBlock[]>(
     `/v1/decision-trees/${code}/candidate-blocks`,
   );
+  return data;
+}
+
+// Farms the tree targets, with targeted-block counts — populates the run
+// picker. Separate from candidate-blocks: a run is farm-wide, so the author
+// picks a farm and the count tells them how much of it is in scope.
+export async function getDecisionTreeCandidateFarms(code: string): Promise<TreeRunCandidateFarm[]> {
+  const { data } = await apiClient.get<TreeRunCandidateFarm[]>(
+    `/v1/decision-trees/${code}/candidate-farms`,
+  );
+  return data;
+}
+
+// Runs the published version for real: opens recommendations in the Action
+// Center for every targeted block of the farm.
+export async function runDecisionTreeOnFarm(
+  code: string,
+  payload: TreeRunPayload,
+): Promise<TreeRunResponse> {
+  const { data } = await apiClient.post<TreeRunResponse>(`/v1/decision-trees/${code}:run`, payload);
   return data;
 }

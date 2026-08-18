@@ -105,6 +105,8 @@ vi.mock("@/queries/decisionTrees", () => ({
   useDryRunDecisionTree: () => noopMutation,
   useUpdateDecisionTree: () => noopMutation,
   useDecisionTreeCandidateBlocks: () => ({ data: [], isLoading: false, isError: false }),
+  useDecisionTreeCandidateFarms: () => ({ data: [], isLoading: false, isError: false }),
+  useRunDecisionTreeOnFarm: () => noopMutation,
 }));
 vi.mock("@/rbac/useCapability", () => ({ useCapability: () => true }));
 vi.mock("@/api/signals", () => ({ listSignalDefinitions: () => Promise.resolve([]) }));

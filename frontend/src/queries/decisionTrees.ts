@@ -10,18 +10,23 @@ import {
   type DryRunPayload,
   type DryRunResponse,
   type EvalTraceFilters,
+  type TreeRunCandidateFarm,
+  type TreeRunPayload,
+  type TreeRunResponse,
   appendDecisionTreeVersion,
   archiveDecisionTree,
   createDecisionTree,
   dryRunDecisionTree,
   getDecisionTree,
   getDecisionTreeCandidateBlocks,
+  getDecisionTreeCandidateFarms,
   getEvalTrace,
   listDecisionTrees,
   listEvalRuns,
   listEvalTraces,
   publishDecisionTreeVersion,
   restoreDecisionTree,
+  runDecisionTreeOnFarm,
   updateDecisionTree,
 } from "@/api/decisionTrees";
 
@@ -167,5 +172,34 @@ export function useDecisionTreeCandidateBlocks(code: string | undefined) {
   });
 }
 
+// Farms the tree's targeting admits, with how many blocks of each are in
+// scope — populates the "run on a farm" picker.
+export function useDecisionTreeCandidateFarms(code: string | undefined) {
+  return useQuery({
+    queryKey: ["decision_trees", "candidate_farms", code] as const,
+    queryFn: () => getDecisionTreeCandidateFarms(code!),
+    enabled: Boolean(code),
+    staleTime: 30_000,
+  });
+}
+
+// Runs the published tree across a farm, for real. Unlike the dry-run this
+// writes, so invalidate everything that reads what it wrote: the Action
+// Center's items, the recommendation lists, the board, and the eval-run
+// lineage the traces page reads.
+export function useRunDecisionTreeOnFarm() {
+  const qc = useQueryClient();
+  return useMutation<TreeRunResponse, Error, { code: string; payload: TreeRunPayload }>({
+    mutationFn: ({ code, payload }) => runDecisionTreeOnFarm(code, payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["action_items"] });
+      void qc.invalidateQueries({ queryKey: ["recommendations"] });
+      void qc.invalidateQueries({ queryKey: ["alerts"] });
+      void qc.invalidateQueries({ queryKey: ["board"] });
+      void qc.invalidateQueries({ queryKey: ["decision_trees", "eval_runs"] });
+    },
+  });
+}
+
 // Re-exports so callers can grab the type from one place.
-export type { DecisionTree, DecisionTreeDetail };
+export type { DecisionTree, DecisionTreeDetail, TreeRunCandidateFarm, TreeRunResponse };

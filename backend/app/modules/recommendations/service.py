@@ -41,6 +41,8 @@ from app.modules.recommendations.engine import (
 )
 from app.modules.recommendations.errors import (
     BlockNotInFarmError,
+    DecisionTreeNotRunnableError,
+    FarmNotFoundError,
     InvalidRecommendationTransitionError,
     RecommendationNotFoundError,
 )
@@ -268,9 +270,24 @@ class RecommendationsServiceImpl:
         tenant_schema: str,
         tenant_id: UUID,
         run_id: UUID | None = None,
+        only_tree_code: str | None = None,
+        tally: dict[str, int] | None = None,
     ) -> dict[str, int]:
         """Run every active tree visible to this tenant against
         ``block_id``; insert new open recommendations.
+
+        ``only_tree_code`` narrows the pass to a single tree. Everything
+        downstream - targeting, parameter overrides, dedup, traces, audit,
+        notifications - is unchanged, which is the point: the authoring
+        "run this tree now" button must produce the same rows the nightly
+        sweep would, not a parallel implementation of them.
+
+        ``tally``, when supplied, accumulates per-outcome counts
+        (``fired`` / ``deduped`` / ``clear`` / ``error``) across every tree
+        walked. ``deduped`` is the one the caller cannot infer: a tree that
+        fired but hit the open-recommendation idempotency index opens
+        nothing, and without this it is indistinguishable from a tree whose
+        conditions simply did not match.
 
         ``tenant_id`` scopes the catalog lookup to platform trees +
         this tenant's own authored trees. The Beat task resolves this
@@ -282,7 +299,9 @@ class RecommendationsServiceImpl:
         beyond the recommendations themselves, which keeps the many tests that
         drive this method directly from needing a run row.
         """
-        setup = await self._prepare_block_evaluation(block_id=block_id, tenant_id=tenant_id)
+        setup = await self._prepare_block_evaluation(
+            block_id=block_id, tenant_id=tenant_id, only_tree_code=only_tree_code
+        )
         if setup is None:
             return {
                 "trees_evaluated": 0,
@@ -333,6 +352,7 @@ class RecommendationsServiceImpl:
                     actor_user_id=actor_user_id,
                     tenant_schema=tenant_schema,
                     trace=trace,
+                    tally=tally,
                 )
                 is not None
             ):
@@ -346,22 +366,163 @@ class RecommendationsServiceImpl:
             trees_skipped_crop=trees_skipped_crop,
             recommendations_opened=recommendations_opened,
             trace=trace,
+            tally=tally,
         )
+
+    async def run_tree_on_farm(
+        self,
+        *,
+        tree_code: str,
+        farm_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        tenant_id: UUID,
+    ) -> dict[str, Any]:
+        """Run one published tree across one farm, for real.
+
+        This is the authoring counterpart to ``:dry-run``. The dry-run
+        answers "what would this tree decide here?"; this answers "decide it
+        and put the work in front of the team." Every block of the farm goes
+        through the same ``evaluate_block`` the nightly sweep drives, with
+        the tree set cut to one — so what lands in the Action Center is
+        indistinguishable in kind from what the sweep produces, including
+        traces, audit rows and notifications.
+
+        Deliberately refuses to run an unpublished draft. A recommendation
+        names the ``(tree_code, tree_version)`` that produced it and the
+        Action Center links back to that version; a run from unsaved YAML
+        would write rows nothing can explain afterwards. Test drafts with
+        ``:dry-run``, publish, then run.
+
+        Re-running is safe and expected: the partial UNIQUE on
+        ``(block_id, tree_id) WHERE state='open'`` means a block that
+        already carries an open recommendation from this tree gets no
+        second one. The returned ``deduped`` count is what tells the author
+        that happened, rather than leaving "0 opened" to read as failure.
+        """
+        if not await self._repo.farm_exists(farm_id=farm_id):
+            raise FarmNotFoundError(farm_id)
+        # The same visibility + published-version filter the sweep applies.
+        # Empty here means the sweep would skip this tree too, so refusing is
+        # the honest answer — see DecisionTreeNotRunnableError.
+        trees = await self._repo.list_active_trees_with_current_version(
+            visible_to_tenant_id=tenant_id, only_code=tree_code
+        )
+        if not trees:
+            raise DecisionTreeNotRunnableError(tree_code)
+        tree = trees[0]
+
+        block_ids = await self._repo.list_active_block_ids(farm_id=farm_id)
+        labels = await self._repo.get_block_labels(block_ids=block_ids)
+
+        # Traced like the sweep and the single-block debug run: an on-demand
+        # pass that wrote recommendations but left no lineage would be the one
+        # kind of run nobody could audit afterwards.
+        run_id = await self._repo.open_eval_run(kind="on_demand", actor_user_id=actor_user_id)
+
+        blocks: list[dict[str, Any]] = []
+        totals = {
+            "trees_evaluated": 0,
+            "trees_skipped_targeting": 0,
+            "recommendations_opened": 0,
+            "traces_written": 0,
+        }
+        outcomes = {"fired": 0, "deduped": 0, "clear": 0, "error": 0}
+
+        for block_id in block_ids:
+            tally: dict[str, int] = {}
+            summary = await self.evaluate_block(
+                block_id=block_id,
+                actor_user_id=actor_user_id,
+                tenant_schema=tenant_schema,
+                tenant_id=tenant_id,
+                run_id=run_id,
+                only_tree_code=tree_code,
+                tally=tally,
+            )
+            totals["trees_evaluated"] += summary["trees_evaluated"]
+            totals["trees_skipped_targeting"] += summary["trees_skipped_crop"]
+            totals["recommendations_opened"] += summary["recommendations_opened"]
+            totals["traces_written"] += summary.get("traces_written", 0)
+            for key in outcomes:
+                outcomes[key] += tally.get(key, 0)
+            blocks.append(
+                {
+                    "block_id": block_id,
+                    "label": labels.get(block_id, str(block_id)),
+                    # Zero when targeting excluded the tree from this block —
+                    # the block was visited, the tree never walked.
+                    "trees_evaluated": summary["trees_evaluated"],
+                    "skipped_targeting": summary["trees_skipped_crop"] > 0,
+                    "recommendations_opened": summary["recommendations_opened"],
+                    "fired": tally.get("fired", 0),
+                    "deduped": tally.get("deduped", 0),
+                    "errors": tally.get("error", 0),
+                }
+            )
+
+        await self._repo.close_eval_run(
+            run_id=run_id,
+            blocks_evaluated=len(block_ids),
+            trees_evaluated=totals["trees_evaluated"],
+            trees_skipped=totals["trees_skipped_targeting"],
+            recommendations_opened=totals["recommendations_opened"],
+            # Leaf-opened alerts are counted in the trace rows, not in the
+            # per-block summary — same accounting as the sweep and the
+            # single-block on-demand route.
+            alerts_opened=0,
+            traces_written=totals["traces_written"],
+            # 'failed', not 'error' — the run row's CHECK constraint admits
+            # only 'ok' | 'failed' (tenant 0062), and the trace rows are where
+            # the per-tree 'error' status lives.
+            outcome="failed" if outcomes["error"] else "ok",
+        )
+
+        self._log.info(
+            "decision_tree_farm_run",
+            tree_code=tree_code,
+            tree_version=tree["version"],
+            farm_id=str(farm_id),
+            run_id=str(run_id),
+            blocks_evaluated=len(block_ids),
+            recommendations_opened=totals["recommendations_opened"],
+            deduped=outcomes["deduped"],
+        )
+        return {
+            "run_id": run_id,
+            "farm_id": farm_id,
+            "tree_code": tree_code,
+            "tree_version": tree["version"],
+            "scope": tree.get("scope") or "block",
+            "blocks_evaluated": len(block_ids),
+            "blocks_targeted": sum(1 for b in blocks if not b["skipped_targeting"]),
+            "recommendations_opened": totals["recommendations_opened"],
+            "deduped": outcomes["deduped"],
+            "cleared": outcomes["clear"],
+            "errors": outcomes["error"],
+            "traces_written": totals["traces_written"],
+            "blocks": blocks,
+        }
 
     async def _prepare_block_evaluation(
         self,
         *,
         block_id: UUID,
         tenant_id: UUID,
+        only_tree_code: str | None = None,
     ) -> _BlockEvaluation | None:
         """Load the trees, signals and targeting split for ``block_id``.
 
         Returns ``None`` when the block has no parent farm (nothing can be
         evaluated). Performs no writes, so both the sweep and the read-only
         explain endpoint can call it.
+
+        ``only_tree_code`` cuts the tree set to one before targeting is
+        evaluated, so a single-tree run also skips the parameter-override
+        bulk load for every other tree.
         """
         trees = await self._repo.list_active_trees_with_current_version(
-            visible_to_tenant_id=tenant_id
+            visible_to_tenant_id=tenant_id, only_code=only_tree_code
         )
         latest = await self._repo.get_latest_aggregate_per_index(block_id=block_id)
         # Merge precomputed trend features (slope/delta/trend_direction)
@@ -490,6 +651,7 @@ class RecommendationsServiceImpl:
         trees_skipped_crop: int,
         recommendations_opened: int,
         trace: _TraceBuffer | None = None,
+        tally: dict[str, int] | None = None,
     ) -> dict[str, int]:
         """Run the cell-scoped trees and emit their digest notifications."""
         farm_id = setup.farm_id
@@ -522,6 +684,7 @@ class RecommendationsServiceImpl:
                         actor_user_id=actor_user_id,
                         tenant_schema=tenant_schema,
                         trace=trace,
+                        tally=tally,
                     )
                     if opened is None:
                         continue
@@ -682,6 +845,7 @@ class RecommendationsServiceImpl:
         actor_user_id: UUID | None,
         tenant_schema: str,
         trace: _TraceBuffer | None = None,
+        tally: dict[str, int] | None = None,
     ) -> dict[str, Any] | None:
         """Evaluate one tree against one context (block or cell) and persist its
         output. Returns ``{"kind", "action_type", "severity"}`` for the opened
@@ -702,6 +866,12 @@ class RecommendationsServiceImpl:
             recommendation_id: UUID | None = None,
             alert_id: UUID | None = None,
         ) -> None:
+            # Counted here rather than at each call site because this closure
+            # is the one thing every exit below goes through exactly once -
+            # including the two that return None after the tree fired.
+            if tally is not None:
+                key = "deduped" if (outcome or {}).get("deduped") else status
+                tally[key] = tally.get(key, 0) + 1
             if trace is None:
                 return
             trace.add(
@@ -2289,6 +2459,52 @@ class DecisionTreesAuthorService:
                 }
             )
         return out
+
+    async def candidate_farms(
+        self, *, code: str, tenant_session: AsyncSession
+    ) -> list[dict[str, Any]]:
+        """Farms this tree would fire on, with how many of their blocks it
+        targets — drives the "run this tree on a farm" picker.
+
+        Built from the same per-block targeting the dry-run picker uses, then
+        rolled up: a farm is offered when at least one of its active blocks
+        passes the tree's crop / country / soil filters, and the count is what
+        stops an author from running a tree on a 40-block farm where it
+        targets one. Farms with no targeted block are omitted entirely rather
+        than shown at zero — running there is a guaranteed no-op.
+        """
+        tree = await self._repo.get_tree_by_code(
+            code, scope_tenant_id=self._tenant_id, include_platform=True
+        )
+        if tree is None:
+            raise _DecisionTreeNotFoundError(code)
+        repo = RecommendationsRepository(tenant_session=tenant_session, public_session=self._public)
+        blocks = await repo.list_blocks_for_targeting()
+        farms: dict[UUID, dict[str, Any]] = {}
+        for b in blocks:
+            farm_id = b["farm_id"]
+            entry = farms.setdefault(
+                farm_id,
+                {
+                    "farm_id": farm_id,
+                    "name": b["farm_name"] or str(farm_id),
+                    "blocks_total": 0,
+                    "blocks_targeted": 0,
+                },
+            )
+            entry["blocks_total"] += 1
+            if tree_targets_block(
+                tree,
+                crop_path=b["crop_path"],
+                crop_id=b["crop_id"],
+                country_code=b["country_code"],
+                soil_texture=b["soil_texture"],
+            ):
+                entry["blocks_targeted"] += 1
+        return sorted(
+            (f for f in farms.values() if f["blocks_targeted"] > 0),
+            key=lambda f: f["name"],
+        )
 
     # ---- Internals ----------------------------------------------------
 

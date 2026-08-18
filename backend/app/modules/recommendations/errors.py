@@ -107,3 +107,45 @@ class InvalidTreeYamlError(APIError):
     @classmethod
     def from_parse_error(cls, exc: DecisionTreeParseError) -> InvalidTreeYamlError:
         return cls(reason=getattr(exc, "reason", None) or (exc.detail or "malformed tree YAML"))
+
+
+class FarmNotFoundError(APIError):
+    """Named farm is absent (or archived) in this tenant.
+
+    Checked before a tree run opens its run row: an unknown farm has no
+    active blocks, so without this the run would close with every counter
+    at zero and read as "the tree matched nothing" rather than "that farm
+    does not exist."
+    """
+
+    def __init__(self, farm_id: UUID) -> None:
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Farm not found",
+            detail=f"No farm with id {farm_id} in this tenant.",
+            type_=f"{_TYPE_BASE}/farm-not-found",
+            extras={"farm_id": str(farm_id)},
+        )
+
+
+class DecisionTreeNotRunnableError(APIError):
+    """The tree exists but the evaluator would never reach it.
+
+    Archived, deactivated, or never published — the three states in which
+    the nightly sweep silently skips a tree. Running one on demand has to
+    refuse for the same reason: the run would write nothing and the author
+    would read that as "my conditions did not match."
+    """
+
+    def __init__(self, tree_code: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Decision tree is not runnable",
+            detail=(
+                f"Decision tree {tree_code!r} is archived, inactive, or has no "
+                "published version, so the evaluator would skip it. Publish a "
+                "version and make sure the tree is active, then run again."
+            ),
+            type_=f"{_TYPE_BASE}/decision-tree-not-runnable",
+            extras={"tree_code": tree_code},
+        )
