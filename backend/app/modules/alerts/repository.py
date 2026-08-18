@@ -14,16 +14,23 @@ now owns signal loading + tree evaluation; tree leaves with
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy import bindparam, select, text
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.alerts.models import Alert
+from app.shared.action_items import ALERT_SQL
+
+# Alert lifecycle values that still count as live. Kept as one SQL fragment
+# so the dedup predicate, the group lookups and the cascade cannot disagree
+# about what "still open" means.
+_ACTIVE = ALERT_SQL.active
 
 
 def _serialize_jsonb(value: dict[str, Any] | None) -> str | None:
@@ -64,6 +71,10 @@ class AlertsRepository:
         prescription_activity_id: UUID | None,
         signal_snapshot: dict[str, Any] | None,
         actor_user_id: UUID | None,
+        group_key: str | None = None,
+        group_parent_id: UUID | None = None,
+        is_group: bool = False,
+        today: date | None = None,
     ) -> bool:
         """Open one alert. Returns True if a row was inserted, False if
         the partial UNIQUE on (block_id, rule_code) blocked it (an
@@ -87,14 +98,18 @@ class AlertsRepository:
                         diagnosis_en, diagnosis_ar,
                         prescription_en, prescription_ar,
                         prescription_activity_id,
-                        signal_snapshot, created_by, updated_by
+                        signal_snapshot, created_by, updated_by,
+                        group_key, group_parent_id, is_group,
+                        first_seen_at, last_seen_at, last_seen_day
                     ) VALUES (
                         :id, :block_id, :cell_id, :rule_code, :severity,
                         :action_type, 'open',
                         :diag_en, :diag_ar,
                         :pre_en, :pre_ar,
                         :prescription_activity_id,
-                        CAST(:snapshot AS jsonb), :actor, :actor
+                        CAST(:snapshot AS jsonb), :actor, :actor,
+                        :group_key, :group_parent_id, :is_group,
+                        now(), now(), CAST(:today AS date)
                     )
                     """
                 ).bindparams(
@@ -103,6 +118,7 @@ class AlertsRepository:
                     bindparam("cell_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("prescription_activity_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                    bindparam("group_parent_id", type_=PG_UUID(as_uuid=True)),
                 ),
                 {
                     "id": alert_id,
@@ -118,6 +134,10 @@ class AlertsRepository:
                     "prescription_activity_id": prescription_activity_id,
                     "snapshot": _serialize_jsonb(signal_snapshot),
                     "actor": actor_user_id,
+                    "group_key": group_key,
+                    "group_parent_id": group_parent_id,
+                    "is_group": is_group,
+                    "today": today,
                 },
             )
             await savepoint.commit()
@@ -126,11 +146,238 @@ class AlertsRepository:
             # Partial UNIQUE on (block_id, rule_code) WHERE status IN
             # open/ack/snoozed — re-firing while a prior alert is
             # active is a no-op by design.
-            if "uq_alerts_block_rule_open" in str(exc):
+            msg = str(exc)
+            if "uq_alerts_block_rule_open" in msg or "uq_alerts_group_open" in msg:
                 return False
             raise
         await self._tenant.flush()
         return True
+
+    # ---- Grouping + recurrence (tenant migration 0079) ------------------
+    #
+    # The mirror of the recommendations side. Alerts differ in two ways that
+    # leak into every statement here: the lifecycle column is `status` (with
+    # three live values, not one), and there is no `tree_id` — provenance
+    # lives in the synthesised `rule_code`, so a tree-scoped sweep has to key
+    # off the first segment of `group_key` instead.
+
+    async def find_open_group_parent(self, *, block_id: UUID, group_key: str) -> UUID | None:
+        return (
+            await self._tenant.execute(
+                text(
+                    "SELECT id FROM alerts "  # noqa: S608 - _ACTIVE is a module constant
+                    " WHERE block_id = :b AND group_key = :k AND is_group = TRUE "
+                    f"   AND status IN ({_ACTIVE}) AND deleted_at IS NULL"
+                ).bindparams(bindparam("b", type_=PG_UUID(as_uuid=True))),
+                {"b": block_id, "k": group_key},
+            )
+        ).scalar_one_or_none()
+
+    async def find_open_alert(self, *, block_id: UUID, rule_code: str) -> UUID | None:
+        """The alert the partial UNIQUE just refused to duplicate."""
+        return (
+            await self._tenant.execute(
+                text(
+                    "SELECT id FROM alerts "  # noqa: S608 - _ACTIVE is a module constant
+                    " WHERE block_id = :b AND rule_code = :r "
+                    f"   AND status IN ({_ACTIVE}) AND deleted_at IS NULL"
+                ).bindparams(bindparam("b", type_=PG_UUID(as_uuid=True))),
+                {"b": block_id, "r": rule_code},
+            )
+        ).scalar_one_or_none()
+
+    async def bump_recurrence(
+        self, *, row_id: UUID, today: date, actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        row = (
+            (
+                await self._tenant.execute(
+                    text(ALERT_SQL.bump).bindparams(
+                        bindparam("id", type_=PG_UUID(as_uuid=True)),
+                        bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {"id": row_id, "today": today, "actor": actor_user_id},
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        return dict(row) if row is not None else {}
+
+    async def attach_child(
+        self,
+        *,
+        child_id: UUID,
+        parent_id: UUID,
+        group_key: str,
+        diagnosis_en: str | None,
+        diagnosis_ar: str | None,
+        signal_snapshot: dict[str, Any] | None,
+        today: date,
+        actor_user_id: UUID | None,
+    ) -> None:
+        """Re-point an already-active per-cell alert at its group, refreshed."""
+        await self._tenant.execute(
+            text(
+                """
+                UPDATE alerts
+                   SET group_parent_id = :parent, group_key = :key,
+                       diagnosis_en = :diag_en, diagnosis_ar = :diag_ar,
+                       signal_snapshot = CAST(:snapshot AS jsonb),
+                       cleared_at = NULL,
+                       updated_at = now(), updated_by = :actor
+                 WHERE id = :id
+                """
+            ).bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True)),
+                bindparam("parent", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {
+                "id": child_id,
+                "parent": parent_id,
+                "key": group_key,
+                "diag_en": diagnosis_en,
+                "diag_ar": diagnosis_ar,
+                "snapshot": _serialize_jsonb(signal_snapshot),
+                "actor": actor_user_id,
+            },
+        )
+        await self.bump_recurrence(row_id=child_id, today=today, actor_user_id=actor_user_id)
+
+    async def refresh_member_count(self, *, parent_id: UUID, today: date) -> int:
+        return (
+            await self._tenant.execute(
+                text(ALERT_SQL.refresh_member_count).bindparams(
+                    bindparam("parent_id", type_=PG_UUID(as_uuid=True))
+                ),
+                {"parent_id": parent_id, "today": today},
+            )
+        ).scalar_one_or_none() or 0
+
+    async def clear_stale_children(
+        self, *, block_id: UUID, tree_code: str, fired_ids: list[UUID]
+    ) -> tuple[UUID, ...]:
+        """Mark this tree's cells that did not fire in the pass just finished.
+
+        Scoped by the `group_key` prefix rather than a tree id, because the
+        alerts table has never had one — the tree code is the first segment of
+        the key the engine writes, and matching on it keeps one tree's sweep
+        from clearing another tree's group.
+        """
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        ALERT_SQL.clear_stale_children("split_part(group_key, ':', 1) = :tree_code")
+                    ).bindparams(
+                        bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                        bindparam("fired", type_=postgresql.ARRAY(PG_UUID(as_uuid=True))),
+                    ),
+                    {"block_id": block_id, "tree_code": tree_code, "fired": fired_ids},
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return tuple(r for r in rows if r is not None)
+
+    async def refresh_member_counts_for_tree(
+        self, *, block_id: UUID, tree_code: str, today: date
+    ) -> None:
+        await self._tenant.execute(
+            text(
+                ALERT_SQL.refresh_member_counts_scoped(
+                    "split_part(p.group_key, ':', 1) = :tree_code"
+                )
+            ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+            {"block_id": block_id, "tree_code": tree_code, "today": today},
+        )
+
+    async def open_group_parent_ids(self, *, block_id: UUID, tree_code: str) -> tuple[UUID, ...]:
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        ALERT_SQL.open_parent_ids("split_part(group_key, ':', 1) = :tree_code")
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                    {"block_id": block_id, "tree_code": tree_code},
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return tuple(rows)
+
+    async def list_group_members(self, *, parent_id: UUID) -> tuple[dict[str, Any], ...]:
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        """
+                        SELECT a.id, a.cell_id, a.severity, a.status AS state,
+                               a.diagnosis_en AS text_en, a.diagnosis_ar AS text_ar,
+                               a.created_at, a.last_seen_at, a.cleared_at,
+                               a.occurrence_count, a.day_streak,
+                               gc.row_idx, gc.col_idx, gc.area_m2,
+                               ST_Y(gc.centroid::geometry) AS lat,
+                               ST_X(gc.centroid::geometry) AS lon
+                          FROM alerts a
+                          LEFT JOIN grid_cells gc ON gc.id = a.cell_id
+                         WHERE a.group_parent_id = :p AND a.deleted_at IS NULL
+                         ORDER BY a.cleared_at NULLS FIRST, gc.row_idx, gc.col_idx
+                        """
+                    ).bindparams(bindparam("p", type_=PG_UUID(as_uuid=True))),
+                    {"p": parent_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
+    async def cascade_children(
+        self,
+        *,
+        parent_id: UUID,
+        new_status: str,
+        actor_user_id: UUID | None,
+        snoozed_until: datetime | None = None,
+    ) -> tuple[UUID, ...]:
+        """Carry a parent's transition down to every still-active child.
+
+        Children left open under a resolved parent would keep their per-cell
+        dedup keys occupied and silently swallow the next real firing there.
+        """
+        sets = ["status = :status", "updated_at = now()", "updated_by = :actor"]
+        if new_status == "acknowledged":
+            sets += ["acknowledged_at = now()", "acknowledged_by = :actor", "snoozed_until = NULL"]
+        elif new_status == "resolved":
+            sets += ["resolved_at = now()", "resolved_by = :actor", "snoozed_until = NULL"]
+        elif new_status == "snoozed":
+            sets.append("snoozed_until = :snoozed_until")
+        params: dict[str, Any] = {"p": parent_id, "status": new_status, "actor": actor_user_id}
+        if new_status == "snoozed":
+            params["snoozed_until"] = snoozed_until
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        f"UPDATE alerts SET {', '.join(sets)} "  # noqa: S608
+                        f" WHERE group_parent_id = :p AND status IN ({_ACTIVE})"
+                        "   AND deleted_at IS NULL"
+                        " RETURNING id"
+                    ).bindparams(
+                        bindparam("p", type_=PG_UUID(as_uuid=True)),
+                        bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    params,
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return tuple(rows)
 
     async def get_alert(self, *, alert_id: UUID) -> dict[str, Any] | None:
         stmt = select(Alert).where(Alert.id == alert_id, Alert.deleted_at.is_(None))
@@ -146,7 +393,9 @@ class AlertsRepository:
         severity_filter: tuple[str, ...] = (),
         limit: int = 100,
     ) -> tuple[dict[str, Any], ...]:
-        clauses = ["deleted_at IS NULL"]
+        # Members of a group are excluded — the parent stands for them. See
+        # `list_group_members` for the cells behind one.
+        clauses = ["deleted_at IS NULL", "group_parent_id IS NULL"]
         params: dict[str, Any] = {"limit": limit}
         if block_id is not None:
             clauses.append("block_id = :block_id")
@@ -173,7 +422,11 @@ class AlertsRepository:
             "       rule_code, severity, status, "
             "       diagnosis_en, diagnosis_ar, prescription_en, prescription_ar, "
             "       prescription_activity_id, "
-            "       signal_snapshot, created_at, updated_at, "
+            "       signal_snapshot, "
+            "       group_key, group_parent_id, is_group, member_count, "
+            "       occurrence_count, day_streak, first_seen_at, "
+            "       last_seen_at, last_seen_day, cleared_at, "
+            "       created_at, updated_at, "
             "       acknowledged_at, acknowledged_by, "
             "       resolved_at, resolved_by, snoozed_until "
             "FROM alerts "
@@ -245,6 +498,15 @@ def _alert_to_dict(row: Alert) -> dict[str, Any]:
         "prescription_ar": row.prescription_ar,
         "prescription_activity_id": row.prescription_activity_id,
         "signal_snapshot": row.signal_snapshot,
+        "group_key": row.group_key,
+        "group_parent_id": row.group_parent_id,
+        "is_group": row.is_group,
+        "member_count": row.member_count,
+        "occurrence_count": row.occurrence_count,
+        "day_streak": row.day_streak,
+        "first_seen_at": row.first_seen_at,
+        "last_seen_at": row.last_seen_at,
+        "cleared_at": row.cleared_at,
         "created_at": row.created_at,
         "updated_at": row.updated_at,
         "acknowledged_at": row.acknowledged_at,

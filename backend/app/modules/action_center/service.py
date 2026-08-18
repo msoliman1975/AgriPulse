@@ -19,10 +19,15 @@ from app.modules.action_center.schemas import (
     ActionItem,
     ActionItemGroup,
     ActionItemListResponse,
+    ActionItemMember,
+    ActionItemMembersResponse,
+    Aggregation,
     CellLocation,
     DispatchResponse,
     DispatchResultItem,
+    Recurrence,
 )
+from app.shared.action_items import derive_recurrence, derive_spread
 
 # Recommendation action_type -> board activity_type. Mirrors the map the
 # rec-schedule flow already uses; kept here rather than imported so a change to
@@ -157,29 +162,65 @@ def derive_why(row: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
     return None, {}
 
 
+def _cell_of(row: dict[str, Any]) -> CellLocation | None:
+    if row.get("cell_id") is None:
+        return None
+    return CellLocation(
+        cell_id=row["cell_id"],
+        row=row.get("row_idx") or 0,
+        col=row.get("col_idx") or 0,
+        ordinal=row.get("ordinal"),
+        total=row.get("total"),
+        lat=row.get("lat"),
+        lon=row.get("lon"),
+        area_m2=row.get("area_m2"),
+    )
+
+
+def to_member(row: dict[str, Any]) -> ActionItemMember:
+    return ActionItemMember(
+        id=row["id"],
+        cell=_cell_of(row),
+        severity=row["severity"],
+        native_status=row["native_status"],
+        text_en=row.get("text_en"),
+        text_ar=row.get("text_ar"),
+        created_at=row["created_at"],
+        last_seen_at=row.get("last_seen_at"),
+        cleared_at=row.get("cleared_at"),
+        occurrence_count=row.get("occurrence_count") or 1,
+        day_streak=row.get("day_streak") or 1,
+    )
+
+
 def to_item(row: dict[str, Any], *, now: datetime) -> ActionItem:
     bucket, due_date = derive_due(row, now=now)
     why, reasoning = derive_why(row)
-    cell = None
-    if row.get("cell_id") is not None:
-        cell = CellLocation(
-            cell_id=row["cell_id"],
-            row=row.get("row_idx") or 0,
-            col=row.get("col_idx") or 0,
-            ordinal=row.get("ordinal"),
-            total=row.get("total"),
-            lat=row.get("lat"),
-            lon=row.get("lon"),
-            area_m2=row.get("area_m2"),
-        )
+    cell = _cell_of(row)
+    status = unified_status(
+        row["kind"],
+        row["native_status"],
+        has_assignee=row.get("assigned_membership_id") is not None,
+    )
+    # "Acted" is anything past needs_action: dispatched, done, or knowingly set
+    # aside. Escalation is about neglect, so an item somebody is already
+    # dealing with never climbs past `recurring` no matter how long the tree
+    # keeps agreeing with itself.
+    recurrence = Recurrence(
+        state=derive_recurrence(
+            day_streak=row.get("day_streak") or 1,
+            occurrence_count=row.get("occurrence_count") or 1,
+            acted=status != "needs_action",
+        ),
+        occurrence_count=row.get("occurrence_count") or 1,
+        day_streak=row.get("day_streak") or 1,
+        first_seen_at=row.get("first_seen_at"),
+        last_seen_at=row.get("last_seen_at"),
+    )
     return ActionItem(
         id=row["id"],
         kind=row["kind"],
-        status=unified_status(
-            row["kind"],
-            row["native_status"],
-            has_assignee=row.get("assigned_membership_id") is not None,
-        ),
+        status=status,
         native_status=row["native_status"],
         farm_id=row["farm_id"],
         block_id=row["block_id"],
@@ -205,6 +246,17 @@ def to_item(row: dict[str, Any], *, now: datetime) -> ActionItem:
         scheduled_date=row.get("scheduled_date"),
         why=why,
         reasoning=reasoning,
+        aggregation=Aggregation(
+            is_group=bool(row.get("is_group")),
+            member_count=row.get("member_count") or 0,
+            previous_member_count=row.get("previous_member_count") or 0,
+            trend=derive_spread(
+                is_group=bool(row.get("is_group")),
+                member_count=row.get("member_count") or 0,
+                previous_member_count=row.get("previous_member_count") or 0,
+            ),
+        ),
+        recurrence=recurrence,
     )
 
 
@@ -276,7 +328,20 @@ def _group(
         count=len(items),
         critical_count=sum(1 for i in items if i.severity == "critical"),
         block_count=len({i.block_id for i in items}),
-        cell_count=sum(1 for i in items if i.cell is not None),
+        # Cells covered, not rows shown. An aggregate row stands for its whole
+        # membership; counting it as one would report a quieter farm every time
+        # the grouping did its job.
+        cell_count=sum(
+            (
+                i.aggregation.member_count
+                if i.aggregation.is_group
+                else (1 if i.cell is not None else 0)
+            )
+            for i in items
+        ),
+        aggregate_count=sum(1 for i in items if i.aggregation.is_group),
+        spreading_count=sum(1 for i in items if i.aggregation.trend == "spreading"),
+        recurring_count=sum(1 for i in items if i.recurrence.state != "new"),
         responsible_membership_id=responsible_membership_id,
         items=items,
     )
@@ -334,6 +399,28 @@ class ActionCenterServiceImpl:
             status_counts=counts,
             grouped_by=group_by,
             groups=build_groups(items, group_by=group_by, responsible=responsible),
+        )
+
+    async def list_members(
+        self, *, farm_id: UUID, item_id: UUID
+    ) -> ActionItemMembersResponse | None:
+        """The cells behind one aggregated item.
+
+        Resolved through `get_item` first, which is also the authorization
+        boundary: it is farm-scoped, so a member list cannot be used to read
+        across farms by guessing a parent id.
+        """
+        parent = await self._repo.get_item(farm_id=farm_id, item_id=item_id)
+        if parent is None:
+            return None
+        rows = await self._repo.list_members(kind=parent["kind"], parent_id=item_id)
+        members = [to_member(r) for r in rows]
+        return ActionItemMembersResponse(
+            item_id=item_id,
+            kind=parent["kind"],
+            total=len(members),
+            active=sum(1 for m in members if m.cleared_at is None),
+            members=members,
         )
 
     async def dispatch(

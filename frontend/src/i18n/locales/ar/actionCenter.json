@@ -81,7 +81,10 @@
     "noResponsible": "لا يوجد مسؤول",
     "collapse": "طيّ {{group}}",
     "expand": "توسيع {{group}}",
-    "selectAllIn": "تحديد كل ما في {{group}}"
+    "selectAllIn": "تحديد كل ما في {{group}}",
+    "aggregated": "{{count}} مُجمَّع",
+    "recurring": "{{count}} متكرر",
+    "spreading": "{{count}} في اتساع"
   },
   "row": {
     "select": "تحديد العنصر",
@@ -90,7 +93,8 @@
     "cell": "خلية {{cellNo}}",
     "wholeBlock": "القطعة كاملة · {{block}}",
     "raised": "صدر {{when}}",
-    "scheduled": "مجدول {{date}}"
+    "scheduled": "مجدول {{date}}",
+    "lastSeen": "آخر ظهور {{when}}"
   },
   "why": {
     "title": "سبب التفعيل",
@@ -134,5 +138,32 @@
     "cancel": "إلغاء",
     "close": "إغلاق",
     "failed": "فشل الإسناد. لم يتم إسناد أي عنصر."
+  },
+  "aggregate": {
+    "zones": "{{count}} مناطق",
+    "zones_one": "منطقة واحدة",
+    "acrossBlock": "{{count}} مناطق في الحقل {{block}}",
+    "acrossBlock_one": "منطقة واحدة في الحقل {{block}}",
+    "zonesSpreading": "{{count}} مناطق ▲ من {{previous}}",
+    "zonesReceding": "{{count}} مناطق ▼ من {{previous}}"
+  },
+  "recurrence": {
+    "recurring": "متكرر · {{count}} أيام",
+    "recurring_one": "متكرر · يوم واحد",
+    "persistent": "لم يُتخذ إجراء · {{count}} أيام",
+    "persistent_one": "لم يُتخذ إجراء · يوم واحد",
+    "summary": "ظهر في {{days}} يوم، منها {{streak}} أيام متتالية."
+  },
+  "members": {
+    "title": "المناطق ({{active}} من {{total}} ما زالت نشطة)",
+    "loading": "جارٍ تحميل المناطق…",
+    "failed": "تعذر تحميل مناطق هذا العنصر.",
+    "none": "لا توجد مناطق مسجلة لهذا العنصر.",
+    "cellAt": "ص{{row}}ع{{col}}",
+    "unlocated": "منطقة (بدون خلية شبكة)",
+    "cleared": "توقفت",
+    "days": "{{count}} أيام متتالية",
+    "days_one": "يوم واحد",
+    "spreadTitle": "المناطق ({{active}} من {{total}} ما زالت نشطة، كانت {{previous}})"
   }
 }

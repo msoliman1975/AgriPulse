@@ -20,7 +20,11 @@
     "confidence": "الثقة {{percent}}%",
     "zone": "المنطقة {{zone}}",
     "explainShow": "لماذا هذا؟",
-    "explainHide": "إخفاء السبب"
+    "explainHide": "إخفاء السبب",
+    "zones": "{{count}} مناطق",
+    "zones_one": "منطقة واحدة",
+    "recurring": "متكرر · {{count}} أيام",
+    "recurring_one": "متكرر · يوم واحد"
   },
   "actions": {
     "apply": "تطبيق",

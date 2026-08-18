@@ -53,6 +53,20 @@ export function t(lang: Lang, key: MessageKey): string {
 }
 
 /**
+ * A string with one count substituted into it.
+ *
+ * The module header used to say counts could wait for the capture form. They
+ * arrived earlier than that: a visit can now stand for several grid cells and
+ * can have been true for several days, and both are numbers a scout reads on
+ * the row. Still not worth i18next — this is one `{n}` and nothing else. Plural
+ * forms are handled by the caller picking a different key, which is enough for
+ * English and Arabic here and honest about not being a general solution.
+ */
+export function tCount(lang: Lang, key: MessageKey, n: number): string {
+  return t(lang, key).replace("{n}", String(n));
+}
+
+/**
  * "18h" / "2d" / overdue — the countdown the visit ring shows.
  *
  * Rounds rather than floors, for the same reason the push copy does: a visit

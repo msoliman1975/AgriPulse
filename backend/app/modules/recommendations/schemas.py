@@ -72,6 +72,18 @@ class RecommendationResponse(BaseModel):
     outcome_notes: str | None
     created_at: datetime
     updated_at: datetime
+    # Aggregation + recurrence (0079). A cell-scoped tree that fires on many
+    # cells of one block returns ONE row here — the group — with
+    # `member_count` cells behind it; the members are never listed. The
+    # Action Center gives them a richer shape (`aggregation` / `recurrence`
+    # objects plus a members endpoint); this list is the flat module view, so
+    # the fields travel flat.
+    is_group: bool = False
+    member_count: int = 0
+    occurrence_count: int = 1
+    day_streak: int = 1
+    first_seen_at: datetime | None = None
+    last_seen_at: datetime | None = None
 
 
 class RecommendationTransitionRequest(BaseModel):

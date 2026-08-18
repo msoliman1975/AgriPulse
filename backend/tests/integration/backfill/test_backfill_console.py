@@ -149,7 +149,14 @@ async def test_run_lifecycle_and_single_run_per_farm(
         assert created.status_code == 201, created.text
         run = created.json()
         assert run["status"] == "queued"
-        assert run["sources"] == {"imagery": True, "weather": True}
+        # Asserted per source rather than as a whole dict. #483 added `thermal`
+        # as a third source and this assertion was not updated with it; the
+        # test only skips past that when the fixture DB happens to give it no
+        # unoccupied farm, so it was green by luck of module ordering. What the
+        # request asked for is what must come back — a source it did not
+        # mention is not this test's business.
+        assert run["sources"]["imagery"] is True
+        assert run["sources"]["weather"] is True
         assert run["kind"] == "backfill"
 
         # Both sources dispatched, and imagery must stay raw-only.

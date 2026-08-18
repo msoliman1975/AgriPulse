@@ -48,10 +48,21 @@ body { background: var(--field); color: var(--ink); }
 .visit .title { font-size: 15px; font-weight: 650; }
 /* A person wrote this — the only warm surface in the app. */
 .visit .instruction { font-size: 13px; color: var(--sand); margin-top: 4px; }
-.visit .meta { margin-top: 8px; }
+.visit .meta { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;
+  align-items: center; }
 .visit .origin { font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
   padding: 3px 7px; border-radius: 5px; background: var(--field2); color: var(--muted); }
 .visit .origin-ad_hoc { background: #3a3222; color: var(--sand); }
+/* Extent and age. Neither is a severity, so neither borrows the severity
+   palette — a nine-zone info visit is wide, not urgent, and colouring it red
+   would teach a scout to read the wrong thing first. */
+.visit .zones, .visit .streak, .visit .trend { font-size: 10px; letter-spacing: .03em;
+  padding: 3px 7px; border-radius: 5px; background: var(--field2); color: var(--sand); }
+.visit .streak { color: var(--watch); }
+/* Getting worse borrows the watch colour; getting better is the one place on
+   this row that reads as good news. */
+.visit .trend-spreading { color: var(--watch); }
+.visit .trend-receding { color: var(--sage); }
 .visit button { padding: 10px 14px; border: 0; border-radius: 10px;
   background: var(--sage); color: #fff; font-size: 13px; font-weight: 650; }
 .error { color: var(--crit); font-size: 13px; margin-top: 12px; }

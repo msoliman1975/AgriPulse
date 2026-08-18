@@ -23,6 +23,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.shared.action_items import RecurrenceState, SpreadTrend
+
 ItemKind = Literal["recommendation", "alert"]
 
 # Unified lifecycle. The mapping from the native states is in service.py and
@@ -56,6 +58,78 @@ class CellLocation(BaseModel):
     lat: float | None = None
     lon: float | None = None
     area_m2: Decimal | None = None
+
+
+class Aggregation(BaseModel):
+    """How many cells this one row stands for.
+
+    Present on every item so the client never has to branch on its absence.
+    `is_group` false with `member_count` 0 is an ordinary block-scoped item —
+    one place, one finding. `is_group` true means the row is the aggregate of
+    `member_count` grid cells that all hit the same leaf of the same tree at
+    the same severity on the same block, and the cells themselves are one
+    request away at `/action-items/{id}/members`.
+    """
+
+    is_group: bool = False
+    member_count: int = 0
+    # What the count was at the end of the previous evaluation day, and which
+    # way that makes this finding move. Without the baseline the aggregation
+    # would hide the one thing it must not: a 12-cell finding and a 20-cell one
+    # render identically, because a count with no baseline is not a trend.
+    previous_member_count: int = 0
+    trend: SpreadTrend = "unknown"
+
+
+class Recurrence(BaseModel):
+    """How long this finding has been true, and whether anyone has moved.
+
+    The counters are facts recorded by the evaluator; `state` is the reading
+    the UI badges. Severity is deliberately not derived from any of this — the
+    tree decided the agronomy, and how long a supervisor has left it alone is a
+    different fact that must not be allowed to rewrite the first.
+    """
+
+    state: RecurrenceState = "new"
+    # Distinct days this item has fired, first day included.
+    occurrence_count: int = 1
+    # Consecutive firing days. 6 means six mornings in a row.
+    day_streak: int = 1
+    first_seen_at: datetime | None = None
+    last_seen_at: datetime | None = None
+
+
+class ActionItemMember(BaseModel):
+    """One cell under a group.
+
+    Not actionable on its own — the group is the unit a supervisor decides
+    about. This is what the map colours and what the drill-down lists, so it
+    carries the cell's own location, its own severity and its own clock.
+    """
+
+    id: UUID
+    cell: CellLocation | None = None
+    severity: str
+    native_status: str
+    text_en: str | None = None
+    text_ar: str | None = None
+    created_at: datetime
+    last_seen_at: datetime | None = None
+    # Set once this cell stopped firing. The member stays attached — a cell
+    # that has gone quiet is how a receding outbreak looks, and dropping it
+    # would make that indistinguishable from one that never spread.
+    cleared_at: datetime | None = None
+    occurrence_count: int = 1
+    day_streak: int = 1
+
+
+class ActionItemMembersResponse(BaseModel):
+    item_id: UUID
+    kind: ItemKind
+    total: int
+    # Members still firing as of the last evaluation.
+    active: int
+    members: list[ActionItemMember]
 
 
 class ActionItem(BaseModel):
@@ -113,6 +187,10 @@ class ActionItem(BaseModel):
     why: str | None = None
     reasoning: dict[str, Any] = Field(default_factory=dict)
 
+    # Both always present, so a client never has to branch on absence.
+    aggregation: Aggregation = Field(default_factory=Aggregation)
+    recurrence: Recurrence = Field(default_factory=Recurrence)
+
 
 class ActionItemGroup(BaseModel):
     """Server-side grouping, so the client is not the thing that decides what a
@@ -123,7 +201,17 @@ class ActionItemGroup(BaseModel):
     count: int
     critical_count: int
     block_count: int
+    # Cells covered, not rows shown: a group of 14 contributes 14. Counting
+    # rows here would report a quieter farm every time the aggregation worked.
     cell_count: int
+    # Rows in this group that are themselves aggregates of several cells.
+    aggregate_count: int = 0
+    # Aggregates that covered materially more cells today than yesterday. The
+    # count a supervisor should read first — a spreading finding outranks a
+    # merely persistent one.
+    spreading_count: int = 0
+    # Rows firing on consecutive days with nobody acting on them.
+    recurring_count: int = 0
     # Only populated when grouping by block: the member responsible for it.
     responsible_membership_id: UUID | None = None
     items: list[ActionItem]

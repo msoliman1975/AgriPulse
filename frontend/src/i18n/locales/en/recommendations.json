@@ -20,7 +20,11 @@
     "confidence": "confidence {{percent}}%",
     "zone": "zone {{zone}}",
     "explainShow": "Why this?",
-    "explainHide": "Hide reasoning"
+    "explainHide": "Hide reasoning",
+    "zones": "{{count}} zones",
+    "zones_one": "{{count}} zone",
+    "recurring": "Recurring · {{count}} days",
+    "recurring_one": "Recurring · {{count}} day"
   },
   "actions": {
     "apply": "Apply",

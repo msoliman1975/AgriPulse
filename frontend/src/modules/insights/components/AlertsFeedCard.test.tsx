@@ -34,6 +34,12 @@ function alert(id: string, blockId: string): Alert {
     resolved_at: null,
     resolved_by: null,
     snoozed_until: null,
+    is_group: false,
+    member_count: 0,
+    occurrence_count: 1,
+    day_streak: 1,
+    first_seen_at: null,
+    last_seen_at: null,
   };
 }
 

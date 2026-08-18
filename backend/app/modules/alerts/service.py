@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import get_logger
 from app.modules.alerts.errors import (
     AlertNotFoundError,
+    GroupMemberNotActionableError,
     InvalidAlertTransitionError,
 )
 from app.modules.alerts.events import (
@@ -97,7 +98,7 @@ class AlertsServiceImpl:
 
     # ---- Transitions --------------------------------------------------
 
-    async def transition_alert(
+    async def transition_alert(  # noqa: PLR0912 - state-machine transition handler
         self,
         *,
         alert_id: UUID,
@@ -120,6 +121,14 @@ class AlertsServiceImpl:
         before = await self._repo.get_alert(alert_id=alert_id)
         if before is None:
             raise AlertNotFoundError(alert_id)
+        if before.get("group_parent_id") is not None:
+            # A member is one cell's evidence under a group. Closing it alone
+            # would leave the group open with a hole in it — and the client is
+            # almost certainly holding a stale id, so point it at the parent
+            # rather than half-performing what it asked for.
+            raise GroupMemberNotActionableError(
+                alert_id=alert_id, parent_id=before["group_parent_id"]
+            )
         current = before["status"]
 
         if action == "acknowledge":
@@ -147,6 +156,17 @@ class AlertsServiceImpl:
             actor_user_id=actor_user_id,
             snoozed_until=snooze_until,
         )
+        # The group is the unit that was acted on, so its members move with it.
+        # A member left active under a resolved parent would keep its cell's
+        # dedup key occupied and silently swallow the next real firing there.
+        cascaded: tuple[UUID, ...] = ()
+        if before.get("is_group"):
+            cascaded = await self._repo.cascade_children(
+                parent_id=alert_id,
+                new_status=new_status,
+                actor_user_id=actor_user_id,
+                snoozed_until=snooze_until,
+            )
         after = await self._repo.get_alert(alert_id=alert_id)
         if after is None:
             raise AlertNotFoundError(alert_id)
@@ -162,6 +182,7 @@ class AlertsServiceImpl:
                 "block_id": str(before["block_id"]),
                 "rule_code": before["rule_code"],
                 "previous_status": current,
+                "cascaded_members": len(cascaded),
             },
         )
 

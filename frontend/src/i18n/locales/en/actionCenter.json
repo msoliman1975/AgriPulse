@@ -81,7 +81,10 @@
     "noResponsible": "No one responsible",
     "collapse": "Collapse {{group}}",
     "expand": "Expand {{group}}",
-    "selectAllIn": "Select all in {{group}}"
+    "selectAllIn": "Select all in {{group}}",
+    "aggregated": "{{count}} aggregated",
+    "recurring": "{{count}} recurring",
+    "spreading": "{{count}} spreading"
   },
   "row": {
     "select": "Select item",
@@ -90,7 +93,8 @@
     "cell": "cell {{cellNo}}",
     "wholeBlock": "Whole block · {{block}}",
     "raised": "raised {{when}}",
-    "scheduled": "scheduled {{date}}"
+    "scheduled": "scheduled {{date}}",
+    "lastSeen": "last seen {{when}}"
   },
   "why": {
     "title": "Why this fired",
@@ -134,5 +138,32 @@
     "cancel": "Cancel",
     "close": "Close",
     "failed": "Dispatch failed. Nothing was assigned."
+  },
+  "aggregate": {
+    "zones": "{{count}} zones",
+    "zones_one": "{{count}} zone",
+    "acrossBlock": "{{count}} zones in block {{block}}",
+    "acrossBlock_one": "{{count}} zone in block {{block}}",
+    "zonesSpreading": "{{count}} zones ▲ from {{previous}}",
+    "zonesReceding": "{{count}} zones ▼ from {{previous}}"
+  },
+  "recurrence": {
+    "recurring": "Recurring · {{count}} days",
+    "recurring_one": "Recurring · {{count}} day",
+    "persistent": "Not acted on · {{count}} days",
+    "persistent_one": "Not acted on · {{count}} day",
+    "summary": "Fired on {{days}} days, {{streak}} of them consecutive."
+  },
+  "members": {
+    "title": "Zones ({{active}} of {{total}} still firing)",
+    "loading": "Loading zones…",
+    "failed": "Could not load this item's zones.",
+    "none": "No zones are recorded against this item.",
+    "cellAt": "R{{row}}C{{col}}",
+    "unlocated": "Zone (no grid cell)",
+    "cleared": "Stopped",
+    "days": "{{count}} days running",
+    "days_one": "{{count}} day",
+    "spreadTitle": "Zones ({{active}} of {{total}} still firing, was {{previous}})"
   }
 }

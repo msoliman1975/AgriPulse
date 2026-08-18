@@ -20,19 +20,88 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.shared.action_items import derive_spread
+
 # Every column the API returns. `pin_point` is rendered, not selected raw.
+#
+# Qualified with `v.` and read through `_VISIT_FROM` because the visit is
+# joined to whatever raised it. Unqualified `id` would be ambiguous the moment
+# those joins exist — all three tables have one.
 _VISIT_COLUMNS = """
-    id, farm_id, block_id, cell_id, origin,
-    recommendation_id, alert_id, schedule_id,
-    title, instruction, reason_snapshot,
-    CASE WHEN pin_point IS NULL THEN NULL
-         ELSE ST_AsGeoJSON(pin_point)::jsonb END AS pin_point,
-    severity, priority, due_by, status, outcome,
-    assigned_to, assigned_by, assigned_at, accepted_at, started_at,
-    completed_at, completed_by, decline_reason,
-    template_id, observation_group_id, summary_note,
-    created_at, updated_at
+    v.id, v.farm_id, v.block_id, v.cell_id, v.origin,
+    v.recommendation_id, v.alert_id, v.schedule_id,
+    v.title, v.instruction, v.reason_snapshot,
+    CASE WHEN v.pin_point IS NULL THEN NULL
+         ELSE ST_AsGeoJSON(v.pin_point)::jsonb END AS pin_point,
+    v.severity, v.priority, v.due_by, v.status, v.outcome,
+    v.assigned_to, v.assigned_by, v.assigned_at, v.accepted_at, v.started_at,
+    v.completed_at, v.completed_by, v.decline_reason,
+    v.template_id, v.observation_group_id, v.summary_note,
+    v.created_at, v.updated_at,
+    -- What the source item has become since this visit was raised (0079).
+    -- Read live rather than snapshotted into `reason_snapshot`: a visit is
+    -- written once, and "this has now fired six mornings running" is precisely
+    -- the fact that changes after that. A scout holding a stale copy of it
+    -- would be told the problem is newer than it is.
+    COALESCE(r.is_group, a.is_group)                 AS source_is_group,
+    COALESCE(r.member_count, a.member_count)         AS source_member_count,
+    COALESCE(r.previous_member_count, a.previous_member_count)
+                                                     AS source_previous_member_count,
+    COALESCE(r.occurrence_count, a.occurrence_count) AS source_occurrence_count,
+    COALESCE(r.day_streak, a.day_streak)             AS source_day_streak,
+    COALESCE(r.first_seen_at, a.first_seen_at)       AS source_first_seen_at,
+    COALESCE(r.last_seen_at, a.last_seen_at)         AS source_last_seen_at
 """
+
+# A visit points at a recommendation OR an alert OR neither (routine, ad-hoc,
+# self-initiated). Both joins are LEFT and both sides are keyed on a primary
+# key, so the two extra lookups per row cost an index probe each.
+_VISIT_FROM = """
+    FROM scouting_visits v
+    LEFT JOIN recommendations r ON r.id = v.recommendation_id
+    LEFT JOIN alerts a ON a.id = v.alert_id
+"""
+
+
+# The joined columns above arrive flat; the API shape is nested. Folded here
+# rather than in the router so every read path — list, get, idempotency replay
+# — carries it, and a new one cannot forget to.
+_SOURCE_FIELDS = (
+    "is_group",
+    "member_count",
+    "previous_member_count",
+    "occurrence_count",
+    "day_streak",
+    "first_seen_at",
+    "last_seen_at",
+)
+
+
+def _nest_source(row: dict[str, Any]) -> dict[str, Any]:
+    """Fold `source_*` into a `source` object, defaulting a sourceless visit.
+
+    A routine or ad-hoc visit has no decision-engine row behind it, so every
+    joined column is NULL. The defaults describe exactly that — one occurrence,
+    no group — rather than leaving nulls for the client to interpret.
+    """
+    source: dict[str, Any] = {}
+    for field in _SOURCE_FIELDS:
+        source[field] = row.pop(f"source_{field}", None)
+    row["source"] = {
+        "is_group": bool(source["is_group"]),
+        "member_count": source["member_count"] or 0,
+        "previous_member_count": source["previous_member_count"] or 0,
+        "trend": derive_spread(
+            is_group=bool(source["is_group"]),
+            member_count=source["member_count"] or 0,
+            previous_member_count=source["previous_member_count"] or 0,
+        ),
+        "occurrence_count": source["occurrence_count"] or 1,
+        "day_streak": source["day_streak"] or 1,
+        "first_seen_at": source["first_seen_at"],
+        "last_seen_at": source["last_seen_at"],
+    }
+    return row
 
 
 class ScoutingRepository:
@@ -53,51 +122,51 @@ class ScoutingRepository:
         claimable: bool = False,
         limit: int = 200,
     ) -> tuple[dict[str, Any], ...]:
-        clauses = ["deleted_at IS NULL"]
+        clauses = ["v.deleted_at IS NULL"]
         params: dict[str, Any] = {"limit": limit}
         binds: list[Any] = []
         if farm_id is not None:
-            clauses.append("farm_id = :farm_id")
+            clauses.append("v.farm_id = :farm_id")
             params["farm_id"] = farm_id
             binds.append(bindparam("farm_id", type_=PG_UUID(as_uuid=True)))
         if block_id is not None:
-            clauses.append("block_id = :block_id")
+            clauses.append("v.block_id = :block_id")
             params["block_id"] = block_id
             binds.append(bindparam("block_id", type_=PG_UUID(as_uuid=True)))
         if assigned_to is not None:
-            clauses.append("assigned_to = :assigned_to")
+            clauses.append("v.assigned_to = :assigned_to")
             params["assigned_to"] = assigned_to
             binds.append(bindparam("assigned_to", type_=PG_UUID(as_uuid=True)))
         if claimable:
             # Work nobody has taken. Kept as its own bucket so a scout never
             # assumes a colleague already has it.
-            clauses.append("assigned_to IS NULL AND status = 'queued'")
+            clauses.append("v.assigned_to IS NULL AND v.status = 'queued'")
         if statuses:
-            clauses.append("status = ANY(:statuses)")
+            clauses.append("v.status = ANY(:statuses)")
             params["statuses"] = list(statuses)
 
         # Overdue first, then by deadline: a warning due in two hours outranks
         # a critical due tomorrow, and severity alone would invert that.
         sql = (
-            f"SELECT {_VISIT_COLUMNS} FROM scouting_visits "  # noqa: S608
+            f"SELECT {_VISIT_COLUMNS} {_VISIT_FROM} "
             f"WHERE {' AND '.join(clauses)} "
-            "ORDER BY (due_by IS NULL), due_by ASC, "
-            "  CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END "
+            "ORDER BY (v.due_by IS NULL), v.due_by ASC, "
+            "  CASE v.severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END "
             "LIMIT :limit"
         )
         stmt = text(sql)
         if binds:
             stmt = stmt.bindparams(*binds)
         rows = (await self._session.execute(stmt, params)).mappings().all()
-        return tuple(dict(r) for r in rows)
+        return tuple(_nest_source(dict(r)) for r in rows)
 
     async def get_visit(self, *, visit_id: UUID) -> dict[str, Any] | None:
         row = (
             (
                 await self._session.execute(
                     text(
-                        f"SELECT {_VISIT_COLUMNS} FROM scouting_visits "  # noqa: S608
-                        "WHERE id = :id AND deleted_at IS NULL"
+                        f"SELECT {_VISIT_COLUMNS} {_VISIT_FROM} "
+                        "WHERE v.id = :id AND v.deleted_at IS NULL"
                     ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
                     {"id": visit_id},
                 )
@@ -105,15 +174,14 @@ class ScoutingRepository:
             .mappings()
             .first()
         )
-        return dict(row) if row is not None else None
+        return _nest_source(dict(row)) if row is not None else None
 
     async def find_by_idempotency_key(self, *, key: str) -> dict[str, Any] | None:
         row = (
             (
                 await self._session.execute(
                     text(
-                        f"SELECT {_VISIT_COLUMNS} FROM scouting_visits "  # noqa: S608
-                        "WHERE idempotency_key = :key"
+                        f"SELECT {_VISIT_COLUMNS} {_VISIT_FROM} " "WHERE v.idempotency_key = :key"
                     ),
                     {"key": key},
                 )
@@ -121,7 +189,7 @@ class ScoutingRepository:
             .mappings()
             .first()
         )
-        return dict(row) if row is not None else None
+        return _nest_source(dict(row)) if row is not None else None
 
     async def insert_visit(self, *, values: dict[str, Any]) -> dict[str, Any]:
         """Insert a visit. `lat`/`lon`, when present, become `pin_point`."""
