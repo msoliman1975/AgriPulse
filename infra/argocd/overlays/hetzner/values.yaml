@@ -2262,11 +2262,36 @@ global:
   #
   #   api + frontend. NO MIGRATIONS; public 0068, tenant 0078.
   #   Images CONFIRMED by pulling both on the node: api + frontend @ 86faf0b.
+  # api+workers 86faf0b -> 6207ee3 (2026-08-18). BACKEND ONLY — frontend stays
+  # on ceaa572, which is ahead of this SHA's frontend and untouched by it.
+  #
+  # #507: every one of the ten tasks on the `platform.run_tasks` allowlist
+  # carried `ignore_result=True`, so Celery stored nothing and
+  # GET /admin/tasks/runs/{id} reported PENDING forever — for a task that had
+  # already succeeded, indistinguishable from one that never started. Measured:
+  # indices.refresh_index_caggs_for_tenant succeeded in 0.16 s while the caller
+  # polled it PENDING for 480 s. The trigger endpoint shipped in #444 has never
+  # been able to report an outcome. The other 44 tasks keep ignore_result.
+  #
+  # #508: three fixes that let the simulation spine reach Act 3 — httpx client
+  # lifecycle, valid-time sentinels (`0001-01-01` overflowed on a negative
+  # rebase offset), and a loader that runs where the database is.
+  #
+  # Rides along: #513, a maintenance script only.
+  #
+  # No migration in 86faf0b..6207ee3. Image CONFIRMED by pulling
+  # ghcr.io/msoliman1975/agripulse/api:6207ee3 on the node BEFORE this bump.
+  # Forward-only: `git merge-base --is-ancestor 86faf0b1 6207ee3b`.
+  #
+  # Watch after sync: POST /admin/tasks/{name}:run then
+  # GET /admin/tasks/runs/{id} should reach SUCCESS with a result body instead
+  # of sitting on PENDING. Results now occupy Redis db 2 under the default
+  # 24-hour expiry — only for tasks someone actually triggers.
   images:
     api:
-      tag: "86faf0b"
+      tag: "6207ee3"
     workers:
-      tag: "86faf0b"
+      tag: "6207ee3"
     frontend:
       # ceaa572 = #512, the last block-vs-farm wording from #506. On a
       #   whole-farm scene the pixel-cap notice read "the BLOCK is larger
