@@ -2345,11 +2345,25 @@ global:
   #   mobile/, no migrations, and the APK is not deployed by these charts, so
   #   nothing of it reaches prod through this bump.
   #   Images CONFIRMED by pulling both on the node: api + frontend @ 43d7d4e.
+  #
+  # 4bda4c8 = #526, field flags. A scout can report something nobody asked
+  #   about: a note, photos, an optional position and a severity, on a block.
+  #   It draws as a coloured pin on both consoles behind a `Field flags` layer
+  #   toggle (on by default, with a nested `Open flags only`), and carries a
+  #   comment thread a supervisor closes with a reason.
+  #   CARRIES TENANT MIGRATION 0081 — three new tables plus two columns on
+  #   `farms`. Tags roll back; migrations do not, so a tag-only rollback
+  #   leaves the old api reading a schema it does not know about. It is
+  #   additive (no drops, no renames), so an older api simply ignores it.
+  #   api + workers + frontend move TOGETHER: the map layer calls
+  #   /farms/{id}/field-flags, which does not exist on 43d7d4e.
+  #   Images CONFIRMED by pulling both on the node: api @ 9cbc2a28980f,
+  #   frontend @ c03cd32cf333f.
   images:
     api:
-      tag: "43d7d4e"
+      tag: "4bda4c8"
     workers:
-      tag: "43d7d4e"
+      tag: "4bda4c8"
     frontend:
       # 5e84dd6 = #515, the thermal indices reach the decision-tree condition
       #   builder. `lst`/`cwsi`/`smi` were computed and stored per block —
@@ -2370,7 +2384,7 @@ global:
       #   carried `scope`; the notice was not reading it.
       #   FRONTEND ONLY; api + workers stay 86faf0b. No migrations.
       #   Image CONFIRMED by pulling it on the node: frontend @ ceaa572.
-      tag: "43d7d4e"
+      tag: "4bda4c8"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
