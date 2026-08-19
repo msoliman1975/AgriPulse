@@ -83,6 +83,7 @@ PROCESSES = [
             {
                 "t": "Create the farm",
                 "where": "Farm management → New farm",
+                "guide": ("guide-create-a-farm", "Full guide: create a farm"),
                 "steps": [
                     "Give the farm a name your team already uses.",
                     "Set the country. It drives the region targeting used by decision trees.",
@@ -1537,6 +1538,147 @@ CREDITS = [
 
 
 # ===========================================================================
+# Detailed guides — one task, every field, with screenshots
+# ===========================================================================
+
+GUIDES = [
+    {
+        "slug": "guide-create-a-farm",
+        "process": ("process-map-the-farm", "Map the farm", "01"),
+        "img": "p01-map",
+        "title": "Create a farm",
+        "short": "Draw the boundary, name the farm, save it. Two screens, two required fields.",
+        "lede": "A farm is the outer boundary of everything you manage in one place. Imagery and "
+                "weather subscriptions attach to the farm, not to the blocks inside it, so this is "
+                "the first record you create and the one everything else hangs off.",
+        "who": "Tenant admin, farm manager",
+        "time": "5 minutes, once you know where the boundary runs",
+        "clip": "4 minutes",
+        "start": [
+            "A tenant account and a sign-in that can create farms.",
+            "The boundary: either you know where it runs on the map, or you have a KML, "
+            "GeoJSON or zipped Shapefile of it.",
+            "A code and a name your team already uses for this farm.",
+        ],
+        "steps": [
+            {
+                "t": "Open the new farm flow",
+                "img": "guide-farm-01-empty",
+                "cap": "The workspace before any farm exists.",
+                "body": [
+                    "On a new account the workspace opens on <b>No farms yet</b>. Click "
+                    "<b>Create your first farm</b>.",
+                    "If the account already has farms, go to <b>Farm management</b> and start a new "
+                    "farm from there. Both routes open the same two-screen flow at "
+                    "<code>/labs/map?create=farm</code>.",
+                    "Until a farm exists, Insights, Plan, Signals, Action Center, Recommendations, "
+                    "Alerts and Reports are greyed out. They all need a farm to point at.",
+                ],
+            },
+            {
+                "t": "Step 1 of 2 — draw or upload the boundary",
+                "img": "guide-farm-02-step1",
+                "cap": "Step 1. The map opens on satellite imagery so you can trace field edges.",
+                "body": [
+                    "<b>Draw boundary</b> lets you click each corner of the farm on the map. Click "
+                    "once per corner, then double-click the last corner to close the shape.",
+                    "<b>Upload file</b> takes a KML, a GeoJSON, or a Shapefile in a zip. Use this "
+                    "when a surveyor already gave you the boundary.",
+                    "Draw the <b>outer</b> boundary only. Blocks come later, inside it.",
+                    "Include the roads, buildings and canals that sit inside the farm. You mark "
+                    "them as land units afterwards so they stop counting towards crop numbers.",
+                ],
+                "note": "Zoom in before you start drawing. A boundary traced at low zoom is off by "
+                        "tens of metres, and every index number for this farm is computed inside "
+                        "that line.",
+            },
+            {
+                "t": "Check the area before you go on",
+                "img": "guide-farm-03-step2",
+                "cap": "Step 2. The panel header shows the area of the shape you drew.",
+                "body": [
+                    "As soon as the shape closes, the panel header shows the area, for example "
+                    "<b>185.5 feddan</b>. The unit follows the tenant unit setting: feddan, acre "
+                    "or hectare.",
+                    "Compare that figure with what you know the farm to be. A number that is far "
+                    "out means the shape is wrong, and it is much cheaper to fix now.",
+                    "<b>Boundary</b> takes you back to redraw. <b>Cancel</b>, at the top right, "
+                    "throws the whole thing away.",
+                ],
+            },
+            {
+                "t": "Fill the two required fields",
+                "body": [
+                    "<b>Code</b> is the short identifier your team uses, for example "
+                    "<code>GV-01</code>. It appears in lists, exports and reports.",
+                    "<b>Name</b> is the readable name, for example <code>Green Valley North</code>.",
+                    "<b>Create farm</b> stays disabled until both Code and Name are filled. Nothing "
+                    "else on the form is required.",
+                    "Set <b>Country</b> even though it is optional. Decision trees can be written "
+                    "for a region, and a farm with no country matches none of them.",
+                ],
+            },
+            {
+                "t": "Open More details if you have the answers",
+                "img": "guide-farm-04-details",
+                "cap": "More details. Every field here is optional and editable later.",
+                "body": [
+                    "Everything under <b>More details</b> is optional. Skip it if you are recording "
+                    "the farm quickly, and come back later.",
+                    "<b>Primary water source</b> and <b>Farm type</b> are worth setting now. They "
+                    "describe the farm in reports and give context to anyone reading it later.",
+                    "<b>Tags</b> are free text. Use them if you group farms by region or by client.",
+                ],
+            },
+            {
+                "t": "Create the farm",
+                "body": [
+                    "Click <b>Create farm</b>.",
+                    "The farm appears in the farm picker at the top of the workspace, and the "
+                    "workspace pages stop being greyed out.",
+                    "Everything except the boundary can be changed later in Farm settings.",
+                ],
+            },
+        ],
+        "fields": {
+            "cols": ["Field", "Required", "What it is for"],
+            "rows": [
+                ["Boundary", "yes", "The outer edge of the farm. Drawn on the map, or uploaded as KML, GeoJSON or zipped Shapefile."],
+                ["Code", "yes", "Short identifier, for example GV-01. Shows in lists, exports and reports."],
+                ["Name", "yes", "Readable name, for example Green Valley North. Shows in the farm picker."],
+                ["Country", "no", "One of 18 countries. Decision trees can target a region, so a farm with no country matches none of them."],
+                ["Description", "no", "Free text about the farm."],
+                ["Governorate, District", "no", "Administrative location."],
+                ["Nearest city, Address", "no", "Where the farm is, in words."],
+                ["Farm type", "no", "Commercial, Research or Contract. Starts on Commercial."],
+                ["Ownership", "no", "Owned, Leased, Partnership or Other."],
+                ["Primary water source", "no", "Well, Canal, Nile, Desalinated, Rainfed or Mixed."],
+                ["Established date", "no", "When the farm started."],
+                ["Tags", "no", "Free text labels for grouping farms."],
+            ],
+        },
+        "mistakes": {
+            "cols": ["What you see", "What to do"],
+            "rows": [
+                ["Create farm is greyed out", "Code or Name is empty. Both are required. Everything else is optional."],
+                ["The area looks wrong", "The shape is wrong, not the calculation. Click Boundary and redraw at a higher zoom."],
+                ["The boundary cuts through a field", "Redraw before you create blocks. Blocks and grid cells are all computed inside this line."],
+                ["No country set", "The farm still works, but a decision tree written for a region will skip it. Set it in Farm settings."],
+                ["The upload is rejected", "The file must be KML, GeoJSON, or a Shapefile inside a zip. A bare .shp will not do, a Shapefile needs its sidecar files."],
+            ],
+        },
+        "check": [
+            "The farm shows in the farm picker at the top of the workspace.",
+            "The area in Farm settings matches what you know the farm to be.",
+            "The workspace pages are no longer greyed out.",
+        ],
+        "next": [("process-map-the-farm", "Back to Map the farm"),
+                 ("process-plan-the-season", "Plan the season"),
+                 ("concepts", "Key concepts")],
+    },
+]
+
+# ===========================================================================
 # Templates
 # ===========================================================================
 
@@ -1855,12 +1997,17 @@ def build_process(p, prev, nxt) -> str:
                  if st.get("where") else "")
         note = (f'<div class="note"><span class="lab">Note</span><p>{e(st["note"])}</p></div>'
                 if st.get("note") else "")
+        guide = ""
+        if st.get("guide"):
+            gslug, glabel = st["guide"]
+            guide = f'<div><a class="guide-link" href="{gslug}.html">{e(glabel)}</a></div>'
         stages.append(f"""      <div class="stage">
         <div class="badge"></div>
         <div>
           <h3>{e(st["t"])}</h3>
           <ul class="steps">{steps}</ul>
           {where}
+          {guide}
           {note}
         </div>
       </div>
@@ -2140,6 +2287,87 @@ def build_credits() -> str:
 """ + FOOT
 
 
+def build_guide(g) -> str:
+    start = "".join(f"<li>{e(x)}</li>" for x in g["start"])
+
+    steps = []
+    for st in g["steps"]:
+        body = "".join(f"<li>{x}</li>" for x in st["body"])          # trusted markup
+        shot = ""
+        if st.get("img"):
+            shot = (f'<figure class="shot-fig"><img src="img/{st["img"]}.jpg" alt="" '
+                    f'loading="lazy" /><figcaption>{e(st.get("cap", ""))}</figcaption></figure>')
+        note = (f'<div class="note"><span class="lab">Note</span><p>{e(st["note"])}</p></div>'
+                if st.get("note") else "")
+        steps.append(f"""      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>{e(st["t"])}</h3>
+          <ul class="steps">{body}</ul>
+          {shot}
+          {note}
+        </div>
+      </div>
+""")
+
+    check = "".join(f"<li>{e(c)}</li>" for c in g["check"])
+    proc_slug, proc_title, proc_num = g["process"]
+
+    return head(g["title"], g["lede"][:180], "processes") + f"""
+<section class="hero compact">
+  <img class="bg" src="img/{g["img"]}.jpg" alt="" />
+  <div class="inner">
+    <div class="crumbs"><a href="index.html">Docs</a> → <a href="index.html#processes">Processes</a>
+      → <a href="{proc_slug}.html">{e(proc_title)}</a></div>
+    <span class="eyebrow">Guide · Process {e(proc_num)}</span>
+    <h1>{e(g["title"])}</h1>
+    <p class="lede">{e(g["lede"])}</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="cards c3">
+      <div class="card"><h4>Who does this</h4><p>{e(g["who"])}</p></div>
+      <div class="card"><h4>How long it takes</h4><p>{e(g["time"])}</p></div>
+      <div class="card"><h4>Steps</h4><p>{len(g["steps"])} steps</p></div>
+    </div>
+
+    <h3>Watch it in the system</h3>
+{clip_block(g["title"] + " — full walkthrough", g["clip"])}
+
+    <h3>Before you start</h3>
+    <ul>{start}</ul>
+  </div>
+</section>
+
+<section class="band tint">
+  <div class="wrap">
+    <p class="kicker">Step by step</p>
+    <h2 class="section">{e(g["title"])}</h2>
+    <div class="stages" style="margin-top:1.6rem">
+{"".join(steps)}    </div>
+
+    <div class="note"><span class="lab">Check it worked</span>
+      <ul style="margin:.3rem 0 0">{check}</ul>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <p class="kicker">Reference</p>
+    <h2 class="section">Every field on the form</h2>
+{table(g["fields"]["cols"], g["fields"]["rows"])}
+
+    <h3>When it does not work</h3>
+{table(g["mistakes"]["cols"], g["mistakes"]["rows"])}
+  </div>
+</section>
+{related_block(g.get("next"))}
+{support_block("Still stuck?")}
+""" + FOOT
+
 # ===========================================================================
 # Write
 # ===========================================================================
@@ -2158,6 +2386,9 @@ def main() -> None:
     write("credits.html", build_credits())
     write("404.html", build_404())
 
+    for g in GUIDES:
+        write(f'{g["slug"]}.html', build_guide(g))
+
     for i, p in enumerate(PROCESSES):
         prev = (PROCESSES[i - 1]["slug"], PROCESSES[i - 1]["title"]) if i else None
         nxt = (PROCESSES[i + 1]["slug"], PROCESSES[i + 1]["title"]) if i + 1 < len(PROCESSES) else None
@@ -2173,7 +2404,7 @@ def main() -> None:
         nxt = (KB[i + 1]["slug"], KB[i + 1]["title"]) if i + 1 < len(KB) else None
         write(f'{k["slug"]}.html', build_kb_page(k, prev, nxt))
 
-    print(f"\n{6 + len(PROCESSES) + len(CROPS) + len(KB)} pages written into {HERE}")
+    print(f"\n{6 + len(GUIDES) + len(PROCESSES) + len(CROPS) + len(KB)} pages written into {HERE}")
 
 
 if __name__ == "__main__":

@@ -81,6 +81,7 @@
           <h3>Subscribe the farm to imagery</h3>
           <ul class="steps"><li>Pick the provider and the product.</li><li>Turn on fetching for the whole farm area.</li><li>Set the cloud limit you accept for a pass.</li></ul>
           <div><span class="where"><b>In the app</b> Settings → Imagery and weather → Farm</span></div>
+          
           <div class="note"><span class="lab">Note</span><p>A cloud limit applied at the provider means rejected passes never arrive at all. If every stored pass reads exactly 0.0 percent cloud, the limit is filtering at the source.</p></div>
         </div>
       </div>
@@ -91,6 +92,7 @@
           <ul class="steps"><li>Turn on the indices you will read. NDVI is the usual starting point.</li><li>Add NDRE for tree crops, NDMI or MSI for canopy moisture, BSI for bare soil.</li><li>Each index you add costs computation on every pass.</li></ul>
           <div><span class="where"><b>In the app</b> Settings → Imagery and weather → Indices</span></div>
           
+          
         </div>
       </div>
       <div class="stage">
@@ -99,6 +101,7 @@
           <h3>Add thermal, if you need it</h3>
           <ul class="steps"><li>Thermal comes from a different satellite, with a coarser pixel and a longer gap between passes.</li><li>It gives land surface temperature, crop water stress and a soil moisture index.</li><li>Thermal has no grid cells. It is read at block and farm level only.</li></ul>
           <div><span class="where"><b>In the app</b> Settings → Imagery and weather → Thermal</span></div>
+          
           
         </div>
       </div>
@@ -109,6 +112,7 @@
           <ul class="steps"><li>Turn on weather for the farm. History and forecast come from the same provider.</li><li>Set how many days of forecast you want to see.</li><li>The daily job computes growing degree days, reference evapotranspiration and cumulative rainfall.</li></ul>
           <div><span class="where"><b>In the app</b> Settings → Imagery and weather → Weather</span></div>
           
+          
         </div>
       </div>
       <div class="stage">
@@ -118,6 +122,7 @@
           <ul class="steps"><li>Start a backfill for the farm and the date range.</li><li>Watch the run. A backfill of several years takes hours.</li><li>Baselines need history. Without it, an anomaly cannot be called.</li></ul>
           <div><span class="where"><b>In the app</b> Platform → Backfill</span></div>
           
+          
         </div>
       </div>
       <div class="stage">
@@ -126,6 +131,7 @@
           <h3>Check what arrived</h3>
           <ul class="steps"><li>Read the scene strip. It shows one mark per pass day.</li><li>Open a pass and check the coverage and the cloud figure.</li><li>If passes stop arriving, integration health names the failing step.</li></ul>
           <div><span class="where"><b>In the app</b> Farm Console → scene strip, and Platform → Integrations health</span></div>
+          
           
         </div>
       </div>

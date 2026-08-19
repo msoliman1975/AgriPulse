@@ -273,6 +273,24 @@ li { margin:.22rem 0; }
 :root[data-theme="dark"] .chip.live,
 :root:not([data-theme="light"]) .chip.live { color:var(--leaf-200); background:#0f231c; border-color:#1d4536; }
 
+/* ------------------------------ screenshots ----------------------------- */
+.shot-fig { margin:1rem 0 0; max-width:760px; }
+.shot-fig img {
+  width:100%; border:1px solid var(--border); border-radius:10px;
+  box-shadow:var(--shadow-soft); background:var(--surface);
+}
+.shot-fig figcaption { font-size:.82rem; color:var(--muted); margin-top:.45rem; }
+
+/* a link out of a process step into the guide that covers it in full */
+.guide-link {
+  display:inline-flex; align-items:center; gap:.45rem; margin-top:.7rem;
+  font-size:.85rem; font-weight:600; color:var(--accent-ink);
+  background:var(--accent-wash); border:1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius:8px; padding:.32rem .7rem;
+}
+.guide-link:hover { text-decoration:none; border-color:var(--accent); }
+.guide-link::after { content:"→"; }
+
 /* ------------------------------ clips ----------------------------------- */
 .clip {
   position:relative; margin:1.3rem 0 0; border-radius:14px; overflow:hidden;

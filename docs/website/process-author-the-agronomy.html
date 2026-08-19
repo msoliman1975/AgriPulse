@@ -82,6 +82,7 @@
           <ul class="steps"><li>Read the 18 seeded trees first. One may already say what you mean.</li><li>Copy a seeded tree instead of starting from an empty canvas.</li><li>Set the crop path so the tree runs on the right blocks.</li></ul>
           <div><span class="where"><b>In the app</b> Decision trees → Library</span></div>
           
+          
         </div>
       </div>
       <div class="stage">
@@ -90,6 +91,7 @@
           <h3>Lay out the nodes</h3>
           <ul class="steps"><li>A tree is a flow of nodes. A decision node branches on match or miss.</li><li>Add the nodes, then rewire the branches by dragging the connector.</li><li>The editor loads the draft. Publish is a separate step.</li></ul>
           <div><span class="where"><b>In the app</b> Decision trees → Editor canvas</span></div>
+          
           
         </div>
       </div>
@@ -100,6 +102,7 @@
           <ul class="steps"><li>Pick the source: an imagery index, a weather value, a field signal, the crop stage, or a block attribute.</li><li>Pick the operator and the threshold.</li><li>Combine terms with all or any.</li></ul>
           <div><span class="where"><b>In the app</b> Node details → Condition builder</span></div>
           
+          
         </div>
       </div>
       <div class="stage">
@@ -108,6 +111,7 @@
           <h3>Declare the thresholds as parameters</h3>
           <ul class="steps"><li>Give each number a name and a default, for example warn_score with default 40.</li><li>A tenant can then change the number without editing the tree.</li><li>This is how one tree serves farms in different districts.</li></ul>
           <div><span class="where"><b>In the app</b> Tree → Parameters</span></div>
+          
           
         </div>
       </div>
@@ -118,6 +122,7 @@
           <ul class="steps"><li>Run the draft against real data for a chosen farm and date.</li><li>Read how many blocks matched. Nothing is opened by a dry run.</li><li>If it matches every block, the threshold is too loose.</li></ul>
           <div><span class="where"><b>In the app</b> Tree → Dry run</span></div>
           
+          
         </div>
       </div>
       <div class="stage">
@@ -127,6 +132,7 @@
           <ul class="steps"><li>Publishing makes this version the one that runs.</li><li>The old version stays in the history, so you can go back.</li><li>From here the tree runs on schedule, on every pass.</li></ul>
           <div><span class="where"><b>In the app</b> Tree → Publish</span></div>
           
+          
         </div>
       </div>
       <div class="stage">
@@ -135,6 +141,7 @@
           <h3>Read the trace when nothing fires</h3>
           <ul class="steps"><li>The trace records every block the tree looked at and why it stopped.</li><li>Most often the data was missing, not the rule wrong.</li><li>You can also run a tree on a farm on demand instead of waiting for the schedule.</li></ul>
           <div><span class="where"><b>In the app</b> Tree → Evaluation trace</span></div>
+          
           <div class="note"><span class="lab">Note</span><p>Re-running a tree opens nothing new for a block that already has an open item for the same rule. A run that reports zero opened is not a failure.</p></div>
         </div>
       </div>

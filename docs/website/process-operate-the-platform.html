@@ -82,6 +82,7 @@
           <ul class="steps"><li>Create the account. Each tenant gets its own separate data.</li><li>Provision the first admin user for the customer.</li><li>The new account already reads every seeded catalog.</li></ul>
           <div><span class="where"><b>In the app</b> Platform → Tenants</span></div>
           
+          
         </div>
       </div>
       <div class="stage">
@@ -90,6 +91,7 @@
           <h3>Set roles and capabilities</h3>
           <ul class="steps"><li>A role is a set of single permissions, for example open a recommendation.</li><li>Read the page before changing a role. It lists every permission and who holds it.</li><li>Farm scope is separate: it limits a member to named farms.</li></ul>
           <div><span class="where"><b>In the app</b> Platform → Roles and permissions</span></div>
+          
           
         </div>
       </div>
@@ -100,6 +102,7 @@
           <ul class="steps"><li>Defaults are what a new tenant inherits, for example the grid anomaly threshold.</li><li>Changing a default does not change tenants that already set their own value.</li></ul>
           <div><span class="where"><b>In the app</b> Platform → Defaults</span></div>
           
+          
         </div>
       </div>
       <div class="stage">
@@ -108,6 +111,7 @@
           <h3>Maintain the catalogs</h3>
           <ul class="steps"><li>Crops, indices, signal definitions and plan templates are shared by all tenants.</li><li>An improvement to a seeded form reaches every customer.</li><li>A tenant's own row shadows the shared one when the codes collide.</li></ul>
           <div><span class="where"><b>In the app</b> Platform → Catalog, Crops, Signals, Plan templates</span></div>
+          
           
         </div>
       </div>
@@ -118,6 +122,7 @@
           <ul class="steps"><li>Start a backfill for a farm and a date range.</li><li>Watch the run to the end. A long range takes hours.</li><li>Aggregates can lag the raw data. Give the summary tables time to refresh.</li></ul>
           <div><span class="where"><b>In the app</b> Platform → Backfill</span></div>
           
+          
         </div>
       </div>
       <div class="stage">
@@ -127,6 +132,7 @@
           <ul class="steps"><li>Observer follows passes and computation across every tenant.</li><li>Check it when a customer says the map stopped updating.</li><li>Read it per farm, not per block. Farm-level fetching leaves no block-level job.</li></ul>
           <div><span class="where"><b>In the app</b> Platform → Observer, Platform → Integrations health</span></div>
           
+          
         </div>
       </div>
       <div class="stage">
@@ -135,6 +141,7 @@
           <h3>Archive and purge</h3>
           <ul class="steps"><li>Archiving comes before purging. A purge cannot be undone.</li><li>Read the receipt. It lists exactly what was removed.</li></ul>
           <div><span class="where"><b>In the app</b> Platform → Tenants → Purge</span></div>
+          
           <div class="note"><span class="lab">Note</span><p>A purge deletes customer data for good. Confirm the account name against the contract before you start.</p></div>
         </div>
       </div>

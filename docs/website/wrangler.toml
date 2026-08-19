@@ -14,6 +14,8 @@ workers_dev = false
 [assets]
 directory = "."
 # /kb -> kb.html, / -> index.html
+# "none" serves /x.html directly but 404s the site root, so the extra
+# 307 from /x.html to /x is the price of a working "/".
 html_handling = "auto-trailing-slash"
 not_found_handling = "404-page"
 
