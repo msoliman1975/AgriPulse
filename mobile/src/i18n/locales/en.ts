@@ -68,7 +68,8 @@ export const en = {
   "bucket.overdue": "Overdue",
   "bucket.today": "Today",
   "bucket.week": "This week",
-  "bucket.anytime": "Anytime",
+  "bucket.next": "Next week",
+  "bucket.later": "Later",
 
   "group.byBlock": "Group by block",
   "group.byDue": "Group by time",
@@ -90,6 +91,13 @@ export const en = {
   "record.noBlocks": "This farm has no blocks.",
   "record.blocksFailed": "Could not load the blocks.",
   "record.roundFailed": "Could not start the round.",
+
+  "home.greeting": "Signed in as",
+  "work.needValue": "Choose a value before saving.",
+  "work.whatHappened": "What happened",
+  "work.optional": "Optional",
+  "work.yes": "Yes",
+  "work.no": "No",
 
   "records.title": "My records",
   "records.empty": "You have not recorded anything in the last 30 days.",

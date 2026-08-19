@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 import {
+  ApiError,
   acceptVisit,
   completeActivity,
   getVisit,
@@ -229,11 +230,13 @@ function SubmitBar({
 /**
  * Board work: no lifecycle, but the scout can still record what they see.
  *
- * Completing a plan activity needs `plan_activity.complete`, which a Scout
- * does not hold — so there is no Done button here. Recording needs only
- * `signal.record`, which they do hold, and for an activity of type
- * "observation" that IS the job. Telling a scout their assignment is
- * read-only, when the readings they take are the whole point, was wrong.
+ * A Scout DOES hold `plan_activity.complete` — #418 granted it so the work
+ * could be done from the phone — so both closing buttons belong here. An
+ * older comment in this spot claimed the opposite; it was stale, and believing
+ * it would have removed two working controls.
+ *
+ * Recording needs only `signal.record`, and for an activity of type
+ * "observation" the readings ARE the job.
  */
 function BoardActions({
   lang,
@@ -261,14 +264,16 @@ function BoardActions({
     return <p className="hint">{t(lang, "work.alreadyClosed")}</p>;
   }
 
-  async function close(state: "completed" | "skipped"): Promise<void> {
+  async function close(action: "complete" | "skip"): Promise<void> {
     setBusy(true);
     setError(null);
     try {
-      await completeActivity(activityId, state);
+      await completeActivity(activityId, action);
       onDone();
-    } catch {
-      setError(t(lang, "work.actionFailed"));
+    } catch (e) {
+      // Show what the API said. A fixed string hid a 422 about the `state`
+      // verb for as long as this screen has existed.
+      setError(e instanceof ApiError && e.message ? e.message : t(lang, "work.actionFailed"));
     } finally {
       setBusy(false);
     }
@@ -287,10 +292,10 @@ function BoardActions({
       ) : null}
       {/* Two ways to close, because "I did it" and "it did not need doing"
           are different facts and the schedule is wrong in different ways. */}
-      <button type="button" disabled={busy} onClick={() => void close("completed")}>
+      <button type="button" disabled={busy} onClick={() => void close("complete")}>
         {t(lang, "work.markDone")}
       </button>
-      <button type="button" disabled={busy} onClick={() => void close("skipped")}>
+      <button type="button" disabled={busy} onClick={() => void close("skip")}>
         {t(lang, "work.markSkipped")}
       </button>
       {capturing ? (

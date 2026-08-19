@@ -63,7 +63,8 @@ export const ar: Messages = {
   "bucket.overdue": "متأخرة",
   "bucket.today": "اليوم",
   "bucket.week": "هذا الأسبوع",
-  "bucket.anytime": "في أي وقت",
+  "bucket.next": "الأسبوع القادم",
+  "bucket.later": "لاحقًا",
 
   "group.byBlock": "تجميع حسب القطعة",
   "group.byDue": "تجميع حسب الموعد",
@@ -85,6 +86,13 @@ export const ar: Messages = {
   "record.noBlocks": "لا توجد قطع في هذه المزرعة.",
   "record.blocksFailed": "تعذر تحميل القطع.",
   "record.roundFailed": "تعذر بدء الجولة.",
+
+  "home.greeting": "تسجيل الدخول باسم",
+  "work.needValue": "اختر قيمة قبل الحفظ.",
+  "work.whatHappened": "ماذا حدث",
+  "work.optional": "اختياري",
+  "work.yes": "نعم",
+  "work.no": "لا",
 
   "records.title": "سجلاتي",
   "records.empty": "لم تسجل شيئًا خلال آخر ٣٠ يومًا.",
