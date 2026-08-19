@@ -68,7 +68,8 @@ export const en = {
   "bucket.overdue": "Overdue",
   "bucket.today": "Today",
   "bucket.week": "This week",
-  "bucket.anytime": "Anytime",
+  "bucket.next": "Next week",
+  "bucket.later": "Later",
 
   "group.byBlock": "Group by block",
   "group.byDue": "Group by time",

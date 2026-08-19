@@ -63,7 +63,8 @@ export const ar: Messages = {
   "bucket.overdue": "متأخرة",
   "bucket.today": "اليوم",
   "bucket.week": "هذا الأسبوع",
-  "bucket.anytime": "في أي وقت",
+  "bucket.next": "الأسبوع القادم",
+  "bucket.later": "لاحقًا",
 
   "group.byBlock": "تجميع حسب القطعة",
   "group.byDue": "تجميع حسب الموعد",

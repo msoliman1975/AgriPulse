@@ -14,24 +14,37 @@ import { dueAtMs } from "@/time";
 import { WorkDetailScreen } from "@/screens/WorkDetailScreen";
 
 /**
- * Everything this person owes, in the order a day is actually walked.
+ * Everything this person owes.
  *
- * The list used to be grouped by `origin` — `recommendation`, `ad_hoc`,
- * `self_initiated` — which is the name of the subsystem that raised the row.
- * Nobody plans a day around which subsystem asked. It is grouped by **when it
- * is due**, with the source demoted to one glyph on the row, and it can be
- * regrouped **by block**, because a scout walks a route and "while you are at
- * Block 12 there are three things" saves more walking than anything else here.
+ * The landing is **tiles, not a list**. A scout with thirty open jobs cannot
+ * plan a day from a scroll; they need to see *where* the work is before they
+ * see what it is. Each tile is a place — a block — carrying its own count,
+ * plus one tile for work that belongs to no block at all. Tapping a tile opens
+ * that group's list.
+ *
+ * The same landing regroups **by time**, and then the tiles are Overdue /
+ * Today / This week / Next week / Later. Both answer "where do I start"; one
+ * answers by geography and the other by deadline, and which is right depends
+ * on whether the scout is planning a route or a day.
+ *
+ * Origin — `recommendation`, `alert`, `ad_hoc` — groups nothing. It is the
+ * name of the subsystem that raised the row, and nobody plans a day around
+ * that. It stays one glyph on the row.
  */
 
 type Segment = "mine" | "available" | "done";
-type Bucket = "overdue" | "today" | "week" | "anytime";
+type GroupBy = "block" | "time";
+type Bucket = "overdue" | "today" | "week" | "next" | "later";
+
+/** Fixed, ordered and small — unlike blocks, which a farm has dozens of. */
+const BUCKETS: Bucket[] = ["overdue", "today", "week", "next", "later"];
 
 const BUCKET_LABEL: Record<Bucket, MessageKey> = {
   overdue: "bucket.overdue",
   today: "bucket.today",
   week: "bucket.week",
-  anytime: "bucket.anytime",
+  next: "bucket.next",
+  later: "bucket.later",
 };
 
 /** Which surface asked for this, as one character. */
@@ -43,17 +56,27 @@ const SOURCE_GLYPH: Record<string, string> = {
   self_initiated: "✓",
 };
 
-function bucketOf(item: WorkItem, now: number): Bucket {
-  const due = dueAtMs(item.due_at);
-  if (due === null) return "anytime";
-  if (due < now) return "overdue";
-  const endOfToday = new Date(now);
-  endOfToday.setHours(23, 59, 59, 999);
-  if (due <= endOfToday.getTime()) return "today";
-  return due <= now + 7 * 86_400_000 ? "week" : "anytime";
+/** Local end of today, so "today" means the whole day and not this instant. */
+function endOfToday(now: number): number {
+  const d = new Date(now);
+  d.setHours(23, 59, 59, 999);
+  return d.getTime();
 }
 
-/** Soonest first; undated last. Ordering inside a bucket, not across them. */
+function bucketOf(item: WorkItem, now: number): Bucket {
+  const due = dueAtMs(item.due_at);
+  // No deadline is neither late nor today: it is work with no clock on it,
+  // which is what `later` is for.
+  if (due === null) return "later";
+  if (due < now) return "overdue";
+  const today = endOfToday(now);
+  if (due <= today) return "today";
+  if (due <= today + 7 * 86_400_000) return "week";
+  if (due <= today + 14 * 86_400_000) return "next";
+  return "later";
+}
+
+/** Soonest first; undated last. Ordering inside a group, not across them. */
 function bySoonest(a: WorkItem, b: WorkItem): number {
   const x = dueAtMs(a.due_at);
   const y = dueAtMs(b.due_at);
@@ -80,6 +103,33 @@ function asWorkItem(v: Visit, farmId: string, blockName: string | null): WorkIte
     template_id: v.template_id,
     source: v.source,
   };
+}
+
+/** Worst thing inside, so a tile carries the urgency of what it hides. */
+function tileTone(items: WorkItem[], now: number): string {
+  if (items.some((i) => bucketOf(i, now) === "overdue")) return "crit";
+  if (items.some((i) => i.severity === "critical")) return "crit";
+  if (items.some((i) => i.severity === "warning")) return "warn";
+  return "";
+}
+
+function Tile({
+  label,
+  count,
+  tone,
+  onOpen,
+}: {
+  label: string;
+  count: number;
+  tone: string;
+  onOpen: () => void;
+}): ReactNode {
+  return (
+    <button type="button" className={`tile ${tone}`} disabled={count === 0} onClick={onOpen}>
+      <span className="n">{count}</span>
+      <span className="lbl">{label}</span>
+    </button>
+  );
 }
 
 function Row({
@@ -162,7 +212,8 @@ export function TasksScreen({
   onFullScreen: (full: boolean) => void;
 }): ReactNode {
   const [segment, setSegment] = useState<Segment>("mine");
-  const [byBlock, setByBlock] = useState(false);
+  const [groupBy, setGroupBy] = useState<GroupBy>("block");
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [mine, setMine] = useState<WorkItem[]>([]);
   const [available, setAvailable] = useState<WorkItem[]>([]);
   const [done, setDone] = useState<WorkItem[]>([]);
@@ -171,8 +222,6 @@ export function TasksScreen({
 
   async function load(): Promise<void> {
     try {
-      // Blocks come first and are cheap: without them every row and every
-      // detail screen names a place by a UUID the scout cannot walk to.
       const [work, mineVisits, claimable, closed, blockList] = await Promise.all([
         listMyWork(farmId),
         listVisits(farmId, { mine: true }),
@@ -214,6 +263,11 @@ export function TasksScreen({
     onFullScreen(open !== null);
   }, [open, onFullScreen]);
 
+  // Changing how work is grouped invalidates which group is open.
+  useEffect(() => {
+    setOpenGroup(null);
+  }, [groupBy, segment]);
+
   if (open) {
     return (
       <WorkDetailScreen
@@ -230,6 +284,13 @@ export function TasksScreen({
   }
 
   const shown = segment === "mine" ? mine : segment === "available" ? available : done;
+  const now = Date.now();
+
+  const groupKey = (i: WorkItem): string =>
+    groupBy === "block" ? (i.block_name ?? "") : bucketOf(i, now);
+  const inGroup = openGroup === null ? [] : shown.filter((i) => groupKey(i) === openGroup);
+  const groupLabel = (key: string): string =>
+    groupBy === "time" ? t(lang, BUCKET_LABEL[key as Bucket]) : key || t(lang, "group.noBlock");
 
   return (
     <div className="screen tasks">
@@ -248,107 +309,126 @@ export function TasksScreen({
 
       {error ? <p className="error">{error}</p> : null}
 
-      {/* Grouping by block only earns its place on work you still owe.
-          Claimable and finished work is read, not walked. */}
-      {segment === "mine" && shown.length > 1 ? (
-        <button type="button" className={`grouper${byBlock ? " on" : ""}`} onClick={() => setByBlock((v) => !v)}>
-          {t(lang, byBlock ? "group.byDue" : "group.byBlock")}
-        </button>
-      ) : null}
-
-      {shown.length === 0 ? (
+      {/* Tiles are the landing for work you still owe. Claimable work is short
+          and finished work is history — both are read, not planned from. */}
+      {segment === "mine" ? (
+        openGroup === null ? (
+          <>
+            <div className="groupby">
+              {(["block", "time"] as GroupBy[]).map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  className={g === groupBy ? "on" : ""}
+                  onClick={() => setGroupBy(g)}
+                >
+                  {t(lang, g === "block" ? "group.byBlock" : "group.byDue")}
+                </button>
+              ))}
+            </div>
+            {shown.length === 0 ? (
+              <p className="empty">{t(lang, "empty.mine")}</p>
+            ) : (
+              <TileGrid lang={lang} items={shown} groupBy={groupBy} now={now} onOpenGroup={setOpenGroup} />
+            )}
+          </>
+        ) : (
+          <>
+            <button type="button" className="crumb" onClick={() => setOpenGroup(null)}>
+              <span className="back">‹</span>
+              {groupLabel(openGroup)}
+              <span className="count">{inGroup.length}</span>
+            </button>
+            <ul>
+              {[...inGroup].sort(bySoonest).map((i) => (
+                <Row key={`${i.kind}-${i.id}`} lang={lang} item={i} onOpen={() => setOpen(i)} />
+              ))}
+            </ul>
+          </>
+        )
+      ) : shown.length === 0 ? (
         <p className="empty">{t(lang, `empty.${segment}` as MessageKey)}</p>
-      ) : segment === "done" ? (
-        <ul>
-          {[...shown].sort((a, b) => (dueAtMs(b.due_at) ?? 0) - (dueAtMs(a.due_at) ?? 0)).map((i) => (
-            <Row key={`${i.kind}-${i.id}`} lang={lang} item={i} showDue={false} onOpen={() => setOpen(i)} />
-          ))}
-        </ul>
-      ) : byBlock && segment === "mine" ? (
-        <GroupedByBlock lang={lang} items={shown} onOpen={setOpen} />
       ) : (
-        <GroupedByDue
-          lang={lang}
-          items={shown}
-          onOpen={setOpen}
-          onClaim={
-            segment === "available"
-              ? async (id) => {
-                  // A 409 means somebody got there first; reloading shows the
-                  // truth rather than arguing with it.
-                  await claimVisit(id, farmId).catch(() => undefined);
-                  await load();
+        <ul>
+          {[...shown]
+            .sort(
+              segment === "done"
+                ? (a, b) => (dueAtMs(b.due_at) ?? 0) - (dueAtMs(a.due_at) ?? 0)
+                : bySoonest,
+            )
+            .map((i) => (
+              <Row
+                key={`${i.kind}-${i.id}`}
+                lang={lang}
+                item={i}
+                showDue={segment !== "done"}
+                onOpen={() => setOpen(i)}
+                onClaim={
+                  segment === "available"
+                    ? async () => {
+                        // A 409 means somebody got there first; reloading shows
+                        // the truth rather than arguing with it.
+                        await claimVisit(i.id, farmId).catch(() => undefined);
+                        await load();
+                      }
+                    : undefined
                 }
-              : undefined
-          }
-        />
+              />
+            ))}
+        </ul>
       )}
     </div>
   );
 }
 
-function GroupedByDue({
-  lang,
-  items,
-  onOpen,
-  onClaim,
-}: {
-  lang: Lang;
-  items: WorkItem[];
-  onOpen: (item: WorkItem) => void;
-  onClaim?: (visitId: string) => void;
-}): ReactNode {
-  const now = Date.now();
-  const buckets: Bucket[] = ["overdue", "today", "week", "anytime"];
-  return (
-    <>
-      {buckets.map((b) => {
-        const rows = items.filter((i) => bucketOf(i, now) === b).sort(bySoonest);
-        if (rows.length === 0) return null;
-        return (
-          <section key={b}>
-            <h2 className={`section${b === "overdue" ? " overdue" : ""}`}>
-              {t(lang, BUCKET_LABEL[b])} <span className="count">{rows.length}</span>
-            </h2>
-            <ul>
-              {rows.map((i) => (
-                <Row
-                  key={`${i.kind}-${i.id}`}
-                  lang={lang}
-                  item={i}
-                  onOpen={() => onOpen(i)}
-                  onClaim={onClaim ? () => onClaim(i.id) : undefined}
-                />
-              ))}
-            </ul>
-          </section>
-        );
-      })}
-    </>
-  );
-}
-
 /**
- * The same rows, grouped by where they are.
+ * The tiles themselves.
  *
- * Blocks with the most urgent work come first, so a route starts where it
- * matters. Work with no block sits at the end under its own heading rather
- * than being dropped, which is how a job goes missing.
+ * Blocks appear only where there is work: a farm has dozens, and thirty empty
+ * tiles would bury the four that matter. The time buckets are always all five,
+ * because they are a fixed vocabulary and "Today 0" is information a scout
+ * wants — it is the difference between a clear day and a failed fetch.
  */
-function GroupedByBlock({
+function TileGrid({
   lang,
   items,
-  onOpen,
+  groupBy,
+  now,
+  onOpenGroup,
 }: {
   lang: Lang;
   items: WorkItem[];
-  onOpen: (item: WorkItem) => void;
+  groupBy: GroupBy;
+  now: number;
+  onOpenGroup: (key: string) => void;
 }): ReactNode {
+  if (groupBy === "time") {
+    return (
+      <div className="tiles">
+        {BUCKETS.map((b) => {
+          const rows = items.filter((i) => bucketOf(i, now) === b);
+          return (
+            <Tile
+              key={b}
+              label={t(lang, BUCKET_LABEL[b])}
+              count={rows.length}
+              tone={b === "overdue" && rows.length > 0 ? "crit" : tileTone(rows, now)}
+              onOpen={() => onOpenGroup(b)}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
   const groups = new Map<string, WorkItem[]>();
   for (const i of items) {
     const key = i.block_name ?? "";
     groups.set(key, [...(groups.get(key) ?? []), i]);
   }
+  // Most urgent block first, so a route starts where it matters. Work with no
+  // block sits last under its own tile rather than being dropped, which is how
+  // a job goes missing.
   const soonest = (rows: WorkItem[]): number =>
     Math.min(...rows.map((r) => dueAtMs(r.due_at) ?? Number.MAX_SAFE_INTEGER));
   const ordered = [...groups.entries()].sort(([ka, a], [kb, b]) => {
@@ -358,19 +438,16 @@ function GroupedByBlock({
   });
 
   return (
-    <>
-      {ordered.map(([name, rows]) => (
-        <section key={name || "none"}>
-          <h2 className="section">
-            {name || t(lang, "group.noBlock")} <span className="count">{rows.length}</span>
-          </h2>
-          <ul>
-            {rows.sort(bySoonest).map((i) => (
-              <Row key={`${i.kind}-${i.id}`} lang={lang} item={i} onOpen={() => onOpen(i)} />
-            ))}
-          </ul>
-        </section>
+    <div className="tiles">
+      {ordered.map(([key, rows]) => (
+        <Tile
+          key={key || "none"}
+          label={key || t(lang, "group.noBlock")}
+          count={rows.length}
+          tone={tileTone(rows, now)}
+          onOpen={() => onOpenGroup(key)}
+        />
       ))}
-    </>
+    </div>
   );
 }
