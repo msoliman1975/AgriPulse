@@ -87,6 +87,13 @@ export const ar: Messages = {
   "record.blocksFailed": "تعذر تحميل القطع.",
   "record.roundFailed": "تعذر بدء الجولة.",
 
+  "home.greeting": "تسجيل الدخول باسم",
+  "work.needValue": "اختر قيمة قبل الحفظ.",
+  "work.whatHappened": "ماذا حدث",
+  "work.optional": "اختياري",
+  "work.yes": "نعم",
+  "work.no": "لا",
+
   "records.title": "سجلاتي",
   "records.empty": "لم تسجل شيئًا خلال آخر ٣٠ يومًا.",
   "records.loadFailed": "تعذر تحميل سجلاتك.",

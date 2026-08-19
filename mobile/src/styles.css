@@ -287,3 +287,18 @@ body { background: var(--field); color: var(--ink); }
 /* Clear the floating Record button as well as the tab bar: 96px cleared the
    tabs but left the button sitting on top of the last row. */
 .screen { padding-bottom: 140px; }
+
+/* Who is holding the phone, and which language it speaks. Both sit on the
+   first screen: a handset changes hands at shift change, and somebody who
+   cannot read the current language cannot navigate to a tab called "Me" to
+   change it. */
+.homehead { display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 14px; }
+.homehead .who { display: flex; flex-direction: column; min-width: 0; }
+.homehead .lbl { font-size: 11px; color: var(--muted); letter-spacing: .04em; }
+.homehead .nm { font-size: 16px; font-weight: 650;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Tighter than the sign-in screen's copy of this control: here it shares a row
+   with a name rather than owning one. */
+.homehead .langpick { margin-top: 0; flex: none; }
+.homehead .langpick .lang { padding: 5px 11px; font-size: 12px; }

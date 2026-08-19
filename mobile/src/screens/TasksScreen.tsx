@@ -9,6 +9,7 @@ import {
   type Visit,
   type WorkItem,
 } from "@/api/client";
+import { HomeHeader } from "@/components/HomeHeader";
 import { dueIn, t, tCount, type Lang, type MessageKey } from "@/i18n";
 import { dueAtMs } from "@/time";
 import { WorkDetailScreen } from "@/screens/WorkDetailScreen";
@@ -204,10 +205,14 @@ function Row({
 
 export function TasksScreen({
   lang,
+  onLangChange,
+  name,
   farmId,
   onFullScreen,
 }: {
   lang: Lang;
+  onLangChange: (lang: Lang) => void;
+  name: string | null;
   farmId: string;
   onFullScreen: (full: boolean) => void;
 }): ReactNode {
@@ -294,6 +299,7 @@ export function TasksScreen({
 
   return (
     <div className="screen tasks">
+      <HomeHeader lang={lang} onLangChange={onLangChange} name={name} />
       <div className="seg">
         {(["mine", "available", "done"] as Segment[]).map((s) => (
           <button
