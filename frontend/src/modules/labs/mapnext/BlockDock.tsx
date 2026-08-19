@@ -21,26 +21,31 @@
 // environment and nowhere else, activities and sources in Field & plan, and
 // Overview carries only forward-looking summaries that link onward.
 // See docs/proposals/block-dock.html for the design it implements.
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
+import { getIndexCatalog, type AnyIndexCode as ApiIndexCode } from "@/api/indices";
+import { formatIndexValue } from "@/lib/indexFormat";
 import { useCapability } from "@/rbac/useCapability";
 import { WaterBalanceCard } from "./WaterBalanceCard";
 import { clearDetailCache } from "../map/api";
-import type { UnitDetail, UnitIntegration } from "../map/types";
-import {
-  HEALTH_DOT,
-  INDEX_FAMILIES,
-  INDEX_META,
-  isBlockLevel,
-  type IndexFamilyKey,
-} from "./constants";
+import type { IndexSeries, UnitDetail, UnitIntegration } from "../map/types";
+import { HEALTH_DOT, INDEX_FAMILIES, INDEX_META, type IndexFamilyKey } from "./constants";
 import { DockConditionsView } from "./DockConditionsView";
 import { DockFamilyView } from "./DockFamilyView";
-import { cropLabel, deltaLabel, fmt, humanize, longDate, shortDate, weekday } from "./dockFormat";
+import {
+  cropLabel,
+  humanize,
+  indexDeltaLabel,
+  isoDay,
+  isoDaysBefore,
+  longDate,
+  shortDate,
+  weekday,
+} from "./dockFormat";
+import { dockSeriesOptions, seriesFromPoints, toPoints } from "./dockSeries";
 import { useCropAttributeRows } from "@/modules/farms/lib/useCropAttributeRows";
 import { ManagePanel, type ManageMode } from "./ManagePanel";
 import { Dot, ghostBtn } from "./ui";
@@ -102,6 +107,12 @@ interface Props {
   loading: boolean;
   error: boolean;
   activeIndex: ApiIndexCode;
+  /** Indices this console's map can actually draw, in picker order. The live
+   *  console draws the sub-block grid mesh (optical only, since `grid_configs`
+   *  are per-product); the pixel console draws the raster and can draw all
+   *  thirteen. The family tabs offer every index either way — this only
+   *  decides which of them also repaint the map when clicked. */
+  paintableIndices: readonly ApiIndexCode[];
   onActiveIndexChange: (c: ApiIndexCode) => void;
   onClose: () => void;
   farmId: string;
@@ -177,6 +188,7 @@ export function BlockDock({
   loading,
   error,
   activeIndex,
+  paintableIndices,
   onActiveIndexChange,
   onClose,
   farmId,
@@ -273,6 +285,36 @@ export function BlockDock({
   const activityLabel = (a: { activity_type: string; label: string }): string =>
     t(`insights:activityType.${a.activity_type}`, { defaultValue: a.label });
 
+  // ---- the map's index, as a reading -------------------------------------
+  //
+  // The title bar and Overview quote whatever the map is painted by. The
+  // block-detail bundle carries three series (ndvi/ndre/ndwi), so the other
+  // ten used to quote an em dash here while the map showed a full farm of
+  // colour. They are fetched instead, over the same 30-day window and the
+  // same query key the family tabs use — so opening the tab that holds this
+  // index costs no second request, and the three bundled ones cost no first
+  // one.
+  const featuredWindow = useMemo(() => ({ from: isoDaysBefore(30), to: isoDay() }), []);
+  // Widened rather than cast: `UnitDetail.indices` is typed to the three the
+  // summary endpoint publishes, and asking it for `lst` is a legitimate miss,
+  // not a lie about the key.
+  const bundledSeries: Partial<Record<ApiIndexCode, IndexSeries>> = detail?.indices ?? {};
+  const bundled = bundledSeries[activeIndex];
+  const featuredQ = useQuery({
+    ...dockSeriesOptions(selId ?? "", activeIndex, featuredWindow.from, featuredWindow.to),
+    enabled: Boolean(selId) && !bundled,
+  });
+  const featured = bundled ?? seriesFromPoints(toPoints(featuredQ.data));
+
+  // Units are curated platform data; a failure degrades to the dimensionless
+  // case, which is right for every index except `lst`.
+  const catalogQ = useQuery({
+    queryKey: ["indices", "catalog"] as const,
+    queryFn: getIndexCatalog,
+    staleTime: 60 * 60_000,
+  });
+  const activeUnit = catalogQ.data?.find((entry) => entry.code === activeIndex)?.unit ?? "";
+
   if (error) {
     return (
       <DockShell onClose={onClose} title={t("inspector.errorTitle")} height={height}>
@@ -293,10 +335,9 @@ export function BlockDock({
   }
 
   const crit = detail.alerts.filter((a) => a.severity === "critical").length;
-  const featured = isBlockLevel(activeIndex) ? detail.indices[activeIndex] : undefined;
   const healthColor = HEALTH_DOT[detail.health];
   const activeFamily = INDEX_META[activeIndex].family;
-  const activeDelta = deltaLabel(featured?.trend_7d_delta);
+  const activeDelta = indexDeltaLabel(activeIndex, featured?.trend_7d_delta, activeUnit);
 
   return (
     <section
@@ -360,7 +401,8 @@ export function BlockDock({
 
         <span className="ms-auto flex items-center gap-2">
           <span className="text-xs text-ap-muted">
-            {INDEX_META[activeIndex].label} {fmt(featured?.current ?? null)}
+            {INDEX_META[activeIndex].label}{" "}
+            {formatIndexValue(featured?.current ?? null, activeUnit)}
           </span>
           <button
             type="button"
@@ -470,7 +512,7 @@ export function BlockDock({
                 <Col title={t("inspector.indicesSection")}>
                   <div className="flex items-end gap-3">
                     <span className="text-2xl font-bold tabular-nums text-ap-ink">
-                      {fmt(featured?.current ?? null)}
+                      {formatIndexValue(featured?.current ?? null, activeUnit)}
                     </span>
                     <span className="pb-1 text-xs text-ap-muted">
                       {INDEX_META[activeIndex].label}
@@ -517,10 +559,14 @@ export function BlockDock({
 
             {FAMILY_TABS.has(tab) ? (
               <DockFamilyView
+                // Keyed on the family so switching tabs resets which index the
+                // tab charts. Without it the Nutrition tab would open still
+                // plotting whatever was picked in Vigour.
+                key={tab}
                 blockId={detail.id}
                 family={tab as IndexFamilyKey}
-                indices={detail.indices}
                 activeIndex={activeIndex}
+                paintableIndices={paintableIndices}
                 onActiveIndexChange={onActiveIndexChange}
               />
             ) : null}

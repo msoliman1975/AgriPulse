@@ -1018,6 +1018,11 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               loading={detailQ.isLoading}
               error={detailQ.isError}
               activeIndex={activeIndex}
+              // Same list the view bar offers: this console paints the
+              // sub-block grid mesh, which exists for the optical product
+              // only. The dock still shows and charts thermal; clicking a
+              // thermal card there just does not repaint the map.
+              paintableIndices={OPTICAL_INDEX_ORDER}
               onActiveIndexChange={setActiveIndex}
               onClose={deselect}
               farmId={farmId}

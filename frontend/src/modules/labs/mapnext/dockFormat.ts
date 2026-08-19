@@ -5,33 +5,71 @@ import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import type { ExplainStep } from "@/api/recommendations";
 import { chartDateLocale } from "@/lib/chartFormat";
 
-import { HEALTH_DOT, INDEX_BANDS, type IndexBand } from "./constants";
+import { HEALTH_DOT, HIGHER_IS_WORSE, INDEX_BANDS, type IndexBand } from "./constants";
 
 export function fmt(v: number | null | undefined, digits = 2): string {
   return v == null ? "—" : v.toFixed(digits);
 }
 
-/** A 7-day index delta as arrow + signed text + severity colour.
+/** Change thresholds in the index's own units: below `small` is flat, past
+ *  `big` in the wrong direction is a real move.
+ *
+ *  Split by unit, not by index. The twelve dimensionless indices live in
+ *  roughly [-1, 3] and keep the original inspector's numbers. `lst` is
+ *  degrees Celsius on a 0-60 scale, where 0.01 is noise from a 100 m pixel
+ *  and 0.05 would flag every scene as a critical drop. */
+function deltaThresholds(unit: string | null | undefined): { small: number; big: number } {
+  return unit === "°C" ? { small: 0.5, big: 2 } : { small: 0.01, big: 0.05 };
+}
+
+/** A change in one index as arrow + signed text + severity colour.
  *
  * The thresholds are the original inspector's: a small rise is good news, a
  * small fall is worth watching, and anything past -0.05 in a week is a real
- * drop. Restored here because the family tabs put each index's delta back on
- * screen next to its value, which is the comparison a flat pill row lost. */
-export function deltaLabel(d: number | null | undefined): {
-  text: string;
-  arrow: string;
-  color: string;
-} {
-  if (d == null) return { text: "—", arrow: "→", color: HEALTH_DOT.unknown };
-  if (d > 0.01) return { text: `+${d.toFixed(2)}`, arrow: "▲", color: HEALTH_DOT.healthy };
-  if (d < -0.05) return { text: d.toFixed(2), arrow: "▼", color: HEALTH_DOT.critical };
-  if (d < -0.01) return { text: d.toFixed(2), arrow: "▼", color: HEALTH_DOT.watch };
-  return { text: "±0", arrow: "→", color: HEALTH_DOT.unknown };
+ * drop. Two things this adds, which the old number-only `deltaLabel` it
+ * replaces could not know:
+ *
+ *   * DIRECTION. Ten indices read "higher is a better canopy" and three do
+ *     not, so a +6 °C week on LST was painted green, as were rising MSI
+ *     (water stress) and rising NDWI (water standing on the block). The
+ *     colour now follows HIGHER_IS_WORSE; the arrow still follows the number,
+ *     because the arrow states what happened and the colour states whether
+ *     that is good.
+ *   * UNIT. `+0.02` and `+0.02 °C` are not the same statement, and the second
+ *     is below what the sensor resolves.
+ */
+export function indexDeltaLabel(
+  code: ApiIndexCode,
+  d: number | null | undefined,
+  unit?: string | null,
+): { text: string; arrow: string; color: string } {
+  if (d == null || !Number.isFinite(d)) {
+    return { text: "—", arrow: "→", color: HEALTH_DOT.unknown };
+  }
+  const { small, big } = deltaThresholds(unit);
+  const digits = unit === "°C" ? 1 : 2;
+  const arrow = d > small ? "▲" : d < -small ? "▼" : "→";
+  const text =
+    Math.abs(d) <= small
+      ? "±0"
+      : `${d > 0 ? "+" : ""}${d.toFixed(digits)}${unit ? ` ${unit}` : ""}`;
+
+  // Positive `toward` means the block moved the way this index calls better.
+  const toward = HIGHER_IS_WORSE.has(code) ? -d : d;
+  const color =
+    toward > small
+      ? HEALTH_DOT.healthy
+      : toward < -big
+        ? HEALTH_DOT.critical
+        : toward < -small
+          ? HEALTH_DOT.watch
+          : HEALTH_DOT.unknown;
+  return { text, arrow, color };
 }
 
 /** Which interpretation band a reading falls in, or null when there is nothing
- * to interpret — a grid-only index has no block-wide value, and neither does a
- * block the pipeline has not produced a clear scene for yet.
+ * to interpret — a block the pipeline has not produced a clear scene for, or
+ * one whose farm holds no subscription to the product that index comes from.
  *
  * Bands are ascending and inclusive on `max`, so the first one the value fits
  * under wins. The Infinity terminator makes the fallback unreachable in

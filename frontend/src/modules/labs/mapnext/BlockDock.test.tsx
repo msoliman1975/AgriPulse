@@ -7,7 +7,7 @@ import { setupTestI18n } from "@/i18n/testing";
 import type { UnitDetail } from "../map/types";
 
 import { BlockDock } from "./BlockDock";
-import { INDEX_FAMILIES } from "./constants";
+import { INDEX_FAMILIES, OPTICAL_INDEX_ORDER } from "./constants";
 
 // The Conditions tab calls the tree-explain endpoint, which is gated on
 // `recommendation.read`. Roles without it must not see a tab that 403s.
@@ -41,11 +41,38 @@ vi.mock("@/modules/farms/components/AreaDisplay", () => ({
   AreaDisplay: ({ areaM2 }: { areaM2: number }) => <span>{areaM2 / 10_000} ha</span>,
 }));
 
-// The family tabs chart their block-level index over a chosen range.
+// Every tile in a family tab fetches its own series, and the tab charts
+// whichever one is picked. The catalog supplies the display unit — `lst` is
+// the only index with one, and a dock that formats 51.2 °C as "51.20" would
+// pass every other assertion here.
 vi.mock("@/api/indices", async () => {
   const actual = await vi.importActual<typeof import("@/api/indices")>("@/api/indices");
-  return { ...actual, getTimeseries: vi.fn(() => Promise.resolve({ points: [] })) };
+  return {
+    ...actual,
+    getTimeseries: vi.fn(() => Promise.resolve({ points: [] })),
+    getIndexCatalog: vi.fn(() =>
+      Promise.resolve(
+        [...actual.INDEX_CODES, ...actual.THERMAL_INDEX_CODES].map((code) => ({
+          id: code,
+          code,
+          name_en: code.toUpperCase(),
+          name_ar: null,
+          formula_text: "",
+          value_min: "-1",
+          value_max: "1",
+          unit: code === "lst" ? "°C" : "",
+          physical_meaning: null,
+          is_standard: true,
+        })),
+      ),
+    ),
+  };
 });
+
+/** One API point, in the string-NUMERIC shape the route serves. */
+function point(time: string, mean: string) {
+  return { time, mean, min: null, max: null, valid_pixels: 400, valid_pixel_pct: "98" };
+}
 
 const DETAIL: UnitDetail = {
   id: "b1",
@@ -82,6 +109,8 @@ const DETAIL: UnitDetail = {
   responsible_membership_id: null,
 };
 
+const onActiveIndexChange = vi.fn();
+
 function renderDock(detail: UnitDetail = DETAIL): void {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const node: ReactNode = (
@@ -91,7 +120,8 @@ function renderDock(detail: UnitDetail = DETAIL): void {
       loading={false}
       error={false}
       activeIndex="ndvi"
-      onActiveIndexChange={() => {}}
+      paintableIndices={OPTICAL_INDEX_ORDER}
+      onActiveIndexChange={onActiveIndexChange}
       onClose={() => {}}
       farmId="f1"
       gridProductId={null}
@@ -106,6 +136,17 @@ describe("BlockDock", () => {
   beforeEach(async () => {
     await setupTestI18n("en");
     caps.value = true;
+    onActiveIndexChange.mockReset();
+    // Tests below install per-index implementations; without a reset the first
+    // one to do so answers for every test after it.
+    const { getTimeseries } = await import("@/api/indices");
+    vi.mocked(getTimeseries).mockReset();
+    vi.mocked(getTimeseries).mockResolvedValue({
+      block_id: "b1",
+      index_code: "ndvi",
+      granularity: "daily",
+      points: [],
+    });
     getCropAttrs.mockReset();
     getCropAttrs.mockResolvedValue({
       block_crop_id: "00000000-0000-0000-0000-0000000000bc",
@@ -248,8 +289,8 @@ describe("BlockDock", () => {
     await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
     fireEvent.click(screen.getByRole("tab", { name: /^Moisture$/ }));
 
-    // Every member is defined, including the grid-only ones that have no value
-    // of their own — a definition is reference material, not a reading. Tied to
+    // Every member is defined, including one the block has no clear scene for
+    // — a definition is reference material, not a reading. Tied to
     // the family table rather than a literal count, so adding an index to a
     // family does not silently narrow what this test checks.
     const moistureCount = INDEX_FAMILIES.find((f) => f.key === "moisture")!.indices.length;
@@ -270,30 +311,14 @@ describe("BlockDock", () => {
     const { getTimeseries } = await import("@/api/indices");
     // NDWI 0.05 is above McFeeters' zero threshold: standing water, which is
     // the opposite verdict to what the same number would mean on NDVI.
-    vi.mocked(getTimeseries).mockResolvedValueOnce({
-      block_id: "b1",
-      index_code: "ndwi",
-      granularity: "daily",
-      points: [
-        // The API serves NUMERIC as a string; the view runs it through Number().
-        {
-          time: "2026-06-01",
-          mean: "0.04",
-          min: null,
-          max: null,
-          valid_pixels: 400,
-          valid_pixel_pct: "98",
-        },
-        {
-          time: "2026-06-30",
-          mean: "0.05",
-          min: null,
-          max: null,
-          valid_pixels: 400,
-          valid_pixel_pct: "98",
-        },
-      ],
-    });
+    vi.mocked(getTimeseries).mockImplementation((_block, code) =>
+      Promise.resolve({
+        block_id: "b1",
+        index_code: code,
+        granularity: "daily",
+        points: code === "ndwi" ? [point("2026-06-01", "0.04"), point("2026-06-30", "0.05")] : [],
+      }),
+    );
 
     renderDock();
     await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
@@ -304,22 +329,119 @@ describe("BlockDock", () => {
     );
   });
 
-  it("shows a family's members with their readings, grid-only ones disabled", async () => {
+  it("gives every member of a family a reading of its own, none disabled", async () => {
+    const { getTimeseries } = await import("@/api/indices");
+    // GNDVI used to render at 45% opacity with an em dash and the words "Grid
+    // only", on the belief that the block time-series route served ndvi/ndre/
+    // ndwi alone. It never did — so it must carry its own number now.
+    vi.mocked(getTimeseries).mockImplementation((_block, code) =>
+      Promise.resolve({
+        block_id: "b1",
+        index_code: code,
+        granularity: "daily",
+        points: code === "gndvi" ? [point("2026-06-01", "0.41"), point("2026-06-30", "0.47")] : [],
+      }),
+    );
+
     renderDock();
     await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
     fireEvent.click(screen.getByRole("tab", { name: /Nutrition/ }));
 
-    // NDRE is block level, so it carries a value the flat pill row dropped.
-    const ndre = screen.getByRole("button", { name: /NDRE/ });
-    expect(ndre.textContent).toContain("0.30");
-    expect(ndre.hasAttribute("disabled")).toBe(false);
+    const gndvi = await screen.findByRole("button", { name: /GNDVI/ });
+    await waitFor(() => expect(gndvi.textContent).toContain("0.470"));
+    expect(gndvi.hasAttribute("disabled")).toBe(false);
 
-    // GNDVI exists only on the sub-block grid: shown, but not selectable.
-    const gndvi = screen.getByRole("button", { name: /GNDVI/ });
-    expect(gndvi.hasAttribute("disabled")).toBe(true);
+    const ndre = screen.getByRole("button", { name: /NDRE/ });
+    expect(ndre.hasAttribute("disabled")).toBe(false);
 
     // Nothing from another family leaks in.
     expect(screen.queryByRole("button", { name: /NDWI/ })).toBeNull();
+  });
+
+  it("says a member has no reading rather than printing a fabricated one", async () => {
+    const { getTimeseries } = await import("@/api/indices");
+    // MSAVI is seeded late and thinly backfilled, so a 30-day window can hold
+    // one point or none. An index with no clear pass in range must read as
+    // "No reading", not as the em dash that used to mean "grid only" and not
+    // as a stale number carried over from another index.
+    vi.mocked(getTimeseries).mockImplementation((_block, code) =>
+      Promise.resolve({
+        block_id: "b1",
+        index_code: code,
+        granularity: "daily",
+        points: code === "msavi" ? [] : [point("2026-06-30", "0.55")],
+      }),
+    );
+
+    renderDock();
+    await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: /Vigour & canopy/ }));
+
+    const msavi = await screen.findByRole("button", { name: /MSAVI/ });
+    await waitFor(() => expect(msavi.textContent).toContain("No reading"));
+    // Still selectable — the tab can chart it over a wider range.
+    expect(msavi.hasAttribute("disabled")).toBe(false);
+
+    const ndvi = screen.getByRole("button", { name: /NDVI/ });
+    expect(ndvi.textContent).toContain("0.550");
+  });
+
+  it("charts the index whose tile was clicked, and repaints the map with it", async () => {
+    const { getTimeseries } = await import("@/api/indices");
+    vi.mocked(getTimeseries).mockImplementation((_block, code) =>
+      Promise.resolve({
+        block_id: "b1",
+        index_code: code,
+        granularity: "daily",
+        points: [point("2026-06-01", "0.20"), point("2026-06-30", "0.30")],
+      }),
+    );
+
+    renderDock();
+    await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: /Nutrition/ }));
+
+    // Opens on the family's usual index.
+    await waitFor(() => expect(screen.getByText(/Charting NDRE/)).toBeTruthy());
+
+    fireEvent.click(await screen.findByRole("button", { name: /GNDVI/ }));
+    await waitFor(() => expect(screen.getByText(/Charting GNDVI/)).toBeTruthy());
+    // The live console can draw GNDVI, so the click also moves the map.
+    expect(onActiveIndexChange).toHaveBeenCalledWith("gndvi");
+  });
+
+  it("shows the thermal family, in °C, without repainting a map that cannot draw it", async () => {
+    const { getTimeseries } = await import("@/api/indices");
+    vi.mocked(getTimeseries).mockImplementation((_block, code) =>
+      Promise.resolve({
+        block_id: "b1",
+        index_code: code,
+        granularity: "daily",
+        points: [point("2026-06-01", "48.4"), point("2026-06-30", "51.2")],
+      }),
+    );
+
+    renderDock();
+    await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
+    fireEvent.click(screen.getByRole("tab", { name: /Heat & water stress/ }));
+
+    // A temperature, at the precision a 100 m pixel supports — not "51.20",
+    // and not the em dash the tab used to print for all three.
+    const lst = await screen.findByRole("button", { name: /LST/ });
+    await waitFor(() => expect(lst.textContent).toContain("51.2 °C"));
+    expect(lst.hasAttribute("disabled")).toBe(false);
+    await waitFor(() => expect(screen.getByText(/Charting LST/)).toBeTruthy());
+
+    // Hotter is worse, so a rise is not green.
+    expect(screen.getByText(/Very hot|Extreme/)).toBeTruthy();
+
+    // The live console draws the sub-block grid mesh and thermal scenes carry
+    // no cells, so clicking the tile charts it and leaves the map alone.
+    fireEvent.click(lst);
+    expect(onActiveIndexChange).not.toHaveBeenCalled();
+    // Stated on the tab, and again in the scale text of the members that
+    // carry it — hence getAllByText.
+    expect(screen.getAllByText(/resampled to 30 m/).length).toBeGreaterThan(0);
   });
 
   it("keeps water in Water & environment and out of Field & plan", async () => {

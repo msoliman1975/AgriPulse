@@ -4,7 +4,12 @@
 export type Health = "healthy" | "watch" | "critical" | "unknown";
 export type MapSeverity = "watch" | "critical";
 export type SpecUnitType = "block" | "pivot" | "pivot_section";
-export type IndexCode = "ndvi" | "ndre" | "ndwi"; // backend has no NDMI; NDWI is the closest moisture-related proxy.
+// The three indices `GET /farms/{id}/blocks/summary` publishes as columns, and
+// so the three `loadUnitDetail` seeds into `UnitDetail.indices`. NOT the set
+// the block time-series route serves — that one takes any of the thirteen
+// codes (see api/indices.ts::getTimeseries), which is what the Block Dock
+// reads for every other index.
+export type IndexCode = "ndvi" | "ndre" | "ndwi";
 
 export interface UnitSummary {
   id: string;

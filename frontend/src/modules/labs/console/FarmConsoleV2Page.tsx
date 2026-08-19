@@ -518,6 +518,9 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               loading={c.detailQ.isLoading}
               error={c.detailQ.isError}
               activeIndex={c.activeIndex}
+              // The pixel console draws the index raster itself, so every
+              // index the dock lists can also be painted from it.
+              paintableIndices={MAP_INDEX_ORDER}
               onActiveIndexChange={c.setActiveIndex}
               onClose={c.deselect}
               farmId={farmId}

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { ExplainStep } from "@/api/recommendations";
+import { HEALTH_DOT } from "./constants";
 import {
   decisionSteps,
   failingCount,
+  indexDeltaLabel,
   isoDaysBefore,
   leafStep,
   readCondition,
@@ -24,7 +26,9 @@ function step(partial: Partial<ExplainStep>): ExplainStep {
 
 describe("refKey", () => {
   it("builds the dotted key the backend files values under", () => {
-    expect(refKey({ source: "indices", index_code: "ndvi", key: "mean" })).toBe("indices.ndvi.mean");
+    expect(refKey({ source: "indices", index_code: "ndvi", key: "mean" })).toBe(
+      "indices.ndvi.mean",
+    );
     expect(refKey({ source: "params", name: "threshold" })).toBe("params.threshold");
     expect(refKey({ source: "block", field: "crop_category" })).toBe("block.crop_category");
     expect(refKey({ source: "weather", scope: "forecast_24h", field: "temp_c_max" })).toBe(
@@ -160,5 +164,46 @@ describe("step partitioning", () => {
 describe("isoDaysBefore", () => {
   it("counts back from the given day", () => {
     expect(isoDaysBefore(30, new Date("2026-06-30T00:00:00Z"))).toBe("2026-05-31");
+  });
+});
+
+describe("indexDeltaLabel", () => {
+  it("calls a rise good on an index where higher is a better canopy", () => {
+    const d = indexDeltaLabel("ndvi", 0.04);
+    expect(d.arrow).toBe("▲");
+    expect(d.text).toBe("+0.04");
+    expect(d.color).toBe(HEALTH_DOT.healthy);
+  });
+
+  it("calls the same rise bad on an index where higher is worse", () => {
+    // MSI is SWIR/NIR moisture stress: climbing means the canopy is drying.
+    // The old label coloured every rise green, whatever the index meant.
+    const d = indexDeltaLabel("msi", 0.04);
+    expect(d.arrow).toBe("▲");
+    expect(d.color).toBe(HEALTH_DOT.watch);
+    expect(indexDeltaLabel("msi", -0.04).color).toBe(HEALTH_DOT.healthy);
+    // Past the big threshold in the wrong direction is critical, not watch.
+    expect(indexDeltaLabel("msi", 0.09).color).toBe(HEALTH_DOT.critical);
+  });
+
+  it("reads a temperature at its own scale and precision", () => {
+    // 0.4 °C is inside the noise of a 100 m thermal pixel; on the ratio
+    // thresholds it would have registered as a healthy rise.
+    expect(indexDeltaLabel("lst", 0.4, "°C").text).toBe("±0");
+    expect(indexDeltaLabel("lst", 0.4, "°C").arrow).toBe("→");
+
+    // A real warm-up: the number rises, and hotter is worse.
+    const hot = indexDeltaLabel("lst", 6.2, "°C");
+    expect(hot.text).toBe("+6.2 °C");
+    expect(hot.arrow).toBe("▲");
+    expect(hot.color).toBe(HEALTH_DOT.critical);
+
+    // Cooling is the good direction for LST.
+    expect(indexDeltaLabel("lst", -6.2, "°C").color).toBe(HEALTH_DOT.healthy);
+  });
+
+  it("has no verdict without a reading", () => {
+    expect(indexDeltaLabel("ndvi", null).text).toBe("—");
+    expect(indexDeltaLabel("ndvi", Number.NaN).color).toBe(HEALTH_DOT.unknown);
   });
 });
