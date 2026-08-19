@@ -1695,16 +1695,23 @@ GUIDES = [
         "who": "Farm manager, tenant admin",
         "time": "10 minutes for a few blocks, an hour for a large farm",
         "clip": "9 minutes",
+        "clip_file": "add-the-blocks",
+        "clip_poster": "guide-blocks-clip-poster",
+        "clip_note": ("Silent screen capture of the real app, 2 minutes 23 seconds. It draws a "
+                      "block, draws a pivot with eight sectors, and opens the auto-grid and "
+                      "upload panels. The narrated version replaces it once it is recorded."),
         "start": [
             "A farm with a boundary. See Create a farm.",
             "The block layout: which areas you treat as one unit, and the codes your team uses "
             "for them.",
-            "For the upload route, one polygon file per block, as .geojson, .json, .kml, or a "
+            "For the upload route, one polygon per block, in .geojson, .json, .kml, or a "
             "shapefile in a .zip.",
         ],
         "steps": [
             {
                 "t": "Open the Add menu",
+                "img": "guide-blocks-01-add",
+                "cap": "The Add menu. Two groups: add a new farm, or add something to this farm.",
                 "body": [
                     "Open the farm in <b>Farm management</b> and use the <b>Add</b> menu on the map "
                     "toolbar.",
@@ -1716,6 +1723,8 @@ GUIDES = [
             },
             {
                 "t": "Route 1 — draw one block",
+                "img": "guide-blocks-02-panel",
+                "cap": "The block panel. The area is already worked out from the shape you drew.",
                 "body": [
                     "Choose <b>Draw block</b>. The hint bar reads "
                     "<i>Drawing block — click to add points, double-click to finish</i>.",
@@ -1730,6 +1739,8 @@ GUIDES = [
             },
             {
                 "t": "Route 2 — draw a pivot",
+                "img": "guide-blocks-04-pivot",
+                "cap": "A pivot split into eight sectors. Each sector is its own block.",
                 "body": [
                     "Choose <b>Draw pivot</b>. The hint bar reads "
                     "<i>Drawing pivot — click the centre, then click to set the radius</i>.",
@@ -1739,18 +1750,24 @@ GUIDES = [
                     "are 1, 4, 6, 8 and 12, and you can type another number.",
                     "One sector means the whole circle is a single block. Four or more gives you a "
                     "block per wedge, which is how you spot a failing arm of the pivot.",
-                    "<b>Code</b> is required, for example <code>P-3</code>. Click <b>Create pivot</b>.",
+                    "<b>Code</b> is required, for example <code>P-01</code>. Click <b>Create pivot</b>.",
+                    "You get one record for the pivot itself and one block per sector, named after "
+                    "the pivot: <code>P-01-S1</code> through <code>P-01-S8</code>. Eight sectors "
+                    "means nine records in the block list.",
                 ],
             },
             {
                 "t": "Route 3 — auto-block grid",
+                "img": "guide-blocks-03-autogrid",
+                "cap": "Auto-block grid. You set the biggest a block may be, not a cell size.",
                 "body": [
                     "Choose <b>Auto-block grid</b> when the farm is a regular field with no natural "
                     "divisions.",
-                    "Set the <b>cell size in metres</b> and click <b>Compute candidates</b>. The "
-                    "farm is cut into equal squares and each one is offered to you.",
-                    "Select the candidates you want. You do not have to take them all.",
-                    "Click <b>Create selected blocks</b>.",
+                    "Set <b>Max block area</b>, in your tenant's unit. The panel says what it does: "
+                    "it previews blocks that tile the farm, clipped to its boundary, and edge "
+                    "blocks may come out smaller.",
+                    "Click <b>Compute</b> to see the preview, then <b>Create N blocks</b> to keep it.",
+                    "The button counts what it will make, so you know before you click.",
                 ],
                 "note": "This is a different thing from the grid inside a block. Auto-block grid "
                         "creates blocks. The sub-block grid divides one block into cells for "
@@ -1787,7 +1804,7 @@ GUIDES = [
                 ["Code", "yes", "Short identifier, for example B-12 or P-3. Must be unique on the farm."],
                 ["Name", "no", "Readable name, for example North strip."],
                 ["Sectors", "pivot only", "Equal slices of the circle. Presets 1, 4, 6, 8, 12, or type a number."],
-                ["Cell size in metres", "auto-grid only", "The size of each candidate square before you pick which to keep."],
+                ["Max block area", "auto-grid only", "The biggest a generated block may be, in your tenant's area unit. Blocks tile the farm and are clipped to its boundary, so edge blocks come out smaller."],
             ],
         },
         "mistakes": {
@@ -1810,9 +1827,6 @@ GUIDES = [
         "next": [("guide-create-a-farm", "Create a farm"),
                  ("process-map-the-farm", "Back to Map the farm"),
                  ("process-plan-the-season", "Plan the season")],
-        "draft_note": ("Written from the product's own screen text and the code behind it. The "
-                       "screenshots and the clip come next, once a farm exists on the recording "
-                       "account."),
     },
 ]
 

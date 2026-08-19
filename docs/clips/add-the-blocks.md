@@ -67,12 +67,13 @@ that hides it."
 
 ## Take 3 — auto-block grid (4:30 to 6:30)
 
-**Do:** **Add** → **Auto-block grid**. Set the cell size in metres, compute
-candidates, deselect a few, create the rest.
+**Do:** **Add** → **Auto-block grid**. Set **Max block area**, click Compute,
+then Create.
 
 **Say:** "For a regular field with no natural divisions, let the app cut it.
-Set the cell size, compute the candidates, then keep the ones you want. You do
-not have to take them all."
+You do not set a cell size, you set the biggest a block may be. Compute previews
+blocks that tile the farm, clipped to the boundary, so the ones on the edge come
+out smaller. The button tells you how many it will make before you click it."
 
 **Say, as a callout:** "This is not the same thing as the grid inside a block.
 This creates blocks. The sub-block grid divides one block into smaller cells for
@@ -123,7 +124,7 @@ and history, and moving them later costs more."
 | Step | Clip | State |
 | --- | --- | --- |
 | 1 | Create the farm | script written, silent draft capture published |
-| 2 | Add the blocks | script written, not recorded |
+| 2 | Add the blocks | script written, silent draft capture published |
 | 3 | Set the grid cell size | not written |
 | 4 | Mark the land units | not written |
 | 5 | Attach the people | not written |
