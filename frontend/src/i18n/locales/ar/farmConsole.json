@@ -66,7 +66,9 @@
     "grid": "الشبكة الفرعية",
     "gridUsesIndex": "تلوين الخلايا حسب المؤشر المحدد ({{code}}).",
     "signals": "الإشارات",
-    "signalsNone": "— بدون —"
+    "signalsNone": "— بدون —",
+    "flags": "ملاحظات ميدانية",
+    "flagsOpenOnly": "المفتوحة فقط"
   },
   "add": {
     "block": "رسم قطعة",
@@ -852,5 +854,35 @@
     "backfillBudgetAll": "كل المتأثرة",
     "resetToInherited": "إعادة القطع إلى القيمة الموروثة",
     "inheritApplied": "{{touched}} من {{total}} قطعة تعود الآن إلى القيمة الافتراضية الموروثة."
+  },
+  "flags": {
+    "title": "ملاحظة ميدانية",
+    "loading": "جارٍ التحميل…",
+    "open": "مفتوحة",
+    "closed": "مغلقة",
+    "unpinned": "لم تعد على الخريطة",
+    "someone": "أحدهم",
+    "noPosition": "بدون موقع",
+    "reply": "رد",
+    "close": "إغلاق الملاحظة",
+    "confirmClose": "أغلقها",
+    "reopen": "إعادة فتح",
+    "whyClosing": "لماذا تغلقها؟",
+    "replyPlaceholder": "اكتب ردًا…",
+    "commentRequired": "التعليق مطلوب — هو الطريقة الوحيدة ليعرف الكشّاف ما حدث.",
+    "severity": {
+      "info": "للعلم",
+      "warning": "تحتاج انتباه",
+      "critical": "عاجلة"
+    },
+    "reason": {
+      "actioned": "تم التنفيذ",
+      "no_action_needed": "لا حاجة لإجراء",
+      "duplicate": "مكررة"
+    },
+    "kind": {
+      "close": "أغلقها",
+      "reopen": "أعاد فتحها"
+    }
   }
 }

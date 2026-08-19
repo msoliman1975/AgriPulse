@@ -141,6 +141,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     from app.modules.farms.blocks_summary_router import router as farms_blocks_summary_router
     from app.modules.farms.config_router import router as farms_config_router
     from app.modules.farms.router import router as farms_router
+    from app.modules.field_flags.router import router as field_flags_router
     from app.modules.grid.router import router as grid_router
     from app.modules.iam.router import router as iam_router
     from app.modules.imagery.router import router as imagery_router
@@ -221,6 +222,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     app.include_router(reports_router)
     app.include_router(signals_router)
     app.include_router(scouting_router)
+    app.include_router(field_flags_router)
     app.include_router(integrations_health_router)
     app.include_router(integrations_router)
     app.include_router(platform_defaults_router)

@@ -30,6 +30,7 @@ import { mapWithConcurrency } from "@/modules/labs/map/api";
 import { griddedBlocks } from "./gridOverlay";
 import { listSubscriptions } from "@/api/imagery";
 import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
+import { listFieldFlags } from "@/api/fieldFlags";
 import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
 import { loadBlockHealth, loadMapSummary, loadUnitDetail, toUnitIntegration } from "../map/api";
 import { MapCanvas, type GridCellProps, type DrawProgress } from "../map/MapCanvas";
@@ -37,7 +38,9 @@ import { GridCellPopup, type CellItem } from "@/modules/grid/GridCellPopup";
 import { useRecommendations } from "@/queries/recommendations";
 import { useAlerts } from "@/queries/alerts";
 import { InactivateConfirmModal } from "../map/InactivateConfirmModal";
+import { FieldFlagPanel } from "../map/FieldFlagPanel";
 import { SignalObservationPanel } from "../map/SignalObservationPanel";
+import { buildFlagOverlay } from "../map/flagOverlay";
 import { buildSignalOverlay, blockCentroidsFromGeojson } from "../map/signalOverlay";
 import { FarmMembersTab } from "../map/FarmMembersTab";
 import { BlockDefaultsPanel } from "./BlockDefaultsPanel";
@@ -109,6 +112,11 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     labels: true,
     borderOpacity: 0.6,
     fillOpacity: 1,
+    // On by default — a flag exists to be seen. `flagsOpenOnly` starts off so
+    // the first look shows everything the farm has, including what was
+    // recently dealt with.
+    flags: true,
+    flagsOpenOnly: false,
   });
   // Grid overlay. Defaults ON for a farm that has any sub-block grid
   // configured — someone who went to the trouble of zoning a block wants to
@@ -121,6 +129,8 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   const [cellClickPoint, setCellClickPoint] = useState<{ x: number; y: number } | null>(null);
   // Signal observation overlay
   const [signalDefId, setSignalDefId] = useState<string | null>(null);
+  const [openFlagId, setOpenFlagId] = useState<string | null>(null);
+  const [flagClickPoint, setFlagClickPoint] = useState<{ x: number; y: number } | null>(null);
   const [obsClickPoint, setObsClickPoint] = useState<{ x: number; y: number } | null>(null);
   const selectedObsId = search.get("signal_obs");
   // Reshape + inactivate (page-level: need the map / a modal)
@@ -383,6 +393,17 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     enabled: Boolean(farmId && signalDefId),
     staleTime: 30_000,
   });
+  // Flags are fetched whenever the layer is on. `pinned_only` is the map's
+  // question — a flag past its pin lifetime is still open work and still
+  // appears in the panel, it just stops drawing here.
+  const flagsQ = useQuery({
+    queryKey: ["labs/mapnext/fieldFlags", farmId, layers.flagsOpenOnly],
+    queryFn: () =>
+      listFieldFlags(farmId, { pinned_only: true, open_only: layers.flagsOpenOnly }),
+    enabled: Boolean(farmId && layers.flags),
+    staleTime: 30_000,
+  });
+
   const selectedSignalDef = signalDefsQ.data?.find((d) => d.id === signalDefId) ?? null;
   const blockCentroids = useMemo(
     () =>
@@ -391,6 +412,12 @@ function Console({ farmId }: { farmId: string }): ReactNode {
         : new Map<string, [number, number]>(),
     [summaryQ.data],
   );
+  const flagOverlayFc = useMemo(() => {
+    if (!layers.flags) return null;
+    if (!flagsQ.data) return { type: "FeatureCollection" as const, features: [] };
+    return buildFlagOverlay(flagsQ.data, blockCentroids);
+  }, [layers.flags, flagsQ.data, blockCentroids]);
+
   const signalOverlayFc = useMemo(() => {
     if (!signalDefId) return null;
     if (!signalObsQ.data) return { type: "FeatureCollection" as const, features: [] };
@@ -750,6 +777,11 @@ function Console({ farmId }: { farmId: string }): ReactNode {
                 setCellClickPoint(point);
               }}
               signalOverlay={signalOverlayFc}
+              flagOverlay={flagOverlayFc}
+              onFlagClick={(flagId, point) => {
+                setOpenFlagId(flagId);
+                setFlagClickPoint(point);
+              }}
               onSignalClick={(observationId, point) => {
                 const next = new URLSearchParams(search);
                 next.set("signal_obs", observationId);
@@ -932,6 +964,19 @@ function Console({ farmId }: { farmId: string }): ReactNode {
                   next.delete("signal_obs");
                   setSearch(next, { replace: true });
                   setObsClickPoint(null);
+                }}
+              />
+            ) : null}
+
+            {/* Field flag popup — the thread a supervisor answers in. */}
+            {openFlagId ? (
+              <FieldFlagPanel
+                flagId={openFlagId}
+                x={flagClickPoint?.x ?? null}
+                y={flagClickPoint?.y ?? null}
+                onClose={() => {
+                  setOpenFlagId(null);
+                  setFlagClickPoint(null);
                 }}
               />
             ) : null}

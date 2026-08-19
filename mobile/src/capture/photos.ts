@@ -12,7 +12,7 @@
  * edge is enough to see leaf spotting or a cracked emitter.
  */
 
-import { initAttachmentUpload, uploadAttachment } from "@/api/client";
+import { initAttachmentUpload, initFlagPhotoUpload, uploadAttachment } from "@/api/client";
 
 /** Long edge, in pixels, after shrinking. */
 const MAX_EDGE = 1600;
@@ -68,6 +68,26 @@ export async function uploadPhoto(args: {
     signal_definition_id: args.signalDefinitionId,
     farm_id: args.farmId,
     // The shrunk blob is always JPEG; the untouched fallback keeps its own type.
+    content_type: blob.type || "image/jpeg",
+    content_length: blob.size,
+    filename: args.file.name || "photo.jpg",
+  });
+  await uploadAttachment(upload, blob);
+  return upload.attachment_s3_key;
+}
+
+/**
+ * The same shrink-then-PUT, for a photograph that belongs to a field flag
+ * rather than to a signal.
+ *
+ * Split by the presign endpoint rather than by copying the pipeline: the
+ * shrinking rules, the JPEG fallback and the "bytes first, row second" order
+ * are the part that matters, and two copies of them would drift.
+ */
+export async function uploadFlagPhoto(args: { file: File; farmId: string }): Promise<string> {
+  const blob = await shrink(args.file);
+  const upload = await initFlagPhotoUpload({
+    farm_id: args.farmId,
     content_type: blob.type || "image/jpeg",
     content_length: blob.size,
     filename: args.file.name || "photo.jpg",

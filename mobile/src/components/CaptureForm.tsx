@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
+  ApiError,
   getSignalTemplate,
   listSignalDefinitions,
   recordObservation,
@@ -41,6 +42,7 @@ export function CaptureForm({
   const [defs, setDefs] = useState<SignalDefinition[]>([]);
   const [defId, setDefId] = useState("");
   const [value, setValue] = useState("");
+  const [boolValue, setBoolValue] = useState<boolean | null>(null);
   const [notes, setNotes] = useState("");
   const [photos, setPhotos] = useState<File[]>([]);
   const [fix, setFix] = useState<Fix | null>(null);
@@ -85,8 +87,20 @@ export function CaptureForm({
   }, [farmId, lang, templateId]);
 
   const chosen = defs.find((d) => d.id === defId);
-  const numeric = chosen?.value_type === "numeric";
+  // The API accepts EXACTLY ONE value column and it must be the one matching
+  // the definition's kind: `value_event` for an event, `value_boolean` for a
+  // boolean, and so on. Sending `value_categorical` for the seeded
+  // `scout_photo` signal — an event, and a REQUIRED member of the default
+  // scouting template — was rejected every single time, which is why saving a
+  // photo never worked.
+  const kind = chosen?.value_type ?? "categorical";
+  const numeric = kind === "numeric";
   const canAttach = chosen?.attachment_allowed === true;
+  // An event is a thing that happened: the act is the value, so text is
+  // optional and the signal's own code stands in when nothing is typed.
+  // Numeric and categorical carry a measurement, and an empty one is not a
+  // reading at all.
+  const needsValue = kind === "numeric" || kind === "categorical";
 
   function addFiles(list: FileList | null): void {
     if (!list) return;
@@ -112,8 +126,38 @@ export function CaptureForm({
     }
   }
 
+  /** The one value column this definition's kind expects, and only that one. */
+  function valueColumns(): {
+    value_numeric: number | null;
+    value_categorical: string | null;
+    value_event: string | null;
+    value_boolean: boolean | null;
+  } {
+    const empty = {
+      value_numeric: null,
+      value_categorical: null,
+      value_event: null,
+      value_boolean: null,
+    };
+    if (kind === "numeric") return { ...empty, value_numeric: value === "" ? null : Number(value) };
+    if (kind === "boolean") return { ...empty, value_boolean: boolValue };
+    if (kind === "event") return { ...empty, value_event: value.trim() || (chosen?.code ?? "observed") };
+    return { ...empty, value_categorical: value === "" ? null : value };
+  }
+
   async function save(): Promise<void> {
     if (!defId) return;
+    // Checked here rather than left to the server: a scout in a field should
+    // be told "choose a value" by the form, not "could not save" by a request
+    // that was never going to succeed.
+    if (needsValue && value === "") {
+      setError(t(lang, "work.needValue"));
+      return;
+    }
+    if (kind === "boolean" && boolValue === null) {
+      setError(t(lang, "work.needValue"));
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -137,8 +181,7 @@ export function CaptureForm({
         const created = await recordObservation(defId, {
           farm_id: farmId,
           block_id: blockId,
-          value_numeric: numeric && value !== "" ? Number(value) : null,
-          value_categorical: !numeric && value !== "" ? value : null,
+          ...valueColumns(),
           notes: notes || null,
           attachment_s3_key: key,
           // See recordObservation: `free_point` never rejects on GPS drift,
@@ -154,10 +197,14 @@ export function CaptureForm({
       // visit, and making them reopen the form each time is friction in a
       // field with one hand free. The position is kept — they have not moved.
       setValue("");
+      setBoolValue(null);
       setNotes("");
       setPhotos([]);
-    } catch {
-      setError(t(lang, "work.recordFailed"));
+    } catch (e) {
+      // The API writes `detail` for a person to read — "value_categorical must
+      // be one of [...]" tells a scout what to change; "could not save that
+      // reading" tells them nothing and tells us nothing either.
+      setError(e instanceof ApiError && e.message ? e.message : t(lang, "work.recordFailed"));
     } finally {
       setProgress(null);
       setBusy(false);
@@ -170,7 +217,17 @@ export function CaptureForm({
       {error ? <p className="error">{error}</p> : null}
 
       <label htmlFor="def">{t(lang, "work.what")}</label>
-      <select id="def" value={defId} onChange={(e) => setDefId(e.target.value)}>
+      <select
+        id="def"
+        value={defId}
+        onChange={(e) => {
+          setDefId(e.target.value);
+          // The old value belongs to the old signal, and so does the old error.
+          setValue("");
+          setBoolValue(null);
+          setError(null);
+        }}
+      >
         {defs.map((d) => (
           <option key={d.id} value={d.id}>
             {d.name}
@@ -178,8 +235,24 @@ export function CaptureForm({
         ))}
       </select>
 
-      <label htmlFor="val">{t(lang, "work.value")}</label>
-      {chosen?.allowed_values && chosen.allowed_values.length > 0 ? (
+      <label htmlFor="val">
+        {kind === "event" ? t(lang, "work.whatHappened") : t(lang, "work.value")}
+        {chosen?.unit ? ` (${chosen.unit})` : ""}
+      </label>
+      {kind === "boolean" ? (
+        <div className="chips">
+          {[true, false].map((v) => (
+            <button
+              key={String(v)}
+              type="button"
+              className={`chip${boolValue === v ? " on" : ""}`}
+              onClick={() => setBoolValue(v)}
+            >
+              {t(lang, v ? "work.yes" : "work.no")}
+            </button>
+          ))}
+        </div>
+      ) : chosen?.allowed_values && chosen.allowed_values.length > 0 ? (
         <select id="val" value={value} onChange={(e) => setValue(e.target.value)}>
           <option value="">—</option>
           {chosen.allowed_values.map((v) => (
@@ -194,6 +267,7 @@ export function CaptureForm({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           inputMode={numeric ? "decimal" : "text"}
+          placeholder={kind === "event" ? t(lang, "work.optional") : ""}
         />
       )}
 

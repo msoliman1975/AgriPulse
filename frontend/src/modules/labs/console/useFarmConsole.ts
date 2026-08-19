@@ -19,6 +19,7 @@ import { useTranslation } from "react-i18next";
 import type { FeatureCollection, Polygon } from "geojson";
 
 import type { Block } from "@/api/blocks";
+import { listFieldFlags } from "@/api/fieldFlags";
 import { getFarmGridCells, getGridCells } from "@/api/grid";
 import { listFarmScenes, listSubscriptions } from "@/api/imagery";
 import { getIndexCatalog, type AnyIndexCode as ApiIndexCode } from "@/api/indices";
@@ -34,6 +35,7 @@ import {
   toUnitIntegration,
 } from "../map/api";
 import type { GridCellProps } from "../map/MapCanvas";
+import { buildFlagOverlay } from "../map/flagOverlay";
 import { blockCentroidsFromGeojson, buildSignalOverlay } from "../map/signalOverlay";
 import { griddedBlocks } from "../mapnext/gridOverlay";
 import { isThermalIndex, LAST_FARM_KEY } from "../mapnext/constants";
@@ -88,6 +90,11 @@ export function useFarmConsole(farmId: string) {
     labels: true,
     borderOpacity: 0.6,
     fillOpacity: 1,
+    // Both consoles share ViewBar, so both must actually serve the toggle it
+    // draws. Wiring only one would leave a control here that does nothing —
+    // the exact drift that let cell size go missing from a console before.
+    flags: true,
+    flagsOpenOnly: false,
   });
   // Grid overlay defaults ON for a farm that has any sub-block grid
   // configured — someone who went to the trouble of zoning a block wants to
@@ -448,6 +455,18 @@ export function useFarmConsole(farmId: string) {
         : new Map<string, [number, number]>(),
     [summaryQ.data],
   );
+  const flagsQ = useQuery({
+    queryKey: ["labs/console/fieldFlags", farmId, layers.flagsOpenOnly],
+    queryFn: () => listFieldFlags(farmId, { pinned_only: true, open_only: layers.flagsOpenOnly }),
+    enabled: Boolean(farmId && layers.flags),
+    staleTime: 30_000,
+  });
+  const flagOverlayFc = useMemo(() => {
+    if (!layers.flags) return null;
+    if (!flagsQ.data) return { type: "FeatureCollection" as const, features: [] };
+    return buildFlagOverlay(flagsQ.data, blockCentroids);
+  }, [layers.flags, flagsQ.data, blockCentroids]);
+
   const signalOverlayFc = useMemo(() => {
     if (!signalDefId) return null;
     if (!signalObsQ.data) return { type: "FeatureCollection" as const, features: [] };
@@ -558,6 +577,7 @@ export function useFarmConsole(farmId: string) {
     cellItemsByCell,
     selectedSignalDef,
     signalOverlayFc,
+    flagOverlayFc,
     selectedObs,
     // actions
     select,

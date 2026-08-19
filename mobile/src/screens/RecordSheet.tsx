@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { createSelfInitiatedVisit, listBlocks, type Block, type WorkItem } from "@/api/client";
 import { CaptureForm } from "@/components/CaptureForm";
+import { RaiseFlagScreen } from "@/screens/RaiseFlagScreen";
 import { t, type Lang } from "@/i18n";
 import { WorkDetailScreen } from "@/screens/WorkDetailScreen";
 
@@ -21,7 +22,7 @@ import { WorkDetailScreen } from "@/screens/WorkDetailScreen";
  * reading attributed to nowhere cannot be aggregated with anything.
  */
 
-type Mode = "choose" | "block" | "round" | "reading";
+type Mode = "choose" | "block" | "round" | "reading" | "flag";
 
 export function RecordSheet({
   lang,
@@ -98,6 +99,12 @@ export function RecordSheet({
     );
   }
 
+  if (mode === "flag") {
+    return (
+      <RaiseFlagScreen lang={lang} farmId={farmId} onClose={onClose} onRaised={onClose} />
+    );
+  }
+
   if (mode === "reading") {
     return (
       // `overlay` because this renders alongside the tab content rather than
@@ -131,6 +138,12 @@ export function RecordSheet({
 
         {mode === "choose" ? (
           <>
+            {/* First, because it is the one thing this app could not do at
+                all: report something nobody asked about. */}
+            <button type="button" className="opt" onClick={() => setMode("flag")}>
+              <b>{t(lang, "flag.chooser")}</b>
+              <span>{t(lang, "flag.chooserHint")}</span>
+            </button>
             <button
               type="button"
               className="opt"

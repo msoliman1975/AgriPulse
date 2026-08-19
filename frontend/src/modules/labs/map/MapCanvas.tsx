@@ -15,6 +15,7 @@ import { buildAlertBadgePoints } from "./alertBadges";
 import { gridRampExpression } from "./gridRamp";
 import { HEALTH_FILL, HEALTH_FILL_OPACITY, HEALTH_STROKE } from "./health";
 import { approxPolygonAreaM2, haversineMeters, polygonPerimeterM } from "./geo";
+import type { FlagOverlayProps } from "./flagOverlay";
 import type { SignalOverlayProps } from "./signalOverlay";
 import type { UnitFeatureProps } from "./types";
 import type { FeatureCollection, MultiPolygon, Point, Polygon } from "geojson";
@@ -75,6 +76,10 @@ interface Props {
   // (possibly empty) shows it. Click on a marker fires onSignalClick
   // with the underlying observation id.
   signalOverlay?: FeatureCollection<Point, SignalOverlayProps> | null;
+  // Field flags (tenant migration 0081). Same null = hide / FC = show contract
+  // as the signal overlay above, so the layer toggle is one boolean.
+  flagOverlay?: FeatureCollection<Point, FlagOverlayProps> | null;
+  onFlagClick?: (flagId: string, point: { x: number; y: number }) => void;
   onSignalClick?: (observationId: string, point: { x: number; y: number }) => void;
   // Sub-block grid overlay (PR-grid). `null` hides; an FC shows.
   // Each feature must carry { cell_id: string, value: number | null }
@@ -183,6 +188,9 @@ const AOI_LINE_LAYER = "farm-aoi-line";
 // CS-8: signal-observation overlay. One source + one circle layer
 // per active overlay; the map page swaps the source data when the
 // operator picks a different signal definition.
+const FLAG_SOURCE_ID = "field-flag-overlay";
+const FLAG_CIRCLE_LAYER = "field-flag-circle";
+const FLAG_HALO_LAYER = "field-flag-halo";
 const SIGNAL_SOURCE_ID = "signal-overlay";
 const SIGNAL_CIRCLE_LAYER = "signal-overlay-circle";
 const SIGNAL_HALO_LAYER = "signal-overlay-halo";
@@ -255,6 +263,19 @@ const AOI_FILL = "#0ea5e9";
 // because the existing alert palette uses red/orange and we want the
 // overlay to read as informational, not warning-level.
 const SIGNAL_OVERLAY_COLOR = "#f59e0b";
+// Colour carries SEVERITY and fill carries STATE. An open flag is filled; a
+// closed one is a hollow ring in the same colour, because a closed pin stays
+// on the map for the rest of its lifetime and the map has to say which pins
+// are finished without changing what they are about.
+const FLAG_COLOR_BY_SEVERITY: (string | string[])[] = [
+  "match",
+  ["get", "severity"],
+  "critical",
+  "#b24430",
+  "warning",
+  "#c98a18",
+  "#356b30",
+];
 
 // PR-R4b risk-overlay fill. Mirrors the health palette (green/amber/red) so
 // the map reads consistently; "none" is transparent so unscored blocks fall
@@ -354,6 +375,8 @@ export function MapCanvas({
   borderOpacity = 0.9,
   blockFillOpacity = 1,
   signalOverlay = null,
+  flagOverlay = null,
+  onFlagClick,
   onSignalClick,
   gridCells = null,
   gridIndexCode = null,
@@ -385,6 +408,8 @@ export function MapCanvas({
   onReshapeRef.current = onReshape;
   const onSignalClickRef = useRef(onSignalClick);
   onSignalClickRef.current = onSignalClick;
+  const onFlagClickRef = useRef(onFlagClick);
+  onFlagClickRef.current = onFlagClick;
   // Read inside the mount-only map-creation effect, which would otherwise
   // close over the index selected on first render forever.
   const gridIndexCodeRef = useRef(gridIndexCode);
@@ -629,6 +654,51 @@ export function MapCanvas({
       map.on("mouseleave", FILL_LAYER, () => {
         map.getCanvas().style.cursor = "";
       });
+      // Field flags. Two layers for the same reason the signal overlay has
+      // two: a wide soft halo keeps a pin readable over satellite imagery
+      // without the pin itself having to be large.
+      map.addSource(FLAG_SOURCE_ID, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id: FLAG_HALO_LAYER,
+        type: "circle",
+        source: FLAG_SOURCE_ID,
+        paint: {
+          "circle-color": FLAG_COLOR_BY_SEVERITY as never,
+          "circle-radius": 13,
+          // Only an OPEN flag gets a halo. It is what makes unfinished work
+          // findable at a glance on a farm carrying a season of closed pins.
+          "circle-opacity": ["case", ["get", "open"], 0.28, 0] as never,
+        },
+      });
+      map.addLayer({
+        id: FLAG_CIRCLE_LAYER,
+        type: "circle",
+        source: FLAG_SOURCE_ID,
+        paint: {
+          "circle-color": ["case", ["get", "open"], FLAG_COLOR_BY_SEVERITY, "rgba(0,0,0,0)"] as never,
+          "circle-radius": 7,
+          "circle-stroke-color": FLAG_COLOR_BY_SEVERITY as never,
+          "circle-stroke-width": 3,
+        },
+      });
+      map.on("mousemove", FLAG_CIRCLE_LAYER, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", FLAG_CIRCLE_LAYER, () => {
+        map.getCanvas().style.cursor = "";
+      });
+      map.on("click", FLAG_CIRCLE_LAYER, (ev) => {
+        const f = ev.features?.[0];
+        if (!f) return;
+        const props = f.properties as { flag_id?: string };
+        if (props.flag_id) {
+          onFlagClickRef.current?.(props.flag_id, { x: ev.point.x, y: ev.point.y });
+        }
+      });
+
       map.on("mousemove", SIGNAL_CIRCLE_LAYER, () => {
         map.getCanvas().style.cursor = "pointer";
       });
@@ -751,6 +821,8 @@ export function MapCanvas({
       // grid cells (the GRID handler also guards on them).
       if (map.getLayer(SIGNAL_HALO_LAYER)) map.moveLayer(SIGNAL_HALO_LAYER);
       if (map.getLayer(SIGNAL_CIRCLE_LAYER)) map.moveLayer(SIGNAL_CIRCLE_LAYER);
+      if (map.getLayer(FLAG_HALO_LAYER)) map.moveLayer(FLAG_HALO_LAYER);
+      if (map.getLayer(FLAG_CIRCLE_LAYER)) map.moveLayer(FLAG_CIRCLE_LAYER);
       map.moveLayer(LABEL_LAYER);
       map.on("mousemove", GRID_FILL_LAYER, () => {
         map.getCanvas().style.cursor = "pointer";
@@ -979,6 +1051,26 @@ export function MapCanvas({
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
   }, [signalOverlay]);
+
+  // Field flags. Same contract as the signal overlay: null hides the layer,
+  // an FC shows it.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const src = map.getSource(FLAG_SOURCE_ID) as GeoJSONSource | undefined;
+      if (!src) return;
+      const visible = flagOverlay !== null;
+      src.setData(flagOverlay ?? { type: "FeatureCollection", features: [] });
+      for (const layerId of [FLAG_CIRCLE_LAYER, FLAG_HALO_LAYER]) {
+        if (!map.getLayer(layerId)) continue;
+        map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+      }
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once("load", apply);
+  }, [flagOverlay]);
 
   // Sub-block grid overlay. Same null = hide / FC = show pattern as
   // signal overlay; data goes straight into the existing GeoJSON
