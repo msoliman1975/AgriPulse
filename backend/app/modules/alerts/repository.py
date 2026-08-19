@@ -14,8 +14,8 @@ now owns signal loading + tree evaluation; tree leaves with
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
-from typing import Any
+from datetime import UTC, date, datetime
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import bindparam, select, text
@@ -25,7 +25,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.alerts.models import Alert
-from app.shared.action_items import ALERT_SQL
+from app.shared.action_items import ALERT_SQL, TENANT_TODAY_SQL
 
 # Alert lifecycle values that still count as live. Kept as one SQL fragment
 # so the dedup predicate, the group lookups and the cascade cannot disagree
@@ -161,6 +161,16 @@ class AlertsRepository:
     # lives in the synthesised `rule_code`, so a tree-scoped sweep has to key
     # off the first segment of `group_key` instead.
 
+    async def tenant_today(self, *, tenant_schema: str) -> date:
+        """Today in the tenant's own timezone — the boundary streaks are cut on.
+
+        Same statement the recommendations repository runs, from the same
+        constant: two tables whose day boundaries disagreed would give one
+        finding two different streak counts depending on which half you read.
+        """
+        row = await self._public.execute(text(TENANT_TODAY_SQL), {"s": tenant_schema})
+        return cast(date, row.scalar_one_or_none() or datetime.now(UTC).date())
+
     async def find_open_group_parent(self, *, block_id: UUID, group_key: str) -> UUID | None:
         return (
             await self._tenant.execute(
@@ -215,13 +225,23 @@ class AlertsRepository:
         signal_snapshot: dict[str, Any] | None,
         today: date,
         actor_user_id: UUID | None,
+        severity: str | None = None,
     ) -> None:
-        """Re-point an already-active per-cell alert at its group, refreshed."""
+        """Re-point an already-active member at its group, refreshed.
+
+        `severity` is updated when supplied because the member can legitimately
+        change it between sweeps: the per-index dedup is `(block_id,
+        rule_code)` with no severity in it, so an index that escalates from
+        warning to critical keeps its original row and simply moves to the
+        critical group. Leaving the row's own severity behind would put a
+        warning member under a critical card.
+        """
         await self._tenant.execute(
             text(
                 """
                 UPDATE alerts
                    SET group_parent_id = :parent, group_key = :key,
+                       severity = COALESCE(:severity, severity),
                        diagnosis_en = :diag_en, diagnosis_ar = :diag_ar,
                        signal_snapshot = CAST(:snapshot AS jsonb),
                        cleared_at = NULL,
@@ -237,6 +257,7 @@ class AlertsRepository:
                 "id": child_id,
                 "parent": parent_id,
                 "key": group_key,
+                "severity": severity,
                 "diag_en": diagnosis_en,
                 "diag_ar": diagnosis_ar,
                 "snapshot": _serialize_jsonb(signal_snapshot),
@@ -281,6 +302,21 @@ class AlertsRepository:
             .all()
         )
         return tuple(r for r in rows if r is not None)
+
+    async def refresh_grid_member_counts(self, *, block_id: UUID, today: date) -> None:
+        """Recount every live grid group on one block.
+
+        Scoped to the block rather than to the group just written, because a
+        member can MOVE between groups: an index that escalates from warning to
+        critical leaves the warning card one member lighter, and nothing else
+        in the sweep would ever go back and notice.
+        """
+        await self._tenant.execute(
+            text(
+                ALERT_SQL.refresh_member_counts_scoped("split_part(p.group_key, ':', 1) = 'grid'")
+            ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+            {"block_id": block_id, "today": today},
+        )
 
     async def refresh_member_counts_for_tree(
         self, *, block_id: UUID, tree_code: str, today: date

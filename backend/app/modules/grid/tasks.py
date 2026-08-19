@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Coroutine
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any, cast
 from uuid import UUID
 
@@ -35,6 +35,10 @@ from app.modules.grid.anomaly import DEFAULT_K, AnomalyResult, effective_k
 from app.modules.grid.backfill import list_backfill_jobs
 from app.modules.grid.polar_label import ring_sector
 from app.modules.grid.service import get_grid_service
+from app.shared.action_items import (
+    GRID_GROUP_RULE_CODE,
+    build_grid_group_key,
+)
 from app.shared.db.blocks import read_block_context
 from app.shared.db.ids import uuid7
 from app.shared.db.session import (
@@ -182,6 +186,63 @@ def _build_snapshot(
     }
 
 
+# The parent stands for a block, not for an index, so its text cannot name one.
+# Which indices fired is on the members, and the drill-down lists them.
+_GRID_GROUP_DIAGNOSIS_EN = (
+    "Spatial anomaly detected on this block. Open it to see which indices flagged it."
+)
+_GRID_GROUP_DIAGNOSIS_AR = "تم رصد شذوذ مكاني في هذا الحقل. افتحه لمعرفة المؤشرات التي رصدته."
+
+
+async def _ensure_grid_group_parent(
+    *,
+    repo: Any,
+    block_id: UUID,
+    group_key: str,
+    severity: str,
+    today: date,
+) -> tuple[UUID | None, bool]:
+    """The single card a block's spatial anomalies aggregate into.
+
+    Returns ``(parent_id, created)``. Every index calls this, so the bump
+    inside it runs many times per sweep — harmless by construction, because the
+    recurrence counters move on a change of calendar day and not on a call.
+    """
+    existing = await repo.find_open_group_parent(block_id=block_id, group_key=group_key)
+    if existing is not None:
+        await repo.bump_recurrence(row_id=existing, today=today, actor_user_id=None)
+        return existing, False
+
+    parent_id = uuid7()
+    created = await repo.insert_alert(
+        alert_id=parent_id,
+        block_id=block_id,
+        rule_code=GRID_GROUP_RULE_CODE,
+        severity=severity,
+        diagnosis_en=_GRID_GROUP_DIAGNOSIS_EN,
+        diagnosis_ar=_GRID_GROUP_DIAGNOSIS_AR,
+        prescription_en=None,
+        prescription_ar=None,
+        prescription_activity_id=None,
+        signal_snapshot=None,
+        actor_user_id=None,
+        group_key=group_key,
+        group_parent_id=None,
+        is_group=True,
+        today=today,
+    )
+    if created:
+        return parent_id, True
+
+    # Another index of this same block opened the group between the read and
+    # the write. The unique index is what makes that safe; the loser joins the
+    # winner rather than opening a second card.
+    found = await repo.find_open_group_parent(block_id=block_id, group_key=group_key)
+    if found is not None:
+        await repo.bump_recurrence(row_id=found, today=today, actor_user_id=None)
+    return found, False
+
+
 async def _open_anomaly_alert(
     *,
     session: Any,
@@ -214,10 +275,26 @@ async def _open_anomaly_alert(
         index_code=index_code, result=result, worst_label=worst_label
     )
     snapshot = _build_snapshot(index_code=index_code, scene_time=scene_time, result=result)
-    alert_id = uuid7()
 
     repo = AlertsRepository(tenant_session=session, public_session=public_session)
-    inserted = await repo.insert_alert(
+    today = await repo.tenant_today(tenant_schema=tenant_schema)
+    group_key = build_grid_group_key(action_type=None, severity=result.severity)
+
+    # One card per (block, severity), not per index. The members below keep
+    # their own per-index rule_code — that is what still dedups each index —
+    # but the thing anybody looks at and acts on is the block.
+    parent_id, parent_created = await _ensure_grid_group_parent(
+        repo=repo,
+        block_id=block_id,
+        group_key=group_key,
+        severity=result.severity,
+        today=today,
+    )
+    if parent_id is None:
+        return False
+
+    alert_id = uuid7()
+    member_created = await repo.insert_alert(
         alert_id=alert_id,
         block_id=block_id,
         rule_code=rule_code,
@@ -229,10 +306,45 @@ async def _open_anomaly_alert(
         prescription_activity_id=None,
         signal_snapshot=snapshot,
         actor_user_id=None,
+        group_key=group_key,
+        group_parent_id=parent_id,
+        is_group=False,
+        today=today,
     )
-    if not inserted:
+    if not member_created:
+        # This index already had an open alert on this block — from before the
+        # grouping existed, or from yesterday's sweep. Re-point it at the
+        # parent and refresh its evidence rather than leaving an orphan the
+        # queue can no longer reach, and record that it fired again: the old
+        # code returned here having written nothing at all, which is why a
+        # week-old anomaly looked identical to one raised this morning.
+        existing = await repo.find_open_alert(block_id=block_id, rule_code=rule_code)
+        if existing is not None:
+            await repo.attach_child(
+                child_id=existing,
+                parent_id=parent_id,
+                group_key=group_key,
+                diagnosis_en=diag_en,
+                diagnosis_ar=diag_ar,
+                signal_snapshot=snapshot,
+                today=today,
+                actor_user_id=None,
+                severity=result.severity,
+            )
+    # Every grid group on this block, not just the one written: an index that
+    # changed severity has just left another card one member lighter.
+    await repo.refresh_grid_member_counts(block_id=block_id, today=today)
+
+    if not parent_created:
+        # The block is already on the board for this severity. Announcing each
+        # index separately is exactly the fan-out this grouping removes: one
+        # physical anomaly lights up five to nine correlated indices, and that
+        # used to be five to nine notifications for one trip to one block.
         return False
 
+    alert_id = parent_id
+    diag_en, diag_ar = _GRID_GROUP_DIAGNOSIS_EN, _GRID_GROUP_DIAGNOSIS_AR
+    rule_code = GRID_GROUP_RULE_CODE
     await get_audit_service().record(
         tenant_schema=tenant_schema,
         event_type="alerts.alert_opened",

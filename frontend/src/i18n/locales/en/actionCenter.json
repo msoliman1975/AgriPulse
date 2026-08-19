@@ -145,7 +145,13 @@
     "acrossBlock": "{{count}} zones in block {{block}}",
     "acrossBlock_one": "{{count}} zone in block {{block}}",
     "zonesSpreading": "{{count}} zones ▲ from {{previous}}",
-    "zonesReceding": "{{count}} zones ▼ from {{previous}}"
+    "zonesReceding": "{{count}} zones ▼ from {{previous}}",
+    "signals": "{{count}} signals",
+    "signals_one": "{{count}} signal",
+    "signalsSpreading": "{{count}} signals ▲ from {{previous}}",
+    "signalsReceding": "{{count}} signals ▼ from {{previous}}",
+    "signalsOnBlock": "{{count}} indices flagged block {{block}}",
+    "signalsOnBlock_one": "{{count}} index flagged block {{block}}"
   },
   "recurrence": {
     "recurring": "Recurring · {{count}} days",
@@ -164,6 +170,8 @@
     "cleared": "Stopped",
     "days": "{{count}} days running",
     "days_one": "{{count}} day",
-    "spreadTitle": "Zones ({{active}} of {{total}} still firing, was {{previous}})"
+    "spreadTitle": "Zones ({{active}} of {{total}} still firing, was {{previous}})",
+    "titleSignals": "Indices ({{active}} of {{total}} still flagging)",
+    "spreadTitleSignals": "Indices ({{active}} of {{total}} still flagging, was {{previous}})"
   }
 }

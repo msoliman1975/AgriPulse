@@ -75,7 +75,15 @@ export function ItemRow({
   const confidence = confidencePercent(item.confidence);
   const ordinal = item.cell === null ? null : cellOrdinal(item.cell);
   const detail = itemDetail(item, isAr);
-  const { is_group: isGroup, member_count: memberCount, trend } = item.aggregation;
+  const {
+    is_group: isGroup,
+    member_count: memberCount,
+    member_kind: memberKind,
+    trend,
+  } = item.aggregation;
+  // A grid-anomaly card aggregates indices, not places. "8 zones" would send
+  // somebody looking for eight locations that do not exist.
+  const noun = memberKind === "signal" ? "signals" : "zones";
   const recurrence = item.recurrence;
   // "12 zones" alone cannot say whether this is getting worse. When there is a
   // baseline to compare against, the pill carries the direction and the number
@@ -83,10 +91,10 @@ export function ItemRow({
   // implying a stability nobody has measured.
   const zonesKey =
     trend === "spreading"
-      ? "aggregate.zonesSpreading"
+      ? `aggregate.${noun}Spreading`
       : trend === "receding"
-        ? "aggregate.zonesReceding"
-        : "aggregate.zones";
+        ? `aggregate.${noun}Receding`
+        : `aggregate.${noun}`;
 
   const ago = (iso: string): string =>
     formatDistanceToNow(parseISO(iso), { addSuffix: true, locale: dateLocale });
@@ -144,7 +152,10 @@ export function ItemRow({
             // its extent instead. "Whole block" would be a lie — the finding is
             // in some of the block's cells, not all of it.
             <span className="text-ap-muted">
-              {t("aggregate.acrossBlock", { count: memberCount, block: item.block_code })}
+              {t(memberKind === "signal" ? "aggregate.signalsOnBlock" : "aggregate.acrossBlock", {
+                count: memberCount,
+                block: item.block_code,
+              })}
             </span>
           ) : coords === null ? (
             <span className="text-ap-muted">{t("row.wholeBlock", { block: item.block_code })}</span>
@@ -245,6 +256,7 @@ export function ItemRow({
                 itemId={item.id}
                 isAr={isAr}
                 previousCount={item.aggregation.previous_member_count}
+                memberKind={memberKind}
               />
             ) : null}
           </div>

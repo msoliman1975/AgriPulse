@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { ActionItemMember } from "@/api/actionCenter";
+import type { ActionItemMember, MemberKind } from "@/api/actionCenter";
 import { Pill } from "@/components/Pill";
 import { useActionItemMembers } from "@/queries/actionCenter";
 import { formatCoords, mapsUrl } from "@/modules/actionCenter/lib/format";
@@ -13,6 +13,7 @@ interface Props {
   /** Yesterday's member count, so the panel header can state the baseline the
    *  card's arrow is drawn against. 0 when there is no yesterday. */
   previousCount: number;
+  memberKind: MemberKind;
 }
 
 function memberText(member: ActionItemMember, isAr: boolean): string | null {
@@ -30,7 +31,13 @@ function memberText(member: ActionItemMember, isAr: boolean): string | null {
  * rather than hidden. A shrinking outbreak is a different situation from one
  * that never spread, and dropping the quiet cells makes the two look identical.
  */
-export function GroupMembers({ farmId, itemId, isAr, previousCount }: Props): ReactNode {
+export function GroupMembers({
+  farmId,
+  itemId,
+  isAr,
+  previousCount,
+  memberKind,
+}: Props): ReactNode {
   const { t } = useTranslation("actionCenter");
   const query = useActionItemMembers(farmId, itemId);
 
@@ -50,8 +57,15 @@ export function GroupMembers({ farmId, itemId, isAr, previousCount }: Props): Re
     <div className="mt-2.5">
       <h4 className="mb-1.5 text-meta font-bold uppercase tracking-wide text-ap-muted">
         {previousCount > 0 && previousCount !== active
-          ? t("members.spreadTitle", { active, total, previous: previousCount })
-          : t("members.title", { active, total })}
+          ? t(memberKind === "signal" ? "members.spreadTitleSignals" : "members.spreadTitle", {
+              active,
+              total,
+              previous: previousCount,
+            })
+          : t(memberKind === "signal" ? "members.titleSignals" : "members.title", {
+              active,
+              total,
+            })}
       </h4>
       <ul className="flex flex-col gap-1">
         {members.map((member) => {
@@ -66,13 +80,18 @@ export function GroupMembers({ farmId, itemId, isAr, previousCount }: Props): Re
                 cleared ? "text-ap-muted line-through decoration-ap-line" : ""
               }`}
             >
-              <span className="font-medium">
-                {member.cell === null
-                  ? t("members.unlocated")
-                  : t("members.cellAt", {
-                      row: member.cell.row,
-                      col: member.cell.col,
-                    })}
+              <span className="font-medium uppercase">
+                {/* A signal names what fired; a cell names where. Falling back
+                    to "no grid cell" for a signal would describe an index as a
+                    place with a missing location. */}
+                {member.label !== null
+                  ? member.label
+                  : member.cell === null
+                    ? t("members.unlocated")
+                    : t("members.cellAt", {
+                        row: member.cell.row,
+                        col: member.cell.col,
+                      })}
               </span>
               {coords === null ? null : (
                 <code className="rounded border border-ap-line bg-ap-bg px-1.5 py-0.5 font-mono">

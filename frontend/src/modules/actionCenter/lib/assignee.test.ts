@@ -32,7 +32,13 @@ const item = (over: Partial<ActionItem> = {}): ActionItem => ({
   scheduled_date: null,
   why: null,
   reasoning: {},
-  aggregation: { is_group: false, member_count: 0, previous_member_count: 0, trend: "unknown" },
+  aggregation: {
+    is_group: false,
+    member_count: 0,
+    member_kind: "cell",
+    previous_member_count: 0,
+    trend: "unknown",
+  },
   recurrence: {
     state: "new",
     occurrence_count: 1,

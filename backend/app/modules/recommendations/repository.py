@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.indices.trends import compute_trend
 from app.modules.recommendations.models import DecisionTree, DecisionTreeVersion
-from app.shared.action_items import REC_SQL
+from app.shared.action_items import REC_SQL, TENANT_TODAY_SQL
 
 
 def _serialize_jsonb(value: Any) -> str | None:
@@ -806,13 +806,7 @@ class RecommendationsRepository:
         an evening sweep in Cairo would count as tomorrow, splitting a run of
         consecutive days into two runs of one.
         """
-        row = await self._public.execute(
-            text(
-                "SELECT (now() AT TIME ZONE default_timezone)::date "
-                "FROM public.tenants WHERE schema_name = :s"
-            ),
-            {"s": tenant_schema},
-        )
+        row = await self._public.execute(text(TENANT_TODAY_SQL), {"s": tenant_schema})
         return cast(date, row.scalar_one_or_none() or datetime.now(UTC).date())
 
     async def find_open_group_parent(self, *, block_id: UUID, group_key: str) -> UUID | None:
