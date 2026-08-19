@@ -94,6 +94,7 @@ PROCESSES = [
             {
                 "t": "Add the blocks",
                 "where": "Farm management → Blocks",
+                "guide": ("guide-add-the-blocks", "Full guide: add the blocks"),
                 "steps": [
                     "Draw each block, or upload a file with the block shapes.",
                     "For a regular field, use auto-grid to cut the farm into equal blocks.",
@@ -1681,6 +1682,138 @@ GUIDES = [
                  ("process-plan-the-season", "Plan the season"),
                  ("concepts", "Key concepts")],
     },
+    {
+        "slug": "guide-add-the-blocks",
+        "process": ("process-map-the-farm", "Map the farm", "01"),
+        "img": "p02-season",
+        "title": "Add the blocks",
+        "short": "Four ways to cut a farm into the areas you actually manage: draw one, draw a "
+                 "pivot, auto-grid, or upload files.",
+        "lede": "A block is the area you manage as one thing. It carries the crop, the plan and "
+                "the person responsible, and it is the unit every index number is reported "
+                "against. The farm gives you the outline. Blocks are what you work with.",
+        "who": "Farm manager, tenant admin",
+        "time": "10 minutes for a few blocks, an hour for a large farm",
+        "clip": "9 minutes",
+        "start": [
+            "A farm with a boundary. See Create a farm.",
+            "The block layout: which areas you treat as one unit, and the codes your team uses "
+            "for them.",
+            "For the upload route, one polygon file per block, as .geojson, .json, .kml, or a "
+            "shapefile in a .zip.",
+        ],
+        "steps": [
+            {
+                "t": "Open the Add menu",
+                "body": [
+                    "Open the farm in <b>Farm management</b> and use the <b>Add</b> menu on the map "
+                    "toolbar.",
+                    "It offers four ways in: <b>Draw block</b>, <b>Draw pivot</b>, "
+                    "<b>Auto-block grid</b>, and <b>Upload AOI files</b>.",
+                    "Pick by how the farm is laid out, not by habit. A pivot farm should use Draw "
+                    "pivot. A farm you already have files for should use the upload.",
+                ],
+            },
+            {
+                "t": "Route 1 — draw one block",
+                "body": [
+                    "Choose <b>Draw block</b>. The hint bar reads "
+                    "<i>Drawing block — click to add points, double-click to finish</i>.",
+                    "Click each corner, double-click the last one. The panel opens with the area "
+                    "already calculated.",
+                    "<b>Code</b> is required, for example <code>B-12</code>. <b>Name</b> is "
+                    "optional, for example <code>North strip</code>.",
+                    "Click <b>Create block</b>. Repeat for the next block.",
+                ],
+                "note": "Blocks may not overlap. If two blocks share ground, every number for that "
+                        "ground is counted twice, in both blocks.",
+            },
+            {
+                "t": "Route 2 — draw a pivot",
+                "body": [
+                    "Choose <b>Draw pivot</b>. The hint bar reads "
+                    "<i>Drawing pivot — click the centre, then click to set the radius</i>.",
+                    "Click the pivot centre, then click once more to set the radius. The panel "
+                    "shows the radius in metres and the area.",
+                    "<b>Sectors (equal slices)</b> splits the circle into equal wedges. The presets "
+                    "are 1, 4, 6, 8 and 12, and you can type another number.",
+                    "One sector means the whole circle is a single block. Four or more gives you a "
+                    "block per wedge, which is how you spot a failing arm of the pivot.",
+                    "<b>Code</b> is required, for example <code>P-3</code>. Click <b>Create pivot</b>.",
+                ],
+            },
+            {
+                "t": "Route 3 — auto-block grid",
+                "body": [
+                    "Choose <b>Auto-block grid</b> when the farm is a regular field with no natural "
+                    "divisions.",
+                    "Set the <b>cell size in metres</b> and click <b>Compute candidates</b>. The "
+                    "farm is cut into equal squares and each one is offered to you.",
+                    "Select the candidates you want. You do not have to take them all.",
+                    "Click <b>Create selected blocks</b>.",
+                ],
+                "note": "This is a different thing from the grid inside a block. Auto-block grid "
+                        "creates blocks. The sub-block grid divides one block into cells for "
+                        "within-block detail, and it is set per farm.",
+            },
+            {
+                "t": "Route 4 — upload the files",
+                "body": [
+                    "Choose <b>Upload AOI files</b> and drop the files in. It accepts .geojson, "
+                    ".json, .kml, and a shapefile in a .zip. <b>One block per polygon.</b>",
+                    "Each row gets a code and an optional name. Fix any code the upload flags.",
+                    "A row that matches an existing block is marked <b>Reuse</b> or <b>Replace</b>. "
+                    "Replacing needs a tick to confirm, because the old block is deleted if it is "
+                    "empty and deactivated if it is not.",
+                    "Click <b>Create N blocks</b>. The result line reports created, replaced, "
+                    "reused and errors.",
+                ],
+            },
+            {
+                "t": "Check the layout",
+                "body": [
+                    "Add the block areas up and compare against the farm area. The difference "
+                    "should be the roads, buildings and canals you have not marked yet.",
+                    "Look for gaps and overlaps on the map, at the zoom you drew at.",
+                    "Fix the shapes now. Blocks carry crops, plans and history, so moving them "
+                    "later costs more.",
+                ],
+            },
+        ],
+        "fields": {
+            "cols": ["Field", "Required", "What it is for"],
+            "rows": [
+                ["Boundary", "yes", "Drawn on the map, or one polygon per block in an uploaded file."],
+                ["Code", "yes", "Short identifier, for example B-12 or P-3. Must be unique on the farm."],
+                ["Name", "no", "Readable name, for example North strip."],
+                ["Sectors", "pivot only", "Equal slices of the circle. Presets 1, 4, 6, 8, 12, or type a number."],
+                ["Cell size in metres", "auto-grid only", "The size of each candidate square before you pick which to keep."],
+            ],
+        },
+        "mistakes": {
+            "cols": ["What you see", "What it means"],
+            "rows": [
+                ["Could not create, check the code is unique", "Another block on this farm already uses that code."],
+                ["Code is required", "The Create button stays disabled until the code has something in it."],
+                ["Outside Egypt", "An uploaded polygon falls outside the country bounds. The file is in the wrong coordinate system, or the wrong file."],
+                ["No polygon found", "The file has no polygon in it. A points-only KML will not do."],
+                ["Unsupported file type", "Use .geojson, .json, .kml, or a shapefile inside a .zip. A bare .shp is missing its sidecar files."],
+                ["Duplicate code in upload", "Two rows in the same upload carry the same code. Codes must be unique within the batch as well as on the farm."],
+                ["Replace not confirmed", "A row would replace an existing block. Tick the confirmation, or change the code so it creates a new block instead."],
+            ],
+        },
+        "check": [
+            "Every area you manage has a block, and no two blocks overlap.",
+            "The block areas add up to about the farm area, less the roads and buildings.",
+            "Each block shows the code your team uses in the field.",
+        ],
+        "next": [("guide-create-a-farm", "Create a farm"),
+                 ("process-map-the-farm", "Back to Map the farm"),
+                 ("process-plan-the-season", "Plan the season")],
+        "draft_note": ("Written from the product's own screen text and the code behind it. The "
+                       "screenshots and the clip come next, once a farm exists on the recording "
+                       "account."),
+    },
 ]
 
 # ===========================================================================
@@ -2332,6 +2465,10 @@ def build_guide(g) -> str:
 
     check = "".join(f"<li>{e(c)}</li>" for c in g["check"])
     proc_slug, proc_title, proc_num = g["process"]
+    draft = ""
+    if g.get("draft_note"):
+        draft = (f'<div class="note caution"><span class="lab">Draft</span>'
+                 f'<p>{e(g["draft_note"])}</p></div>')
 
     return head(g["title"], g["lede"][:180], "processes") + f"""
 <section class="hero compact">
@@ -2358,6 +2495,7 @@ def build_guide(g) -> str:
 
     <h3>Before you start</h3>
     <ul>{start}</ul>
+{draft}
   </div>
 </section>
 
