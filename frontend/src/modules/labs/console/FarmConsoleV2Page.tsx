@@ -28,6 +28,7 @@ import { useCapability } from "@/rbac/useCapability";
 
 import { MapCanvas } from "../map/MapCanvas";
 import { InactivateConfirmModal } from "../map/InactivateConfirmModal";
+import { FieldFlagPanel } from "../map/FieldFlagPanel";
 import { SignalObservationPanel } from "../map/SignalObservationPanel";
 import { BlockDock } from "../mapnext/BlockDock";
 import { ViewBar } from "../mapnext/ViewBar";
@@ -101,6 +102,8 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   const { unit: areaUnit } = usePrefs();
   const [, setSearch] = useSearchParams();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [openFlagId, setOpenFlagId] = useState<string | null>(null);
+  const [flagClickPoint, setFlagClickPoint] = useState<{ x: number; y: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const fullscreen = useMapFullscreen<HTMLElement>();
@@ -258,6 +261,11 @@ function Console({ farmId }: { farmId: string }): ReactNode {
                 c.setCellClickPoint(point);
               }}
               signalOverlay={c.signalOverlayFc}
+              flagOverlay={c.flagOverlayFc}
+              onFlagClick={(flagId, point) => {
+                setOpenFlagId(flagId);
+                setFlagClickPoint(point);
+              }}
               onSignalClick={c.selectObservation}
               reshapeBlock={
                 m.reshapeTarget
@@ -447,6 +455,19 @@ function Console({ farmId }: { farmId: string }): ReactNode {
                 x={c.obsClickPoint?.x ?? null}
                 y={c.obsClickPoint?.y ?? null}
                 onClose={c.clearObservation}
+              />
+            ) : null}
+
+            {/* Field flag popup — the thread a supervisor answers in. */}
+            {openFlagId ? (
+              <FieldFlagPanel
+                flagId={openFlagId}
+                x={flagClickPoint?.x ?? null}
+                y={flagClickPoint?.y ?? null}
+                onClose={() => {
+                  setOpenFlagId(null);
+                  setFlagClickPoint(null);
+                }}
               />
             ) : null}
 

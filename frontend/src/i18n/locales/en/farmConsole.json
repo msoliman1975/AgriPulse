@@ -66,7 +66,9 @@
     "grid": "Sub-block grid",
     "gridUsesIndex": "Colours cells by the selected index ({{code}}).",
     "signals": "Signals",
-    "signalsNone": "— none —"
+    "signalsNone": "— none —",
+    "flags": "Field flags",
+    "flagsOpenOnly": "Open flags only"
   },
   "add": {
     "block": "Draw block",
@@ -852,5 +854,35 @@
     "backfillBudgetAll": "All affected",
     "resetToInherited": "Reset blocks to the inherited default",
     "inheritApplied": "{{touched}} of {{total}} block(s) now inherit the default again."
+  },
+  "flags": {
+    "title": "Field flag",
+    "loading": "Loading…",
+    "open": "Open",
+    "closed": "Closed",
+    "unpinned": "no longer pinned",
+    "someone": "Someone",
+    "noPosition": "no position recorded",
+    "reply": "Reply",
+    "close": "Close flag",
+    "confirmClose": "Close it",
+    "reopen": "Re-open",
+    "whyClosing": "Why are you closing it?",
+    "replyPlaceholder": "Write a reply…",
+    "commentRequired": "A comment is required — the scout only learns what happened from this.",
+    "severity": {
+      "info": "Worth knowing",
+      "warning": "Needs attention",
+      "critical": "Urgent"
+    },
+    "reason": {
+      "actioned": "Actioned",
+      "no_action_needed": "No action needed",
+      "duplicate": "Duplicate"
+    },
+    "kind": {
+      "close": "closed it",
+      "reopen": "re-opened it"
+    }
   }
 }

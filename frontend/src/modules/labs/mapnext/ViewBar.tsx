@@ -15,6 +15,13 @@ export interface LayerState {
   labels: boolean;
   borderOpacity: number;
   fillOpacity: number;
+  // Field flags. ON by default: a layer nobody knows about is a layer nobody
+  // uses, and the whole point of a flag is that somebody sees it.
+  flags: boolean;
+  // Closed flags keep their pin for the rest of its lifetime, so a farm
+  // working through a season accumulates finished pins. This is the one
+  // checkbox that clears them without hiding the layer.
+  flagsOpenOnly: boolean;
 }
 
 interface Props {
@@ -212,6 +219,21 @@ export function ViewBar({
           on={layers.labels}
           onClick={() => onLayersChange({ labels: !layers.labels })}
         />
+        <PopDivider />
+        <Toggle
+          label={`⚑ ${t("layers.flags")}`}
+          on={layers.flags}
+          onClick={() => onLayersChange({ flags: !layers.flags })}
+        />
+        {/* Nested under the layer it filters, and inert while that layer is
+            off — a checkbox that changes nothing visible is a puzzle. */}
+        {layers.flags ? (
+          <Toggle
+            label={`　↳ ${t("layers.flagsOpenOnly")}`}
+            on={layers.flagsOpenOnly}
+            onClick={() => onLayersChange({ flagsOpenOnly: !layers.flagsOpenOnly })}
+          />
+        ) : null}
         <PopDivider />
         <Toggle label={`◫ ${t("layers.grid")}`} on={showGrid} onClick={onToggleGrid} />
         <div className="px-2.5 pb-1 pt-0.5 text-xs text-ap-muted">

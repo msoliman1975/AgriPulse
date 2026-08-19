@@ -420,3 +420,102 @@ export function registerDevice(token: string, farmId: string) {
 export function revokeDevice(token: string) {
   return request<void>(`/devices/${encodeURIComponent(token)}`, { method: "DELETE" });
 }
+
+// ---- Field flags -----------------------------------------------------------
+//
+// The one thing a scout records that nobody asked for. Mirrors
+// backend/app/modules/field_flags/schemas.py.
+
+export type FlagSeverity = "info" | "warning" | "critical";
+export type FlagStatus = "open" | "closed";
+export type FlagCloseReason = "actioned" | "no_action_needed" | "duplicate";
+
+export interface FlagComment {
+  id: string;
+  body: string;
+  author_id: string;
+  author_name: string | null;
+  kind: "comment" | "close" | "reopen";
+  created_at: string;
+}
+
+export interface FieldFlag {
+  id: string;
+  farm_id: string;
+  block_id: string;
+  block_name: string | null;
+  note: string;
+  severity: FlagSeverity;
+  status: FlagStatus;
+  pin_until: string;
+  is_pinned: boolean;
+  raised_by: string;
+  close_reason: FlagCloseReason | null;
+  comment_count: number;
+  photos: { id: string; download_url: string | null }[];
+  comments: FlagComment[];
+  created_at: string;
+}
+
+export function listFieldFlags(farmId: string, params: { open_only?: boolean } = {}) {
+  const q = new URLSearchParams();
+  if (params.open_only) q.set("open_only", "true");
+  return request<FieldFlag[]>(`/farms/${encodeURIComponent(farmId)}/field-flags?${q}`);
+}
+
+export function getFieldFlag(flagId: string) {
+  return request<FieldFlag>(`/field-flags/${flagId}`);
+}
+
+/**
+ * Raise a flag.
+ *
+ * A block is required — every flag belongs to one, so a finding beside a gate
+ * is attached to the block it sits beside. `point` is optional and, like every
+ * other position this app writes, is a plain fix rather than a claim to be
+ * inside the block boundary.
+ */
+export function raiseFieldFlag(
+  farmId: string,
+  body: {
+    block_id: string;
+    note: string;
+    severity: FlagSeverity;
+    point?: Geopoint | null;
+    accuracy_m?: number | null;
+    attachment_s3_keys?: string[];
+  },
+) {
+  return request<FieldFlag>(`/farms/${encodeURIComponent(farmId)}/field-flags`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function commentOnFlag(flagId: string, body: string) {
+  return request<FieldFlag>(`/field-flags/${flagId}/comments`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
+  });
+}
+
+/** Re-opening needs a comment and restarts the pin on the supervisor's map. */
+export function reopenFieldFlag(flagId: string, comment: string) {
+  return request<FieldFlag>(`/field-flags/${flagId}:reopen`, {
+    method: "POST",
+    body: JSON.stringify({ comment }),
+  });
+}
+
+/** Presigned PUT for one flag photo. Same two-step upload as a signal photo. */
+export function initFlagPhotoUpload(body: {
+  farm_id: string;
+  content_type: string;
+  content_length: number;
+  filename: string;
+}) {
+  return request<AttachmentUpload>(`/field-flags:upload-init`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}

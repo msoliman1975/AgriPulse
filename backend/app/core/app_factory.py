@@ -185,6 +185,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     from app.modules.platform_defaults.router import (
         router as platform_defaults_router,
     )
+    from app.modules.field_flags.router import router as field_flags_router
     from app.modules.purge.router import router as purge_router
     from app.modules.recommendations.router import router as recommendations_router
     from app.modules.reports.router import router as reports_router
@@ -221,6 +222,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     app.include_router(reports_router)
     app.include_router(signals_router)
     app.include_router(scouting_router)
+    app.include_router(field_flags_router)
     app.include_router(integrations_health_router)
     app.include_router(integrations_router)
     app.include_router(platform_defaults_router)

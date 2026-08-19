@@ -320,6 +320,15 @@ class Farm(Base, TimestampedMixin):
     )
     grid_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))
 
+    # Field category (tenant migration 0080). How many days a field flag's pin
+    # keeps drawing on the map. Read at raise time and STORED on the flag, so
+    # editing this moves future pins only — changing it must not silently
+    # remove hundreds of pins that are already out there.
+    default_field_flag_pin_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    field_locked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("FALSE")
+    )
+
 
 class Block(Base, TimestampedMixin):
     __tablename__ = "blocks"

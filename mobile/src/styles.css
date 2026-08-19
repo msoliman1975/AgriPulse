@@ -302,3 +302,15 @@ body { background: var(--field); color: var(--ink); }
    with a name rather than owning one. */
 .homehead .langpick { margin-top: 0; flex: none; }
 .homehead .langpick .lang { padding: 5px 11px; font-size: 12px; }
+
+/* A flag in the records list. The ring carries the severity colour so an
+   urgent one is findable without reading, matching the pin on the map. */
+.record.flag .ring { border-color: var(--sage); color: var(--sage); }
+.record.flag.sev-warning .ring { border-color: var(--watch); color: var(--watch); }
+.record.flag.sev-critical .ring { border-color: var(--crit); color: var(--crit); }
+/* Severity chips on the raise screen, coloured like the pin they produce. */
+.chip.sev-warning.on { background: var(--watch); border-color: var(--watch); color: #1a1205; }
+.chip.sev-critical.on { background: var(--crit); border-color: var(--crit); color: #fff; }
+.btn-raise { padding: 15px; border: 0; border-radius: 11px; background: var(--sage);
+  color: #fff; font-size: 16px; font-weight: 650; }
+.btn-raise:disabled { opacity: .55; }

@@ -204,6 +204,24 @@ BLOCK_OWNED: tuple[OwnedTable, ...] = (
     # block deletion should see the outstanding visits it takes with it.
     OwnedTable("scouting_visits", owner_column="block_id", order=20),
     OwnedTable("scouting_routing_rules", owner_column="block_id", order=20),
+    # Field flags (tenant migration 0080). The photos carry object-storage
+    # keys, so they are listed BEFORE the flag rows they hang off: the engine
+    # collects the keys before the DELETE, and a cascade would take the rows
+    # away first and leave the objects behind forever.
+    OwnedTable(
+        "field_flag_photos",
+        where_sql=(
+            "flag_id IN (SELECT id FROM field_flags WHERE block_id = ANY(:ids))"
+        ),
+        order=10,
+        storage_key_column="attachment_s3_key",
+    ),
+    OwnedTable(
+        "field_flag_comments",
+        where_sql="flag_id IN (SELECT id FROM field_flags WHERE block_id = ANY(:ids))",
+        order=10,
+    ),
+    OwnedTable("field_flags", owner_column="block_id", order=20),
     OwnedTable(
         "recommendations",
         owner_column="block_id",
@@ -339,6 +357,20 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
     OwnedTable("signal_assignments", owner_column="farm_id", order=20),
     OwnedTable("scouting_visits", owner_column="farm_id", order=20),
     OwnedTable("scouting_routing_rules", owner_column="farm_id", order=20),
+    # Field flags (tenant migration 0080) — same ordering reason as the
+    # block-owned entries: photos first, so their storage keys are collected.
+    OwnedTable(
+        "field_flag_photos",
+        where_sql="flag_id IN (SELECT id FROM field_flags WHERE farm_id = ANY(:ids))",
+        order=10,
+        storage_key_column="attachment_s3_key",
+    ),
+    OwnedTable(
+        "field_flag_comments",
+        where_sql="flag_id IN (SELECT id FROM field_flags WHERE farm_id = ANY(:ids))",
+        order=10,
+    ),
+    OwnedTable("field_flags", owner_column="farm_id", order=20),
     OwnedTable("recommendations", owner_column="farm_id", order=20, fk=False),
     OwnedTable("plan_activities", owner_column="farm_id", order=30),
     OwnedTable("vegetation_plans", owner_column="farm_id", order=40),
