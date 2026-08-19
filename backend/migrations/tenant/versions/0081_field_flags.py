@@ -47,8 +47,8 @@ from alembic import op
 from geoalchemy2 import Geometry
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0080"
-down_revision: str | None = "0079"
+revision: str = "0081"
+down_revision: str | None = "0080"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

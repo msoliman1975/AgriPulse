@@ -76,7 +76,7 @@ interface Props {
   // (possibly empty) shows it. Click on a marker fires onSignalClick
   // with the underlying observation id.
   signalOverlay?: FeatureCollection<Point, SignalOverlayProps> | null;
-  // Field flags (tenant migration 0080). Same null = hide / FC = show contract
+  // Field flags (tenant migration 0081). Same null = hide / FC = show contract
   // as the signal overlay above, so the layer toggle is one boolean.
   flagOverlay?: FeatureCollection<Point, FlagOverlayProps> | null;
   onFlagClick?: (flagId: string, point: { x: number; y: number }) => void;

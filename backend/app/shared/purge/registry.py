@@ -204,7 +204,7 @@ BLOCK_OWNED: tuple[OwnedTable, ...] = (
     # block deletion should see the outstanding visits it takes with it.
     OwnedTable("scouting_visits", owner_column="block_id", order=20),
     OwnedTable("scouting_routing_rules", owner_column="block_id", order=20),
-    # Field flags (tenant migration 0080). The photos carry object-storage
+    # Field flags (tenant migration 0081). The photos carry object-storage
     # keys, so they are listed BEFORE the flag rows they hang off: the engine
     # collects the keys before the DELETE, and a cascade would take the rows
     # away first and leave the objects behind forever.
@@ -355,7 +355,7 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
     OwnedTable("signal_assignments", owner_column="farm_id", order=20),
     OwnedTable("scouting_visits", owner_column="farm_id", order=20),
     OwnedTable("scouting_routing_rules", owner_column="farm_id", order=20),
-    # Field flags (tenant migration 0080) — same ordering reason as the
+    # Field flags (tenant migration 0081) — same ordering reason as the
     # block-owned entries: photos first, so their storage keys are collected.
     OwnedTable(
         "field_flag_photos",

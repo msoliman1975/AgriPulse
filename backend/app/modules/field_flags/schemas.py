@@ -76,7 +76,7 @@ class FieldFlagResponse(BaseModel):
 
 
 class FlagCreateRequest(BaseModel):
-    """Raise a flag. Block is required — see migration 0080."""
+    """Raise a flag. Block is required — see migration 0081."""
 
     model_config = ConfigDict(extra="forbid")
 
