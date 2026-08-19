@@ -2324,11 +2324,32 @@ global:
   #   engine that writes the groups runs in workers — a partial promote
   #   either 404s the drill-down or keeps generating one row per cell.
   #   Images CONFIRMED by pulling both on the node: api + frontend @ 0986027.
+  # 43d7d4e = #522, one card per anomalous block instead of one per index.
+  #   #519 grouped cell-scoped output and left block-scoped alerts alone. Prod
+  #   said that was half wrong: 444 of 445 block-scoped alerts came from the
+  #   grid spatial-anomaly sweep, which fires PER INDEX, and NDVI/SAVI/EVI/
+  #   GNDVI/MSAVI are correlated — so one physical anomaly lit up six to nine
+  #   cards on a single block and published an AlertOpenedV1 for each. 87 of
+  #   126 block-severity pairs carried more than one card for one problem.
+  #   Grouped on (block_id, grid:spatial_anomaly:<action>:<severity>), which is
+  #   the 0079 mechanism unchanged. NOT keyed per index across blocks: that
+  #   collapses harder (77 vs 126) but "NDVI anomaly on 40 blocks" is still
+  #   forty visits. The block is the unit of work.
+  #   TENANT MIGRATION 0080 runs on PreSync and back-groups the open grid
+  #   backlog; resolved history is untouched.
+  #   BACKEND + FRONTEND -> api + workers + frontend promoted together off
+  #   43d7d4e. The sweep that writes the parents runs in workers, and the
+  #   frontend reads `aggregation.member_kind` to say "8 signals" instead of
+  #   "8 zones" — on 0986027 it would render indices as map locations.
+  #   Also carries #521 (Scout capture), which is MOBILE-ONLY: 18 files under
+  #   mobile/, no migrations, and the APK is not deployed by these charts, so
+  #   nothing of it reaches prod through this bump.
+  #   Images CONFIRMED by pulling both on the node: api + frontend @ 43d7d4e.
   images:
     api:
-      tag: "0986027"
+      tag: "43d7d4e"
     workers:
-      tag: "0986027"
+      tag: "43d7d4e"
     frontend:
       # 5e84dd6 = #515, the thermal indices reach the decision-tree condition
       #   builder. `lst`/`cwsi`/`smi` were computed and stored per block —
@@ -2349,7 +2370,7 @@ global:
       #   carried `scope`; the notice was not reading it.
       #   FRONTEND ONLY; api + workers stay 86faf0b. No migrations.
       #   Image CONFIRMED by pulling it on the node: frontend @ ceaa572.
-      tag: "0986027"
+      tag: "43d7d4e"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
