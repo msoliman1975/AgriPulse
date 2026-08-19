@@ -17,6 +17,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -125,7 +126,10 @@ class FieldFlagRepository:
         rows = (
             await self._session.execute(
                 text("SELECT id, full_name FROM public.users WHERE id = ANY(:ids)").bindparams(
-                    bindparam("ids", type_=PG_UUID(as_uuid=True), expanding=False)
+                    # ARRAY(...) around the element type, not the element type
+                    # alone: with a bare PG_UUID this renders `ANY($1::UUID)`,
+                    # which asks Postgres to treat one uuid as a list.
+                    bindparam("ids", type_=ARRAY(PG_UUID(as_uuid=True)))
                 ),
                 {"ids": user_ids},
             )
