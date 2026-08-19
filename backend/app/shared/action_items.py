@@ -73,6 +73,39 @@ def build_group_key(
     )
 
 
+# The rule_code every grid-anomaly group parent carries. The per-index members
+# keep their own `grid:<index>_spatial_anomaly` codes, which is what keeps each
+# index deduping on its own; the parent needs a code of its own that no member
+# can collide with.
+GRID_GROUP_RULE_CODE = "grid:spatial_anomaly"
+
+# Today in the tenant's own timezone. Shared by both repositories because both
+# write recurrence counters and the day boundary must be the same one — a
+# streak cut at a different midnight on each table is worse than no streak.
+TENANT_TODAY_SQL = (
+    "SELECT (now() AT TIME ZONE default_timezone)::date "
+    "FROM public.tenants WHERE schema_name = :s"
+)
+
+
+def build_grid_group_key(*, action_type: str | None, severity: str) -> str:
+    """The aggregation identity of one block's spatial anomaly.
+
+    Deliberately NOT keyed on the index. NDVI, SAVI, EVI, GNDVI and MSAVI are
+    correlated vegetation-vigour measures, so one physical anomaly lights up
+    five to nine of them at once and the block gets a card per index for a
+    single problem. Measured on prod: 87 of 126 block-severity pairs carried
+    two or more indices, 38 carried six or more.
+
+    Grouped the other way round — one index across many blocks — the count
+    collapses harder but the card becomes unactionable: "NDVI anomaly on 40
+    blocks" is still forty separate visits. The block is the unit of work, so
+    the block is the unit of aggregation, and which indices fired is detail the
+    drill-down carries.
+    """
+    return ":".join(("grid", "spatial_anomaly", action_type or "unclassified", severity))
+
+
 def derive_recurrence(
     *,
     day_streak: int,
@@ -331,6 +364,9 @@ ALERT_SQL = GroupingSQL(
 
 __all__ = [
     "ALERT_SQL",
+    "GRID_GROUP_RULE_CODE",
+    "TENANT_TODAY_SQL",
+    "build_grid_group_key",
     "SPREAD_MIN_CELLS",
     "SPREAD_MIN_RATIO",
     "SpreadTrend",

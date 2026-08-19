@@ -265,6 +265,7 @@ class ActionCenterRepository:
     _MEMBERS = {
         "recommendation": """
             SELECT r.id, r.cell_id, r.severity, r.state AS native_status,
+                   NULL::text AS rule_code,
                    r.text_en, r.text_ar, r.created_at, r.last_seen_at,
                    r.cleared_at, r.occurrence_count, r.day_streak,
                    gc.row_idx, gc.col_idx, gc.area_m2,
@@ -279,6 +280,7 @@ class ActionCenterRepository:
         """,
         "alert": """
             SELECT a.id, a.cell_id, a.severity, a.status AS native_status,
+                   a.rule_code,
                    a.diagnosis_en AS text_en, a.diagnosis_ar AS text_ar,
                    a.created_at, a.last_seen_at,
                    a.cleared_at, a.occurrence_count, a.day_streak,

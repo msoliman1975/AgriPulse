@@ -58,7 +58,13 @@ function item(over: Partial<ActionItem> = {}): ActionItem {
     scheduled_date: null,
     why: "ndvi < -0.15",
     reasoning: {},
-    aggregation: { is_group: false, member_count: 0, previous_member_count: 0, trend: "unknown" },
+    aggregation: {
+      is_group: false,
+      member_count: 0,
+      member_kind: "cell",
+      previous_member_count: 0,
+      trend: "unknown",
+    },
     recurrence: {
       state: "new",
       occurrence_count: 1,
@@ -112,6 +118,7 @@ describe("ItemRow — aggregation and recurrence", () => {
         aggregation: {
           is_group: true,
           member_count: 12,
+          member_kind: "cell",
           previous_member_count: 12,
           trend: "steady",
         },
@@ -159,6 +166,7 @@ describe("ItemRow — aggregation and recurrence", () => {
         aggregation: {
           is_group: true,
           member_count: 20,
+          member_kind: "cell",
           previous_member_count: 12,
           trend: "spreading",
         },
@@ -173,6 +181,7 @@ describe("ItemRow — aggregation and recurrence", () => {
         aggregation: {
           is_group: true,
           member_count: 4,
+          member_kind: "cell",
           previous_member_count: 14,
           trend: "receding",
         },
@@ -187,6 +196,7 @@ describe("ItemRow — aggregation and recurrence", () => {
         aggregation: {
           is_group: true,
           member_count: 7,
+          member_kind: "cell",
           previous_member_count: 0,
           trend: "unknown",
         },
@@ -196,6 +206,89 @@ describe("ItemRow — aggregation and recurrence", () => {
     // baseline, and an arrow here would be an invented comparison.
     expect(screen.getByText("7 zones")).toBeInTheDocument();
     expect(screen.queryByText(/▲|▼/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * A grid-anomaly card aggregates indices, not places. Rendering "6 zones"
+   * for six correlated indices tells a supervisor to walk to six locations
+   * that do not exist on the map.
+   */
+  it("counts a grid group in signals, not zones", async () => {
+    listMembers.mockResolvedValue({
+      item_id: "i1",
+      kind: "alert",
+      total: 2,
+      active: 2,
+      members: [
+        {
+          id: "m1",
+          cell: null,
+          label: "ndvi",
+          severity: "warning",
+          native_status: "open",
+          text_en: "ndvi anomaly",
+          text_ar: null,
+          created_at: "2026-08-12T06:00:00Z",
+          last_seen_at: "2026-08-12T06:00:00Z",
+          cleared_at: null,
+          occurrence_count: 1,
+          day_streak: 1,
+        },
+        {
+          id: "m2",
+          cell: null,
+          label: "savi",
+          severity: "warning",
+          native_status: "open",
+          text_en: "savi anomaly",
+          text_ar: null,
+          created_at: "2026-08-12T06:00:00Z",
+          last_seen_at: "2026-08-12T06:00:00Z",
+          cleared_at: null,
+          occurrence_count: 1,
+          day_streak: 1,
+        },
+      ],
+    });
+
+    const grid = item({
+      kind: "alert",
+      aggregation: {
+        is_group: true,
+        member_count: 6,
+        member_kind: "signal",
+        previous_member_count: 0,
+        trend: "unknown",
+      },
+    });
+    renderRow(grid);
+    expect(screen.getByText("6 signals")).toBeInTheDocument();
+    expect(screen.queryByText(/zones/i)).not.toBeInTheDocument();
+    expect(screen.getByText("6 indices flagged block B-01")).toBeInTheDocument();
+
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <ItemRow
+            item={grid}
+            isAr={false}
+            dateLocale={enUS}
+            selected={false}
+            expanded
+            canDispatch
+            onToggleSelect={() => {}}
+            onToggleExpand={() => {}}
+            onDispatch={() => {}}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    // The drill-down names what fired, since the card deliberately cannot.
+    expect(await screen.findByText("ndvi")).toBeInTheDocument();
+    expect(screen.getByText("savi")).toBeInTheDocument();
+    // A signal is not a place with a missing location.
+    expect(screen.queryByText(/no grid cell/i)).not.toBeInTheDocument();
   });
 
   it("shows when a recurring item last fired, not only when it was raised", () => {
@@ -225,6 +318,7 @@ describe("ItemRow — aggregation and recurrence", () => {
         {
           id: "m1",
           cell: CELL,
+          label: null,
           severity: "warning",
           native_status: "open",
           text_en: "Aphids here",
@@ -238,6 +332,7 @@ describe("ItemRow — aggregation and recurrence", () => {
         {
           id: "m2",
           cell: { ...CELL, cell_id: "c2", row: 4, col: 1 },
+          label: null,
           severity: "warning",
           native_status: "open",
           text_en: null,
@@ -252,7 +347,13 @@ describe("ItemRow — aggregation and recurrence", () => {
     });
 
     const grouped = item({
-      aggregation: { is_group: true, member_count: 1, previous_member_count: 1, trend: "steady" },
+      aggregation: {
+        is_group: true,
+        member_count: 1,
+        member_kind: "cell",
+        previous_member_count: 1,
+        trend: "steady",
+      },
     });
     const { rerender } = renderRow(grouped);
     // A farm-wide queue holds hundreds of groups; eagerly loading every
@@ -297,6 +398,7 @@ describe("ItemRow — aggregation and recurrence", () => {
               aggregation: {
                 is_group: true,
                 member_count: 9,
+                member_kind: "cell",
                 previous_member_count: 9,
                 trend: "steady",
               },

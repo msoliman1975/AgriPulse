@@ -34,6 +34,15 @@ export type RecurrenceState = "new" | "recurring" | "persistent";
  */
 export type SpreadTrend = "unknown" | "steady" | "spreading" | "receding";
 
+/**
+ * What a group's members are.
+ *
+ * `cell` is a place on the map — a grid cell that fired. `signal` is a
+ * measurement — one index that flagged the whole block. Rendering one as the
+ * other tells a supervisor to walk to somewhere that does not exist.
+ */
+export type MemberKind = "cell" | "signal";
+
 /** Named windows the toolbar offers; `custom` is expressed as explicit bounds. */
 export type DateRange = "1d" | "7d" | "30d" | "90d" | "all" | "custom";
 
@@ -62,6 +71,7 @@ export interface CellLocation {
 export interface Aggregation {
   is_group: boolean;
   member_count: number;
+  member_kind: MemberKind;
   /** What the count was at the end of the previous evaluation day. Without a
    *  baseline the card cannot distinguish a 12-cell finding from a 20-cell
    *  one — a count with no baseline is not a trend. */
@@ -88,6 +98,9 @@ export interface Recurrence {
 export interface ActionItemMember {
   id: string;
   cell: CellLocation | null;
+  /** Set on a `signal` member: the index that fired, e.g. `ndvi`. A cell
+   *  member has a location instead and leaves this null. */
+  label: string | null;
   severity: ItemSeverity;
   native_status: string;
   text_en: string | null;

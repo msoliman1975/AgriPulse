@@ -27,7 +27,11 @@ from app.modules.action_center.schemas import (
     DispatchResultItem,
     Recurrence,
 )
-from app.shared.action_items import derive_recurrence, derive_spread
+from app.shared.action_items import (
+    GRID_GROUP_RULE_CODE,
+    derive_recurrence,
+    derive_spread,
+)
 
 # Recommendation action_type -> board activity_type. Mirrors the map the
 # rec-schedule flow already uses; kept here rather than imported so a change to
@@ -177,10 +181,24 @@ def _cell_of(row: dict[str, Any]) -> CellLocation | None:
     )
 
 
+def member_label(rule_code: str | None) -> str | None:
+    """Name a member that is a measurement rather than a place.
+
+    A grid-anomaly member's `rule_code` is `grid:<index>_spatial_anomaly`, and
+    the only part a supervisor reads is the index. Returns None for anything
+    else, including cell members, which are identified by where they are.
+    """
+    if not rule_code or not rule_code.startswith("grid:"):
+        return None
+    tail = rule_code.split(":", 1)[1]
+    return tail.removesuffix("_spatial_anomaly") or None
+
+
 def to_member(row: dict[str, Any]) -> ActionItemMember:
     return ActionItemMember(
         id=row["id"],
         cell=_cell_of(row),
+        label=member_label(row.get("rule_code")),
         severity=row["severity"],
         native_status=row["native_status"],
         text_en=row.get("text_en"),
@@ -249,6 +267,9 @@ def to_item(row: dict[str, Any], *, now: datetime) -> ActionItem:
         aggregation=Aggregation(
             is_group=bool(row.get("is_group")),
             member_count=row.get("member_count") or 0,
+            # A grid-anomaly parent aggregates indices, not places; everything
+            # else aggregates the cells that fired.
+            member_kind=("signal" if row.get("rule_code") == GRID_GROUP_RULE_CODE else "cell"),
             previous_member_count=row.get("previous_member_count") or 0,
             trend=derive_spread(
                 is_group=bool(row.get("is_group")),

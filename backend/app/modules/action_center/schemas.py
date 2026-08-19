@@ -25,6 +25,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.shared.action_items import RecurrenceState, SpreadTrend
 
+# What a group's members are. `cell` is a place on the map — a grid cell that
+# fired. `signal` is a measurement — one index that flagged the whole block.
+# The client needs the difference to label the count at all: "12 zones" and
+# "8 signals" are not the same sentence, and rendering one as the other tells
+# a supervisor to walk somewhere that does not exist.
+MemberKind = Literal["cell", "signal"]
+
 ItemKind = Literal["recommendation", "alert"]
 
 # Unified lifecycle. The mapping from the native states is in service.py and
@@ -73,6 +80,7 @@ class Aggregation(BaseModel):
 
     is_group: bool = False
     member_count: int = 0
+    member_kind: MemberKind = "cell"
     # What the count was at the end of the previous evaluation day, and which
     # way that makes this finding move. Without the baseline the aggregation
     # would hide the one thing it must not: a 12-cell finding and a 20-cell one
@@ -109,6 +117,9 @@ class ActionItemMember(BaseModel):
 
     id: UUID
     cell: CellLocation | None = None
+    # Set on a `signal` member: the thing that fired, e.g. the index code
+    # `ndvi`. A cell member has a location instead and leaves this None.
+    label: str | None = None
     severity: str
     native_status: str
     text_en: str | None = None
