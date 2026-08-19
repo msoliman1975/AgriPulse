@@ -1,32 +1,46 @@
 // One agronomic family of indices — the Vigour & canopy / Nutrition /
-// Moisture tabs of the Block Dock.
+// Moisture / Thermal tabs of the Block Dock.
 //
-// Replaces the single "Index" tab, whose pill row listed all seven indices
-// with no values and no grouping. A family tab answers one question, so it can
-// afford to show every member's current reading and 7-day delta side by side
-// (the comparison the flat row lost) and still chart the one index in the
-// family the block-level API actually serves.
+// Replaces the single "Index" tab, whose pill row listed every index with no
+// values and no grouping. A family tab answers one question, so it can afford
+// to show every member's current reading and its change side by side (the
+// comparison the flat row lost) and chart whichever member you pick.
 //
 // It also has room to say what each index IS and what its number MEANS, which
 // no surface in the console did: the reference column carries a definition and
 // a scale per index, and the charted reading is turned into a sentence via
 // INDEX_BANDS rather than left as a bare decimal.
-import { useQuery } from "@tanstack/react-query";
+//
+// ⚠️ Ten of the thirteen tiles used to be DISABLED here, labelled "Grid only",
+// on the belief that `/blocks/{id}/indices/{code}/timeseries` served only
+// ndvi/ndre/ndwi. It never did — that is the farm-wide summary endpoint
+// (`blocks_summary_router._MAP_INDICES`), which the dock does not call. The
+// route reads `block_index_daily` by `index_code` with no allowed-list. Every
+// tile now fetches its own series; see dockSeries.ts.
+import { useQueries, useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { getTimeseries, type AnyIndexCode as ApiIndexCode } from "@/api/indices";
-import type { IndexCode, IndexSeries } from "../map/types";
+import { getIndexCatalog, type AnyIndexCode as ApiIndexCode } from "@/api/indices";
+import { formatIndexTick, formatIndexValue } from "@/lib/indexFormat";
 import {
   FAMILY_PRIMARY,
   HEALTH_DOT,
   INDEX_FAMILIES,
   INDEX_META,
-  isBlockLevel,
+  isThermalIndex,
   type IndexFamilyKey,
 } from "./constants";
-import { bandFor, deltaLabel, fmt, isoDay, isoDaysBefore, shortDate } from "./dockFormat";
+import { bandFor, indexDeltaLabel, isoDay, isoDaysBefore, shortDate } from "./dockFormat";
+import {
+  deltaOver,
+  deltaPctOver,
+  dockSeriesOptions,
+  latestValue,
+  toPoints,
+  type SeriesPoint,
+} from "./dockSeries";
 import { Dot } from "./ui";
 
 const PRESETS: { days: number; key: string }[] = [
@@ -35,12 +49,18 @@ const PRESETS: { days: number; key: string }[] = [
   { days: 365, key: "season" },
 ];
 
-interface Point {
-  time: string;
-  value: number;
-}
+/** Window the tile deltas are measured over. Kept at the 7 days the cards
+ *  always claimed, independent of the chart range — a card that says "7 days"
+ *  under a 365-day chart must still mean 7 days. */
+const CARD_DELTA_DAYS = 7;
 
-function Chart({ points }: { points: Point[] }): ReactNode {
+/** Native resolution of the thermal sensor, for the caveat the tab prints
+ *  once. Same number the pixel console's legend states. */
+const THERMAL_METRES = 100;
+
+type Point = SeriesPoint;
+
+function Chart({ points, unit }: { points: Point[]; unit: string }): ReactNode {
   const { t, i18n } = useTranslation("farmConsole");
   const lang = i18n.language;
   if (points.length < 2) {
@@ -68,9 +88,11 @@ function Chart({ points }: { points: Point[] }): ReactNode {
   const line = points
     .map((p, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(p.value).toFixed(1)}`)
     .join(" ");
+  // Ticks carry the index's own precision: three decimals of a ratio, one of
+  // a temperature. `43.00` and `43.000` both overstate a 100 m thermal pixel.
   const gridlines = [0, 1, 2, 3, 4].map((g) => {
     const v = yMin + (g / 4) * (yMax - yMin);
-    return { y: Y(v), label: v.toFixed(2) };
+    return { y: Y(v), label: formatIndexTick(v, unit) };
   });
   const ticks = [0, Math.floor((points.length - 1) / 2), points.length - 1];
 
@@ -125,51 +147,73 @@ function Chart({ points }: { points: Point[] }): ReactNode {
   );
 }
 
-/** One index in the family. Block-level members carry their reading and are
- * clickable — clicking paints the map with that index, which is what the
- * original grouped cards did. Grid-only members are shown disabled rather than
- * hidden, so it stays obvious why they have no block-wide number. */
+/** One index in the family: its latest reading, how it moved, and a click that
+ * charts it here.
+ *
+ * Every member is selectable now. Ten of the thirteen used to render disabled
+ * at 45% opacity with an em dash and the words "Grid only" — a statement about
+ * the API that was not true (see the file header). The only thing that still
+ * varies between members is whether the MAP can paint this index, which is a
+ * per-console fact the parent passes in: the pixel console draws the index COG
+ * itself and can draw all thirteen, while the live console draws the sub-block
+ * grid mesh, and `grid_configs` exist only for the optical product. A card the
+ * map cannot honour still charts, and says so instead of silently not
+ * repainting.
+ */
 function IndexCard({
   code,
-  series,
-  active,
+  points,
+  loading,
+  unit,
+  charted,
+  onMap,
+  paintable,
   onSelect,
 }: {
   code: ApiIndexCode;
-  series: IndexSeries | undefined;
-  active: boolean;
+  points: SeriesPoint[];
+  loading: boolean;
+  unit: string;
+  /** This card is the one the tab is plotting. */
+  charted: boolean;
+  /** This card is the index the map is painted by. */
+  onMap: boolean;
+  paintable: boolean;
   onSelect: () => void;
 }): ReactNode {
   const { t } = useTranslation("farmConsole");
-  const gridOnly = !isBlockLevel(code);
-  const d = deltaLabel(series?.trend_7d_delta);
-  const meaning = t(`dock.meaning.${code}`);
+  const current = latestValue(points);
+  const d = indexDeltaLabel(code, deltaOver(points, CARD_DELTA_DAYS), unit);
+  const empty = !loading && current == null;
+  const title = [t(`dock.meaning.${code}`), paintable ? null : t("dock.notOnThisMap")]
+    .filter(Boolean)
+    .join(" — ");
 
   return (
     <button
       type="button"
-      disabled={gridOnly}
-      aria-pressed={active}
-      title={gridOnly ? t("inspector.gridOnlyIndex", { code: INDEX_META[code].label }) : meaning}
+      aria-pressed={charted}
+      title={title}
       onClick={onSelect}
       className={clsx(
         "relative flex min-w-[104px] flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-start",
-        active
+        charted
           ? "border-ap-primary bg-ap-primary-soft"
           : "border-ap-line hover:bg-ap-primary-soft/50",
-        gridOnly && "cursor-not-allowed opacity-45 hover:bg-transparent",
       )}
     >
-      {gridOnly ? null : <Dot color={d.color} className="absolute end-2.5 top-2.5" />}
-      <span className="text-xs font-bold tracking-wide text-ap-ink">{INDEX_META[code].label}</span>
-      <span className="text-lg font-bold leading-tight tabular-nums text-ap-ink">
-        {gridOnly ? "—" : fmt(series?.current ?? null)}
+      <Dot color={empty ? HEALTH_DOT.unknown : d.color} className="absolute end-2.5 top-2.5" />
+      <span className="flex items-center gap-1 text-xs font-bold tracking-wide text-ap-ink">
+        {INDEX_META[code].label}
+        {/* The map's current index, marked on the card rather than only in the
+            title bar — the two used to be readable only apart. */}
+        {onMap ? <span aria-label={t("dock.onMap")}>◉</span> : null}
       </span>
-      <span
-        className="text-xs font-bold"
-        style={{ color: gridOnly ? HEALTH_DOT.unknown : d.color }}
-      >
-        {gridOnly ? t("dock.gridOnly") : `${d.arrow} ${d.text}`}
+      <span className="text-lg font-bold leading-tight tabular-nums text-ap-ink">
+        {loading ? "…" : formatIndexValue(current, unit)}
+      </span>
+      <span className="text-xs font-bold" style={{ color: empty ? HEALTH_DOT.unknown : d.color }}>
+        {empty ? t("dock.noReading") : `${d.arrow} ${d.text}`}
       </span>
     </button>
   );
@@ -178,64 +222,91 @@ function IndexCard({
 export function DockFamilyView({
   blockId,
   family,
-  indices,
   activeIndex,
+  paintableIndices,
   onActiveIndexChange,
 }: {
   blockId: string;
   family: IndexFamilyKey;
-  /** The 30-day bundle already loaded for the block, so the cards read their
-   *  current value and delta without a second round trip per tab. */
-  indices: Record<IndexCode, IndexSeries>;
+  /** What the map is currently painted by. Marked on the matching card; not
+   *  what this tab charts. */
   activeIndex: ApiIndexCode;
+  /** Indices THIS console's map can draw. The live console draws the
+   *  sub-block grid mesh, which exists for the optical product only; the pixel
+   *  console draws the index raster and can draw all thirteen. */
+  paintableIndices: readonly ApiIndexCode[];
   onActiveIndexChange: (c: ApiIndexCode) => void;
 }): ReactNode {
   const { t } = useTranslation("farmConsole");
   const [from, setFrom] = useState(() => isoDaysBefore(30));
   const [to, setTo] = useState(() => isoDay());
 
-  const members = INDEX_FAMILIES.find((f) => f.key === family)?.indices ?? [];
-  // The tab decides what is charted — its one block-level index — while
-  // `activeIndex` stays the map's business. Reading Nutrition therefore never
-  // silently repaints the map; clicking a card does that, explicitly.
-  //
-  // Null for the thermal family, which has no block-level member at all:
-  // `/blocks/{id}/indices/{code}/timeseries` serves the three fixed columns
-  // `blocks_summary_router` publishes and none of them is thermal. The tab
-  // then shows its cards and its reference column with the chart replaced by
-  // a statement of why — charting a neighbouring index under a thermal
-  // heading would be a plausible-looking lie, and an empty chart frame reads
-  // as a failed request.
-  const charted = FAMILY_PRIMARY[family];
+  const members = useMemo(
+    () => INDEX_FAMILIES.find((f) => f.key === family)?.indices ?? [],
+    [family],
+  );
 
-  const seriesQ = useQuery({
-    queryKey: ["labs/mapnext/dockSeries", blockId, charted, from, to],
-    queryFn: () =>
-      getTimeseries(blockId, charted as IndexCode, { granularity: "daily", from, to }),
-    enabled: charted !== null,
-    staleTime: 60_000,
+  // What this tab plots. It opens on the family's usual index, or on the map's
+  // index when that belongs to this family, so arriving here from "open this
+  // family" charts what the reader was already looking at. Clicking a card
+  // moves it — reading a tab never repaints the map on its own.
+  const [charted, setCharted] = useState<ApiIndexCode>(() =>
+    members.includes(activeIndex) ? activeIndex : FAMILY_PRIMARY[family],
+  );
+  useEffect(() => {
+    setCharted((c) => (members.includes(c) ? c : FAMILY_PRIMARY[family]));
+  }, [members, family]);
+
+  const paintable = useMemo(() => new Set(paintableIndices), [paintableIndices]);
+
+  // Units are platform-wide curated data (`public.indices_catalog`), cached
+  // for an hour across every farm and index. Read rather than hardcoded: a
+  // local code-to-unit table is the mirror that drifts. A failure degrades to
+  // the dimensionless case, which is right for twelve of the thirteen.
+  const catalogQ = useQuery({
+    queryKey: ["indices", "catalog"] as const,
+    queryFn: getIndexCatalog,
+    staleTime: 60 * 60_000,
   });
+  const unitFor = useMemo(() => {
+    const byCode = new Map((catalogQ.data ?? []).map((e) => [e.code, e.unit ?? ""]));
+    return (code: ApiIndexCode): string => byCode.get(code) ?? "";
+  }, [catalogQ.data]);
 
-  const points = useMemo<Point[]>(() => {
-    const raw = seriesQ.data?.points ?? [];
-    return raw
-      .map((p) => ({ time: p.time, value: p.mean == null ? Number.NaN : Number(p.mean) }))
-      .filter((p): p is Point => Number.isFinite(p.value));
-  }, [seriesQ.data]);
+  // One query per member of the OPEN tab — two to five requests, and only for
+  // the family being read. The charted index's query is the same entry the
+  // chart reads, so plotting costs nothing beyond the card.
+  const seriesQs = useQueries({
+    queries: members.map((code) => dockSeriesOptions(blockId, code, from, to)),
+  });
+  const seriesData = seriesQs.map((q) => q.data);
+  const pointsByCode = useMemo(() => {
+    const m = new Map<ApiIndexCode, SeriesPoint[]>();
+    members.forEach((code, i) => m.set(code, toPoints(seriesData[i])));
+    return m;
+    // `seriesQs` is a fresh array every render; the payloads inside it are
+    // what actually change, so the deps are spread rather than the array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members, ...seriesData]);
 
-  const current = points.length ? points[points.length - 1].value : null;
+  const chartedIdx = members.indexOf(charted);
+  const chartedQ = chartedIdx >= 0 ? seriesQs[chartedIdx] : undefined;
+  const points = pointsByCode.get(charted) ?? [];
+  const chartedUnit = unitFor(charted);
+
+  const current = latestValue(points);
   // Change over the trailing 14 days of whatever window is on screen.
-  const earlier = useMemo(() => {
-    if (points.length < 2) return null;
-    const cutoff = Date.parse(points[points.length - 1].time) - 14 * 86_400_000;
-    const before = points.filter((p) => Date.parse(p.time) <= cutoff);
-    return before.length ? before[before.length - 1].value : points[0].value;
-  }, [points]);
-  const delta =
-    current != null && earlier != null && earlier !== 0
-      ? ((current - earlier) / Math.abs(earlier)) * 100
-      : null;
-  const chartedBand = charted === null ? null : bandFor(charted, current);
+  const delta = deltaPctOver(points, 14);
+  const chartedBand = bandFor(charted, current);
+
+  function selectCard(code: ApiIndexCode): void {
+    setCharted(code);
+    // Only repaint the map with something it can actually draw. On the live
+    // console a thermal chip would paint an empty farm: thermal scenes carry
+    // no grid cells, because `grid_configs` are per-product and only the
+    // optical product has one.
+    if (paintable.has(code)) onActiveIndexChange(code);
+  }
 
   return (
     <div className="grid h-full grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
@@ -245,13 +316,17 @@ export function DockFamilyView({
           role="group"
           aria-label={t(`dock.family.${family}`)}
         >
-          {members.map((code) => (
+          {members.map((code, i) => (
             <IndexCard
               key={code}
               code={code}
-              series={isBlockLevel(code) ? indices[code] : undefined}
-              active={activeIndex === code}
-              onSelect={() => onActiveIndexChange(code)}
+              points={pointsByCode.get(code) ?? []}
+              loading={seriesQs[i]?.isPending ?? true}
+              unit={unitFor(code)}
+              charted={charted === code}
+              onMap={activeIndex === code}
+              paintable={paintable.has(code)}
+              onSelect={() => selectCard(code)}
             />
           ))}
         </div>
@@ -292,29 +367,25 @@ export function DockFamilyView({
           ))}
         </div>
 
-        {charted === null ? (
-          <div className="flex h-[168px] items-center justify-center rounded-xl border border-dashed border-ap-line px-6 text-center text-sm text-ap-muted">
-            {t("dock.index.noBlockSeries")}
-          </div>
-        ) : seriesQ.isLoading ? (
+        {chartedQ?.isPending ? (
           <div className="h-[168px] animate-pulse rounded-xl bg-ap-line/40" />
-        ) : seriesQ.isError ? (
+        ) : chartedQ?.isError ? (
           <div className="flex h-[168px] items-center justify-center rounded-xl border border-ap-line text-sm text-ap-muted">
             {t("dock.index.error")}
           </div>
         ) : (
-          <Chart points={points} />
+          <Chart points={points} unit={chartedUnit} />
         )}
         <div className="text-xs text-ap-muted">
-          {charted === null
-            ? t("dock.index.readOnMap")
-            : `${t("dock.index.charting", { code: INDEX_META[charted].label })} · ${t("dock.index.footer", { count: points.length })}`}
+          {`${t("dock.index.charting", { code: INDEX_META[charted].label })} · ${t("dock.index.footer", { count: points.length })}`}
         </div>
       </div>
 
       <div className="min-h-0 overflow-auto">
         <div className="flex items-end gap-4">
-          <span className="text-3xl font-bold tabular-nums text-ap-ink">{fmt(current)}</span>
+          <span className="text-3xl font-bold tabular-nums text-ap-ink">
+            {formatIndexValue(current, chartedUnit)}
+          </span>
           <span className="pb-1 text-xs">
             <span
               className="font-semibold tabular-nums"
@@ -322,13 +393,7 @@ export function DockFamilyView({
                 color:
                   delta == null
                     ? HEALTH_DOT.unknown
-                    : delta > 0.6
-                      ? HEALTH_DOT.healthy
-                      : delta < -2
-                        ? HEALTH_DOT.critical
-                        : delta < -0.6
-                          ? HEALTH_DOT.watch
-                          : HEALTH_DOT.unknown,
+                    : indexDeltaLabel(charted, delta / 100, null).color,
               }}
             >
               {delta == null ? "—" : `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}%`}
@@ -338,9 +403,7 @@ export function DockFamilyView({
           </span>
         </div>
 
-        {/* What the number above actually says about the block. The charted
-            index is the family's only block-level member, so this is the one
-            live interpretation on the tab — the rest carry their scale. */}
+        {/* What the number above actually says about the block. */}
         {chartedBand ? (
           <div
             className="mt-2 flex items-start gap-2 rounded-xl border px-3 py-2 text-sm text-ap-ink"
@@ -351,17 +414,33 @@ export function DockFamilyView({
           </div>
         ) : null}
 
+        {/* Said once per tab rather than once per thermal card: the three
+            thermal indices come from a 100 m sensor, so a block smaller than
+            a hectare is reading its surroundings. */}
+        {family === "thermal" ? (
+          <p className="mt-2 text-xs text-ap-muted">
+            {t("legend.thermalCaveat", { metres: THERMAL_METRES })}
+          </p>
+        ) : null}
+
         <div className="mt-3 text-xs font-bold uppercase tracking-wide text-ap-primary">
           {t("dock.inThisFamily")}
         </div>
         <div className="mt-1 flex flex-col gap-1.5">
           {members.map((code) => (
             <div key={code} className="rounded-xl border border-ap-line px-3 py-2 text-sm">
-              <div className="flex items-baseline gap-2">
+              <div className="flex flex-wrap items-baseline gap-2">
                 <span className="font-semibold text-ap-ink">{INDEX_META[code].label}</span>
+                {/* Which satellite the number came from. This slot used to say
+                    "Block level" or "Grid only", a distinction that no longer
+                    exists — but sensor does, and it is the one that changes how
+                    much weight a reading carries. */}
                 <span className="text-xs text-ap-muted">
-                  {isBlockLevel(code) ? t("dock.blockLevel") : t("dock.gridOnly")}
+                  {isThermalIndex(code) ? t("dock.source.thermal") : t("dock.source.optical")}
                 </span>
+                {paintable.has(code) ? null : (
+                  <span className="text-xs text-ap-muted">· {t("dock.notOnThisMap")}</span>
+                )}
               </div>
               <dl className="mt-1 flex flex-col gap-1.5">
                 <div>

@@ -6,12 +6,11 @@ import { describe, expect, it } from "vitest";
 import ar from "@/i18n/locales/ar/farmConsole.json";
 import en from "@/i18n/locales/en/farmConsole.json";
 import {
-  BLOCK_LEVEL_INDICES,
   FAMILY_PRIMARY,
+  HIGHER_IS_WORSE,
   INDEX_BANDS,
   INDEX_FAMILIES,
   INDEX_META,
-  isBlockLevel,
   MAP_INDEX_ORDER,
 } from "./constants";
 import { bandFor } from "./dockFormat";
@@ -46,22 +45,34 @@ describe("index families", () => {
     }
   });
 
-  it("gives each family at most one block-level index, and charts exactly it", () => {
+  it("opens every family on an index that family actually holds", () => {
+    // Every family has a primary and it is one of its own members. This used
+    // to read "at most one block-level index per family, and thermal has
+    // none" — a restriction that came from mistaking the farm-wide summary
+    // endpoint for the block time-series route. All thirteen have a
+    // block-level series, so a family without a chart is no longer a state
+    // the dock can reach.
     for (const family of INDEX_FAMILIES) {
-      const blockLevel = family.indices.filter(isBlockLevel);
-      // More than one and the tab would have to choose which to plot.
-      expect(blockLevel.length, family.key).toBeLessThanOrEqual(1);
-      // NONE is allowed, and `thermal` is the case: the block-level timeseries
-      // route serves the three fixed optical columns `blocks_summary_router`
-      // publishes, and no thermal index is among them. The tab then says so
-      // rather than charting a neighbour under a thermal heading — which is
-      // why the primary is nullable and why this asserts the two agree in
-      // BOTH directions rather than just that a primary exists.
-      expect(FAMILY_PRIMARY[family.key] ?? null, family.key).toBe(blockLevel[0] ?? null);
+      const primary = FAMILY_PRIMARY[family.key];
+      expect(primary, family.key).toBeTruthy();
+      expect(family.indices, family.key).toContain(primary);
     }
-    expect(Object.values(FAMILY_PRIMARY).filter(Boolean).sort()).toEqual(
-      [...BLOCK_LEVEL_INDICES].sort(),
-    );
+    expect(Object.keys(FAMILY_PRIMARY).sort()).toEqual(INDEX_FAMILIES.map((f) => f.key).sort());
+  });
+
+  it("marks an index as higher-is-worse when its own bands descend", () => {
+    // The delta colouring reads HIGHER_IS_WORSE and the value colouring reads
+    // the band tone. They are the same fact about one index, and they drifted
+    // once already: LST was painted green for a rise because the delta side
+    // assumed every index climbs toward health.
+    const rank = { unknown: 0, critical: 1, watch: 2, healthy: 3 } as const;
+    for (const code of MAP_INDEX_ORDER) {
+      const tones = INDEX_BANDS[code].filter((b) => b.tone !== "unknown").map((b) => rank[b.tone]);
+      const top = tones[tones.length - 1];
+      const bottom = tones[0];
+      if (top === bottom) continue; // no direction to disagree about
+      expect(HIGHER_IS_WORSE.has(code), code).toBe(top < bottom);
+    }
   });
 });
 
@@ -88,7 +99,9 @@ describe("index bands", () => {
       // The ceiling itself is inclusive, so each band's own max selects it.
       bands.forEach((band, i) => {
         if (band.max === Infinity) return;
-        expect(bandFor(code as keyof typeof INDEX_BANDS, band.max)?.key, `${code}#${i}`).toBe(band.key);
+        expect(bandFor(code as keyof typeof INDEX_BANDS, band.max)?.key, `${code}#${i}`).toBe(
+          band.key,
+        );
       });
       // Above the last finite ceiling you land in the Infinity band.
       const finite = bands.filter((b) => b.max !== Infinity);
@@ -128,6 +141,28 @@ describe("index copy", () => {
     }
   });
 
+  it.each(LOCALES)("has a one-line meaning for every index in %s", (_name, bundle) => {
+    // The card's tooltip. It was missing for the thermal three for as long as
+    // their cards were disabled and unhoverable, which hid it.
+    for (const code of MAP_INDEX_ORDER) {
+      expect(lookup(bundle, `dock.meaning.${code}`), code).toEqual(expect.any(String));
+    }
+  });
+
+  it.each(LOCALES)("carries no copy for the retired grid-only split in %s", (_name, bundle) => {
+    // Every index has a block-level series, so nothing is "Grid only" and no
+    // family is missing its chart. Leaving the strings behind invites the
+    // claim back.
+    for (const gone of [
+      "dock.gridOnly",
+      "dock.blockLevel",
+      "dock.index.noBlockSeries",
+      "dock.index.readOnMap",
+    ]) {
+      expect(lookup(bundle, gone), gone).toBeUndefined();
+    }
+  });
+
   it.each(LOCALES)("has a reading for every band in %s", (_name, bundle) => {
     for (const [code, bands] of Object.entries(INDEX_BANDS)) {
       for (const band of bands) {
@@ -138,13 +173,16 @@ describe("index copy", () => {
     }
   });
 
-  it.each(LOCALES)("carries no band copy for a band that no longer exists in %s", (_name, bundle) => {
-    const copy = lookup(bundle, "dock.band") as Record<string, Record<string, string>>;
-    expect(Object.keys(copy).sort()).toEqual([...MAP_INDEX_ORDER].sort());
-    for (const [code, bands] of Object.entries(INDEX_BANDS)) {
-      expect(Object.keys(copy[code]).sort(), code).toEqual(bands.map((b) => b.key).sort());
-    }
-  });
+  it.each(LOCALES)(
+    "carries no band copy for a band that no longer exists in %s",
+    (_name, bundle) => {
+      const copy = lookup(bundle, "dock.band") as Record<string, Record<string, string>>;
+      expect(Object.keys(copy).sort()).toEqual([...MAP_INDEX_ORDER].sort());
+      for (const [code, bands] of Object.entries(INDEX_BANDS)) {
+        expect(Object.keys(copy[code]).sort(), code).toEqual(bands.map((b) => b.key).sort());
+      }
+    },
+  );
 
   it.each(LOCALES)("names all three families in %s", (_name, bundle) => {
     for (const family of INDEX_FAMILIES) {

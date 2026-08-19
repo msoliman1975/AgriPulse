@@ -86,9 +86,23 @@ export interface GetTimeseriesParams {
   to?: string;
 }
 
+/**
+ * Block-level time series for ONE index.
+ *
+ * `AnyIndexCode`, not `IndexCode`: the route reads
+ * `block_index_daily`/`block_index_weekly` filtered by `index_code` with no
+ * allowed-list of its own, and the ingest task writes one
+ * `block_index_aggregates` row per index it computed for the scene. Every
+ * code either product produces therefore has a block-level series, thermal
+ * included — checked on prod 2026-08-19, where `block_index_daily` held all
+ * thirteen codes for the same blocks with matching row counts.
+ *
+ * The narrower `IndexCode` here is what filed the other ten as "grid only" in
+ * the Block Dock for a year.
+ */
 export async function getTimeseries(
   blockId: string,
-  indexCode: IndexCode,
+  indexCode: AnyIndexCode,
   params: GetTimeseriesParams = {},
 ): Promise<IndexTimeseriesResponse> {
   const { data } = await apiClient.get<IndexTimeseriesResponse>(

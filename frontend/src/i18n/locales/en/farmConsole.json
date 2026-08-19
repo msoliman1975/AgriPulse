@@ -161,7 +161,7 @@
     "trend7d": "7-day trend",
     "none": "—",
     "otherIndices": "Other indices",
-    "gridOnlyIndex": "{{code}} shows on the sub-block grid overlay; no block-level trend.",
+    "gridOnlyIndex": "{{code}} is not in the farm summary — open a block to read it.",
     "noActivities": "No upcoming activities.",
     "waterSection": "Water & environment",
     "irrigation": "Irrigation",
@@ -426,9 +426,7 @@
       "footer": "{{count}} clear passes in range",
       "footer_one": "{{count}} clear pass in range",
       "over14d": "over last 14 days",
-      "charting": "Charting {{code}}",
-      "noBlockSeries": "No block-level series for the thermal indices — they are read on the map, at farm scale.",
-      "readOnMap": "Thermal is a farm-scale reading. Compare across the farm on the map rather than block by block."
+      "charting": "Charting {{code}}"
     },
     "conditions": {
       "treesHeading": "Decision trees",
@@ -472,7 +470,10 @@
       "ndwi": "Standing surface water",
       "ndmi": "Vegetation moisture (SWIR)",
       "bsi": "Bare ground between plants",
-      "msi": "Moisture stress (higher is worse)"
+      "msi": "Moisture stress (higher is worse)",
+      "lst": "Canopy and ground temperature",
+      "cwsi": "How close the canopy is to water stress",
+      "smi": "Relative surface wetness"
     },
     "definition": "Definition",
     "howToRead": "How to read it",
@@ -610,8 +611,6 @@
     },
     "openFamily": "Open {{family}} →",
     "inThisFamily": "In this family",
-    "blockLevel": "Block level",
-    "gridOnly": "Grid only",
     "noWeather": "No forecast for this block. Check its weather subscription.",
     "soilFromSchedule": "Read from the irrigation schedule, not a live sensor.",
     "emergency": "Emergency irrigation",
@@ -630,7 +629,14 @@
       "kcGeneric": "generic",
       "notLogged": "not logged",
       "unloggedWarning": "No irrigation recorded for this day, so this shortfall may be missing bookkeeping rather than dry soil."
-    }
+    },
+    "source": {
+      "optical": "Sentinel-2 · 10 m",
+      "thermal": "Landsat · 100 m"
+    },
+    "notOnThisMap": "Not drawn on this map",
+    "onMap": "Painted on the map now",
+    "noReading": "No reading"
   },
   "soilStatus": {
     "optimal": "optimal",

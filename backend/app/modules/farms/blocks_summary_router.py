@@ -50,10 +50,20 @@ from app.shared.rbac.check import requires_capability
 router = APIRouter(prefix="/api/v1", tags=["farms"])
 
 
-# Indices the map surfaces. Backend has no NDMI; NDWI is the closest
-# moisture-related index available — see the frontend api.ts for the
-# matching substitution. Add NDMI to this tuple once the imagery
-# pipeline starts computing it.
+# Indices this FARM-WIDE summary carries, one column each, for every block on
+# the map at once.
+#
+# It is three of thirteen on purpose — the response colours polygons and fills
+# the units rail, and a fourteen-column row per block is a cost paid on every
+# 60s poll. It is NOT a statement about what the pipeline computes: the ingest
+# task writes a `block_index_aggregates` row per index, and
+# `/blocks/{id}/indices/{code}/timeseries` serves any of them.
+#
+# ⚠️ That distinction was lost once already. This tuple's old comment said
+# "backend has no NDMI", the frontend copied the claim, and the Block Dock
+# spent a year showing ten of its thirteen index tiles disabled and labelled
+# "Grid only". Widen this tuple only for the map's own needs; a block-level
+# reading does not have to come through here.
 _MAP_INDICES: tuple[str, ...] = ("ndvi", "ndre", "ndwi")
 
 # How far back the *first* pass of the latest-value lookup looks.

@@ -2,7 +2,7 @@
 // files so react-refresh (fast refresh) stays happy.
 import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import { THERMAL_INDEX_CODES } from "@/api/indices";
-import type { Health, IndexCode } from "../map/types";
+import type { Health } from "../map/types";
 
 // Last farm the user looked at, so /labs/map with no :farmId can restore it.
 // Shared by the console and the create-farm flow (which writes it on success).
@@ -71,11 +71,25 @@ export function isThermalIndex(code: ApiIndexCode): boolean {
   return THERMAL_SET.has(code);
 }
 
-export const BLOCK_LEVEL_INDICES: IndexCode[] = ["ndvi", "ndre", "ndwi"];
-
-export function isBlockLevel(c: ApiIndexCode): c is IndexCode {
-  return c === "ndvi" || c === "ndre" || c === "ndwi";
-}
+/**
+ * Indices whose reading gets WORSE as the number climbs.
+ *
+ * Ten of the thirteen are "higher is a better canopy", and the dock's delta
+ * colouring assumed that for all of them — so a block whose surface
+ * temperature rose 6 °C in a week was painted green, and rising MSI (water
+ * stress) and rising NDWI (standing water on the block) with it.
+ *
+ * The tone in INDEX_BANDS already encodes this per band; this set is the same
+ * fact stated for a CHANGE, which has no band. Keep the two in step: an index
+ * whose band tones descend belongs here.
+ */
+export const HIGHER_IS_WORSE: ReadonlySet<ApiIndexCode> = new Set<ApiIndexCode>([
+  "ndwi", // McFeeters surface water: above zero is water standing on the block
+  "msi", // SWIR/NIR ratio, inverted — high is stressed
+  "bsi", // bare soil: high is exposed ground
+  "lst", // canopy heating up
+  "cwsi", // stomata closing
+]);
 
 // ---- agronomic families ---------------------------------------------------
 //
@@ -89,11 +103,9 @@ export type IndexFamilyKey = "vigour" | "nutrition" | "moisture" | "thermal";
 
 // `bsi` files under vigour and `msi` under moisture rather than earning a
 // fourth "soil" tab. The family question vigour answers is "is the canopy
-// covering the ground", and bare soil is that question inverted — but the
-// deciding constraint is FAMILY_PRIMARY below: every family needs a
-// block-level index to chart, and block-level is only ndvi/ndre/ndwi. A soil
-// family would have had no series to plot until `blocks_summary_router`
-// grows a fourth fixed column.
+// covering the ground", and bare soil is that question inverted. (The other
+// half of that argument used to be that a soil family would have had no
+// series to chart. That was never true — see FAMILY_PRIMARY.)
 //
 // The thermal three get their OWN family rather than being filed under
 // moisture, where two of them arguably belong by subject. Two reasons, and
@@ -114,20 +126,21 @@ export const INDEX_FAMILIES: { key: IndexFamilyKey; indices: ApiIndexCode[] }[] 
   { key: "thermal", indices: ["lst", "cwsi", "smi"] },
 ];
 
-// The one block-level index in each family — what that family's tab charts,
-// since the grid-only members have no block-wide series to plot.
+// The index a family tab charts when it opens. Every member is chartable —
+// `/blocks/{id}/indices/{code}/timeseries` reads the daily continuous
+// aggregate by `index_code` and the ingest task writes a row per computed
+// index — so this is a starting point, not a restriction: clicking any card
+// in the tab charts that index instead.
 //
-// Thermal has NONE. `/blocks/{id}/indices/{code}/timeseries` serves the three
-// fixed optical columns `blocks_summary_router` publishes, and no thermal
-// index is among them — so the thermal tab has no series to chart and says so
-// rather than plotting a neighbouring index under a thermal heading. `null`
-// is the honest value; every consumer already has to handle a family whose
-// primary is absent because `isBlockLevel` was always allowed to be false.
-export const FAMILY_PRIMARY: Record<IndexFamilyKey, IndexCode | null> = {
+// It used to be "the one block-level index in the family", nullable because
+// thermal had none. That reading of the API was wrong. The route was never
+// limited to the three columns `blocks_summary_router` publishes; only the
+// FARM-WIDE summary is, and the dock does not read the summary.
+export const FAMILY_PRIMARY: Record<IndexFamilyKey, ApiIndexCode> = {
   vigour: "ndvi",
   nutrition: "ndre",
   moisture: "ndwi",
-  thermal: null,
+  thermal: "lst",
 };
 
 // Family names, definitions, scales and band readings are i18n keys
