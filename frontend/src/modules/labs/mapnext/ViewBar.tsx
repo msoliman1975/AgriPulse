@@ -229,7 +229,7 @@ export function ViewBar({
             off — a checkbox that changes nothing visible is a puzzle. */}
         {layers.flags ? (
           <Toggle
-            label={`　↳ ${t("layers.flagsOpenOnly")}`}
+            label={`↳ ${t("layers.flagsOpenOnly")}`}
             on={layers.flagsOpenOnly}
             onClick={() => onLayersChange({ flagsOpenOnly: !layers.flagsOpenOnly })}
           />

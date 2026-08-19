@@ -98,7 +98,7 @@ class FieldFlagService:
         """
         try:
             return self._storage.presign_download(key=key).url
-        except Exception:  # noqa: BLE001 - storage failures must not break a read
+        except Exception:
             self._log.warning("field_flag_photo_url_failed", key=key)
             return None
 
@@ -154,7 +154,7 @@ class FieldFlagService:
                     tenant_schema=self._tenant_schema,
                 )
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             self._log.exception("field_flag_announce_failed", flag_id=str(flag["id"]))
 
     async def comment(self, *, flag_id: UUID, body: str, actor_user_id: UUID) -> dict[str, Any]:
@@ -191,7 +191,13 @@ class FieldFlagService:
         return await self.get_flag(flag_id=flag_id)
 
     async def init_photo_upload(
-        self, *, farm_id: UUID, tenant_id: UUID, content_type: str, content_length: int, filename: str
+        self,
+        *,
+        farm_id: UUID,
+        tenant_id: UUID,
+        content_type: str,
+        content_length: int,
+        filename: str,
     ) -> dict[str, Any]:
         """Presigned PUT for one photograph.
 

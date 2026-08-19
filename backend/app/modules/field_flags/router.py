@@ -130,9 +130,7 @@ async def list_flags(
     service: FieldFlagService = Depends(_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
-    return await service.list_flags(
-        farm_id=farm_id, open_only=open_only, pinned_only=pinned_only
-    )
+    return await service.list_flags(farm_id=farm_id, open_only=open_only, pinned_only=pinned_only)
 
 
 @router.post(

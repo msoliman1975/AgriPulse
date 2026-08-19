@@ -153,7 +153,9 @@ class FieldFlagRepository:
 
     async def insert_flag(self, *, values: dict[str, Any]) -> UUID:
         point_sql = (
-            "ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)" if values.get("lat") is not None else "NULL"
+            "ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)"
+            if values.get("lat") is not None
+            else "NULL"
         )
         sql = (
             "INSERT INTO field_flags "  # noqa: S608
@@ -172,7 +174,7 @@ class FieldFlagRepository:
                 values,
             )
         ).first()
-        assert row is not None  # noqa: S101 - RETURNING always yields a row
+        assert row is not None
         return UUID(str(row.id))
 
     async def insert_photos(self, *, flag_id: UUID, keys: list[str]) -> None:
@@ -203,7 +205,7 @@ class FieldFlagRepository:
             )
         ).mappings()
         first = row.first()
-        assert first is not None  # noqa: S101
+        assert first is not None
         return dict(first)
 
     async def close_flag(self, *, flag_id: UUID, reason: str, closed_by: UUID) -> None:

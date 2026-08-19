@@ -185,9 +185,9 @@ async def test_pinned_only_hides_expired_pins_but_the_panel_still_lists_them(
     # A real UUID object through a typed bindparam, never a CAST over a
     # string — that pattern has taken this platform down three times.
     await admin_session.execute(
-        text("UPDATE field_flags SET pin_until = now() - interval '1 day' WHERE id = :id").bindparams(
-            bindparam("id", type_=PG_UUID(as_uuid=True))
-        ),
+        text(
+            "UPDATE field_flags SET pin_until = now() - interval '1 day' WHERE id = :id"
+        ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
         {"id": UUID(flag["id"])},
     )
     await admin_session.commit()

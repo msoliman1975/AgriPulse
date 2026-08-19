@@ -210,9 +210,7 @@ BLOCK_OWNED: tuple[OwnedTable, ...] = (
     # away first and leave the objects behind forever.
     OwnedTable(
         "field_flag_photos",
-        where_sql=(
-            "flag_id IN (SELECT id FROM field_flags WHERE block_id = ANY(:ids))"
-        ),
+        where_sql=("flag_id IN (SELECT id FROM field_flags WHERE block_id = ANY(:ids))"),
         order=10,
         storage_key_column="attachment_s3_key",
     ),
