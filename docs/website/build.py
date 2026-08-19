@@ -106,7 +106,8 @@ PROCESSES = [
             },
             {
                 "t": "Set the grid cell size",
-                "where": "Farm management → Farm tab → Grid template",
+                "where": "Farm management → gear → Farm settings → Zones",
+                "guide": ("guide-set-the-grid-cell-size", "Full guide: set the grid cell size"),
                 "steps": [
                     "Choose the cell size for the whole farm. Cell size is a farm setting, not a block setting.",
                     "A smaller cell shows more variation inside a block and costs more to compute.",
@@ -114,16 +115,9 @@ PROCESSES = [
                 ],
             },
             {
-                "t": "Mark the land units",
-                "where": "Farm management → Land units",
-                "steps": [
-                    "Draw roads, buildings, canals and any other area that is not crop.",
-                    "Land units are excluded from crop numbers, so index averages stop being dragged down.",
-                ],
-            },
-            {
                 "t": "Attach the people",
-                "where": "Farm management → Members, and the block detail page",
+                "where": "Settings → Team, and Farm settings → Members",
+                "guide": ("guide-attach-the-people", "Full guide: attach the people"),
                 "steps": [
                     "Invite the users who work on this farm and give each one a role.",
                     "Limit a member to named farms if they should not see the rest.",
@@ -133,7 +127,7 @@ PROCESSES = [
         ],
         "check": [
             "The farm picker shows the farm, and the map shows the boundary you drew.",
-            "The sum of block areas is close to the farm area, minus the land units.",
+            "The sum of block areas is close to the farm area.",
             "Opening the Farm Console shows the grid drawn inside each block.",
         ],
         "related": [("concepts", "Key concepts"), ("kb", "Knowledge Base")],
@@ -1827,6 +1821,233 @@ GUIDES = [
         "next": [("guide-create-a-farm", "Create a farm"),
                  ("process-map-the-farm", "Back to Map the farm"),
                  ("process-plan-the-season", "Plan the season")],
+    },
+    {
+        "slug": "guide-set-the-grid-cell-size",
+        "process": ("process-map-the-farm", "Map the farm", "01"),
+        "img": "p04-read",
+        "title": "Set the grid cell size",
+        "short": "One setting for the whole farm that decides how finely you can see inside a "
+                 "block.",
+        "lede": "A block tells you the average. The grid tells you which corner of the block is "
+                "dragging that average down. Cell size decides how small that corner can be, and "
+                "it is set once for the farm, not per block.",
+        "who": "Farm manager, tenant admin",
+        "time": "5 minutes, plus reprocessing time if you change it later",
+        "clip": "6 minutes",
+        "clip_file": "grid-cell-size",
+        "clip_poster": "guide-grid-clip-poster",
+        "clip_note": ("Silent screen capture of the real app, 1 minute 8 seconds. It opens Farm "
+                      "settings, walks the Zones section, and runs a preview without committing "
+                      "the change."),
+        "start": [
+            "A farm with blocks. See Add the blocks.",
+            "At least one imagery product turned on for the farm. Blocks with no imagery are "
+            "skipped, so the grid is built for nothing.",
+            "A view on how small an area you would actually act on.",
+        ],
+        "steps": [
+            {
+                "t": "Open Farm settings",
+                "img": "guide-grid-01-panel",
+                "cap": "Farm settings, Farm tab. Zones sits under Satellite imagery and Weather.",
+                "body": [
+                    "Open the farm in <b>Farm management</b> and click the gear on the map toolbar.",
+                    "The panel has three tabs: <b>Farm</b>, <b>Block defaults</b> and <b>Members</b>. "
+                    "Stay on Farm.",
+                    "Scroll to <b>Zones (sub-block grid)</b>. The section says it plainly: cell size "
+                    "and sensitivity are set for the farm and applied to every block that has imagery.",
+                ],
+            },
+            {
+                "t": "Turn imagery on first, if it is off",
+                "body": [
+                    "Just above Zones is <b>Satellite imagery</b>, with the products you can turn on.",
+                    "A block with no imagery subscription has nothing to draw a grid from. The "
+                    "preview counts those blocks as skipped.",
+                    "Turning a product on subscribes the whole farm. There is no separate step to "
+                    "apply it to blocks.",
+                ],
+            },
+            {
+                "t": "Choose the cell size",
+                "body": [
+                    "Type a size in metres in <b>Cell size (m)</b>.",
+                    "Smaller cells show more variation inside a block and cost more to compute on "
+                    "every pass. Larger cells are cheaper and blur the thing you are looking for.",
+                    "Pick the smallest area you would actually send someone to. A cell you would "
+                    "never act on alone is detail you are paying for and ignoring.",
+                ],
+            },
+            {
+                "t": "Preview before you commit",
+                "img": "guide-grid-02-preview",
+                "cap": "The preview counts the work before you agree to it.",
+                "body": [
+                    "Click <b>Preview changes</b>. Nothing is changed yet.",
+                    "The answer is exact, for example: <i>0 blocks would change — 0 new grids, "
+                    "0 rezoned, 10 skipped</i>.",
+                    "<b>New grid</b> means a block that had none. <b>Rezoned</b> means a block whose "
+                    "cells are redrawn. <b>Skipped</b> usually means the block has no imagery.",
+                    "If the numbers are not what you expected, the cell size or the imagery "
+                    "subscription is wrong, not the preview.",
+                ],
+                "note": "Changing cell size redraws the zones. Scenes already processed keep their "
+                        "old zones until they are reprocessed, so a farm can hold two grid "
+                        "generations at once. That is why the change asks for confirmation and "
+                        "states the cost first.",
+            },
+            {
+                "t": "Set the anomaly sensitivity",
+                "body": [
+                    "<b>Anomaly sensitivity (z)</b> is how far below the field average a cell must "
+                    "fall before it is flagged.",
+                    "Lower is more sensitive, so more cells are flagged.",
+                    "Leave it empty to inherit the tenant default.",
+                    "It takes effect on the next detection sweep and reprocesses nothing, so it is "
+                    "cheap to tune.",
+                ],
+            },
+            {
+                "t": "Undo a per-block override",
+                "body": [
+                    "<b>Reset blocks to the inherited default</b> puts every block in this farm back "
+                    "on the farm setting.",
+                    "Use it when blocks have drifted apart and you want one rule again.",
+                ],
+            },
+        ],
+        "fields": {
+            "cols": ["Field", "Scope", "What it does"],
+            "rows": [
+                ["Cell size (m)", "the whole farm", "The size of each grid cell. Applied to every block that has imagery."],
+                ["Preview changes", "read only", "Counts new grids, rezoned blocks and skipped blocks before anything is written."],
+                ["Anomaly sensitivity (z)", "the whole farm", "How far below the field average a cell must fall before it is flagged. Lower is more sensitive. Empty inherits the tenant default."],
+                ["Reset blocks to the inherited default", "the whole farm", "Clears per-block overrides so every block follows the farm setting again."],
+            ],
+        },
+        "mistakes": {
+            "cols": ["What you see", "What it means"],
+            "rows": [
+                ["Every block skipped", "The blocks have no imagery subscription. Turn a product on in Satellite imagery first."],
+                ["Nothing would change", "The blocks already use this cell size. Nothing to do."],
+                ["The old grid is still on the map", "Scenes already processed keep their old zones. New zones appear as scenes are reprocessed."],
+                ["Too many cells flagged", "The sensitivity is too low. Raise it. It takes effect on the next sweep and costs nothing to change."],
+            ],
+        },
+        "check": [
+            "The preview reports the number of blocks you expected, not zero and not all of them.",
+            "After the next pass, opening a block shows cells at the size you set.",
+            "A single weak corner of a block stands out instead of being averaged away.",
+        ],
+        "next": [("guide-add-the-blocks", "Add the blocks"),
+                 ("guide-attach-the-people", "Attach the people"),
+                 ("process-connect-the-data", "Connect the data")],
+    },
+    {
+        "slug": "guide-attach-the-people",
+        "process": ("process-map-the-farm", "Map the farm", "01"),
+        "img": "p07-act",
+        "title": "Attach the people",
+        "short": "Invite the team to the account, then give each person a role on this farm.",
+        "lede": "Two steps, on two screens. A person joins the account once and gets a "
+                "tenant-wide role. Then they get a role on each farm they work on. Work opened by "
+                "a decision tree goes to whoever holds the farm.",
+        "who": "Tenant admin",
+        "time": "10 minutes for a small team",
+        "clip": "7 minutes",
+        "clip_file": "attach-the-people",
+        "clip_poster": "guide-people-clip-poster",
+        "clip_note": ("Silent screen capture of the real app, 1 minute 4 seconds. It opens the "
+                      "invite form and the farm Members tab. Nothing is sent and nobody is "
+                      "invited."),
+        "start": [
+            "A mapped farm.",
+            "The names, email addresses and phone numbers of the people who work on it.",
+            "A decision on who does what, before you start typing.",
+        ],
+        "steps": [
+            {
+                "t": "Invite people to the account",
+                "img": "guide-people-01-team",
+                "cap": "Team and roles. Everyone in the account, with their tenant-wide role.",
+                "body": [
+                    "Go to <b>Settings → Team</b>. The page is <b>Team &amp; roles</b>: everyone in "
+                    "this account and the role they hold across it.",
+                    "Click <b>Invite user</b> and fill in the email, the full name, an optional "
+                    "phone number, and the tenant role.",
+                    "On success the person gets a welcome email. If mail is not available, the "
+                    "screen shows a one-time temporary password to copy and hand over instead. "
+                    "They are forced to change it at first sign-in.",
+                ],
+                "note": "The tenant role is what they can do across the account. It is not the same "
+                        "as what they can do on one farm. That comes next.",
+            },
+            {
+                "t": "Give them a role on this farm",
+                "img": "guide-people-02-members",
+                "cap": "Farm settings, Members tab.",
+                "body": [
+                    "Open the farm, click the gear, and go to the <b>Members</b> tab.",
+                    "Choose the <b>Role</b> for this farm: Farm Manager, Agronomist, Field "
+                    "Operator, Scout or Viewer.",
+                    "Click <b>Assign</b>. The person now appears in the farm's member list.",
+                ],
+                "note": "The Members tab asks for a membership ID, a long identifier, and the Team "
+                        "page does not show one. Until that box becomes a name picker, ask whoever "
+                        "operates the platform for the id, or read it from the account's user list "
+                        "through the API, where it is returned as membership_id.",
+            },
+            {
+                "t": "Decide who owns what",
+                "body": [
+                    "<b>Farm Manager</b> runs the farm day to day and receives the work.",
+                    "<b>Agronomist</b> reads the data and writes or tunes the rules.",
+                    "<b>Field Operator</b> carries out dispatched jobs.",
+                    "<b>Scout</b> records observations from the phone app.",
+                    "<b>Viewer</b> can see the farm and change nothing.",
+                    "Give the smallest role that lets someone do their job. It is easy to raise "
+                    "later and awkward to explain afterwards.",
+                ],
+            },
+            {
+                "t": "Check it from their side",
+                "body": [
+                    "Ask the person to sign in and open the farm picker.",
+                    "They should see this farm and nothing they should not see.",
+                    "A member limited to named farms sees only those farms, everywhere in the app.",
+                ],
+            },
+        ],
+        "fields": {
+            "cols": ["Field", "Where", "What it is for"],
+            "rows": [
+                ["Email", "Invite user", "Where the welcome message goes, and the sign-in name."],
+                ["Full name", "Invite user", "Shown throughout the app, so spell it the way they spell it."],
+                ["Phone", "Invite user", "Optional here. Required later for anyone who uses the Scout app."],
+                ["Tenant role", "Invite user", "What they can do across the whole account."],
+                ["Membership ID", "Farm settings, Members", "Identifies the person inside this account. Returned as membership_id by the users API."],
+                ["Role", "Farm settings, Members", "Farm Manager, Agronomist, Field Operator, Scout or Viewer, on this farm only."],
+            ],
+        },
+        "mistakes": {
+            "cols": ["What you see", "What it means"],
+            "rows": [
+                ["No users in this tenant yet", "Nobody has been invited. Start with Invite user."],
+                ["No welcome email arrived", "Mail was unavailable, so the screen showed a temporary password instead. Hand it over directly. It can be reissued with Resend invite."],
+                ["The person signs in but sees no farms", "They have an account role but no farm role. Assign them on the farm's Members tab."],
+                ["The Assign button does nothing useful", "The membership ID is wrong. It is a long identifier, not an email address."],
+                ["A field worker shows as a phone number", "Their sign-in is a phone, not an email. Fill in the full name so the app has something to show."],
+            ],
+        },
+        "check": [
+            "The person appears on Team and roles with the role you gave them.",
+            "The person appears in the farm's member list.",
+            "They sign in and see this farm.",
+        ],
+        "next": [("guide-set-the-grid-cell-size", "Set the grid cell size"),
+                 ("process-map-the-farm", "Back to Map the farm"),
+                 ("process-run-the-field-team", "Run the field team")],
     },
 ]
 
