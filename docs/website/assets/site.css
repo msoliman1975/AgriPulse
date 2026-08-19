@@ -296,6 +296,7 @@ li { margin:.22rem 0; }
   position:relative; margin:1.3rem 0 0; border-radius:14px; overflow:hidden;
   border:1px solid var(--border); background:var(--surface-2);
 }
+.clip video { display:block; width:100%; height:auto; background:#0d1411; }
 .clip .frame {
   aspect-ratio:16/9; display:grid; place-items:center; text-align:center;
   background:

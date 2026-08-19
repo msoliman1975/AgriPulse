@@ -1554,6 +1554,11 @@ GUIDES = [
         "who": "Tenant admin, farm manager",
         "time": "5 minutes, once you know where the boundary runs",
         "clip": "4 minutes",
+        "clip_file": "farm-creation",
+        "clip_poster": "guide-farm-clip-poster",
+        "clip_note": ("Silent screen capture of the real app, 1 minute 38 seconds. It covers "
+                      "steps 1 to 5 and stops before Create farm. The narrated version replaces "
+                      "it once it is recorded."),
         "start": [
             "A tenant account and a sign-in that can create farms.",
             "The boundary: either you know where it runs on the map, or you have a KML, "
@@ -1820,7 +1825,22 @@ def table(cols, rows) -> str:
             f'<tbody>{"".join(body)}</tbody></table></div>')
 
 
-def clip_block(title: str, length: str) -> str:
+def clip_block(title: str, length: str, file: str = "", poster: str = "", note: str = "") -> str:
+    """The video slot. Plays a file when there is one, otherwise shows the placeholder."""
+    if file:
+        poster_attr = f' poster="img/{poster}.jpg"' if poster else ""
+        return f"""    <div class="clip">
+      <video controls preload="metadata"{poster_attr} playsinline>
+        <source src="media/{file}.mp4" type="video/mp4" />
+        Your browser cannot play this video. Download it at
+        <a href="media/{file}.mp4">media/{file}.mp4</a>.
+      </video>
+      <div class="bar">
+        <span><b>{e(title)}.</b> {e(note)}</span>
+        <span class="chip live">Draft capture</span>
+      </div>
+    </div>
+"""
     return f"""    <div class="clip">
       <div class="frame">
         <div>
@@ -2334,7 +2354,7 @@ def build_guide(g) -> str:
     </div>
 
     <h3>Watch it in the system</h3>
-{clip_block(g["title"] + " — full walkthrough", g["clip"])}
+{clip_block(g["title"] + " — walkthrough", g["clip"], g.get("clip_file", ""), g.get("clip_poster", ""), g.get("clip_note", ""))}
 
     <h3>Before you start</h3>
     <ul>{start}</ul>
