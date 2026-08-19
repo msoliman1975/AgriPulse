@@ -29,11 +29,17 @@ export interface FarmScope {
 }
 
 interface MeResponse {
+  id?: string;
+  full_name?: string;
   preferences?: { language?: string };
   farm_scopes?: FarmScope[];
 }
 
 export interface Me {
+  /** Needed because the observations endpoint has no `recorded_by` filter:
+   *  the Records screen keeps its own rows out of the farm's recent ones. */
+  userId: string | null;
+  name: string | null;
   farms: FarmScope[];
   /**
    * Null covers three cases the caller treats identically: the request failed,
@@ -55,8 +61,13 @@ export async function fetchMe(): Promise<Me> {
   try {
     const me = await authedGet<MeResponse>("/me");
     const lang = me.preferences?.language;
-    return { farms: me.farm_scopes ?? [], language: isLang(lang) ? lang : null };
+    return {
+      userId: me.id ?? null,
+      name: me.full_name ?? null,
+      farms: me.farm_scopes ?? [],
+      language: isLang(lang) ? lang : null,
+    };
   } catch {
-    return { farms: [], language: null };
+    return { userId: null, name: null, farms: [], language: null };
   }
 }

@@ -16,11 +16,6 @@ export const en = {
   "signIn.invalidCredentials": "That phone number or PIN is not right",
   "signIn.language": "Language",
 
-  "visits.title": "My visits",
-  "visits.overdue": "Overdue",
-  "visits.assigned": "Assigned to me",
-  "visits.claimable": "Open to claim",
-  "work.board": "Scheduled work",
   "work.back": "Back",
   "work.accept": "Accept",
   "work.start": "I'm here — start",
@@ -42,7 +37,6 @@ export const en = {
   "work.actionFailed": "That did not go through. Try again.",
   "work.recordFailed": "Could not save that reading.",
   "work.loadDefsFailed": "Could not load what can be recorded.",
-  "visits.empty": "Nothing to walk right now.",
   "visits.loadFailed": "Could not load your visits.",
   "visits.claim": "I'll take it",
   // One visit can now stand for several grid cells of one block, and it
@@ -63,7 +57,62 @@ export const en = {
   "farms.loading": "Loading…",
   "farms.pick": "Choose a farm",
 
-  "due.overdue": "overdue",
+  "tab.tasks": "Tasks",
+  "tab.records": "Records",
+  "tab.me": "Me",
+
+  "seg.mine": "My work",
+  "seg.available": "Available",
+  "seg.done": "Done",
+
+  "bucket.overdue": "Overdue",
+  "bucket.today": "Today",
+  "bucket.week": "This week",
+  "bucket.anytime": "Anytime",
+
+  "group.byBlock": "Group by block",
+  "group.byDue": "Group by time",
+  "group.noBlock": "No block",
+
+  "empty.mine": "Nothing to walk right now.",
+  "empty.available": "Nothing open to take.",
+  "empty.done": "Nothing finished yet.",
+
+  "record.fab": "＋ Record",
+  "record.title": "Record something",
+  "record.round": "Log a round I did",
+  "record.roundHint": "You inspected a block on your own. Same form, closes with an outcome.",
+  "record.reading": "Enter a reading",
+  "record.readingHint": "One measurement — trap count, incidence, soil feel.",
+  "record.cancel": "Cancel",
+  "record.whichBlock": "Which block?",
+  "record.start": "Start",
+  "record.noBlocks": "This farm has no blocks.",
+  "record.blocksFailed": "Could not load the blocks.",
+  "record.roundFailed": "Could not start the round.",
+
+  "records.title": "My records",
+  "records.empty": "You have not recorded anything in the last 30 days.",
+  "records.loadFailed": "Could not load your records.",
+
+  "me.title": "My account",
+  "me.farm": "Farm",
+
+  "work.why": "Why you are going",
+  "work.photos": "Photos",
+  "work.takePhoto": "Take photo",
+  "work.choosePhoto": "Choose photos",
+  "work.removePhoto": "Remove photo",
+  "work.uploading": "Uploading",
+  "work.positionOff": "Position not set",
+  "work.positionSet": "Position set",
+  "work.positionUse": "Use my position",
+  "work.positionRedo": "Update position",
+  "work.positionAsking": "Finding you…",
+  "work.positionDenied": "Location permission refused",
+  "work.positionUnavailable": "Position not available",
+
+  "due.overdue": "late",
 
   // Reachability. Shown before sign-in, because "wrong PIN" and "the server is
   // not there" look identical from the sign-in screen otherwise.
