@@ -211,11 +211,17 @@ export interface SignalDefinition {
  * metadata, and the two gate on different capabilities — `state` needs
  * `plan_activity.complete`, metadata needs `plan.manage`. Sending only
  * `state` keeps a scout on the side they hold.
+ *
+ * `state` is an ACTION VERB — `start` / `complete` / `skip` — not the status
+ * it produces. This used to send `completed` / `skipped`, which are the
+ * resulting statuses; the field is a Literal of the three verbs, so every
+ * call was rejected and "Mark done" had never once worked. The argument here
+ * is named `action` so the next reader cannot make the same swap.
  */
-export function completeActivity(activityId: string, state: "completed" | "skipped") {
+export function completeActivity(activityId: string, action: "complete" | "skip") {
   return request<{ id: string; status: string }>(`/activities/${activityId}`, {
     method: "PATCH",
-    body: JSON.stringify({ state }),
+    body: JSON.stringify({ state: action }),
   });
 }
 

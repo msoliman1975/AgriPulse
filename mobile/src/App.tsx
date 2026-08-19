@@ -110,7 +110,13 @@ export function App(): ReactNode {
     return (
       <div className="app" dir={dirOf(lang)} lang={lang}>
         {tab === "tasks" ? (
-          <TasksScreen lang={lang} farmId={resolved} onFullScreen={setFullScreen} />
+          <TasksScreen
+            lang={lang}
+            onLangChange={setLang}
+            name={name}
+            farmId={resolved}
+            onFullScreen={setFullScreen}
+          />
         ) : tab === "records" ? (
           <RecordsScreen lang={lang} farmId={resolved} userId={userId} />
         ) : (
