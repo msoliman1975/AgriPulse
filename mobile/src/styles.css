@@ -17,6 +17,12 @@
 body { background: var(--field); color: var(--ink); }
 .app { min-height: 100vh; }
 .screen { padding: 20px 18px 32px; }
+/* Edge-to-edge is mandatory from targetSdk 35, so the WebView starts behind
+   the status bar and the first control lands under the clock. `env()` is the
+   right answer; the `.native` floor is the backstop for a WebView that reports
+   zero insets, where the alternative is an unreachable segmented control. */
+.screen { padding-top: calc(20px + env(safe-area-inset-top)); }
+.native .screen { padding-top: calc(20px + max(env(safe-area-inset-top), 28px)); }
 
 .signin { display: flex; flex-direction: column; min-height: 100vh; }
 .signin .logo { width: 52px; height: 52px; border-radius: 15px; margin-top: 56px;
@@ -137,12 +143,14 @@ body { background: var(--field); color: var(--ink); }
 .screen { padding-bottom: 96px; }
 .tabs { position: fixed; inset-inline: 0; bottom: 0; display: grid;
   grid-template-columns: repeat(3, 1fr); background: var(--field2);
-  border-top: 1px solid var(--line); }
+  border-top: 1px solid var(--line);
+  /* Clear the gesture bar as well as the screen edge. */
+  padding-bottom: env(safe-area-inset-bottom); }
 .tabs button { padding: 14px 0 18px; background: none; border: 0;
   color: var(--muted); font-size: 13px; }
 .tabs button.on { color: var(--ink); font-weight: 650;
   box-shadow: inset 0 2px 0 var(--sage); }
-.fab { position: fixed; inset-inline-end: 16px; bottom: 74px; z-index: 2;
+.fab { position: fixed; inset-inline-end: 16px; bottom: calc(74px + env(safe-area-inset-bottom)); z-index: 2;
   padding: 13px 20px; border: 0; border-radius: 999px; background: var(--sage);
   color: #fff; font-size: 15px; font-weight: 650;
   box-shadow: 0 6px 18px rgba(0,0,0,.45); }
@@ -154,11 +162,38 @@ body { background: var(--field); color: var(--ink); }
   background: none; color: var(--muted); font-size: 14px; }
 .seg button.on { background: var(--field); color: var(--ink); font-weight: 650; }
 
-/* Regroup toggle. Quiet until used — it changes the meaning of every heading
-   below it, so its state has to be readable at a glance. */
-.grouper { margin: 12px 0 0; padding: 9px 14px; border-radius: 999px;
-  border: 1px solid var(--line); background: none; color: var(--muted); font-size: 13px; }
-.grouper.on { border-color: var(--sage); color: var(--ink); background: var(--field2); }
+/* How the tiles are grouped. Two words, always both visible: the scout has to
+   see that the other way of looking exists, or they will never find it. */
+.groupby { display: flex; gap: 8px; margin: 14px 0 2px; }
+.groupby button { padding: 8px 14px; border-radius: 999px; font-size: 13px;
+  border: 1px solid var(--line); background: none; color: var(--muted); }
+.groupby button.on { border-color: var(--sage); color: var(--ink); background: var(--field2); }
+
+/* --- Tiles ---------------------------------------------------------------
+   The landing. A count first and the place second, because the count is what
+   a scout scans for; two columns so a thumb reaches every tile. */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+.tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  min-height: 92px; padding: 14px; border-radius: 14px; text-align: start;
+  border: 1px solid var(--line); background: var(--field2); color: var(--ink); }
+.tile .n { font-size: 30px; font-weight: 700; line-height: 1; }
+.tile .lbl { font-size: 13px; color: var(--muted); line-height: 1.3; }
+/* Tone is the worst thing inside, so a tile warns before it is opened. */
+.tile.warn { border-color: var(--watch); }
+.tile.warn .n { color: var(--watch); }
+.tile.crit { border-color: var(--crit); }
+.tile.crit .n { color: var(--crit); }
+/* An empty bucket stays visible in time mode — "Today 0" is a fact worth
+   having — but it must not look tappable. */
+.tile:disabled { opacity: .4; }
+
+/* Back out of an opened tile. Doubles as the group's title, so the screen
+   never loses track of which pile is on show. */
+.crumb { display: flex; align-items: center; gap: 8px; width: 100%; margin: 12px 0 2px;
+  padding: 11px 12px; border-radius: 10px; font-size: 15px; font-weight: 650;
+  border: 1px solid var(--line); background: var(--field2); color: var(--ink); }
+.crumb .back { color: var(--sage); font-size: 19px; line-height: 1; }
+.crumb .count { margin-inline-start: auto; color: var(--muted); font-weight: 400; }
 
 .section .count { color: var(--muted); font-weight: 400; }
 .visit .src { font-size: 13px; }
@@ -197,7 +232,7 @@ body { background: var(--field); color: var(--ink); }
 .sheet-wrap { position: fixed; inset: 0; z-index: 3; background: rgba(0,0,0,.55);
   display: flex; align-items: flex-end; }
 .sheet { width: 100%; background: var(--field); border-radius: 18px 18px 0 0;
-  padding: 12px 16px 26px; display: flex; flex-direction: column; gap: 10px; }
+  padding: 12px 16px calc(26px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; }
 .sheet .grab { width: 38px; height: 4px; border-radius: 2px; background: var(--line);
   align-self: center; }
 .sheet h2 { font-size: 17px; }
@@ -238,6 +273,10 @@ body { background: var(--field); color: var(--ink); }
    from the sheet has to cover the list it came from. */
 .screen.overlay { position: fixed; inset: 0; z-index: 4; overflow-y: auto;
   background: var(--field); }
+/* A fixed overlay does not inherit the flow padding, so it needs the inset
+   again or its Back control sits under the status bar. */
+.screen.overlay { padding-top: calc(20px + env(safe-area-inset-top)); }
+.native .screen.overlay { padding-top: calc(20px + max(env(safe-area-inset-top), 28px)); }
 
 /* A secondary action in a capture row. Without this it inherits the browser
    default — a white block in a dark app — because only the first button in
