@@ -1,0 +1,83 @@
+# Apply the R2 bucket CORS policy.
+#
+# Browser uploads go straight to R2 with a presigned PUT, so the bucket needs a
+# CORS policy or the preflight is refused and no photo can ever be uploaded —
+# which is exactly the state this repository was in until 2026-08-19. See
+# infra/r2/README.md.
+#
+# Run by hand; the policy changes about once a year. It is idempotent: the same
+# policy applied twice is the same policy.
+name: Set R2 bucket CORS
+
+on:
+  workflow_dispatch:
+    inputs:
+      bucket:
+        description: R2 bucket to configure
+        default: agripulse-imagery
+        required: true
+  # Also runs when the policy itself changes on this branch, so the first
+  # application does not need the workflow to be on the default branch first.
+  push:
+    branches: [chore/r2-cors]
+    paths:
+      - infra/r2/**
+      - .github/workflows/r2-cors.yml
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BUCKET: ${{ inputs.bucket || 'agripulse-imagery' }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check the token can see R2
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          code=$(curl -s -o /tmp/buckets.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/r2/buckets")
+          echo "list buckets -> HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN cannot read R2. It needs the"
+            echo "::error::'Workers R2 Storage: Edit' permission on this account."
+            # The body names the reason; it carries no secret.
+            cat /tmp/buckets.json
+            exit 1
+          fi
+          python3 -c "import json;print('buckets:', [b['name'] for b in json.load(open('/tmp/buckets.json'))['result']['buckets']])"
+
+      - name: Apply the policy
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          echo "applying infra/r2/cors-$BUCKET.json to $BUCKET"
+          cat "infra/r2/cors-$BUCKET.json"
+          code=$(curl -s -o /tmp/put.json -w '%{http_code}' -X PUT \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data-binary "@infra/r2/cors-$BUCKET.json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/r2/buckets/$BUCKET/cors")
+          echo "put cors -> HTTP $code"
+          cat /tmp/put.json
+          [ "$code" = "200" ]
+
+      - name: Read it back
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          curl -s -H "Authorization: Bearer $CF_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/r2/buckets/$BUCKET/cors" \
+            | python3 -m json.tool
