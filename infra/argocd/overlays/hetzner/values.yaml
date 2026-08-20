@@ -2404,11 +2404,40 @@ global:
   #   a screen that is no longer in the menu.
   #   Images CONFIRMED by pulling both on the node: api @ d7adbf863469f,
   #   frontend @ fb85f29f465c6.
+  # 127406f = #535, imagery discovery timing + the Sentinel-2 pixel grid.
+  #   Found by comparing our MSAVI against an outside GeoTIFF for the Agrosina
+  #   field. The index maths was not the problem: our formula on the same scene
+  #   reproduces that file to 5.7e-8 over 7394 pixels.
+  #   Discovery polled before the scene existed. A 24h cadence is measured from
+  #   the last attempt, so a daily poll stays at whatever hour it drifted to.
+  #   The Agrosina farm subscription polled at 03:23 UTC and that day's L2A
+  #   scene was published at 12:30 UTC, so the product served three-day-old
+  #   imagery while a same-day scene sat in the catalogue. A cadence of a day
+  #   or more now also becomes due once the clock passes
+  #   IMAGERY_DISCOVERY_ANCHOR_HOUR_UTC (default 14) if it has not been polled
+  #   since. The two rules converge on one poll a day at that hour.
+  #   Fetches were not on the Sentinel-2 grid. The Process request sent only
+  #   the AOI geometry, so Sentinel Hub took the geometry's own bounds and
+  #   stretched whole pixels to fit them: the stored raster has pixels of
+  #   10.0217 m by 10.0130 m at an origin that is not a multiple of 10. The
+  #   request now sends a bbox snapped outward to whole multiples of the
+  #   resolution alongside the geometry, which returns exactly 10.000000 m.
+  #   WATCH FOR THIS: block aggregates step ONCE, on the first scene after the
+  #   sync. Measured on Bashier Elkhier, same scene, both request shapes:
+  #   79x120 -> 80x121 px, 7485 -> 7502 total pixels, per-block MSAVI means
+  #   move by at most 0.0039 (mean +0.00014, RMS 0.0019). Old rows are not
+  #   rewritten, so the series has a small step at the cutover date.
+  #   Also watch the first evening beat: every daily subscription last polled
+  #   before 14:00 UTC becomes due at once, so expect one catch-up round of
+  #   discovery across all tenants, then one poll a day.
+  #   BACKEND ONLY. Frontend stays 0cba71c, tile-server stays 9d140cc.
+  #   Images CONFIRMED by pulling both on the node: api @ 19880147624db,
+  #   workers @ 5b4a94a16f2d5.
   images:
     api:
-      tag: "0cba71c"
+      tag: "127406f"
     workers:
-      tag: "0cba71c"
+      tag: "127406f"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
