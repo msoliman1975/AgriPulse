@@ -2365,6 +2365,23 @@ global:
     workers:
       tag: "4bda4c8"
     frontend:
+      # 822dea3 = #528, every index tile in the Block Dock gets a reading.
+      #   Ten of the thirteen tiles rendered disabled and greyed, showing an
+      #   em dash and the words "Grid only". The tooltip claimed there was no
+      #   block-level trend for them. Two endpoints had been confused:
+      #   /farms/{id}/blocks/summary publishes three fixed columns for every
+      #   block at once and is polled every 60s, while
+      #   /blocks/{id}/indices/{code}/timeseries takes any index_code and
+      #   reads block_index_daily with no allowed-list. Confirmed on prod
+      #   before shipping: block_index_daily holds all thirteen codes for the
+      #   same blocks, 1435 rows each.
+      #   Also fixes the delta colour, which assumed every index climbs
+      #   toward health — a +6 °C week on LST rendered green, as did rising
+      #   MSI and rising NDWI.
+      #   FRONTEND ONLY. The backend change in the PR is a comment, so api +
+      #   workers stay 4bda4c8. No migrations.
+      #   Image CONFIRMED by pulling it on the node: frontend @ 822dea3,
+      #   sha256 a1980f9058659.
       # 5e84dd6 = #515, the thermal indices reach the decision-tree condition
       #   builder. `lst`/`cwsi`/`smi` were computed and stored per block —
       #   796 `lst` rows in prod — but the builder's index picker mirrored
@@ -2384,7 +2401,7 @@ global:
       #   carried `scope`; the notice was not reading it.
       #   FRONTEND ONLY; api + workers stay 86faf0b. No migrations.
       #   Image CONFIRMED by pulling it on the node: frontend @ ceaa572.
-      tag: "4bda4c8"
+      tag: "822dea3"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
