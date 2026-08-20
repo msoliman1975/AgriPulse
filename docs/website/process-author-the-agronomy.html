@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Write the agronomy · AgriPulse docs</title>
+<meta name="description" content="A decision tree is the rule your agronomist already applies, written down once and run on every block. This process goes from a seeded tree to a published version of your own, with" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+<header class="site">
+  <div class="site-inner">
+    <a class="brand" href="index.html">
+      <span class="mark">A</span>
+      <span>AgriPulse<small>documentation</small></span>
+    </a>
+    <nav class="main">
+      <a href="index.html#processes" class="on">Processes</a>
+      <a href="kb.html">Knowledge Base</a>
+      <a href="concepts.html">Concepts</a>
+      <a href="support.html">Support</a>
+    </nav>
+    <span class="site-spacer"></span>
+    <button class="hbtn" id="lang" type="button" title="Arabic pages are planned">العربية</button>
+    <button class="hbtn" id="theme" type="button">Theme</button>
+  </div>
+</header>
+
+<section class="hero compact">
+  <img class="bg" src="img/p05-agronomy.jpg" alt="" />
+  <div class="inner">
+    <div class="crumbs"><a href="index.html">Docs</a> → <a href="index.html#processes">Processes</a></div>
+    <span class="eyebrow">Process 05</span>
+    <h1>Write the agronomy</h1>
+    <p class="lede">A decision tree is the rule your agronomist already applies, written down once and run on every block. This process goes from a seeded tree to a published version of your own, with a dry run before anything opens.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="cards c3">
+      <div class="card"><h4>Who does this</h4><p>Agronomist, tenant admin</p></div>
+      <div class="card"><h4>How long it takes</h4><p>An hour for a first tree</p></div>
+      <div class="card"><h4>Steps</h4><p>7 steps, in order</p></div>
+    </div>
+
+    <h3>Watch it in the system</h3>
+    <p>A screen recording of the whole process, start to finish, in the real product.</p>
+    <div class="clip">
+      <div class="frame">
+        <div>
+          <div class="play"></div>
+          <b>Write the agronomy — full walkthrough</b>
+          <span>Screen recording, planned length about 16 minutes. Not recorded yet.</span>
+        </div>
+      </div>
+      <div class="bar">
+        <span><b>Video slot.</b> The recording drops in here, with captions in English and Arabic.</span>
+        <span class="chip">Not recorded</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section class="band tint">
+  <div class="wrap">
+    <p class="kicker">Step by step</p>
+    <h2 class="section">The written guide</h2>
+
+    <h3>Before you start</h3>
+    <ul><li>A farm with data flowing, so a dry run has something to read.</li><li>The rule itself, in words, with the numbers you use today.</li></ul>
+
+    <div class="stages" style="margin-top:2rem">
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Start from something that works</h3>
+          <ul class="steps"><li>Read the 18 seeded trees first. One may already say what you mean.</li><li>Copy a seeded tree instead of starting from an empty canvas.</li><li>Set the crop path so the tree runs on the right blocks.</li></ul>
+          <div><span class="where"><b>In the app</b> Decision trees → Library</span></div>
+          
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Lay out the nodes</h3>
+          <ul class="steps"><li>A tree is a flow of nodes. A decision node branches on match or miss.</li><li>Add the nodes, then rewire the branches by dragging the connector.</li><li>The editor loads the draft. Publish is a separate step.</li></ul>
+          <div><span class="where"><b>In the app</b> Decision trees → Editor canvas</span></div>
+          
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Write the conditions</h3>
+          <ul class="steps"><li>Pick the source: an imagery index, a weather value, a field signal, the crop stage, or a block attribute.</li><li>Pick the operator and the threshold.</li><li>Combine terms with all or any.</li></ul>
+          <div><span class="where"><b>In the app</b> Node details → Condition builder</span></div>
+          
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Declare the thresholds as parameters</h3>
+          <ul class="steps"><li>Give each number a name and a default, for example warn_score with default 40.</li><li>A tenant can then change the number without editing the tree.</li><li>This is how one tree serves farms in different districts.</li></ul>
+          <div><span class="where"><b>In the app</b> Tree → Parameters</span></div>
+          
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Dry run before you publish</h3>
+          <ul class="steps"><li>Run the draft against real data for a chosen farm and date.</li><li>Read how many blocks matched. Nothing is opened by a dry run.</li><li>If it matches every block, the threshold is too loose.</li></ul>
+          <div><span class="where"><b>In the app</b> Tree → Dry run</span></div>
+          
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Publish the version</h3>
+          <ul class="steps"><li>Publishing makes this version the one that runs.</li><li>The old version stays in the history, so you can go back.</li><li>From here the tree runs on schedule, on every pass.</li></ul>
+          <div><span class="where"><b>In the app</b> Tree → Publish</span></div>
+          
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Read the trace when nothing fires</h3>
+          <ul class="steps"><li>The trace records every block the tree looked at and why it stopped.</li><li>Most often the data was missing, not the rule wrong.</li><li>You can also run a tree on a farm on demand instead of waiting for the schedule.</li></ul>
+          <div><span class="where"><b>In the app</b> Tree → Evaluation trace</span></div>
+          
+          <div class="note"><span class="lab">Note</span><p>Re-running a tree opens nothing new for a block that already has an open item for the same rule. A run that reports zero opened is not a failure.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note"><span class="lab">Check it worked</span>
+      <ul style="margin:.3rem 0 0"><li>The dry run matched the blocks you expected, and not the rest.</li><li>The published version shows in the tree history with today's date.</li><li>After the next pass, the trace shows the tree ran.</li></ul>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <p class="kicker">Clips</p>
+    <h2 class="section">One short clip per step</h2>
+    <p>Beside the full walkthrough, each step gets its own short recording, so you can jump
+       straight to the part you need.</p>
+<div class="cliplist"><div class="row"><span class="ix">01</span><span class="t">Start from something that works</span><span class="chip">Not recorded</span></div><div class="row"><span class="ix">02</span><span class="t">Lay out the nodes</span><span class="chip">Not recorded</span></div><div class="row"><span class="ix">03</span><span class="t">Write the conditions</span><span class="chip">Not recorded</span></div><div class="row"><span class="ix">04</span><span class="t">Declare the thresholds as parameters</span><span class="chip">Not recorded</span></div><div class="row"><span class="ix">05</span><span class="t">Dry run before you publish</span><span class="chip">Not recorded</span></div><div class="row"><span class="ix">06</span><span class="t">Publish the version</span><span class="chip">Not recorded</span></div><div class="row"><span class="ix">07</span><span class="t">Read the trace when nothing fires</span><span class="chip">Not recorded</span></div></div>
+  </div>
+</section>
+
+  <section class="band tint">
+    <div class="wrap">
+      <p class="kicker">Related</p>
+      <h2 class="section">Read next</h2>
+      <div class="cards c3" style="margin-top:1.2rem"><a class="card" href="kb-trees.html"><h4>Decision tree library</h4><p>Open the page</p></a><a class="card" href="kb-signals.html"><h4>Scouting signal catalog</h4><p>Open the page</p></a><a class="card" href="kb-indices.html"><h4>Imagery index catalog</h4><p>Open the page</p></a></div>
+    </div>
+  </section>
+
+
+  <section class="band">
+    <div class="wrap">
+      <p class="kicker">Support</p>
+      <h2 class="section">Still stuck?</h2>
+      <p class="big" style="max-width:60ch">Three channels beside the documentation. All three
+         pages are placeholders for now and will be designed next.</p>
+      <div class="support"><a href="support.html#faq"><div class="ico">❓</div><h4>FAQs</h4><p>The questions we answer most often, grouped by process.</p><p style="margin-top:.6rem"><span class="chip">To be designed</span></p></a><a href="support.html#ask"><div class="ico">💬</div><h4>Ask the AgriPulse team</h4><p>Send a question to the people who build and run the platform.</p><p style="margin-top:.6rem"><span class="chip">To be designed</span></p></a><a href="support.html#feature"><div class="ico">✨</div><h4>Request a feature</h4><p>Tell us what is missing. Requests are read and answered.</p><p style="margin-top:.6rem"><span class="chip">To be designed</span></p></a></div>
+    </div>
+  </section>
+
+<section class="band tint" style="padding-top:0">
+<div class="wrap"><div class="pagenav"><a href="process-read-the-field.html"><div class="dir">Previous</div><div class="t">Read the field</div></a><a class="next" href="process-run-the-field-team.html"><div class="dir">Next</div><div class="t">Run the field team</div></a></div></div>
+</section>
+
+<footer class="site">
+  <div class="inner">
+    <div>
+      <a class="brand" href="index.html"><span class="mark">A</span><span>AgriPulse<small>documentation</small></span></a>
+      <p>Farm intelligence for Egypt and the region. Satellite, weather and field
+         observation in one record, with a dated action at the end of it.</p>
+    </div>
+    <div>
+      <h5>Processes</h5>
+      <a href="process-map-the-farm.html">Map the farm</a>
+      <a href="process-plan-the-season.html">Plan the season</a>
+      <a href="process-connect-the-data.html">Connect the data</a>
+      <a href="process-read-the-field.html">Read the field</a>
+      <a href="process-author-the-agronomy.html">Write the agronomy</a>
+      <a href="process-run-the-field-team.html">Run the field team</a>
+      <a href="process-close-the-loop.html">Close the loop</a>
+      <a href="process-operate-the-platform.html">Run the platform</a>
+    </div>
+    <div>
+      <h5>Knowledge Base</h5>
+      <a href="kb.html">All catalogs</a>
+      <a href="kb-crop-mango.html">Mango</a>
+      <a href="kb-crop-date-palm.html">Date palm</a>
+      <a href="kb-crop-potato.html">Potato</a>
+      <a href="kb-indices.html">Imagery indices</a>
+      <a href="kb-weather.html">Weather</a>
+      <a href="kb-trees.html">Decision trees</a>
+      <a href="concepts.html">Key concepts</a>
+    </div>
+    <div>
+      <h5>Support</h5>
+      <a href="support.html#faq">FAQs</a>
+      <a href="support.html#ask">Ask the AgriPulse team</a>
+      <a href="support.html#feature">Request a feature</a>
+      <a href="credits.html">Photo credits</a>
+      <a href="https://app.agripulse.cloud">Sign in to the app</a>
+    </div>
+  </div>
+  <div class="legal">
+    <div class="inner">
+      <span>AgriPulse documentation · docs.agripulse.cloud · draft, 18 August 2026</span>
+      <span>Photographs are used under the licences listed on the credits page.</span>
+    </div>
+  </div>
+</footer>
+<script>
+  (function () {
+    var order = ["light", "dark", ""];
+    document.getElementById("theme").addEventListener("click", function () {
+      var cur = document.documentElement.getAttribute("data-theme") || "";
+      var next = order[(order.indexOf(cur) + 1) % order.length];
+      if (next) { document.documentElement.setAttribute("data-theme", next); }
+      else { document.documentElement.removeAttribute("data-theme"); }
+    });
+    var lang = document.getElementById("lang");
+    lang.addEventListener("click", function () {
+      var rtl = document.documentElement.dir === "rtl";
+      document.documentElement.dir = rtl ? "ltr" : "rtl";
+      lang.textContent = rtl ? "العربية" : "English";
+    });
+  })();
+</script>
+</body>
+</html>

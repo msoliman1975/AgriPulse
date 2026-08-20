@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Add the blocks · AgriPulse docs</title>
+<meta name="description" content="A block is the area you manage as one thing. It carries the crop, the plan and the person responsible, and it is the unit every index number is reported against. The farm gives you" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+<header class="site">
+  <div class="site-inner">
+    <a class="brand" href="index.html">
+      <span class="mark">A</span>
+      <span>AgriPulse<small>documentation</small></span>
+    </a>
+    <nav class="main">
+      <a href="index.html#processes" class="on">Processes</a>
+      <a href="kb.html">Knowledge Base</a>
+      <a href="concepts.html">Concepts</a>
+      <a href="support.html">Support</a>
+    </nav>
+    <span class="site-spacer"></span>
+    <button class="hbtn" id="lang" type="button" title="Arabic pages are planned">العربية</button>
+    <button class="hbtn" id="theme" type="button">Theme</button>
+  </div>
+</header>
+
+<section class="hero compact">
+  <img class="bg" src="img/p02-season.jpg" alt="" />
+  <div class="inner">
+    <div class="crumbs"><a href="index.html">Docs</a> → <a href="index.html#processes">Processes</a>
+      → <a href="process-map-the-farm.html">Map the farm</a></div>
+    <span class="eyebrow">Guide · Process 01</span>
+    <h1>Add the blocks</h1>
+    <p class="lede">A block is the area you manage as one thing. It carries the crop, the plan and the person responsible, and it is the unit every index number is reported against. The farm gives you the outline. Blocks are what you work with.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="cards c3">
+      <div class="card"><h4>Who does this</h4><p>Farm manager, tenant admin</p></div>
+      <div class="card"><h4>How long it takes</h4><p>10 minutes for a few blocks, an hour for a large farm</p></div>
+      <div class="card"><h4>Steps</h4><p>6 steps</p></div>
+    </div>
+
+    <h3>Watch it in the system</h3>
+    <div class="clip">
+      <video controls preload="metadata" poster="img/guide-blocks-clip-poster.jpg" playsinline>
+        <source src="media/add-the-blocks.mp4" type="video/mp4" />
+        Your browser cannot play this video. Download it at
+        <a href="media/add-the-blocks.mp4">media/add-the-blocks.mp4</a>.
+      </video>
+      <div class="bar">
+        <span><b>Add the blocks — walkthrough.</b> Silent screen capture of the real app, 2 minutes 23 seconds. It draws a block, draws a pivot with eight sectors, and opens the auto-grid and upload panels. The narrated version replaces it once it is recorded.</span>
+        <span class="chip live">Draft capture</span>
+      </div>
+    </div>
+
+
+    <h3>Before you start</h3>
+    <ul><li>A farm with a boundary. See Create a farm.</li><li>The block layout: which areas you treat as one unit, and the codes your team uses for them.</li><li>For the upload route, one polygon per block, in .geojson, .json, .kml, or a shapefile in a .zip.</li></ul>
+
+  </div>
+</section>
+
+<section class="band tint">
+  <div class="wrap">
+    <p class="kicker">Step by step</p>
+    <h2 class="section">Add the blocks</h2>
+    <div class="stages" style="margin-top:1.6rem">
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Open the Add menu</h3>
+          <ul class="steps"><li>Open the farm in <b>Farm management</b> and use the <b>Add</b> menu on the map toolbar.</li><li>It offers four ways in: <b>Draw block</b>, <b>Draw pivot</b>, <b>Auto-block grid</b>, and <b>Upload AOI files</b>.</li><li>Pick by how the farm is laid out, not by habit. A pivot farm should use Draw pivot. A farm you already have files for should use the upload.</li></ul>
+          <figure class="shot-fig"><img src="img/guide-blocks-01-add.jpg" alt="" loading="lazy" /><figcaption>The Add menu. Two groups: add a new farm, or add something to this farm.</figcaption></figure>
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Route 1 — draw one block</h3>
+          <ul class="steps"><li>Choose <b>Draw block</b>. The hint bar reads <i>Drawing block — click to add points, double-click to finish</i>.</li><li>Click each corner, double-click the last one. The panel opens with the area already calculated.</li><li><b>Code</b> is required, for example <code>B-12</code>. <b>Name</b> is optional, for example <code>North strip</code>.</li><li>Click <b>Create block</b>. Repeat for the next block.</li></ul>
+          <figure class="shot-fig"><img src="img/guide-blocks-02-panel.jpg" alt="" loading="lazy" /><figcaption>The block panel. The area is already worked out from the shape you drew.</figcaption></figure>
+          <div class="note"><span class="lab">Note</span><p>Blocks may not overlap. If two blocks share ground, every number for that ground is counted twice, in both blocks.</p></div>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Route 2 — draw a pivot</h3>
+          <ul class="steps"><li>Choose <b>Draw pivot</b>. The hint bar reads <i>Drawing pivot — click the centre, then click to set the radius</i>.</li><li>Click the pivot centre, then click once more to set the radius. The panel shows the radius in metres and the area.</li><li><b>Sectors (equal slices)</b> splits the circle into equal wedges. The presets are 1, 4, 6, 8 and 12, and you can type another number.</li><li>One sector means the whole circle is a single block. Four or more gives you a block per wedge, which is how you spot a failing arm of the pivot.</li><li><b>Code</b> is required, for example <code>P-01</code>. Click <b>Create pivot</b>.</li><li>You get one record for the pivot itself and one block per sector, named after the pivot: <code>P-01-S1</code> through <code>P-01-S8</code>. Eight sectors means nine records in the block list.</li></ul>
+          <figure class="shot-fig"><img src="img/guide-blocks-04-pivot.jpg" alt="" loading="lazy" /><figcaption>A pivot split into eight sectors. Each sector is its own block.</figcaption></figure>
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Route 3 — auto-block grid</h3>
+          <ul class="steps"><li>Choose <b>Auto-block grid</b> when the farm is a regular field with no natural divisions.</li><li>Set <b>Max block area</b>, in your tenant's unit. The panel says what it does: it previews blocks that tile the farm, clipped to its boundary, and edge blocks may come out smaller.</li><li>Click <b>Compute</b> to see the preview, then <b>Create N blocks</b> to keep it.</li><li>The button counts what it will make, so you know before you click.</li></ul>
+          <figure class="shot-fig"><img src="img/guide-blocks-03-autogrid.jpg" alt="" loading="lazy" /><figcaption>Auto-block grid. You set the biggest a block may be, not a cell size.</figcaption></figure>
+          <div class="note"><span class="lab">Note</span><p>This is a different thing from the grid inside a block. Auto-block grid creates blocks. The sub-block grid divides one block into cells for within-block detail, and it is set per farm.</p></div>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Route 4 — upload the files</h3>
+          <ul class="steps"><li>Choose <b>Upload AOI files</b> and drop the files in. It accepts .geojson, .json, .kml, and a shapefile in a .zip. <b>One block per polygon.</b></li><li>Each row gets a code and an optional name. Fix any code the upload flags.</li><li>A row that matches an existing block is marked <b>Reuse</b> or <b>Replace</b>. Replacing needs a tick to confirm, because the old block is deleted if it is empty and deactivated if it is not.</li><li>Click <b>Create N blocks</b>. The result line reports created, replaced, reused and errors.</li></ul>
+          
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Check the layout</h3>
+          <ul class="steps"><li>Add the block areas up and compare against the farm area. The difference should be the roads, buildings and canals you have not marked yet.</li><li>Look for gaps and overlaps on the map, at the zoom you drew at.</li><li>Fix the shapes now. Blocks carry crops, plans and history, so moving them later costs more.</li></ul>
+          
+          
+        </div>
+      </div>
+    </div>
+
+    <div class="note"><span class="lab">Check it worked</span>
+      <ul style="margin:.3rem 0 0"><li>Every area you manage has a block, and no two blocks overlap.</li><li>The block areas add up to about the farm area, less the roads and buildings.</li><li>Each block shows the code your team uses in the field.</li></ul>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <p class="kicker">Reference</p>
+    <h2 class="section">Every field on the form</h2>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Required</th><th>What it is for</th></tr></thead><tbody><tr><td>Boundary</td><td>yes</td><td>Drawn on the map, or one polygon per block in an uploaded file.</td></tr><tr><td>Code</td><td>yes</td><td>Short identifier, for example B-12 or P-3. Must be unique on the farm.</td></tr><tr><td>Name</td><td>no</td><td>Readable name, for example North strip.</td></tr><tr><td>Sectors</td><td>pivot only</td><td>Equal slices of the circle. Presets 1, 4, 6, 8, 12, or type a number.</td></tr><tr><td>Max block area</td><td>auto-grid only</td><td>The biggest a generated block may be, in your tenant's area unit. Blocks tile the farm and are clipped to its boundary, so edge blocks come out smaller.</td></tr></tbody></table></div>
+
+    <h3>When it does not work</h3>
+<div class="table-wrap"><table><thead><tr><th>What you see</th><th>What it means</th></tr></thead><tbody><tr><td>Could not create, check the code is unique</td><td>Another block on this farm already uses that code.</td></tr><tr><td>Code is required</td><td>The Create button stays disabled until the code has something in it.</td></tr><tr><td>Outside Egypt</td><td>An uploaded polygon falls outside the country bounds. The file is in the wrong coordinate system, or the wrong file.</td></tr><tr><td>No polygon found</td><td>The file has no polygon in it. A points-only KML will not do.</td></tr><tr><td>Unsupported file type</td><td>Use .geojson, .json, .kml, or a shapefile inside a .zip. A bare .shp is missing its sidecar files.</td></tr><tr><td>Duplicate code in upload</td><td>Two rows in the same upload carry the same code. Codes must be unique within the batch as well as on the farm.</td></tr><tr><td>Replace not confirmed</td><td>A row would replace an existing block. Tick the confirmation, or change the code so it creates a new block instead.</td></tr></tbody></table></div>
+  </div>
+</section>
+
+  <section class="band tint">
+    <div class="wrap">
+      <p class="kicker">Related</p>
+      <h2 class="section">Read next</h2>
+      <div class="cards c3" style="margin-top:1.2rem"><a class="card" href="guide-create-a-farm.html"><h4>Create a farm</h4><p>Open the page</p></a><a class="card" href="process-map-the-farm.html"><h4>Back to Map the farm</h4><p>Open the page</p></a><a class="card" href="process-plan-the-season.html"><h4>Plan the season</h4><p>Open the page</p></a></div>
+    </div>
+  </section>
+
+
+  <section class="band">
+    <div class="wrap">
+      <p class="kicker">Support</p>
+      <h2 class="section">Still stuck?</h2>
+      <p class="big" style="max-width:60ch">Three channels beside the documentation. All three
+         pages are placeholders for now and will be designed next.</p>
+      <div class="support"><a href="support.html#faq"><div class="ico">❓</div><h4>FAQs</h4><p>The questions we answer most often, grouped by process.</p><p style="margin-top:.6rem"><span class="chip">To be designed</span></p></a><a href="support.html#ask"><div class="ico">💬</div><h4>Ask the AgriPulse team</h4><p>Send a question to the people who build and run the platform.</p><p style="margin-top:.6rem"><span class="chip">To be designed</span></p></a><a href="support.html#feature"><div class="ico">✨</div><h4>Request a feature</h4><p>Tell us what is missing. Requests are read and answered.</p><p style="margin-top:.6rem"><span class="chip">To be designed</span></p></a></div>
+    </div>
+  </section>
+
+
+<footer class="site">
+  <div class="inner">
+    <div>
+      <a class="brand" href="index.html"><span class="mark">A</span><span>AgriPulse<small>documentation</small></span></a>
+      <p>Farm intelligence for Egypt and the region. Satellite, weather and field
+         observation in one record, with a dated action at the end of it.</p>
+    </div>
+    <div>
+      <h5>Processes</h5>
+      <a href="process-map-the-farm.html">Map the farm</a>
+      <a href="process-plan-the-season.html">Plan the season</a>
+      <a href="process-connect-the-data.html">Connect the data</a>
+      <a href="process-read-the-field.html">Read the field</a>
+      <a href="process-author-the-agronomy.html">Write the agronomy</a>
+      <a href="process-run-the-field-team.html">Run the field team</a>
+      <a href="process-close-the-loop.html">Close the loop</a>
+      <a href="process-operate-the-platform.html">Run the platform</a>
+    </div>
+    <div>
+      <h5>Knowledge Base</h5>
+      <a href="kb.html">All catalogs</a>
+      <a href="kb-crop-mango.html">Mango</a>
+      <a href="kb-crop-date-palm.html">Date palm</a>
+      <a href="kb-crop-potato.html">Potato</a>
+      <a href="kb-indices.html">Imagery indices</a>
+      <a href="kb-weather.html">Weather</a>
+      <a href="kb-trees.html">Decision trees</a>
+      <a href="concepts.html">Key concepts</a>
+    </div>
+    <div>
+      <h5>Support</h5>
+      <a href="support.html#faq">FAQs</a>
+      <a href="support.html#ask">Ask the AgriPulse team</a>
+      <a href="support.html#feature">Request a feature</a>
+      <a href="credits.html">Photo credits</a>
+      <a href="https://app.agripulse.cloud">Sign in to the app</a>
+    </div>
+  </div>
+  <div class="legal">
+    <div class="inner">
+      <span>AgriPulse documentation · docs.agripulse.cloud · draft, 18 August 2026</span>
+      <span>Photographs are used under the licences listed on the credits page.</span>
+    </div>
+  </div>
+</footer>
+<script>
+  (function () {
+    var order = ["light", "dark", ""];
+    document.getElementById("theme").addEventListener("click", function () {
+      var cur = document.documentElement.getAttribute("data-theme") || "";
+      var next = order[(order.indexOf(cur) + 1) % order.length];
+      if (next) { document.documentElement.setAttribute("data-theme", next); }
+      else { document.documentElement.removeAttribute("data-theme"); }
+    });
+    var lang = document.getElementById("lang");
+    lang.addEventListener("click", function () {
+      var rtl = document.documentElement.dir === "rtl";
+      document.documentElement.dir = rtl ? "ltr" : "rtl";
+      lang.textContent = rtl ? "العربية" : "English";
+    });
+  })();
+</script>
+</body>
+</html>

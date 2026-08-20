@@ -129,3 +129,6 @@ AOIs/
 .playwright-mcp/
 # Renewed GitHub PAT, kept locally so agents can auth without gh keyring.
 github-token.txt
+
+# Cloudflare account credentials shared in chat. Never commit.
+cloudflare-details.txt
