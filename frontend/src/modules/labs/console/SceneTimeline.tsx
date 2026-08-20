@@ -5,6 +5,12 @@
 // ("74% cloud") is worth far more than a shorter timeline that looks like
 // data loss. Selecting a day moves the map, the grid and the legend together.
 //
+// Cloud is reported on two kinds of day, not one. A pass skipped ENTIRELY for
+// cloud draws nothing and is struck through. A pass that succeeded under
+// PARTIAL cloud draws most of the farm and leaves holes where the mask took
+// the pixels, so it carries the same figure without the strike-through.
+// Reporting only the first left the second looking like a rendering fault.
+//
 // The trailing "next pass" is an EXPECTATION derived from this farm's own
 // recent cadence, never a promise — cloud decides whether a pass is usable,
 // and the copy says so.
@@ -28,6 +34,33 @@ function isCloudy(s: FarmScene): boolean {
   return s.succeeded_count === 0 && s.skipped_cloud_count > 0;
 }
 
+function noReadingPct(s: FarmScene): number | null {
+  if (s.no_reading_pct == null) return null;
+  const n = Number(s.no_reading_pct);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
+
+// Every farm loses a little of every pass. The index mask is cut at the farm
+// boundary, so the edge pixels never carry a value and `no_reading_pct` sits
+// at a small constant on a perfectly clear day — 2% on Green Farm [Demo-01],
+// higher on a farm of many small blocks, and there is no one number that is
+// right for all of them.
+//
+// So the floor is read off the farm's own history rather than hardcoded: the
+// quietest pass in the strip is what this farm looks like with no weather in
+// the way, and a day is worth flagging when it loses this much MORE than that.
+const LOSS_OVER_FLOOR_PCT = 3;
+
+// ...unless the loss is large on its own. Without this, a strip where every
+// pass is cloudy has a high floor and flags nothing at all.
+const LOSS_ALWAYS_FLAG_PCT = 15;
+
+/** The farm's structural loss: the quietest pass on the strip. */
+function lossFloor(scenes: readonly FarmScene[]): number | null {
+  const vals = scenes.map(noReadingPct).filter((v): v is number => v !== null);
+  return vals.length > 0 ? Math.min(...vals) : null;
+}
+
 function cloudPct(s: FarmScene): number | null {
   if (s.cloud_cover_pct == null) return null;
   const n = Number(s.cloud_cover_pct);
@@ -49,6 +82,7 @@ export function SceneTimeline({
   // Oldest first, so the strip reads left-to-right as time moves forward
   // (and right-to-left under RTL, which the browser handles for us).
   const ordered = useMemo(() => [...scenes].reverse(), [scenes]);
+  const floor = useMemo(() => lossFloor(scenes), [scenes]);
 
   // Formatted in UTC, deliberately. `scene_date` is a DATE, not an instant —
   // the day the satellite passed over, which the api derives as
@@ -133,6 +167,26 @@ export function SceneTimeline({
               // treatment: a reader who sees "☁ 91%" knows both that there is
               // nothing to draw and why, where a grey dash would lose the why.
               const unprocessed = s.computed_count === 0 && !cloudy;
+              // A pass that succeeded can still carry cloud over PART of the
+              // farm. The mask drops those pixels, so the cells above them
+              // draw as "no reading" while the rest of the map paints
+              // normally — and until now the strip said nothing about it. On
+              // Green Farm [Demo-01] the 2026-08-18 pass left 84 of
+              // AG-R02-C02's 224 cells with no value, which reads as a broken
+              // map rather than as weather.
+              //
+              // Measured with `no_reading_pct`, NOT with the chip's other
+              // figure `cloud_cover_pct`. That one describes the whole
+              // satellite tile: on this farm it calls 2026-08-17 the cloudier
+              // of the two days (13.24% against 6.50%) when 08-17 lost 2.04%
+              // of the farm and 08-18 lost 8.17%. It ranks them backwards.
+              const loss = noReadingPct(s);
+              const partlyCloudy =
+                !cloudy &&
+                !unprocessed &&
+                loss !== null &&
+                (loss >= LOSS_ALWAYS_FLAG_PCT ||
+                  (floor !== null && loss - floor >= LOSS_OVER_FLOOR_PCT));
               return (
                 <button
                   key={s.scene_date}
@@ -152,10 +206,16 @@ export function SceneTimeline({
                         ? t("timeline.unprocessedOn", {
                             date: fmtFull.format(new Date(`${s.scene_date}T00:00:00Z`)),
                           })
-                        : t("timeline.passOn", {
-                            date: fmtFull.format(new Date(`${s.scene_date}T00:00:00Z`)),
-                            count: s.succeeded_count,
-                          })
+                        : partlyCloudy
+                          ? t("timeline.partlyCloudyOn", {
+                              date: fmtFull.format(new Date(`${s.scene_date}T00:00:00Z`)),
+                              count: s.succeeded_count,
+                              pct: loss ?? "—",
+                            })
+                          : t("timeline.passOn", {
+                              date: fmtFull.format(new Date(`${s.scene_date}T00:00:00Z`)),
+                              count: s.succeeded_count,
+                            })
                   }
                   data-unprocessed={unprocessed || undefined}
                   className={
@@ -179,8 +239,19 @@ export function SceneTimeline({
                   >
                     {fmtDay.format(new Date(`${s.scene_date}T00:00:00Z`))}
                   </span>
-                  <span className="mt-0.5 block text-[10px] leading-none text-ap-muted">
-                    {cloudy ? `☁ ${pct ?? "—"}%` : unprocessed ? "—" : `${s.succeeded_count}`}
+                  <span
+                    className={
+                      "mt-0.5 block text-[10px] leading-none " +
+                      (partlyCloudy ? "text-ap-warn" : "text-ap-muted")
+                    }
+                  >
+                    {cloudy
+                      ? `☁ ${pct ?? "—"}%`
+                      : partlyCloudy
+                        ? `☁ ${loss ?? "—"}%`
+                        : unprocessed
+                          ? "—"
+                          : `${s.succeeded_count}`}
                   </span>
                 </button>
               );

@@ -209,7 +209,16 @@ class FarmSceneRead(BaseModel):
     #: ingested but never processed.
     computed_count: int
     #: Mean across the jobs of the day that reported one; null if none did.
+    #:
+    #: This is the STAC ``eo:cloud_cover`` of the whole satellite tile, not of
+    #: the farm. Read ``no_reading_pct`` for what the pass cost this farm.
     cloud_cover_pct: Decimal | None
+    #: Percent of the farm's measured pixels that carry no value on this pass,
+    #: for the index being drawn. Cloud, shadow and cirrus are removed by the
+    #: scene-classification mask, so this is what a reader sees as holes in the
+    #: map. A few percent is the permanent loss along the farm boundary. Null
+    #: when the pass has no index rasters, so nothing was measured.
+    no_reading_pct: Decimal | None = None
 
 
 class FarmScenesResponse(BaseModel):
