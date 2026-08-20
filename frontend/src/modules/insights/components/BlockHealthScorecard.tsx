@@ -88,7 +88,7 @@ export function BlockHealthScorecard({ farmId, blockIds = null }: Props): ReactN
               {rows.map((b) => (
                 <Tr key={b.block_id} className="hover:bg-ap-bg/40">
                   <Td className="text-ap-ink">
-                    <Link to={`/labs/map/${farmId}?unit=${b.block_id}`} className="hover:underline">
+                    <Link to={`/labs/map-v2/${farmId}?unit=${b.block_id}`} className="hover:underline">
                       {b.block_name}
                     </Link>
                   </Td>

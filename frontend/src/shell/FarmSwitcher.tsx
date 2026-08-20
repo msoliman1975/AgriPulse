@@ -11,7 +11,7 @@ import { ChevronIcon } from "./icons";
 // on the legacy /farms/new form. Query param rather than a path segment: goTo()
 // below rewrites the LAST path segment on a farm switch, which would mangle a
 // /labs/map/new route. See docs/proposals/farm-creation-in-console.md.
-const NEW_FARM_PATH = "/labs/map?create=farm";
+const NEW_FARM_PATH = "/labs/map-v2?create=farm";
 
 const PINNED_PREFIXES = [
   "/insights/",

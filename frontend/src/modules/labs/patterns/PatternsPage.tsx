@@ -162,7 +162,7 @@ export function PatternsPage(): ReactNode {
   return (
     <Page width={width}>
       <PageHeader
-        above={<Breadcrumb items={[{ label: "Labs", to: "/labs/map" }, { label: "Patterns" }]} />}
+        above={<Breadcrumb items={[{ label: "Labs", to: "/labs/map-v2" }, { label: "Patterns" }]} />}
         title="Page patterns"
         badge={<Pill kind="info">internal</Pill>}
         subtitle="Every standard template in every state. Switch the state to see the ladder; switch the language in the top bar to check RTL."
@@ -174,7 +174,7 @@ export function PatternsPage(): ReactNode {
             >
               {i18n.language === "ar" ? "English" : "العربية"}
             </Button>
-            <LinkButton to="/labs/map">Farm console</LinkButton>
+            <LinkButton to="/labs/map-v2">Farm console</LinkButton>
           </>
         }
       />
@@ -247,7 +247,7 @@ export function PatternsPage(): ReactNode {
           empty={
             <EmptyState
               message="No farms yet. Create the first one to get started."
-              action={<LinkButton to="/labs/map?create=farm">Create farm</LinkButton>}
+              action={<LinkButton to="/labs/map-v2?create=farm">Create farm</LinkButton>}
             />
           }
           noResults={

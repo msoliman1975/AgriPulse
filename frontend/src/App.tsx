@@ -145,7 +145,7 @@ export function App(): ReactNode {
                     route redirects so existing links and bookmarks survive. */}
                 <Route
                   path="/farms/new"
-                  element={<Navigate to="/labs/map?create=farm" replace />}
+                  element={<Navigate to="/labs/map-v2?create=farm" replace />}
                 />
                 <Route path="/farms/:farmId" element={<FarmDetailPage />} />
                 <Route path="/farms/:farmId/edit" element={<FarmEditPage />} />

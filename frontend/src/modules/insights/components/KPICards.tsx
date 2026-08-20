@@ -71,7 +71,7 @@ export function KPICards({ farmId }: Props): ReactNode {
         title={t("kpi.landUnits.title")}
         value={blocksQuery.isLoading ? <Skeleton className="h-8 w-12" /> : totalBlocks}
         hint={t("kpi.landUnits.hint")}
-        onClick={() => navigate(`/labs/map/${farmId}`)}
+        onClick={() => navigate(`/labs/map-v2/${farmId}`)}
       />
       <KPICard
         title={t("kpi.alerts.title")}
