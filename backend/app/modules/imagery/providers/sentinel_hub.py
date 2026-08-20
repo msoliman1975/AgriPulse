@@ -16,6 +16,7 @@ TIFF keeps quota use linear in scene count.
 
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -23,6 +24,7 @@ from decimal import Decimal
 from typing import Any
 
 import httpx
+from shapely.geometry import shape
 
 from app.core.logging import get_logger
 from app.core.settings import get_settings
@@ -354,6 +356,13 @@ class SentinelHubProvider:
         payload = {
             "input": {
                 "bounds": {
+                    # Both keys on purpose: `bbox` fixes the output extent and
+                    # `geometry` still masks everything outside the AOI. Without
+                    # the bbox, Sentinel Hub derives the extent from the
+                    # geometry's own bounds, which land on arbitrary metres, and
+                    # then divides that span into whole pixels — so `resx` is a
+                    # request, not a guarantee. See `_snap_bbox_to_grid`.
+                    "bbox": _snap_bbox_to_grid(aoi_geojson_utm36n, self._resolution_m),
                     "geometry": aoi_geojson_utm36n,
                     "properties": {"crs": "http://www.opengis.net/def/crs/EPSG/0/32636"},
                 },
@@ -472,6 +481,41 @@ def _feature_to_discovered(feature: dict[str, Any]) -> DiscoveredScene:
         cloud_cover_pct=cloud_decimal,
         geometry_geojson=feature.get("geometry") or {},
     )
+
+
+def _snap_bbox_to_grid(aoi_geojson_utm36n: dict[str, Any], resolution_m: float) -> list[float]:
+    """The AOI's bounding box, grown outward to whole multiples of ``resolution_m``.
+
+    Sending only ``geometry`` gets an output raster whose pixels are *near*
+    the requested size but not on the product's own grid. Sentinel Hub takes
+    the geometry's bounds, divides each span by ``resx``/``resy``, rounds to a
+    whole pixel count, and then stretches the pixels to fill the span exactly.
+    A farm boundary ends on arbitrary metres, so the result is a grid like
+    10.0217 m x 10.0130 m at an origin that is not a multiple of 10 --
+    measured on the Agrosina farm raster, 2026-08-20. Every output pixel is
+    then a resampled read of the native pixel its centre happens to land in,
+    and the offset drifts across the raster.
+
+    Snapping the bbox outward to multiples of the resolution puts the request
+    back on the native grid: Sentinel-2 UTM tiles have their origin at a
+    multiple of 100 km and 10/20/60 m pixels, so any multiple of the
+    resolution is a native pixel edge. The output is then exactly
+    ``resolution_m`` per pixel with no resampling, and it grows by at most one
+    pixel per side.
+
+    ``geometry`` stays in the request, so pixels outside the AOI are still
+    masked by the provider, and our own AOI mask (``_rasterio_io``) rasterises
+    the same geometry onto this grid.
+    """
+    if resolution_m <= 0:
+        raise ValueError(f"resolution_m must be positive, got {resolution_m!r}")
+    min_x, min_y, max_x, max_y = shape(aoi_geojson_utm36n).bounds
+    return [
+        math.floor(min_x / resolution_m) * resolution_m,
+        math.floor(min_y / resolution_m) * resolution_m,
+        math.ceil(max_x / resolution_m) * resolution_m,
+        math.ceil(max_y / resolution_m) * resolution_m,
+    ]
 
 
 def _build_multiband_evalscript(sh_band_names: list[str]) -> str:

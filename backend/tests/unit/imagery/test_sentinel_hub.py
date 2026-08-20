@@ -22,7 +22,10 @@ import respx
 
 from app.core.settings import get_settings
 from app.modules.imagery.errors import SentinelHubNotConfiguredError
-from app.modules.imagery.providers.sentinel_hub import SentinelHubProvider
+from app.modules.imagery.providers.sentinel_hub import (
+    SentinelHubProvider,
+    _snap_bbox_to_grid,
+)
 
 # Use the real Settings defaults (the URLs are public). Token / search /
 # process URLs match what `SentinelHubProvider` reads from get_settings().
@@ -208,6 +211,10 @@ async def test_fetch_requests_native_res_and_scl_band() -> None:
     body = json.loads(process_route.calls.last.request.content)
     assert body["output"]["resx"] == 10.0
     assert body["output"]["resy"] == 10.0
+    # The bbox rides along with the geometry so the output lands on the
+    # product's own 10 m grid rather than a stretched near-10 m one.
+    assert body["input"]["bounds"]["bbox"] == [200000.0, 3300000.0, 201000.0, 3301000.0]
+    assert body["input"]["bounds"]["geometry"]["type"] == "Polygon"
     # SCL appears as an input band in the evalscript when masking is on.
     assert '"SCL"' in body["evalscript"]
     assert result.cog_bytes == fake_tiff
@@ -240,7 +247,12 @@ async def test_fetch_omits_scl_when_cloud_mask_disabled() -> None:
             scene_id="s",
             scene_datetime=datetime(2026, 1, 15, 8, 30, 0, tzinfo=UTC),
             product_code="s2_l2a",
-            aoi_geojson_utm36n={"type": "Polygon", "coordinates": [[[0, 0]]]},
+            aoi_geojson_utm36n={
+                "type": "Polygon",
+                "coordinates": [
+                    [[200000, 3300000], [201000, 3300000], [201000, 3301000], [200000, 3300000]]
+                ],
+            },
             bands=science,
         )
     body = json.loads(process_route.calls.last.request.content)
@@ -269,7 +281,12 @@ async def test_fetch_5xx_retries_then_succeeds(
             scene_id="abc",
             scene_datetime=datetime(2026, 1, 15, 8, 30, 0, tzinfo=UTC),
             product_code="s2_l2a",
-            aoi_geojson_utm36n={"type": "Polygon", "coordinates": [[[0, 0]]]},
+            aoi_geojson_utm36n={
+                "type": "Polygon",
+                "coordinates": [
+                    [[200000, 3300000], [201000, 3300000], [201000, 3301000], [200000, 3300000]]
+                ],
+            },
             bands=("red", "nir"),
         )
     assert result.cog_bytes == fake_tiff
@@ -292,7 +309,17 @@ async def test_fetch_4xx_does_not_retry(
                 scene_id="abc",
                 scene_datetime=datetime(2026, 1, 15, 8, 30, 0, tzinfo=UTC),
                 product_code="s2_l2a",
-                aoi_geojson_utm36n={"type": "Polygon", "coordinates": [[[0, 0]]]},
+                aoi_geojson_utm36n={
+                    "type": "Polygon",
+                    "coordinates": [
+                        [
+                            [200000, 3300000],
+                            [201000, 3300000],
+                            [201000, 3301000],
+                            [200000, 3300000],
+                        ]
+                    ],
+                },
                 bands=("red",),
             )
     assert process_route.call_count == 1
@@ -310,6 +337,64 @@ async def test_unsupported_product_raises(
             from_datetime=datetime(2026, 1, 1, tzinfo=UTC),
             to_datetime=datetime(2026, 1, 2, tzinfo=UTC),
         )
+
+
+def test_snap_bbox_to_grid_grows_outward_to_whole_pixels() -> None:
+    """A boundary ending on arbitrary metres snaps out to multiples of 10."""
+    aoi = {
+        "type": "Polygon",
+        "coordinates": [
+            [
+                [464686.47, 3326795.38],
+                [465478.18, 3326795.38],
+                [465478.18, 3327995.99],
+                [464686.47, 3326795.38],
+            ]
+        ],
+    }
+    assert _snap_bbox_to_grid(aoi, 10.0) == [464680.0, 3326790.0, 465480.0, 3328000.0]
+
+
+def test_snap_bbox_to_grid_leaves_an_aligned_box_alone() -> None:
+    """A bbox already on the grid must not grow — otherwise every re-fetch of
+    an aligned AOI would silently widen by a pixel per side."""
+    aoi = {
+        "type": "Polygon",
+        "coordinates": [
+            [
+                [464680.0, 3326790.0],
+                [465480.0, 3326790.0],
+                [465480.0, 3328000.0],
+                [464680.0, 3326790.0],
+            ]
+        ],
+    }
+    assert _snap_bbox_to_grid(aoi, 10.0) == [464680.0, 3326790.0, 465480.0, 3328000.0]
+
+
+def test_snap_bbox_to_grid_honours_a_coarser_resolution() -> None:
+    """Landsat-sized pixels snap to their own multiple, not to 10."""
+    aoi = {
+        "type": "Polygon",
+        "coordinates": [
+            [
+                [464686.0, 3326795.0],
+                [465478.0, 3326795.0],
+                [465478.0, 3327995.0],
+                [464686.0, 3326795.0],
+            ]
+        ],
+    }
+    assert _snap_bbox_to_grid(aoi, 30.0) == [464670.0, 3326790.0, 465480.0, 3328020.0]
+
+
+def test_snap_bbox_to_grid_rejects_a_non_positive_resolution() -> None:
+    aoi = {
+        "type": "Polygon",
+        "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 0]]],
+    }
+    with pytest.raises(ValueError, match="must be positive"):
+        _snap_bbox_to_grid(aoi, 0.0)
 
 
 # Reference URLs for code grep — quiet ruff "unused" warning.

@@ -2180,6 +2180,7 @@ async def _discover_active_farm_subscriptions_async() -> dict[str, int]:
                 due = await ImageryRepository(session2).list_farm_subscriptions_due(
                     default_cadence_hours=24,
                     now=datetime.now(UTC),
+                    anchor_hour_utc=get_settings().imagery_discovery_anchor_hour_utc,
                 )
         except Exception:
             _log.exception("imagery_farm_sweep_tenant_failed", tenant_schema=tenant_schema)
@@ -2665,6 +2666,7 @@ async def _discover_active_subscriptions_async() -> dict[str, int]:
                 due = await repo.list_active_subscriptions_due(
                     default_cadence_hours=24,  # fallback; per-row cadence applies first
                     now=datetime.now(UTC),
+                    anchor_hour_utc=get_settings().imagery_discovery_anchor_hour_utc,
                 )
         except Exception:
             _log.exception("imagery_due_sweep_tenant_failed", tenant_schema=tenant_schema)
