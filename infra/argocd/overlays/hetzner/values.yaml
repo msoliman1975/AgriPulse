@@ -2359,9 +2359,29 @@ global:
   #   /farms/{id}/field-flags, which does not exist on 43d7d4e.
   #   Images CONFIRMED by pulling both on the node: api @ 9cbc2a28980f,
   #   frontend @ c03cd32cf333f.
+  #
+  # 2f1d766 = #531, the date bar says what cloud cost the farm. A pass can
+  #   succeed and still leave holes: the scene-classification mask removes
+  #   cloud, shadow and cirrus pixels and the grid cells above them draw as
+  #   "no reading". On Green Farm [Demo-01] the 2026-08-18 pass left block
+  #   AG-R02-C02 with 137 of its 224 cells carrying a value, against 221 the
+  #   day before, and the strip said nothing about it.
+  #   The figure is NOT the job's `cloud_cover_pct`. That is the STAC
+  #   `eo:cloud_cover` of a whole Sentinel-2 tile, 110 km on a side, and on
+  #   this farm it calls 2026-08-17 the cloudier day (13.24% against 6.50%)
+  #   when 08-17 lost 2.04% of the farm and 08-18 lost 8.17%. The new
+  #   `no_reading_pct` is measured from the pixel counts the index step
+  #   writes, per farm, per pass, per index.
+  #   NO MIGRATION. api + frontend move TOGETHER: the chip reads a field that
+  #   does not exist on 4bda4c8, and an older api leaves it null, which reads
+  #   as "this farm never loses anything to cloud".
+  #   WORKERS STAY 4bda4c8 on purpose: the change is one read query on the
+  #   console route plus a chip, and no worker task calls either.
+  #   Images CONFIRMED by pulling both on the node: api @ be33b83a0a3b0,
+  #   frontend @ 122d2a9a64955.
   images:
     api:
-      tag: "4bda4c8"
+      tag: "2f1d766"
     workers:
       tag: "4bda4c8"
     frontend:
@@ -2401,7 +2421,10 @@ global:
       #   carried `scope`; the notice was not reading it.
       #   FRONTEND ONLY; api + workers stay 86faf0b. No migrations.
       #   Image CONFIRMED by pulling it on the node: frontend @ ceaa572.
-      tag: "822dea3"
+      #
+      # 2f1d766 = #531, the date bar says what cloud cost the farm. Moves with
+      #   the api — see the note above the `images` key.
+      tag: "2f1d766"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
