@@ -41,3 +41,18 @@ credential is object-scoped and returns `AccessDenied` on `PutBucketCors`.
 
 Equivalent by hand: Cloudflare → R2 → `agripulse-imagery` → Settings → CORS
 Policy.
+
+## Applied 2026-08-19
+
+Verified against a live presigned URL from the production node, which is the
+only check that means anything — the preflight is what was failing:
+
+```
+OPTIONS <presigned-url>  Origin: https://localhost
+-> 204  Access-Control-Allow-Origin: https://localhost
+        Access-Control-Allow-Methods: PUT, GET, HEAD
+```
+
+Then end to end: PUT a real JPEG → 200, raise a flag carrying its key → 201
+with one photo and a working download URL. The test flag and its object were
+removed afterwards.
