@@ -291,7 +291,11 @@ def _build_render_ctx(
         "prescription": prescription or "",
         "fired_at": alert["created_at"].isoformat() if alert.get("created_at") else "",
         "signal_snapshot_json": json.dumps(alert.get("signal_snapshot") or {}),
-        "link_url": f"/alerts/{alert['farm_id']}?alert={alert['alert_id']}",
+        # The Action Center is the queue now; /alerts is delisted. `item`
+        # opens this row rather than dropping the reader into a farm-wide
+        # list, which is what the old link did — /alerts never read its
+        # `?alert=` parameter.
+        "link_url": (f"/action-center/{alert['farm_id']}?kind=alert&item={alert['alert_id']}"),
     }
 
 
@@ -1094,7 +1098,10 @@ def _build_render_ctx_for_recommendation(
         "text": text_localized or "",
         "fired_at": rec["created_at"].isoformat() if rec.get("created_at") else "",
         "evaluation_snapshot_json": json.dumps(rec.get("evaluation_snapshot") or {}),
-        "link_url": f"/recommendations/{rec['farm_id']}?recommendation={rec['recommendation_id']}",
+        "link_url": (
+            f"/action-center/{rec['farm_id']}"
+            f"?kind=recommendation&item={rec['recommendation_id']}"
+        ),
     }
 
 

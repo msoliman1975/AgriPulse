@@ -12,6 +12,12 @@ caller with only one gets their half via ``kinds``.
 
 Dispatch writes a board activity and therefore needs ``plan.manage`` on top of
 ``recommendation.act``.
+
+Closing an item is NOT here. Acknowledge, resolve, apply, dismiss and defer
+stay on ``PATCH /alerts/{id}`` and ``PATCH /recommendations/{id}``, which
+already hold the right capability check for each verb. Repeating them here
+would put ``plan.manage`` in front of closing work, which no role needs for
+it — an Agronomist may resolve an alert and may not write a board plan.
 """
 
 from __future__ import annotations
@@ -90,6 +96,10 @@ async def list_action_items(
     block_id: UUID | None = None,
     action_type: Annotated[list[str] | None, Query()] = None,
     severity: Annotated[list[str] | None, Query()] = None,
+    # The row's own state (`deferred`, `snoozed`, `expired`, `acknowledged`, …).
+    # Four native states share the `dismissed` tab, so the tabs alone cannot
+    # ask for one of them.
+    native_status: Annotated[list[str] | None, Query()] = None,
     assigned_membership_id: UUID | None = None,
     date_range: Annotated[Literal["1d", "7d", "30d", "90d", "all"] | None, Query()] = None,
     raised_from: datetime | None = None,
@@ -122,6 +132,7 @@ async def list_action_items(
         block_id=block_id,
         action_types=tuple(action_type or ()),
         severities=tuple(severity or ()),
+        native_statuses=tuple(native_status or ()),
         assigned_membership_id=assigned_membership_id,
         raised_from=raised_from,
         raised_to=raised_to,

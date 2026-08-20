@@ -69,7 +69,7 @@ export function WeatherRiskRow({ farmId, blockIds = null }: Props): ReactNode {
         <h3 className="text-xs font-bold uppercase tracking-wide text-ap-primary">
           {t("widget.title")}
         </h3>
-        <Link to="/labs/map" className="text-xs font-medium text-ap-accent hover:underline">
+        <Link to="/labs/map-v2" className="text-xs font-medium text-ap-accent hover:underline">
           {t("widget.viewMap")}
         </Link>
       </div>

@@ -108,6 +108,15 @@ items AS (
         r.tree_path                   AS reasoning_path,
         NULL::jsonb                   AS signal_snapshot,
         NULL::text                    AS rule_code,
+        -- Lifecycle timestamps. Each kind fills its own pair and leaves the
+        -- other NULL: applying a recommendation and resolving an alert are
+        -- different events and must not share one column.
+        NULL::timestamptz             AS acknowledged_at,
+        NULL::timestamptz             AS resolved_at,
+        r.applied_at                  AS applied_at,
+        r.dismissed_at                AS dismissed_at,
+        r.deferred_until              AS deferred_until,
+        NULL::timestamptz             AS snoozed_until,
         r.is_group                    AS is_group,
         r.member_count                AS member_count,
         r.previous_member_count       AS previous_member_count,
@@ -143,6 +152,12 @@ items AS (
         NULL::jsonb                   AS reasoning_path,
         a.signal_snapshot             AS signal_snapshot,
         a.rule_code                   AS rule_code,
+        a.acknowledged_at             AS acknowledged_at,
+        a.resolved_at                 AS resolved_at,
+        NULL::timestamptz             AS applied_at,
+        NULL::timestamptz             AS dismissed_at,
+        NULL::timestamptz             AS deferred_until,
+        a.snoozed_until               AS snoozed_until,
         a.is_group                    AS is_group,
         a.member_count                AS member_count,
         a.previous_member_count       AS previous_member_count,
@@ -200,6 +215,7 @@ class ActionCenterRepository:
         block_id: UUID | None = None,
         action_types: tuple[str, ...] = (),
         severities: tuple[str, ...] = (),
+        native_statuses: tuple[str, ...] = (),
         assigned_membership_id: UUID | None = None,
         raised_from: datetime | None = None,
         raised_to: datetime | None = None,
@@ -222,6 +238,12 @@ class ActionCenterRepository:
         if severities:
             sql += " AND i.severity = ANY(:severities)"
             params["severities"] = list(severities)
+        # The row's own state, not the unified one. A single tab holds
+        # `deferred`, `expired`, `snoozed` and `dismissed`, so without this
+        # there is no way to ask for one of them.
+        if native_statuses:
+            sql += " AND i.native_status = ANY(:native_statuses)"
+            params["native_statuses"] = list(native_statuses)
         if assigned_membership_id is not None:
             sql += " AND act.assigned_membership_id = :assignee"
             params["assignee"] = assigned_membership_id

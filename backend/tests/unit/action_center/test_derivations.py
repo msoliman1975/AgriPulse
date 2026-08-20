@@ -14,10 +14,13 @@ from uuid import uuid4
 import pytest
 
 from app.modules.action_center.repository import unified_status
+from app.modules.action_center.schemas import TreePathStep
 from app.modules.action_center.service import (
     build_groups,
     derive_due,
     derive_why,
+    normalise_actions,
+    normalise_tree_path,
     to_item,
 )
 
@@ -298,3 +301,89 @@ def test_a_cell_scoped_item_carries_coordinates_not_just_a_zone_code():
 
 def test_a_block_scoped_item_has_no_cell():
     assert _item().cell is None
+
+
+# ---------- guidance and the decision path --------------------------------
+#
+# Both come off the row as untyped JSON, written by whichever engine version
+# fired. The normalisers decide what the client is allowed to see, so what they
+# drop matters as much as what they keep.
+
+
+def test_guidance_keeps_the_four_horizons_in_order():
+    raw = {
+        "monitoring": [{"text_en": "Re-scout in 7 days"}],
+        "immediate": [{"text_en": "Spray within 48 hours", "text_ar": "رش خلال ٤٨ ساعة"}],
+    }
+    out = normalise_actions(raw)
+    assert list(out) == ["immediate", "monitoring"]
+    assert out["immediate"][0].text_ar == "رش خلال ٤٨ ساعة"
+
+
+def test_guidance_drops_an_empty_horizon_rather_than_returning_it_empty():
+    # The panel decides whether to render by asking if this mapping is empty.
+    assert normalise_actions({"immediate": [], "long_term": None}) == {}
+
+
+def test_guidance_drops_a_line_with_no_english_text():
+    # text_en is the fallback for every language. A line without one renders
+    # as a blank bullet, which reads as missing data rather than as no data.
+    out = normalise_actions({"immediate": [{"text_ar": "فقط عربي"}, {"text_en": "kept"}]})
+    assert [line.text_en for line in out["immediate"]] == ["kept"]
+
+
+def test_guidance_ignores_a_horizon_nobody_renders():
+    assert normalise_actions({"next_season": [{"text_en": "x"}]}) == {}
+
+
+def test_path_keeps_the_leaf_as_neither_matched_nor_unmatched():
+    steps = normalise_tree_path(
+        [
+            {"node_id": "root", "matched": True, "values": {"ndvi": -0.18}},
+            {"node_id": "leaf_spray"},
+        ]
+    )
+    assert [s.node_id for s in steps] == ["root", "leaf_spray"]
+    assert steps[0].matched is True
+    # None, not False: a leaf is where the walk stopped, and rendering that as
+    # "no match" reads as a failure.
+    assert steps[1].matched is None
+    assert steps[0].values == {"ndvi": -0.18}
+
+
+def test_path_drops_a_step_with_no_node_id():
+    assert normalise_tree_path([{"matched": True}, {"node_id": "n1"}, "junk"]) == [
+        TreePathStep(node_id="n1")
+    ]
+
+
+def test_path_of_an_alert_is_empty_not_missing():
+    # Alerts carry a signal snapshot instead. NULL must become [], so no client
+    # has to branch on absence.
+    assert normalise_tree_path(None) == []
+
+
+def test_an_item_carries_both_structures_and_its_lifecycle_times():
+    acked = datetime(2026, 8, 8, 7, 0, tzinfo=UTC)
+    item = to_item(
+        {
+            "id": uuid4(),
+            "kind": "alert",
+            "native_status": "acknowledged",
+            "farm_id": uuid4(),
+            "block_id": uuid4(),
+            "block_code": "B-01",
+            "severity": "warning",
+            "title_en": "Aphid pressure",
+            "created_at": NOW,
+            "acknowledged_at": acked,
+            "resolved_at": None,
+            "actions": {"immediate": [{"text_en": "Spray"}]},
+            "reasoning_path": [{"node_id": "root", "matched": False}],
+        },
+        now=NOW,
+    )
+    assert item.acknowledged_at == acked
+    assert item.resolved_at is None
+    assert item.actions["immediate"][0].text_en == "Spray"
+    assert [s.node_id for s in item.tree_path] == ["root"]

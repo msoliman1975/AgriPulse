@@ -43,7 +43,7 @@ export function HomePage(): ReactNode {
           {canCreateFarm ? t("home.noFarmsBody") : t("home.comingSoon")}
         </p>
         {canCreateFarm ? (
-          <LinkButton to="/labs/map?create=farm" className="mt-4">
+          <LinkButton to="/labs/map-v2?create=farm" className="mt-4">
             {t("home.createFirstFarm")}
           </LinkButton>
         ) : null}

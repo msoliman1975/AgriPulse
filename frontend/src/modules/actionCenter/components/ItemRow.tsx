@@ -8,9 +8,12 @@ import { Button } from "@/components/Button";
 import { LinkButton } from "@/components/LinkButton";
 import { Pill } from "@/components/Pill";
 import { GroupMembers } from "@/modules/actionCenter/components/GroupMembers";
+import { GuidanceList, TreePathList } from "@/modules/actionCenter/components/Explain";
 import {
+  canClose,
   cellOrdinal,
   confidencePercent,
+  deferUntil24h,
   formatCoords,
   itemDetail,
   itemTitle,
@@ -45,6 +48,18 @@ const TREND_PILL: Record<string, "info" | "warn" | "ok"> = {
   receding: "ok",
 };
 
+// Which timestamp to show, and what to call it. Ordered so the newest event
+// in a normal lifecycle reads last. Each item fills at most two of these: the
+// other kind's columns are null.
+const LIFECYCLE = [
+  { field: "acknowledged_at", key: "row.acknowledged" },
+  { field: "snoozed_until", key: "row.snoozedUntil" },
+  { field: "deferred_until", key: "row.deferredUntil" },
+  { field: "applied_at", key: "row.applied" },
+  { field: "dismissed_at", key: "row.dismissed" },
+  { field: "resolved_at", key: "row.resolved" },
+] as const satisfies ReadonlyArray<{ field: keyof ActionItem; key: string }>;
+
 interface Props {
   item: ActionItem;
   isAr: boolean;
@@ -52,9 +67,18 @@ interface Props {
   selected: boolean;
   expanded: boolean;
   canDispatch: boolean;
+  // Closing an item is a different permission from dispatching it, and each
+  // verb has its own. An Agronomist holds all three of these and holds no
+  // `plan.manage`, so gating the close buttons on `canDispatch` would leave
+  // them with a queue they can read and cannot answer.
+  canAcknowledge: boolean;
+  canResolve: boolean;
+  canAct: boolean;
+  closing: boolean;
   onToggleSelect: () => void;
   onToggleExpand: () => void;
   onDispatch: () => void;
+  onClose: (payload: Record<string, unknown>) => void;
 }
 
 export function ItemRow({
@@ -64,12 +88,21 @@ export function ItemRow({
   selected,
   expanded,
   canDispatch,
+  canAcknowledge,
+  canResolve,
+  canAct,
+  closing,
   onToggleSelect,
   onToggleExpand,
   onDispatch,
+  onClose,
 }: Props): ReactNode {
   const { t } = useTranslation("actionCenter");
   const terminal = item.status === "done" || item.status === "dismissed";
+  // Not the same test as `terminal`. A deferred recommendation and a snoozed
+  // alert both sit in the `dismissed` tab, and both can still be applied or
+  // resolved — only the states the item can never leave rule the buttons out.
+  const closable = canClose(item);
   const coords = item.cell === null ? null : formatCoords(item.cell);
   const href = item.cell === null ? null : mapsUrl(item.cell);
   const confidence = confidencePercent(item.confidence);
@@ -140,7 +173,12 @@ export function ItemRow({
               ? t("action.unclassified")
               : t(`action.${item.action_type}`, { defaultValue: item.action_type })}
           </Pill>
-          <Pill kind="neutral">{item.native_status}</Pill>
+          {/* The row's own state, not the unified one. An `acknowledged` alert
+              and a `deferred` recommendation both sit in a tab that cannot
+              tell them apart, so the word itself has to be on the row. */}
+          <Pill kind="neutral">
+            {t(`nativeStatus.${item.native_status}`, { defaultValue: item.native_status })}
+          </Pill>
         </div>
 
         {/* Location. A cell-scoped item leads with its centroid — the zone
@@ -225,6 +263,18 @@ export function ItemRow({
               <span>{t("row.scheduled", { date: item.scheduled_date })}</span>
             </>
           )}
+          {/* When somebody last moved this item. "Raised 6 days ago" with no
+              answer to "and then what" is the reason people re-open a queue
+              item that was already handled. */}
+          {LIFECYCLE.map(({ field, key }) => {
+            const when = item[field];
+            return when === null ? null : (
+              <span key={field}>
+                {" · "}
+                {t(key, { when: ago(when) })}
+              </span>
+            );
+          })}
         </div>
 
         {expanded ? (
@@ -250,6 +300,8 @@ export function ItemRow({
                 </span>
               ) : null}
             </div>
+            <GuidanceList actions={item.actions} isAr={isAr} />
+            <TreePathList path={item.tree_path} isAr={isAr} />
             {isGroup ? (
               <GroupMembers
                 farmId={item.farm_id}
@@ -265,17 +317,21 @@ export function ItemRow({
 
       <div className="flex flex-none flex-col items-end gap-1.5 px-3 py-3">
         <div className="flex gap-1">
-          {/* Only once there is an activity to open. A board link on an
-              undispatched item points at nothing in particular. */}
-          {item.activity_id === null ? null : (
-            <LinkButton
-              size="sm"
-              variant="ghost"
-              to={`/board/${item.farm_id}?activity=${item.activity_id}&lane=${item.block_id}`}
-            >
-              {t("actions.openOnBoard")}
-            </LinkButton>
-          )}
+          {/* With an activity this opens the card. Without one it opens the
+              block's lane, which is still where the work would go — the old
+              alerts screen always offered a way through to the plan and
+              hiding the link until dispatch removed it. */}
+          <LinkButton
+            size="sm"
+            variant="ghost"
+            to={
+              item.activity_id === null
+                ? `/board/${item.farm_id}?lane=${item.block_id}`
+                : `/board/${item.farm_id}?activity=${item.activity_id}&lane=${item.block_id}`
+            }
+          >
+            {t("actions.openOnBoard")}
+          </LinkButton>
           <Button size="sm" variant="ghost" onClick={onToggleExpand}>
             {expanded ? t("actions.hideWhy") : t("actions.why")}
           </Button>
@@ -285,6 +341,60 @@ export function ItemRow({
             </Button>
           )}
         </div>
+
+        {/* Closing the item, in its own vocabulary. Dispatch hands the work to
+            somebody; these say what happened to the finding. An item can be
+            dispatched and still open, which is why both rows exist. */}
+        {closable ? (
+          <div className="flex gap-1">
+            {item.kind === "alert" ? (
+              <>
+                {item.native_status === "open" && canAcknowledge ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={closing}
+                    onClick={() => onClose({ acknowledge: true })}
+                  >
+                    {t("actions.acknowledge")}
+                  </Button>
+                ) : null}
+                {canResolve ? (
+                  <Button size="sm" disabled={closing} onClick={() => onClose({ resolve: true })}>
+                    {t("actions.resolve")}
+                  </Button>
+                ) : null}
+              </>
+            ) : canAct ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={closing}
+                  onClick={() => onClose({ dismiss: true })}
+                >
+                  {t("actions.dismiss")}
+                </Button>
+                {/* Deferring a deferred item again would just move the date,
+                    and there is no picker to move it to. */}
+                {item.native_status === "open" ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    title={t("actions.defer24Title")}
+                    disabled={closing}
+                    onClick={() => onClose({ defer_until: deferUntil24h() })}
+                  >
+                    {t("actions.defer24")}
+                  </Button>
+                ) : null}
+                <Button size="sm" disabled={closing} onClick={() => onClose({ apply: true })}>
+                  {t("actions.apply")}
+                </Button>
+              </>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );

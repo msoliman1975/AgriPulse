@@ -1,6 +1,6 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 
 import type {
   ActionItem,
@@ -8,6 +8,7 @@ import type {
   GroupBy,
   ItemKind,
   ItemSeverity,
+  NativeStatus,
   UnifiedStatus,
 } from "@/api/actionCenter";
 import { Button } from "@/components/Button";
@@ -21,7 +22,8 @@ import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { DispatchDialog } from "@/modules/actionCenter/components/DispatchDialog";
 import { ItemRow } from "@/modules/actionCenter/components/ItemRow";
-import { useActionItems } from "@/queries/actionCenter";
+import { isApiError } from "@/api/errors";
+import { useActionItems, useCloseActionItem } from "@/queries/actionCenter";
 import { useTenantUsers } from "@/queries/users";
 import { useCapability } from "@/rbac/useCapability";
 
@@ -39,6 +41,14 @@ const RANGES: ReadonlyArray<DateRange> = ["1d", "7d", "30d", "90d", "all", "cust
 
 const SEVERITIES: ReadonlyArray<ItemSeverity> = ["critical", "warning", "info"];
 
+// The row's own states, grouped by kind so the picker reads as two lists
+// rather than eight loose words. Four of them share the `dismissed` tab, which
+// is why this filter exists at all.
+const NATIVE_STATUSES: ReadonlyArray<{ kind: ItemKind; values: readonly NativeStatus[] }> = [
+  { kind: "recommendation", values: ["open", "applied", "deferred", "dismissed", "expired"] },
+  { kind: "alert", values: ["open", "acknowledged", "resolved", "snoozed"] },
+];
+
 /**
  * Action Center — one queue over recommendations and alerts.
  *
@@ -51,16 +61,30 @@ export function ActionCenterPage(): ReactNode {
   const dateLocale = useDateLocale();
   const isAr = i18n.language === "ar";
   const canDispatch = useCapability("plan.manage", { farmId });
+  // Four separate permissions, because closing an item is not dispatching it.
+  // An Agronomist holds the three closing ones and holds no `plan.manage`.
+  const canAcknowledge = useCapability("alert.acknowledge", { farmId });
+  const canResolve = useCapability("alert.resolve", { farmId });
+  const canAct = useCapability("recommendation.act", { farmId });
 
+  // `?kind=alert` narrows the queue on arrival. The Insights alert card and
+  // the two KPI tiles used to open single-kind screens; landing on a mixed
+  // queue after clicking a tile that counted one kind reads as a wrong number.
+  // Read once, as the initial value — after that the toolbar owns the filter.
+  const [search] = useSearchParams();
   const [tab, setTab] = useState<UnifiedStatus | "all">("needs_action");
   const [groupBy, setGroupBy] = useState<GroupBy>("action_type");
-  const [kinds, setKinds] = useState<Set<ItemKind>>(
-    () => new Set<ItemKind>(["recommendation", "alert"]),
-  );
+  const [kinds, setKinds] = useState<Set<ItemKind>>(() => {
+    const requested = search.get("kind");
+    return requested === "alert" || requested === "recommendation"
+      ? new Set<ItemKind>([requested])
+      : new Set<ItemKind>(["recommendation", "alert"]);
+  });
   const [range, setRange] = useState<DateRange>("30d");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [severity, setSeverity] = useState<ItemSeverity | "">("");
+  const [nativeStatus, setNativeStatus] = useState<NativeStatus | "">("");
   const [blockId, setBlockId] = useState("");
   const [assignee, setAssignee] = useState("");
 
@@ -81,6 +105,7 @@ export function ActionCenterPage(): ReactNode {
       kind: [...kinds],
       group_by: groupBy,
       ...(severity !== "" ? { severity: [severity] } : {}),
+      ...(nativeStatus !== "" ? { native_status: [nativeStatus] } : {}),
       ...(blockId !== "" ? { block_id: blockId } : {}),
       ...(assignee !== "" ? { assigned_membership_id: assignee } : {}),
       ...(range === "custom"
@@ -92,10 +117,38 @@ export function ActionCenterPage(): ReactNode {
           }
         : { date_range: range }),
     };
-  }, [farmId, tab, kinds, groupBy, severity, blockId, assignee, range, customFrom, customTo]);
+  }, [
+    farmId,
+    tab,
+    kinds,
+    groupBy,
+    severity,
+    nativeStatus,
+    blockId,
+    assignee,
+    range,
+    customFrom,
+    customTo,
+  ]);
 
   const query = useActionItems(params);
   const tenantUsers = useTenantUsers();
+  const close = useCloseActionItem();
+
+  // A notification links to one row: `?item=<id>`. Groups start collapsed, so
+  // without this the link lands on a screen where the row it names is not on
+  // the page at all. Runs once per id — after that the user owns what is open,
+  // and re-opening a group they just closed would be a fight.
+  const deepLinked = search.get("item");
+  const revealed = useRef<string | null>(null);
+  useEffect(() => {
+    if (deepLinked === null || revealed.current === deepLinked) return;
+    const holder = (query.data?.groups ?? []).find((g) => g.items.some((i) => i.id === deepLinked));
+    if (holder === undefined) return;
+    revealed.current = deepLinked;
+    setExpandedGroups((prev) => new Set(prev).add(holder.key));
+    setExpanded((prev) => new Set(prev).add(deepLinked));
+  }, [deepLinked, query.data]);
 
   if (farmId === undefined) {
     return <Navigate to="/" replace />;
@@ -120,6 +173,7 @@ export function ActionCenterPage(): ReactNode {
 
   const anyFilterActive =
     severity !== "" ||
+    nativeStatus !== "" ||
     blockId !== "" ||
     assignee !== "" ||
     range !== "30d" ||
@@ -129,6 +183,7 @@ export function ActionCenterPage(): ReactNode {
 
   const clearFilters = (): void => {
     setSeverity("");
+    setNativeStatus("");
     setBlockId("");
     setAssignee("");
     setRange("30d");
@@ -288,6 +343,28 @@ export function ActionCenterPage(): ReactNode {
             ))}
           </select>
 
+          {/* The row's own state. The tabs cannot reach four of these:
+              `deferred`, `expired`, `snoozed` and `dismissed` all sit in one
+              tab, so without this there is no way to list just the deferred
+              ones. */}
+          <select
+            className="input w-auto"
+            aria-label={t("filters.nativeStatus")}
+            value={nativeStatus}
+            onChange={(e) => setNativeStatus(e.target.value as NativeStatus | "")}
+          >
+            <option value="">{t("filters.anyState")}</option>
+            {NATIVE_STATUSES.filter((group) => kinds.has(group.kind)).map((group) => (
+              <optgroup key={group.kind} label={t(`kind.${group.kind}`)}>
+                {group.values.map((value) => (
+                  <option key={`${group.kind}:${value}`} value={value}>
+                    {t(`nativeStatus.${value}`)}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+
           {/* Assigned-to. Only meaningful once something has been dispatched,
               so the options are the people who actually hold work here rather
               than the whole roster. */}
@@ -420,6 +497,17 @@ export function ActionCenterPage(): ReactNode {
                       selected={selected.has(item.id)}
                       expanded={expanded.has(item.id)}
                       canDispatch={canDispatch}
+                      canAcknowledge={canAcknowledge}
+                      canResolve={canResolve}
+                      canAct={canAct}
+                      closing={close.isPending}
+                      onClose={(payload) =>
+                        close.mutate(
+                          item.kind === "alert"
+                            ? { kind: "alert", id: item.id, payload }
+                            : { kind: "recommendation", id: item.id, payload },
+                        )
+                      }
                       onToggleSelect={() => toggleSelect(item.id)}
                       onToggleExpand={() =>
                         setExpanded((prev) => {
@@ -438,6 +526,20 @@ export function ActionCenterPage(): ReactNode {
           );
         })
       )}
+
+      {/* A failed close is silent otherwise: the row simply does not move, and
+          the user presses the button again. The server's own `detail` is
+          shown, because "could not close" hides which rule refused — acting on
+          a member of a group returns a 409 that says exactly that. */}
+      {close.isError ? (
+        <div
+          role="alert"
+          className="mb-3 rounded-card border border-ap-crit-soft bg-ap-crit-soft/40 p-3 text-sm text-ap-crit"
+        >
+          {t("close.failed")}
+          {apiDetail(close.error) === null ? "" : ` — ${apiDetail(close.error)}`}
+        </div>
+      ) : null}
 
       {/* ---- bulk bar ---- */}
       {selectedItems.length > 0 ? (
@@ -467,6 +569,12 @@ export function ActionCenterPage(): ReactNode {
       ) : null}
     </Page>
   );
+}
+
+/** The server's own explanation, when it sent one. */
+function apiDetail(error: unknown): string | null {
+  if (!isApiError(error)) return null;
+  return error.problem.detail ?? error.problem.title ?? null;
 }
 
 export default ActionCenterPage;

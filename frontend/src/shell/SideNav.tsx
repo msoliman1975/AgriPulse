@@ -197,13 +197,12 @@ export function SideNav(): ReactNode {
           activePathPrefix="/platform/defaults"
           collapsed={collapsed}
         />
-        <SideNavItem
-          to="/platform/crops"
-          label={t("nav.crops")}
-          icon={<GearIcon className="h-4 w-4" />}
-          activePathPrefix="/platform/crops"
-          collapsed={collapsed}
-        />
+        {/* /platform/catalog is the one crop row in the nav. The older
+            /platform/crops tree is delisted but still routed: the catalog's
+            attribute panel deep-links to /platform/crops/:id/attributes,
+            which is where attribute definitions are still authored.
+            TODO: delist that too once attribute authoring moves into the
+            catalog inspector, then delete /platform/crops. */}
         <SideNavItem
           to="/platform/catalog"
           label={t("nav.catalog")}
@@ -284,33 +283,25 @@ export function SideNav(): ReactNode {
         activePathPrefix="/insights/"
         collapsed={collapsed}
       />
-      <SideNavItem
-        to={hasFarm ? `/labs/map/${farmSegment}` : "/labs/map"}
-        label={t("common:workspaceNav.farmManagement")}
-        icon={<LandUnitsIcon className="h-4 w-4" />}
-        // No-farm case deliberately has NO prefix: a bare "/labs/map" prefix
-        // also matches "/labs/map-v2", which lit both rows at once. Falling
-        // through to the exact-match branch keeps them mutually exclusive.
-        activePathPrefix={hasFarm ? `/labs/map/${farmSegment}` : undefined}
-        collapsed={collapsed}
-      />
-      {/* Farm Console v2, running beside the default until it clears the
-          cutover bar. Delete this row (and promote the one above) at
-          cutover — see docs/proposals/farm-console-unified.html. */}
+      {/* Farm Console v2 (/labs/map-v2) is the one Farm-management row in the
+          nav. It carried a BETA badge while it ran beside the older console
+          at /labs/map; the badge went with the second row, since "beta" says
+          nothing to a user who has no other console to choose.
+
+          Two older surfaces stay routed but delisted:
+            * /labs/map      — the previous console. Nothing links to it now.
+            * /labs/map-legacy — the original map. The console's "Edit AoI"
+              still deep-links into it until AoI/polygon editing reaches
+              parity in the console.
+          TODO(nuke-legacy-farms): delete /labs/map, /labs/map-legacy and
+          /farms/* once AoI-edit lands in the console. */}
       <SideNavItem
         to={hasFarm ? `/labs/map-v2/${farmSegment}` : "/labs/map-v2"}
         label={t("common:workspaceNav.farmManagement")}
         icon={<LandUnitsIcon className="h-4 w-4" />}
         activePathPrefix={hasFarm ? `/labs/map-v2/${farmSegment}` : undefined}
-        badge={t("common:workspaceNav.beta")}
         collapsed={collapsed}
       />
-      {/* /labs/map is the single Farm-management surface in nav. The
-          legacy map experience (/labs/map-legacy) is delisted but still
-          routed — the new console's "Edit AoI" deep-links into it until
-          AoI/polygon editing reaches parity there. TODO(nuke-legacy-farms):
-          drop /labs/map-legacy + /farms/* routes once AoI-edit lands in
-          the console. */}
       <SideNavItem
         to={hasFarm ? `/board/${farmSegment}` : "#"}
         label={t("common:workspaceNav.plan")}
@@ -327,30 +318,18 @@ export function SideNav(): ReactNode {
         activePathPrefix="/signals/"
         collapsed={collapsed}
       />
-      {/* The unified queue. The two single-kind screens below stay in the nav
-          until this one is signed off, then they go. */}
+      {/* The one queue over recommendations and alerts. /recommendations and
+          /alerts are delisted: everything they did is here — acknowledge,
+          resolve, apply, dismiss, defer, the four-horizon guidance and the
+          decision path — and this screen also filters, groups and dispatches.
+          Both stay routed, because notification links point at them.
+          TODO: repoint those links, then delete the two pages. */}
       <SideNavItem
         to={hasFarm ? `/action-center/${farmSegment}` : "#"}
         label={t("common:workspaceNav.actionCenter")}
         icon={<RecommendationsIcon className="h-4 w-4" />}
         disabled={!hasFarm}
         activePathPrefix="/action-center/"
-        collapsed={collapsed}
-      />
-      <SideNavItem
-        to={hasFarm ? `/recommendations/${farmSegment}` : "#"}
-        label={t("common:workspaceNav.recommendations")}
-        icon={<RecommendationsIcon className="h-4 w-4" />}
-        disabled={!hasFarm}
-        activePathPrefix="/recommendations/"
-        collapsed={collapsed}
-      />
-      <SideNavItem
-        to={hasFarm ? `/alerts/${farmSegment}` : "#"}
-        label={t("common:workspaceNav.alerts")}
-        icon={<AlertsIcon className="h-4 w-4" />}
-        disabled={!hasFarm}
-        activePathPrefix="/alerts/"
         collapsed={collapsed}
       />
       <SideNavItem

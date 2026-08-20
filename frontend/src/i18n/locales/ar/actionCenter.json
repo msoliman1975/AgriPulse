@@ -70,7 +70,9 @@
     "groupBy": "التجميع حسب",
     "assignedTo": "المكلّف",
     "anyone": "الجميع",
-    "clearAll": "مسح كل المرشّحات"
+    "clearAll": "مسح كل المرشّحات",
+    "nativeStatus": "الحالة",
+    "anyState": "كل الحالات"
   },
   "group": {
     "meta": "{{count}} عنصر · {{blocks}} قطعة",
@@ -94,7 +96,13 @@
     "wholeBlock": "القطعة كاملة · {{block}}",
     "raised": "صدر {{when}}",
     "scheduled": "مجدول {{date}}",
-    "lastSeen": "آخر ظهور {{when}}"
+    "lastSeen": "آخر ظهور {{when}}",
+    "acknowledged": "أُقِرّت {{when}}",
+    "resolved": "حُلَّت {{when}}",
+    "applied": "طُبِّقت {{when}}",
+    "dismissed": "رُفِضت {{when}}",
+    "deferredUntil": "مؤجَّلة حتى {{when}}",
+    "snoozedUntil": "مؤجَّلة حتى {{when}}"
   },
   "why": {
     "title": "سبب التفعيل",
@@ -108,7 +116,13 @@
     "dispatch": "إسناد",
     "dispatchTo": "إسناد إلى…",
     "dispatchAll": "إسناد الكل ({{count}})",
-    "openOnBoard": "فتح في اللوحة"
+    "openOnBoard": "فتح في اللوحة",
+    "acknowledge": "إقرار",
+    "resolve": "حلّ",
+    "apply": "تطبيق",
+    "dismiss": "رفض",
+    "defer24": "تأجيل ٢٤س",
+    "defer24Title": "تأجيل لمدة ٢٤ ساعة"
   },
   "bulk": {
     "selected": "{{count}} محدّد",
@@ -173,5 +187,30 @@
     "spreadTitle": "المناطق ({{active}} من {{total}} ما زالت نشطة، كانت {{previous}})",
     "titleSignals": "المؤشرات ({{active}} من {{total}} ما زالت نشطة)",
     "spreadTitleSignals": "المؤشرات ({{active}} من {{total}} ما زالت نشطة، كانت {{previous}})"
+  },
+  "close": {
+    "failed": "لم تُنفَّذ العملية."
+  },
+  "nativeStatus": {
+    "open": "مفتوحة",
+    "applied": "مطبَّقة",
+    "dismissed": "مرفوضة",
+    "deferred": "مؤجَّلة",
+    "expired": "منتهية",
+    "acknowledged": "مُقرَّة",
+    "resolved": "محلولة",
+    "snoozed": "مؤجَّلة"
+  },
+  "actionHorizon": {
+    "immediate": "فوري",
+    "short_term": "قصير المدى",
+    "long_term": "طويل المدى",
+    "monitoring": "متابعة"
+  },
+  "path": {
+    "title": "كيف وصلت الشجرة إلى هنا",
+    "match": "مطابق",
+    "noMatch": "غير مطابق",
+    "leaf": "ورقة"
   }
 }

@@ -10,6 +10,11 @@ import {
   listActionItemMembers,
   listActionItems,
 } from "@/api/actionCenter";
+import { type AlertTransitionPayload, transitionAlert } from "@/api/alerts";
+import {
+  type RecommendationTransitionPayload,
+  transitionRecommendation,
+} from "@/api/recommendations";
 
 export function useActionItems(params: ListActionItemsParams | null) {
   return useQuery<ActionItemListResponse>({
@@ -47,6 +52,46 @@ export function useDispatchActionItems() {
       void qc.invalidateQueries({ queryKey: ["recommendations"] });
       void qc.invalidateQueries({ queryKey: ["alerts"] });
       void qc.invalidateQueries({ queryKey: ["board"] });
+    },
+  });
+}
+
+/**
+ * Close one item from the queue.
+ *
+ * The verbs are the item's own — a recommendation is applied, dismissed or
+ * deferred; an alert is acknowledged or resolved — so this calls the module
+ * endpoints that already exist rather than a unified one. Two reasons:
+ *
+ *   * Capabilities. `PATCH /alerts/{id}` checks `alert.acknowledge` or
+ *     `alert.resolve` per verb, and `PATCH /recommendations/{id}` checks
+ *     `recommendation.act`. A unified endpoint would have to re-derive that,
+ *     and the obvious shortcut — reusing the dispatch check — puts
+ *     `plan.manage` in front of closing work. An Agronomist holds every
+ *     closing capability and does not hold `plan.manage`.
+ *   * Behaviour. Group cascade, audit events and the dedup rules live behind
+ *     those endpoints. A second path into the same tables would drift.
+ *
+ * What is different here is only what goes stale: closing an item moves it
+ * between Action Center tabs, so this queue is invalidated as well.
+ */
+export function useCloseActionItem() {
+  const qc = useQueryClient();
+  return useMutation<
+    unknown,
+    Error,
+    | { kind: "recommendation"; id: string; payload: RecommendationTransitionPayload }
+    | { kind: "alert"; id: string; payload: AlertTransitionPayload }
+  >({
+    mutationFn: (input) =>
+      input.kind === "alert"
+        ? transitionAlert(input.id, input.payload)
+        : transitionRecommendation(input.id, input.payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["action_items"] });
+      void qc.invalidateQueries({ queryKey: ["action_item_members"] });
+      void qc.invalidateQueries({ queryKey: ["recommendations"] });
+      void qc.invalidateQueries({ queryKey: ["alerts"] });
     },
   });
 }

@@ -10,7 +10,7 @@
 // (the context farm, when there is one, is drawn as the starting view).
 // See docs/proposals/farm-creation-in-console.md.
 import { useMemo, useRef, useState, type ReactNode } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
@@ -43,6 +43,7 @@ export function CreateFarmFlow({ contextFarmId }: { contextFarmId?: string }): R
   const { t } = useTranslation("farmConsole");
   const { t: tf } = useTranslation("farms");
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const qc = useQueryClient();
   const [search, setSearch] = useSearchParams();
   const canCreate = useCapability("farm.create");
@@ -91,6 +92,12 @@ export function CreateFarmFlow({ contextFarmId }: { contextFarmId?: string }): R
     return contextFarmQ.data?.boundary ?? null;
   }, [boundary, contextFarmQ.data]);
 
+  // Land back on the console this flow was opened from. Two consoles render
+  // this component — /labs/map-v2, which the nav points at, and the delisted
+  // /labs/map — so a hard-coded path would drop a v2 user into the other one
+  // right after they created their farm.
+  const consoleBase = pathname.startsWith("/labs/map-v2") ? "/labs/map-v2" : "/labs/map";
+
   const exit = (): void => {
     const next = new URLSearchParams(search);
     next.delete("create");
@@ -137,11 +144,11 @@ export function CreateFarmFlow({ contextFarmId }: { contextFarmId?: string }): R
     mutationFn: (payload: FarmCreatePayload) => createFarm(payload),
     onSuccess: (farm) => {
       // Refresh both farm lists (console rail + shell switcher) and remember
-      // the new farm so /labs/map lands on it.
+      // the new farm so the console lands on it.
       void qc.invalidateQueries({ queryKey: ["labs/mapnext/farmsList"] });
       void qc.invalidateQueries({ queryKey: ["farms", "list", "switcher"] });
       if (typeof window !== "undefined") window.localStorage.setItem(LAST_FARM_KEY, farm.id);
-      navigate(`/labs/map/${farm.id}`, { replace: true });
+      navigate(`${consoleBase}/${farm.id}`, { replace: true });
     },
     onError: (err) => {
       setSubmitError(

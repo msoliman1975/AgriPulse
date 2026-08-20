@@ -55,6 +55,46 @@ describe("<SideNav> Admin section", () => {
   });
 });
 
+describe("<SideNav> menu cutover", () => {
+  it("offers Farm Management once, pointing at the v2 console", () => {
+    mockUseAuth.mockReturnValue({
+      user: { access_token: jwt({ tenant_role: "TenantAdmin" }) },
+    });
+    renderNav();
+    // getByText throws when there are two matches, which is the state this
+    // guards against: the nav carried the same label twice while the two
+    // consoles ran side by side.
+    const row = screen.getByText("admin,common:common:workspaceNav.farmManagement");
+    expect(row.closest("a")).toHaveAttribute("href", "/labs/map-v2");
+  });
+
+  it("offers one queue, not three", () => {
+    mockUseAuth.mockReturnValue({
+      user: { access_token: jwt({ tenant_role: "TenantAdmin" }) },
+    });
+    renderNav();
+    expect(screen.getByText("admin,common:common:workspaceNav.actionCenter")).toBeInTheDocument();
+    // Both single-kind screens stay routed for old links; neither is a
+    // destination in the nav any more.
+    expect(
+      screen.queryByText("admin,common:common:workspaceNav.recommendations"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("admin,common:common:workspaceNav.alerts")).not.toBeInTheDocument();
+  });
+
+  it("offers the crop catalog once, on the catalog console", () => {
+    mockUseAuth.mockReturnValue({
+      user: { access_token: jwt({ platform_role: "PlatformAdmin" }) },
+    });
+    renderNav();
+    const row = screen.getByText("admin,common:nav.catalog");
+    expect(row.closest("a")).toHaveAttribute("href", "/platform/catalog");
+    // The older crop tree stays routed for attribute authoring, but it is no
+    // longer a destination in the nav.
+    expect(screen.queryByText("admin,common:nav.crops")).not.toBeInTheDocument();
+  });
+});
+
 describe("<SideNav> collapse", () => {
   beforeEach(() => {
     mockUseAuth.mockReturnValue({
