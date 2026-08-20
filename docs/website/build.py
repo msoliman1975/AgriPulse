@@ -228,7 +228,8 @@ PROCESSES = [
         "stages": [
             {
                 "t": "Subscribe the farm to imagery",
-                "where": "Settings → Imagery and weather → Farm",
+                "where": "Farm management → gear → Farm settings → Satellite imagery",
+                "guide": ("guide-turn-on-imagery-and-weather", "Full guide: turn on imagery and weather"),
                 "steps": [
                     "Pick the provider and the product.",
                     "Turn on fetching for the whole farm area.",
@@ -278,7 +279,8 @@ PROCESSES = [
             },
             {
                 "t": "Check what arrived",
-                "where": "Farm Console → scene strip, and Platform → Integrations health",
+                "where": "Settings → Integrations → Health, and the Farm Console scene strip",
+                "guide": ("guide-check-what-arrived", "Full guide: check what arrived"),
                 "steps": [
                     "Read the scene strip. It shows one mark per pass day.",
                     "Open a pass and check the coverage and the cloud figure.",
@@ -2048,6 +2050,249 @@ GUIDES = [
         "next": [("guide-set-the-grid-cell-size", "Set the grid cell size"),
                  ("process-map-the-farm", "Back to Map the farm"),
                  ("process-run-the-field-team", "Run the field team")],
+    },
+    {
+        "slug": "guide-turn-on-imagery-and-weather",
+        "process": ("process-connect-the-data", "Connect the data", "03"),
+        "img": "p03-connect",
+        "title": "Turn on imagery and weather",
+        "short": "Two checkboxes on the farm decide whether anything gets computed at all.",
+        "lede": "Nothing is measured until a farm is subscribed. Both subscriptions live on the "
+                "farm, not on the blocks, so this is two ticks and a couple of numbers. What you "
+                "set here decides how often data arrives and how much of it you throw away.",
+        "who": "Tenant admin, farm manager",
+        "time": "10 minutes",
+        "clip": "8 minutes",
+        "clip_file": "connect-the-data",
+        "clip_poster": "guide-data-clip-poster",
+        "clip_note": ("Silent screen capture of the real app, 1 minute 20 seconds. It turns "
+                      "Sentinel-2 and Open-Meteo on for a farm, then shows the tenant cloud "
+                      "threshold and the health page."),
+        "start": [
+            "A farm with a boundary and its blocks. See Add the blocks.",
+            "A decision on which products you want, because each one costs a request on every pass.",
+            "The permission to change farm settings.",
+        ],
+        "steps": [
+            {
+                "t": "Open the imagery section",
+                "img": "guide-data-01-panel",
+                "cap": "Farm settings. Both subscriptions sit on the farm, above the Zones section.",
+                "body": [
+                    "Open the farm in <b>Farm management</b>, click the gear, and stay on the "
+                    "<b>Farm</b> tab.",
+                    "<b>Satellite imagery</b> lists the products you can turn on. The section says "
+                    "it plainly: turning a product on subscribes the whole farm, and there is no "
+                    "separate step to apply it to blocks.",
+                    "Two products ship: <b>Sentinel-2 L2A</b> for the optical indices, and "
+                    "<b>Landsat 8/9 Collection-2 Level-2 Surface Temperature</b> for the thermal ones.",
+                ],
+            },
+            {
+                "t": "Turn on Sentinel-2 first",
+                "body": [
+                    "Tick <b>Sentinel-2 L2A</b>. This is the stream behind NDVI, NDRE, NDWI, NDMI "
+                    "and the rest of the optical indices.",
+                    "The row saves as you change it. There is no separate save button for this "
+                    "section.",
+                    "Two fields appear beside it: <b>Every (h)</b>, how often the farm is checked "
+                    "for a new pass, and <b>Max cloud %</b>, the most cloud you will accept in one.",
+                ],
+                "note": "A cloud limit rejects passes at the provider, so the ones it rejects never "
+                        "arrive and leave no trace. If every stored pass reads exactly 0.0 percent "
+                        "cloud, the limit is doing the filtering, not the sky.",
+            },
+            {
+                "t": "Understand what farm-level fetching means",
+                "body": [
+                    "A subscribed row is marked <b>Fetched as one farm area</b>.",
+                    "The panel is honest about the trade: fetching the farm as one area measures "
+                    "land outside your blocks too, and costs one larger request per pass instead of "
+                    "one per block.",
+                    "Farms are moved to farm-level fetching centrally. A farm wider than the "
+                    "provider's per-request limit stays on per-block fetching.",
+                    "This is why land units matter. Ground inside the boundary that is not crop is "
+                    "still measured unless you mark it.",
+                ],
+            },
+            {
+                "t": "Add thermal only if you will use it",
+                "body": [
+                    "<b>Landsat 8/9 Surface Temperature</b> is a second satellite, with a coarser "
+                    "pixel and a longer gap between passes.",
+                    "It gives land surface temperature, crop water stress and a soil moisture index.",
+                    "Thermal is read at block and farm level only. It is not computed per grid cell.",
+                    "On bare or sparsely planted ground the numbers are real but not useful: the "
+                    "water stress index pins at its maximum because there is no canopy to cool.",
+                ],
+            },
+            {
+                "t": "Turn on weather",
+                "body": [
+                    "Tick <b>Open-Meteo</b> under <b>Weather</b>.",
+                    "Weather is fetched once for the farm's location and shared by every block, so "
+                    "there is nothing to set per block.",
+                    "<b>Every (h)</b> sets how often it is pulled.",
+                    "History and forecast come from the same provider. The daily job then computes "
+                    "growing degree days, reference evapotranspiration and cumulative rainfall.",
+                ],
+            },
+            {
+                "t": "Set the account-wide defaults, once",
+                "img": "guide-data-02-tenant",
+                "cap": "Settings, Integrations, Imagery. Tenant defaults cascade to every farm.",
+                "body": [
+                    "Go to <b>Settings → Integrations</b>. It has four tabs: Health, Weather, "
+                    "Imagery and Detection.",
+                    "<b>Imagery</b> holds the account default for the cloud-cover threshold. "
+                    "<b>Weather</b> holds the default provider and the polling cadence in hours.",
+                    "These cascade to every farm unless a farm overrides them. Pick a farm under "
+                    "<b>Farm overrides</b> to see the resolved chain and change it for that farm only.",
+                    "Set the account default the way you want most farms to behave, and override "
+                    "only the farms that differ.",
+                ],
+            },
+        ],
+        "fields": {
+            "cols": ["Setting", "Where", "What it does"],
+            "rows": [
+                ["Sentinel-2 L2A", "Farm settings", "The optical stream. Turning it on subscribes the whole farm."],
+                ["Landsat 8/9 Surface Temperature", "Farm settings", "The thermal stream. Coarser pixel, longer gap, no grid cells."],
+                ["Every (h)", "Farm settings, per product", "How often the farm is checked for new data."],
+                ["Max cloud %", "Farm settings, imagery", "The most cloud accepted in a pass. Rejected passes never arrive."],
+                ["Open-Meteo", "Farm settings, Weather", "The weather provider. Fetched once per farm and shared by every block."],
+                ["imagery.cloud_cover_threshold_pct", "Settings, Integrations, Imagery", "The account default cloud threshold, cascaded to every farm."],
+                ["weather.default_provider_code", "Settings, Integrations, Weather", "The account default weather provider."],
+                ["weather.default_cadence_hours", "Settings, Integrations, Weather", "The account default polling cadence."],
+            ],
+        },
+        "mistakes": {
+            "cols": ["What you see", "What it means"],
+            "rows": [
+                ["No active subscription on the health page", "Neither product is ticked on the farm. Nothing will ever be computed."],
+                ["Every pass reads exactly 0.0 percent cloud", "The cloud limit is filtering at the provider. Raise it to see what you are rejecting."],
+                ["Numbers cover ground you do not farm", "The farm is fetched as one area. Mark roads, buildings and canals so they stop counting."],
+                ["Thermal water stress pinned at its maximum", "There is not enough canopy for the index to mean anything. That is the ground, not a fault."],
+                ["A farm still fetches per block", "It is wider than the provider's per-request limit, so it cannot be moved to farm-level fetching."],
+            ],
+        },
+        "check": [
+            "The product row shows as ticked and marked Fetched as one farm area.",
+            "The health page lists the farm with a weather and an imagery row instead of No active subscription.",
+            "After the first sync, the scene strip in the Farm Console shows a mark per pass day.",
+        ],
+        "next": [("guide-check-what-arrived", "Check what arrived"),
+                 ("kb-indices", "Imagery index catalog"),
+                 ("kb-weather", "Weather catalog")],
+    },
+    {
+        "slug": "guide-check-what-arrived",
+        "process": ("process-connect-the-data", "Connect the data", "03"),
+        "img": "p08-platform",
+        "title": "Check what arrived",
+        "short": "Read the health page, know what each state means, and know when to worry.",
+        "lede": "Subscribing starts a queue, not a picture. This is how you tell the difference "
+                "between data that has not arrived yet and data that is not coming.",
+        "who": "Tenant admin, platform admin",
+        "time": "5 minutes, then whenever something looks wrong",
+        "clip": "5 minutes",
+        "start": [
+            "A farm with at least one subscription. See Turn on imagery and weather.",
+            "Patience. The first sync waits for the next scheduled run.",
+        ],
+        "steps": [
+            {
+                "t": "Open integration health",
+                "img": "guide-data-03-health",
+                "cap": "Integration health right after subscribing. Failing here means not yet.",
+                "body": [
+                    "Go to <b>Settings → Integrations → Health</b>. It shows when weather and "
+                    "imagery last synced for each farm and block, and refreshes every 30 seconds.",
+                    "Six views: <b>Overview</b>, <b>Runs</b>, <b>Queue</b>, <b>Providers</b>, "
+                    "<b>Farms</b> and <b>Blocks</b>.",
+                    "Start on Overview. One row per farm, with a weather column and an imagery column.",
+                ],
+            },
+            {
+                "t": "Read the states honestly",
+                "body": [
+                    "<b>No active subscription</b> means nothing is turned on. Go back and turn it on.",
+                    "<b>Never synced, overdue</b> immediately after subscribing is normal. The job "
+                    "has not run yet.",
+                    "<b>Failing</b> next to <b>Never synced</b> on a farm you have just subscribed "
+                    "is the same thing said harshly. Give it a scheduled cycle before you treat it "
+                    "as a fault.",
+                    "<b>Failing</b> on a farm that used to sync is a real problem. Open <b>Runs</b> "
+                    "to see what the last attempt did.",
+                ],
+                "note": "The way to tell them apart is the Runs view. On the farm we set up for "
+                        "these guides, Overview read Failing, Never synced, 1 overdue while Runs "
+                        "read \"No recent ingestion attempts in the last 14 days\". Nothing had "
+                        "failed. Nothing had run yet.",
+            },
+            {
+                "t": "Read it per farm, not per block",
+                "body": [
+                    "A farm fetched as one area has no per-block jobs at all.",
+                    "So a block-level view of a farm-level subscription looks dead even when "
+                    "everything is working.",
+                    "Use the <b>Farms</b> view for a farm-level subscription, and <b>Blocks</b> "
+                    "only for farms that still fetch per block.",
+                ],
+            },
+            {
+                "t": "Look at the passes themselves",
+                "body": [
+                    "Open the farm in <b>Farm management</b> and read the scene strip: one mark per "
+                    "pass day.",
+                    "Open a pass and check its coverage and cloud figure.",
+                    "A gap in the strip is either cloud, a missed acquisition, or a cloud limit set "
+                    "too low.",
+                ],
+            },
+            {
+                "t": "Backfill the history, if you need it",
+                "body": [
+                    "A new subscription starts from today. Baselines need history, and without a "
+                    "baseline an anomaly cannot be called.",
+                    "Backfill is run by whoever operates the platform, from <b>Platform → Backfill</b>, "
+                    "not from tenant settings.",
+                    "Several years takes hours. Aggregates can lag the raw data, so give the summary "
+                    "tables time before you judge the result.",
+                ],
+                "note": "Ask for a backfill deliberately. It re-reads imagery for every pass in the "
+                        "range, so it is the most expensive thing in this process.",
+            },
+        ],
+        "fields": {
+            "cols": ["View", "What it answers"],
+            "rows": [
+                ["Overview", "Is each farm syncing, for weather and for imagery."],
+                ["Runs", "What the recent attempts did, and why one failed."],
+                ["Queue", "What is waiting to run right now."],
+                ["Providers", "Whether the upstream provider is answering at all."],
+                ["Farms", "Farm-level detail. The right view for a farm fetched as one area."],
+                ["Blocks", "Block-level detail. Only meaningful for farms that fetch per block."],
+            ],
+        },
+        "mistakes": {
+            "cols": ["What you see", "What it means"],
+            "rows": [
+                ["Failing, never synced, right after subscribing", "The first job has not run. Wait for a scheduled cycle."],
+                ["Aggregates look fine but jobs look dead", "You are reading block jobs on a farm-level subscription. Read the Farms view."],
+                ["No passes in the scene strip", "Either no acquisition, or the cloud limit rejected them all."],
+                ["Numbers on the chart but no baseline band", "There is not enough history. Ask for a backfill."],
+                ["Backfill finished but the map is unchanged", "The summary tables lag the raw data. Give them time before re-running anything."],
+            ],
+        },
+        "check": [
+            "The health page shows a weather and an imagery row for the farm.",
+            "The scene strip shows marks on the dates you expect.",
+            "The index chart draws a line instead of an empty panel.",
+        ],
+        "next": [("guide-turn-on-imagery-and-weather", "Turn on imagery and weather"),
+                 ("process-read-the-field", "Read the field"),
+                 ("kb-indices", "Imagery index catalog")],
     },
 ]
 

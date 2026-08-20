@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Connect the data · AgriPulse docs</title>
-<meta name="description" content="Nothing is computed until a farm is subscribed. This process turns on imagery and weather for a farm, picks the indices, and pulls back the history you need for a baseline." />
+<title>Check what arrived · AgriPulse docs</title>
+<meta name="description" content="Subscribing starts a queue, not a picture. This is how you tell the difference between data that has not arrived yet and data that is not coming." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -30,12 +30,13 @@
 </header>
 
 <section class="hero compact">
-  <img class="bg" src="img/p03-connect.jpg" alt="" />
+  <img class="bg" src="img/p08-platform.jpg" alt="" />
   <div class="inner">
-    <div class="crumbs"><a href="index.html">Docs</a> → <a href="index.html#processes">Processes</a></div>
-    <span class="eyebrow">Process 03</span>
-    <h1>Connect the data</h1>
-    <p class="lede">Nothing is computed until a farm is subscribed. This process turns on imagery and weather for a farm, picks the indices, and pulls back the history you need for a baseline.</p>
+    <div class="crumbs"><a href="index.html">Docs</a> → <a href="index.html#processes">Processes</a>
+      → <a href="process-connect-the-data.html">Connect the data</a></div>
+    <span class="eyebrow">Guide · Process 03</span>
+    <h1>Check what arrived</h1>
+    <p class="lede">Subscribing starts a queue, not a picture. This is how you tell the difference between data that has not arrived yet and data that is not coming.</p>
   </div>
 </section>
 
@@ -43,18 +44,17 @@
   <div class="wrap">
     <div class="cards c3">
       <div class="card"><h4>Who does this</h4><p>Tenant admin, platform admin</p></div>
-      <div class="card"><h4>How long it takes</h4><p>15 minutes to set up, hours to days for the backfill</p></div>
-      <div class="card"><h4>Steps</h4><p>6 steps, in order</p></div>
+      <div class="card"><h4>How long it takes</h4><p>5 minutes, then whenever something looks wrong</p></div>
+      <div class="card"><h4>Steps</h4><p>5 steps</p></div>
     </div>
 
     <h3>Watch it in the system</h3>
-    <p>A screen recording of the whole process, start to finish, in the real product.</p>
     <div class="clip">
       <div class="frame">
         <div>
           <div class="play"></div>
-          <b>Connect the data — full walkthrough</b>
-          <span>Screen recording, planned length about 8 minutes. Not recorded yet.</span>
+          <b>Check what arrived — walkthrough</b>
+          <span>Screen recording, planned length about 5 minutes. Not recorded yet.</span>
         </div>
       </div>
       <div class="bar">
@@ -63,44 +63,41 @@
       </div>
     </div>
 
+
+    <h3>Before you start</h3>
+    <ul><li>A farm with at least one subscription. See Turn on imagery and weather.</li><li>Patience. The first sync waits for the next scheduled run.</li></ul>
+
   </div>
 </section>
 
 <section class="band tint">
   <div class="wrap">
     <p class="kicker">Step by step</p>
-    <h2 class="section">The written guide</h2>
-
-    <h3>Before you start</h3>
-    <ul><li>A mapped farm. Subscriptions are set at farm level, not block level.</li><li>A decision on how far back you need history.</li></ul>
-
-    <div class="stages" style="margin-top:2rem">
+    <h2 class="section">Check what arrived</h2>
+    <div class="stages" style="margin-top:1.6rem">
       <div class="stage">
         <div class="badge"></div>
         <div>
-          <h3>Subscribe the farm to imagery</h3>
-          <ul class="steps"><li>Pick the provider and the product.</li><li>Turn on fetching for the whole farm area.</li><li>Set the cloud limit you accept for a pass.</li></ul>
-          <div><span class="where"><b>In the app</b> Farm management → gear → Farm settings → Satellite imagery</span></div>
-          <div><a class="guide-link" href="guide-turn-on-imagery-and-weather.html">Full guide: turn on imagery and weather</a></div>
-          <div class="note"><span class="lab">Note</span><p>A cloud limit applied at the provider means rejected passes never arrive at all. If every stored pass reads exactly 0.0 percent cloud, the limit is filtering at the source.</p></div>
-        </div>
-      </div>
-      <div class="stage">
-        <div class="badge"></div>
-        <div>
-          <h3>Choose the indices</h3>
-          <ul class="steps"><li>Turn on the indices you will read. NDVI is the usual starting point.</li><li>Add NDRE for tree crops, NDMI or MSI for canopy moisture, BSI for bare soil.</li><li>Each index you add costs computation on every pass.</li></ul>
-          <div><span class="where"><b>In the app</b> Settings → Imagery and weather → Indices</span></div>
-          
+          <h3>Open integration health</h3>
+          <ul class="steps"><li>Go to <b>Settings → Integrations → Health</b>. It shows when weather and imagery last synced for each farm and block, and refreshes every 30 seconds.</li><li>Six views: <b>Overview</b>, <b>Runs</b>, <b>Queue</b>, <b>Providers</b>, <b>Farms</b> and <b>Blocks</b>.</li><li>Start on Overview. One row per farm, with a weather column and an imagery column.</li></ul>
+          <figure class="shot-fig"><img src="img/guide-data-03-health.jpg" alt="" loading="lazy" /><figcaption>Integration health right after subscribing. Failing here means not yet.</figcaption></figure>
           
         </div>
       </div>
       <div class="stage">
         <div class="badge"></div>
         <div>
-          <h3>Add thermal, if you need it</h3>
-          <ul class="steps"><li>Thermal comes from a different satellite, with a coarser pixel and a longer gap between passes.</li><li>It gives land surface temperature, crop water stress and a soil moisture index.</li><li>Thermal has no grid cells. It is read at block and farm level only.</li></ul>
-          <div><span class="where"><b>In the app</b> Settings → Imagery and weather → Thermal</span></div>
+          <h3>Read the states honestly</h3>
+          <ul class="steps"><li><b>No active subscription</b> means nothing is turned on. Go back and turn it on.</li><li><b>Never synced, overdue</b> immediately after subscribing is normal. The job has not run yet.</li><li><b>Failing</b> next to <b>Never synced</b> on a farm you have just subscribed is the same thing said harshly. Give it a scheduled cycle before you treat it as a fault.</li><li><b>Failing</b> on a farm that used to sync is a real problem. Open <b>Runs</b> to see what the last attempt did.</li></ul>
+          
+          <div class="note"><span class="lab">Note</span><p>The way to tell them apart is the Runs view. On the farm we set up for these guides, Overview read Failing, Never synced, 1 overdue while Runs read "No recent ingestion attempts in the last 14 days". Nothing had failed. Nothing had run yet.</p></div>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Read it per farm, not per block</h3>
+          <ul class="steps"><li>A farm fetched as one area has no per-block jobs at all.</li><li>So a block-level view of a farm-level subscription looks dead even when everything is working.</li><li>Use the <b>Farms</b> view for a farm-level subscription, and <b>Blocks</b> only for farms that still fetch per block.</li></ul>
           
           
         </div>
@@ -108,9 +105,8 @@
       <div class="stage">
         <div class="badge"></div>
         <div>
-          <h3>Subscribe to weather</h3>
-          <ul class="steps"><li>Turn on weather for the farm. History and forecast come from the same provider.</li><li>Set how many days of forecast you want to see.</li><li>The daily job computes growing degree days, reference evapotranspiration and cumulative rainfall.</li></ul>
-          <div><span class="where"><b>In the app</b> Settings → Imagery and weather → Weather</span></div>
+          <h3>Look at the passes themselves</h3>
+          <ul class="steps"><li>Open the farm in <b>Farm management</b> and read the scene strip: one mark per pass day.</li><li>Open a pass and check its coverage and cloud figure.</li><li>A gap in the strip is either cloud, a missed acquisition, or a cloud limit set too low.</li></ul>
           
           
         </div>
@@ -118,38 +114,28 @@
       <div class="stage">
         <div class="badge"></div>
         <div>
-          <h3>Backfill the history</h3>
-          <ul class="steps"><li>Start a backfill for the farm and the date range.</li><li>Watch the run. A backfill of several years takes hours.</li><li>Baselines need history. Without it, an anomaly cannot be called.</li></ul>
-          <div><span class="where"><b>In the app</b> Platform → Backfill</span></div>
+          <h3>Backfill the history, if you need it</h3>
+          <ul class="steps"><li>A new subscription starts from today. Baselines need history, and without a baseline an anomaly cannot be called.</li><li>Backfill is run by whoever operates the platform, from <b>Platform → Backfill</b>, not from tenant settings.</li><li>Several years takes hours. Aggregates can lag the raw data, so give the summary tables time before you judge the result.</li></ul>
           
-          
-        </div>
-      </div>
-      <div class="stage">
-        <div class="badge"></div>
-        <div>
-          <h3>Check what arrived</h3>
-          <ul class="steps"><li>Read the scene strip. It shows one mark per pass day.</li><li>Open a pass and check the coverage and the cloud figure.</li><li>If passes stop arriving, integration health names the failing step.</li></ul>
-          <div><span class="where"><b>In the app</b> Settings → Integrations → Health, and the Farm Console scene strip</span></div>
-          <div><a class="guide-link" href="guide-check-what-arrived.html">Full guide: check what arrived</a></div>
-          
+          <div class="note"><span class="lab">Note</span><p>Ask for a backfill deliberately. It re-reads imagery for every pass in the range, so it is the most expensive thing in this process.</p></div>
         </div>
       </div>
     </div>
 
     <div class="note"><span class="lab">Check it worked</span>
-      <ul style="margin:.3rem 0 0"><li>The scene strip shows passes on the dates you expect.</li><li>The index chart on Insights draws a line, not an empty panel.</li><li>The weather panel shows yesterday and the forecast days ahead.</li></ul>
+      <ul style="margin:.3rem 0 0"><li>The health page shows a weather and an imagery row for the farm.</li><li>The scene strip shows marks on the dates you expect.</li><li>The index chart draws a line instead of an empty panel.</li></ul>
     </div>
   </div>
 </section>
 
 <section class="band">
   <div class="wrap">
-    <p class="kicker">Clips</p>
-    <h2 class="section">One short clip per step</h2>
-    <p>Beside the full walkthrough, each step gets its own short recording, so you can jump
-       straight to the part you need.</p>
-<div class="cliplist"><div class="row"><span class="ix">01</span><span class="t">Subscribe the farm to imagery</span><span class="chip">Not recorded</span></div><div class="row"><span class="ix">02</span><span class="t">Choose the indices</span><span class="chip">Not recorded</span></div><div class="row"><span class="ix">03</span><span class="t">Add thermal, if you need it</span><span class="chip">Not recorded</span></div><div class="row"><span class="ix">04</span><span class="t">Subscribe to weather</span><span class="chip">Not recorded</span></div><div class="row"><span class="ix">05</span><span class="t">Backfill the history</span><span class="chip">Not recorded</span></div><div class="row"><span class="ix">06</span><span class="t">Check what arrived</span><span class="chip">Not recorded</span></div></div>
+    <p class="kicker">Reference</p>
+    <h2 class="section">Every field on the form</h2>
+<div class="table-wrap"><table><thead><tr><th>View</th><th>What it answers</th></tr></thead><tbody><tr><td>Overview</td><td>Is each farm syncing, for weather and for imagery.</td></tr><tr><td>Runs</td><td>What the recent attempts did, and why one failed.</td></tr><tr><td>Queue</td><td>What is waiting to run right now.</td></tr><tr><td>Providers</td><td>Whether the upstream provider is answering at all.</td></tr><tr><td>Farms</td><td>Farm-level detail. The right view for a farm fetched as one area.</td></tr><tr><td>Blocks</td><td>Block-level detail. Only meaningful for farms that fetch per block.</td></tr></tbody></table></div>
+
+    <h3>When it does not work</h3>
+<div class="table-wrap"><table><thead><tr><th>What you see</th><th>What it means</th></tr></thead><tbody><tr><td>Failing, never synced, right after subscribing</td><td>The first job has not run. Wait for a scheduled cycle.</td></tr><tr><td>Aggregates look fine but jobs look dead</td><td>You are reading block jobs on a farm-level subscription. Read the Farms view.</td></tr><tr><td>No passes in the scene strip</td><td>Either no acquisition, or the cloud limit rejected them all.</td></tr><tr><td>Numbers on the chart but no baseline band</td><td>There is not enough history. Ask for a backfill.</td></tr><tr><td>Backfill finished but the map is unchanged</td><td>The summary tables lag the raw data. Give them time before re-running anything.</td></tr></tbody></table></div>
   </div>
 </section>
 
@@ -157,7 +143,7 @@
     <div class="wrap">
       <p class="kicker">Related</p>
       <h2 class="section">Read next</h2>
-      <div class="cards c3" style="margin-top:1.2rem"><a class="card" href="kb-indices.html"><h4>Imagery index catalog</h4><p>Open the page</p></a><a class="card" href="kb-weather.html"><h4>Weather catalog</h4><p>Open the page</p></a></div>
+      <div class="cards c3" style="margin-top:1.2rem"><a class="card" href="guide-turn-on-imagery-and-weather.html"><h4>Turn on imagery and weather</h4><p>Open the page</p></a><a class="card" href="process-read-the-field.html"><h4>Read the field</h4><p>Open the page</p></a><a class="card" href="kb-indices.html"><h4>Imagery index catalog</h4><p>Open the page</p></a></div>
     </div>
   </section>
 
@@ -172,9 +158,6 @@
     </div>
   </section>
 
-<section class="band tint" style="padding-top:0">
-<div class="wrap"><div class="pagenav"><a href="process-plan-the-season.html"><div class="dir">Previous</div><div class="t">Plan the season</div></a><a class="next" href="process-read-the-field.html"><div class="dir">Next</div><div class="t">Read the field</div></a></div></div>
-</section>
 
 <footer class="site">
   <div class="inner">
