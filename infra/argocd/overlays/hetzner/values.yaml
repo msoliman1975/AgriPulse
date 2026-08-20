@@ -2379,11 +2379,36 @@ global:
   #   console route plus a chip, and no worker task calls either.
   #   Images CONFIRMED by pulling both on the node: api @ be33b83a0a3b0,
   #   frontend @ 122d2a9a64955.
+  #
+  # 0cba71c = #533, one queue and one of each console. Two parts.
+  #   Menu: "Farm Management" appeared twice, at /labs/map and /labs/map-v2,
+  #   which is why cell size was reachable from one console and not the other.
+  #   Platform admin carried the crop taxonomy twice. Each pair collapses to
+  #   the newer surface; the older routes stay routed and nothing links to
+  #   them. Recommendations and Alerts leave the nav as well.
+  #   Action Center: it could filter, group and dispatch and could NOT close
+  #   anything. Dispatch writes a board activity and never touches the row's
+  #   own state, so a recommendation dispatched there stayed `open` for ever.
+  #   Rows now carry their own verbs, calling the PATCH endpoints that already
+  #   exist, so the per-verb capability checks come with them. That is the
+  #   second half of the fix: dispatch needs `plan.manage`, an Agronomist does
+  #   not hold it, and gating the close buttons on dispatch left that role a
+  #   queue it could read and could not answer.
+  #   NO MIGRATION. Every column the wider payload reads was already there.
+  #   api + workers + frontend move TOGETHER. The frontend reads `actions`,
+  #   `tree_path` and six lifecycle timestamps that do not exist on 2f1d766,
+  #   and an older api leaves them null, which renders as "no guidance was
+  #   authored" for every row. Workers move because notification link text is
+  #   built in workers (`notifications/subscribers.py`) and now points at
+  #   /action-center; on 4bda4c8 every new notification would keep linking to
+  #   a screen that is no longer in the menu.
+  #   Images CONFIRMED by pulling both on the node: api @ d7adbf863469f,
+  #   frontend @ fb85f29f465c6.
   images:
     api:
-      tag: "2f1d766"
+      tag: "0cba71c"
     workers:
-      tag: "4bda4c8"
+      tag: "0cba71c"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -2424,7 +2449,10 @@ global:
       #
       # 2f1d766 = #531, the date bar says what cloud cost the farm. Moves with
       #   the api — see the note above the `images` key.
-      tag: "2f1d766"
+      #
+      # 0cba71c = #533, one queue and one of each console. Moves with the api
+      #   and the workers — see the note above the `images` key.
+      tag: "0cba71c"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
