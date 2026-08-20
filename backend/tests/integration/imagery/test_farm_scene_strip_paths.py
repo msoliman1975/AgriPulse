@@ -112,19 +112,25 @@ async def _insert_aggregate(
     product_id: UUID,
     at: datetime,
     index_code: str = "ndvi",
+    valid_pixel_count: int = 100,
+    total_pixel_count: int = 100,
 ) -> None:
     """What `_write_block_aggregates_from_farm` leaves behind.
 
     Measured off the farm-wide raster, so it carries the FARM's
     ``stac_item_id`` and the farm job's ``scene_datetime`` — which is exactly
     why the strip can find it without a block job existing.
+
+    The two pixel counts default to "everything readable". They are what the
+    strip's ``no_reading_pct`` is measured from, so a test about cloud over
+    part of a farm sets them apart.
     """
     await admin_session.execute(
         text(
             f'INSERT INTO "{tenant_schema}".block_index_aggregates '
             "(time, block_id, index_code, product_id, mean, "
             " valid_pixel_count, total_pixel_count, stac_item_id) "
-            "VALUES (:at, :block, :code, :prod, 0.5, 100, 100, :stac)"
+            "VALUES (:at, :block, :code, :prod, 0.5, :valid, :total, :stac)"
         ).bindparams(
             bindparam("block", type_=PG_UUID(as_uuid=True)),
             bindparam("prod", type_=PG_UUID(as_uuid=True)),
@@ -134,6 +140,8 @@ async def _insert_aggregate(
             "block": block_id,
             "code": index_code,
             "prod": product_id,
+            "valid": valid_pixel_count,
+            "total": total_pixel_count,
             "stac": "sentinel_hub/s2_l2a/FARMPASS/farmaoihash",
         },
     )
@@ -497,3 +505,108 @@ async def test_the_pixel_layer_still_resolves_for_a_cut_over_farm(
     assert body["items"] == [], "no block jobs — the per-block path has nothing"
     assert body["farm"] is not None, "the farm surface is what the layer draws"
     assert body["farm"]["stac_item_id"].startswith("sentinel_hub/s2_l2a/FARM_PASS/")
+
+
+@pytest.mark.asyncio
+async def test_a_partly_clouded_pass_reports_what_the_farm_lost(
+    admin_session: AsyncSession,
+) -> None:
+    """A pass can succeed and still leave holes in the map.
+
+    Green Farm [Demo-01] on 2026-08-18 is the case this was written for: the
+    job succeeded, the scene-classification mask dropped 319 of the farm's
+    5,037 pixels as cloud, and 84 of AG-R02-C02's 224 grid cells came back
+    with no value. Every index has the same holes, because they share one
+    mask. The strip said nothing about it and the day read as a plain "4".
+
+    The job's own ``cloud_cover_pct`` cannot carry this. It is the STAC
+    ``eo:cloud_cover`` of a whole Sentinel-2 tile, 110 km on a side, so on
+    that farm it calls 2026-08-17 the cloudier day (13.24% against 6.50%)
+    when 08-17 lost 2.04% of the farm and 08-18 lost 8.17%. It ranks the two
+    backwards, which is why this reads the pixel counts instead.
+    """
+    schema, client = await _setup(admin_session, "strip-partly-cloudy")
+    at = datetime(2026, 8, 18, 8, 51, tzinfo=UTC)
+
+    async with client:
+        farm_id, block_a = await _create_farm_and_block(client)
+        product_id = await _get_s2l2a_product_id(admin_session)
+        sub = await _farm_subscription(
+            admin_session,
+            tenant_schema=schema,
+            farm_id=UUID(farm_id),
+            product_id=UUID(product_id),
+        )
+        await _insert_farm_job(
+            admin_session,
+            tenant_schema=schema,
+            farm_id=UUID(farm_id),
+            product_id=UUID(product_id),
+            subscription_id=sub,
+            scene_id="FARM_PARTLY_CLOUDY",
+            scene_datetime=at,
+            # Low, and deliberately so: the tile figure and the farm's own
+            # loss disagree, and the strip must follow the farm.
+            cloud_cover_pct=6.5,
+            stac_item_id="sentinel_hub/s2_l2a/FARM_PARTLY_CLOUDY/farmaoihash",
+        )
+        await _insert_aggregate(
+            admin_session,
+            tenant_schema=schema,
+            block_id=UUID(block_a),
+            product_id=UUID(product_id),
+            at=at,
+            valid_pixel_count=917,
+            total_pixel_count=1000,
+        )
+        await admin_session.commit()
+
+        resp = await client.get(f"/api/v1/farms/{farm_id}/scenes")
+
+    assert resp.status_code == 200
+    (row,) = resp.json()["items"]
+    assert row["computed_count"] == 1, "the pass is drawable — most of the farm has a value"
+    assert float(row["no_reading_pct"]) == 8.30, "83 of 1000 pixels carry no value"
+    assert round(float(row["cloud_cover_pct"])) == 6, "the tile figure is kept, and disagrees"
+
+
+@pytest.mark.asyncio
+async def test_a_pass_that_never_computed_reports_no_loss_rather_than_zero(
+    admin_session: AsyncSession,
+) -> None:
+    """Nothing was measured, so there is no share to report.
+
+    Zero would read as "the whole farm has a value", which is the opposite of
+    what an unprocessed pass means. Null is the honest answer, and
+    ``computed_count`` is what the console greys the day out on.
+    """
+    schema, client = await _setup(admin_session, "strip-no-loss")
+    at = datetime(2026, 8, 18, 8, 51, tzinfo=UTC)
+
+    async with client:
+        farm_id, _block_a = await _create_farm_and_block(client)
+        product_id = await _get_s2l2a_product_id(admin_session)
+        sub = await _farm_subscription(
+            admin_session,
+            tenant_schema=schema,
+            farm_id=UUID(farm_id),
+            product_id=UUID(product_id),
+        )
+        await _insert_farm_job(
+            admin_session,
+            tenant_schema=schema,
+            farm_id=UUID(farm_id),
+            product_id=UUID(product_id),
+            subscription_id=sub,
+            scene_id="FARM_UNCOMPUTED",
+            scene_datetime=at,
+            stac_item_id="sentinel_hub/s2_l2a/FARM_UNCOMPUTED/farmaoihash",
+        )
+        await admin_session.commit()
+
+        resp = await client.get(f"/api/v1/farms/{farm_id}/scenes")
+
+    assert resp.status_code == 200
+    (row,) = resp.json()["items"]
+    assert row["computed_count"] == 0
+    assert row["no_reading_pct"] is None

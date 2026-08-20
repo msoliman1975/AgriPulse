@@ -110,8 +110,21 @@ export interface FarmScene {
    * "succeeded" and still render nothing. Zero means never processed.
    */
   computed_count: number;
-  /** Mean across jobs that reported one; null when none did. */
+  /**
+   * Mean across jobs that reported one; null when none did.
+   *
+   * This is the whole satellite tile's cloud figure, 110 km on a side, not
+   * the farm's. Use `no_reading_pct` to say what the pass cost this farm.
+   */
   cloud_cover_pct: string | null;
+  /**
+   * Percent of the farm's measured pixels with no value on this pass, for the
+   * index being drawn. Cloud, shadow and cirrus are stripped before the map is
+   * drawn, so this is the share the reader sees as holes. A few percent is the
+   * permanent loss along the farm boundary. Null on an api that predates the
+   * field, and on a pass whose indices never ran.
+   */
+  no_reading_pct?: string | null;
 }
 
 export interface FarmScenesResponse {

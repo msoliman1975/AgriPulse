@@ -695,6 +695,7 @@
     "nextPassHint": "Expected from this farm's recent cadence. Cloud decides whether the pass is usable, so treat it as a guide, not a promise.",
     "passOn": "{{date}} — {{count}} block(s) imaged",
     "cloudyOn": "{{date}} — skipped, {{pct}}% cloud",
+    "partlyCloudyOn": "{{date}} — {{count}} block(s) imaged. {{pct}}% of the farm has no reading: cloud, shadow and haze are removed before the map is drawn.",
     "empty": "No satellite passes recorded for this farm yet.",
     "unavailable": "Scene history is not available from this API version.",
     "unprocessedOn": "{{date}} — ingested but never processed, so there is nothing to draw"

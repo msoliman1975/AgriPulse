@@ -78,7 +78,18 @@ block_days AS (
             WHERE j.status = 'skipped_cloud'
         )                                           AS skipped_cloud_count,
         count(DISTINCT a.block_id)                  AS computed_count,
-        avg(j.cloud_cover_pct)                      AS cloud_cover_pct
+        avg(j.cloud_cover_pct)                      AS cloud_cover_pct,
+        -- How much of the farm this pass could NOT measure. See the note on
+        -- `no_reading_pct` under the outer SELECT for why the job's own
+        -- `cloud_cover_pct` cannot answer this.
+        CASE
+            WHEN sum(a.total_pixel_count) > 0
+            THEN round(
+                100.0 * (sum(a.total_pixel_count) - sum(a.valid_pixel_count))
+                / sum(a.total_pixel_count),
+                2
+            )
+        END                                         AS no_reading_pct
     FROM imagery_ingestion_jobs j
     JOIN blocks b ON b.id = j.block_id
     -- Did the INDEX step ever run for this pass?
@@ -149,7 +160,15 @@ farm_passes AS (
 farm_agg AS (
     SELECT
         a.time                     AS at,
-        count(DISTINCT a.block_id) AS computed_count
+        count(DISTINCT a.block_id) AS computed_count,
+        CASE
+            WHEN sum(a.total_pixel_count) > 0
+            THEN round(
+                100.0 * (sum(a.total_pixel_count) - sum(a.valid_pixel_count))
+                / sum(a.total_pixel_count),
+                2
+            )
+        END                        AS no_reading_pct
     FROM block_index_aggregates a
     JOIN blocks ab ON ab.id = a.block_id
     WHERE ab.farm_id = :farm
@@ -171,7 +190,11 @@ farm_days AS (
         -- computed_count 0 — the strip greys it out as unprocessed — exactly
         -- as count() over no rows did.
         COALESCE(g.computed_count, 0::bigint) AS computed_count,
-        p.cloud_cover_pct
+        p.cloud_cover_pct,
+        -- No COALESCE here, unlike computed_count: a pass whose indices never
+        -- ran measured no pixels at all, and "0% unreadable" would be a claim
+        -- about a map that does not exist. NULL is the honest answer.
+        g.no_reading_pct
     FROM farm_passes p
     CROSS JOIN live_blocks l
     LEFT JOIN farm_agg g ON g.at = p.at
@@ -183,7 +206,27 @@ SELECT
     max(succeeded_count)     AS succeeded_count,
     max(skipped_cloud_count) AS skipped_cloud_count,
     max(computed_count)      AS computed_count,
-    avg(cloud_cover_pct)     AS cloud_cover_pct
+    avg(cloud_cover_pct)     AS cloud_cover_pct,
+    -- The share of the farm this pass left with no reading, measured from the
+    -- pixels the index step actually counted.
+    --
+    -- `cloud_cover_pct` cannot stand in for it. That number is the STAC
+    -- `eo:cloud_cover` of a whole Sentinel-2 tile — 110 km on a side against a
+    -- farm of 50 ha — so it describes weather somewhere in the tile, not over
+    -- this farm. Measured on Green Farm [Demo-01]: 2026-08-17 reports 13.24%
+    -- cloud and left every cell readable, while 2026-08-18 reports 6.50% and
+    -- blanked 84 of AG-R02-C02's 224 cells. Ranking the two by the tile figure
+    -- puts them in the wrong order, so putting it on the strip would point the
+    -- reader at the wrong day.
+    --
+    -- `valid_pixel_count` and `total_pixel_count` are per farm, per pass and
+    -- per index, written by the same step that writes the pixels the console
+    -- draws. On the same two days they read 2.0% and 8.2%.
+    --
+    -- On a cutover day both branches measure the same ground; take the worse
+    -- of the two rather than mixing a numerator from one with a denominator
+    -- from the other. Never claim the map is more complete than it is.
+    max(no_reading_pct)      AS no_reading_pct
 FROM (
     SELECT * FROM block_days
     UNION ALL
