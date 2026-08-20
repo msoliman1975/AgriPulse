@@ -46,6 +46,44 @@ export type MemberKind = "cell" | "signal";
 /** Named windows the toolbar offers; `custom` is expressed as explicit bounds. */
 export type DateRange = "1d" | "7d" | "30d" | "90d" | "all" | "custom";
 
+/**
+ * The row's state in its own table, which is finer than the unified status.
+ *
+ * Four of these — `deferred`, `expired`, `snoozed`, `dismissed` — share the
+ * `dismissed` tab, so the tabs alone cannot ask for one of them.
+ */
+export type NativeStatus =
+  | "open"
+  | "applied"
+  | "dismissed"
+  | "deferred"
+  | "expired"
+  | "acknowledged"
+  | "resolved"
+  | "snoozed";
+
+/** The four time horizons a decision-tree leaf can author guidance for. */
+export type ActionHorizon = "immediate" | "short_term" | "long_term" | "monitoring";
+
+export interface ActionGuidance {
+  text_en: string;
+  text_ar: string | null;
+}
+
+/**
+ * One node of the walk that produced a recommendation.
+ *
+ * `matched` is null on the leaf — a leaf is where the walk stopped, not a
+ * condition that passed or failed.
+ */
+export interface TreePathStep {
+  node_id: string;
+  matched: boolean | null;
+  label_en: string | null;
+  label_ar: string | null;
+  values: Record<string, unknown>;
+}
+
 export interface CellLocation {
   cell_id: string;
   row: number;
@@ -160,8 +198,26 @@ export interface ActionItem {
   activity_id: string | null;
   scheduled_date: string | null;
 
+  /** Lifecycle timestamps. An alert fills the first two, a recommendation the
+   *  next two; each leaves the other pair null. One shared `closed_at` would
+   *  report an applied recommendation and a resolved alert as one event. */
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  applied_at: string | null;
+  dismissed_at: string | null;
+  /** How long the item is hidden for — `deferred_until` on a recommendation,
+   *  `snoozed_until` on an alert. */
+  deferred_until: string | null;
+  snoozed_until: string | null;
+
   why: string | null;
   reasoning: Record<string, unknown>;
+  /** The full walk behind a recommendation. Empty for an alert, which carries
+   *  a signal snapshot rather than a path. */
+  tree_path: TreePathStep[];
+  /** Guidance by horizon, as the leaf authored it. Empty when the leaf carried
+   *  only a one-line summary. */
+  actions: Partial<Record<ActionHorizon, ActionGuidance[]>>;
 
   /** Both always present, so no consumer has to branch on absence. */
   aggregation: Aggregation;
@@ -203,6 +259,7 @@ export interface ListActionItemsParams {
   block_id?: string;
   action_type?: string[];
   severity?: ItemSeverity[];
+  native_status?: NativeStatus[];
   assigned_membership_id?: string;
   date_range?: Exclude<DateRange, "custom">;
   raised_from?: string;

@@ -318,30 +318,18 @@ export function SideNav(): ReactNode {
         activePathPrefix="/signals/"
         collapsed={collapsed}
       />
-      {/* The unified queue. The two single-kind screens below stay in the nav
-          until this one is signed off, then they go. */}
+      {/* The one queue over recommendations and alerts. /recommendations and
+          /alerts are delisted: everything they did is here — acknowledge,
+          resolve, apply, dismiss, defer, the four-horizon guidance and the
+          decision path — and this screen also filters, groups and dispatches.
+          Both stay routed, because notification links point at them.
+          TODO: repoint those links, then delete the two pages. */}
       <SideNavItem
         to={hasFarm ? `/action-center/${farmSegment}` : "#"}
         label={t("common:workspaceNav.actionCenter")}
         icon={<RecommendationsIcon className="h-4 w-4" />}
         disabled={!hasFarm}
         activePathPrefix="/action-center/"
-        collapsed={collapsed}
-      />
-      <SideNavItem
-        to={hasFarm ? `/recommendations/${farmSegment}` : "#"}
-        label={t("common:workspaceNav.recommendations")}
-        icon={<RecommendationsIcon className="h-4 w-4" />}
-        disabled={!hasFarm}
-        activePathPrefix="/recommendations/"
-        collapsed={collapsed}
-      />
-      <SideNavItem
-        to={hasFarm ? `/alerts/${farmSegment}` : "#"}
-        label={t("common:workspaceNav.alerts")}
-        icon={<AlertsIcon className="h-4 w-4" />}
-        disabled={!hasFarm}
-        activePathPrefix="/alerts/"
         collapsed={collapsed}
       />
       <SideNavItem

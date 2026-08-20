@@ -70,7 +70,9 @@
     "groupBy": "Group by",
     "assignedTo": "Assigned to",
     "anyone": "Anyone",
-    "clearAll": "Clear all filters"
+    "clearAll": "Clear all filters",
+    "nativeStatus": "State",
+    "anyState": "Any state"
   },
   "group": {
     "meta": "{{count}} items · {{blocks}} blocks",
@@ -94,7 +96,13 @@
     "wholeBlock": "Whole block · {{block}}",
     "raised": "raised {{when}}",
     "scheduled": "scheduled {{date}}",
-    "lastSeen": "last seen {{when}}"
+    "lastSeen": "last seen {{when}}",
+    "acknowledged": "acknowledged {{when}}",
+    "resolved": "resolved {{when}}",
+    "applied": "applied {{when}}",
+    "dismissed": "dismissed {{when}}",
+    "deferredUntil": "deferred until {{when}}",
+    "snoozedUntil": "snoozed until {{when}}"
   },
   "why": {
     "title": "Why this fired",
@@ -108,7 +116,13 @@
     "dispatch": "Dispatch",
     "dispatchTo": "Dispatch to…",
     "dispatchAll": "Dispatch all {{count}}",
-    "openOnBoard": "Open on board"
+    "openOnBoard": "Open on board",
+    "acknowledge": "Acknowledge",
+    "resolve": "Resolve",
+    "apply": "Apply",
+    "dismiss": "Dismiss",
+    "defer24": "Defer 24h",
+    "defer24Title": "Defer for 24 hours"
   },
   "bulk": {
     "selected": "{{count}} selected",
@@ -173,5 +187,30 @@
     "spreadTitle": "Zones ({{active}} of {{total}} still firing, was {{previous}})",
     "titleSignals": "Indices ({{active}} of {{total}} still flagging)",
     "spreadTitleSignals": "Indices ({{active}} of {{total}} still flagging, was {{previous}})"
+  },
+  "close": {
+    "failed": "That did not go through."
+  },
+  "nativeStatus": {
+    "open": "Open",
+    "applied": "Applied",
+    "dismissed": "Dismissed",
+    "deferred": "Deferred",
+    "expired": "Expired",
+    "acknowledged": "Acknowledged",
+    "resolved": "Resolved",
+    "snoozed": "Snoozed"
+  },
+  "actionHorizon": {
+    "immediate": "Immediate",
+    "short_term": "Short-term",
+    "long_term": "Long-term",
+    "monitoring": "Monitoring"
+  },
+  "path": {
+    "title": "How the tree got here",
+    "match": "match",
+    "noMatch": "no match",
+    "leaf": "leaf"
   }
 }

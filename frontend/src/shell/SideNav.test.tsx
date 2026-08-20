@@ -68,6 +68,20 @@ describe("<SideNav> menu cutover", () => {
     expect(row.closest("a")).toHaveAttribute("href", "/labs/map-v2");
   });
 
+  it("offers one queue, not three", () => {
+    mockUseAuth.mockReturnValue({
+      user: { access_token: jwt({ tenant_role: "TenantAdmin" }) },
+    });
+    renderNav();
+    expect(screen.getByText("admin,common:common:workspaceNav.actionCenter")).toBeInTheDocument();
+    // Both single-kind screens stay routed for old links; neither is a
+    // destination in the nav any more.
+    expect(
+      screen.queryByText("admin,common:common:workspaceNav.recommendations"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("admin,common:common:workspaceNav.alerts")).not.toBeInTheDocument();
+  });
+
   it("offers the crop catalog once, on the catalog console", () => {
     mockUseAuth.mockReturnValue({
       user: { access_token: jwt({ platform_role: "PlatformAdmin" }) },

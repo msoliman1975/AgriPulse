@@ -46,6 +46,40 @@ DueBucket = Literal["overdue", "today", "week", "later", "monitoring", "none"]
 
 GroupBy = Literal["none", "action_type", "block", "due"]
 
+# The four time horizons a decision-tree leaf can author guidance for. Alerts
+# never carry them; a recommendation carries whichever ones its leaf filled in.
+ActionHorizon = Literal["immediate", "short_term", "long_term", "monitoring"]
+
+
+class ActionGuidance(BaseModel):
+    """One line of guidance inside one horizon.
+
+    The same shape `RecommendationResponse.actions` uses. It is repeated rather
+    than imported so the Action Center schema stays readable on its own and a
+    change to the recommendations module cannot silently reshape this one.
+    """
+
+    text_en: str
+    text_ar: str | None = None
+
+
+class TreePathStep(BaseModel):
+    """One node of the walk that produced a recommendation.
+
+    ``matched`` is None on the leaf: a leaf is where the walk stopped, not a
+    condition that passed or failed, and rendering it as "no match" reads as a
+    failure. ``values`` holds what the condition actually compared, which is
+    the part a user checks the finding against.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    node_id: str
+    matched: bool | None = None
+    label_en: str | None = None
+    label_ar: str | None = None
+    values: dict[str, Any] = Field(default_factory=dict)
+
 
 class CellLocation(BaseModel):
     """Where a cell-scoped item actually is.
@@ -192,11 +226,31 @@ class ActionItem(BaseModel):
     activity_id: UUID | None = None
     scheduled_date: date | None = None
 
+    # When each lifecycle step happened, in the item's own vocabulary. An alert
+    # fills the first two, a recommendation the second two, and each kind
+    # leaves the other pair NULL — one shared "closed_at" would report an
+    # applied recommendation and a resolved alert as the same event.
+    acknowledged_at: datetime | None = None
+    resolved_at: datetime | None = None
+    applied_at: datetime | None = None
+    dismissed_at: datetime | None = None
+    # How long the item is hidden for. `deferred_until` is a recommendation,
+    # `snoozed_until` an alert; both mean "do not ask me again until then".
+    deferred_until: datetime | None = None
+    snoozed_until: datetime | None = None
+
     # One-line "because …" derived from the deciding condition. Always present
-    # for both kinds; the full decision path lives behind the trace endpoint
-    # and may have been purged.
+    # for both kinds.
     why: str | None = None
     reasoning: dict[str, Any] = Field(default_factory=dict)
+    # The full walk behind a recommendation, deciding step included. Empty for
+    # an alert, which has a signal snapshot rather than a path. This is the
+    # row's own copy, written when it fired — not the evaluation trace, which
+    # is purged after 100 days.
+    tree_path: list[TreePathStep] = Field(default_factory=list)
+    # Guidance by horizon, as the leaf authored it. Empty for an alert and for
+    # a recommendation whose leaf carried only a one-line summary.
+    actions: dict[ActionHorizon, list[ActionGuidance]] = Field(default_factory=dict)
 
     # Both always present, so a client never has to branch on absence.
     aggregation: Aggregation = Field(default_factory=Aggregation)

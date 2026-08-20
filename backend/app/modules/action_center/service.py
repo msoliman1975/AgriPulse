@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.action_center.repository import ActionCenterRepository, unified_status
 from app.modules.action_center.schemas import (
+    ActionGuidance,
     ActionItem,
     ActionItemGroup,
     ActionItemListResponse,
@@ -26,6 +27,7 @@ from app.modules.action_center.schemas import (
     DispatchResponse,
     DispatchResultItem,
     Recurrence,
+    TreePathStep,
 )
 from app.shared.action_items import (
     GRID_GROUP_RULE_CODE,
@@ -166,6 +168,58 @@ def derive_why(row: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
     return None, {}
 
 
+def normalise_tree_path(raw: Any) -> list[TreePathStep]:
+    """The stored walk, as steps the client can render.
+
+    ``tree_path`` is untyped JSON on the row, written by whichever engine
+    version fired. Anything that is not a dict with a node id is dropped
+    rather than guessed at: a step with no node cannot be shown as one.
+    """
+    if not isinstance(raw, list):
+        return []
+    steps: list[TreePathStep] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        node_id = entry.get("node_id")
+        if node_id is None:
+            continue
+        values = entry.get("values")
+        steps.append(
+            TreePathStep(
+                node_id=str(node_id),
+                matched=entry.get("matched"),
+                label_en=entry.get("label_en"),
+                label_ar=entry.get("label_ar"),
+                values=values if isinstance(values, dict) else {},
+            )
+        )
+    return steps
+
+
+def normalise_actions(raw: Any) -> dict[str, list[ActionGuidance]]:
+    """Guidance by horizon, keeping only the four horizons the UI renders.
+
+    An empty horizon is dropped, not returned empty: the panel decides whether
+    to render at all by asking whether this mapping is empty.
+    """
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, list[ActionGuidance]] = {}
+    for horizon in ("immediate", "short_term", "long_term", "monitoring"):
+        entries = raw.get(horizon)
+        if not isinstance(entries, list):
+            continue
+        lines = [
+            ActionGuidance(text_en=str(e["text_en"]), text_ar=e.get("text_ar"))
+            for e in entries
+            if isinstance(e, dict) and e.get("text_en")
+        ]
+        if lines:
+            out[horizon] = lines
+    return out
+
+
 def _cell_of(row: dict[str, Any]) -> CellLocation | None:
     if row.get("cell_id") is None:
         return None
@@ -262,8 +316,16 @@ def to_item(row: dict[str, Any], *, now: datetime) -> ActionItem:
         assigned_membership_id=row.get("assigned_membership_id"),
         activity_id=row.get("activity_id"),
         scheduled_date=row.get("scheduled_date"),
+        acknowledged_at=row.get("acknowledged_at"),
+        resolved_at=row.get("resolved_at"),
+        applied_at=row.get("applied_at"),
+        dismissed_at=row.get("dismissed_at"),
+        deferred_until=row.get("deferred_until"),
+        snoozed_until=row.get("snoozed_until"),
         why=why,
         reasoning=reasoning,
+        tree_path=normalise_tree_path(row.get("reasoning_path")),
+        actions=normalise_actions(row.get("actions")),
         aggregation=Aggregation(
             is_group=bool(row.get("is_group")),
             member_count=row.get("member_count") or 0,
@@ -386,6 +448,7 @@ class ActionCenterServiceImpl:
         block_id: UUID | None = None,
         action_types: tuple[str, ...] = (),
         severities: tuple[str, ...] = (),
+        native_statuses: tuple[str, ...] = (),
         assigned_membership_id: UUID | None = None,
         raised_from: datetime | None = None,
         raised_to: datetime | None = None,
@@ -398,6 +461,7 @@ class ActionCenterServiceImpl:
             block_id=block_id,
             action_types=action_types,
             severities=severities,
+            native_statuses=native_statuses,
             assigned_membership_id=assigned_membership_id,
             raised_from=raised_from,
             raised_to=raised_to,

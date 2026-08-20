@@ -42,3 +42,34 @@ export function itemTitle(item: ActionItem, isAr: boolean): string {
 export function itemDetail(item: ActionItem, isAr: boolean): string | null {
   return isAr ? (item.detail_ar ?? item.detail_en) : item.detail_en;
 }
+
+/**
+ * States an item can never leave, so no close button applies.
+ *
+ * Deliberately narrower than the unified `dismissed` tab. That tab holds
+ * `deferred`, `expired`, `snoozed` and `dismissed` together, but a deferred
+ * recommendation can still be applied and a snoozed alert can still be
+ * resolved. Only `expired` is terminal without anybody deciding anything: the
+ * window closed on its own.
+ */
+const CLOSED: Record<string, ReadonlySet<string>> = {
+  recommendation: new Set(["applied", "dismissed", "expired"]),
+  alert: new Set(["resolved"]),
+};
+
+export function canClose(item: Pick<ActionItem, "kind" | "native_status">): boolean {
+  return !(CLOSED[item.kind]?.has(item.native_status) ?? false);
+}
+
+/**
+ * Tomorrow, same time, as an ISO instant.
+ *
+ * One fixed shortcut rather than a date picker, matching the recommendations
+ * screen this replaces. UTC arithmetic so the result does not shift by an hour
+ * across a daylight-saving boundary.
+ */
+export function deferUntil24h(): string {
+  const when = new Date();
+  when.setUTCHours(when.getUTCHours() + 24);
+  return when.toISOString();
+}

@@ -56,8 +56,16 @@ function item(over: Partial<ActionItem> = {}): ActionItem {
     assigned_membership_id: null,
     activity_id: null,
     scheduled_date: null,
+    acknowledged_at: null,
+    resolved_at: null,
+    applied_at: null,
+    dismissed_at: null,
+    deferred_until: null,
+    snoozed_until: null,
     why: "ndvi < -0.15",
     reasoning: {},
+    tree_path: [],
+    actions: {},
     aggregation: {
       is_group: false,
       member_count: 0,
@@ -88,9 +96,14 @@ function renderRow(value: ActionItem) {
           selected={false}
           expanded={false}
           canDispatch
+          canAcknowledge
+          canResolve
+          canAct
+          closing={false}
           onToggleSelect={() => {}}
           onToggleExpand={() => {}}
           onDispatch={() => {}}
+          onClose={() => {}}
         />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -277,9 +290,14 @@ describe("ItemRow — aggregation and recurrence", () => {
             selected={false}
             expanded
             canDispatch
+            canAcknowledge
+            canResolve
+            canAct
+            closing={false}
             onToggleSelect={() => {}}
             onToggleExpand={() => {}}
             onDispatch={() => {}}
+            onClose={() => {}}
           />
         </MemoryRouter>
       </QueryClientProvider>,
@@ -372,9 +390,14 @@ describe("ItemRow — aggregation and recurrence", () => {
             selected={false}
             expanded
             canDispatch
+            canAcknowledge
+            canResolve
+            canAct
+            closing={false}
             onToggleSelect={() => {}}
             onToggleExpand={() => {}}
             onDispatch={() => {}}
+            onClose={() => {}}
           />
         </MemoryRouter>
       </QueryClientProvider>,
@@ -408,14 +431,207 @@ describe("ItemRow — aggregation and recurrence", () => {
             selected={false}
             expanded={false}
             canDispatch
+            canAcknowledge
+            canResolve
+            canAct
+            closing={false}
             onToggleSelect={() => {}}
             onToggleExpand={() => {}}
             onDispatch={onDispatch}
+            onClose={() => {}}
           />
         </MemoryRouter>
       </QueryClientProvider>,
     );
     await userEvent.click(screen.getByRole("button", { name: "Dispatch" }));
     expect(onDispatch).toHaveBeenCalledOnce();
+  });
+});
+
+describe("ItemRow — closing an item", () => {
+  beforeEach(async () => {
+    await setupTestI18n("en");
+    listMembers.mockReset();
+  });
+
+  function renderWith(value: ActionItem, caps: Partial<Record<string, boolean>> = {}) {
+    const onClose = vi.fn();
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <ItemRow
+            item={value}
+            isAr={false}
+            dateLocale={enUS}
+            selected={false}
+            expanded={false}
+            canDispatch={caps.canDispatch ?? true}
+            canAcknowledge={caps.canAcknowledge ?? true}
+            canResolve={caps.canResolve ?? true}
+            canAct={caps.canAct ?? true}
+            closing={false}
+            onToggleSelect={() => {}}
+            onToggleExpand={() => {}}
+            onDispatch={() => {}}
+            onClose={onClose}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    return onClose;
+  }
+
+  it("offers a recommendation its own three verbs", async () => {
+    const onClose = renderWith(item());
+    await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(onClose).toHaveBeenCalledWith({ apply: true });
+    await userEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(onClose).toHaveBeenCalledWith({ dismiss: true });
+    // Alert verbs must not appear on a recommendation.
+    expect(screen.queryByRole("button", { name: "Resolve" })).not.toBeInTheDocument();
+  });
+
+  it("offers an alert acknowledge and resolve, not apply", async () => {
+    const onClose = renderWith(item({ kind: "alert", native_status: "open" }));
+    await userEvent.click(screen.getByRole("button", { name: "Acknowledge" }));
+    expect(onClose).toHaveBeenCalledWith({ acknowledge: true });
+    await userEvent.click(screen.getByRole("button", { name: "Resolve" }));
+    expect(onClose).toHaveBeenCalledWith({ resolve: true });
+    expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
+  });
+
+  it("still lets a deferred recommendation be applied", () => {
+    // The `dismissed` tab holds deferred, expired, snoozed and dismissed
+    // together. Only the states nobody can leave rule the buttons out.
+    renderWith(item({ native_status: "deferred", status: "dismissed" }));
+    expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
+    // Deferring a deferred item again would only move a date it cannot pick.
+    expect(screen.queryByRole("button", { name: "Defer 24h" })).not.toBeInTheDocument();
+  });
+
+  it("offers nothing on an applied recommendation", () => {
+    renderWith(item({ native_status: "applied", status: "done" }));
+    expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Dismiss" })).not.toBeInTheDocument();
+  });
+
+  it("hides the verbs the user has no capability for", () => {
+    renderWith(item({ kind: "alert", native_status: "open" }), {
+      canAcknowledge: false,
+      canResolve: false,
+    });
+    expect(screen.queryByRole("button", { name: "Acknowledge" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Resolve" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the closing verbs for someone who cannot dispatch", () => {
+    // An Agronomist holds every closing capability and holds no plan.manage.
+    // Gating these on dispatch would leave them unable to answer the queue.
+    renderWith(item(), { canDispatch: false });
+    expect(screen.queryByRole("button", { name: "Dispatch" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
+  });
+
+  it("offers the board even before dispatch, pointing at the block's lane", () => {
+    renderWith(item({ activity_id: null }));
+    expect(screen.getByRole("link", { name: "Open on board" })).toHaveAttribute(
+      "href",
+      "/board/f1?lane=b1",
+    );
+  });
+
+  it("names the item's own state in words, not the tab's", () => {
+    renderWith(item({ kind: "alert", native_status: "acknowledged", status: "dispatched" }));
+    expect(screen.getByText("Acknowledged")).toBeInTheDocument();
+  });
+
+  it("says when the item was last moved", () => {
+    renderWith(
+      item({
+        kind: "alert",
+        native_status: "acknowledged",
+        acknowledged_at: "2026-08-12T09:00:00Z",
+      }),
+    );
+    // "Acknowledged" also appears as the state pill, so match the meta line's
+    // shape instead: the verb followed by how long ago it happened.
+    expect(screen.getByText(/acknowledged .*ago/i)).toBeInTheDocument();
+  });
+});
+
+describe("ItemRow — the why panel", () => {
+  beforeEach(async () => {
+    await setupTestI18n("en");
+    listMembers.mockReset();
+  });
+
+  function renderExpanded(value: ActionItem) {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <ItemRow
+            item={value}
+            isAr={false}
+            dateLocale={enUS}
+            selected={false}
+            expanded
+            canDispatch
+            canAcknowledge
+            canResolve
+            canAct
+            closing={false}
+            onToggleSelect={() => {}}
+            onToggleExpand={() => {}}
+            onDispatch={() => {}}
+            onClose={() => {}}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  }
+
+  it("shows the guidance the leaf authored, in horizon order", () => {
+    renderExpanded(
+      item({
+        actions: {
+          monitoring: [{ text_en: "Re-scout in 7 days", text_ar: null }],
+          immediate: [{ text_en: "Spray within 48 hours", text_ar: null }],
+        },
+      }),
+    );
+    const headings = screen.getAllByRole("term").map((n) => n.textContent);
+    expect(headings).toEqual(["Immediate", "Monitoring"]);
+    expect(screen.getByText("Spray within 48 hours")).toBeInTheDocument();
+  });
+
+  it("shows every step of the walk and what each one compared", () => {
+    renderExpanded(
+      item({
+        tree_path: [
+          {
+            node_id: "root",
+            matched: true,
+            label_en: "NDVI dropped",
+            label_ar: null,
+            values: { ndvi: -0.18 },
+          },
+          { node_id: "leaf_spray", matched: null, label_en: null, label_ar: null, values: {} },
+        ],
+      }),
+    );
+    expect(screen.getByText("root")).toBeInTheDocument();
+    expect(screen.getByText("match")).toBeInTheDocument();
+    // The leaf is where the walk stopped, not a condition that failed.
+    expect(screen.getByText("leaf")).toBeInTheDocument();
+    expect(screen.queryByText("no match")).not.toBeInTheDocument();
+    expect(screen.getByText("-0.18")).toBeInTheDocument();
+  });
+
+  it("renders no guidance block when the leaf carried only a summary", () => {
+    renderExpanded(item({ actions: {}, tree_path: [] }));
+    expect(screen.queryByText("Immediate")).not.toBeInTheDocument();
+    expect(screen.queryByText("How the tree got here")).not.toBeInTheDocument();
   });
 });

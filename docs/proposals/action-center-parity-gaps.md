@@ -1,11 +1,26 @@
 # Can Action Center replace Recommendations and Alerts?
 
-Answer: not yet. The Action Center is a better queue, but it cannot close an
-item. Every state change a user makes today happens on `/recommendations` or
-`/alerts`. If those two rows leave the navigation now, several roles lose the
-only control they have.
+Answer at the time of the audit: not yet. All eight gaps below are now built,
+and the two menu rows are delisted. The document is kept as the record of what
+was missing and what closed it.
 
-Checked on `origin/main` at `1d6229d0`, 2026-08-20.
+Audited on `origin/main` at `1d6229d0`, 2026-08-20. Closed on the same day.
+
+## What closed each gap
+
+| Gap | Change |
+| --- | --- |
+| G1 | Close buttons on every row, calling the existing PATCH endpoints |
+| G2 | Four separate capability checks; `plan.manage` gates dispatch only |
+| G3 | `actions` returned on `ActionItem`, rendered by horizon |
+| G4 | `tree_path` returned on `ActionItem`, rendered as a step list |
+| G5 | `native_status` query parameter and a State picker |
+| G6 | `nativeStatus.*` keys in English and Arabic |
+| G7 | Six lifecycle timestamps returned and shown on the meta line |
+| G8 | Board link falls back to the block lane |
+
+Notification deep links moved to `/action-center/:farmId?kind=…&item=…`, and
+the Action Center opens the row that link names.
 
 ## What the Action Center already covers
 

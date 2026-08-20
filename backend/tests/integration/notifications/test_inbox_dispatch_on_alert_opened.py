@@ -198,7 +198,10 @@ async def test_alert_open_creates_inbox_item_and_skipped_dispatches(
     item = dict(alert_rows[0])
     assert item["severity"] == "critical"
     assert item["read_at"] is None
-    assert "/alerts/" in item["link_url"]
+    # The notification opens the Action Center on this row. /alerts is
+    # delisted, and it never read its own `?alert=` parameter anyway.
+    assert "/action-center/" in item["link_url"]
+    assert "kind=alert" in item["link_url"]
     assert item["title"]  # non-empty rendered subject
     assert item["body"]
 

@@ -40,7 +40,7 @@ export function AlertsFeedCard({ farmId }: Props): ReactNode {
         </h2>
         <button
           type="button"
-          onClick={() => navigate(`/alerts/${farmId}`)}
+          onClick={() => navigate(`/action-center/${farmId}?kind=alert`)}
           className="text-xs font-medium text-ap-primary hover:underline"
         >
           {t("alertsFeed.viewAll")}
