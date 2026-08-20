@@ -327,6 +327,23 @@ class Settings(BaseSettings):
     # tolerates one missed poll.
     imagery_discovery_lookback_hours: int = 48
 
+    # Hour of day (UTC) a daily subscription becomes due, on top of the plain
+    # "last attempt older than cadence" rule.
+    #
+    # Without it, a 24h cadence is anchored wherever the previous attempt
+    # happened to land and stays there. Measured on prod 2026-08-20: the
+    # Agrosina farm subscription last polled at 03:23 UTC, while that day's
+    # Sentinel-2 L2A scene was published at 12:30 UTC. The poll ran nine hours
+    # before the scene existed, so the newest reading in the product was three
+    # days old while a same-day scene sat in the catalogue.
+    #
+    # 14:00 UTC clears Sentinel-2's typical 3-6h L2A publication latency for
+    # EMEA longitudes (sensing ~08:30 UTC over Egypt). It is a single global
+    # hour, so a fleet spread over many longitudes wants either a later value
+    # or a per-subscription column; set it to None to switch the rule off and
+    # keep pure cadence behaviour.
+    imagery_discovery_anchor_hour_utc: int | None = 14
+
     # Cold-start floor: how far back a *fresh* subscription's discovery reaches
     # when it has no `last_successful_ingest_at` watermark yet. Normal daily
     # discovery is watermark-driven, so this only bounds the very first poll.

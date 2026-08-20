@@ -17,7 +17,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Text, and_, bindparam, select, text, update
+from sqlalchemy import Integer, Text, and_, bindparam, select, text, update
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -238,6 +238,53 @@ LIMIT :limit
 """
 
 
+def _due_predicate_sql(prefix: str = "") -> str:
+    """SQL for "this subscription should be polled now".
+
+    Two ways to become due, joined by OR:
+
+    1. The plain cadence rule — the last attempt is older than
+       ``cadence_hours`` (or there has never been one).
+    2. The daily anchor — for a subscription on a cadence of a day or more,
+       once the clock passes ``:anchor_hour`` UTC and the last attempt was
+       before today's anchor.
+
+    Rule 2 exists because rule 1 alone anchors a daily poll wherever the
+    previous one landed and keeps it there. A farm whose poll drifted to
+    03:23 UTC kept missing the same day's Sentinel-2 scene, published at
+    12:30 UTC, and served three-day-old imagery while a fresh scene sat in
+    the catalogue (measured on prod, Agrosina, 2026-08-20).
+
+    The two rules converge rather than compete. After an anchor-triggered
+    poll, ``last_attempted_at`` is today's anchor time, so rule 1 next fires
+    24h later — which is the anchor again. A daily subscription therefore
+    settles into exactly one poll per day, at the anchor hour.
+
+    Both anchor comparisons pin the day boundary to UTC explicitly rather
+    than trusting the session's TimeZone setting.
+
+    ``prefix`` is the table alias plus a dot, or empty for an unaliased table.
+    """
+    p = prefix
+    anchor = (
+        "(date_trunc('day', :now AT TIME ZONE 'UTC') "
+        "+ make_interval(hours => :anchor_hour)) AT TIME ZONE 'UTC'"
+    )
+    return f"""(
+            {p}last_attempted_at IS NULL
+         OR {p}last_attempted_at <
+            (:now - make_interval(
+                hours => COALESCE({p}cadence_hours, :default_cadence)
+            ))
+         OR (
+                :anchor_hour IS NOT NULL
+            AND COALESCE({p}cadence_hours, :default_cadence) >= 24
+            AND :now >= {anchor}
+            AND {p}last_attempted_at < {anchor}
+            )
+      )"""
+
+
 class ImageryRepository:
     """Internal repository — service layer is the only consumer."""
 
@@ -289,29 +336,24 @@ class ImageryRepository:
         *,
         default_cadence_hours: int,
         now: datetime,
+        anchor_hour_utc: int | None = None,
     ) -> tuple[dict[str, Any], ...]:
-        """Return active subscriptions whose `last_attempted_at` is older
-        than their cadence (or NULL — never attempted).
+        """Return active subscriptions that are due to be polled.
 
         ``cadence_hours`` defaults to ``default_cadence_hours`` when the
-        column is NULL. The Beat sweep enqueues a `discover_scenes`
+        column is NULL. ``anchor_hour_utc`` adds the daily anchor rule — see
+        `_due_predicate_sql`. The Beat sweep enqueues a `discover_scenes`
         task per result.
         """
         rows = (
             (
                 await self._session.execute(
                     text(
-                        """
+                        f"""
                     SELECT s.* FROM imagery_aoi_subscriptions s
                     WHERE s.is_active = TRUE
                       AND s.deleted_at IS NULL
-                      AND (
-                            s.last_attempted_at IS NULL
-                         OR s.last_attempted_at <
-                            (:now - make_interval(
-                                hours => COALESCE(s.cadence_hours, :default_cadence)
-                            ))
-                      )
+                      AND {_due_predicate_sql("s.")}
                       -- Skip blocks whose FARM is being fetched as one AOI.
                       -- Gated on fetch_farm_aoi, not merely on a farm row
                       -- existing: 0074 created a farm subscription for every
@@ -330,8 +372,13 @@ class ImageryRepository:
                             AND f.deleted_at IS NULL
                       )
                     ORDER BY s.created_at ASC
-                    """
-                    ).bindparams(now=now, default_cadence=default_cadence_hours)
+                    """  # noqa: S608 - the predicate is a module literal, values are bound
+                    ).bindparams(
+                        bindparam("anchor_hour", type_=Integer()),
+                        now=now,
+                        default_cadence=default_cadence_hours,
+                        anchor_hour=anchor_hour_utc,
+                    )
                 )
             )
             .mappings()
@@ -1508,6 +1555,7 @@ class ImageryRepository:
         *,
         default_cadence_hours: int,
         now: datetime,
+        anchor_hour_utc: int | None = None,
     ) -> tuple[dict[str, Any], ...]:
         """Active farm subscriptions with the farm-AOI fetch switched ON.
 
@@ -1515,26 +1563,28 @@ class ImageryRepository:
         nothing: 0074 created an active farm subscription for every farm that
         had block subscriptions, so without the flag every farm on the
         platform would start fetching a second, larger AOI on the next beat.
+
+        ``anchor_hour_utc`` adds the daily anchor rule — see
+        `_due_predicate_sql`.
         """
         rows = (
             (
                 await self._session.execute(
                     text(
-                        """
+                        f"""
                     SELECT * FROM imagery_farm_subscriptions
                     WHERE is_active = TRUE
                       AND fetch_farm_aoi = TRUE
                       AND deleted_at IS NULL
-                      AND (
-                            last_attempted_at IS NULL
-                         OR last_attempted_at <
-                            (:now - make_interval(
-                                hours => COALESCE(cadence_hours, :default_cadence)
-                            ))
-                      )
+                      AND {_due_predicate_sql()}
                     ORDER BY created_at ASC
-                    """
-                    ).bindparams(now=now, default_cadence=default_cadence_hours)
+                    """  # noqa: S608 - the predicate is a module literal, values are bound
+                    ).bindparams(
+                        bindparam("anchor_hour", type_=Integer()),
+                        now=now,
+                        default_cadence=default_cadence_hours,
+                        anchor_hour=anchor_hour_utc,
+                    )
                 )
             )
             .mappings()
