@@ -94,6 +94,18 @@ export const en = {
 
   "home.greeting": "Signed in as",
   "work.needValue": "Choose a value before saving.",
+  // The lookup list and the bounds the tenant defined for this signal. The
+  // server rejects anything outside them, so these say what to change rather
+  // than reporting a refusal after the fact. `{min}`, `{max}` and `{allowed}`
+  // are filled in by CaptureForm.
+  "work.needNumber": "Enter a number.",
+  "work.belowMin": "Too low. The smallest allowed is {min}.",
+  "work.aboveMax": "Too high. The largest allowed is {max}.",
+  "work.notAllowed": "Choose one of: {allowed}",
+  "work.range": "Allowed:",
+  "work.needPosition": "Set your position first — it is the reading.",
+  "work.positionIsValue": "Your position will be saved as the reading.",
+  "work.unknownKind": "This signal cannot be recorded on the phone. Tell the office.",
   "work.whatHappened": "What happened",
   "work.optional": "Optional",
   "work.yes": "Yes",

@@ -193,15 +193,44 @@ export function submitVisit(
   });
 }
 
-/** A thing a scout can record against a block. */
+/** The five shapes a reading can take. Mirrors `ValueKind` in
+ *  backend/app/modules/signals/schemas.py — the server rejects any value that
+ *  does not match the definition's kind, so this list must stay identical. */
+export type ValueKind = "numeric" | "categorical" | "event" | "boolean" | "geopoint";
+
+/**
+ * A thing a scout can record against a block.
+ *
+ * **The field names here are the API's, exactly.** This interface used to
+ * invent its own — `value_type` for `value_kind`, `allowed_values` for
+ * `categorical_values` — and because both were declared optional, TypeScript
+ * accepted them and every read returned `undefined`. The form then fell back
+ * to a free-text box for every signal on the phone and posted every reading
+ * into `value_categorical`, so the server rejected all twelve definitions in
+ * production: the eight with a lookup list ("value_categorical must be one
+ * of [...]"), the three numeric ones and `scout_photo`. Renaming a field here
+ * without renaming it in the API breaks the app silently. There is no test
+ * that can catch it, because the wrong name is legal TypeScript.
+ *
+ * `value_min` / `value_max` arrive as **strings** — they are Postgres
+ * `numeric` columns, and Pydantic serialises `Decimal` to a JSON string to
+ * avoid float rounding. Compare them with `Number()`, never with `<` directly.
+ */
 export interface SignalDefinition {
   id: string;
   code: string;
   name: string;
-  value_type: "numeric" | "categorical" | "event" | "boolean" | "geopoint" | null;
-  unit?: string | null;
-  allowed_values?: string[] | null;
-  attachment_allowed?: boolean | null;
+  description: string | null;
+  value_kind: ValueKind;
+  unit: string | null;
+  /** The lookup list. Non-empty for every `categorical` definition — the
+   *  server refuses to create one without it — and null for every other kind. */
+  categorical_values: string[] | null;
+  /** Inclusive bounds on a `numeric` reading. Decimal-as-string; see above. */
+  value_min: string | null;
+  value_max: string | null;
+  attachment_allowed: boolean;
+  is_active: boolean;
 }
 
 /**
@@ -271,9 +300,16 @@ export function recordObservation(
   body: {
     farm_id: string;
     block_id?: string | null;
+    // All five value columns are declared, and the server accepts EXACTLY ONE
+    // of them — the one matching the definition's `value_kind`. `value_event`
+    // and `value_geopoint` were missing from this type while the caller was
+    // already spreading them in; TypeScript does not excess-property-check a
+    // spread, so the omission never surfaced as an error.
     value_numeric?: number | null;
     value_categorical?: string | null;
+    value_event?: string | null;
     value_boolean?: boolean | null;
+    value_geopoint?: Geopoint | null;
     notes?: string | null;
     attachment_s3_key?: string | null;
     location_mode?: "entity" | "free_point";

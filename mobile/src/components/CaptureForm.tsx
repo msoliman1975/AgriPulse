@@ -5,6 +5,7 @@ import {
   getSignalTemplate,
   listSignalDefinitions,
   recordObservation,
+  type Geopoint,
   type SignalDefinition,
 } from "@/api/client";
 import { currentFix, type Fix } from "@/capture/location";
@@ -93,14 +94,70 @@ export function CaptureForm({
   // `scout_photo` signal — an event, and a REQUIRED member of the default
   // scouting template — was rejected every single time, which is why saving a
   // photo never worked.
-  const kind = chosen?.value_type ?? "categorical";
+  //
+  // Read straight off the definition, with NO `?? "categorical"` fallback.
+  // That fallback is what hid the field-name bug: `value_type` is not a field
+  // the API sends, so it was always undefined, the fallback always won, and
+  // every signal on the phone became a free-text categorical one. A kind we
+  // cannot read is now an unusable form and a visible message, not a wrong
+  // form that fails on save.
+  const kind = chosen?.value_kind;
   const numeric = kind === "numeric";
   const canAttach = chosen?.attachment_allowed === true;
+  // The lookup list the tenant defined. The server requires a non-empty one
+  // for every categorical definition, so an empty list here means a legacy row
+  // — fall back to free text rather than showing a picker with nothing in it.
+  const options = chosen?.categorical_values ?? [];
+  const usePicker = kind === "categorical" && options.length > 0;
+  // Decimal-as-string on the wire. `Number(null)` is 0, which would silently
+  // impose a floor of zero on every unbounded signal, so the null check is
+  // deliberate and must stay.
+  const min = chosen?.value_min == null ? null : Number(chosen.value_min);
+  const max = chosen?.value_max == null ? null : Number(chosen.value_max);
   // An event is a thing that happened: the act is the value, so text is
   // optional and the signal's own code stands in when nothing is typed.
   // Numeric and categorical carry a measurement, and an empty one is not a
   // reading at all.
   const needsValue = kind === "numeric" || kind === "categorical";
+
+  /** "0 – 100 %", or null when the signal has no bounds to show. Written next
+   *  to the box so the scout knows the range BEFORE typing, rather than after
+   *  the server rejects the reading. */
+  function rangeHint(): string | null {
+    if (kind !== "numeric") return null;
+    const unit = chosen?.unit ? ` ${chosen.unit}` : "";
+    if (min !== null && max !== null) return `${min} – ${max}${unit}`;
+    if (min !== null) return `≥ ${min}${unit}`;
+    if (max !== null) return `≤ ${max}${unit}`;
+    return null;
+  }
+
+  /**
+   * The same checks the server runs, run here first.
+   *
+   * Not belt-and-braces: on a field connection a rejected POST costs the scout
+   * a round trip and tells them nothing until it comes back. `_validate_value`
+   * in signals/service.py is the authority — these messages mirror its rules
+   * so the two can never disagree about what is acceptable.
+   */
+  function localValueError(): string | null {
+    if (!chosen || !kind) return t(lang, "work.unknownKind");
+    if (kind === "boolean") return boolValue === null ? t(lang, "work.needValue") : null;
+    if (kind === "geopoint") return fix ? null : t(lang, "work.needPosition");
+    if (needsValue && value === "") return t(lang, "work.needValue");
+    if (kind === "numeric") {
+      // Not `Number(value)` alone: `Number("")` is 0 and `Number(" ")` is 0,
+      // so a blank box would pass as a valid zero reading.
+      const n = Number(value);
+      if (value.trim() === "" || !Number.isFinite(n)) return t(lang, "work.needNumber");
+      if (min !== null && n < min) return t(lang, "work.belowMin").replace("{min}", String(min));
+      if (max !== null && n > max) return t(lang, "work.aboveMax").replace("{max}", String(max));
+    }
+    if (usePicker && !options.includes(value)) {
+      return t(lang, "work.notAllowed").replace("{allowed}", options.join(", "));
+    }
+    return null;
+  }
 
   function addFiles(list: FileList | null): void {
     if (!list) return;
@@ -132,30 +189,33 @@ export function CaptureForm({
     value_categorical: string | null;
     value_event: string | null;
     value_boolean: boolean | null;
+    value_geopoint: Geopoint | null;
   } {
     const empty = {
       value_numeric: null,
       value_categorical: null,
       value_event: null,
       value_boolean: null,
+      value_geopoint: null,
     };
     if (kind === "numeric") return { ...empty, value_numeric: value === "" ? null : Number(value) };
     if (kind === "boolean") return { ...empty, value_boolean: boolValue };
     if (kind === "event") return { ...empty, value_event: value.trim() || (chosen?.code ?? "observed") };
+    // A geopoint signal records a place, so the reading IS the fix. `save()`
+    // refuses to run without one, which is why this cannot post a null.
+    if (kind === "geopoint") return { ...empty, value_geopoint: fix?.point ?? null };
     return { ...empty, value_categorical: value === "" ? null : value };
   }
 
   async function save(): Promise<void> {
     if (!defId) return;
     // Checked here rather than left to the server: a scout in a field should
-    // be told "choose a value" by the form, not "could not save" by a request
-    // that was never going to succeed.
-    if (needsValue && value === "") {
-      setError(t(lang, "work.needValue"));
-      return;
-    }
-    if (kind === "boolean" && boolValue === null) {
-      setError(t(lang, "work.needValue"));
+    // be told what is wrong by the form, not "could not save" by a request
+    // that was never going to succeed. One call covers every kind, including
+    // the range and lookup-list rules the server enforces.
+    const problem = localValueError();
+    if (problem) {
+      setError(problem);
       return;
     }
     setBusy(true);
@@ -252,24 +312,41 @@ export function CaptureForm({
             </button>
           ))}
         </div>
-      ) : chosen?.allowed_values && chosen.allowed_values.length > 0 ? (
+      ) : usePicker ? (
+        /* The tenant's lookup list, and nothing else. A scout cannot type a
+           value the server will reject, which is the whole point of defining
+           the list — before this, every one of these was a free-text box and
+           the reading came back "value_categorical must be one of [...]". */
         <select id="val" value={value} onChange={(e) => setValue(e.target.value)}>
           <option value="">—</option>
-          {chosen.allowed_values.map((v) => (
+          {options.map((v) => (
             <option key={v} value={v}>
               {v}
             </option>
           ))}
         </select>
+      ) : kind === "geopoint" ? (
+        /* Nothing to type: the position below IS the reading. */
+        <p className="hint">{fix ? t(lang, "work.positionIsValue") : t(lang, "work.needPosition")}</p>
       ) : (
         <input
           id="val"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           inputMode={numeric ? "decimal" : "text"}
+          // The browser enforces nothing here — this is a controlled React
+          // input inside a WebView, and `type="number"` on Android hides the
+          // minus sign on some keyboards. The bounds are checked in
+          // `localValueError()`; these attributes only shape the keypad and
+          // the stepper.
+          type={numeric ? "number" : "text"}
+          min={numeric && min !== null ? min : undefined}
+          max={numeric && max !== null ? max : undefined}
           placeholder={kind === "event" ? t(lang, "work.optional") : ""}
         />
       )}
+      {/* Shown before the scout types, not after the server refuses. */}
+      {rangeHint() ? <p className="hint">{t(lang, "work.range")} {rangeHint()}</p> : null}
 
       {/* Photos only where the signal permits them. A definition with
           attachments switched off silently drops the key, so offering a camera
