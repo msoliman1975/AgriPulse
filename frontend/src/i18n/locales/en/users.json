@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "Team & roles",
-    "subtitle": "Everyone in this tenant and their tenant-wide roles. Per-farm role assignments live on each farm's Members page.",
+    "subtitle": "Everyone in this tenant and the one role each of them holds. Tenant-wide roles apply to every farm; the rest are granted per farm.",
     "loadFailed": "Failed to load users.",
     "empty": "No users in this tenant yet.",
     "newButton": "Invite user",
@@ -10,7 +10,7 @@
   "table": {
     "name": "Name",
     "email": "Email",
-    "tenantRoles": "Tenant roles",
+    "tenantRoles": "Role",
     "status": "Status",
     "lastLogin": "Last login",
     "actions": "Actions"
@@ -26,7 +26,10 @@
     "reactivate": "Reactivate",
     "delete": "Delete",
     "resend": "Resend invite",
-    "resending": "Resending…"
+    "resending": "Resending…",
+    "farmRole": "{{role}} · {{farm}}",
+    "unknownFarm": "unknown farm",
+    "noRole": "no role"
   },
   "credential": {
     "emailSent": "Welcome email sent to {{email}}.",
@@ -43,13 +46,20 @@
     "email": "Email",
     "fullName": "Full name",
     "phone": "Phone (optional)",
-    "tenantRole": "Tenant role",
+    "tenantRole": "Role",
     "save": "Send invite",
     "saving": "Inviting…",
     "saveFailed": "Invite failed",
     "cancel": "Cancel",
     "successProvisioned": "Invite sent — Keycloak welcome email queued.",
-    "successPending": "User created in DB; Keycloak provisioning is offline. Operator will provision via kcadm.sh."
+    "successPending": "User created in DB; Keycloak provisioning is offline. Operator will provision via kcadm.sh.",
+    "farms": "Farms",
+    "farmsHint": "This role is granted one farm at a time. Pick every farm this person works on.",
+    "farmsRequired": "Pick at least one farm for this role.",
+    "farmsLoading": "Loading farms…",
+    "farmsFailed": "Could not load the farm list.",
+    "farmsEmpty": "This tenant has no farms yet. Create a farm first, or pick a tenant-wide role.",
+    "farmsTruncated": "Only the first 100 farms are listed. Use the farm's Members page for the rest."
   },
   "edit": {
     "title": "Edit user",
@@ -60,5 +70,33 @@
     "saving": "Saving…",
     "saveFailed": "Save failed",
     "cancel": "Cancel"
+  },
+  "roles": {
+    "TenantOwner": "Tenant Owner",
+    "TenantAdmin": "Tenant Admin",
+    "BillingAdmin": "Billing Admin",
+    "FarmManager": "Farm Manager",
+    "Agronomist": "Agronomist",
+    "FieldOperator": "Field Operator",
+    "Scout": "Scout",
+    "Viewer": "Viewer"
+  },
+  "roleHints": {
+    "TenantOwner": "Full control of the tenant, on every farm. Only an owner can transfer ownership.",
+    "TenantAdmin": "Manages users, farms and settings across every farm in the tenant.",
+    "BillingAdmin": "Subscriptions and invoices only. No access to farm data.",
+    "FarmManager": "Runs the farms you choose below: blocks, plans, workers and alerts.",
+    "Agronomist": "Reviews and acts on recommendations and alerts for the farms you choose below.",
+    "FieldOperator": "Records work done in the field on the farms you choose below.",
+    "Scout": "Files scouting visits and observations on the farms you choose below.",
+    "Viewer": "Read-only access to the farms you choose below."
+  },
+  "role": {
+    "title": "Role",
+    "replaceNotice": "Setting a role replaces the one this person holds now. Roles do not add up.",
+    "save": "Change role",
+    "saving": "Saving…",
+    "saved": "Role changed.",
+    "saveFailed": "Could not change the role"
   }
 }

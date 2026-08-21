@@ -21,7 +21,7 @@ is isolated. The KC client is the in-memory `FakeKeycloakClient`.
 
 from __future__ import annotations
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import bindparam, text
@@ -29,12 +29,15 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.iam.users_service import (
+    FarmsNotInTenantError,
+    LastTenantOwnerError,
     TenantUserAlreadyExistsError,
     TenantUserNotFoundError,
     TenantUsersService,
 )
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.keycloak import FakeKeycloakClient
+from app.shared.rbac import FARM_TIER_ROLES, TENANT_TIER_ROLES, RoleNotAssignableError
 
 pytestmark = [pytest.mark.integration]
 
@@ -65,21 +68,70 @@ def _users_service(admin_session: AsyncSession, fake: FakeKeycloakClient) -> Ten
     return TenantUsersService(public_session=admin_session, keycloak=fake)
 
 
+async def _tenant_scoped_service(
+    admin_session: AsyncSession,
+    fake: FakeKeycloakClient,
+    *,
+    schema: str,
+) -> TenantUsersService:
+    """A service that can also read `schema`, the way the router builds one.
+
+    Farm-tier grants validate their farm ids against the tenant's `farms`
+    table, which a public-only session cannot see. One session serves both
+    roles here: every public query in the service is schema-qualified, and
+    the farm lookup is the only unqualified one, so it resolves through the
+    search_path set below — the same thing `get_db_session` does in
+    production from the JWT's tenant claim.
+
+    Setting it here, rather than relying on whatever `_make_farm` left
+    behind, is the point: a stale search_path pointed the cross-tenant test
+    at the wrong schema and it found the farm it was supposed to reject.
+    """
+    await admin_session.execute(text(f'SET search_path TO "{schema}", public'))
+    return TenantUsersService(
+        public_session=admin_session, tenant_session=admin_session, keycloak=fake
+    )
+
+
+async def _make_farm(admin_session: AsyncSession, schema: str, *, code: str) -> UUID:
+    """One live farm in `schema`, seeded with SQL.
+
+    The farms API is not mounted in this package, and a role assignment only
+    needs the row to exist.
+    """
+    farm_id = uuid4()
+    await admin_session.execute(text(f'SET search_path TO "{schema}", public'))
+    await admin_session.execute(
+        text(
+            "INSERT INTO farms (id, code, name, boundary) "
+            "VALUES (:id, :code, :name, ST_GeomFromText("
+            "'POLYGON((31.2 30.0,31.21 30.0,31.21 30.01,31.2 30.01,31.2 30.0))', 4326))"
+        ),
+        {"id": str(farm_id), "code": code, "name": f"{code} farm"},
+    )
+    return farm_id
+
+
 # =====================================================================
 # Invite
 # =====================================================================
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("role", ["TenantOwner", "TenantAdmin", "BillingAdmin", "Viewer"])
-async def test_invite_accepts_every_tenant_role(admin_session: AsyncSession, role: str) -> None:
-    """Every role the invite API/UI offers must be insertable.
+@pytest.mark.parametrize("role", TENANT_TIER_ROLES)
+async def test_invite_accepts_every_tenant_tier_role(
+    admin_session: AsyncSession, role: str
+) -> None:
+    """Every tenant-tier role the invite API offers must be insertable.
 
     Regression for the default-role 500: the tenant_role_assignments CHECK
-    constraint omitted 'Viewer' (the DEFAULT invite role), so a default invite
-    raised CheckViolationError. The role lands in tenant_role_assignments via a
-    real DB insert here (FakeKeycloakClient can't catch the DB CHECK), so this
-    fails pre-0036 for 'Viewer' and passes after.
+    constraint has to accept whatever the invite path writes. The role lands
+    via a real DB insert here, which FakeKeycloakClient cannot shortcut, so a
+    CHECK that disagrees with the offered list fails this test.
+
+    `Viewer` used to be in this list. It is farm-tier now — it is a FarmRole,
+    and a tenant-wide Viewer granted nothing at all, because the JWT claim is
+    parsed against the tenant-role enum and the value was dropped.
     """
     fake = FakeKeycloakClient()
     tenant_id, schema = await _make_tenant(admin_session, fake, prefix="role")
@@ -96,6 +148,296 @@ async def test_invite_accepts_every_tenant_role(admin_session: AsyncSession, rol
     assert result["keycloak_provisioning"] == "succeeded"
     rows = await svc.list_users(tenant_id=tenant_id)
     assert rows[0]["tenant_roles"] == [role]
+    assert rows[0]["farm_roles"] == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", FARM_TIER_ROLES)
+async def test_invite_farm_tier_role_without_farms_is_refused(
+    admin_session: AsyncSession, role: str
+) -> None:
+    """A farm-tier role with no farms would write no role row at all.
+
+    The API layer rejects the pair, but the service is also called directly,
+    and silently creating a member with no role is the worst of the outcomes:
+    they sign in and every screen 403s with nothing to point at.
+    """
+    fake = FakeKeycloakClient()
+    _tenant_id, schema = await _make_tenant(admin_session, fake, prefix="nofarm")
+    svc = _users_service(admin_session, fake)
+
+    with pytest.raises(ValueError, match="granted per farm"):
+        await svc.invite_user(
+            email=f"{role.lower()}@nofarm.test",
+            full_name=f"{role} User",
+            phone=None,
+            tenant_role=role,
+            tenant_schema=schema,
+            actor_user_id=None,
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", ["PlatformAdmin", "PlatformSupport"])
+async def test_invite_refuses_platform_roles(admin_session: AsyncSession, role: str) -> None:
+    """A platform role must never be assignable from inside a tenant.
+
+    Refused before any row is written, rather than left to the
+    tenant_role_assignments CHECK — which would surface as a 500 rather than
+    a validation error, and would not cover the farm_scopes path at all.
+    """
+    fake = FakeKeycloakClient()
+    _tenant_id, schema = await _make_tenant(admin_session, fake, prefix="plat")
+    svc = _users_service(admin_session, fake)
+
+    with pytest.raises(RoleNotAssignableError):
+        await svc.invite_user(
+            email=f"{role.lower()}@plat.test",
+            full_name=f"{role} User",
+            phone=None,
+            tenant_role=role,
+            tenant_schema=schema,
+            actor_user_id=None,
+        )
+
+
+@pytest.mark.asyncio
+async def test_invite_farm_tier_role_writes_farm_scopes(admin_session: AsyncSession) -> None:
+    """A farm-tier invite grants through farm_scopes and no tenant role.
+
+    That combination — a member with farm scopes and no tenant assignment —
+    is the shape a scout has had since PR #269/#270, and it is what lets a
+    farm role stay confined to its farms.
+    """
+    fake = FakeKeycloakClient()
+    tenant_id, schema = await _make_tenant(admin_session, fake, prefix="fscope")
+    farm_id = await _make_farm(admin_session, schema, code="AGR")
+    svc = await _tenant_scoped_service(admin_session, fake, schema=schema)
+
+    result = await svc.invite_user(
+        email="agronomist@fscope.test",
+        full_name="Agronomist User",
+        phone=None,
+        tenant_role="Agronomist",
+        farm_ids=(farm_id,),
+        tenant_schema=schema,
+        actor_user_id=None,
+    )
+    assert result["keycloak_provisioning"] == "succeeded"
+
+    rows = await svc.list_users(tenant_id=tenant_id)
+    row = next(r for r in rows if r["email"] == "agronomist@fscope.test")
+    assert row["tenant_roles"] == []
+    assert row["farm_roles"] == [{"farm_id": str(farm_id), "role": "Agronomist"}]
+
+    # The JWT carries farm_scopes, so the Keycloak attribute has to be
+    # written too — without it the member signs in and is 403 everywhere.
+    kc_user = fake.users[result["keycloak_subject"]]
+    assert kc_user.farm_scopes == ({"farm_id": str(farm_id), "role": "Agronomist"},)
+    # A farm role is not a realm role, and must not be set as tenant_role.
+    assert kc_user.tenant_role is None
+    # tenant_id still has to reach the JWT, or there is no tenant context.
+    assert kc_user.tenant_id == str(tenant_id)
+
+
+@pytest.mark.asyncio
+async def test_invite_rejects_a_farm_from_another_tenant(admin_session: AsyncSession) -> None:
+    """`public.farm_scopes.farm_id` is a logical reference, not a FK.
+
+    Nothing in the database would reject another tenant's farm id, so the
+    check has to happen in the service or the grant is accepted and then
+    resolves against a farm the member cannot see.
+    """
+    fake = FakeKeycloakClient()
+    _a_id, a_schema = await _make_tenant(admin_session, fake, prefix="xa")
+    _b_id, b_schema = await _make_tenant(admin_session, fake, prefix="xb")
+    b_farm = await _make_farm(admin_session, b_schema, code="BF")
+    svc = await _tenant_scoped_service(admin_session, fake, schema=a_schema)
+
+    with pytest.raises(FarmsNotInTenantError):
+        await svc.invite_user(
+            email="stranger@xa.test",
+            full_name="Stranger",
+            phone=None,
+            tenant_role="Agronomist",
+            farm_ids=(b_farm,),
+            tenant_schema=a_schema,
+            actor_user_id=None,
+        )
+
+
+# =====================================================================
+# Role change
+# =====================================================================
+
+
+@pytest.mark.asyncio
+async def test_assign_role_replaces_the_previous_tenant_role(
+    admin_session: AsyncSession,
+) -> None:
+    """Setting a role revokes the old one. Roles do not stack."""
+    fake = FakeKeycloakClient()
+    tenant_id, schema = await _make_tenant(admin_session, fake, prefix="chg")
+    svc = _users_service(admin_session, fake)
+    # An owner has to exist first, or demoting the only member trips the
+    # last-owner guard rather than exercising the replacement.
+    await svc.invite_user(
+        email="owner@chg.test",
+        full_name="Owner",
+        phone=None,
+        tenant_role="TenantOwner",
+        tenant_schema=schema,
+        actor_user_id=None,
+    )
+    invited = await svc.invite_user(
+        email="billing@chg.test",
+        full_name="Billing",
+        phone=None,
+        tenant_role="BillingAdmin",
+        tenant_schema=schema,
+        actor_user_id=None,
+    )
+
+    result = await svc.assign_role(
+        user_id=invited["user_id"],
+        tenant_id=tenant_id,
+        tenant_schema=schema,
+        role="TenantAdmin",
+        farm_ids=(),
+        actor_user_id=None,
+    )
+    assert result["role"] == "TenantAdmin"
+    assert result["revoked"]["tenant_roles"] == ["BillingAdmin"]
+
+    rows = await svc.list_users(tenant_id=tenant_id)
+    row = next(r for r in rows if r["email"] == "billing@chg.test")
+    assert row["tenant_roles"] == ["TenantAdmin"]
+
+    # The Keycloak attribute drives the JWT claim, so a change that only
+    # touched the database would keep granting the revoked role.
+    assert fake.users[invited["keycloak_subject"]].tenant_role == "TenantAdmin"
+
+
+@pytest.mark.asyncio
+async def test_assign_role_can_cross_tiers_in_both_directions(
+    admin_session: AsyncSession,
+) -> None:
+    """Tenant -> farm drops the tenant assignment; farm -> tenant drops scopes."""
+    fake = FakeKeycloakClient()
+    tenant_id, schema = await _make_tenant(admin_session, fake, prefix="tier")
+    farm_id = await _make_farm(admin_session, schema, code="TF")
+    svc = await _tenant_scoped_service(admin_session, fake, schema=schema)
+    await svc.invite_user(
+        email="owner@tier.test",
+        full_name="Owner",
+        phone=None,
+        tenant_role="TenantOwner",
+        tenant_schema=schema,
+        actor_user_id=None,
+    )
+    invited = await svc.invite_user(
+        email="mover@tier.test",
+        full_name="Mover",
+        phone=None,
+        tenant_role="TenantAdmin",
+        tenant_schema=schema,
+        actor_user_id=None,
+    )
+
+    # Down to the farm tier.
+    await svc.assign_role(
+        user_id=invited["user_id"],
+        tenant_id=tenant_id,
+        tenant_schema=schema,
+        role="Scout",
+        farm_ids=(farm_id,),
+        actor_user_id=None,
+    )
+    rows = await svc.list_users(tenant_id=tenant_id)
+    row = next(r for r in rows if r["email"] == "mover@tier.test")
+    assert row["tenant_roles"] == []
+    assert row["farm_roles"] == [{"farm_id": str(farm_id), "role": "Scout"}]
+    kc_user = fake.users[invited["keycloak_subject"]]
+    # Cleared, not left behind: a stale attribute keeps granting TenantAdmin.
+    assert kc_user.tenant_role is None
+    assert kc_user.farm_scopes == ({"farm_id": str(farm_id), "role": "Scout"},)
+
+    # And back up to the tenant tier.
+    await svc.assign_role(
+        user_id=invited["user_id"],
+        tenant_id=tenant_id,
+        tenant_schema=schema,
+        role="TenantAdmin",
+        farm_ids=(),
+        actor_user_id=None,
+    )
+    rows = await svc.list_users(tenant_id=tenant_id)
+    row = next(r for r in rows if r["email"] == "mover@tier.test")
+    assert row["tenant_roles"] == ["TenantAdmin"]
+    assert row["farm_roles"] == []
+    kc_user = fake.users[invited["keycloak_subject"]]
+    assert kc_user.tenant_role == "TenantAdmin"
+    assert kc_user.farm_scopes == ()
+
+
+@pytest.mark.asyncio
+async def test_assign_role_refuses_to_remove_the_last_owner(
+    admin_session: AsyncSession,
+) -> None:
+    """TenantOwner holds the only capability that can appoint another one.
+
+    A tenant with no owner cannot recover without a PlatformAdmin, so the
+    change is refused rather than audited after the fact.
+    """
+    fake = FakeKeycloakClient()
+    tenant_id, schema = await _make_tenant(admin_session, fake, prefix="last")
+    svc = _users_service(admin_session, fake)
+    owner = await svc.invite_user(
+        email="only@last.test",
+        full_name="Only Owner",
+        phone=None,
+        tenant_role="TenantOwner",
+        tenant_schema=schema,
+        actor_user_id=None,
+    )
+
+    with pytest.raises(LastTenantOwnerError):
+        await svc.assign_role(
+            user_id=owner["user_id"],
+            tenant_id=tenant_id,
+            tenant_schema=schema,
+            role="TenantAdmin",
+            farm_ids=(),
+            actor_user_id=None,
+        )
+    # Nothing was revoked on the way to the refusal.
+    rows = await svc.list_users(tenant_id=tenant_id)
+    assert rows[0]["tenant_roles"] == ["TenantOwner"]
+
+
+@pytest.mark.asyncio
+async def test_assign_role_refuses_a_platform_role(admin_session: AsyncSession) -> None:
+    fake = FakeKeycloakClient()
+    tenant_id, schema = await _make_tenant(admin_session, fake, prefix="pesc")
+    svc = _users_service(admin_session, fake)
+    invited = await svc.invite_user(
+        email="climber@pesc.test",
+        full_name="Climber",
+        phone=None,
+        tenant_role="TenantAdmin",
+        tenant_schema=schema,
+        actor_user_id=None,
+    )
+
+    with pytest.raises(RoleNotAssignableError):
+        await svc.assign_role(
+            user_id=invited["user_id"],
+            tenant_id=tenant_id,
+            tenant_schema=schema,
+            role="PlatformAdmin",
+            farm_ids=(),
+            actor_user_id=None,
+        )
 
 
 @pytest.mark.asyncio

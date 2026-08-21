@@ -2,10 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   type TenantUser,
+  type UserRoleAssignPayload,
+  type UserRoleAssignResponse,
   type UserInvitePayload,
   type UserInviteResponse,
   type UserResendInviteResponse,
   type UserUpdatePayload,
+  assignTenantUserRole,
   deleteTenantUser,
   inviteTenantUser,
   listTenantUsers,
@@ -39,6 +42,24 @@ export function useUpdateTenantUser() {
     mutationFn: ({ userId, payload }) => updateTenantUser(userId, payload),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["tenant_users"] });
+    },
+  });
+}
+
+export function useAssignTenantUserRole() {
+  const qc = useQueryClient();
+  return useMutation<
+    UserRoleAssignResponse,
+    Error,
+    { userId: string; payload: UserRoleAssignPayload }
+  >({
+    mutationFn: ({ userId, payload }) => assignTenantUserRole(userId, payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["tenant_users"] });
+      // A farm-tier grant writes farm_scopes, which is what the farm
+      // members list reads. Without this the member appears in Team & roles
+      // and is missing from the farm they were just given.
+      void qc.invalidateQueries({ queryKey: ["farm_members"] });
     },
   });
 }

@@ -84,6 +84,59 @@ def role_tier(role: str) -> str:
         raise UnknownRoleError(f"unknown role: {role!r}") from None
 
 
+# --- What a tenant administrator is allowed to hand out -------------------
+#
+# Derived from the enums, never restated. PlatformAdmin and PlatformSupport
+# are excluded by construction rather than by an explicit deny-list, so a
+# third platform role added later cannot leak into a tenant-facing picker
+# through somebody forgetting to extend a blocklist.
+#
+# The two tiers are assigned through different tables, which is why callers
+# need `assignment_tier` rather than a flat list:
+#   tenant tier -> public.tenant_role_assignments (applies to every farm)
+#   farm tier   -> public.farm_scopes             (one row per farm)
+PLATFORM_TIER_ROLES: tuple[str, ...] = tuple(r.value for r in PlatformRole)
+TENANT_TIER_ROLES: tuple[str, ...] = tuple(r.value for r in TenantRole)
+FARM_TIER_ROLES: tuple[str, ...] = tuple(r.value for r in FarmRole)
+
+#: Every role a TenantOwner / TenantAdmin may grant, in authority order.
+TENANT_ASSIGNABLE_ROLES: tuple[str, ...] = TENANT_TIER_ROLES + FARM_TIER_ROLES
+
+
+class RoleNotAssignableError(ValueError):
+    """A role a tenant administrator is not allowed to grant.
+
+    Raised for the platform tier and for names that are not roles at all.
+    Both are 422, not 403: the caller is not being denied a permission, it
+    named something that cannot be assigned from inside a tenant.
+    """
+
+
+def assignment_tier(role: str) -> str:
+    """`tenant` | `farm` — which table grants `role`, for a tenant admin.
+
+    Unlike `role_tier`, this refuses the platform tier. It is the single
+    guard between a request body and a role write, so that "PlatformAdmin is
+    not available to tenant users" holds for every caller rather than only
+    for the ones that remembered to check.
+
+    `Viewer` answers `farm` here. It is a `FarmRole`, and although public
+    migration 0036 widened the tenant CHECK to accept it, a tenant-wide
+    Viewer grants nothing at all: the JWT claim is parsed with
+    `_safe_enum(..., TenantRole)`, which drops the value and leaves the user
+    with no capabilities. Routing Viewer through farm_scopes is what makes
+    the role actually resolve.
+    """
+    if role in TENANT_TIER_ROLES:
+        return "tenant"
+    if role in FARM_TIER_ROLES:
+        return "farm"
+    raise RoleNotAssignableError(
+        f"role {role!r} cannot be assigned by a tenant administrator; "
+        f"expected one of {', '.join(TENANT_ASSIGNABLE_ROLES)}"
+    )
+
+
 _RBAC_DIR = Path(__file__).resolve().parent
 _CAPABILITIES_FILE = _RBAC_DIR / "capabilities.yaml"
 _ROLE_CAPABILITIES_FILE = _RBAC_DIR / "role_capabilities.yaml"

@@ -1,7 +1,9 @@
+import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow, parseISO } from "date-fns";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { listFarms, type Farm } from "@/api/farms";
 import type { TenantUser, UserUpdatePayload } from "@/api/users";
 import { AsyncBoundary } from "@/components/AsyncBoundary";
 import { Button } from "@/components/Button";
@@ -16,6 +18,7 @@ import { Pill } from "@/components/Pill";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
 import {
+  useAssignTenantUserRole,
   useDeleteTenantUser,
   useInviteTenantUser,
   useReactivateTenantUser,
@@ -24,8 +27,130 @@ import {
   useTenantUsers,
   useUpdateTenantUser,
 } from "@/queries/users";
+import { ASSIGNABLE_ROLES, needsFarms, roleTier } from "@/rbac/assignableRoles";
 
-const TENANT_ROLES = ["TenantOwner", "TenantAdmin", "BillingAdmin", "Viewer"] as const;
+/**
+ * The farms a farm-tier role can be granted on.
+ *
+ * Only live farms, and only the first page: a picker is not a farm browser,
+ * and a tenant large enough to page here should be granting through Farm ->
+ * Members instead. `hasMore` is surfaced in the UI rather than hidden, so a
+ * missing farm reads as "not listed here" rather than "does not exist".
+ */
+function useFarmOptions(enabled: boolean) {
+  return useQuery({
+    queryKey: ["farms", "role-picker"] as const,
+    queryFn: () => listFarms({ limit: 100 }),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+/** Farm id -> name, for rendering a grant the API returns as ids only. */
+function useFarmNames(): Map<string, string> {
+  const farms = useFarmOptions(true);
+  return useMemo(() => {
+    const map = new Map<string, string>();
+    for (const farm of farms.data?.items ?? []) map.set(farm.id, farm.name);
+    return map;
+  }, [farms.data]);
+}
+
+/**
+ * Role select, plus a farm picker when the chosen role needs one.
+ *
+ * The two tiers are stored in different tables and the server rejects a
+ * mismatched pair, so the farm list appears and disappears with the role
+ * rather than sitting there permanently greyed out.
+ */
+function RolePicker({
+  role,
+  farmIds,
+  onRoleChange,
+  onFarmIdsChange,
+  idPrefix,
+}: {
+  role: string;
+  farmIds: string[];
+  onRoleChange: (role: string) => void;
+  onFarmIdsChange: (farmIds: string[]) => void;
+  idPrefix: string;
+}): ReactNode {
+  const { t } = useTranslation("users");
+  const wantsFarms = needsFarms(role);
+  const farms = useFarmOptions(wantsFarms);
+
+  const toggle = (farmId: string): void => {
+    onFarmIdsChange(
+      farmIds.includes(farmId) ? farmIds.filter((f) => f !== farmId) : [...farmIds, farmId],
+    );
+  };
+
+  return (
+    <>
+      {/* The hint sits outside FormField on purpose. FormField renders a
+          <label> around its children, so a <p> inside it becomes part of the
+          field's accessible name — a screen reader would announce the whole
+          sentence as the label of the select. */}
+      <div>
+        <FormField label={t("invite.tenantRole")}>
+          <select
+            id={`${idPrefix}-role`}
+            value={role}
+            onChange={(e) => {
+              onRoleChange(e.target.value);
+              // Switching to the tenant tier must clear the farms, or the
+              // request carries a pair the server refuses with a 422.
+              if (!needsFarms(e.target.value)) onFarmIdsChange([]);
+            }}
+            className={inputCls}
+          >
+            {ASSIGNABLE_ROLES.map((r) => (
+              <option key={r} value={r}>
+                {t(`roles.${r}`)}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <p className="mt-1 text-xs text-ap-muted">{t(`roleHints.${role}`)}</p>
+      </div>
+
+      {wantsFarms ? (
+        <fieldset className="flex flex-col gap-1">
+          <legend className="text-xs font-medium text-ap-muted">{t("invite.farms")}</legend>
+          {farms.isPending ? (
+            <p className="text-xs text-ap-muted">{t("invite.farmsLoading")}</p>
+          ) : farms.isError ? (
+            <p className="text-xs text-ap-crit">{t("invite.farmsFailed")}</p>
+          ) : (farms.data?.items.length ?? 0) === 0 ? (
+            <p className="text-xs text-ap-warn">{t("invite.farmsEmpty")}</p>
+          ) : (
+            <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-ap-line bg-ap-panel p-2">
+              {(farms.data?.items ?? []).map((farm: Farm) => (
+                <label
+                  key={farm.id}
+                  className="flex cursor-pointer items-center gap-2 text-sm text-ap-ink"
+                >
+                  <input
+                    type="checkbox"
+                    checked={farmIds.includes(farm.id)}
+                    onChange={() => toggle(farm.id)}
+                  />
+                  <span>{farm.name}</span>
+                  <span className="font-mono text-xs text-ap-muted">{farm.code}</span>
+                </label>
+              ))}
+            </div>
+          )}
+          <p className="mt-1 text-xs text-ap-muted">{t("invite.farmsHint")}</p>
+          {farms.data?.next_cursor ? (
+            <p className="mt-1 text-xs text-ap-warn">{t("invite.farmsTruncated")}</p>
+          ) : null}
+        </fieldset>
+      ) : null}
+    </>
+  );
+}
 
 /** A first-login credential surfaced after invite/resend. `password` is
  * set only when SMTP was unavailable and a temp credential was minted. */
@@ -47,6 +172,7 @@ export function UsersConfigPage(): ReactNode {
   const [credential, setCredential] = useState<Credential | null>(null);
 
   const users = useTenantUsers();
+  const farmNames = useFarmNames();
   const suspendMut = useSuspendTenantUser();
   const reactivateMut = useReactivateTenantUser();
   const deleteMut = useDeleteTenantUser();
@@ -72,7 +198,7 @@ export function UsersConfigPage(): ReactNode {
       {inviting ? (
         <InviteForm onClose={() => setInviting(false)} onCredential={setCredential} />
       ) : null}
-      {editing ? <EditForm user={editing} onClose={() => setEditing(null)} /> : null}
+      {editing ? <EditPanel user={editing} onClose={() => setEditing(null)} /> : null}
       {credential ? (
         <CredentialBanner credential={credential} onDismiss={() => setCredential(null)} />
       ) : null}
@@ -111,6 +237,7 @@ export function UsersConfigPage(): ReactNode {
                 <UserRow
                   key={user.id}
                   user={user}
+                  farmNames={farmNames}
                   canUpdate={canUpdate}
                   canSuspend={canSuspend}
                   canDelete={canDelete}
@@ -150,6 +277,7 @@ export function UsersConfigPage(): ReactNode {
 
 function UserRow({
   user,
+  farmNames,
   canUpdate,
   canSuspend,
   canDelete,
@@ -162,6 +290,7 @@ function UserRow({
   onResend,
 }: {
   user: TenantUser;
+  farmNames: Map<string, string>;
   canUpdate: boolean;
   canSuspend: boolean;
   canDelete: boolean;
@@ -185,9 +314,22 @@ function UserRow({
         <div className="flex flex-wrap gap-1">
           {user.tenant_roles.map((role) => (
             <Pill key={role} kind="info">
-              {role}
+              {t(`roles.${role}`, { defaultValue: role })}
             </Pill>
           ))}
+          {/* A farm-tier member has no tenant role at all, so without these
+              the column is empty and reads as "no access". */}
+          {user.farm_roles.map((grant) => (
+            <Pill key={`${grant.farm_id}:${grant.role}`} kind="neutral">
+              {t("row.farmRole", {
+                role: t(`roles.${grant.role}`, { defaultValue: grant.role }),
+                farm: farmNames.get(grant.farm_id) ?? t("row.unknownFarm"),
+              })}
+            </Pill>
+          ))}
+          {user.tenant_roles.length === 0 && user.farm_roles.length === 0 ? (
+            <Pill kind="warn">{t("row.noRole")}</Pill>
+          ) : null}
         </div>
       </Td>
       <Td>
@@ -279,8 +421,15 @@ function InviteForm({
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
-  const [tenantRole, setTenantRole] = useState<string>("Viewer");
+  // TenantAdmin, not Viewer. The old default put every invite on the tier
+  // that grants the least, and a tenant-wide Viewer granted nothing at all.
+  // A default that needs a farm chosen would also make the form invalid on
+  // open, which is a worse first impression than a role that has to be
+  // narrowed down.
+  const [role, setRole] = useState<string>("TenantAdmin");
+  const [farmIds, setFarmIds] = useState<string[]>([]);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const missingFarms = needsFarms(role) && farmIds.length === 0;
 
   const submit = (event: React.FormEvent): void => {
     event.preventDefault();
@@ -291,7 +440,8 @@ function InviteForm({
         email: invitedEmail,
         full_name: fullName.trim(),
         phone: phone.trim() || null,
-        tenant_role: tenantRole,
+        role,
+        farm_ids: needsFarms(role) ? farmIds : [],
       },
       {
         onSuccess: (res) => {
@@ -310,6 +460,7 @@ function InviteForm({
           setEmail("");
           setFullName("");
           setPhone("");
+          setFarmIds([]);
         },
       },
     );
@@ -351,19 +502,13 @@ function InviteForm({
         <FormField label={t("invite.phone")}>
           <input value={phone} onChange={(e) => setPhone(e.target.value)} className={inputCls} />
         </FormField>
-        <FormField label={t("invite.tenantRole")}>
-          <select
-            value={tenantRole}
-            onChange={(e) => setTenantRole(e.target.value)}
-            className={inputCls}
-          >
-            {TENANT_ROLES.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-        </FormField>
+        <RolePicker
+          role={role}
+          farmIds={farmIds}
+          onRoleChange={setRole}
+          onFarmIdsChange={setFarmIds}
+          idPrefix="invite"
+        />
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
         {successMsg ? <span className="text-xs text-ap-ok">{successMsg}</span> : null}
@@ -372,12 +517,97 @@ function InviteForm({
             {invite.error?.message ?? t("invite.saveFailed")}
           </span>
         ) : null}
+        {missingFarms ? (
+          <span className="text-xs text-ap-warn">{t("invite.farmsRequired")}</span>
+        ) : null}
         <button
           type="submit"
-          disabled={invite.isPending}
+          disabled={invite.isPending || missingFarms}
           className="rounded-md bg-ap-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
         >
           {invite.isPending ? t("invite.saving") : t("invite.save")}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Change which role a member holds.
+ *
+ * Separate from the profile form above because it is a different endpoint
+ * (`PUT /v1/users/{id}/role`) behind a different capability
+ * (`role.assign_tenant`, which only TenantOwner and TenantAdmin hold). A
+ * member who may edit a name is not automatically allowed to grant
+ * themselves administration.
+ *
+ * The server replaces rather than adds: whatever the member held is revoked
+ * in the same transaction. That is stated on the form, because "set role"
+ * and "add role" look identical until someone checks what happened to the
+ * old one.
+ */
+function RoleForm({ user }: { user: TenantUser }): ReactNode {
+  const { t } = useTranslation("users");
+  const canAssign = useCapability("role.assign_tenant");
+  const assign = useAssignTenantUserRole();
+
+  const currentRole = user.tenant_roles[0] ?? user.farm_roles[0]?.role ?? "";
+  const [role, setRole] = useState<string>(currentRole || "TenantAdmin");
+  const [farmIds, setFarmIds] = useState<string[]>(user.farm_roles.map((grant) => grant.farm_id));
+  const [done, setDone] = useState(false);
+
+  if (!canAssign) return null;
+
+  const missingFarms = needsFarms(role) && farmIds.length === 0;
+  const unchanged =
+    role === currentRole &&
+    (roleTier(role) !== "farm" ||
+      // Same farms, order-insensitive: the picker builds the list in click
+      // order, so a plain join would call an unchanged grant a change.
+      (farmIds.length === user.farm_roles.length &&
+        farmIds.every((id) => user.farm_roles.some((g) => g.farm_id === id))));
+
+  const submit = (event: React.FormEvent): void => {
+    event.preventDefault();
+    setDone(false);
+    assign.mutate(
+      {
+        userId: user.id,
+        payload: { role, farm_ids: needsFarms(role) ? farmIds : [] },
+      },
+      { onSuccess: () => setDone(true) },
+    );
+  };
+
+  return (
+    <form onSubmit={submit} className="mt-3 rounded-lg border border-ap-line bg-ap-bg p-3">
+      <h3 className="mb-1 text-sm font-semibold text-ap-ink">{t("role.title")}</h3>
+      <p className="mb-3 text-xs text-ap-muted">{t("role.replaceNotice")}</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <RolePicker
+          role={role}
+          farmIds={farmIds}
+          onRoleChange={setRole}
+          onFarmIdsChange={setFarmIds}
+          idPrefix={`role-${user.id}`}
+        />
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+        {done ? <span className="text-xs text-ap-ok">{t("role.saved")}</span> : null}
+        {missingFarms ? (
+          <span className="text-xs text-ap-warn">{t("invite.farmsRequired")}</span>
+        ) : null}
+        {assign.isError ? (
+          <span className="text-xs text-ap-crit">
+            {assign.error?.message ?? t("role.saveFailed")}
+          </span>
+        ) : null}
+        <button
+          type="submit"
+          disabled={assign.isPending || missingFarms || unchanged}
+          className="rounded-md border border-ap-primary bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-primary hover:bg-ap-primary/10 disabled:opacity-60"
+        >
+          {assign.isPending ? t("role.saving") : t("role.save")}
         </button>
       </div>
     </form>
@@ -454,6 +684,22 @@ function EditForm({ user, onClose }: { user: TenantUser; onClose: () => void }):
         </button>
       </div>
     </form>
+  );
+}
+
+/**
+ * The edit panel: profile above, role below.
+ *
+ * Two sibling forms, not one nested inside the other — nesting a `<form>`
+ * inside a `<form>` is invalid HTML, and the browser drops the inner one, so
+ * its submit button would silently save the profile instead of the role.
+ */
+function EditPanel({ user, onClose }: { user: TenantUser; onClose: () => void }): ReactNode {
+  return (
+    <div>
+      <EditForm user={user} onClose={onClose} />
+      <RoleForm user={user} />
+    </div>
   );
 }
 

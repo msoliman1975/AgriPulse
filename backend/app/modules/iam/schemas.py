@@ -71,7 +71,21 @@ class MeResponse(BaseModel):
 # =====================================================================
 
 
-from pydantic import EmailStr, Field  # noqa: E402
+from pydantic import AliasChoices, EmailStr, Field, model_validator  # noqa: E402
+
+from app.shared.rbac import (  # noqa: E402
+    FARM_TIER_ROLES,
+    TENANT_ASSIGNABLE_ROLES,
+    RoleNotAssignableError,
+    assignment_tier,
+)
+
+
+class FarmRoleGrantResponse(BaseModel):
+    """One active row of `public.farm_scopes` for a tenant member."""
+
+    farm_id: UUID
+    role: str
 
 
 class TenantUserResponse(BaseModel):
@@ -100,21 +114,116 @@ class TenantUserResponse(BaseModel):
     membership_status: str
     joined_at: datetime | None
     tenant_roles: list[str]
+    # Farm-tier roles this member holds, one entry per farm. Without this the
+    # roles column is blank for anyone who is not a tenant-tier member, which
+    # reads as "no role" rather than "Agronomist on two farms". Farm names are
+    # not joined here: `farm_scopes` lives in `public` and the names live in
+    # the tenant schema, so the frontend joins them against its farms list.
+    farm_roles: list[FarmRoleGrantResponse]
     preferences: UserPreferencesResponse | None
 
 
-class UserInviteRequest(BaseModel):
+class RoleAssignmentMixin(BaseModel):
+    """The `role` + `farm_ids` pair, shared by invite and role change.
+
+    Two tiers reach this field and they are stored in different tables, so
+    the payload is validated as a unit rather than field by field:
+
+      * tenant tier (TenantOwner / TenantAdmin / BillingAdmin) applies to
+        the whole tenant, and `farm_ids` is meaningless — sending it is an
+        error, not something to ignore, because silently dropping it would
+        look like the farms had been restricted.
+      * farm tier (FarmManager / Agronomist / FieldOperator / Scout /
+        Viewer) is granted one farm at a time, so at least one farm id is
+        required. Without it the user signs in and is 403 everywhere, which
+        is the failure this validation exists to prevent.
+
+    PlatformAdmin and PlatformSupport are refused here with a 422. The
+    allow-list comes from `app.shared.rbac`, which builds it from the role
+    enums, so this is not a blocklist that can fall behind.
+    """
+
+    role: str = Field(
+        default="Viewer",
+        # The field was called `tenant_role` while only tenant-tier roles
+        # could be assigned. Kept as an accepted alias so an in-flight
+        # frontend build and the stored OpenAPI clients keep working.
+        validation_alias=AliasChoices("role", "tenant_role"),
+        description=(
+            "One of " + " / ".join(TENANT_ASSIGNABLE_ROLES) + ". "
+            "Platform roles cannot be assigned from inside a tenant."
+        ),
+    )
+    farm_ids: list[UUID] = Field(
+        default_factory=list,
+        description=(
+            "Required, non-empty, for a farm-tier role. Must be empty for a " "tenant-tier role."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _check_role_and_farms(self) -> RoleAssignmentMixin:
+        try:
+            tier = assignment_tier(self.role)
+        except RoleNotAssignableError as exc:
+            raise ValueError(str(exc)) from exc
+        if tier == "farm" and not self.farm_ids:
+            raise ValueError(
+                f"role {self.role!r} is granted per farm; farm_ids must name "
+                f"at least one farm (farm-tier roles: {', '.join(FARM_TIER_ROLES)})"
+            )
+        if tier == "tenant" and self.farm_ids:
+            raise ValueError(
+                f"role {self.role!r} applies to every farm in the tenant; " "farm_ids must be empty"
+            )
+        if len(set(self.farm_ids)) != len(self.farm_ids):
+            raise ValueError("farm_ids contains duplicates")
+        return self
+
+    @property
+    def role_tier(self) -> str:
+        """`tenant` | `farm`. Safe after validation."""
+        return assignment_tier(self.role)
+
+
+class UserInviteRequest(RoleAssignmentMixin):
     """POST /v1/users:invite — invite a new user to the current tenant."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     email: EmailStr
     full_name: str = Field(min_length=1, max_length=200)
     phone: str | None = Field(default=None, max_length=32)
-    tenant_role: str = Field(
-        default="Viewer",
-        description="One of TenantOwner / TenantAdmin / BillingAdmin / Viewer.",
-    )
+
+
+class RevokedRolesResponse(BaseModel):
+    """What the change took away, echoed back so the caller can show it."""
+
+    tenant_roles: list[str]
+    farm_roles: list[FarmRoleGrantResponse]
+
+
+class UserRoleAssignResponse(BaseModel):
+    """PUT /v1/users/{user_id}/role."""
+
+    membership_id: UUID
+    role: str
+    role_tier: Literal["tenant", "farm"]
+    farm_ids: list[UUID]
+    revoked: RevokedRolesResponse
+
+
+class UserRoleAssignRequest(RoleAssignmentMixin):
+    """PUT /v1/users/{user_id}/role — replace a member's role.
+
+    A replacement, not an addition: whatever the member held before is
+    revoked in the same transaction. Roles do not stack in this product —
+    the resolver takes the first tier that grants a capability — so an
+    additive endpoint would leave a member holding two roles with no screen
+    able to show which one is in force.
+    """
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
 
 class UserInviteResponse(BaseModel):

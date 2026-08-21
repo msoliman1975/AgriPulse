@@ -125,7 +125,7 @@ class KeycloakAdminClient(Protocol):
     async def get_user_state(self, *, keycloak_user_id: str) -> KeycloakUserState | None: ...
 
     async def set_tenant_attributes(
-        self, *, keycloak_user_id: str, tenant_id: UUID | str, tenant_role: str
+        self, *, keycloak_user_id: str, tenant_id: UUID | str, tenant_role: str | None
     ) -> None: ...
 
     async def set_farm_scopes(
@@ -210,7 +210,7 @@ class NoopKeycloakClient:
         return None
 
     async def set_tenant_attributes(
-        self, *, keycloak_user_id: str, tenant_id: UUID | str, tenant_role: str
+        self, *, keycloak_user_id: str, tenant_id: UUID | str, tenant_role: str | None
     ) -> None:
         del tenant_id, tenant_role
         self._log.warning("keycloak_noop_set_tenant_attributes", keycloak_user_id=keycloak_user_id)
@@ -439,11 +439,15 @@ class HttpxKeycloakAdminClient:
         # Keycloak's PUT /users/{id} treats missing fields as empty and
         # would wipe email/firstName/lastName (mirrors what
         # `invite_platform_admin` does for `platform_role`).
-        if tenant_id is not None and roles:
-            body["attributes"] = {
-                "tenant_id": [str(tenant_id)],
-                "tenant_role": [roles[0]],
-            }
+        if tenant_id is not None:
+            attributes: dict[str, list[str]] = {"tenant_id": [str(tenant_id)]}
+            # A farm-tier invite passes no roles. `tenant_id` still has to be
+            # written, or the JWT carries no tenant context and every route
+            # 403s on `_ensure_tenant` before RBAC is even consulted. This is
+            # the same shape `enrol_field_user` writes for a scout.
+            if roles:
+                attributes["tenant_role"] = [roles[0]]
+            body["attributes"] = attributes
 
         resp = await self._request(
             "POST", "/users", operation="create_user", json=body, expected=(201, 409)
@@ -600,12 +604,13 @@ class HttpxKeycloakAdminClient:
         )
         for role in roles:
             await self._assign_realm_role(keycloak_user_id, role)
-        # See invite_user above for why we set tenant_id/tenant_role here.
-        if tenant_id is not None and roles:
+        # See invite_user above for why we set tenant_id/tenant_role here,
+        # and why tenant_id is written even for a role-less (farm-tier) add.
+        if tenant_id is not None:
             await self._set_tenant_attributes(
                 keycloak_user_id=keycloak_user_id,
                 tenant_id=tenant_id,
-                tenant_role=roles[0],
+                tenant_role=roles[0] if roles else None,
             )
         self._log.info(
             "keycloak_add_existing_user_to_group",
@@ -651,7 +656,7 @@ class HttpxKeycloakAdminClient:
         )
 
     async def set_tenant_attributes(
-        self, *, keycloak_user_id: str, tenant_id: UUID | str, tenant_role: str
+        self, *, keycloak_user_id: str, tenant_id: UUID | str, tenant_role: str | None
     ) -> None:
         await self._set_tenant_attributes(
             keycloak_user_id=keycloak_user_id,
@@ -808,7 +813,7 @@ class HttpxKeycloakAdminClient:
         *,
         keycloak_user_id: str,
         tenant_id: UUID | str,
-        tenant_role: str,
+        tenant_role: str | None,
     ) -> None:
         """Set tenant_id + tenant_role user attributes on an existing
         Keycloak user.
@@ -836,7 +841,16 @@ class HttpxKeycloakAdminClient:
         user = resp.json()
         attrs = dict(user.get("attributes") or {})
         attrs["tenant_id"] = [str(tenant_id)]
-        attrs["tenant_role"] = [tenant_role]
+        if tenant_role is None:
+            # A member moved to the farm tier. The attribute has to go, not
+            # be set empty: the `tenant_role-mapper` would still emit a claim
+            # and `_safe_enum` would drop it, which happens to be harmless
+            # today but hides the real state from anyone reading Keycloak.
+            # The realm role mapping is left alone on purpose — nothing in
+            # the resolver reads realm roles, only this attribute.
+            attrs.pop("tenant_role", None)
+        else:
+            attrs["tenant_role"] = [tenant_role]
         user["attributes"] = attrs
         await self._request(
             "PUT",

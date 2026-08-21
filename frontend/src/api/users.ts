@@ -33,14 +33,49 @@ export interface TenantUser {
   membership_status: string;
   joined_at: string | null;
   tenant_roles: string[];
+  /**
+   * Farm-tier roles, one entry per farm. A member holds either this or
+   * `tenant_roles`, never both, so a reader that looks only at
+   * `tenant_roles` shows every farm-tier member as having no role.
+   * Farm names are not included — join them against the farms list.
+   */
+  farm_roles: FarmRoleGrant[];
   preferences: UserPreferences | null;
+}
+
+/** One active row of `public.farm_scopes`. */
+export interface FarmRoleGrant {
+  farm_id: string;
+  role: string;
 }
 
 export interface UserInvitePayload {
   email: string;
   full_name: string;
   phone?: string | null;
-  tenant_role: string;
+  /** Any role in `ASSIGNABLE_ROLES`. Platform roles are refused with a 422. */
+  role: string;
+  /** Required and non-empty for a farm-tier role; must be empty otherwise. */
+  farm_ids?: string[];
+}
+
+export interface UserRoleAssignPayload {
+  role: string;
+  farm_ids?: string[];
+}
+
+/** What the change took away, so the caller can say what was replaced. */
+export interface RevokedRoles {
+  tenant_roles: string[];
+  farm_roles: FarmRoleGrant[];
+}
+
+export interface UserRoleAssignResponse {
+  membership_id: string;
+  role: string;
+  role_tier: "tenant" | "farm";
+  farm_ids: string[];
+  revoked: RevokedRoles;
 }
 
 export interface UserInviteResponse {
@@ -81,6 +116,18 @@ export async function updateTenantUser(userId: string, payload: UserUpdatePayloa
   await apiClient.patch(`/v1/users/${userId}`, payload);
 }
 
+/**
+ * Replace a member's role. The server revokes whatever they held first —
+ * roles do not stack, so this is a set, not an add.
+ */
+export async function assignTenantUserRole(
+  userId: string,
+  payload: UserRoleAssignPayload,
+): Promise<UserRoleAssignResponse> {
+  const { data } = await apiClient.put<UserRoleAssignResponse>(`/v1/users/${userId}/role`, payload);
+  return data;
+}
+
 export async function suspendTenantUser(userId: string): Promise<void> {
   await apiClient.post(`/v1/users/${userId}:suspend`);
 }
@@ -93,9 +140,7 @@ export async function deleteTenantUser(userId: string): Promise<void> {
   await apiClient.delete(`/v1/users/${userId}`);
 }
 
-export async function resendTenantUserInvite(
-  userId: string,
-): Promise<UserResendInviteResponse> {
+export async function resendTenantUserInvite(userId: string): Promise<UserResendInviteResponse> {
   const { data } = await apiClient.post<UserResendInviteResponse>(
     `/v1/users/${userId}:resend-invite`,
   );

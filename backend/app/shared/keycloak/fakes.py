@@ -128,9 +128,14 @@ class FakeKeycloakClient:
             if user.email == email:
                 self.groups[group_id].member_ids.append(user.id)
                 user.realm_roles = tuple(set(user.realm_roles).union(roles))
-                if tenant_id is not None and roles:
+                # Mirrors the real client: tenant_id lands whenever a tenant
+                # is named, tenant_role only for a tenant-tier invite. A
+                # farm-tier invite passes no roles and must still get the
+                # tenant_id attribute.
+                if tenant_id is not None:
                     user.tenant_id = str(tenant_id)
-                    user.tenant_role = roles[0]
+                    if roles:
+                        user.tenant_role = roles[0]
                 return self._issue(user)
         uid = uuid4().hex
         user = FakeUser(
@@ -166,7 +171,7 @@ class FakeKeycloakClient:
         )
 
     async def set_tenant_attributes(
-        self, *, keycloak_user_id: str, tenant_id: UUID | str, tenant_role: str
+        self, *, keycloak_user_id: str, tenant_id: UUID | str, tenant_role: str | None
     ) -> None:
         self._maybe_fail("set_tenant_attributes")
         user = self.users.get(keycloak_user_id)
