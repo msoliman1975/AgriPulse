@@ -384,6 +384,12 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
     # (farms/consistency_check.py) that reports orphans and never deletes them.
     OwnedTable("farm_scopes", owner_column="farm_id", schema="public", order=10, fk=False),
     OwnedTable("backfill_runs", owner_column="farm_id", schema="public", order=10, fk=False),
+    # Operator alerts about this farm (public migration 0069). They must go,
+    # not merely resolve: the row denormalises `farm_name` so a resolved alert
+    # still reads back the name of a farm that was hard-deleted. Alerts with a
+    # NULL farm_id are platform-wide (a failing background task) and are left
+    # alone by construction, because the delete is keyed on the column.
+    OwnedTable("platform_alerts", owner_column="farm_id", schema="public", order=10, fk=False),
 )
 
 
@@ -441,6 +447,18 @@ TENANT_PUBLIC_OWNED: tuple[OwnedTable, ...] = (
         note="public.farm_scopes cascades off this",
     ),
     OwnedTable("tenant_settings", owner_column="tenant_id", schema="public", order=20),
+    OwnedTable(
+        "platform_alerts",
+        owner_column="tenant_id",
+        schema="public",
+        order=20,
+        fk=False,
+        note=(
+            "operator alerts; the row denormalises tenant_name/slug/farm_name, "
+            "so it has to be deleted rather than left resolved. Alerts with a "
+            "NULL tenant_id are platform-wide and survive, as intended."
+        ),
+    ),
     OwnedTable(
         "tenant_subscriptions",
         owner_column="tenant_id",
