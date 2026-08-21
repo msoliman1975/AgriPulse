@@ -379,7 +379,17 @@ class IndicesRepository:
         Handing asyncpg a dict for a jsonb parameter is the CAST-plus-bind
         family that caused three production incidents in one day — the cast
         has to be explicit and the value has to arrive as text.
+
+        `duration_ms` is subtracted in Python for the same family of reason.
+        It used to be `EXTRACT(EPOCH FROM (:completed_at - :started_at))`,
+        and asyncpg sends a bare bind as `unknown`, so Postgres saw
+        `unknown - unknown` and refused it with "operator is not unique".
+        Every insert raised, and because the caller treats lineage as
+        best-effort and only logs a warning, the table stayed empty in
+        every tenant from the day it shipped. Both arguments are already
+        `datetime` here, so there is nothing for SQL to do.
         """
+        duration_ms = int((completed_at - started_at).total_seconds() * 1000)
         await self._session.execute(
             text(
                 """
@@ -399,8 +409,7 @@ class IndicesRepository:
                     :aoi_pixel_count, :masked_pixel_count,
                     CAST(:per_index AS jsonb),
                     :trigger, :outcome, :error,
-                    :started_at, :completed_at,
-                    (EXTRACT(EPOCH FROM (:completed_at - :started_at)) * 1000)::int
+                    :started_at, :completed_at, :duration_ms
                 )
                 """
             ).bindparams(
@@ -433,5 +442,6 @@ class IndicesRepository:
                 "error": error,
                 "started_at": started_at,
                 "completed_at": completed_at,
+                "duration_ms": duration_ms,
             },
         )

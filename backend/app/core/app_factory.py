@@ -183,6 +183,9 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     from app.modules.platform_admins.tenant_integrations import (
         router as platform_tenant_integrations_router,
     )
+    from app.modules.platform_alerts.router import (
+        router as platform_alerts_router,
+    )
     from app.modules.platform_defaults.router import (
         router as platform_defaults_router,
     )
@@ -233,6 +236,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     app.include_router(platform_tasks_router)
     app.include_router(platform_health_rollup_router)
     app.include_router(platform_health_tenant_drill_router)
+    app.include_router(platform_alerts_router)
     app.include_router(observer_router)
 
     # Cross-module event subscribers â€” registered once per process.

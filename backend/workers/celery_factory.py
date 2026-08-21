@@ -46,6 +46,10 @@ _TASK_PACKAGES: tuple[str, ...] = (
     "app.modules.irrigation.tasks",
     "app.modules.integrations_health.probes",
     "app.modules.integrations_health.streak_watcher",
+    # Platform alert sweep. Importing this module on every worker is what
+    # registers the `task_failure` signal handler, so a task that dies
+    # before writing anything still leaves a trace.
+    "app.modules.platform_alerts.tasks",
     # Sub-block grid spatial-anomaly alerting sweep.
     "app.modules.grid.tasks",
     # Platform-admin hard delete. Only large purges reach a worker; small

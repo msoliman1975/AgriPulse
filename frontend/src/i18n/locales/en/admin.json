@@ -10,7 +10,8 @@
     "platformHealth": "Integration health",
     "backfill": "Backfill",
     "observer": "Observer",
-    "roles": "Roles & permissions"
+    "roles": "Roles & permissions",
+    "platformAlerts": "Platform alerts"
   },
   "crops": {
     "title": "Crop catalog",
@@ -1132,6 +1133,69 @@
       "toggleRevoke": "Revoke {{capability}} from this role",
       "viewChanges": "Change log",
       "wildcardImmutable": "PlatformAdmin grants every permission and cannot be edited. That is enforced by the server, so nobody can remove the access needed to undo a mistake made on this page."
+    }
+  },
+  "platformAlerts": {
+    "title": "Platform alerts",
+    "subtitle": "Integration and pipeline failures across every tenant. A stop-gap operator queue until full observability lands.",
+    "sweepNow": "Run sweep now",
+    "sweeping": "Sweeping…",
+    "acknowledge": "Acknowledge",
+    "acknowledged": "Acknowledged",
+    "resolve": "Resolve",
+    "empty": "Nothing is failing. The sweep runs every 10 minutes.",
+    "noResults": "No alerts match this filter.",
+    "loadError": "Could not load platform alerts.",
+    "sinceCount_one": "First seen {{since}} · {{count}} occurrence",
+    "sinceCount_other": "First seen {{since}} · {{count}} occurrences",
+    "col": {
+      "severity": "Severity",
+      "what": "What is wrong",
+      "where": "Where",
+      "kind": "Type",
+      "seen": "Last seen"
+    },
+    "filter": {
+      "status": "Status",
+      "severity": "Severity",
+      "category": "Stream"
+    },
+    "status": {
+      "live": "Live",
+      "open": "Open",
+      "acknowledged": "Acknowledged",
+      "resolved": "Resolved"
+    },
+    "severity": {
+      "critical": "Critical",
+      "warning": "Warning"
+    },
+    "category": {
+      "imagery": "Imagery",
+      "thermal": "Thermal",
+      "weather": "Weather",
+      "index_calc": "Index calculation",
+      "task": "Background task"
+    },
+    "kind": {
+      "stream_silent": "No data",
+      "peer_lag": "Behind other farms",
+      "failure_streak": "Repeated failures",
+      "task_error": "Task error",
+      "stuck_job": "Stuck jobs"
+    },
+    "resolvedReason": {
+      "auto": "Cleared automatically",
+      "manual": "Resolved by hand"
+    },
+    "banner": {
+      "critical_one": "{{count}} critical platform alert",
+      "critical_other": "{{count}} critical platform alerts",
+      "warning_one": "{{count}} platform warning",
+      "warning_other": "{{count}} platform warnings",
+      "alsoWarnings_one": "and {{count}} warning",
+      "alsoWarnings_other": "and {{count}} warnings",
+      "review": "Review"
     }
   }
 }

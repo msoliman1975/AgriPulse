@@ -22,6 +22,7 @@ from app.modules.irrigation.engine import (
     compute_recommendation,
     lookup_kc,
 )
+from app.modules.irrigation.repository import IrrigationRepository
 from app.modules.irrigation.service import get_irrigation_service
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.db.session import AsyncSessionLocal
@@ -397,3 +398,48 @@ async def test_block_without_current_crop_returns_none(
                 tenant_schema=tenant.schema_name,
             )
     assert out is None
+
+
+@pytest.mark.asyncio
+async def test_load_water_balance_blocks_runs_against_the_real_schema(
+    admin_session: AsyncSession,
+) -> None:
+    """Regression: the sweep's own query, executed for real.
+
+    `irrigation.water_balance_for_tenant` raised
+    `UndefinedColumnError: column b.status does not exist` on every run for
+    every tenant in production, and no test caught it — the only coverage
+    was `tests/unit/irrigation/test_water_balance_sweep.py`, which stubs
+    `load_water_balance_blocks` with a fake that returns a literal. A fake
+    repository cannot fail on SQL the real one gets wrong.
+
+    `blocks` has no `status` column; liveness is the `active_from` /
+    `active_to` window (tenant migration 0026). This test exists to execute
+    the statement, so any future column that stops existing fails here
+    instead of silently in a worker.
+    """
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug="wb-real-sql",
+        name="Water balance real SQL",
+        contact_email="ops@wb-real-sql.test",
+    )
+    _farm_id, block_id = await _seed_block_with_crop_and_weather(
+        admin_session,
+        tenant.schema_name,
+        et0_today=Decimal("5.0"),
+        precip_recent=Decimal("0.0"),
+        growth_stage="vegetative",
+    )
+
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
+        async with factory() as public_session:
+            repo = IrrigationRepository(tenant_session=session, public_session=public_session)
+            rows = await repo.load_water_balance_blocks(
+                target_date=datetime.now(UTC).date(),
+            )
+
+    assert [r["block_id"] for r in rows] == [block_id]
+    assert rows[0]["et0_mm"] == Decimal("5.0")
