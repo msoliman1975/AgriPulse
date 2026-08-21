@@ -2433,11 +2433,39 @@ global:
   #   BACKEND ONLY. Frontend stays 0cba71c, tile-server stays 9d140cc.
   #   Images CONFIRMED by pulling both on the node: api @ 19880147624db,
   #   workers @ 5b4a94a16f2d5.
+  # 992cfb5 = #537, Team & roles offers the roles the platform actually has.
+  #   The dropdown was a four-element literal in UsersConfigPage.tsx while
+  #   Roles & permissions read ten roles from /admin/rbac/matrix. Nothing
+  #   compared the two, so four of the eight roles a tenant admin may grant
+  #   could not be granted, and the screen showed no sign of it.
+  #   A tenant-wide Viewer granted NOTHING. The tenant_role claim is parsed
+  #   with _safe_enum(..., TenantRole) and TenantRole has no Viewer member,
+  #   so the value was dropped and the member had no capabilities at all.
+  #   Viewer is a FarmRole; it now goes through farm_scopes, where it
+  #   resolves. Five such rows exist on prod, all demo accounts in
+  #   agrosina-demo-2, each already holding a farm scope — so nobody's
+  #   access changes and no data migration is needed.
+  #   Also: no role could be changed after invite (role.assign_tenant was
+  #   marked active and held by TenantOwner/TenantAdmin but no route ever
+  #   enforced it), and the role on the invite body was an unvalidated str,
+  #   so a request naming PlatformAdmin was stopped only by the
+  #   tenant_role_assignments CHECK and surfaced as a 500.
+  #   NEW ROUTE: PUT /v1/users/{user_id}/role. GET /v1/users grows
+  #   farm_roles.
+  #   API + FRONTEND MOVE TOGETHER, and they must. The new dropdown posts a
+  #   (role, farm_ids) pair and calls the new route; against 127406f the
+  #   route is a 404 and any farm-tier role is rejected. The old frontend
+  #   against the new api still works — `tenant_role` stays accepted as an
+  #   alias for `role` — so the frontend is the half that cannot lag.
+  #   Workers move because they share the api image.
+  #   No migrations. tile-server unchanged stays 9d140cc.
+  #   Images CONFIRMED by pulling both on the node: api @ 0b21d9f6a92e8,
+  #   frontend @ bb910367d1fd5.
   images:
     api:
-      tag: "127406f"
+      tag: "992cfb5"
     workers:
-      tag: "127406f"
+      tag: "992cfb5"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -2481,7 +2509,11 @@ global:
       #
       # 0cba71c = #533, one queue and one of each console. Moves with the api
       #   and the workers — see the note above the `images` key.
-      tag: "0cba71c"
+      #
+      # 992cfb5 = #537, Team & roles offers the roles the platform actually
+      #   has. MUST move with the api: the dropdown calls a route that only
+      #   the new api serves. See the note above the `images` key.
+      tag: "992cfb5"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
