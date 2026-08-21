@@ -19,11 +19,15 @@ from app.modules.iam.schemas import (
     UserInviteRequest,
     UserInviteResponse,
     UserResendInviteResponse,
+    UserRoleAssignRequest,
+    UserRoleAssignResponse,
     UserUpdateRequest,
     WorkItemResponse,
 )
 from app.modules.iam.service import UserNotFoundError, UserService, get_user_service
 from app.modules.iam.users_service import (
+    FarmsNotInTenantError,
+    LastTenantOwnerError,
     TenantUserAlreadyExistsError,
     TenantUserNotFoundError,
     TenantUsersService,
@@ -96,6 +100,22 @@ async def _resolve_tenant_id(*, schema: str, session: AsyncSession) -> UUID:
             type_="https://agripulse.cloud/problems/tenant-not-found",
         )
     return row.id
+
+
+def _farms_not_in_tenant(exc: FarmsNotInTenantError) -> APIError:
+    """422, not 404: the farm ids are a field of a role assignment.
+
+    They are named alongside a role, and the caller needs to know which of
+    the ids was wrong, so the offending ids are echoed back rather than the
+    request simply failing.
+    """
+    return APIError(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        title="Unknown farm",
+        detail=str(exc),
+        type_="https://agripulse.cloud/problems/iam/farm-not-in-tenant",
+        extras={"farm_ids": [str(f) for f in exc.farm_ids]},
+    )
 
 
 def _user_not_found(user_id: UUID) -> APIError:
@@ -205,7 +225,8 @@ async def invite_tenant_user(
             email=str(payload.email),
             full_name=payload.full_name,
             phone=payload.phone,
-            tenant_role=payload.tenant_role,
+            tenant_role=payload.role,
+            farm_ids=tuple(payload.farm_ids),
             tenant_schema=schema,
             actor_user_id=context.user_id,
         )
@@ -217,6 +238,8 @@ async def invite_tenant_user(
             type_="https://agripulse.cloud/problems/iam/user-already-exists",
             extras={"email": exc.email},
         ) from exc
+    except FarmsNotInTenantError as exc:
+        raise _farms_not_in_tenant(exc) from exc
 
 
 @router.post(
@@ -271,6 +294,58 @@ async def update_tenant_user(
         )
     except TenantUserNotFoundError as exc:
         raise _user_not_found(user_id) from exc
+
+
+@router.put(
+    "/users/{user_id}/role",
+    response_model=UserRoleAssignResponse,
+    summary="Replace a tenant member's role.",
+)
+async def assign_tenant_user_role(
+    user_id: UUID,
+    payload: UserRoleAssignRequest,
+    context: RequestContext = Depends(requires_capability("role.assign_tenant")),
+    service: TenantUsersService = Depends(_users_service),
+    session: AsyncSession = Depends(get_admin_db_session),
+) -> dict[str, Any]:
+    """Set the one role a member holds, in either tier.
+
+    Gated on `role.assign_tenant`, which only TenantOwner and TenantAdmin
+    hold. That capability was declared `active` since the RBAC catalogue was
+    written but no route had ever enforced it, so a role could be chosen at
+    invite time and never changed again.
+
+    A farm-tier role additionally needs `role.assign_farm` on each named
+    farm. The route dependency cannot check that — it reads path and query
+    params only, and the farms arrive in the body — so it is checked here,
+    one farm at a time, the same way the field-enrolment route does it.
+    """
+    schema = _ensure_tenant(context)
+    tenant_id = await _resolve_tenant_id(schema=schema, session=session)
+    for farm_id in payload.farm_ids:
+        if not has_capability(context, "role.assign_farm", farm_id=farm_id):
+            raise PermissionDeniedError("role.assign_farm", farm_id=farm_id)
+    try:
+        return await service.assign_role(
+            user_id=user_id,
+            tenant_id=tenant_id,
+            tenant_schema=schema,
+            role=payload.role,
+            farm_ids=tuple(payload.farm_ids),
+            actor_user_id=context.user_id,
+        )
+    except TenantUserNotFoundError as exc:
+        raise _user_not_found(user_id) from exc
+    except FarmsNotInTenantError as exc:
+        raise _farms_not_in_tenant(exc) from exc
+    except LastTenantOwnerError as exc:
+        raise APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Tenant would have no owner",
+            detail=str(exc),
+            type_="https://agripulse.cloud/problems/iam/last-tenant-owner",
+            extras={"user_id": str(user_id)},
+        ) from exc
 
 
 @router.post(
