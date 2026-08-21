@@ -2461,11 +2461,28 @@ global:
   #   No migrations. tile-server unchanged stays 9d140cc.
   #   Images CONFIRMED by pulling both on the node: api @ 0b21d9f6a92e8,
   #   frontend @ bb910367d1fd5.
+  # f04a739 = #538, the platform alerts list and the red bar. Adds
+  #   public.platform_alerts (public migration 0069, runs on PreSync) and a
+  #   Beat sweep, platform_alerts.sweep, every 10 minutes.
+  #   WHY IT EXISTS: the existing streak watcher only sees failures that were
+  #   recorded as failures. Four problems were running here on 2026-08-21 with
+  #   nothing reported anywhere - indices_calc_runs empty in all 3 tenants
+  #   since the table shipped, irrigation.water_balance_for_tenant raising on
+  #   every run, an OOM kill, and 9 imagery jobs stuck in `running` (oldest
+  #   528 hours). This ships the detectors plus fixes for the two SQL bugs.
+  #   API + WORKERS + FRONTEND MOVE TOGETHER. The workers carry the sweep and
+  #   the Celery task_failure hook, the api serves /v1/admin/alerts, and the
+  #   frontend adds /platform/alerts plus the bar in AppShell. An old frontend
+  #   against the new api just lacks the page; a new frontend against the old
+  #   api gets a 404 on every summary poll, so the api cannot lag.
+  #   tile-server unchanged stays 9d140cc.
+  #   Images CONFIRMED by pulling all three on the node: api @ f01b4a954685b,
+  #   workers @ e18e61978df27, frontend @ 6db993dce2adf.
   images:
     api:
-      tag: "992cfb5"
+      tag: "f04a739"
     workers:
-      tag: "992cfb5"
+      tag: "f04a739"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -2513,7 +2530,10 @@ global:
       # 992cfb5 = #537, Team & roles offers the roles the platform actually
       #   has. MUST move with the api: the dropdown calls a route that only
       #   the new api serves. See the note above the `images` key.
-      tag: "992cfb5"
+      #
+      # f04a739 = #538, the platform alerts list and the red bar. Moves with
+      #   the api and the workers - see the note above the `images` key.
+      tag: "f04a739"
     tileServer:
       tag: "9d140cc"
 # Top-level env merges into every service chart's own env map (api + workers
