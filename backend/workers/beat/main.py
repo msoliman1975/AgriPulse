@@ -223,4 +223,15 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.integration_failure_check_seconds),
         "options": {"queue": "light"},
     },
+    # Platform-wide alert sweep. Distinct from the streak watcher above,
+    # which notifies *tenant* admins about recorded failures. This one
+    # writes to `public.platform_alerts` for the platform operator, and
+    # detects the failures that leave no failure row at all: a stream that
+    # has gone quiet, a farm left behind by its own siblings, and a job
+    # parked in `running` that will never finish or fail.
+    "platform_alerts.sweep": {
+        "task": "platform_alerts.sweep",
+        "schedule": float(_settings.platform_alert_sweep_seconds),
+        "options": {"queue": "light"},
+    },
 }

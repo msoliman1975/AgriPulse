@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { Header } from "./Header";
+import { PlatformAlertBanner } from "./PlatformAlertBanner";
 import { SideNav } from "./SideNav";
 
 export function AppShell(): ReactNode {
@@ -29,6 +30,10 @@ export function AppShell(): ReactNode {
       >
         {t("nav.skipToContent")}
       </a>
+      {/* Above <Header> on purpose: a platform-wide failure outranks the
+          page you are on, and this is the one strip that must not scroll
+          away or sit inside a route that a tenant user never visits. */}
+      <PlatformAlertBanner />
       <Header />
       <div className="flex min-h-0 w-full flex-1 gap-0">
         <SideNav />

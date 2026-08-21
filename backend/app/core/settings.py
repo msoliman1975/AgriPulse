@@ -310,6 +310,58 @@ class Settings(BaseSettings):
     # `platform_defaults` is a future follow-up.
     integration_failure_streak_threshold: int = 3
 
+    # --- Platform alert sweep (stop-gap operator observability) ----------
+    # `platform_alerts.sweep` walks every active tenant and writes into
+    # `public.platform_alerts`. 10 min matches the streak watcher: these
+    # are hours-scale problems, so a tighter cadence buys nothing and the
+    # sweep is linear in tenant count.
+    platform_alert_sweep_seconds: int = 600
+
+    # Staleness ceilings, in hours, per stream. A stream older than its
+    # warning ceiling opens a `warning`; older than its critical ceiling
+    # escalates the same row to `critical`.
+    #
+    # These are revisit-aware, not arbitrary. Weather polls on a 24h
+    # cadence, so 26h is one missed poll plus slack. Sentinel-2 over a
+    # single tile is covered by one relative orbit, which in the worst
+    # case is a 5-day gap between usable passes -- 6 days is the first
+    # age that cannot be explained by the satellite. Landsat 8 + 9
+    # interleave to about 8 days over one path, so thermal needs roughly
+    # double the optical ceiling before silence means anything.
+    #
+    # Set them lower and the page fills with alerts for farms that are
+    # merely between passes, which is exactly how an alert list becomes
+    # something operators stop reading.
+    platform_alert_weather_warn_hours: int = 26
+    platform_alert_weather_crit_hours: int = 50
+    platform_alert_optical_warn_hours: int = 144
+    platform_alert_optical_crit_hours: int = 240
+    platform_alert_thermal_warn_hours: int = 288
+    platform_alert_thermal_crit_hours: int = 480
+
+    # Peer-lag detector. A farm is "behind its peers" when another farm in
+    # the same tenant ingested a scene for the same product and this farm
+    # still has not, this many hours later.
+    #
+    # 26h is deliberate. Discovery runs on a 24h cadence whose phase is
+    # whatever time of day the subscription last ran, so two farms on the
+    # same tile can legitimately sit up to a full day apart -- that is a
+    # phase offset, not a fault. Anything past 26h is no longer explained
+    # by the cadence.
+    platform_alert_peer_lag_hours: int = 26
+
+    # An imagery job still in a non-terminal state after this long has
+    # stopped, not slowed. Production had one sitting in `running` for
+    # eleven days; nothing flagged it, because a job that never finishes
+    # also never fails.
+    platform_alert_stuck_job_hours: int = 6
+
+    # A `task_error` alert has no sweep to re-detect it -- it is written by
+    # a Celery failure signal, so absence of news is the only recovery
+    # signal available. Auto-resolve after this long with no new failure.
+    # 6h spans several runs of every scheduled task we have.
+    platform_alert_task_quiet_hours: int = 6
+
     # --- Imagery thresholds ----------------------------------------------
     # ARCHITECTURE.md Â§ 9: 60% for visualization, 20% for index aggregation.
     # Per-tenant overrides live on `imagery_aoi_subscriptions.cloud_cover_max_pct`

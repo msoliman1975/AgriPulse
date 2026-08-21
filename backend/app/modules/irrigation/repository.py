@@ -390,7 +390,14 @@ class IrrigationRepository:
                              GROUP BY s.block_id
                            ) irr ON irr.block_id = b.id
                      WHERE b.deleted_at IS NULL
-                       AND b.status NOT IN ('archived', 'abandoned')
+                       -- `blocks` has no `status` column. Liveness is the
+                       -- active window (tenant migration 0026, and the note
+                       -- on farms.models.Block): this query used to say
+                       -- `b.status NOT IN ('archived','abandoned')` and so
+                       -- raised UndefinedColumn on every run, for every
+                       -- tenant, silently.
+                       AND b.active_from <= :d
+                       AND (b.active_to IS NULL OR b.active_to > :d)
                        AND wd.et0_mm_daily IS NOT NULL
                     """
                     ),

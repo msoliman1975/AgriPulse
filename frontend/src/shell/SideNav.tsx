@@ -253,6 +253,13 @@ export function SideNav(): ReactNode {
           collapsed={collapsed}
         />
         <SideNavItem
+          to="/platform/alerts"
+          label={t("nav.platformAlerts")}
+          icon={<AlertsIcon className="h-4 w-4" />}
+          activePathPrefix="/platform/alerts"
+          collapsed={collapsed}
+        />
+        <SideNavItem
           to="/platform/integrations/health"
           label={t("nav.platformHealth")}
           icon={<AlertsIcon className="h-4 w-4" />}

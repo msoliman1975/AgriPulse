@@ -10,7 +10,8 @@
     "platformHealth": "صحة التكاملات",
     "backfill": "التعبئة التاريخية",
     "observer": "المراقب",
-    "roles": "الأدوار والأذونات"
+    "roles": "الأدوار والأذونات",
+    "platformAlerts": "تنبيهات المنصة"
   },
   "crops": {
     "title": "دليل المحاصيل",
@@ -1132,6 +1133,69 @@
       "toggleRevoke": "سحب {{capability}} من هذا الدور",
       "viewChanges": "سجل التغييرات",
       "wildcardImmutable": "يمنح مدير المنصة كل الأذونات ولا يمكن تعديله. يفرض الخادم ذلك، فلا يستطيع أحد إزالة الصلاحية اللازمة للتراجع عن خطأ في هذه الصفحة."
+    }
+  },
+  "platformAlerts": {
+    "title": "تنبيهات المنصة",
+    "subtitle": "أعطال التكامل ومعالجة البيانات عبر جميع المستأجرين.",
+    "sweepNow": "تشغيل الفحص الآن",
+    "sweeping": "جارٍ الفحص…",
+    "acknowledge": "إقرار بالاطلاع",
+    "acknowledged": "تم الاطلاع",
+    "resolve": "إغلاق",
+    "empty": "لا يوجد عطل. يعمل الفحص كل 10 دقائق.",
+    "noResults": "لا توجد تنبيهات مطابقة لهذا المرشّح.",
+    "loadError": "تعذر تحميل تنبيهات المنصة.",
+    "sinceCount_one": "أول ظهور {{since}} · {{count}} مرة",
+    "sinceCount_other": "أول ظهور {{since}} · {{count}} مرات",
+    "col": {
+      "severity": "الخطورة",
+      "what": "العطل",
+      "where": "الموقع",
+      "kind": "النوع",
+      "seen": "آخر ظهور"
+    },
+    "filter": {
+      "status": "الحالة",
+      "severity": "الخطورة",
+      "category": "المصدر"
+    },
+    "status": {
+      "live": "قائم",
+      "open": "مفتوح",
+      "acknowledged": "تم الاطلاع",
+      "resolved": "مغلق"
+    },
+    "severity": {
+      "critical": "حرج",
+      "warning": "تحذير"
+    },
+    "category": {
+      "imagery": "الصور",
+      "thermal": "الحراري",
+      "weather": "الطقس",
+      "index_calc": "حساب المؤشرات",
+      "task": "مهمة خلفية"
+    },
+    "kind": {
+      "stream_silent": "لا توجد بيانات",
+      "peer_lag": "متأخر عن بقية المزارع",
+      "failure_streak": "أعطال متكررة",
+      "task_error": "خطأ في المهمة",
+      "stuck_job": "مهام متوقفة"
+    },
+    "resolvedReason": {
+      "auto": "أُغلق تلقائياً",
+      "manual": "أُغلق يدوياً"
+    },
+    "banner": {
+      "critical_one": "{{count}} تنبيه حرج",
+      "critical_other": "{{count}} تنبيهات حرجة",
+      "warning_one": "{{count}} تحذير",
+      "warning_other": "{{count}} تحذيرات",
+      "alsoWarnings_one": "و{{count}} تحذير",
+      "alsoWarnings_other": "و{{count}} تحذيرات",
+      "review": "مراجعة"
     }
   }
 }

@@ -67,6 +67,7 @@ import { ObserverSceneDetailPage } from "@/modules/admin/pages/ObserverSceneDeta
 import { PlatformObserverPage } from "@/modules/admin/pages/PlatformObserverPage";
 import { PlatformPlanTemplatesPage } from "@/modules/admin/pages/PlatformPlanTemplatesPage";
 import { PlanTemplateEditorPage } from "@/modules/admin/pages/PlanTemplateEditorPage";
+import { PlatformAlertsPage } from "@/modules/admin/pages/PlatformAlertsPage";
 import { PlatformAdminsPage } from "@/modules/admin/pages/PlatformAdminsPage";
 import { PlatformHealthPage } from "@/modules/admin/pages/PlatformHealthPage";
 import { PlatformHealthTenantDrillPage } from "@/modules/admin/pages/PlatformHealthTenantDrillPage";
@@ -321,6 +322,7 @@ export function App(): ReactNode {
                 <Route path="admins" element={<PlatformAdminsPage />} />
                 <Route path="roles" element={<PlatformRolesPage />} />
                 <Route path="integrations/health" element={<PlatformHealthPage />} />
+                <Route path="alerts" element={<PlatformAlertsPage />} />
                 <Route
                   path="integrations/health/tenants/:tenantId"
                   element={<PlatformHealthTenantDrillPage />}
