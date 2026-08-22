@@ -443,3 +443,43 @@ async def test_load_water_balance_blocks_runs_against_the_real_schema(
 
     assert [r["block_id"] for r in rows] == [block_id]
     assert rows[0]["et0_mm"] == Decimal("5.0")
+
+
+@pytest.mark.asyncio
+async def test_list_active_block_ids_runs_against_the_real_schema(
+    admin_session: AsyncSession,
+) -> None:
+    """The sibling of the water-balance query, and the same bug.
+
+    `load_water_balance_blocks` was fixed for `b.status does not exist`;
+    `list_active_block_ids` was not, so `irrigation.generate_for_tenant`
+    kept raising `UndefinedColumnError` on every run for every tenant. It
+    reached the operator only because the platform-alert sweep started
+    reporting Celery failures.
+
+    Executing the statement is the point of this test. Asserting the seeded
+    block comes back proves the replacement window predicate selects rather
+    than merely parsing.
+    """
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug="active-blocks-real-sql",
+        name="Active blocks real SQL",
+        contact_email="ops@active-blocks.test",
+    )
+    _farm_id, block_id = await _seed_block_with_crop_and_weather(
+        admin_session,
+        tenant.schema_name,
+        et0_today=Decimal("5.0"),
+        precip_recent=Decimal("0.0"),
+        growth_stage="vegetative",
+    )
+
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
+        async with factory() as public_session:
+            repo = IrrigationRepository(tenant_session=session, public_session=public_session)
+            block_ids = await repo.list_active_block_ids()
+
+    assert block_id in block_ids

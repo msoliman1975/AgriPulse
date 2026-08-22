@@ -66,7 +66,8 @@ class PlatformAdminsRoleService:
                            u.keycloak_subject,
                            pra.role AS role,
                            pra.granted_at AS granted_at,
-                           pra.granted_by AS granted_by
+                           pra.granted_by AS granted_by,
+                           pra.receives_alert_emails AS receives_alert_emails
                     FROM public.platform_role_assignments pra
                     JOIN public.users u ON u.id = pra.user_id
                     WHERE pra.revoked_at IS NULL
@@ -305,6 +306,51 @@ class PlatformAdminsRoleService:
             subject_id=user_id,
             details={"role": role},
         )
+
+    async def set_alert_emails(
+        self,
+        *,
+        user_id: UUID,
+        role: str,
+        enabled: bool,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Switch platform-alert email on or off for one role grant.
+
+        Keyed on (user, role) rather than user alone because that is what a
+        row is, and it is what the page renders. A person holding both
+        PlatformAdmin and PlatformSupport has two rows and two checkboxes;
+        `PlatformAlertsRepository.list_email_recipients` reads DISTINCT, so
+        ticking either one is enough to receive the mail and ticking both
+        does not double it.
+
+        No Keycloak round trip: this is a delivery preference, not a
+        permission. Nothing about it belongs in the JWT.
+        """
+        result = await self._public.execute(
+            text(
+                """
+                UPDATE public.platform_role_assignments
+                   SET receives_alert_emails = :enabled
+                 WHERE user_id = :user_id
+                   AND role = :role
+                   AND revoked_at IS NULL
+             RETURNING id
+                """
+            ).bindparams(bindparam("user_id", type_=PG_UUID(as_uuid=True))),
+            {"user_id": user_id, "role": role, "enabled": enabled},
+        )
+        if result.first() is None:
+            raise PlatformAdminNotFoundError(f"No active {role} assignment for user {user_id}.")
+
+        await self._audit.record_archive(
+            event_type="platform.platform_admin_alert_emails_changed",
+            actor_user_id=actor_user_id,
+            subject_kind="user",
+            subject_id=user_id,
+            details={"role": role, "receives_alert_emails": enabled},
+        )
+        return {"user_id": user_id, "role": role, "receives_alert_emails": enabled}
 
     # ---- Helpers ------------------------------------------------------
 

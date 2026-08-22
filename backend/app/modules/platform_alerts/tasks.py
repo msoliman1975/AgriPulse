@@ -46,6 +46,7 @@ from app.modules.platform_alerts.detectors import (
     Finding,
     Thresholds,
 )
+from app.modules.platform_alerts.email import notify
 from app.modules.platform_alerts.repository import PlatformAlertsRepository
 from app.shared.db.session import (
     AsyncSessionLocal,
@@ -170,11 +171,29 @@ async def run_sweep() -> dict[str, Any]:
         )
         resolved += await repo.auto_resolve_missing_tenants()
 
+    # Mail after the write transaction has committed, and in its own
+    # transaction. Two reasons. The send is slow and would hold the write
+    # lock on every row the sweep just touched for the length of an SMTP
+    # round trip per recipient. And a relay that hangs must not be able to
+    # roll back the alert records themselves - the alerts are the thing
+    # worth keeping, the mail is a convenience on top of them.
+    email: dict[str, int] = {"recipients": 0, "alerts": 0, "sent": 0}
+    try:
+        async with factory() as session, session.begin():
+            email = await notify(PlatformAlertsRepository(session))
+    except Exception:
+        # Same rule as the failure hook: observability must not be able to
+        # fail the thing it observes. A sweep that found and wrote every
+        # alert has done its job whether or not the mail went out.
+        _log.warning("platform_alert_email_step_failed", exc_info=True)
+
     result = {
         "tenants_scanned": len(tenants),
         "tenants_failed": tenants_failed,
         "findings": len(all_findings),
         "resolved": resolved,
+        "emails_sent": email["sent"],
+        "emails_alerts": email["alerts"],
         "swept_at": datetime.now(UTC).isoformat(),
     }
     _log.info("platform_alert_sweep_done", **result)

@@ -190,6 +190,100 @@ class PlatformAlertsRepository:
         )
         return int(cast("CursorResult[Any]", result).rowcount or 0)
 
+    # --- Email notification ------------------------------------------------
+
+    async def list_unnotified(self, *, limit: int) -> list[dict[str, Any]]:
+        """Live alerts that have not been mailed at their current severity.
+
+        Two cases match. A brand new alert has ``notified_at IS NULL``. An
+        alert that escalated has a ``notified_severity`` that no longer
+        matches, because 0069 moves the existing row rather than opening a
+        second one. Both deserve a mail; a plain re-detection does not.
+
+        Ordered worst first so a capped digest drops warnings, not
+        criticals.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        f"""
+                        SELECT {_COLS}
+                          FROM public.platform_alerts
+                         WHERE status <> 'resolved'
+                           AND (notified_at IS NULL
+                                OR notified_severity IS DISTINCT FROM severity)
+                         ORDER BY (severity = 'critical') DESC, last_seen_at DESC
+                         LIMIT :limit
+                        """  # noqa: S608
+                    ),
+                    {"limit": limit},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]
+
+    async def mark_notified(self, *, alert_ids: list[UUID]) -> int:
+        """Stamp the rows a mail actually covered.
+
+        Called only after the send returns. A failed send leaves the rows
+        unstamped so the next sweep tries again, which is the behaviour we
+        want from a mail relay that is briefly down.
+
+        ``notified_severity`` is copied from the row rather than passed in,
+        so a severity that moved between the read and the write is recorded
+        as what the row now says instead of being lost.
+        """
+        if not alert_ids:
+            return 0
+        result = await self._session.execute(
+            text(
+                """
+                UPDATE public.platform_alerts
+                   SET notified_at = now(),
+                       notified_severity = severity
+                 WHERE id = ANY(:ids)
+                """
+            ).bindparams(bindparam("ids", type_=ARRAY(PG_UUID(as_uuid=True)))),
+            {"ids": alert_ids},
+        )
+        return int(cast("CursorResult[Any]", result).rowcount or 0)
+
+    async def list_email_recipients(self) -> list[dict[str, Any]]:
+        """Platform admins who asked for alert mail.
+
+        DISTINCT because a person can hold both PlatformAdmin and
+        PlatformSupport, which is two grant rows and would otherwise be two
+        copies of the same email.
+        """
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        SELECT DISTINCT u.email::text AS email, u.full_name
+                          FROM public.platform_role_assignments pra
+                          JOIN public.users u ON u.id = pra.user_id
+                         WHERE pra.revoked_at IS NULL
+                           AND pra.receives_alert_emails
+                           AND u.deleted_at IS NULL
+                           AND u.email IS NOT NULL
+                         -- Order by the aliased cast, not `u.email`. Under
+                         -- SELECT DISTINCT the sort expression has to be in
+                         -- the select list, and `u.email` is citext while
+                         -- the projection is its ::text cast.
+                         ORDER BY email
+                        """
+                    )
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]
+
     async def list_alerts(
         self,
         *,

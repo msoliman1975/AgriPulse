@@ -516,12 +516,23 @@ class IrrigationRepository:
         return [dict(r) for r in rows]
 
     async def list_active_block_ids(self) -> tuple[UUID, ...]:
+        """Blocks that are live today.
+
+        `blocks` has no `status` column. Liveness is the active window
+        (tenant migration 0026, and the note on `farms.models.Block`). This
+        query used to say `status NOT IN ('archived','abandoned')`, so
+        `irrigation.generate_for_tenant` raised UndefinedColumn on every run
+        for every tenant. Its sibling in `water_balance_for_tenant` was
+        fixed earlier and this one was missed; the predicate below matches
+        `recommendations.repository.list_active_block_ids`.
+        """
         rows = (
             await self._tenant.execute(
                 text(
                     "SELECT id FROM blocks "
                     "WHERE deleted_at IS NULL "
-                    "AND status NOT IN ('archived', 'abandoned')"
+                    "  AND active_from <= current_date "
+                    "  AND (active_to IS NULL OR active_to > current_date)"
                 )
             )
         ).all()

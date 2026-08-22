@@ -50,6 +50,22 @@ class PlatformAdminRow(BaseModel):
     role: Literal["PlatformAdmin", "PlatformSupport"]
     granted_at: datetime
     granted_by: UUID | None
+    # Whether the platform-alert digest is mailed to this person. A
+    # delivery preference, not a capability - see `set_alert_emails`.
+    receives_alert_emails: bool = False
+
+
+class AlertEmailsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["PlatformAdmin", "PlatformSupport"] = "PlatformAdmin"
+    enabled: bool
+
+
+class AlertEmailsResponse(BaseModel):
+    user_id: UUID
+    role: Literal["PlatformAdmin", "PlatformSupport"]
+    receives_alert_emails: bool
 
 
 class InvitePlatformAdminRequest(BaseModel):
@@ -142,4 +158,38 @@ async def remove_platform_admin(
             title="Cannot remove last admin",
             detail=str(exc),
             type_="https://agripulse.cloud/problems/platform-admin-last",
+        ) from exc
+
+
+@router.patch(
+    "/{user_id}/alert-emails",
+    response_model=AlertEmailsResponse,
+)
+async def set_platform_admin_alert_emails(
+    user_id: UUID,
+    payload: AlertEmailsRequest,
+    context: RequestContext = Depends(requires_capability("platform.manage_platform_admins")),
+    service: PlatformAdminsRoleService = Depends(_service),
+) -> dict[str, Any]:
+    """Turn the platform-alert email digest on or off for one admin.
+
+    Gated on the same capability as inviting and removing, because the
+    people who manage the platform admin list are the ones who decide who
+    is on call for it.
+    """
+    try:
+        return await service.set_alert_emails(
+            user_id=user_id,
+            role=payload.role,
+            enabled=payload.enabled,
+            actor_user_id=context.user_id,
+        )
+    except PlatformAdminNotFoundError as exc:
+        from app.core.errors import APIError
+
+        raise APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Platform admin not found",
+            detail=str(exc),
+            type_="https://agripulse.cloud/problems/platform-admin-not-found",
         ) from exc

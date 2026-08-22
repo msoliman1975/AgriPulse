@@ -91,7 +91,8 @@
     "col": {
       "user": "User",
       "role": "Role",
-      "actions": ""
+      "actions": "",
+      "alertEmails": "Alert emails"
     },
     "inviteTitle": "Invite a platform admin",
     "inviteHint": "Creates a Keycloak user (or reuses an existing one) and sets the platform_role attribute. They'll receive a password-reset email.",
@@ -104,6 +105,10 @@
       "cancel": "Cancel",
       "kcOk": "Welcome email queued via Keycloak.",
       "kcPending": "Operator must finish provisioning via kcadm.sh — DB rows landed."
+    },
+    "alertEmails": {
+      "on": "Receives",
+      "off": "Does not receive"
     }
   },
   "owner": {

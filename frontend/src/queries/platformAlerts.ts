@@ -40,10 +40,17 @@ export function usePlatformAlertSummary(enabled: boolean) {
   });
 }
 
-export function usePlatformAlerts(filters: PlatformAlertFilters) {
+/**
+ * `enabled` defaults to true for the page, which is always fetching while
+ * it is mounted. The bell drawer passes `false` while it is closed - a
+ * drawer nobody has opened should not be polling every 60 seconds on every
+ * page in the app.
+ */
+export function usePlatformAlerts(filters: PlatformAlertFilters, enabled = true) {
   return useQuery({
     queryKey: platformAlertKeys.list(filters),
     queryFn: () => listPlatformAlerts(filters),
+    enabled,
     refetchInterval: LIST_REFETCH_MS,
     staleTime: LIST_REFETCH_MS / 2,
   });

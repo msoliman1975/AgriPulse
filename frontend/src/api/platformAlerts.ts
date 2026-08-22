@@ -68,6 +68,10 @@ export interface SweepResult {
   tenants_failed: number;
   findings: number;
   resolved: number;
+  // How many recipients the digest reached, and how many new or escalated
+  // alerts it covered. Normally 0 on a sweep that found nothing unmailed.
+  emails_sent: number;
+  emails_alerts: number;
   swept_at: string;
 }
 

@@ -54,7 +54,11 @@
       "active": "نشط",
       "suspended": "معلّق",
       "pending": "قيد المراجعة"
-    }
+    },
+    "platformAlertsTitle": "تنبيهات المنصة",
+    "platformAlertsEmpty": "لا يوجد عطل الآن.",
+    "platformAlertsSeeAll_one": "عرض صفحة التنبيهات ({{count}} نشط)",
+    "platformAlertsSeeAll_other": "عرض صفحة التنبيهات ({{count}} نشط)"
   },
   "tenant": {
     "metadata": "بيانات المؤسسة",
@@ -108,5 +112,11 @@
   },
   "table": {
     "openRow": "فتح"
+  },
+  "errorBoundary": {
+    "title": "تعذر عرض هذه الصفحة",
+    "body": "حدث خطأ داخل الصفحة أثناء رسمها. بقية التطبيق تعمل، يمكنك الانتقال إلى صفحة أخرى والعودة.",
+    "retry": "حاول مرة أخرى",
+    "reload": "إعادة تحميل الصفحة"
   }
 }
