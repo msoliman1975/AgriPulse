@@ -69,6 +69,7 @@ from app.modules.imagery.providers.sentinel_hub import SentinelHubProvider
 from app.modules.imagery.repository import ImageryRepository
 from app.modules.imagery.storage import raw_bands_key
 from app.modules.indices.computation import MASK_RULESET, PRODUCT_MASK_RULESETS
+from app.modules.indices.tasks import recompute_baselines_for_farm
 from app.modules.integrations_health.error_codes import classify_error
 from app.modules.weather.service import get_weather_service
 from app.shared import backfill_progress
@@ -78,6 +79,11 @@ from app.shared.eventbus import get_default_bus
 from app.shared.storage import StorageClient, get_storage_client
 
 _log = get_logger(__name__)
+
+# Floor for the delay before the first post-backfill baseline recompute. The
+# real delay adds two seconds per dispatched scene; this floor covers a run
+# that dispatched almost nothing but still needs the queue to turn over.
+_BASELINE_RECOMPUTE_MIN_DELAY_S = 120
 
 
 def _run_task[T](coro: Coroutine[Any, Any, T]) -> T:
@@ -801,12 +807,50 @@ async def _backfill_farm_indices_async(
     for (farm_job_id,) in farm_rows:
         recompute_farm_scene_indices.delay(str(farm_job_id), tenant_schema)
 
+    # Refresh this farm's index baselines and z-scores once the compute
+    # tasks above have had time to land.
+    #
+    # `block_index_aggregates.baseline_deviation` is derived by
+    # `record_aggregate_row` at write time, against whatever baselines exist
+    # at that moment. A backfill writes history that has no baseline yet, so
+    # those rows land NULL and every decision tree reading
+    # `indices.<code>.baseline_deviation` gets nothing.
+    #
+    # THIS TASK ONLY DISPATCHES. It returns as soon as the `.delay()` calls
+    # above are queued, so there is no point recomputing here — the
+    # aggregates do not exist yet. There is also no completion signal to
+    # wait on: `compute_indices` is `ignore_result=True` (so no chord), and
+    # `indices_calc_runs` is empty in every tenant, so it cannot be counted
+    # either.
+    #
+    # So: two delayed shots, sized off the work dispatched. The first covers
+    # the normal case, the second covers a slow or contended heavy queue.
+    # Both are cheap when nothing changed — the UPDATE carries an
+    # `IS DISTINCT FROM` guard, so a run with nothing to fix touches no rows.
+    # The hourly `indices.recompute_baselines_sweep` remains the guarantee;
+    # these two only make the numbers appear sooner.
+    #
+    # Nothing dispatched means nothing will be written, so there is nothing to
+    # recompute — skip rather than put two pointless jobs on the queue.
+    dispatched = len(rows) + len(farm_rows)
+    countdowns: list[int] = []
+    if dispatched:
+        first_delay = min(_BASELINE_RECOMPUTE_MIN_DELAY_S + dispatched * 2, 1800)
+        countdowns = [first_delay, first_delay + 1800]
+        for countdown in countdowns:
+            recompute_baselines_for_farm.apply_async(
+                args=[str(farm_id), tenant_schema],
+                queue="light",
+                countdown=countdown,
+            )
+
     _log.info(
         "imagery_farm_indices_enqueued",
         farm_id=str(farm_id),
         scenes=len(rows),
         farm_scenes=len(farm_rows),
         run_id=run_id,
+        baseline_recompute_countdowns=countdowns,
     )
     backfill_progress.finish(
         run_id,

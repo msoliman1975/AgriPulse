@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Coroutine
 from typing import Any
+from uuid import UUID
 
 from celery import shared_task
 from sqlalchemy import text
@@ -90,6 +91,25 @@ async def _recompute_baselines_for_tenant_async(tenant_schema: str) -> dict[str,
         # Reach through to the repo for the cheap distinct query.
         pairs = await svc._repo.list_distinct_block_index_pairs()  # type: ignore[attr-defined]
 
+    counts = await _recompute_pairs(tenant_schema, pairs)
+
+    _log.info(
+        "indices_baselines_recomputed",
+        tenant_schema=tenant_schema,
+        **counts,
+    )
+    return counts
+
+
+async def _recompute_pairs(tenant_schema: str, pairs: tuple[Any, ...]) -> dict[str, int]:
+    """Recompute baselines, then re-derive deviations, for each pair.
+
+    One transaction per pair so a long list does not hold a single
+    transaction open, and one bad pair cannot lose the counters of the ones
+    before it. Shared by the tenant-wide sweep and the farm-scoped task a
+    backfill queues.
+    """
+    factory = AsyncSessionLocal()
     written_total = 0
     deviations_total = 0
     pairs_processed = 0
@@ -111,19 +131,48 @@ async def _recompute_baselines_for_tenant_async(tenant_schema: str) -> dict[str,
         written_total += written
         deviations_total += deviations
         pairs_processed += 1
-
-    _log.info(
-        "indices_baselines_recomputed",
-        tenant_schema=tenant_schema,
-        pairs_processed=pairs_processed,
-        baselines_written=written_total,
-        deviations_updated=deviations_total,
-    )
     return {
         "pairs_processed": pairs_processed,
         "baselines_written": written_total,
         "deviations_updated": deviations_total,
     }
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="indices.recompute_baselines_for_farm",
+    bind=False,
+    ignore_result=True,
+)
+def recompute_baselines_for_farm(farm_id: str, tenant_schema: str) -> dict[str, int]:
+    """Recompute one farm's baselines and z-scores.
+
+    Queued by the imagery indices backfill so a run's numbers appear without
+    waiting for the hourly tenant sweep. Farm-scoped because a backfill is
+    farm-scoped, and because the tenant sweep measured 420s for 828 pairs —
+    too long to run repeatedly during a backfill.
+    """
+    return _run_task(_recompute_baselines_for_farm_async(farm_id, tenant_schema))
+
+
+async def _recompute_baselines_for_farm_async(farm_id: str, tenant_schema: str) -> dict[str, int]:
+    factory = AsyncSessionLocal()
+    pairs: tuple[Any, ...] = ()
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        svc = get_indices_service(tenant_session=session)
+        pairs = await svc._repo.list_distinct_block_index_pairs_for_farm(  # type: ignore[attr-defined]
+            farm_id=UUID(farm_id)
+        )
+
+    counts = await _recompute_pairs(tenant_schema, pairs)
+
+    _log.info(
+        "indices_farm_baselines_recomputed",
+        tenant_schema=tenant_schema,
+        farm_id=farm_id,
+        **counts,
+    )
+    return counts
 
 
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
