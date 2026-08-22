@@ -2565,11 +2565,40 @@ global:
   #   Rollback is these two tags back to 677c7dc. The repaired column values
   #   stay -- they are correct z-scores either way, the old code just never
   #   wrote them.
+  # f7353bd = #551, four things the Platform alerts page turned up once it
+  #   could be read.
+  #   PUBLIC MIGRATION 0071. Adds `platform_role_assignments
+  #   .receives_alert_emails` and `platform_alerts.notified_at` /
+  #   `notified_severity`. All three are defaulted or nullable, so it is safe
+  #   against the live alert rows.
+  #   API + WORKERS + FRONTEND MOVE TOGETHER. The sweep that mails the digest
+  #   runs on workers-light; the api serves the recipient checkbox and the
+  #   operator-forced sweep; the frontend carries the checkbox, the error
+  #   boundary and the platform bell. tile-server has no delta and stays.
+  #   1. There was no React error boundary anywhere in frontend/src, so any
+  #      render that threw blanked the whole document. There is one now,
+  #      around the app and around the routed page area.
+  #   2. `irrigation.generate_for_tenant` raised UndefinedColumn on every run
+  #      for every tenant - `list_active_block_ids` still queried
+  #      `blocks.status`, which does not exist. Second site of a bug fixed
+  #      once already.
+  #   3. The four tasks reporting "got Future attached to a different loop"
+  #      were victims. `farms.farm_scope_consistency_check` and
+  #      `iam.reconcile_keycloak` ran `asyncio.run` without disposing the
+  #      engine, and the next task in that worker inherited a pool owned by
+  #      a closed loop. `get_engine` now rebuilds on a foreign loop, so a
+  #      future omission costs one pool, not the worker process.
+  #   4. The bell was 403-dead for platform admins (/v1/inbox is
+  #      tenant-scoped). It now counts platform alerts and opens the list.
+  #   EMAIL SENDS NOTHING until somebody ticks a box on /platform/admins.
+  #   The column defaults to false.
+  #   Images CONFIRMED by pulling both on the node: api @ e04a870c04362,
+  #   frontend @ 62304abab58a9.
   images:
     api:
-      tag: "575bb7c"
+      tag: "f7353bd"
     workers:
-      tag: "575bb7c"
+      tag: "f7353bd"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -2620,7 +2649,7 @@ global:
       #
       # f04a739 = #538, the platform alerts list and the red bar. Moves with
       #   the api and the workers - see the note above the `images` key.
-      tag: "03f2a0d"
+      tag: "f7353bd"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
