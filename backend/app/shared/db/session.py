@@ -23,9 +23,11 @@ SQL injection through the JWT claim.
 # can't resolve string annotations to the FastAPI Request injection —
 # it would silently demote the parameter to a query param.
 
+import asyncio
 import re
 import threading
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Coroutine
+from typing import Any
 
 from fastapi import Request
 from sqlalchemy.ext.asyncio import (
@@ -100,6 +102,38 @@ async def dispose_engine() -> None:
         if _engine is not None:
             await _engine.dispose()
             _engine = None
+
+
+def run_task_async[T](coro: Coroutine[Any, Any, T]) -> T:
+    """Run one coroutine in a fresh event loop, then drop the engine.
+
+    Every Celery task body is a sync shim over async code, so each one calls
+    `asyncio.run` and gets a brand-new event loop. The engine, and the asyncpg
+    connections pooled inside it, are process-wide and outlive that loop.
+
+    Disposing is therefore not tidy-up, it is required. A pooled connection
+    created on one loop and handed to the next task on a different loop fails
+    with:
+
+        RuntimeError: ... got Future ... attached to a different loop
+
+    and the failure lands on the *next* task to touch the database, not on the
+    one that skipped the dispose. Observed on production 2026-08-21:
+    `iam.reconcile_keycloak` ran without disposing at 18:59, and
+    `integrations_health.check_failure_streaks` was the one that raised at
+    19:04 in the same pool process.
+
+    Use this in every Celery task entry point rather than calling
+    `asyncio.run` directly.
+    """
+
+    async def _runner() -> T:
+        try:
+            return await coro
+        finally:
+            await dispose_engine()
+
+    return asyncio.run(_runner())
 
 
 def AsyncSessionLocal() -> async_sessionmaker[AsyncSession]:
