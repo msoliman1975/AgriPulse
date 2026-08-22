@@ -4,6 +4,7 @@ import { initReactI18next } from "react-i18next";
 
 import enCommon from "./locales/en/common.json";
 import enAuth from "./locales/en/auth.json";
+import enAccount from "./locales/en/account.json";
 import enFarms from "./locales/en/farms.json";
 import enImagery from "./locales/en/imagery.json";
 import enIndices from "./locales/en/indices.json";
@@ -32,6 +33,7 @@ import enPlanTemplates from "./locales/en/planTemplates.json";
 import enBulkUpdates from "./locales/en/bulkUpdates.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
+import arAccount from "./locales/ar/account.json";
 import arFarms from "./locales/ar/farms.json";
 import arImagery from "./locales/ar/imagery.json";
 import arIndices from "./locales/ar/indices.json";
@@ -71,6 +73,7 @@ const resources = {
   en: {
     common: enCommon,
     auth: enAuth,
+    account: enAccount,
     farms: enFarms,
     imagery: enImagery,
     indices: enIndices,
@@ -101,6 +104,7 @@ const resources = {
   ar: {
     common: arCommon,
     auth: arAuth,
+    account: arAccount,
     farms: arFarms,
     imagery: arImagery,
     indices: arIndices,
@@ -141,6 +145,7 @@ void i18n
     ns: [
       "common",
       "auth",
+      "account",
       "farms",
       "imagery",
       "indices",

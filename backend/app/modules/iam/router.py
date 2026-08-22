@@ -13,8 +13,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import APIError
 from app.modules.iam.field_enrolment import get_field_enrolment_service
 from app.modules.iam.my_work import list_my_work
+from app.modules.iam.notification_prefs import (
+    UnknownChannelError,
+    read_preferences,
+    update_preferences,
+)
 from app.modules.iam.schemas import (
     MeResponse,
+    MyNotificationPreferencesResponse,
+    MyNotificationPreferencesUpdate,
     TenantUserResponse,
     UserInviteRequest,
     UserInviteResponse,
@@ -154,6 +161,83 @@ async def get_me(
             title="User not found",
             detail="No user record exists for this token. Sign out and back in.",
             type_="https://agripulse.cloud/problems/user-not-found",
+        ) from exc
+
+
+async def _my_notification_context(
+    context: RequestContext,
+    session: AsyncSession,
+) -> UUID | None:
+    """Resolve the caller's tenant id, or None outside a tenant JWT.
+
+    Deliberately not `_ensure_tenant`. A Platform Admin holds no tenant
+    claim, and locking them out of their own notification settings would be
+    a strange thing for this screen to do. Without a tenant we cannot read
+    the tenant's channel list or count devices, so the response falls back
+    to the same defaults the fan-out uses.
+    """
+    schema = context.tenant_schema
+    if schema is None:
+        return None
+    return await _resolve_tenant_id(schema=schema, session=session)
+
+
+@router.get(
+    "/me/notification-preferences",
+    response_model=MyNotificationPreferencesResponse,
+    summary="The caller's own notification channels and notification language.",
+)
+async def get_my_notification_preferences(
+    context: RequestContext = Depends(get_current_context),
+    session: AsyncSession = Depends(get_admin_db_session),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    # No capability gate anywhere on this pair. The row belongs to the
+    # caller, every role has one, and the footer of every notification email
+    # links here — a gate would 403 the people the link is written for.
+    tenant_id = await _my_notification_context(context, session)
+    return await read_preferences(
+        session=session,
+        tenant_session=tenant_session if tenant_id is not None else None,
+        user_id=context.user_id,
+        tenant_id=tenant_id,
+        email_address=context.email or None,
+    )
+
+
+@router.patch(
+    "/me/notification-preferences",
+    response_model=MyNotificationPreferencesResponse,
+    summary="Change the caller's own notification channels or language.",
+)
+async def patch_my_notification_preferences(
+    payload: MyNotificationPreferencesUpdate,
+    context: RequestContext = Depends(get_current_context),
+    session: AsyncSession = Depends(get_admin_db_session),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    tenant_id = await _my_notification_context(context, session)
+    try:
+        return await update_preferences(
+            session=session,
+            tenant_session=tenant_session if tenant_id is not None else None,
+            user_id=context.user_id,
+            tenant_id=tenant_id,
+            email_address=context.email or None,
+            channels=payload.channels,
+            language=payload.language,
+        )
+    except UnknownChannelError as exc:
+        raise APIError(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            title="Unknown notification channel",
+            detail=(
+                f"Not a per-user channel: {', '.join(exc.unknown)}. "
+                "Choose from in_app, email, push. The webhook channel is "
+                "configured once per tenant, not per person."
+            ),
+            type_="https://agripulse.cloud/problems/iam/unknown-notification-channel",
+            extras={"unknown": exc.unknown},
         ) from exc
 
 

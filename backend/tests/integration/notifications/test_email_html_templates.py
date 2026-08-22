@@ -69,7 +69,7 @@ CTX = {
     "evaluation_snapshot_json": "{}",
     "link_url": "/action-center/8f2c?kind=alert&item=b71e",
     "link_url_abs": "https://app.agripulse.cloud/action-center/8f2c?kind=alert&item=b71e",
-    "preferences_url": "https://app.agripulse.cloud/settings/notifications",
+    "preferences_url": "https://app.agripulse.cloud/account/notifications",
 }
 
 

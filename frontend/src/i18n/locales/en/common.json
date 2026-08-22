@@ -47,6 +47,7 @@
     "configTenantSettings": "Tenant settings",
     "configDecisionTrees": "Decision trees",
     "preferences": "Preferences",
+    "notificationSettings": "Notification settings",
     "alertsTitle": "Alerts",
     "alertsEmpty": "No alerts yet. They will appear here once the alerts service is wired.",
     "alertsCount": "{{count}} unread alerts",

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "react-oidc-context";
 import { useTranslation } from "react-i18next";
 
@@ -57,6 +58,17 @@ export function SettingsDrawer({ open, onClose }: Props): ReactNode {
             <UnitToggle />
           </div>
         </div>
+        {/* The two toggles above are this browser only. Which alerts actually
+            reach you, and in which language, is stored on your account — and
+            that lives on its own page because the footer of every
+            notification email links to it. */}
+        <Link
+          to="/account/notifications"
+          onClick={onClose}
+          className="inline-block text-sm text-ap-primary underline underline-offset-2 hover:no-underline"
+        >
+          {tc("shell.notificationSettings")}
+        </Link>
       </section>
 
       <hr className="my-5 border-ap-line" />

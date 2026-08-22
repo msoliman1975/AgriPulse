@@ -40,6 +40,7 @@ import { FarmConsolePage } from "@/modules/labs/mapnext/FarmConsolePage";
 import { FarmConsoleV2Page } from "@/modules/labs/console/FarmConsoleV2Page";
 import { PatternsPage } from "@/modules/labs/patterns/PatternsPage";
 import { BulkUpdatesPage } from "@/modules/settings/pages/BulkUpdatesPage";
+import { NotificationPreferencesPage } from "@/modules/account/pages/NotificationPreferencesPage";
 import { SettingsLayout } from "@/modules/settings/pages/SettingsLayout";
 import { SettingsIndexPage } from "@/modules/settings/pages/SettingsIndexPage";
 import { SettingsPlaceholderPage } from "@/modules/settings/pages/SettingsPlaceholderPage";
@@ -236,6 +237,11 @@ export function App(): ReactNode {
                 <Route path="/decision-tree-traces" element={<DecisionTreeTracesPage />} />
                 {/* Tenant Settings Hub. Capability checks live on each
                   page so a deep link with the wrong role still 403s. */}
+                {/* The caller's own settings. Outside /settings on purpose:
+                    that hub is tenant-wide config and every tab is
+                    capability-gated, so the link in a notification email
+                    would 403 the Scouts and Agronomists it is written for. */}
+                <Route path="/account/notifications" element={<NotificationPreferencesPage />} />
                 <Route path="/settings" element={<SettingsLayout />}>
                   <Route index element={<SettingsIndexPage />} />
                   <Route
