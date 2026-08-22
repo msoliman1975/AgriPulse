@@ -3,7 +3,7 @@
 OAuth2 client-credentials with cached token, paginated catalog
 discovery, and a multi-band Process API call that returns all seven
 S2 bands (blue/green/red/red_edge_1/nir/swir1/swir2) in one COG-shaped
-GeoTIFF in EPSG:32636.
+GeoTIFF in the AOI's UTM zone.
 
 Token cache is in-process per worker (Q4 in the PR-B plan): each pod
 holds one access token, refreshed at 50 minutes (Sentinel Hub's tokens
@@ -310,14 +310,17 @@ class SentinelHubProvider:
         scene_id: str,
         scene_datetime: datetime,
         product_code: str,
-        aoi_geojson_utm36n: dict[str, Any],
+        aoi_geojson_utm: dict[str, Any],
+        aoi_srid: int,
         bands: tuple[str, ...],
     ) -> FetchResult:
         """Pull all requested bands for one scene as a multi-band TIFF.
 
-        ``aoi_geojson_utm36n`` carries the block geometry already
-        transformed into EPSG:32636 by the caller — Sentinel Hub
-        accepts the AOI in any CRS as long as the request says so.
+        ``aoi_geojson_utm`` carries the geometry already transformed into the
+        farm's UTM zone by the caller, and ``aoi_srid`` names that zone.
+        Sentinel Hub accepts the AOI in any CRS as long as the request says
+        so, which is why the CRS is built from ``aoi_srid`` rather than
+        pinned. The output COG comes back in the same CRS.
         """
         if product_code != "s2_l2a":
             raise ValueError(f"Sentinel Hub adapter does not support product {product_code!r}")
@@ -362,9 +365,9 @@ class SentinelHubProvider:
                     # geometry's own bounds, which land on arbitrary metres, and
                     # then divides that span into whole pixels — so `resx` is a
                     # request, not a guarantee. See `_snap_bbox_to_grid`.
-                    "bbox": _snap_bbox_to_grid(aoi_geojson_utm36n, self._resolution_m),
-                    "geometry": aoi_geojson_utm36n,
-                    "properties": {"crs": "http://www.opengis.net/def/crs/EPSG/0/32636"},
+                    "bbox": _snap_bbox_to_grid(aoi_geojson_utm, self._resolution_m),
+                    "geometry": aoi_geojson_utm,
+                    "properties": {"crs": f"http://www.opengis.net/def/crs/EPSG/0/{aoi_srid}"},
                 },
                 "data": [
                     {
@@ -377,7 +380,7 @@ class SentinelHubProvider:
                 ],
             },
             "output": {
-                # resx/resy are in the bounds CRS units (EPSG:32636 → metres),
+                # resx/resy are in the bounds CRS units (a UTM zone → metres),
                 # so this pins the output to the product's native GSD instead
                 # of Sentinel Hub's default 256x256 grid. AOIs are per-block
                 # (sub-km), comfortably under the Process API's 2500px/side cap.
@@ -483,7 +486,7 @@ def _feature_to_discovered(feature: dict[str, Any]) -> DiscoveredScene:
     )
 
 
-def _snap_bbox_to_grid(aoi_geojson_utm36n: dict[str, Any], resolution_m: float) -> list[float]:
+def _snap_bbox_to_grid(aoi_geojson_utm: dict[str, Any], resolution_m: float) -> list[float]:
     """The AOI's bounding box, grown outward to whole multiples of ``resolution_m``.
 
     Sending only ``geometry`` gets an output raster whose pixels are *near*
@@ -509,7 +512,7 @@ def _snap_bbox_to_grid(aoi_geojson_utm36n: dict[str, Any], resolution_m: float) 
     """
     if resolution_m <= 0:
         raise ValueError(f"resolution_m must be positive, got {resolution_m!r}")
-    min_x, min_y, max_x, max_y = shape(aoi_geojson_utm36n).bounds
+    min_x, min_y, max_x, max_y = shape(aoi_geojson_utm).bounds
     return [
         math.floor(min_x / resolution_m) * resolution_m,
         math.floor(min_y / resolution_m) * resolution_m,

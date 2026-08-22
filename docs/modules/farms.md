@@ -182,8 +182,9 @@ Areas come back from the API in `mÂ²`; the frontend converts to the user's pre
 
 - All input geometries are GeoJSON in **WGS84 (SRID 4326)**.
 - `farms.boundary` is a `MultiPolygon`; `blocks.boundary` is a `Polygon`.
-- Triggers in the tenant migration (`0002_farms_blocks_attachments.py`) compute `boundary_utm` (transform to **UTM 36N / EPSG:32636**), `centroid`, and `area_m2 = ST_Area(boundary_utm)` on every insert/update. For blocks, the trigger also recomputes `aoi_hash = sha256(ST_AsText(boundary_utm))` so imagery can key cached scenes by geometry identity.
-- The API rejects (422) any input that is not a valid Polygon/MultiPolygon, that self-intersects (`ST_IsValid`), or whose bounding box falls outside Egypt (lon `24..36`, lat `22..32`).
+- Triggers compute `boundary_utm` (transform to the farm's UTM zone), `centroid`, and `area_m2 = ST_Area(boundary_utm)` on every insert/update, plus `aoi_hash = sha256(ST_AsText(boundary_utm))` so imagery can key cached scenes by geometry identity. Defined in `0002_farms_blocks_attachments.py`, last replaced in `0082_farm_utm_zone.py`.
+- The zone is `farms.utm_srid`. The farm trigger derives it once, on insert, from the boundary centroid; on update the column already holds it, so reshaping a farm never moves it between coordinate systems. Blocks read their parent farm's value. Changing a zone changes `aoi_hash`, which is how a farm or block is matched to its stored rasters, so it is never done implicitly.
+- The API rejects (422) any input that is not a valid Polygon/MultiPolygon or that self-intersects (`ST_IsValid`). There is no country restriction: a boundary anywhere on Earth gets a correct area, because the zone follows the farm.
 
 ---
 

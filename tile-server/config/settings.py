@@ -5,7 +5,7 @@ PYTHONPATH (the Helm chart mounts a ConfigMap to ``/opt/agripulse/config/``
 and prepends it). Anything not set here falls back to TiTiler defaults.
 
 ARCHITECTURE.md Â§ 9 commits:
-- COGs in object storage (UTM 36N, EPSG:32636)
+- COGs in object storage, each in its farm's UTM zone (`farms.utm_srid`)
 - Web tiles in Web Mercator (EPSG:3857), reprojected on the fly
 - Cloud-cover thresholds applied upstream â€” this layer just serves bytes
 """

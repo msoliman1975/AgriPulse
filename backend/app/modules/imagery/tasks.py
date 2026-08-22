@@ -1005,7 +1005,8 @@ async def _acquire_scene_async(
                 scene_id=job["scene_id"],
                 scene_datetime=job["scene_datetime"],
                 product_code=product["code"],
-                aoi_geojson_utm36n=block["boundary_utm_geojson"],
+                aoi_geojson_utm=block["boundary_utm_geojson"],
+                aoi_srid=block["utm_srid"],
                 bands=tuple(product["bands"]),
             )
         except Exception as exc:
@@ -1512,7 +1513,7 @@ async def _compute_farm_scene_indices(
         bands_arrays, aoi_mask, cloud_mask, profile = load_raw_bands_and_aggregate(
             f"s3://{storage.bucket}/{s3_key}",
             band_names=tuple(product["bands"]),
-            aoi_geojson_utm36n=farm["boundary_utm_geojson"],
+            aoi_geojson_utm=farm["boundary_utm_geojson"],
             product_code=product["code"],
             # Cut at the boundary, not one pixel past it. This surface is
             # DRAWN, over the farm's own outline, and the touched rule paints
@@ -2084,7 +2085,8 @@ async def _acquire_farm_scene_async(job_id: UUID, tenant_schema: str) -> dict[st
                     scene_id=job["scene_id"],
                     scene_datetime=job["scene_datetime"],
                     product_code=product["code"],
-                    aoi_geojson_utm36n=farm["boundary_utm_geojson"],
+                    aoi_geojson_utm=farm["boundary_utm_geojson"],
+                    aoi_srid=farm["utm_srid"],
                     bands=tuple(product["bands"]),
                 )
             except Exception as exc:
@@ -2270,7 +2272,7 @@ async def _compute_indices_async(
         bands_arrays, aoi_mask, cloud_mask, profile = load_raw_bands_and_aggregate(
             raw_uri,
             band_names=tuple(product["bands"]),
-            aoi_geojson_utm36n=block["boundary_utm_geojson"],
+            aoi_geojson_utm=block["boundary_utm_geojson"],
             product_code=product["code"],
         )
         aoi_pixel_count, masked_pixel_count = _mask_counts(aoi_mask, cloud_mask)

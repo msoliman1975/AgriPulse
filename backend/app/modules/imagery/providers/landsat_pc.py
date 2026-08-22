@@ -22,10 +22,10 @@ The same files are byte-identical in AWS `s3://usgs-landsat/`
 (requester-pays), so losing PC is a credentials change here, not a
 rewrite.
 
-Two properties make this cheap for us specifically: the assets are
-already `EPSG:32636` over Egypt — our storage CRS — so the common path
-does no reprojection, and they live in Azure West Europe, a short hop
-from the Hetzner node.
+Two properties make this cheap for us specifically: a Landsat item is
+already in the UTM zone of the ground it covers, so for a farm in that
+same zone the common path does no reprojection, and the assets live in
+Azure West Europe, a short hop from the Hetzner node.
 
 Only Landsat 8 and 9 are considered. Landsat 4/5/7 carry a `lwir`
 asset, not `lwir11`, and L7's SLC-off striping would need gap-filling;
@@ -331,7 +331,8 @@ class LandsatPlanetaryComputerProvider:
         scene_id: str,
         scene_datetime: datetime,
         product_code: str,
-        aoi_geojson_utm36n: dict[str, Any],
+        aoi_geojson_utm: dict[str, Any],
+        aoi_srid: int,
         bands: tuple[str, ...],
     ) -> FetchResult:
         """Read the requested bands over the AOI as one multi-band COG.
@@ -381,7 +382,8 @@ class LandsatPlanetaryComputerProvider:
             _read_window_to_cog,
             signed_hrefs=signed,
             bands=out_bands,
-            aoi_geojson_utm36n=aoi_geojson_utm36n,
+            aoi_geojson_utm=aoi_geojson_utm,
+            aoi_srid=aoi_srid,
         )
         return FetchResult(
             cog_bytes=cog_bytes,
@@ -523,7 +525,8 @@ def _read_window_to_cog(
     *,
     signed_hrefs: list[str],
     bands: tuple[str, ...],
-    aoi_geojson_utm36n: dict[str, Any],
+    aoi_geojson_utm: dict[str, Any],
+    aoi_srid: int,
 ) -> bytes:
     """Read the AOI window from each band and stack into one COG.
 
@@ -531,19 +534,20 @@ def _read_window_to_cog(
     window is computed once from the first band and reused — that also
     guarantees the stack is pixel-aligned.
     """
-    aoi_bounds = shape(aoi_geojson_utm36n).bounds
+    aoi_bounds = shape(aoi_geojson_utm).bounds
 
     with _gdal_vsicurl_env():
         with rasterio.open(_gdal_path(signed_hrefs[0])) as first:
             source_crs = first.crs
-            # Egypt sits in UTM 36N, which is already our storage CRS, so
-            # this is the common path. The transform is still computed
-            # rather than assumed: a farm near a zone boundary would land
-            # in a neighbouring UTM zone and silently read the wrong
-            # pixels otherwise.
-            if source_crs is not None and source_crs.to_epsg() != 32636:
+            # A Landsat item carries the UTM zone of the ground it covers, so
+            # for a farm inside that zone this is a no-op. It is computed
+            # rather than assumed for the two cases where it is not: a farm
+            # near a zone boundary whose item sits in the neighbouring zone,
+            # and any farm whose own zone is not the item's. Skipping it
+            # reads the wrong pixels without raising.
+            if source_crs is not None and source_crs.to_epsg() != aoi_srid:
                 read_bounds = transform_bounds(
-                    "EPSG:32636", source_crs, *aoi_bounds, densify_pts=21
+                    f"EPSG:{aoi_srid}", source_crs, *aoi_bounds, densify_pts=21
                 )
             else:
                 read_bounds = aoi_bounds
@@ -564,7 +568,7 @@ def _read_window_to_cog(
         "height": height,
         "width": width,
         "dtype": "float32",
-        "crs": source_crs if source_crs is not None else "EPSG:32636",
+        "crs": source_crs if source_crs is not None else f"EPSG:{aoi_srid}",
         "transform": transform,
         "compress": "deflate",
         "tiled": True,

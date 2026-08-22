@@ -121,7 +121,6 @@
       "tooLarge": "File too large",
       "invalid_code": "Invalid block code",
       "invalid_geometry": "Invalid geometry",
-      "out_of_egypt": "Outside Egypt",
       "duplicate": "Duplicate code in upload",
       "duplicate_in_batch": "Duplicate code in upload",
       "replace_not_confirmed": "Replace not confirmed",

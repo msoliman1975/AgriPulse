@@ -89,7 +89,7 @@ def load_raw_bands_and_aggregate(
     raw_uri: str,
     *,
     band_names: tuple[str, ...],
-    aoi_geojson_utm36n: dict[str, Any],
+    aoi_geojson_utm: dict[str, Any],
     product_code: str = "s2_l2a",
     all_touched: bool = True,
 ) -> tuple[
@@ -116,6 +116,11 @@ def load_raw_bands_and_aggregate(
     encodings are not interchangeable: SCL is a class enum and QA_PIXEL is a
     bitmask, so reading one with the other's rules produces a
     plausible-looking mask that is entirely wrong.
+
+    ``aoi_geojson_utm`` must be in the raw COG's own CRS. That is the farm's
+    UTM zone (`farms.utm_srid`), not a fixed one — the mask is rasterised
+    against the dataset transform, so a mismatch masks the wrong pixels
+    without raising.
 
     ``all_touched`` picks the rule for "is this pixel inside the AOI".
 
@@ -150,7 +155,7 @@ def load_raw_bands_and_aggregate(
             cloud_mask = quality_band_mask(product_code, quality)
         else:
             cloud_mask = np.zeros((ds.height, ds.width), dtype=bool)
-        geom = shape(aoi_geojson_utm36n)
+        geom = shape(aoi_geojson_utm)
         aoi_mask = ~geometry_mask(
             [geom],
             out_shape=(ds.height, ds.width),

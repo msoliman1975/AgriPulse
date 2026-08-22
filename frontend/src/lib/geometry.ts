@@ -8,9 +8,6 @@ import type {
 } from "geojson";
 import { area, bbox, booleanValid, kinks } from "@turf/turf";
 
-// Egypt sanity bbox per prompt-02. Server enforces too.
-export const EGYPT_BBOX = { minLon: 24, minLat: 22, maxLon: 36, maxLat: 32 } as const;
-
 export type ParsedGeoJson = FeatureCollection | Feature | Geometry;
 
 export interface GeometryError {
@@ -19,7 +16,6 @@ export interface GeometryError {
     | "not_multipolygon"
     | "self_intersect"
     | "invalid"
-    | "out_of_egypt"
     | "empty";
   detail?: string;
 }
@@ -48,16 +44,6 @@ export function bboxOfGeometry(geometry: Geometry): [number, number, number, num
   return bbox({ type: "Feature", properties: {}, geometry }) as [number, number, number, number];
 }
 
-export function isInEgyptBbox(geometry: Geometry): boolean {
-  const [minLon, minLat, maxLon, maxLat] = bboxOfGeometry(geometry);
-  return (
-    minLon >= EGYPT_BBOX.minLon &&
-    maxLon <= EGYPT_BBOX.maxLon &&
-    minLat >= EGYPT_BBOX.minLat &&
-    maxLat <= EGYPT_BBOX.maxLat
-  );
-}
-
 export function geometryAreaM2(geometry: Polygon | MultiPolygon): number {
   return area({ type: "Feature", properties: {}, geometry });
 }
@@ -77,9 +63,6 @@ export function ensureValidPolygon(geometry: Geometry): Polygon {
     !booleanValid(geometry)
   ) {
     throw new GeometryValidationError({ code: "self_intersect" });
-  }
-  if (!isInEgyptBbox(geometry)) {
-    throw new GeometryValidationError({ code: "out_of_egypt" });
   }
   return geometry;
 }
@@ -104,9 +87,6 @@ export function ensureValidMultiPolygon(geometry: Geometry): MultiPolygon {
   }
   if (!booleanValid(geometry)) {
     throw new GeometryValidationError({ code: "self_intersect" });
-  }
-  if (!isInEgyptBbox(geometry)) {
-    throw new GeometryValidationError({ code: "out_of_egypt" });
   }
   return geometry;
 }

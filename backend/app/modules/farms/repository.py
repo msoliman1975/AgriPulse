@@ -241,7 +241,12 @@ class FarmsRepository:
             )
             VALUES (
                 :id, :code, :name, :description, ST_GeomFromEWKT(:boundary),
-                'SRID=32636;MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))'::geometry,
+                -- Placeholder. `farms_geom_compute` overwrites it BEFORE INSERT
+                -- with the boundary transformed into the farm's own UTM zone.
+                -- SRID 0 rather than a real one: if the trigger were ever
+                -- missing, an unset SRID fails loudly instead of reading as a
+                -- deliberate zone.
+                'SRID=0;MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))'::geometry,
                 'SRID=4326;POINT(0 0)'::geometry,
                 0,
                 :elevation_m, :country_code, :governorate, :district, :nearest_city,
@@ -486,7 +491,9 @@ class FarmsRepository:
             )
             VALUES (
                 :id, :farm_id, :code, :name, ST_GeomFromEWKT(:boundary),
-                'SRID=32636;POLYGON((0 0,1 0,1 1,0 1,0 0))'::geometry,
+                -- Placeholder; see the note in create_farm. `blocks_geom_compute`
+                -- overwrites it with the parent farm's zone.
+                'SRID=0;POLYGON((0 0,1 0,1 1,0 1,0 0))'::geometry,
                 'SRID=4326;POINT(0 0)'::geometry,
                 0, '',
                 :elevation_m, :irrigation_system, :irrigation_source,

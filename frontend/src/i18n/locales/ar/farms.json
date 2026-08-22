@@ -77,8 +77,7 @@
       "nameRequired": "الاسم مطلوب.",
       "boundaryRequired": "ارسم أو ارفع الحدود أولًا.",
       "boundaryInvalid": "الحدود ليست مضلعًا صحيحًا.",
-      "boundarySelfIntersect": "الحدود تتقاطع مع نفسها.",
-      "boundaryOutOfEgypt": "الحدود خارج النطاق الجغرافي لمصر."
+      "boundarySelfIntersect": "الحدود تتقاطع مع نفسها."
     },
     "identity": "بيانات المزرعة"
   },

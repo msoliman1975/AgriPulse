@@ -77,8 +77,7 @@
       "nameRequired": "Name is required.",
       "boundaryRequired": "Draw or upload a boundary first.",
       "boundaryInvalid": "Boundary is not a valid polygon.",
-      "boundarySelfIntersect": "Boundary self-intersects.",
-      "boundaryOutOfEgypt": "Boundary is outside Egypt's bounding box."
+      "boundarySelfIntersect": "Boundary self-intersects."
     },
     "identity": "Farm details"
   },

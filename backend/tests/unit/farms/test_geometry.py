@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from app.modules.farms.errors import GeometryInvalidError, GeometryOutOfEgyptError
+from app.modules.farms.errors import GeometryInvalidError
 from app.modules.farms.geometry import (
     geojson_to_ewkt_multipolygon,
     geojson_to_ewkt_polygon,
-    is_in_egypt,
     validate_multipolygon_geojson,
     validate_polygon_geojson,
 )
@@ -29,27 +28,15 @@ def _square_polygon(lon: float, lat: float, size: float = 0.001) -> dict[str, ob
     }
 
 
-class TestEgyptBbox:
-    def test_inside_egypt(self) -> None:
-        # Cairo: ~31.2E, 30.0N
-        assert is_in_egypt(31.2, 30.0)
-
-    def test_outside_egypt_west(self) -> None:
-        # Tripoli: ~13E, 32N
-        assert not is_in_egypt(13.0, 32.0)
-
-    def test_outside_egypt_north(self) -> None:
-        # Cyprus: 33E, 35N
-        assert not is_in_egypt(33.0, 35.0)
-
-    def test_corner_inclusive(self) -> None:
-        assert is_in_egypt(24.0, 22.0)
-        assert is_in_egypt(36.0, 32.0)
-
-
 class TestPolygonValidator:
-    def test_valid_egyptian_square(self) -> None:
+    def test_valid_square(self) -> None:
         validate_polygon_geojson(_square_polygon(31.2, 30.0))  # no exception
+
+    def test_accepts_a_square_outside_egypt(self) -> None:
+        # Tripoli: ~13E, 32N. There is no country check — the metric
+        # coordinate system is per farm, so any longitude produces a
+        # correct area. See tests/integration/farms/test_farm_utm_zone.py.
+        validate_polygon_geojson(_square_polygon(13.0, 32.0))  # no exception
 
     def test_rejects_non_polygon_type(self) -> None:
         geom = {"type": "Point", "coordinates": [31.0, 30.0]}
@@ -64,10 +51,6 @@ class TestPolygonValidator:
         }
         with pytest.raises(GeometryInvalidError):
             validate_polygon_geojson(unclosed)
-
-    def test_rejects_outside_egypt(self) -> None:
-        with pytest.raises(GeometryOutOfEgyptError):
-            validate_polygon_geojson(_square_polygon(13.0, 32.0))
 
     def test_rejects_too_few_vertices(self) -> None:
         triangle = {
@@ -90,13 +73,12 @@ class TestMultiPolygonValidator:
         with pytest.raises(GeometryInvalidError):
             validate_multipolygon_geojson({"type": "MultiPolygon", "coordinates": []})
 
-    def test_rejects_one_outside_egypt(self) -> None:
+    def test_accepts_a_polygon_outside_egypt(self) -> None:
         geom = {
             "type": "MultiPolygon",
             "coordinates": [_square_polygon(13.0, 32.0)["coordinates"]],
         }
-        with pytest.raises(GeometryOutOfEgyptError):
-            validate_multipolygon_geojson(geom)
+        validate_multipolygon_geojson(geom)  # no exception
 
 
 class TestEwktFormatters:

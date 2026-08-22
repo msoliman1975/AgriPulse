@@ -30,7 +30,7 @@ Every authenticated request runs `SET LOCAL search_path TO tenant_<id>, public` 
 - Booleans: `is_<adjective>` or `has_<noun>` (`is_active`, `has_imagery`)
 - Timestamps: `<verb>_at` (`created_at`, `updated_at`, `deleted_at`)
 - Enums: stored as PostgreSQL `TEXT` with a `CHECK` constraint listing allowed values, not native `ENUM` (easier to evolve)
-- All geometry columns: PostGIS `geometry(<type>, 4326)` for WGS84 lat/lon storage; computed UTM 36N geometries stored separately as `geometry_utm`
+- All geometry columns: PostGIS `geometry(<type>, 4326)` for WGS84 lat/lon storage; computed metric geometries stored separately as `geometry_utm`, in the farm's own UTM zone (`farms.utm_srid`) rather than a fixed one
 
 ### 1.3 Primary keys
 
@@ -398,7 +398,8 @@ The top-level operational unit owned by a tenant.
 | `name` | TEXT | NOT NULL | |
 | `description` | TEXT | | |
 | `boundary` | geometry(MultiPolygon, 4326) | NOT NULL | WGS84 |
-| `boundary_utm` | geometry(MultiPolygon, 32636) | NOT NULL | UTM 36N for accurate area math; computed by trigger from `boundary` |
+| `boundary_utm` | geometry(MultiPolygon) | NOT NULL | The farm's UTM zone, for accurate area math; computed by trigger from `boundary`. No SRID in the type — see `utm_srid` |
+| `utm_srid` | INTEGER | NOT NULL | EPSG code of that zone. Derived once from the boundary centroid on insert and never recomputed: a change here moves `aoi_hash` and orphans stored imagery |
 | `centroid` | geometry(Point, 4326) | NOT NULL | Computed from boundary |
 | `area_m2` | NUMERIC(14,2) | NOT NULL | Computed from `boundary_utm` (`ST_Area(boundary_utm)`) |
 | `elevation_m` | NUMERIC(7,2) | | Sampled from DEM at centroid |
@@ -436,7 +437,7 @@ The operational subdivision of a farm — what gets monitored, alerted, and fore
 | `code` | TEXT | NOT NULL | Unique within farm, e.g. `B-12` |
 | `name` | TEXT | | Display name; falls back to `code` |
 | `boundary` | geometry(Polygon, 4326) | NOT NULL | |
-| `boundary_utm` | geometry(Polygon, 32636) | NOT NULL | |
+| `boundary_utm` | geometry(Polygon) | NOT NULL | In the parent farm's `utm_srid`, so a farm and its blocks share one coordinate system |
 | `centroid` | geometry(Point, 4326) | NOT NULL | |
 | `area_m2` | NUMERIC(14,2) | NOT NULL | |
 | `elevation_m` | NUMERIC(7,2) | | Mean elevation from DEM |
