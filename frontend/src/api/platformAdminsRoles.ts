@@ -10,6 +10,10 @@ export interface PlatformAdminRow {
   role: PlatformRole;
   granted_at: string;
   granted_by: string | null;
+  // Whether this person gets the platform-alert email digest. A delivery
+  // preference on the role grant, not a capability - nothing about it is
+  // in the JWT.
+  receives_alert_emails: boolean;
 }
 
 export interface InvitePlatformAdminPayload {
@@ -41,4 +45,22 @@ export async function invitePlatformAdmin(
 
 export async function removePlatformAdmin(userId: string, role: PlatformRole): Promise<void> {
   await apiClient.delete(`${base}/${userId}`, { params: { role } });
+}
+
+export interface AlertEmailsResponse {
+  user_id: string;
+  role: PlatformRole;
+  receives_alert_emails: boolean;
+}
+
+export async function setPlatformAdminAlertEmails(
+  userId: string,
+  role: PlatformRole,
+  enabled: boolean,
+): Promise<AlertEmailsResponse> {
+  const { data } = await apiClient.patch<AlertEmailsResponse>(`${base}/${userId}/alert-emails`, {
+    role,
+    enabled,
+  });
+  return data;
 }

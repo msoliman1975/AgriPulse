@@ -4,6 +4,8 @@ import {
   invitePlatformAdmin,
   listPlatformAdmins,
   removePlatformAdmin,
+  setPlatformAdminAlertEmails,
+  type AlertEmailsResponse,
   type InvitePlatformAdminPayload,
   type InvitePlatformAdminResponse,
   type PlatformAdminRow,
@@ -32,6 +34,27 @@ export function useRemovePlatformAdmin() {
   const qc = useQueryClient();
   return useMutation<void, Error, { userId: string; role: PlatformRole }>({
     mutationFn: ({ userId, role }) => removePlatformAdmin(userId, role),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["platform_admins_roles"] });
+    },
+  });
+}
+
+/**
+ * Turn the platform-alert email digest on or off for one admin.
+ *
+ * No optimistic update. The checkbox decides who is paged when the
+ * platform breaks, so it should read what the server stored rather than
+ * what the click intended.
+ */
+export function useSetPlatformAdminAlertEmails() {
+  const qc = useQueryClient();
+  return useMutation<
+    AlertEmailsResponse,
+    Error,
+    { userId: string; role: PlatformRole; enabled: boolean }
+  >({
+    mutationFn: ({ userId, role, enabled }) => setPlatformAdminAlertEmails(userId, role, enabled),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["platform_admins_roles"] });
     },

@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { getUnreadCount } from "@/api/inbox";
+import { usePlatformAlertSummary } from "@/queries/platformAlerts";
+import { useCapability } from "@/rbac/useCapability";
 import { openInboxStream } from "@/realtime/inboxStream";
 import { ActiveFarmContext } from "./ActiveFarmContext";
 import { AlertsDrawer } from "./AlertsDrawer";
@@ -29,14 +31,29 @@ export function Header({ toolbar }: HeaderProps = {}): ReactNode {
   //     each event so the UI reflects new alerts within a second.
   //   * Pull fallback: 60s poll covers the gap if the stream errors
   //     (no token, network blip, dev server reload).
+  //
+  // A platform admin has no tenant, so every inbox call answers 403 and the
+  // bell was permanently empty for the one person the platform alerts are
+  // written for. For them the bell counts live platform alerts instead and
+  // the drawer lists those, which is also the second way into
+  // /platform/alerts alongside the red bar.
+  const isPlatformAdmin = useCapability("platform.manage_tenants");
   const qc = useQueryClient();
-  const { data: alertsCount = 0 } = useQuery({
+  const { data: inboxCount = 0 } = useQuery({
     queryKey: ["inbox", "unread-count"] as const,
     queryFn: getUnreadCount,
     refetchInterval: 60_000,
+    enabled: !isPlatformAdmin,
   });
+  const { data: platformSummary } = usePlatformAlertSummary(isPlatformAdmin);
+  const alertsCount = isPlatformAdmin
+    ? (platformSummary?.critical ?? 0) + (platformSummary?.warning ?? 0)
+    : inboxCount;
 
   useEffect(() => {
+    // The inbox stream is tenant-scoped too. Opening it as a platform admin
+    // only produces a 403 in the console on every page load.
+    if (isPlatformAdmin) return;
     const handle = openInboxStream({
       onEvent: () => {
         void qc.invalidateQueries({ queryKey: ["inbox", "unread-count"] });
@@ -49,7 +66,7 @@ export function Header({ toolbar }: HeaderProps = {}): ReactNode {
     return () => {
       handle.close();
     };
-  }, [qc]);
+  }, [qc, isPlatformAdmin]);
 
   return (
     <header className="border-b border-ap-line bg-ap-panel">
@@ -104,7 +121,11 @@ export function Header({ toolbar }: HeaderProps = {}): ReactNode {
         </div>
       </div>
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <AlertsDrawer open={alertsOpen} onClose={() => setAlertsOpen(false)} />
+      <AlertsDrawer
+        open={alertsOpen}
+        onClose={() => setAlertsOpen(false)}
+        platform={isPlatformAdmin}
+      />
     </header>
   );
 }

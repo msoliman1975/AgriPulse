@@ -71,4 +71,9 @@ class SweepResult(BaseModel):
     tenants_failed: int
     findings: int
     resolved: int
+    # How many alerts the digest covered and how many recipients it reached.
+    # `emails_alerts` counts new or escalated alerts, so it is normally 0 on
+    # a sweep that found nothing that was not already mailed.
+    emails_sent: int = 0
+    emails_alerts: int = 0
     swept_at: str

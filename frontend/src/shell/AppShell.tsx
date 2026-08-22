@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
+import { RouteErrorBoundary } from "@/components/ErrorBoundary";
+
 import { Header } from "./Header";
 import { PlatformAlertBanner } from "./PlatformAlertBanner";
 import { SideNav } from "./SideNav";
@@ -43,7 +45,13 @@ export function AppShell(): ReactNode {
             viewportPinned ? "min-w-0 flex-1 overflow-hidden" : "min-w-0 flex-1 overflow-x-hidden"
           }
         >
-          <Outlet />
+          {/* Inside <main>, so a page that throws leaves the header, the
+              nav and the platform alert bar standing. Before this the app
+              had no boundary at all and one bad render blanked the whole
+              document. */}
+          <RouteErrorBoundary>
+            <Outlet />
+          </RouteErrorBoundary>
         </main>
       </div>
     </div>

@@ -362,6 +362,21 @@ class Settings(BaseSettings):
     # 6h spans several runs of every scheduled task we have.
     platform_alert_task_quiet_hours: int = 6
 
+    # --- Platform alert email --------------------------------------------
+    # Who gets the mail is a per-admin checkbox on
+    # `public.platform_role_assignments.receives_alert_emails`, not a
+    # setting. This switch exists so an environment can turn the whole
+    # channel off without editing anyone's record - useful in dev, where
+    # SMTP points at MailHog and the alert list is mostly noise.
+    platform_alert_email_enabled: bool = True
+    # One digest per sweep, capped. A tenant migration that breaks every
+    # farm at once can produce hundreds of findings; a mail listing all of
+    # them is unreadable and would very likely be rejected on size. The
+    # ones past the cap are still marked as notified, and the mail says how
+    # many were left out - repeating them in the next digest would mean a
+    # mail every 10 minutes for as long as the problem lasted.
+    platform_alert_email_max_items: int = 25
+
     # --- Imagery thresholds ----------------------------------------------
     # ARCHITECTURE.md Â§ 9: 60% for visualization, 20% for index aggregation.
     # Per-tenant overrides live on `imagery_aoi_subscriptions.cloud_cover_max_pct`

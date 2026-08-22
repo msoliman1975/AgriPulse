@@ -16,6 +16,7 @@ import {
   useInvitePlatformAdmin,
   usePlatformAdmins,
   useRemovePlatformAdmin,
+  useSetPlatformAdminAlertEmails,
   type PlatformAdminRow,
 } from "@/queries/platformAdminsRoles";
 
@@ -32,6 +33,7 @@ export function PlatformAdminsPage(): ReactNode {
   const adminsQ = usePlatformAdmins();
   const invite = useInvitePlatformAdmin();
   const remove = useRemovePlatformAdmin();
+  const alertEmails = useSetPlatformAdminAlertEmails();
 
   const [openInvite, setOpenInvite] = useState(false);
   const [email, setEmail] = useState("");
@@ -75,6 +77,7 @@ export function PlatformAdminsPage(): ReactNode {
               <tr>
                 <Th>{t("platformAdmins.col.user")}</Th>
                 <Th>{t("platformAdmins.col.role")}</Th>
+                <Th className="w-48">{t("platformAdmins.col.alertEmails")}</Th>
                 <Th className="text-end">{t("platformAdmins.col.actions")}</Th>
               </tr>
             </Thead>
@@ -86,6 +89,10 @@ export function PlatformAdminsPage(): ReactNode {
                   canManage={canManage}
                   onRemove={() => remove.mutate({ userId: row.user_id, role: row.role })}
                   removing={remove.isPending}
+                  onAlertEmailsChange={(enabled) =>
+                    alertEmails.mutate({ userId: row.user_id, role: row.role, enabled })
+                  }
+                  savingAlertEmails={alertEmails.isPending}
                 />
               ))}
             </Tbody>
@@ -204,11 +211,15 @@ function Row({
   canManage,
   onRemove,
   removing,
+  onAlertEmailsChange,
+  savingAlertEmails,
 }: {
   row: PlatformAdminRow;
   canManage: boolean;
   onRemove: () => void;
   removing: boolean;
+  onAlertEmailsChange: (enabled: boolean) => void;
+  savingAlertEmails: boolean;
 }): ReactNode {
   const { t } = useTranslation("admin");
   return (
@@ -222,6 +233,23 @@ function Row({
       </Td>
       <Td>
         <Pill kind={row.role === "PlatformAdmin" ? "warn" : "info"}>{row.role}</Pill>
+      </Td>
+      <Td>
+        {/* Who gets paged when the platform breaks. Disabled rather than
+            hidden without the manage capability, so a support user can see
+            who is on the list without being able to change it. */}
+        <label className="flex items-center gap-2 text-xs text-ap-muted">
+          <input
+            type="checkbox"
+            checked={row.receives_alert_emails}
+            disabled={!canManage || savingAlertEmails}
+            onChange={(e) => onAlertEmailsChange(e.target.checked)}
+            className="h-4 w-4 rounded border-ap-line text-ap-primary focus:ring-ap-primary disabled:opacity-60"
+          />
+          {row.receives_alert_emails
+            ? t("platformAdmins.alertEmails.on")
+            : t("platformAdmins.alertEmails.off")}
+        </label>
       </Td>
       <Td className="text-end">
         {canManage ? (

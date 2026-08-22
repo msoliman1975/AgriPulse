@@ -23,6 +23,7 @@ SQL injection through the JWT claim.
 # can't resolve string annotations to the FastAPI Request injection —
 # it would silently demote the parameter to a query param.
 
+import asyncio
 import re
 import threading
 from collections.abc import AsyncIterator
@@ -36,12 +37,19 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.sql import text
 
+from app.core.logging import get_logger
 from app.core.settings import get_settings
+
+_log = get_logger(__name__)
 
 # Public name kept for typing in module imports.
 Engine = AsyncEngine
 
 _engine: AsyncEngine | None = None
+# The event loop the current engine's pool belongs to, or None if it has not
+# been used inside one yet. An asyncpg connection is owned by the loop that
+# opened it, so an engine outlives its loop only as a trap. See `get_engine`.
+_engine_loop: asyncio.AbstractEventLoop | None = None
 _engine_lock = threading.Lock()
 _TENANT_SCHEMA_RE = re.compile(r"^tenant_[a-z0-9_]{1,64}$")
 
@@ -84,22 +92,82 @@ def create_engine() -> AsyncEngine:
     )
 
 
+def _running_loop() -> asyncio.AbstractEventLoop | None:
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        return None
+
+
 def get_engine() -> AsyncEngine:
-    """Return the process-wide async engine, creating it on first call."""
-    global _engine
+    """Return the process-wide async engine, creating it on first call.
+
+    An engine whose pool belongs to a different event loop is abandoned and
+    rebuilt rather than handed out.
+
+    Celery workers are synchronous, so every task body opens its own loop
+    with `asyncio.run`. Each task is supposed to dispose the engine before
+    that loop closes; two of them did not, and the next task in the same
+    worker process inherited pooled asyncpg connections owned by a loop that
+    no longer existed. Every query it ran raised "got Future attached to a
+    different loop", and because the failure was in the pool rather than in
+    the task, the four tasks that reported it were never the ones at fault.
+
+    Fixing the two call sites removes today's instance. This check is what
+    stops the next one: a task that forgets to dispose now costs one
+    abandoned pool, not a worker process that fails every job it is given
+    until it restarts.
+
+    The old engine is dropped, not closed. Closing it means awaiting on the
+    dead loop, which is the exact thing that raises. The sockets go when the
+    object is collected.
+    """
+    global _engine, _engine_loop
+    loop = _running_loop()
     with _engine_lock:
+        if _engine is not None and loop is not None:
+            if _engine_loop is None:
+                # Built outside a loop and used inside this one first.
+                # Nothing has connected yet, so it belongs here now.
+                _engine_loop = loop
+            elif _engine_loop is not loop:
+                _log.warning(
+                    "db_engine_abandoned_foreign_loop",
+                    reason="a task closed its event loop without disposing the engine",
+                )
+                _engine = None
+                _engine_loop = None
         if _engine is None:
             _engine = create_engine()
+            _engine_loop = loop
         return _engine
 
 
 async def dispose_engine() -> None:
-    """Dispose the process-wide engine. Used in app shutdown and tests."""
-    global _engine
+    """Dispose the process-wide engine. Used in app shutdown and tests.
+
+    The global is cleared even when `dispose()` raises. Disposing a pool
+    whose asyncpg connections were created on an event loop that has since
+    closed can itself fail, and leaving the broken engine installed turns
+    one bad task into every later task in that worker process failing the
+    same way, for the life of the process. Dropping the reference is what
+    lets the next `get_engine()` build a clean one.
+    """
+    global _engine, _engine_loop
+    loop = _running_loop()
     with _engine_lock:
-        if _engine is not None:
-            await _engine.dispose()
-            _engine = None
+        engine, engine_loop = _engine, _engine_loop
+        _engine, _engine_loop = None, None
+    if engine is None:
+        return
+    if engine_loop is not None and loop is not None and engine_loop is not loop:
+        # Disposing means awaiting the pool's connections closed, and those
+        # belong to a loop that is not this one. Awaiting them here raises
+        # the same different-loop error we are trying to prevent. The
+        # reference is already dropped, which is what matters.
+        _log.warning("db_engine_dispose_skipped_foreign_loop")
+        return
+    await engine.dispose()
 
 
 def AsyncSessionLocal() -> async_sessionmaker[AsyncSession]:

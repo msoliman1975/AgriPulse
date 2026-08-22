@@ -54,7 +54,11 @@
       "active": "Active",
       "suspended": "Suspended",
       "pending": "Pending"
-    }
+    },
+    "platformAlertsTitle": "Platform alerts",
+    "platformAlertsEmpty": "Nothing is failing right now.",
+    "platformAlertsSeeAll_one": "See the alerts page ({{count}} live)",
+    "platformAlertsSeeAll_other": "See the alerts page ({{count}} live)"
   },
   "tenant": {
     "metadata": "Tenant info",
@@ -108,5 +112,11 @@
   },
   "table": {
     "openRow": "Open"
+  },
+  "errorBoundary": {
+    "title": "This page could not be shown",
+    "body": "Something in the page failed while it was being drawn. The rest of the app still works, so you can go somewhere else and come back.",
+    "retry": "Try again",
+    "reload": "Reload the page"
   }
 }
