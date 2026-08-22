@@ -19,6 +19,7 @@ import type { PixelLayer } from "../map/MapCanvas";
 import { CONSOLE_QK } from "./constants";
 import { classesFor } from "./indexClasses";
 import {
+  aoiHashFromStacItemId,
   blockStatsUrl,
   blockTileUrl,
   TILE_SIZE,
@@ -85,12 +86,14 @@ async function readStats(input: {
   code: ApiIndexCode;
   id: string;
   resolutionM: number;
+  cutlineAoi?: string | null;
 }): Promise<BlockPixelCounts | null> {
   const url = blockStatsUrl({
     tileServerBaseUrl: input.config.tile_server_base_url,
     s3Bucket: input.config.s3_bucket,
     asset: input.asset,
     code: input.code,
+    cutlineAoi: input.cutlineAoi,
   });
   try {
     const resp = await fetch(url);
@@ -148,6 +151,19 @@ export function useIndexPixels(input: {
     [assetsQ.data],
   );
 
+  /**
+   * Cut the farm surface to the farm's outline when it is drawn and counted.
+   *
+   * Only the farm path. A block raster is cut to its BLOCK on the pixel grid,
+   * and every `block_index_aggregates` row on record was measured that way —
+   * cutting those tiles would make the picture and the stored numbers
+   * disagree. The farm surface has no such history.
+   */
+  const cutlineAoi = useMemo(
+    () => (farmRaster ? aoiHashFromStacItemId(farmRaster.stac_item_id) : null),
+    [farmRaster],
+  );
+
   // Statistics are fetched even when the pixel LAYER is hidden: the block
   // fill and the legend both read them, and they are what the panel would
   // otherwise have nothing to say. Bounded concurrency for the same reason
@@ -171,6 +187,7 @@ export function useIndexPixels(input: {
           code,
           id: FARM_SCOPE_ID,
           resolutionM: Number(farmRaster.resolution_m),
+          cutlineAoi,
         });
         return counts
           ? { counts: [counts], failedBlockIds: [] }
@@ -219,6 +236,7 @@ export function useIndexPixels(input: {
             s3Bucket: config.s3_bucket,
             asset: farmRaster,
             code,
+            cutlineAoi,
           }),
           bounds: farmBounds ?? undefined,
           tileSize: TILE_SIZE,
@@ -238,7 +256,7 @@ export function useIndexPixels(input: {
         bounds: boundsByBlockId.get(asset.block_id),
         tileSize: TILE_SIZE,
       }));
-  }, [assets, config, code, boundsByBlockId, failedBlockIds, farmRaster, farmBounds]);
+  }, [assets, config, code, boundsByBlockId, failedBlockIds, farmRaster, farmBounds, cutlineAoi]);
 
   // The block's own mean for this index and scene. Read off the same
   // statistics the tiles are drawn from rather than from the map summary,

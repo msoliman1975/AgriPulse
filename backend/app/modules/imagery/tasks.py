@@ -41,6 +41,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import get_logger
 from app.core.settings import get_settings
 from app.modules.audit import get_audit_service
+from app.modules.imagery.boundary import publish_aoi_boundary
 from app.modules.imagery.errors import (
     IngestionJobNotFoundError,
     SentinelHubNotConfiguredError,
@@ -1497,6 +1498,16 @@ async def _compute_farm_scene_indices(
         load_raw_bands_and_aggregate,
     )
 
+    # The outline the tile server cuts this scene's tiles with. Written on
+    # every compute rather than once: it is content-addressed, so a repeat
+    # is the same bytes, and a farm redrawn gets its new outline with its
+    # first new scene. Never fatal - see boundary.py.
+    publish_aoi_boundary(
+        storage,
+        aoi_hash=farm.get("aoi_hash"),
+        boundary_geojson=farm.get("boundary_geojson"),
+    )
+
     try:
         bands_arrays, aoi_mask, cloud_mask, profile = load_raw_bands_and_aggregate(
             f"s3://{storage.bucket}/{s3_key}",
@@ -2675,6 +2686,95 @@ async def _discover_active_subscriptions_async() -> dict[str, int]:
             discover_scenes.delay(str(row["id"]), tenant_schema)
             enqueued += 1
     return {"tenants_scanned": len(tenant_schemas), "enqueued": enqueued}
+
+
+# --- publish_farm_boundaries (one-off / on demand) --------------------------
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="imagery.publish_farm_boundaries",
+    bind=False,
+    ignore_result=False,
+)
+def publish_farm_boundaries(tenant_schema: str | None = None) -> dict[str, int]:
+    """Write every farm's outline for the tile server to cut tiles with.
+
+    The compute path publishes a farm's outline with each new scene, so
+    this only exists to reach the scenes ALREADY stored: the cut happens
+    at render time, so publishing an outline today cuts every pass that
+    farm has, back to its first one.
+
+    Pass a tenant schema to do one tenant, or nothing to do them all.
+    Safe to run more than once - the object is the same bytes each time.
+    """
+    return _run_task(_publish_farm_boundaries_async(tenant_schema))
+
+
+async def _publish_farm_boundaries_async(tenant_schema: str | None) -> dict[str, int]:
+    import json as _json
+
+    storage = _get_storage()
+    factory = AsyncSessionLocal()
+
+    if tenant_schema:
+        tenant_schemas = [tenant_schema]
+    else:
+        async with factory() as session, session.begin():
+            rows = (
+                await session.execute(
+                    text(
+                        "SELECT schema_name FROM public.tenants "
+                        "WHERE status = 'active' AND deleted_at IS NULL"
+                    )
+                )
+            ).all()
+        tenant_schemas = [str(r[0]) for r in rows]
+
+    written = 0
+    skipped = 0
+    for schema in tenant_schemas:
+        try:
+            sanitize_tenant_schema(schema)
+        except ValueError:
+            continue
+        # One tenant must not end the run for the others.
+        try:
+            async with AsyncSessionLocal()() as session2, session2.begin():
+                await _set_tenant_context(session2, schema)
+                farms = (
+                    await session2.execute(
+                        text(
+                            """
+                            SELECT aoi_hash, ST_AsGeoJSON(boundary)::text AS boundary_geojson
+                              FROM farms
+                             WHERE deleted_at IS NULL
+                               AND aoi_hash IS NOT NULL
+                               AND boundary IS NOT NULL
+                            """
+                        )
+                    )
+                ).all()
+        except Exception:
+            _log.exception("aoi_boundary_publish_tenant_failed", tenant_schema=schema)
+            continue
+        for aoi_hash, boundary_geojson in farms:
+            key = publish_aoi_boundary(
+                storage,
+                aoi_hash=str(aoi_hash),
+                boundary_geojson=_json.loads(boundary_geojson),
+            )
+            if key:
+                written += 1
+            else:
+                skipped += 1
+
+    _log.info(
+        "aoi_boundaries_published",
+        tenants=len(tenant_schemas),
+        written=written,
+        skipped=skipped,
+    )
+    return {"tenants": len(tenant_schemas), "written": written, "skipped": skipped}
 
 
 # --- helpers ---------------------------------------------------------------
