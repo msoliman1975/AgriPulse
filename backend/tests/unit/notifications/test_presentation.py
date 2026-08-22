@@ -119,5 +119,7 @@ class TestUrls:
         monkeypatch.setattr(settings, "app_base_url", "https://app.agripulse.cloud/")
         assert absolute_url("/x") == "https://app.agripulse.cloud/x"
 
-    def test_preferences_url_points_at_the_notifications_screen(self) -> None:
-        assert preferences_url().endswith("/settings/notifications")
+    def test_preferences_url_points_at_the_persons_own_screen(self) -> None:
+        # Not /settings/notifications. That hub is tenant-wide config and every
+        # tab is capability-gated, so the link would 403 most recipients.
+        assert preferences_url().endswith("/account/notifications")

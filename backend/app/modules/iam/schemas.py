@@ -20,6 +20,51 @@ class UserPreferencesResponse(BaseModel):
     notification_channels: list[str]
 
 
+class NotificationChannelAvailability(BaseModel):
+    """Whether a channel the caller ticked can actually deliver to them.
+
+    Separate from the choice itself. A person can select `email` while their
+    tenant has email switched off; the screen has to be able to say so rather
+    than accept the tick and drop the message.
+    """
+
+    channel: Literal["in_app", "email", "push"]
+    deliverable: bool
+    # None when deliverable. Otherwise one of: tenant_disabled,
+    # no_email_address, no_registered_device.
+    reason: str | None = None
+
+
+class MyNotificationPreferencesResponse(BaseModel):
+    """GET/PATCH /v1/me/notification-preferences."""
+
+    # The caller's stored choice, or the fan-out's own defaults when they
+    # have no preferences row yet.
+    channels: list[str]
+    # Which locale the alert and recommendation templates render in. Read
+    # only by the notification fan-out — see iam/notification_prefs.py.
+    language: Literal["en", "ar"]
+    email_address: str | None
+    registered_device_count: int
+    # What the tenant allows, before the caller's own choice narrows it.
+    tenant_channels: list[str]
+    availability: list[NotificationChannelAvailability]
+
+
+class MyNotificationPreferencesUpdate(BaseModel):
+    """PATCH body. Omitting a field leaves it as it is.
+
+    An empty `channels` list is a valid choice, not a mistake, so the field is
+    optional rather than defaulted — `None` means "do not touch", `[]` means
+    "send me nothing".
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    channels: list[str] | None = None
+    language: Literal["en", "ar"] | None = None
+
+
 class TenantRoleResponse(BaseModel):
     role: str
     granted_at: datetime

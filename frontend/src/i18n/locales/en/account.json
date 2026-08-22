@@ -1,0 +1,47 @@
+{
+  "notifications": {
+    "title": "Your notifications",
+    "subtitle": "Choose how AgriPulse reaches you when an alert or a recommendation opens on a farm you can see.",
+    "loadFailed": "Could not load your notification settings.",
+    "retry": "Try again",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "saved": "Saved.",
+    "saveFailed": "Could not save. Your settings were not changed.",
+    "scopeNote": "These settings are yours alone. They do not change what anyone else on your farm receives.",
+    "allOff": "You will not be notified at all.",
+    "allOffDetail": "Alerts and recommendations still open in the Action Center. Nothing is lost — you will only see them when you go looking.",
+    "channels": {
+      "heading": "How to reach you",
+      "hint": "Every channel you tick gets the same alert. Untick the ones you do not want."
+    },
+    "channel": {
+      "in_app": {
+        "label": "In the app",
+        "hint": "Shows on the bell in the top bar."
+      },
+      "email": {
+        "label": "Email",
+        "hint": "Sent to the address on your account.",
+        "to": "Sent to {{address}}."
+      },
+      "push": {
+        "label": "Phone notification",
+        "hint": "Needs the AgriPulse app signed in on a phone.",
+        "devices_one": "{{count}} phone is signed in.",
+        "devices_other": "{{count}} phones are signed in."
+      }
+    },
+    "reason": {
+      "tenant_disabled": "Your organisation has this channel switched off, so nothing is being sent on it. An administrator can turn it back on in Settings.",
+      "no_email_address": "Your account has no email address, so nothing can be sent.",
+      "no_registered_device": "No phone is signed in to the AgriPulse app, so nothing can be sent yet. Sign in on a phone and this starts working."
+    },
+    "language": {
+      "label": "Language of your notifications",
+      "hint": "Sets the language of the emails and the bell. It does not change the language of this website.",
+      "en": "English",
+      "ar": "العربية"
+    }
+  }
+}

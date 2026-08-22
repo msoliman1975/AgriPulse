@@ -146,5 +146,12 @@ def absolute_url(path: str) -> str:
 
 
 def preferences_url() -> str:
-    """Where the footer's "change your notifications" link points."""
-    return absolute_url("/settings/notifications")
+    """Where the footer's "change your notifications" link points.
+
+    `/account/notifications`, not `/settings/notifications`. The Settings hub
+    is tenant-wide configuration and every tab there is capability-gated, so
+    most recipients of this email cannot open it — a Scout or an Agronomist
+    would follow the link and be refused. This route is the caller's own row
+    and carries no gate.
+    """
+    return absolute_url("/account/notifications")

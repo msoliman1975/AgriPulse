@@ -3,6 +3,7 @@ import { initReactI18next } from "react-i18next";
 
 import enCommon from "./locales/en/common.json";
 import enAuth from "./locales/en/auth.json";
+import enAccount from "./locales/en/account.json";
 import enFarms from "./locales/en/farms.json";
 import enImagery from "./locales/en/imagery.json";
 import enIndices from "./locales/en/indices.json";
@@ -19,6 +20,7 @@ import enActionCenter from "./locales/en/actionCenter.json";
 import enUsers from "./locales/en/users.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
+import arAccount from "./locales/ar/account.json";
 import arFarms from "./locales/ar/farms.json";
 import arImagery from "./locales/ar/imagery.json";
 import arIndices from "./locales/ar/indices.json";
@@ -48,6 +50,7 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
         en: {
           common: enCommon,
           auth: enAuth,
+          account: enAccount,
           farms: enFarms,
           imagery: enImagery,
           indices: enIndices,
@@ -66,6 +69,7 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
         ar: {
           common: arCommon,
           auth: arAuth,
+          account: arAccount,
           farms: arFarms,
           imagery: arImagery,
           indices: arIndices,
@@ -88,6 +92,7 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
       ns: [
         "common",
         "auth",
+        "account",
         "farms",
         "imagery",
         "indices",
