@@ -146,6 +146,11 @@ env:
   SMTP_USERNAME: "aac72b001@smtp-brevo.com"
   SMTP_STARTTLS: "true"
   SMTP_FROM: "AgriPulse <admin@agripulse.tech>"
+  # Origin the SPA is served from — `app.<envHost>`, tracking the frontend
+  # chart's `ingress.hostPrefix`. Notification links are stored relative
+  # because the in-app bell hands them to react-router; the email channel
+  # prefixes this to make them clickable outside a browser tab.
+  APP_BASE_URL: "https://app.{{ .Values.global.envHost }}"
   # SPA at app.<envHost> calls api.<envHost> cross-origin. CORS middleware
   # only attaches when this list is non-empty (see app/core/app_factory.py).
   #

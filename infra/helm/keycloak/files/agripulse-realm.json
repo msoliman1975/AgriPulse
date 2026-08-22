@@ -14,6 +14,7 @@
   "ssoSessionMaxLifespan": 36000,
   "loginTheme": "agripulse",
   "accountTheme": "agripulse",
+  "emailTheme": "agripulse",
   "roles": {
     "realm": [
       { "name": "PlatformAdmin", "description": "AgriPulse staff with full cross-tenant control." },
