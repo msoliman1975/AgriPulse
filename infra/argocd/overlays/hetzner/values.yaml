@@ -2510,11 +2510,36 @@ global:
   #   stay on 676746a rather than restart for no delta.
   #   No migrations.
   #   Image CONFIRMED by pulling on the node: frontend @ c67c9a008338f.
+  # 677c7dc = #542, HTML email for alerts and recommendations, and a Keycloak
+  #   email theme. Every email the platform sent was plain text: the four
+  #   email rows in public.notification_templates carried body_html NULL, and
+  #   Keycloak had no email theme, so an invite arrived as its stock `base`
+  #   markup with no AgriPulse on it.
+  #   API + WORKERS + KEYCLOAK MOVE TOGETHER. Public migration 0070 writes the
+  #   version 2 template rows (version 1 stays, so an alert already sent keeps
+  #   its wording and rollback is a delete). The keycloak image carries the
+  #   new themes/agripulse/email folder; the theme is baked in by
+  #   Dockerfile.theme, so the tag has to move for the invite to change.
+  #   NEW ENV, and this is the reason workers restarts and not only api: the
+  #   workers chart carried SMTP_PASSWORD and none of the other four SMTP
+  #   keys, so every send from a worker dialled localhost:1025 inside the pod.
+  #   Grid anomaly alerts publish AlertOpenedV1 from grid/tasks.py, a Celery
+  #   task, so that whole email fan-out ran there. Both charts also gain
+  #   APP_BASE_URL, because notification links are stored relative for the
+  #   in-app bell and a mail client cannot resolve them.
+  #   Migration: public 0070. Idempotent insert; downgrade deletes the v2 rows.
+  #   FRONTEND AND TILE-SERVER DO NOT MOVE. `git diff --name-only 03f2a0d
+  #   677c7dc` touches nothing under frontend/ or tile-server/.
+  #   AFTER THE ROLL: the keycloak-hetzner PostSync hook sets the realm's
+  #   emailTheme. A realm that already exists never re-reads
+  #   agripulse-realm.json, so that hook is the only path to the live realm.
+  #   Images CONFIRMED by pulling both on the node: api @ 4f68697e20890,
+  #   keycloak @ af160a93d3c1b.
   images:
     api:
-      tag: "676746a"
+      tag: "677c7dc"
     workers:
-      tag: "676746a"
+      tag: "677c7dc"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -2666,7 +2691,10 @@ keycloak:
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
   image:
-    tag: "9d140cc"
+    # 677c7dc = #542, the agripulse theme gains an `email` folder. See the
+    # note above `global.images`. The theme is baked into this image, so a
+    # template change reaches the server only when this tag moves.
+    tag: "677c7dc"
   # No prometheus-operator on Hetzner → ServiceMonitor CRD absent.
   metrics:
     serviceMonitor:
