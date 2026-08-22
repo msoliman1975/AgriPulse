@@ -2535,11 +2535,41 @@ global:
   #   agripulse-realm.json, so that hook is the only path to the live realm.
   #   Images CONFIRMED by pulling both on the node: api @ 4f68697e20890,
   #   keycloak @ af160a93d3c1b.
+  # 575bb7c = #545, the index z-score reaches the rows already stored.
+  #   `compute_indices` set `block_index_aggregates.baseline_deviation` once,
+  #   at write time, against the baselines that existed at that moment. A
+  #   baseline needs three samples on its day-of-year and the row being
+  #   written is one of them, so the first rows of a day-of-year are always
+  #   written before their own baseline exists. Nothing revisited them, so
+  #   they kept NULL for ever and every decision tree reading
+  #   `indices.<code>.baseline_deviation` got null. Measured before the fix:
+  #   576 of 828 latest rows NULL in tenant agrosina, 468 of 468 in
+  #   green-valley, and 32,017 of agrosina's 34,334 NULL rows already had a
+  #   usable baseline stored.
+  #   The hourly `indices.recompute_baselines_for_tenant` sweep now pushes the
+  #   fresh baselines back onto the stored rows, the same catch-up the weather
+  #   module has done since PR-W3.
+  #   API AND WORKERS ONLY. The sweep runs on the light worker; the api ships
+  #   the same image. `git diff --name-only 677c7dc 575bb7c` touches four
+  #   files under backend/ and nothing under frontend/ or tile-server/, so
+  #   those two stay where they are.
+  #   No migrations.
+  #   COMPRESSION NOTE: `block_index_aggregates` is a compressed hypertable
+  #   and its segmentby is (block_id, index_code) -- the same key the UPDATE
+  #   filters on, so each pair decompresses one batch per chunk rather than a
+  #   whole chunk. The statement also carries an `IS DISTINCT FROM` guard, so
+  #   after the first repair later sweeps touch no rows. The columnstore
+  #   policy re-compresses anything older than 30 days within 12 hours.
+  #   The two continuous aggregates do not select `baseline_deviation`, so
+  #   their numbers do not move.
+  #   Rollback is these two tags back to 677c7dc. The repaired column values
+  #   stay -- they are correct z-scores either way, the old code just never
+  #   wrote them.
   images:
     api:
-      tag: "677c7dc"
+      tag: "575bb7c"
     workers:
-      tag: "677c7dc"
+      tag: "575bb7c"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
