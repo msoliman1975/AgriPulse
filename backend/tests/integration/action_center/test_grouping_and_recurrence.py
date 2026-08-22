@@ -772,9 +772,13 @@ async def test_tenant_today_uses_the_tenant_timezone(admin_session: Any) -> None
         {"i": (await _tenant_id(admin_session, seed))},
     )
     behind = await repo.tenant_today(tenant_schema=_SHARED["schema"])
-    # +14 and -11 are 25 hours apart, so the two never agree on the date.
+    # +14 and -11 are 25 hours apart, so the two never agree on the date --
+    # but the gap is 1 day or 2, not always 1. Kiritimati rolls over at 10:00
+    # UTC and Midway at 11:00 UTC, so for that one hour of every day the two
+    # dates are two apart. Asserting exactly 1 made this test fail every day
+    # between 10:00 and 11:00 UTC.
     assert ahead != behind
-    assert (ahead - behind) == timedelta(days=1)
+    assert (ahead - behind) in (timedelta(days=1), timedelta(days=2))
     assert abs((ahead - datetime.now(UTC).date()).days) <= 1
     await admin_session.rollback()
 
