@@ -47,7 +47,8 @@ const VALID_RING: Polygon = {
     ],
   ],
 };
-const OUT_OF_BBOX_RING: Polygon = {
+// Well outside Egypt. There is no country box, so this must reach the API.
+const FAR_FROM_EGYPT_RING: Polygon = {
   type: "Polygon",
   coordinates: [
     [
@@ -142,9 +143,16 @@ describe("CreateFarmFlow", () => {
     expect(await screen.findByText("landed-on-console")).toBeInTheDocument();
   });
 
-  it("rejects an out-of-bounds boundary without calling the API", async () => {
+  it("submits a boundary outside Egypt", async () => {
     await setupTestI18n("en");
-    drawn.polygon = OUT_OF_BBOX_RING;
+    createFarmMock.mockResolvedValue({
+      id: "farm-10",
+      code: "SUEZ-02",
+      name: "Suez East",
+      area_m2: 1,
+      area_value: 1,
+    });
+    drawn.polygon = FAR_FROM_EGYPT_RING;
     renderFlow();
     const user = userEvent.setup();
 
@@ -153,8 +161,10 @@ describe("CreateFarmFlow", () => {
     await user.type(screen.getByLabelText("Name"), "Suez East");
     await user.click(screen.getByRole("button", { name: "Create farm" }));
 
-    expect(await screen.findByText(/outside/i)).toBeInTheDocument();
-    expect(createFarmMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(createFarmMock).toHaveBeenCalledTimes(1));
+    expect(createFarmMock.mock.calls[0][0].boundary.coordinates[0]).toEqual(
+      FAR_FROM_EGYPT_RING.coordinates,
+    );
   });
 
   it("refuses to render for a user without farm.create", async () => {

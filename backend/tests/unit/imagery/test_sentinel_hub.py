@@ -200,12 +200,13 @@ async def test_fetch_requests_native_res_and_scl_band() -> None:
             scene_id="2026-01-15T08:30:00Z",
             scene_datetime=datetime(2026, 1, 15, 8, 30, 0, tzinfo=UTC),
             product_code="s2_l2a",
-            aoi_geojson_utm36n={
+            aoi_geojson_utm={
                 "type": "Polygon",
                 "coordinates": [
                     [[200000, 3300000], [201000, 3300000], [201000, 3301000], [200000, 3300000]]
                 ],
             },
+            aoi_srid=32636,
             bands=science,
         )
     body = json.loads(process_route.calls.last.request.content)
@@ -247,12 +248,13 @@ async def test_fetch_omits_scl_when_cloud_mask_disabled() -> None:
             scene_id="s",
             scene_datetime=datetime(2026, 1, 15, 8, 30, 0, tzinfo=UTC),
             product_code="s2_l2a",
-            aoi_geojson_utm36n={
+            aoi_geojson_utm={
                 "type": "Polygon",
                 "coordinates": [
                     [[200000, 3300000], [201000, 3300000], [201000, 3301000], [200000, 3300000]]
                 ],
             },
+            aoi_srid=32636,
             bands=science,
         )
     body = json.loads(process_route.calls.last.request.content)
@@ -281,12 +283,13 @@ async def test_fetch_5xx_retries_then_succeeds(
             scene_id="abc",
             scene_datetime=datetime(2026, 1, 15, 8, 30, 0, tzinfo=UTC),
             product_code="s2_l2a",
-            aoi_geojson_utm36n={
+            aoi_geojson_utm={
                 "type": "Polygon",
                 "coordinates": [
                     [[200000, 3300000], [201000, 3300000], [201000, 3301000], [200000, 3300000]]
                 ],
             },
+            aoi_srid=32636,
             bands=("red", "nir"),
         )
     assert result.cog_bytes == fake_tiff
@@ -309,7 +312,7 @@ async def test_fetch_4xx_does_not_retry(
                 scene_id="abc",
                 scene_datetime=datetime(2026, 1, 15, 8, 30, 0, tzinfo=UTC),
                 product_code="s2_l2a",
-                aoi_geojson_utm36n={
+                aoi_geojson_utm={
                     "type": "Polygon",
                     "coordinates": [
                         [
@@ -320,6 +323,7 @@ async def test_fetch_4xx_does_not_retry(
                         ]
                     ],
                 },
+                aoi_srid=32636,
                 bands=("red",),
             )
     assert process_route.call_count == 1

@@ -276,7 +276,7 @@ Resolution order: PlatformRole â†’ TenantRole â†’ FarmScope (first mat
 - **MVP provider:** Sentinel Hub Process API behind `SentinelHubProvider` adapter.
 - **Adapter pattern:** per-product adapters (`SentinelHubProvider`, future `Sentinel2OpenDataProvider`, future `PlanetScopeProvider`).
 - **Index computation:** hybrid â€” six standard indices (NDVI, NDWI, EVI, SAVI, NDRE, GNDVI) pre-computed and stored as COGs + aggregated to TimescaleDB; custom indices on-demand.
-- **Storage:** COGs in object storage in UTM 36N (EPSG:32636); web tiles served in Web Mercator (EPSG:3857) by TiTiler reprojecting on the fly.
+- **Storage:** COGs in object storage in the farm's own UTM zone (`farms.utm_srid`, derived once from the boundary centroid — EPSG:32636 for Egypt); web tiles served in Web Mercator (EPSG:3857) by TiTiler reprojecting on the fly.
 - **STAC catalog:** pgstac inside the same Postgres instance.
 - **Cloud cover thresholds:** 60% for visualization, 20% for index aggregation; per-tenant overrides.
 - **Retention:** 90 days hot in S3 Standard; lifecycle rule moves to S3 Glacier Instant Retrieval after.

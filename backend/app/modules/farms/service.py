@@ -1250,7 +1250,7 @@ class FarmServiceImpl:
         result row (``status == "error"``) that flows straight back to the
         client. Mutates ``seen_codes`` to detect duplicates within the batch.
         """
-        from app.modules.farms.errors import GeometryInvalidError, GeometryOutOfEgyptError
+        from app.modules.farms.errors import GeometryInvalidError
         from app.modules.farms.schemas import _validate_code
 
         code = str(item.get("code") or "").strip()
@@ -1268,8 +1268,6 @@ class FarmServiceImpl:
         try:
             _geometry.validate_polygon_geojson(boundary)
             ewkt = _geometry.geojson_to_ewkt_polygon(boundary)
-        except GeometryOutOfEgyptError:
-            return _bulk_err(index, code, "out_of_egypt", "Geometry is outside Egypt.")
         except (GeometryInvalidError, ValueError, TypeError, KeyError):
             return _bulk_err(index, code, "invalid_geometry", "Invalid geometry.")
         return {"status": "ok", "code": code, "ewkt": ewkt}

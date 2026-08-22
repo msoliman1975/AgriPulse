@@ -86,7 +86,7 @@ def test_landsat_quality_band_is_read_as_a_bitmask(tmp_path: Path) -> None:
     _bands, _aoi_mask, cloud_mask, _profile = load_raw_bands_and_aggregate(
         str(cog),
         band_names=("lwir11", "red", "nir08"),
-        aoi_geojson_utm36n=_AOI,
+        aoi_geojson_utm=_AOI,
         product_code="landsat_c2_l2_st",
     )
 
@@ -101,7 +101,7 @@ def test_landsat_cloud_bits_mask_the_scene(tmp_path: Path) -> None:
     _bands, _aoi_mask, cloud_mask, _profile = load_raw_bands_and_aggregate(
         str(cog),
         band_names=("lwir11", "red", "nir08"),
-        aoi_geojson_utm36n=_AOI,
+        aoi_geojson_utm=_AOI,
         product_code="landsat_c2_l2_st",
     )
 
@@ -122,13 +122,13 @@ def test_the_two_rulesets_disagree_on_the_same_quality_values(tmp_path: Path) ->
     _b, _a, landsat_mask, _p = load_raw_bands_and_aggregate(
         str(cog),
         band_names=("lwir11", "red", "nir08"),
-        aoi_geojson_utm36n=_AOI,
+        aoi_geojson_utm=_AOI,
         product_code="landsat_c2_l2_st",
     )
     _b2, _a2, s2_mask, _p2 = load_raw_bands_and_aggregate(
         str(cog),
         band_names=("lwir11", "red", "nir08"),
-        aoi_geojson_utm36n=_AOI,
+        aoi_geojson_utm=_AOI,
         product_code="s2_l2a",
     )
 
@@ -147,7 +147,7 @@ def test_default_product_code_keeps_the_sentinel2_behaviour(tmp_path: Path) -> N
     _b, _a, cloud_mask, _p = load_raw_bands_and_aggregate(
         str(cog),
         band_names=("blue", "green", "red", "red_edge_1", "nir", "swir1", "swir2"),
-        aoi_geojson_utm36n=_AOI,
+        aoi_geojson_utm=_AOI,
     )
     assert cloud_mask.all()
 
@@ -158,7 +158,7 @@ def test_thermal_product_writes_exactly_the_thermal_indices(tmp_path: Path) -> N
     bands, aoi_mask, cloud_mask, profile = load_raw_bands_and_aggregate(
         str(cog),
         band_names=("lwir11", "red", "nir08"),
-        aoi_geojson_utm36n=_AOI,
+        aoi_geojson_utm=_AOI,
         product_code="landsat_c2_l2_st",
     )
     storage = _FakeStorage()
@@ -191,7 +191,7 @@ def test_missing_air_temperature_drops_cwsi_but_keeps_the_scene(tmp_path: Path) 
     bands, aoi_mask, cloud_mask, profile = load_raw_bands_and_aggregate(
         str(cog),
         band_names=("lwir11", "red", "nir08"),
-        aoi_geojson_utm36n=_AOI,
+        aoi_geojson_utm=_AOI,
         product_code="landsat_c2_l2_st",
     )
     storage = _FakeStorage()
@@ -225,7 +225,7 @@ def test_lst_aggregates_are_a_temperature_not_a_ratio(tmp_path: Path) -> None:
     bands, aoi_mask, cloud_mask, profile = load_raw_bands_and_aggregate(
         str(cog),
         band_names=("lwir11", "red", "nir08"),
-        aoi_geojson_utm36n=_AOI,
+        aoi_geojson_utm=_AOI,
         product_code="landsat_c2_l2_st",
     )
 
@@ -269,7 +269,7 @@ def _aoi_mask_for(cog: Path, *, all_touched: bool) -> np.ndarray:
     return load_raw_bands_and_aggregate(
         str(cog),
         band_names=("lwir11", "red", "nir08"),
-        aoi_geojson_utm36n=_CLIPPING_AOI,
+        aoi_geojson_utm=_CLIPPING_AOI,
         product_code="landsat_c2_l2_st",
         all_touched=all_touched,
     )[1]

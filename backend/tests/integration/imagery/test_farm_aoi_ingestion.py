@@ -59,12 +59,14 @@ class _FakeProvider:
     def __init__(self, scenes: tuple[DiscoveredScene, ...]) -> None:
         self._scenes = scenes
         self.fetched_aois: list[dict[str, Any]] = []
+        self.fetched_srids: list[int] = []
 
     async def discover(self, **_: Any) -> tuple[DiscoveredScene, ...]:
         return self._scenes
 
     async def fetch(self, **kwargs: Any) -> FetchResult:
-        self.fetched_aois.append(kwargs["aoi_geojson_utm36n"])
+        self.fetched_aois.append(kwargs["aoi_geojson_utm"])
+        self.fetched_srids.append(kwargs["aoi_srid"])
         return FetchResult(
             cog_bytes=b"II*\x00fake-farm-multiband",
             band_order=("blue", "green", "red", "red_edge_1", "nir", "swir1", "swir2"),
@@ -112,7 +114,7 @@ def _stub_rasterio(
         uri: str,
         *,
         band_names: tuple[str, ...],
-        aoi_geojson_utm36n: dict,
+        aoi_geojson_utm: dict,
         product_code: str = "s2_l2a",
         all_touched: bool = True,
     ) -> tuple:

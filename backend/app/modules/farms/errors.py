@@ -330,19 +330,6 @@ class GeometryInvalidError(APIError):
         )
 
 
-class GeometryOutOfEgyptError(APIError):
-    def __init__(self) -> None:
-        super().__init__(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            title="Geometry outside Egypt",
-            detail=(
-                "Geometry must lie within Egypt's bounding box "
-                "(longitude 24..36, latitude 22..32)."
-            ),
-            type_=f"{_TYPE_BASE}/geometry-out-of-egypt",
-        )
-
-
 class FarmMembershipMissingError(APIError):
     def __init__(self, *, membership_id: UUID, tenant_id: UUID) -> None:
         super().__init__(

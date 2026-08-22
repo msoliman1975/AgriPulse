@@ -2,8 +2,6 @@
 
 What lives here:
 
-  * Egypt bounding-box guard (lon 24..36, lat 22..32) — a sanity filter
-    matching the country's continental footprint with a small buffer.
   * GeoJSON-shape validators that complement Pydantic field validation.
   * EWKT helpers used by the repository to write geometry into Postgres
     in a single round-trip without geoalchemy2's WKBElement plumbing.
@@ -19,19 +17,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.modules.farms.errors import GeometryInvalidError, GeometryOutOfEgyptError
-
-# Buffered bounding box for Egypt: ~24E..36E, 22N..32N. Block geometries
-# anywhere inside this box are accepted; anywhere outside are rejected.
-_EGYPT_LON_MIN = 24.0
-_EGYPT_LON_MAX = 36.0
-_EGYPT_LAT_MIN = 22.0
-_EGYPT_LAT_MAX = 32.0
-
-
-def is_in_egypt(lon: float, lat: float) -> bool:
-    """True if a single point (lon, lat) is inside Egypt's bbox."""
-    return _EGYPT_LON_MIN <= lon <= _EGYPT_LON_MAX and _EGYPT_LAT_MIN <= lat <= _EGYPT_LAT_MAX
+from app.modules.farms.errors import GeometryInvalidError
 
 
 def _iter_polygon_rings(polygon: list[Any]) -> list[list[list[float]]]:
@@ -64,9 +50,11 @@ def _validate_polygon_shape(rings: list[list[list[float]]]) -> None:
 
 
 def validate_polygon_geojson(geom: dict[str, Any]) -> None:
-    """Validate a GeoJSON Polygon: shape, coordinates, Egypt bbox.
+    """Validate a GeoJSON Polygon: shape and coordinates.
 
-    Raises GeometryInvalidError or GeometryOutOfEgyptError on failure.
+    Raises GeometryInvalidError on failure. There is no country check: the
+    metric coordinate system is per farm (`farms.utm_srid`), so a boundary
+    anywhere on Earth produces a correct area.
     """
     if not isinstance(geom, dict):
         raise GeometryInvalidError("geometry must be a JSON object")
@@ -77,14 +65,10 @@ def validate_polygon_geojson(geom: dict[str, Any]) -> None:
         raise GeometryInvalidError("missing or non-list coordinates")
     rings = _iter_polygon_rings(coords)
     _validate_polygon_shape(rings)
-    for ring in rings:
-        for lon, lat in ring:
-            if not is_in_egypt(lon, lat):
-                raise GeometryOutOfEgyptError()
 
 
 def validate_multipolygon_geojson(geom: dict[str, Any]) -> None:
-    """Validate a GeoJSON MultiPolygon: every polygon shape and every vertex."""
+    """Validate a GeoJSON MultiPolygon: the shape of every polygon."""
     if not isinstance(geom, dict):
         raise GeometryInvalidError("geometry must be a JSON object")
     if geom.get("type") != "MultiPolygon":
@@ -97,10 +81,6 @@ def validate_multipolygon_geojson(geom: dict[str, Any]) -> None:
             raise GeometryInvalidError("each polygon in multipolygon must be a list of rings")
         rings = _iter_polygon_rings(polygon_coords)
         _validate_polygon_shape(rings)
-        for ring in rings:
-            for lon, lat in ring:
-                if not is_in_egypt(lon, lat):
-                    raise GeometryOutOfEgyptError()
 
 
 def geojson_to_ewkt_polygon(geom: dict[str, Any]) -> str:
@@ -123,7 +103,3 @@ def geojson_to_ewkt_multipolygon(geom: dict[str, Any]) -> str:
         parts = ["(" + ", ".join(f"{lon} {lat}" for lon, lat in ring) + ")" for ring in rings]
         polys.append("(" + ", ".join(parts) + ")")
     return f"SRID=4326;MULTIPOLYGON({', '.join(polys)})"
-
-
-# Re-exported for the auto-grid module — same constants, same units.
-EGYPT_BBOX = (_EGYPT_LON_MIN, _EGYPT_LAT_MIN, _EGYPT_LON_MAX, _EGYPT_LAT_MAX)

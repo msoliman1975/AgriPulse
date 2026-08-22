@@ -36,7 +36,7 @@ For the full module reference (routes, RBAC, S3 layout, events, periodic jobs) s
 
 ### Farm shows `area_m2 = 0` after create
 
-**Triage:** the `boundary_utm` trigger didn't fire or the geometry collapsed during the UTM 36N transform (very high-latitude polygons fall outside zone 36's projection domain).
+**Triage:** the `boundary_utm` trigger didn't fire, or the geometry collapsed during the transform to the farm's UTM zone (a polygon within a few degrees of a pole falls outside any UTM zone's projection domain). Check `SELECT utm_srid, ST_SRID(boundary_utm) FROM farms WHERE id = ...` — the two must match.
 
 **Resolution:**
 - Confirm in psql:

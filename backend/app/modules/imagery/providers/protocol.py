@@ -34,9 +34,10 @@ class DiscoveredScene:
 class FetchResult:
     """Bytes + metadata returned by `ImageryProvider.fetch()`.
 
-    `cog_bytes` is a multi-band Cloud Optimized GeoTIFF in UTM 36N
-    (EPSG:32636). `band_order` documents the band ordering in the COG
-    so the indices computation step (PR-C) can read each by index.
+    `cog_bytes` is a multi-band Cloud Optimized GeoTIFF in the AOI's UTM
+    zone — the `aoi_srid` passed to `fetch`. `band_order` documents the band
+    ordering in the COG so the indices computation step (PR-C) can read each
+    by index.
     """
 
     cog_bytes: bytes
@@ -96,14 +97,18 @@ class ImageryProvider(Protocol):
         scene_id: str,
         scene_datetime: datetime,
         product_code: str,
-        aoi_geojson_utm36n: dict[str, Any],
+        aoi_geojson_utm: dict[str, Any],
+        aoi_srid: int,
         bands: tuple[str, ...],
     ) -> FetchResult:
         """Pull the requested bands for a specific scene as a multi-band COG.
 
-        The AOI is supplied in UTM 36N (EPSG:32636) — that's the storage
-        CRS per ARCHITECTURE.md § 9. Provider adapters that prefer a
-        different CRS internally are responsible for re-projecting.
+        The AOI is supplied in the farm's own UTM zone, and ``aoi_srid`` is
+        that zone's EPSG code (`farms.utm_srid`). It was a fixed EPSG:32636
+        until migration 0082; a farm outside zone 36 now arrives in its own
+        zone, and an adapter that assumes 32636 reads the wrong ground
+        without raising. Adapters that prefer a different CRS internally are
+        responsible for re-projecting.
 
         ``scene_datetime`` lets adapters whose APIs filter by time
         window (e.g. Sentinel Hub Process) target a specific scene

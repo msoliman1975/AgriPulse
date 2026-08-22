@@ -246,7 +246,7 @@ async def test_bulk_error_rows_do_not_fail_batch(admin_session: AsyncSession) ->
                     {"code": "bad code!", "boundary": _polygon(31.22, 30.11)},
                     {"code": "DUP", "boundary": _polygon(31.23, 30.11)},
                     {"code": "DUP", "boundary": _polygon(31.24, 30.11)},
-                    {"code": "OUT", "boundary": _polygon(10.0, 10.0)},
+                    {"code": "BADGEOM", "boundary": {"type": "Polygon"}},
                 ]
             },
         )
@@ -257,6 +257,6 @@ async def test_bulk_error_rows_do_not_fail_batch(admin_session: AsyncSession) ->
     assert statuses[1] == ("error", "invalid_code")
     assert statuses[2] == ("created", None)  # first DUP wins
     assert statuses[3] == ("error", "duplicate_in_batch")
-    assert statuses[4] == ("error", "out_of_egypt")
+    assert statuses[4] == ("error", "invalid_geometry")
     assert body["created"] == 2
     assert body["errors"] == 3

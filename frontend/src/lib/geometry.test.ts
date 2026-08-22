@@ -3,7 +3,6 @@ import {
   ensureValidMultiPolygon,
   ensureValidPolygon,
   GeometryValidationError,
-  isInEgyptBbox,
   polygonToMultiPolygon,
 } from "./geometry";
 import type { Polygon } from "geojson";
@@ -22,7 +21,7 @@ const cairoSquare = (): Polygon => ({
 });
 
 describe("ensureValidPolygon", () => {
-  it("accepts a valid Egyptian polygon", () => {
+  it("accepts a valid polygon", () => {
     expect(() => ensureValidPolygon(cairoSquare())).not.toThrow();
   });
 
@@ -32,7 +31,7 @@ describe("ensureValidPolygon", () => {
     );
   });
 
-  it("rejects out-of-Egypt coordinates", () => {
+  it("accepts a polygon outside Egypt", () => {
     const paris: Polygon = {
       type: "Polygon",
       coordinates: [
@@ -45,12 +44,9 @@ describe("ensureValidPolygon", () => {
         ],
       ],
     };
-    try {
-      ensureValidPolygon(paris);
-      throw new Error("should have thrown");
-    } catch (e) {
-      expect((e as GeometryValidationError).code).toBe("out_of_egypt");
-    }
+    // The metric coordinate system is per farm (`farms.utm_srid`), so a
+    // boundary anywhere on Earth gets a correct area. There is no country box.
+    expect(() => ensureValidPolygon(paris)).not.toThrow();
   });
 
   it("rejects a self-intersecting polygon", () => {
@@ -89,28 +85,6 @@ describe("ensureValidMultiPolygon", () => {
     } catch (e) {
       expect((e as GeometryValidationError).code).toBe("empty");
     }
-  });
-});
-
-describe("isInEgyptBbox", () => {
-  it("true for Cairo polygon", () => {
-    expect(isInEgyptBbox(cairoSquare())).toBe(true);
-  });
-  it("false for Paris polygon", () => {
-    expect(
-      isInEgyptBbox({
-        type: "Polygon",
-        coordinates: [
-          [
-            [2.3, 48.8],
-            [2.31, 48.8],
-            [2.31, 48.81],
-            [2.3, 48.81],
-            [2.3, 48.8],
-          ],
-        ],
-      }),
-    ).toBe(false);
   });
 });
 

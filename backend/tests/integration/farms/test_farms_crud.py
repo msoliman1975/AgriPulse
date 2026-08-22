@@ -118,40 +118,6 @@ async def test_create_and_get_farm(admin_session: AsyncSession) -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_rejects_out_of_egypt_geometry(admin_session: AsyncSession) -> None:
-    tenancy = get_tenant_service(admin_session)
-    tenant = await tenancy.create_tenant(
-        slug="farms-bbox",
-        name="OOB",
-        contact_email="ops@farms-bbox.test",
-    )
-
-    user_id = uuid4()
-    await _create_user_in_tenant(admin_session, tenant_id=tenant.tenant_id, user_id=user_id)
-
-    context = make_context(
-        user_id=user_id,
-        tenant_id=tenant.tenant_id,
-        tenant_role=TenantRole.TENANT_ADMIN,
-    )
-    app = build_app(context)
-
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-        resp = await c.post(
-            "/api/v1/farms",
-            json={
-                "code": "FARM-OOB",
-                "name": "Out of bounds",
-                # Tripoli — outside Egypt's bbox.
-                "boundary": _square(13.0, 32.0),
-                "farm_type": "commercial",
-            },
-        )
-    assert resp.status_code == 422
-    assert "Egypt" in resp.json().get("title", "") or "egypt" in resp.text.lower()
-
-
-@pytest.mark.asyncio
 async def test_auto_grid_by_max_area_derives_and_echoes_cell_size(
     admin_session: AsyncSession,
 ) -> None:

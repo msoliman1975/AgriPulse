@@ -312,7 +312,8 @@ def test_read_window_to_cog_stacks_bands_on_one_aligned_window(
     cog = _read_window_to_cog(
         signed_hrefs=[str(thermal), str(red), str(qa)],
         bands=("lwir11", "red", "qa_pixel"),
-        aoi_geojson_utm36n=_AOI_UTM,
+        aoi_geojson_utm=_AOI_UTM,
+        aoi_srid=32636,
     )
 
     with rasterio.MemoryFile(cog) as memfile, memfile.open() as ds:
@@ -354,7 +355,9 @@ def test_read_window_rounds_outward_so_a_subpixel_aoi_still_yields_a_pixel(
             ]
         ],
     }
-    cog = _read_window_to_cog(signed_hrefs=[str(band)], bands=("lwir11",), aoi_geojson_utm36n=tiny)
+    cog = _read_window_to_cog(
+        signed_hrefs=[str(band)], bands=("lwir11",), aoi_geojson_utm=tiny, aoi_srid=32636
+    )
 
     with rasterio.MemoryFile(cog) as memfile, memfile.open() as ds:
         assert ds.height >= 1
@@ -382,7 +385,10 @@ def test_read_window_rejects_an_aoi_outside_the_scene(
     }
     with pytest.raises(ValueError, match="does not intersect"):
         _read_window_to_cog(
-            signed_hrefs=[str(band)], bands=("lwir11",), aoi_geojson_utm36n=far_away
+            signed_hrefs=[str(band)],
+            bands=("lwir11",),
+            aoi_geojson_utm=far_away,
+            aoi_srid=32636,
         )
 
 
@@ -437,7 +443,8 @@ async def test_fetch_resolves_assets_signs_them_and_returns_band_order(
             scene_id=scene_id,
             scene_datetime=datetime(2026, 3, 1, 8, 16, tzinfo=UTC),
             product_code="landsat_c2_l2_st",
-            aoi_geojson_utm36n=_AOI_UTM,
+            aoi_geojson_utm=_AOI_UTM,
+            aoi_srid=32636,
             bands=("lwir11", "nir08"),
         )
 
@@ -458,7 +465,8 @@ async def test_fetch_rejects_unknown_bands(
             scene_id="X",
             scene_datetime=datetime(2026, 3, 1, tzinfo=UTC),
             product_code="landsat_c2_l2_st",
-            aoi_geojson_utm36n=_AOI_UTM,
+            aoi_geojson_utm=_AOI_UTM,
+            aoi_srid=32636,
             bands=("swir1",),
         )
 
@@ -478,7 +486,8 @@ async def test_fetch_raises_when_the_scene_lacks_the_thermal_asset(
                 scene_id="LE07_X",
                 scene_datetime=datetime(2026, 3, 1, tzinfo=UTC),
                 product_code="landsat_c2_l2_st",
-                aoi_geojson_utm36n=_AOI_UTM,
+                aoi_geojson_utm=_AOI_UTM,
+                aoi_srid=32636,
                 bands=("lwir11",),
             )
 
@@ -528,7 +537,8 @@ async def test_cloud_masking_appends_qa_pixel_as_a_trailing_band(
             scene_id=scene_id,
             scene_datetime=datetime(2026, 7, 31, 8, 17, tzinfo=UTC),
             product_code="landsat_c2_l2_st",
-            aoi_geojson_utm36n=_AOI_UTM,
+            aoi_geojson_utm=_AOI_UTM,
+            aoi_srid=32636,
             bands=("lwir11",),
         )
 

@@ -1215,7 +1215,7 @@ class ImageryRepository:
     # switched on one farm at a time and must not be able to break it.
 
     async def get_farm_boundary(self, farm_id: UUID) -> dict[str, Any] | None:
-        """Read `boundary`, `boundary_utm`, `aoi_hash` for a farm.
+        """Read `boundary`, `boundary_utm`, `aoi_hash`, `utm_srid` for a farm.
 
         The farm mirror of `get_block_boundary`, and the reason a farm-AOI
         fetch can cover ground that no block was ever drawn around.
@@ -1227,6 +1227,7 @@ class ImageryRepository:
                         """
                     SELECT
                         f.aoi_hash,
+                        f.utm_srid,
                         ST_AsGeoJSON(f.boundary)::text AS boundary_geojson,
                         ST_AsGeoJSON(f.boundary_utm)::text AS boundary_utm_geojson
                     FROM farms f
@@ -1246,6 +1247,7 @@ class ImageryRepository:
             "aoi_hash": row["aoi_hash"],
             "boundary_geojson": json.loads(row["boundary_geojson"]),
             "boundary_utm_geojson": json.loads(row["boundary_utm_geojson"]),
+            "utm_srid": int(row["utm_srid"]),
         }
 
     async def product_resolutions(self) -> dict[UUID, Any]:
@@ -1859,7 +1861,7 @@ class ImageryRepository:
         await self._session.flush()
 
     async def get_block_boundary(self, block_id: UUID) -> dict[str, Any] | None:
-        """Read `boundary`, `boundary_utm`, `aoi_hash`, `farm_id` for a block.
+        """Read `boundary`, `boundary_utm`, `aoi_hash`, `farm_id`, `utm_srid`.
 
         Returns None if the block is missing or soft-deleted. Used by
         the discovery / fetch path so it can build the SH AOI without
@@ -1873,6 +1875,7 @@ class ImageryRepository:
                     SELECT
                         b.farm_id,
                         b.aoi_hash,
+                        ST_SRID(b.boundary_utm) AS utm_srid,
                         ST_AsGeoJSON(b.boundary)::text AS boundary_geojson,
                         ST_AsGeoJSON(b.boundary_utm)::text AS boundary_utm_geojson
                     FROM blocks b
@@ -1892,6 +1895,7 @@ class ImageryRepository:
             "aoi_hash": row["aoi_hash"],
             "boundary_geojson": json.loads(row["boundary_geojson"]),
             "boundary_utm_geojson": json.loads(row["boundary_utm_geojson"]),
+            "utm_srid": int(row["utm_srid"]),
         }
 
 

@@ -172,7 +172,6 @@ export function CreateFarmFlow({ contextFarmId }: { contextFarmId?: string }): R
     } catch (err) {
       const code = err instanceof GeometryValidationError ? err.code : null;
       if (code === "self_intersect") setSubmitError(tf("form.errors.boundarySelfIntersect"));
-      else if (code === "out_of_egypt") setSubmitError(tf("form.errors.boundaryOutOfEgypt"));
       else setSubmitError(tf("form.errors.boundaryInvalid"));
       return;
     }

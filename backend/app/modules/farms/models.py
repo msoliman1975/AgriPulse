@@ -256,10 +256,15 @@ class Farm(Base, TimestampedMixin):
         Geometry(geometry_type="MULTIPOLYGON", srid=4326, spatial_index=False),
         nullable=False,
     )
+    # No SRID in the type: the zone is per farm, held by `utm_srid` below.
     boundary_utm: Mapped[Any] = mapped_column(
-        Geometry(geometry_type="MULTIPOLYGON", srid=32636, spatial_index=False),
+        Geometry(geometry_type="MULTIPOLYGON", spatial_index=False),
         nullable=False,
     )
+    # The UTM zone this farm's metric geometry lives in. Derived once from the
+    # boundary centroid by the `farms_geom_compute` trigger and never
+    # recomputed, because a change here moves `aoi_hash` and orphans imagery.
+    utm_srid: Mapped[int] = mapped_column(Integer, nullable=False)
     centroid: Mapped[Any] = mapped_column(
         Geometry(geometry_type="POINT", srid=4326, spatial_index=False),
         nullable=False,
@@ -347,8 +352,9 @@ class Block(Base, TimestampedMixin):
         Geometry(geometry_type="POLYGON", srid=4326, spatial_index=False),
         nullable=False,
     )
+    # No SRID in the type: a block takes its farm's zone (see Farm.utm_srid).
     boundary_utm: Mapped[Any] = mapped_column(
-        Geometry(geometry_type="POLYGON", srid=32636, spatial_index=False),
+        Geometry(geometry_type="POLYGON", spatial_index=False),
         nullable=False,
     )
     centroid: Mapped[Any] = mapped_column(

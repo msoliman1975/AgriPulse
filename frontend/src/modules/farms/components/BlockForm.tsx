@@ -132,7 +132,6 @@ export function BlockForm({
     } catch (err) {
       const code = (err as GeometryValidationError).code;
       if (code === "self_intersect") setBoundaryError(t("form.errors.boundarySelfIntersect"));
-      else if (code === "out_of_egypt") setBoundaryError(t("form.errors.boundaryOutOfEgypt"));
       else setBoundaryError(t("form.errors.boundaryInvalid"));
       return;
     }
