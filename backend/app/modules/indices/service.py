@@ -99,6 +99,13 @@ class IndicesService(Protocol):
         window_days: int = 7,
     ) -> int: ...
 
+    async def recompute_block_index_deviations(
+        self,
+        *,
+        block_id: UUID,
+        index_code: str,
+    ) -> int: ...
+
 
 class IndicesServiceImpl:
     """Concrete service. One per request — receives a tenant-scoped session."""
@@ -285,6 +292,25 @@ class IndicesServiceImpl:
                 years_observed=row.years_observed,
             )
         return len(rows)
+
+    async def recompute_block_index_deviations(
+        self,
+        *,
+        block_id: UUID,
+        index_code: str,
+    ) -> int:
+        """Re-derive the stored z-score for one (block, index) pair.
+
+        `record_aggregate_row` computes the deviation once, when the row is
+        written, against whatever baselines exist at that moment. A row
+        written before its own day-of-year reached the minimum sample count
+        keeps NULL for ever. Call this after
+        :meth:`recompute_block_index_baselines` so the fresh baselines reach
+        the rows already stored. Returns the number of rows updated.
+        """
+        return await self._repo.recompute_baseline_deviations(
+            block_id=block_id, index_code=index_code
+        )
 
 
 def get_indices_service(*, tenant_session: AsyncSession) -> IndicesService:

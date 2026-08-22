@@ -16,10 +16,10 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import ARRAY, Text, bindparam, text
+from sqlalchemy import ARRAY, CursorResult, Text, bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -228,6 +228,66 @@ class IndicesRepository:
                 "years_observed": years_observed,
             },
         )
+
+    async def recompute_baseline_deviations(self, *, block_id: UUID, index_code: str) -> int:
+        """Re-derive `baseline_deviation` on stored rows of one (block, index).
+
+        `record_aggregate_row` sets the z-score at write time, from the
+        baselines that exist at that moment. A row written before its own
+        day-of-year had enough samples therefore keeps NULL for ever, because
+        the baseline sweep only writes `block_index_baselines`. This is the
+        catch-up pass, and it mirrors the weather module's
+        `recompute_weather_index_deviations`.
+
+        A LEFT JOIN over the aggregate rows (not the baselines) means a row
+        whose baseline disappeared is reset to NULL rather than left stale.
+
+        `block_index_aggregates` is a compressed hypertable, so an UPDATE
+        decompresses the batches it touches. The
+        `IS DISTINCT FROM` guard limits the write to rows whose value really
+        changes, which makes the second and later runs touch nothing.
+
+        Returns the number of rows updated.
+        """
+        result = await self._session.execute(
+            text(
+                """
+                UPDATE block_index_aggregates a
+                SET baseline_deviation = sub.dev
+                FROM (
+                    SELECT r.time, r.block_id, r.index_code, r.product_id,
+                           CASE
+                               WHEN b.baseline_std IS NOT NULL
+                                    AND b.baseline_std > 0
+                               THEN round(
+                                   (r.mean - b.baseline_mean) / b.baseline_std, 4
+                               )
+                               ELSE NULL
+                           END AS dev
+                    FROM block_index_aggregates r
+                    LEFT JOIN block_index_baselines b
+                        ON b.block_id = r.block_id
+                        AND b.index_code = r.index_code
+                        -- UTC explicitly: `time` is timestamptz, so a bare
+                        -- EXTRACT would follow the session TimeZone, while the
+                        -- write-time path in `record_aggregate_row` takes the
+                        -- day-of-year from the UTC datetime.
+                        AND b.day_of_year =
+                            EXTRACT(DOY FROM (r.time AT TIME ZONE 'UTC'))::int
+                    WHERE r.block_id = :block_id
+                      AND r.index_code = :index_code
+                      AND r.mean IS NOT NULL
+                ) sub
+                WHERE a.time = sub.time
+                  AND a.block_id = sub.block_id
+                  AND a.index_code = sub.index_code
+                  AND a.product_id = sub.product_id
+                  AND a.baseline_deviation IS DISTINCT FROM sub.dev
+                """
+            ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+            {"block_id": block_id, "index_code": index_code},
+        )
+        return int(cast("CursorResult[Any]", result).rowcount or 0)
 
     async def list_distinct_block_index_pairs(
         self,

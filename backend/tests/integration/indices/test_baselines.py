@@ -330,3 +330,289 @@ async def test_record_without_baseline_leaves_deviation_null(
         )
     ).scalar_one()
     assert row is None
+
+
+# ---------------------------------------------------------------------------
+# Integration: the catch-up pass that re-derives stored deviations
+# ---------------------------------------------------------------------------
+
+
+async def _record_ndvi(
+    schema_name: str,
+    *,
+    block_id: UUID,
+    product_id: UUID,
+    time: datetime,
+    mean: Decimal,
+) -> None:
+    """Write one aggregate row through the real service path.
+
+    Goes through `record_aggregate_row` on purpose: the bug under test is
+    that this path derives the z-score once and never revisits it.
+    """
+    from app.shared.db.session import AsyncSessionLocal
+
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await session.execute(text(f'SET LOCAL search_path TO "{schema_name}", public'))
+        svc = get_indices_service(tenant_session=session)
+        await svc.record_aggregate_row(
+            time=time,
+            block_id=block_id,
+            index_code="ndvi",
+            product_id=product_id,
+            stac_item_id=f"rederive/{time.isoformat()}",
+            mean=mean,
+            min_value=None,
+            max_value=None,
+            p10=None,
+            p50=None,
+            p90=None,
+            std_dev=None,
+            valid_pixel_count=100,
+            total_pixel_count=100,
+            cloud_cover_pct=None,
+        )
+
+
+async def _deviations(
+    admin_session: AsyncSession, schema_name: str, *, block_id: UUID
+) -> dict[datetime, Decimal | None]:
+    rows = (
+        await admin_session.execute(
+            text(
+                f'SELECT time, baseline_deviation FROM "{schema_name}".block_index_aggregates '
+                "WHERE block_id = :bid ORDER BY time"
+            ).bindparams(bindparam("bid", type_=PG_UUID(as_uuid=True))),
+            {"bid": block_id},
+        )
+    ).all()
+    return {r[0]: r[1] for r in rows}
+
+
+@pytest.mark.asyncio
+async def test_rederive_fills_deviations_written_before_the_baseline_existed(
+    admin_session: AsyncSession,
+) -> None:
+    """The reported bug: every stored row keeps NULL, and the sweep fixes it.
+
+    A baseline needs three samples on the day-of-year, and the row being
+    written is one of them. So the first three rows of a day-of-year are all
+    written before any baseline exists and all three get NULL. Recomputing
+    baselines alone does not touch them; the new pass does.
+    """
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug="dev-rederive",
+        name="Deviation Re-derive",
+        contact_email="ops@dev-rederive.test",
+    )
+    block_id = uuid4()
+    farm_id = uuid4()
+    product_id = uuid4()
+    await _seed_block(admin_session, tenant.schema_name, block_id=block_id, farm_id=farm_id)
+
+    # Jan 15 is DOY 15 in leap and non-leap years alike.
+    seeds = [
+        (datetime(2023, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.60")),
+        (datetime(2024, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.62")),
+        (datetime(2025, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.58")),
+    ]
+    for time, mean in seeds:
+        await _record_ndvi(
+            tenant.schema_name,
+            block_id=block_id,
+            product_id=product_id,
+            time=time,
+            mean=mean,
+        )
+
+    before = await _deviations(admin_session, tenant.schema_name, block_id=block_id)
+    assert list(before.values()) == [
+        None,
+        None,
+        None,
+    ], f"expected every row to start NULL, got {before}"
+
+    from app.shared.db.session import AsyncSessionLocal
+
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
+        svc = get_indices_service(tenant_session=session)
+        written = await svc.recompute_block_index_baselines(
+            block_id=block_id, index_code="ndvi", window_days=0
+        )
+        assert written == 1
+
+    # Recomputing baselines on its own leaves the stored rows untouched.
+    still_null = await _deviations(admin_session, tenant.schema_name, block_id=block_id)
+    assert list(still_null.values()) == [None, None, None]
+
+    async with factory() as session, session.begin():
+        await session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
+        svc = get_indices_service(tenant_session=session)
+        updated = await svc.recompute_block_index_deviations(block_id=block_id, index_code="ndvi")
+    assert updated == 3, f"expected 3 rows updated, got {updated}"
+
+    after = await _deviations(admin_session, tenant.schema_name, block_id=block_id)
+    # Baseline mean 0.6000, population std 0.0163.
+    # 0.60 -> 0; 0.62 -> +1.227; 0.58 -> -1.227.
+    assert after[seeds[0][0]] == Decimal("0.0000")
+    assert after[seeds[1][0]] is not None
+    assert abs(after[seeds[1][0]] - Decimal("1.2270")) < Decimal("0.01")
+    assert after[seeds[2][0]] is not None
+    assert abs(after[seeds[2][0]] - Decimal("-1.2270")) < Decimal("0.01")
+
+
+@pytest.mark.asyncio
+async def test_rederive_is_a_no_op_on_the_second_run(
+    admin_session: AsyncSession,
+) -> None:
+    """The second run must touch 0 rows.
+
+    `block_index_aggregates` is a compressed hypertable. An UPDATE
+    decompresses the batches it touches, so the hourly sweep must not
+    rewrite rows whose value did not change.
+    """
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug="dev-rederive-noop",
+        name="Deviation Re-derive No-op",
+        contact_email="ops@dev-rederive-noop.test",
+    )
+    block_id = uuid4()
+    farm_id = uuid4()
+    product_id = uuid4()
+    await _seed_block(admin_session, tenant.schema_name, block_id=block_id, farm_id=farm_id)
+    await _seed_aggregate_history(
+        admin_session,
+        tenant.schema_name,
+        block_id=block_id,
+        product_id=product_id,
+        rows=[
+            (datetime(2023, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.60")),
+            (datetime(2024, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.62")),
+            (datetime(2025, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.58")),
+        ],
+    )
+
+    from app.shared.db.session import AsyncSessionLocal
+
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
+        svc = get_indices_service(tenant_session=session)
+        await svc.recompute_block_index_baselines(
+            block_id=block_id, index_code="ndvi", window_days=0
+        )
+        first = await svc.recompute_block_index_deviations(block_id=block_id, index_code="ndvi")
+    assert first == 3
+
+    async with factory() as session, session.begin():
+        await session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
+        svc = get_indices_service(tenant_session=session)
+        second = await svc.recompute_block_index_deviations(block_id=block_id, index_code="ndvi")
+    assert second == 0, f"expected the second run to touch no rows, got {second}"
+
+
+@pytest.mark.asyncio
+async def test_rederive_clears_a_deviation_whose_baseline_is_gone(
+    admin_session: AsyncSession,
+) -> None:
+    """Deleting the baseline resets the stored value to NULL, not stale."""
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug="dev-rederive-clear",
+        name="Deviation Re-derive Clear",
+        contact_email="ops@dev-rederive-clear.test",
+    )
+    block_id = uuid4()
+    farm_id = uuid4()
+    product_id = uuid4()
+    await _seed_block(admin_session, tenant.schema_name, block_id=block_id, farm_id=farm_id)
+    await _seed_aggregate_history(
+        admin_session,
+        tenant.schema_name,
+        block_id=block_id,
+        product_id=product_id,
+        rows=[
+            (datetime(2023, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.60")),
+            (datetime(2024, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.62")),
+            (datetime(2025, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.58")),
+        ],
+    )
+
+    from app.shared.db.session import AsyncSessionLocal
+
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
+        svc = get_indices_service(tenant_session=session)
+        await svc.recompute_block_index_baselines(
+            block_id=block_id, index_code="ndvi", window_days=0
+        )
+        await svc.recompute_block_index_deviations(block_id=block_id, index_code="ndvi")
+
+    populated = await _deviations(admin_session, tenant.schema_name, block_id=block_id)
+    assert all(v is not None for v in populated.values())
+
+    await admin_session.execute(
+        text(
+            f'DELETE FROM "{tenant.schema_name}".block_index_baselines WHERE block_id = :bid'
+        ).bindparams(bindparam("bid", type_=PG_UUID(as_uuid=True))),
+        {"bid": block_id},
+    )
+    await admin_session.commit()
+
+    async with factory() as session, session.begin():
+        await session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
+        svc = get_indices_service(tenant_session=session)
+        cleared = await svc.recompute_block_index_deviations(block_id=block_id, index_code="ndvi")
+    assert cleared == 3
+
+    after = await _deviations(admin_session, tenant.schema_name, block_id=block_id)
+    assert list(after.values()) == [None, None, None]
+
+
+@pytest.mark.asyncio
+async def test_tenant_sweep_task_fills_deviations(
+    admin_session: AsyncSession,
+) -> None:
+    """The Beat task itself must fill the deviations, not just the service.
+
+    Runs `indices.recompute_baselines_for_tenant` against a real tenant
+    schema. Without the wiring in the task the rows stay NULL even though
+    the baselines table fills in.
+    """
+    from app.modules.indices import tasks as indices_tasks
+
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug="dev-rederive-sweep",
+        name="Deviation Re-derive Sweep",
+        contact_email="ops@dev-rederive-sweep.test",
+    )
+    block_id = uuid4()
+    farm_id = uuid4()
+    product_id = uuid4()
+    await _seed_block(admin_session, tenant.schema_name, block_id=block_id, farm_id=farm_id)
+    await _seed_aggregate_history(
+        admin_session,
+        tenant.schema_name,
+        block_id=block_id,
+        product_id=product_id,
+        rows=[
+            (datetime(2023, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.60")),
+            (datetime(2024, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.62")),
+            (datetime(2025, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.58")),
+        ],
+    )
+
+    out = await indices_tasks._recompute_baselines_for_tenant_async(tenant.schema_name)
+    assert out["pairs_processed"] == 1, out
+    assert out["baselines_written"] > 0, out
+    assert out["deviations_updated"] == 3, out
+
+    after = await _deviations(admin_session, tenant.schema_name, block_id=block_id)
+    assert all(v is not None for v in after.values()), after
