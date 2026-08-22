@@ -2,9 +2,18 @@
 
 Currently one task: a Beat-driven weekly sweep that recomputes
 per-(block, index, day-of-year) baselines from the rolling history of
-``block_index_aggregates``. The actual aggregate writes happen inside
-imagery's ``compute_indices`` task; baselines are derived data that
-trail behind by up to a week.
+``block_index_aggregates``, then re-derives ``baseline_deviation`` on the
+rows already stored. The actual aggregate writes happen inside imagery's
+``compute_indices`` task; baselines are derived data that trail behind by
+up to a week.
+
+The second step matters because ``compute_indices`` computes the z-score
+once, when it writes the row, against the baselines that exist at that
+moment. A baseline needs three samples in a rolling window, and the row
+being written is one of them, so the first rows of a season are always
+written before their own baseline exists. Without this catch-up they keep
+NULL for ever and every decision tree reading
+``indices.<code>.baseline_deviation`` gets nothing.
 
 We keep the task off the heavy queue because the math is light —
 loading a few thousand rows per (block, index) and computing means is
@@ -82,6 +91,7 @@ async def _recompute_baselines_for_tenant_async(tenant_schema: str) -> dict[str,
         pairs = await svc._repo.list_distinct_block_index_pairs()  # type: ignore[attr-defined]
 
     written_total = 0
+    deviations_total = 0
     pairs_processed = 0
     for block_id, index_code in pairs:
         async with factory() as session, session.begin():
@@ -90,7 +100,16 @@ async def _recompute_baselines_for_tenant_async(tenant_schema: str) -> dict[str,
             written = await svc.recompute_block_index_baselines(
                 block_id=block_id, index_code=index_code
             )
+            # Push the fresh baselines back onto the rows already stored.
+            # `record_aggregate_row` derives the z-score once, at write
+            # time, so a row written before its day-of-year had enough
+            # samples keeps NULL until this runs. Same catch-up the
+            # weather sweep already does for `weather_index_daily`.
+            deviations = await svc.recompute_block_index_deviations(
+                block_id=block_id, index_code=index_code
+            )
         written_total += written
+        deviations_total += deviations
         pairs_processed += 1
 
     _log.info(
@@ -98,8 +117,13 @@ async def _recompute_baselines_for_tenant_async(tenant_schema: str) -> dict[str,
         tenant_schema=tenant_schema,
         pairs_processed=pairs_processed,
         baselines_written=written_total,
+        deviations_updated=deviations_total,
     )
-    return {"pairs_processed": pairs_processed, "baselines_written": written_total}
+    return {
+        "pairs_processed": pairs_processed,
+        "baselines_written": written_total,
+        "deviations_updated": deviations_total,
+    }
 
 
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
