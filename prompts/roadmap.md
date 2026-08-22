@@ -648,15 +648,17 @@ weather.
 ## Prompt 10 — Onboarding: from tenant created to a farm you can trust
 
 **Goal:** make the first hour of a new customer work without an operator. Today a
-provisioning failure shows one fixed sentence and hides its cause, every account email is
-the stock Keycloak template in English only, the first screen a new owner sees is a single
-empty card, a farm drawn with the wrong boundary can only be fixed by inactivating and
-purging it, and the date on screen is formatted from four different sources depending on
-which component drew it.
+provisioning failure shows one fixed sentence and hides its cause, account email is
+branded but English only, the first screen a new owner sees is a single empty card, a farm
+drawn with the wrong boundary can only be fixed by inactivating and purging it, and the
+date on screen is formatted from four different sources depending on which component drew
+it.
 
-**Source analysis:** read on 2026-08-21 from the working tree on branch
-`feat/rbac-page-density`. Line numbers are from that read. Nothing in `docs/proposals/`
-covers this. Track 3 depends on Prompt 9 (D-3); the other four tracks do not.
+**Source analysis:** read on 2026-08-21 against `origin/main` at `aa719d0b`, which
+includes PR #542 (`677c7dc`, HTML product email and a Keycloak email theme). The first
+read of track 2 was taken from a branch 226 commits behind and was wrong; it is corrected
+here. Line numbers are from `origin/main`. Nothing in `docs/proposals/` covers this.
+Track 3 depends on Prompt 9 (D-3); the other four tracks do not.
 
 ### What the reading found
 
@@ -671,18 +673,21 @@ Shape B: the group is created, `invite_user` runs and returns `keycloak_provisio
 rows do land (`tenancy/service.py:462-489`). Both shapes end as `pending_provision`, and
 the reason is written only to the log line.
 
-**Track 2 — account email.** `public.notification_templates` holds three codes:
-`alert_opened` (`public/0014`), `recommendation_opened` (`public/0016`) and
-`visit_assigned` (`public/0055`). None of them is an account event. Registration, invite
-and password email come from Keycloak, and the realm has no email theme.
+**Track 2 — account email.** PR #542 closed most of this before the prompt was written.
+An `email/` theme now exists with `executeActions` (the invite) and `password-reset` in
+both html and text, `emailTheme` is set in the realm file and in the promote script, and
+`Dockerfile.theme` asserts seven email files. What is left is language and coverage: the
+theme ships `messages_en.properties` only, and its own `theme.properties` records why —
+"locales: English only. The realm has internationalizationEnabled unset." Product email
+(alerts, recommendations) is bilingual because the api sends it, not Keycloak.
 
-**Track 3 — first run.** `HomePage.tsx:36-51` is the whole first-run experience: one
+**Track 3 — first run.** `HomePage.tsx:37-52` is the whole first-run experience: one
 heading, one sentence, one button. There is no checklist and no second step.
 
 **Track 4 — boundary correction.** The API already accepts a new farm boundary. The
 frontend has no way to send one.
 
-**Track 5 — date format.** The frontend has 53 date and time formatting calls outside
+**Track 5 — date format.** The frontend has 57 date and time formatting calls outside
 tests, and they read the locale from four different places: `i18n.language`, the browser
 default, a hard-coded `"en-US"`, and `chartDateLocale`, which itself returns `"en-US"` for
 every language that is not Arabic (`lib/chartFormat.ts:15-17`). The farm country is used
@@ -696,22 +701,22 @@ by nothing. A user in Egypt with an `en-GB` browser reads `8/21/2026` on one scr
 | **O-1** | The provisioning failure reason is never stored | `tenancy/service.py:451-458` puts the Keycloak error string in a log line only. `TenantSnapshot` carries no reason field, so the console shows one fixed sentence for every cause (`en/admin.json:266`). | Any operator fixing the failure without shell access to the pod |
 | **O-2** | Two different failure shapes share one status | Shape A leaves no owner rows; shape B leaves all of them. Both write `pending_provision`. Nothing on the row records which happened. | O-3; any correct retry |
 | **O-3** | Retry does not use the create path | `retry_provisioning` (`tenancy/service.py:544-583`) calls `self._kc.ensure_group` and `self._kc.invite_user` directly. It never calls `TenantUsersService.invite_user`. After shape A it sets the tenant to `active` while the owner still has no `public.users` row, no membership and no role assignment. | A retried tenant whose owner can sign in and see nothing |
-| **O-4** | Retry writes no Keycloak subject back | `set_provisioning_state` updates the tenant row only. A `public.users` row created during shape B keeps `keycloak_subject = 'pending::<email>'` for ever, and `iam/users_service.py:276-280` shows that a later invite for that email makes no Keycloak call at all. | Re-inviting the owner; `resend_invite` returns `pending` for a `pending::` subject (`users_service.py:419-425`) |
-| **O-5** | The retry tests cannot see O-3 or O-4 | `tests/integration/tenancy/test_keycloak_provisioning.py:101-124` asserts the tenant snapshot and `len(fake.users) == 1`. It reads no `public.users`, `tenant_memberships` or `tenant_role_assignments` row. | Catching this class of defect at all |
-| **E-1** | No account-email template exists in the product | The three seeded `template_code` values are alert, recommendation and visit. There is no registration, invite, password-reset or password-changed template in any channel. | Any control over what a new user reads first |
-| **E-2** | The realm has no email theme | `infra/helm/keycloak/themes/agripulse/` contains `login/` and nothing else. `agripulse-realm.json` sets `loginTheme` and `accountTheme` (lines 15-16) and no `emailTheme`. Every account email is the stock Keycloak template with the realm display name. | Wording, branding and the Arabic version of every account email |
-| **E-3** | `accountTheme` names a theme that has no account directory | Same two lines. Keycloak falls back to its own default for a missing theme type, so the key reads as configured and changes nothing on screen. | Trusting the realm file as a record of what users see |
-| **E-4** | The realm is English only | `agripulse-realm.json` sets no `internationalizationEnabled` and no `supportedLocales`. The product ships Arabic, and `default_locale` is a tenant column. | Any Arabic account email or Arabic login page |
-| **E-5** | SMTP is set once and never checked | `promote-kc-tenancy.py:170-188` writes `realm["smtpServer"]` from the `BREVO_*` values at promote time. There is no test send, no delivery record and no alert. `keycloak_smtp_enabled` (`core/settings.py:101`) switches invites to a temporary password in the API response with no other signal. | Knowing whether a welcome email arrived |
-| **F-1** | The first screen has one action and no path | `HomePage.tsx:36-51`. With `farm.create` the user gets a title, one sentence and one button. Without it the user gets "Welcome" and "Features coming soon." and no action at all. | Any owner whose first job is not creating a farm — inviting a team, setting units, picking crops |
-| **F-2** | The first action routes to a labs URL | `HomePage.tsx:45` links to `/labs/map?create=farm`. The first task asked of a paying customer runs through a route named `labs`. | Confidence; and the two-console drift already recorded for the Farm tab |
+| **O-4** | Retry writes no Keycloak subject back | `set_provisioning_state` updates the tenant row only. A `public.users` row created during shape B keeps `keycloak_subject = 'pending::<email>'` for ever, and the third branch of the Keycloak provisioning helper (`iam/users_service.py:666-668`) returns `pending` for that email with no Keycloak call at all. | Re-inviting the owner; `resend_invite` returns `pending` for a `pending::` subject (`users_service.py:876`) |
+| **O-5** | The retry tests cannot see O-3 or O-4 | `tests/integration/tenancy/test_keycloak_provisioning.py:103-125` asserts the tenant snapshot and `len(fake.users) == 1`. It reads no `public.users`, `tenant_memberships` or `tenant_role_assignments` row. | Catching this class of defect at all |
+| **E-1** | Two account emails are covered; the rest fall through unbranded | The theme holds `executeActions` and `password-reset` only. Its own `theme.properties` records the consequence: any Keycloak email with no template "still falls through to base and renders unbranded; today that is only templates for flows this realm has switched off (self-registration, email verification, OTP)". Switching one of those flows on ships a stock email. | Turning on email verification, which `agripulse-realm.json` does not set either way |
+| **E-2** | ~~The realm has no email theme~~ — **closed by PR #542** | `themes/agripulse/email/` now holds `html/template.ftl`, `html/executeActions.ftl`, `html/password-reset.ftl`, both text versions, `theme.properties` and `messages/messages_en.properties`. `emailTheme` is set in `agripulse-realm.json:17` and again in `promote-kc-tenancy.py:180`, because the live realm never re-reads the import file. `Dockerfile.theme:38-44` asserts all seven files. | Nothing. Kept as the record of what shipped, and as the pattern to copy |
+| **E-3** | `accountTheme` names a theme that has no account directory | `agripulse-realm.json:16` sets `accountTheme: agripulse`, and `themes/agripulse/` holds `login/` and `email/` only. Keycloak falls back to its own default for a missing theme type, so the key reads as configured and changes nothing on screen. Still open after #542. | Trusting the realm file as a record of what users see |
+| **E-4** | Account email is English only | `email/theme.properties` sets `locales=en` and says why: "The realm has internationalizationEnabled unset, so Keycloak has one language to render in." `agripulse-realm.json` sets no `internationalizationEnabled` and no `supportedLocales`. The product ships Arabic, `default_locale` is a tenant column, and product email is already bilingual through `public/0070`. | An Arabic-speaking owner reading an English invite as the first thing the product sends |
+| **E-5** | SMTP is set once and never checked | `promote-kc-tenancy.py` writes `realm["smtpServer"]` from the `BREVO_*` values at promote time and prints the host. There is no test send, no delivery record and no alert. `keycloak_smtp_enabled` (`core/settings.py:101`) switches invites to a temporary password in the API response with no other signal. PR #542 fixed the matching gap for product email — the workers chart carried `SMTP_PASSWORD` and none of the other four keys — which is the same class of defect one layer down. | Knowing whether a welcome email arrived |
+| **F-1** | The first screen has one action and no path | `HomePage.tsx:37-52`. With `farm.create` the user gets a title, one sentence and one button. Without it the user gets "Welcome" and "Features coming soon." and no action at all. | Any owner whose first job is not creating a farm — inviting a team, setting units, picking crops |
+| **F-2** | The first action routes to a labs URL | `HomePage.tsx:46` links to `/labs/map-v2?create=farm`. The first task asked of a paying customer runs through a route named `labs`. | Confidence; and the two-console drift already recorded for the Farm tab |
 | **F-3** | The first farm still produces nothing | Prompt 9, D-3: `create_farm` writes one row. A new farm has no imagery subscription, no weather subscription and no grid template. The empty state disappears and no data arrives. | The whole first-run promise. Fix D-3 before F-3 |
 | **F-4** | There is no first-run checklist | I searched the frontend for onboarding, getting-started and checklist. No component exists. | Knowing what is left to set up |
 | **B-1** | The frontend cannot change a farm boundary, but the API can | `PATCH /farms/{farm_id}` accepts `boundary` (`farms/router.py:241-264`), `FarmUpdateRequest.boundary` is declared (`farms/schemas.py:549`), and `update_farm` validates and writes it (`farms/service.py:837-889`). | The reported problem: the only fix today is inactivate, purge, re-create |
-| **B-2** | Nothing links to the farm edit page | The route is registered at `App.tsx:150`. A search over `frontend/src` for links to `/farms/:farmId/edit` returns the route line and its two test files only. | Reaching the page that already exists |
-| **B-3** | The edit form drops the boundary it was given | `FarmEditPage.tsx:85` passes `initial.boundary`. `FarmForm` never reads it: `drawnPolygon` and `uploadedBoundary` both start `null` (`FarmForm.tsx:77-78`), `MapDraw` and `AoiUploader` receive no initial value (`FarmForm.tsx:336-343`), and submit stops with `boundaryRequired` when both are empty (`FarmForm.tsx:108-112`). Renaming a farm therefore forces a full redraw. | B-1; any use of the edit page for any field |
+| **B-2** | Nothing links to the farm edit page | The route is registered at `App.tsx:152`. A search over `frontend/src` for links to `/farms/:farmId/edit` returns the route line and its two test files only. | Reaching the page that already exists |
+| **B-3** | The edit form drops the boundary it was given | `FarmEditPage.tsx:87` passes `initial.boundary`. `FarmForm` never reads it: `drawnPolygon` and `uploadedBoundary` both start `null` (`FarmForm.tsx:77-78`), `MapDraw` and `AoiUploader` receive no initial value (`FarmForm.tsx:340-345`), and submit stops with `boundaryRequired` when both are empty (`FarmForm.tsx:108-112`). Renaming a farm therefore forces a full redraw. | B-1; any use of the edit page for any field |
 | **B-4** | `FarmBoundaryChangedV1` has no subscriber | Published at `farms/service.py:880-888`. No `subscribe` call for it exists in `backend/app`. Same shape as `FarmCreatedV1` in Prompt 9, D-4. | Recomputing anything after a boundary changes |
-| **L-1** | Four locale sources for one date | Of the 53 formatting calls outside tests: 6 pass `chartDateLocale(lang)`, 4 pass `i18n.language`, 3 pass `undefined` (the browser), 3 hard-code `"en-US"`, and 2 pass nothing at all. Nothing decides which is right. | One readable date across the product |
+| **L-1** | Four locale sources for one date | Of the 57 formatting calls outside tests, spread over 34 files: 6 pass `chartDateLocale(lang)`, 4 pass `i18n.language`, 3 pass `undefined` (the browser), 3 hard-code `"en-US"`, and 2 pass nothing at all. Nothing decides which is right. | One readable date across the product |
 | **L-2** | The chart helper hard-codes US order | `chartDateLocale` returns `"en-US"` for every language that is not Arabic (`lib/chartFormat.ts:15-17`). A browser set to `en-GB`, and every Egyptian user reading the English UI, gets month-before-day on every chart axis and tooltip. | The reported problem |
 | **L-3** | There is no shared date helper for tables and pages | `lib/chartFormat.ts` covers chart axes and tooltips only. A search for a `formatDate` export over `frontend/src` returns nothing. Each page formats its own dates. | Fixing L-1 in one place |
 | **L-4** | The farm country carries no locale, and will not be the source | `public.countries` (`public/0043`) holds `code`, `name_en` and `name_ar` and nothing else — no locale, no date order, no timezone. `farms.country_code` is nullable and the create form leaves it optional. Recorded so the option is not re-opened: scope decision 9 uses the browser instead. | Nothing, once scope decision 9 stands |
@@ -725,10 +730,11 @@ by nothing. A user in Egypt with an `en-GB` browser reads `8/21/2026` on one scr
 2. **Retry uses the create path.** `retry_provisioning` calls
    `TenantUsersService.invite_user`, the same call `create_tenant` makes. One invite path,
    not two.
-3. **Account email stays Keycloak's job.** Build an `email` theme under
-   `infra/helm/keycloak/themes/agripulse/` and set `emailTheme`. Do not add account
-   templates to `public.notification_templates`; that table serves alerts, recommendations
-   and visits, and its renderer runs inside the notifications subscriber.
+3. **Account email stays Keycloak's job.** PR #542 already settled this: the theme lives
+   at `infra/helm/keycloak/themes/agripulse/email/` and `emailTheme` is set in two places.
+   Extend that theme. Do not add account templates to `public.notification_templates`;
+   that table serves alerts, recommendations and visits, and its renderer runs inside the
+   notifications subscriber.
 4. **Arabic is part of this track, not a follow-up.** Turn on realm internationalisation
    with `en` and `ar`, and ship both message files with the email theme.
 5. **A boundary override is allowed only when nothing derived from the old boundary
@@ -763,19 +769,21 @@ by nothing. A user in Egypt with an `en-GB` browser reads `8/21/2026` on one scr
   `public.users`, `tenant_memberships` and `tenant_role_assignments` rows it skipped.
 - **Backend: write the subject back.** After a successful invite for an email whose
   `public.users.keycloak_subject` still starts with `pending::`, update the column. Cover
-  the third branch at `iam/users_service.py:276-280`, which today makes no Keycloak call.
+  the third branch of the Keycloak provisioning helper (`iam/users_service.py:666-668`),
+  which today makes no Keycloak call.
 - **Backend tests: assert the rows, not the fake.** Extend `test_keycloak_provisioning.py`
   so every retry test reads `public.users`, `tenant_memberships` and
   `tenant_role_assignments`. That is what would have caught O-3.
 - **Frontend: show the reason.** The tenant detail page shows the stored stage and error
   next to the Retry provisioning button, in place of the one fixed sentence.
-- **Infra: an email theme.** `themes/agripulse/email/` with `html/` and `text/` for the
-  account events users receive: `executeActions` (the invite), `password-reset`,
-  `email-verification` and `event-update_password`. Add `emailTheme` to the realm file,
-  and fix `accountTheme` by either adding an `account/` directory or removing the key (E-3).
-- **Infra: realm internationalisation.** Set `internationalizationEnabled`,
-  `supportedLocales: [en, ar]` and `defaultLocale`, and ship `messages_ar.properties` for
-  both the login theme and the new email theme.
+- **Infra: Arabic account email.** Set `internationalizationEnabled`,
+  `supportedLocales: [en, ar]` and `defaultLocale` on the realm, change
+  `email/theme.properties` from `locales=en` to `locales=en,ar`, and add
+  `messages_ar.properties` to both the email theme and the login theme. Add the Arabic
+  files to the `Dockerfile.theme` assertion list, which already checks seven email files.
+- **Infra: close the two theme gaps #542 left.** Fix `accountTheme` by adding an
+  `account/` directory or removing the key (E-3), and decide whether `email-verification`
+  needs a template before `verifyEmail` is ever switched on (E-1).
 - **Infra: prove the mail path.** Add a test-send step to the promote job, or an admin
   endpoint that sends one email and reports the result. E-5 is the reason nobody knows
   whether a welcome email arrived.
@@ -798,8 +806,8 @@ by nothing. A user in Egypt with an `en-GB` browser reads `8/21/2026` on one scr
   returns day, day-with-time, month and weekday formatters. It builds one BCP-47 tag from
   the browser region and the interface language, per scope decisions 9 and 10. Move
   `chartDateLocale` onto the same resolver so its `"en-US"` fallback goes.
-- **Frontend: replace all 53 call sites** with the helper, including the two that pass no
-  locale at all and the three that hard-code `"en-US"`.
+- **Frontend: replace all 57 call sites** with the helper, including the ones that pass no
+  locale at all and the ones that hard-code `"en-US"`.
 - **Frontend: a lint rule.** Ban `toLocaleDateString`, `toLocaleTimeString`,
   `Date.prototype.toLocaleString` and bare `Intl.DateTimeFormat` outside `lib/dateFormat.ts`.
   Without the rule the four sources come back one pull request at a time.
@@ -837,8 +845,9 @@ by nothing. A user in Egypt with an `en-GB` browser reads `8/21/2026` on one scr
    for the owner, and `keycloak_subject` does not start with `pending::`.
 3. That owner signs in and lands on the first-run page with a tenant role, not a 403.
 4. A retry test fails when the membership rows are missing.
-5. An invite email received in a tenant whose `default_locale` is `ar` is in Arabic and
-   carries the AgriPulse mark. An `en` tenant gets the English version.
+5. An invite email received in a tenant whose `default_locale` is `ar` is in Arabic. The
+   English version already carries the AgriPulse layout from PR #542, so this gate is
+   about language only.
 6. One command or endpoint sends a test email and reports success or the SMTP error.
 7. The first-run page shows six checklist rows, and each row's state matches a query
    against the tenant schema.
@@ -861,7 +870,7 @@ by nothing. A user in Egypt with an `en-GB` browser reads `8/21/2026` on one scr
 
 - **`retry_provisioning` runs on a tenant that may already hold owner rows.** Shape B wrote
   them. Calling `TenantUsersService.invite_user` again must reuse the existing
-  `public.users` row by email — that path exists at `iam/users_service.py:216-224` — and
+  `public.users` row by email — that path exists at `iam/users_service.py:723-742` — and
   must not insert a second membership.
 - **`create_tenant` flushes but does not commit**; the caller's `session.begin()` commits
   (`tenancy/service.py:422`). A new column write must stay inside that transaction.
@@ -871,8 +880,12 @@ by nothing. A user in Egypt with an `en-GB` browser reads `8/21/2026` on one scr
   `accountTheme` that names a theme with no `account/` directory has been in the realm file
   and has changed nothing. Check the rendered page, not the realm JSON.
 - **The theme image is built separately.** `infra/helm/keycloak/Dockerfile.theme` copies
-  `themes/agripulse` and asserts four login files exist. Adding `email/` needs the same
-  kind of assertion, or a missing file ships without failing the build.
+  `themes/agripulse` and asserts eleven files: four login, seven email. A new Arabic file
+  that is not added to that list ships missing without failing the build.
+- **`emailTheme` is set in two places on purpose.** `agripulse-realm.json:17` covers a
+  fresh import; `promote-kc-tenancy.py:180` covers the live realm, which never reads the
+  import file again. Changing one and not the other looks correct and changes nothing on
+  the running server.
 - **`keycloak_smtp_enabled` changes the invite result shape.** When false the API returns a
   temporary password instead of sending mail. A first-run test that asserts on email
   delivery passes or fails on this flag, not on the theme.
@@ -888,7 +901,8 @@ by nothing. A user in Egypt with an `en-GB` browser reads `8/21/2026` on one scr
   `signals/components/ObservedAtPicker.tsx:17` both work around this today.
 - **`farms.country_code` is nullable.** The create form leaves the field optional, so many
   farms carry no country. The resolver must fall through, not throw.
-- **`chartDateLocale` is imported by six call sites.** Changing its return value changes
+- **`chartDateLocale` is imported by six call sites and still returns `"en-US"` for every
+  language that is not Arabic on `origin/main`.** Changing its return value changes
   every chart axis at once. Read the callers before editing it.
 - **jsdom reports one locale.** `navigator.language` under Vitest does not follow the
   machine. A test for gate item 11 must set the value itself, or it asserts nothing.
@@ -903,10 +917,11 @@ by nothing. A user in Egypt with an `en-GB` browser reads `8/21/2026` on one scr
   `provisioning_stage` column next to the existing status enough?
 - Is the failure text shown raw, or mapped to a short list of causes? A raw Keycloak error
   can carry a URL and a client id.
-- Which account emails does a real customer receive today? Invite and password reset are
-  certain. Verify-email depends on `verifyEmail`, which the realm file does not set.
+- Is `verifyEmail` going to be switched on? If yes, `email-verification` needs a template
+  before that day, or the first email a customer sees is stock Keycloak markup.
 - Is the email locale the tenant's `default_locale`, the user's `preferred_language`, or
-  the Keycloak user locale attribute? All three exist and they can disagree.
+  the Keycloak user locale attribute? All three exist and they can disagree. Keycloak
+  renders from its own user locale, so something has to write it at invite time.
 - Does the first-run page replace `HomePage`, or does `HomePage` redirect to it while the
   checklist is incomplete?
 - For the boundary override: is "zero blocks" the whole condition, or do zero blocks plus a
