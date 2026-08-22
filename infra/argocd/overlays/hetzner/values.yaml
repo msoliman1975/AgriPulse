@@ -2620,11 +2620,33 @@ global:
   #   `farms.utm_srid` and the backfill preserved every existing value.
   #   Images CONFIRMED by pulling both on the node: api @ 2392430965b87,
   #   frontend @ 391742b42867a.
+  # d4512a8 = #555, a backfill refreshes its own farm's index baselines.
+  #   Follow-up to #545. A backfill writes index history whose day-of-year
+  #   baselines do not exist yet, and `record_aggregate_row` derives
+  #   `baseline_deviation` once at write time, so those rows land NULL.
+  #   Since #545 the hourly tenant sweep repairs them, but the wait is up to
+  #   an hour.
+  #   `imagery.backfill_farm_indices` ONLY DISPATCHES -- it returns as soon as
+  #   the compute tasks are queued, so a recompute placed there would run
+  #   before the aggregates exist. There is no completion signal to wait on
+  #   either: `compute_indices` is `ignore_result=True` (no chord) and
+  #   `indices_calc_runs` holds 0 rows in both tenants (nothing to count).
+  #   So the backfill queues two delayed shots of a new farm-scoped task,
+  #   `indices.recompute_baselines_for_farm`, on the light queue. Timing is
+  #   best-effort by design; the hourly sweep stays the guarantee.
+  #   Both shots are cheap when nothing changed -- #545's UPDATE carries an
+  #   `IS DISTINCT FROM` guard, and prod measured 0 rows for a repeat run.
+  #   API AND WORKERS ONLY. `git diff --name-only 3dc25cf d4512a8` touches
+  #   backend/ and infra/ and nothing else, so frontend stays 3dc25cf and
+  #   tile-server stays 676746a.
+  #   No migrations.
+  #   Rollback is these two tags back to 3dc25cf. Nothing to unwind: the task
+  #   is additive and the data it writes is correct either way.
   images:
     api:
-      tag: "3dc25cf"
+      tag: "d4512a8"
     workers:
-      tag: "3dc25cf"
+      tag: "d4512a8"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
