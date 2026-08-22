@@ -2496,6 +2496,20 @@ global:
   #   pass.
   #   Images CONFIRMED by pulling all three on the node: api @ 454567dea7c0d,
   #   frontend @ 09832222b93f5, tile-server @ 82ec67bfa5abb.
+  # 03f2a0d = #541, the Platform alerts page rendered blank.
+  #   /platform/alerts handed <DataTable> the whole `{items, total, limit,
+  #   offset}` response instead of the rows. DataTable calls .map() on what it
+  #   gets, so the render threw `TypeError: data.map is not a function`. There
+  #   is no React error boundary anywhere in frontend/src, so the throw
+  #   unmounted the whole app and the page body was empty. The red bar at the
+  #   top of every page links here, so the one screen that explains the bar
+  #   showed nothing. A `as unknown as Parameters<typeof queryState<...>>[0]`
+  #   cast is why tsc accepted it.
+  #   FRONTEND ONLY. `git diff --name-only 676746a 03f2a0d` touches two files
+  #   under frontend/src and nothing else, so api, workers and tile-server
+  #   stay on 676746a rather than restart for no delta.
+  #   No migrations.
+  #   Image CONFIRMED by pulling on the node: frontend @ c67c9a008338f.
   images:
     api:
       tag: "676746a"
@@ -2551,7 +2565,7 @@ global:
       #
       # f04a739 = #538, the platform alerts list and the red bar. Moves with
       #   the api and the workers - see the note above the `images` key.
-      tag: "676746a"
+      tag: "03f2a0d"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
