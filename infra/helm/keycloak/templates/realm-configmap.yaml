@@ -3,6 +3,27 @@ Realm import ConfigMap. The realm JSON is loaded from the file shipped
 in infra/dev/keycloak/agripulse-realm.json so dev and the cluster
 import the same baseline. Per-env overlays may replace the contents
 in their own ConfigMap.
+
+DO NOT ADD COMMENT KEYS TO THE REALM JSON. Keycloak parses it into
+RealmRepresentation with unknown fields rejected, so a key the class
+does not declare kills the pod at boot:
+
+  ERROR: Failed to run import
+  ERROR: Unrecognized field "_comment_users"
+
+That is not a warning and not a skipped field — the container exits and
+CrashLoopBackOff follows. A StatefulSet does not restart on a ConfigMap
+change, so a bad key sits harmless until the next image bump and then
+takes down every pod that rolls. `_comment_users` did exactly that: it
+went in with #213 on 2026-06-09 and surfaced on 2026-08-22.
+
+What that key used to say, kept here where it cannot reach the parser:
+deployed clusters deliberately ship NO seed user (IH-1). The first
+PlatformAdmin is created by the PostSync promote job (promote-kc-admin.py)
+from KC_BOOTSTRAP_ADMIN_EMAIL plus a temporary password sourced from a
+Secret, which forces UPDATE_PASSWORD on first login. The local
+docker-compose realm at infra/dev/keycloak/agripulse-realm.json keeps the
+dev/dev convenience user.
 */}}
 apiVersion: v1
 kind: ConfigMap

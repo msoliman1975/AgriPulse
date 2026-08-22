@@ -267,6 +267,16 @@ jobs:
             echo "::endgroup::"
           done
 
+      # Keycloak parses the realm file into RealmRepresentation with unknown
+      # fields rejected, so one key the class does not declare exits the
+      # container at boot and CrashLoopBackOff follows. A StatefulSet does not
+      # restart on a ConfigMap change, so a bad key sits harmless until the
+      # next image bump and then takes down every pod that rolls.
+      # `_comment_users` went in on 2026-06-09 and surfaced on 2026-08-22.
+      - name: realm JSON carries no comment keys
+        run: |
+          python3 scripts/check_realm_json.py             infra/helm/keycloak/files/agripulse-realm.json             infra/dev/keycloak/agripulse-realm.json
+
   containers:
     name: containers
     runs-on: ubuntu-24.04
