@@ -54,6 +54,20 @@ env:
   KEYCLOAK_JWKS_URL: "https://keycloak.{{ .Values.global.envHost }}/realms/agripulse/protocol/openid-connect/certs"
   # See api/values.yaml — service is `observability-tempo`, not `tempo`.
   OTEL_EXPORTER_OTLP_ENDPOINT: http://observability-tempo.observability.svc.cluster.local:4318
+  # SMTP. The workers chart already pulled SMTP_PASSWORD from Secrets
+  # Manager but carried none of the other four keys, so every send from a
+  # worker fell back to the dev defaults in settings.py and dialled
+  # localhost:1025 inside the pod. That is not theoretical: grid anomaly
+  # alerts publish AlertOpenedV1 from `grid/tasks.py`, a Celery task, so
+  # their whole email fan-out ran here. Same failure shape as the S3
+  # defaults noted below. Values mirror api/values.yaml exactly.
+  SMTP_HOST: smtp-relay.brevo.com
+  SMTP_PORT: "587"
+  SMTP_USERNAME: "aac72b001@smtp-brevo.com"
+  SMTP_STARTTLS: "true"
+  SMTP_FROM: "AgriPulse <admin@agripulse.tech>"
+  # Origin the SPA is served from. See api/values.yaml.
+  APP_BASE_URL: "https://app.{{ .Values.global.envHost }}"
   # Sentinel Hub OAuth client_id — see api/values.yaml for rationale.
   # Must be set in the per-env overlay alongside the SENTINEL_HUB_CLIENT_SECRET
   # crossRef; both halves are required or imagery.discover_scenes writes the

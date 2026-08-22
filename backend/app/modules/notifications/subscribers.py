@@ -33,6 +33,14 @@ from app.core.logging import get_logger
 from app.core.settings import get_settings
 from app.modules.alerts.events import AlertOpenedV1
 from app.modules.notifications.events import InboxItemCreatedV1
+from app.modules.notifications.presentation import (
+    absolute_url,
+    action_type_label,
+    format_timestamp,
+    preferences_url,
+    severity_colours,
+    severity_label,
+)
 from app.modules.notifications.push import PushSendError, send_push
 from app.modules.notifications.sink import (
     SUPPRESSED_REASON,
@@ -267,8 +275,8 @@ def _build_render_ctx(
     fields directly.
     """
     is_ar = locale == "ar"
-    severity_map = {"info": "Info", "warning": "Warning", "critical": "Critical"}
-    severity_label = severity_map.get(alert["severity"], alert["severity"]).upper()
+    severity = alert["severity"]
+    fg, bg, border = severity_colours(severity)
     diagnosis = alert.get("diagnosis_ar") if is_ar else alert.get("diagnosis_en")
     prescription = alert.get("prescription_ar") if is_ar else alert.get("prescription_en")
     rule_name = (
@@ -276,6 +284,7 @@ def _build_render_ctx(
         if rule is not None
         else alert["rule_code"]
     ) or alert["rule_code"]
+    link_url = f"/action-center/{alert['farm_id']}?kind=alert&item={alert['alert_id']}"
     return {
         "tenant_id": str(tenant_id),
         "alert_id": str(alert["alert_id"]),
@@ -285,17 +294,25 @@ def _build_render_ctx(
         "farm_name": alert.get("farm_name"),
         "rule_code": alert["rule_code"],
         "rule_name": rule_name,
-        "severity": alert["severity"],
-        "severity_label": severity_label,
+        "severity": severity,
+        "severity_label": severity_label(severity, locale),
+        "severity_color": fg,
+        "severity_bg": bg,
+        "severity_border": border,
         "diagnosis": diagnosis or "",
         "prescription": prescription or "",
         "fired_at": alert["created_at"].isoformat() if alert.get("created_at") else "",
+        "fired_at_display": format_timestamp(alert.get("created_at"), locale),
         "signal_snapshot_json": json.dumps(alert.get("signal_snapshot") or {}),
         # The Action Center is the queue now; /alerts is delisted. `item`
         # opens this row rather than dropping the reader into a farm-wide
         # list, which is what the old link did — /alerts never read its
         # `?alert=` parameter.
-        "link_url": (f"/action-center/{alert['farm_id']}?kind=alert&item={alert['alert_id']}"),
+        "link_url": link_url,
+        # Email has no origin to resolve a relative path against. The bell
+        # keeps `link_url`; only the email templates read this one.
+        "link_url_abs": absolute_url(link_url),
+        "preferences_url": preferences_url(),
     }
 
 
@@ -727,7 +744,11 @@ def _dispatch_channel_for_user(
         )
         return None
 
-    # email
+    # email. `body_html` has to be rendered like the other two — it was
+    # being passed through raw, which nobody saw only because every seeded
+    # row had body_html NULL. `escape=True` because the substituted values
+    # (farm name, diagnosis, a rule name an operator typed) land inside
+    # markup here, unlike the text body.
     _send_email_channel(
         session,
         event=event,
@@ -735,7 +756,7 @@ def _dispatch_channel_for_user(
         locale=locale,
         subject=subject,
         body=body,
-        body_html=template.get("body_html"),
+        body_html=render(template.get("body_html"), ctx, escape=True) or None,
     )
     return None
 
@@ -1075,14 +1096,17 @@ def _build_render_ctx_for_recommendation(
 ) -> dict[str, Any]:
     """Variables exposed to the recommendation template renderer."""
     is_ar = locale == "ar"
-    severity_map = {"info": "Info", "warning": "Warning", "critical": "Critical"}
-    severity_label = severity_map.get(rec["severity"], rec["severity"]).upper()
+    severity = rec["severity"]
+    fg, bg, border = severity_colours(severity)
     text_localized = rec.get("text_ar") if is_ar else rec.get("text_en")
     tree_name = (
         (tree.get("name_ar") if is_ar else tree.get("name_en"))
         if tree is not None
         else rec["tree_code"]
     ) or rec["tree_code"]
+    link_url = (
+        f"/action-center/{rec['farm_id']}?kind=recommendation&item={rec['recommendation_id']}"
+    )
     return {
         "tenant_id": str(tenant_id),
         "recommendation_id": str(rec["recommendation_id"]),
@@ -1093,15 +1117,19 @@ def _build_render_ctx_for_recommendation(
         "tree_code": rec["tree_code"],
         "tree_name": tree_name,
         "action_type": rec["action_type"],
-        "severity": rec["severity"],
-        "severity_label": severity_label,
+        "action_type_label": action_type_label(rec["action_type"], locale),
+        "severity": severity,
+        "severity_label": severity_label(severity, locale),
+        "severity_color": fg,
+        "severity_bg": bg,
+        "severity_border": border,
         "text": text_localized or "",
         "fired_at": rec["created_at"].isoformat() if rec.get("created_at") else "",
+        "fired_at_display": format_timestamp(rec.get("created_at"), locale),
         "evaluation_snapshot_json": json.dumps(rec.get("evaluation_snapshot") or {}),
-        "link_url": (
-            f"/action-center/{rec['farm_id']}"
-            f"?kind=recommendation&item={rec['recommendation_id']}"
-        ),
+        "link_url": link_url,
+        "link_url_abs": absolute_url(link_url),
+        "preferences_url": preferences_url(),
     }
 
 
@@ -1197,7 +1225,9 @@ def _dispatch_rec_channel_for_user(
             created_at=event.created_at,
         )
 
-    # email
+    # email. Same as the alert path: render body_html rather than passing
+    # the template through raw, and escape the substituted values because
+    # they land inside markup here.
     _send_rec_email_channel(
         session,
         event=event,
@@ -1205,7 +1235,7 @@ def _dispatch_rec_channel_for_user(
         locale=locale,
         subject=subject,
         body=body,
-        body_html=template.get("body_html"),
+        body_html=render(template.get("body_html"), ctx, escape=True) or None,
     )
     return None
 

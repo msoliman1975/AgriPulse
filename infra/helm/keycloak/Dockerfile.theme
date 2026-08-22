@@ -34,4 +34,11 @@ USER 1001
 RUN test -f /opt/bitnami/keycloak/themes/agripulse/login/theme.properties \
  && test -f /opt/bitnami/keycloak/themes/agripulse/login/template.ftl \
  && test -f /opt/bitnami/keycloak/themes/agripulse/login/resources/css/login.css \
- && test -f /opt/bitnami/keycloak/themes/agripulse/login/resources/img/mark.svg
+ && test -f /opt/bitnami/keycloak/themes/agripulse/login/resources/img/mark.svg \
+ && test -f /opt/bitnami/keycloak/themes/agripulse/email/theme.properties \
+ && test -f /opt/bitnami/keycloak/themes/agripulse/email/html/template.ftl \
+ && test -f /opt/bitnami/keycloak/themes/agripulse/email/html/executeActions.ftl \
+ && test -f /opt/bitnami/keycloak/themes/agripulse/email/html/password-reset.ftl \
+ && test -f /opt/bitnami/keycloak/themes/agripulse/email/text/executeActions.ftl \
+ && test -f /opt/bitnami/keycloak/themes/agripulse/email/text/password-reset.ftl \
+ && test -f /opt/bitnami/keycloak/themes/agripulse/email/messages/messages_en.properties

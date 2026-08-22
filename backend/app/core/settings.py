@@ -438,6 +438,14 @@ class Settings(BaseSettings):
     smtp_from: str = "AgriPulse <noreply@agripulse.local>"
     smtp_timeout_seconds: float = 10.0
 
+    # Origin the web app is served from. Notification links are built
+    # relative (`/action-center/...`) because the in-app bell hands them
+    # straight to react-router's `navigate()`, which treats an absolute
+    # URL as a path and produces `/https://...`. An email has no origin to
+    # resolve a relative path against, so the email channel prefixes this.
+    # Trailing slashes are stripped when the link is built.
+    app_base_url: str = "http://localhost:5173"
+
     # --- FCM (notifications push channel, scout app S2) ------------------
     # Off by default so a dev environment without Firebase credentials records
     # `skipped` dispatch rows rather than failing every send. Cluster envs

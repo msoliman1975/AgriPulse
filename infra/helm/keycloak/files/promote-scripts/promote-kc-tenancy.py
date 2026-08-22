@@ -172,6 +172,12 @@ def configure_smtp(c: httpx.Client, token: str) -> None:
     r = c.get(f"{KC_BASE}/admin/realms/{REALM}", headers=h)
     r.raise_for_status()
     realm = r.json()
+    # emailTheme is set here and not only in agripulse-realm.json because
+    # that file is an *import* — a realm that already exists never reads
+    # it again. This hook runs on every sync and does a full-realm PUT, so
+    # it is the only path that reaches a live realm. Without it Keycloak
+    # renders its stock `base` theme and the invite arrives unbranded.
+    realm["emailTheme"] = "agripulse"
     realm["smtpServer"] = {
         "host": BREVO_HOST,
         "port": BREVO_PORT,
@@ -186,6 +192,7 @@ def configure_smtp(c: httpx.Client, token: str) -> None:
     r = c.put(f"{KC_BASE}/admin/realms/{REALM}", headers=h, json=realm)
     r.raise_for_status()
     print(f"realm smtpServer set: {BREVO_HOST}:{BREVO_PORT} from={BREVO_FROM_EMAIL}")
+    print("realm emailTheme set: agripulse")
 
 
 def main() -> None:
