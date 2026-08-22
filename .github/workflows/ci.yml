@@ -275,25 +275,7 @@ jobs:
       # `_comment_users` went in on 2026-06-09 and surfaced on 2026-08-22.
       - name: realm JSON carries no comment keys
         run: |
-          fail=0
-          for realm in infra/helm/keycloak/files/agripulse-realm.json \
-                       infra/dev/keycloak/agripulse-realm.json; do
-            [ -f "$realm" ] || continue
-            echo "checking ${realm}"
-            python3 -c "
-import json, sys
-path = sys.argv[1]
-with open(path, encoding='utf-8') as fh:
-    realm = json.load(fh)
-bad = sorted(k for k in realm if k.startswith('_'))
-if bad:
-    print(f'  {path}: Keycloak will refuse these keys: {bad}')
-    print('  Put the explanation in realm-configmap.yaml, not in the JSON.')
-    sys.exit(1)
-print(f'  ok, {len(realm)} top-level keys, none starting with _')
-" "$realm" || fail=1
-          done
-          exit $fail
+          python3 scripts/check_realm_json.py             infra/helm/keycloak/files/agripulse-realm.json             infra/dev/keycloak/agripulse-realm.json
 
   containers:
     name: containers
