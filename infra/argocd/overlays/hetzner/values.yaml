@@ -2594,11 +2594,37 @@ global:
   #   The column defaults to false.
   #   Images CONFIRMED by pulling both on the node: api @ e04a870c04362,
   #   frontend @ 62304abab58a9.
+  # 3dc25cf = #553 plus the two PRs that merged behind it. All three ship
+  #   together: images are built per main commit, so there is no way to
+  #   deploy one of them alone.
+  #   TENANT MIGRATION 0082, from #547. It runs on the api PreSync for every
+  #   tenant.
+  #   #553 - `farms.farm_scope_consistency_check` bound a scalar where
+  #     `ANY(:ids)` needs an array, so it raised on every run for every
+  #     tenant holding a farm scope, since it was written. One line.
+  #   #547 - each farm gets its own UTM zone. The two PostGIS trigger
+  #     functions transformed every boundary with a literal EPSG:32636, and
+  #     ST_Transform does not fail outside its zone - it returns a finite,
+  #     wrong number. Measured against a geodesic reference a 0.01-degree
+  #     square came out 4.8% too large in Riyadh and 5.3x too large in Sao
+  #     Paulo, and that number is `area_m2`, which feeds every feddan,
+  #     hectare and per-hectare figure. 0082 backfills every existing farm
+  #     with the SRID it already has, so no stored area moves. The Egypt-only
+  #     boundary check is gone.
+  #   #554 - a person can change their own notification settings.
+  #   tile-server STAYS on 676746a. Its only change in this range is a
+  #   docstring; #547 says the cutline needs no change because it stores the
+  #   AOI in EPSG:4326 and reprojects at render time.
+  #   Rollback is these three tags back to f7353bd. Tenant 0082 has a
+  #   downgrade, but leaving it applied is harmless: the old code ignores
+  #   `farms.utm_srid` and the backfill preserved every existing value.
+  #   Images CONFIRMED by pulling both on the node: api @ 2392430965b87,
+  #   frontend @ 391742b42867a.
   images:
     api:
-      tag: "f7353bd"
+      tag: "3dc25cf"
     workers:
-      tag: "f7353bd"
+      tag: "3dc25cf"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -2649,7 +2675,7 @@ global:
       #
       # f04a739 = #538, the platform alerts list and the red bar. Moves with
       #   the api and the workers - see the note above the `images` key.
-      tag: "f7353bd"
+      tag: "3dc25cf"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
