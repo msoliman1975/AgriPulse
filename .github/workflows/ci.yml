@@ -218,7 +218,7 @@ jobs:
       # boto3 is not installed here: the tests stand in for the boundary
       # read, and the module imports boto3 only when it reaches storage.
       - name: Install
-        run: pip install "titiler.core==0.21.1" "rio-tiler==7.4.0" pytest==8.3.4
+        run: pip install "titiler.core==0.21.1" "rio-tiler==7.4.0" "shapely==2.0.6" pytest==8.3.4
 
       - name: Test
         run: python -m pytest tests -q

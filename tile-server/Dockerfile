@@ -23,11 +23,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     VSI_CACHE=TRUE \
     VSI_CACHE_SIZE=536870912
 
-# The cutline reads one small GeoJSON object per farm from the same
-# bucket the rasters come from. GDAL reads rasters over its own /vsis3/
-# driver, which cannot hand a plain file back to Python, so the boundary
-# read needs an S3 client of its own. Upstream does not ship one.
-RUN pip install --no-cache-dir "boto3>=1.34,<2"
+# boto3: the cutline reads one small GeoJSON object per farm from the
+# same bucket the rasters come from. GDAL reads rasters over its own
+# /vsis3/ driver, which cannot hand a plain file back to Python, so the
+# boundary read needs an S3 client of its own. Upstream ships none.
+#
+# shapely: the base image already carries it as a transitive dependency.
+# Naming it here makes ours deliberate, so it cannot disappear under a
+# base-image bump that drops whichever package pulled it in.
+RUN pip install --no-cache-dir "boto3>=1.34,<2" "shapely>=2.0,<3"
 
 # Drop our config + application + entrypoint in. The upstream image
 # already exposes uvicorn at :8000; we only override env defaults.
