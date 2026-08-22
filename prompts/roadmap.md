@@ -1086,6 +1086,129 @@ maximum block area, and every per-hectare number in plans and reports.
 
 ---
 
+## Topics awaiting a decision
+
+Larger than the housekeeping backlog and not yet a prompt. Each item here has
+been read against the code, but a scope decision is still open, so writing a
+locked scope now would lock in a guess. An item leaves this section in one of
+two directions: it becomes a numbered prompt once the open questions are
+answered, or it is dropped with the reason recorded.
+
+### T-1 — A formal definition of a season
+
+**Question asked:** do we have a formal definition of a season, something like a
+season master record, and is one needed?
+
+**Source analysis:** the 2026-08-21 session, read against the working tree at
+`fd8cc89b`. No proposal document covers this. Do not go looking for one.
+
+#### What the reading found
+
+There is no season entity. The word "season" is free text in two places that do
+not reference each other.
+
+| Where | Column | Type | Who sets it |
+|---|---|---|---|
+| `block_crops` | `season_label` | `TEXT`, max 64 | The user types it. `CropAssignmentPanel.tsx:80` starts as an empty text box with no list and no format rule. |
+| `vegetation_plans` | `season_label` and `season_year` | `TEXT` and `INTEGER` | `ApplyTemplateDialog.tsx:47` defaults the label to the current year as a string. |
+
+Nothing joins the two. A plan for season `2026` and a crop assignment for season
+`2026-summer` are the same season to a person and two unrelated rows to the
+database. `docs/data_model.md:507` offers three formats on one line:
+`2026-summer`, `2025-2026`, and `Y3`.
+
+Only one query filters on the label: the plan-template repeat check at
+`plan_templates/repository.py:390`. Everywhere else the label is text on a
+screen.
+
+**Four parts of the system already decide when a season starts, and they give
+four different answers.**
+
+1. Growing degree days. `weather/derivations.py:29` records that the schema calls
+   for a reset by event, and that the code resets on the calendar year instead
+   because that event was never built. `docs/data_model.md:852` still describes
+   the column as reset by event.
+2. Phenology. Stage advance anchors on `block_crops.planting_date`, per block
+   (`farms/phenology.py:14`).
+3. Plan templates. `plan_templates/apply.py:49` builds every stage date as
+   `date(season_year, month, day)`, which anchors on the calendar year.
+4. The crop assignment record. `effective_from` and `effective_to` form a real
+   half-open date range and are the only correct start and end dates in the
+   system today.
+
+This has an effect now. An Egyptian winter crop runs from October to May. The
+season-to-date growing degree days in the report reset on 1 January, in the
+middle of that crop. A perennial stage window written as `12-15` to `01-20` maps
+onto a single `season_year`, so the January half lands in the wrong year.
+
+#### Gap register
+
+| ID | Gap | Evidence — why it is a gap | Blocks |
+|---|---|---|---|
+| **S-1** | The season is free text with no format rule | `farms/models.py:502` is `TEXT`. `farms/schemas.py:974` limits length only. | Any grouping, filtering or comparison by season |
+| **S-2** | Two season carriers with no link | `block_crops.season_label` and `vegetation_plans.season_label`. No foreign key, no shared value rule. | Reading a plan and its planted crops as one season |
+| **S-3** | The growing degree day cumulative resets on 1 January | `weather/derivations.py:29` | A correct season total for any crop that crosses a year boundary |
+| **S-4** | Stage dates anchor on a calendar year | `plan_templates/apply.py:49` | A perennial stage window that crosses December into January |
+| **S-5** | The season-context endpoint carries no dates | `insights/schemas.py:130` names the missing pieces as planting and expected-harvest dates per block. | A progress reading of the form day 42 of 150 |
+| **S-6** | Board activities carry no season | `plan_activities.plan_id` is nullable, and the board creates rows with no plan. | Grouping the board by season |
+| **S-7** | No season-over-season comparison is possible | No two records agree on a window. | Comparing this season against last season for any measure |
+
+#### The shape being proposed
+
+A thin season table holding only the window and the name: `id`, `code`,
+`name_en`, `name_ar`, `start_date`, `end_date` as a half-open range,
+`season_year`, `status`. `block_crops` and `vegetation_plans` both reference it
+by id.
+
+**The crop dates stay where they are.** `planting_date`, `actual_harvest_date`,
+`effective_from` and `effective_to` remain on `block_crops`. A season row that
+also claimed to know when a crop started would give one fact two sources, and
+the two would drift.
+
+#### Areas a change would touch
+
+| Area | What changes | Where |
+|---|---|---|
+| Crop assignment | The text box becomes a picker. Existing labels need a backfill. | `farms/models.py:502`, six fields in `farms/schemas.py`, `farms/service.py`, `CropAssignmentPanel.tsx`, `bulkCropAssignment.ts` |
+| Plans | The unique index `uq_vegetation_plans_farm_season_active` moves from `(farm_id, season_label)` to `(farm_id, season_id)`. The 409 message text changes. | `plans/models.py`, `plans/errors.py:37`, `plan_templates/repository.py:390` |
+| Weather | The season cumulative can reset on the real season start. This is the hardest part; see open question 4. | `weather/derivations.py`, `observer/weather.py:252`, `reports/service.py:1085` |
+| Decision trees | `gdd_cumulative_base10_season` is a condition source, so changing its reset changes which trees fire. A parity test pins the condition list. Read the test before touching the picker. | `shared/conditions/context.py:208` |
+| Reports | A report could be scoped to a season instead of a date range. | `reports/schemas.py:234`, `:257`, `:277` |
+| Insights | The season-context bar becomes a real progress reading. | `insights/service.py:268` |
+| Plan templates | Perennial day-of-year windows anchor on the season instead of the calendar year, which fixes the October-to-May case. | `plan_templates/apply.py` |
+| Board | Activities created with no plan gain a season. | `plans/models.py` |
+| Platform catalog | Seeded Egyptian seasons would follow the crop catalog pattern. Use a logical UUID, not a foreign key from a tenant schema into `public`. | new |
+| Purge manifest | A new tenant table must join the manifest, or CI fails. | purge manifest |
+
+#### Arguments against, recorded so they are not lost
+
+- Seasons overlap. One block can still be in winter while its neighbour is in
+  summer. A single current season per farm would be wrong for that farm.
+- Perennials have no season in the annual sense. The `Y3` example in the data
+  model shows the field is already used to mean orchard age. A start date and an
+  end date do not describe a mango orchard.
+- The size of the backfill depends on how varied the existing labels are, and
+  production has not been read yet.
+
+#### The cheap first step
+
+Before any schema work, count the distinct `season_label` values per tenant on
+production. It is a read-only query. Three tidy values means a small mapping.
+Forty values means a manual mapping, which changes the size of this work.
+
+#### Open questions (answer before this becomes a prompt)
+
+1. Is a season tenant-wide, or per farm? A tenant with farms in the Delta and in
+   Upper Egypt has different windows.
+2. Can one block sit in two seasons at once? If it can, no screen can say "this
+   season" without first asking which one.
+3. Do perennials get a season, or is it empty for them, with `Y3`-style labels
+   moving to a separate field?
+4. Is the growing degree day cumulative per farm or per crop assignment? Per farm
+   keeps the weather table shape. Per crop assignment turns the stored column
+   into a computed value, which is a much larger change.
+---
+
 ## How to use this roadmap
 
 1. **Run Prompt 1** with Claude Code in a fresh session. Provide it with `prompts/prompt_01_foundation.md` as the user message, and ensure it has access to `docs/ARCHITECTURE.md` and `docs/data_model.md`.
