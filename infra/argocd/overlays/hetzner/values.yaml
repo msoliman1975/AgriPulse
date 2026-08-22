@@ -2478,11 +2478,29 @@ global:
   #   tile-server unchanged stays 9d140cc.
   #   Images CONFIRMED by pulling all three on the node: api @ f01b4a954685b,
   #   workers @ e18e61978df27, frontend @ 6db993dce2adf.
+  # 676746a = #539, index colour stops at the farm border. The tile server
+  #   cuts every rendered image to the farm boundary, so the colour a grower
+  #   sees ends where the field ends. The stored raster is cut on its own
+  #   10 m pixel grid, which leaves up to 5 m of colour outside a straight
+  #   border and 15 m on the 30 m thermal product; this cuts again on the
+  #   grid of the image returned, which is screen pixels.
+  #   ALL FOUR MOVE TOGETHER. tile-server carries the `cutline` algorithm and
+  #   its own application module (MODULE_NAME now points at agripulse_tiles
+  #   .main); the frontend is what asks for the cut; api + workers write the
+  #   boundary object the tile server reads. Each half is inert without the
+  #   others and none of them breaks the old behaviour: a farm with no
+  #   boundary object published renders exactly as it does today.
+  #   No migrations.
+  #   AFTER THE ROLL: run imagery.publish_farm_boundaries once, or farms
+  #   whose scenes were computed before this stay uncut until their next
+  #   pass.
+  #   Images CONFIRMED by pulling all three on the node: api @ 454567dea7c0d,
+  #   frontend @ 09832222b93f5, tile-server @ 82ec67bfa5abb.
   images:
     api:
-      tag: "f04a739"
+      tag: "676746a"
     workers:
-      tag: "f04a739"
+      tag: "676746a"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -2533,9 +2551,9 @@ global:
       #
       # f04a739 = #538, the platform alerts list and the red bar. Moves with
       #   the api and the workers - see the note above the `images` key.
-      tag: "f04a739"
+      tag: "676746a"
     tileServer:
-      tag: "9d140cc"
+      tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
 # consume all of these; tile-server/frontend ignore the keys they don't read).
 env:
