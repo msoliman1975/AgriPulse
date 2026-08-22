@@ -15,7 +15,7 @@ import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Toolbar, type FilterValues } from "@/components/Toolbar";
-import { queryState } from "@/components/asyncState";
+import { mapAsyncState, queryState } from "@/components/asyncState";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import {
   useAcknowledgePlatformAlert,
@@ -66,9 +66,11 @@ export function PlatformAlertsPage(): ReactNode {
   const sweep = useRunPlatformAlertSweep();
 
   const rows = q.data?.items ?? [];
-  const state = queryState(
-    q as unknown as Parameters<typeof queryState<PlatformAlert[]>>[0],
-  );
+  // The endpoint returns an envelope, <DataTable> renders rows. Project the
+  // success payload instead of casting the query result: the cast this
+  // replaced type-checked, then handed the table an object to .map() over,
+  // which threw and blanked the page.
+  const state = mapAsyncState(queryState(q), (page) => page.items);
 
   const ago = (iso: string): string =>
     formatDistanceToNow(parseISO(iso), { addSuffix: true, locale: dateLocale });
