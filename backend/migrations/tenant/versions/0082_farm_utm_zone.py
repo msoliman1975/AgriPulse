@@ -26,6 +26,14 @@ per-block rasters are all cut against each other.
 Re-zoning the Egyptian farms west of longitude 30 is deliberately NOT done
 here. It is correct, and it needs an imagery backfill to go with it.
 
+The zone rule is written out in full in both trigger functions rather than
+factored into a helper. A trigger function resolves unqualified names through
+the search_path in force when it fires, and callers write schema-qualified SQL
+(``INSERT INTO "tenant_x".farms ...``) without putting that schema on the path.
+A helper in the tenant schema is invisible to those callers, and the insert
+dies with "function does not exist". The PostGIS and pgcrypto calls below are
+safe because those extensions live in ``public``, which is always on the path.
+
 Revision ID: 0082
 Revises: 0081
 Create Date: 2026-08-21
@@ -44,15 +52,13 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
-# The zone rule, in SQL only. Keeping a second copy in Python would be the
-# mirrored-constant problem: two definitions that drift with nothing failing
-# until a user sees a wrong area. Every write path reaches the trigger,
-# including the raw INSERTs in tests and in scripts/.
-_UTM_SRID_FN = """
-CREATE OR REPLACE FUNCTION utm_srid_for_geometry(geom geometry)
-RETURNS INTEGER
+# `NEW.boundary` is SRID 4326 by column type, so a longitude reads straight off
+# its centroid with no transform. 60 zones of 6 degrees, numbered from the
+# antimeridian; longitude 180 exactly would compute zone 61, so it is clamped.
+_FARMS_GEOM_FN_ZONED = """
+CREATE OR REPLACE FUNCTION farms_geom_compute()
+RETURNS TRIGGER
 LANGUAGE plpgsql
-IMMUTABLE
 AS $$
 DECLARE
     c        geometry;
@@ -60,39 +66,26 @@ DECLARE
     lat      DOUBLE PRECISION;
     zone_no  INTEGER;
 BEGIN
-    c := ST_Centroid(ST_Transform(geom, 4326));
-    lon := ST_X(c);
-    lat := ST_Y(c);
-    -- 60 zones of 6 degrees, numbered from the antimeridian. Longitude 180
-    -- exactly would compute zone 61, so the result is clamped.
-    zone_no := floor((lon + 180.0) / 6.0)::INTEGER + 1;
-    IF zone_no < 1 THEN
-        zone_no := 1;
-    ELSIF zone_no > 60 THEN
-        zone_no := 60;
-    END IF;
-    IF lat >= 0 THEN
-        RETURN 32600 + zone_no;
-    ELSE
-        RETURN 32700 + zone_no;
-    END IF;
-END;
-$$;
-"""
-
-_FARMS_GEOM_FN_ZONED = """
-CREATE OR REPLACE FUNCTION farms_geom_compute()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
     IF NEW.boundary IS NULL THEN
         RAISE EXCEPTION 'farms.boundary cannot be NULL';
     END IF;
     -- Derived once. On UPDATE the column already carries the farm's zone, so
     -- reshaping a farm never moves it between coordinate systems.
     IF NEW.utm_srid IS NULL THEN
-        NEW.utm_srid := utm_srid_for_geometry(NEW.boundary);
+        c := ST_Centroid(NEW.boundary);
+        lon := ST_X(c);
+        lat := ST_Y(c);
+        zone_no := floor((lon + 180.0) / 6.0)::INTEGER + 1;
+        IF zone_no < 1 THEN
+            zone_no := 1;
+        ELSIF zone_no > 60 THEN
+            zone_no := 60;
+        END IF;
+        IF lat >= 0 THEN
+            NEW.utm_srid := 32600 + zone_no;
+        ELSE
+            NEW.utm_srid := 32700 + zone_no;
+        END IF;
     END IF;
     NEW.boundary_utm := ST_Multi(ST_Transform(NEW.boundary, NEW.utm_srid));
     NEW.centroid := ST_Centroid(NEW.boundary);
@@ -113,17 +106,42 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
     farm_srid INTEGER;
+    c         geometry;
+    lon       DOUBLE PRECISION;
+    lat       DOUBLE PRECISION;
+    zone_no   INTEGER;
 BEGIN
     IF NEW.boundary IS NULL THEN
         RAISE EXCEPTION 'blocks.boundary cannot be NULL';
     END IF;
-    SELECT utm_srid INTO farm_srid FROM farms WHERE id = NEW.farm_id;
+    -- Qualified by the trigger's own schema, not left to the search_path.
+    -- Callers insert schema-qualified (`INSERT INTO "tenant_x".blocks ...`)
+    -- without putting that schema on the path, and a bare `FROM farms` then
+    -- fails with "relation does not exist". `format('%I', ...)` is safe: the
+    -- value comes from the trigger context, not from the row.
+    EXECUTE format('SELECT utm_srid FROM %I.farms WHERE id = $1', TG_TABLE_SCHEMA)
+       INTO farm_srid
+      USING NEW.farm_id;
     IF farm_srid IS NULL THEN
         -- No farm row for this farm_id. The foreign key rejects the row a
-        -- moment from now, so raising here would only replace that error
-        -- with a less useful one, and would hide any other constraint the
-        -- row also breaks. Fall back to the block's own centroid.
-        farm_srid := utm_srid_for_geometry(NEW.boundary);
+        -- moment from now, so raising here would only replace that error with
+        -- a less useful one, and would hide any other constraint the row also
+        -- breaks. Fall back to the block's own centroid, by the same rule
+        -- farms_geom_compute uses above.
+        c := ST_Centroid(NEW.boundary);
+        lon := ST_X(c);
+        lat := ST_Y(c);
+        zone_no := floor((lon + 180.0) / 6.0)::INTEGER + 1;
+        IF zone_no < 1 THEN
+            zone_no := 1;
+        ELSIF zone_no > 60 THEN
+            zone_no := 60;
+        END IF;
+        IF lat >= 0 THEN
+            farm_srid := 32600 + zone_no;
+        ELSE
+            farm_srid := 32700 + zone_no;
+        END IF;
     END IF;
     NEW.boundary_utm := ST_Transform(NEW.boundary, farm_srid);
     NEW.centroid := ST_Centroid(NEW.boundary);
@@ -183,8 +201,6 @@ $$;
 
 
 def upgrade() -> None:
-    op.execute(_UTM_SRID_FN)
-
     # Nullable first so the column can land before the backfill. The trigger
     # fills it on every insert from here on, so it ends NOT NULL.
     op.add_column("farms", sa.Column("utm_srid", sa.Integer(), nullable=True))
@@ -209,7 +225,7 @@ def upgrade() -> None:
         "ALTER COLUMN boundary_utm TYPE geometry(MultiPolygon) USING boundary_utm"
     )
     op.execute(
-        "ALTER TABLE blocks " "ALTER COLUMN boundary_utm TYPE geometry(Polygon) USING boundary_utm"
+        "ALTER TABLE blocks ALTER COLUMN boundary_utm TYPE geometry(Polygon) USING boundary_utm"
     )
 
     # Both functions in one migration on purpose. Replacing only one would
@@ -225,28 +241,19 @@ def downgrade() -> None:
     # Re-narrowing the type needs every row back in zone 36. For a farm
     # outside zone 36 this rewrites boundary_utm, area_m2 and aoi_hash, so its
     # stored imagery is orphaned. That is the cost of going back, and it is
-    # why this migration is one-way in practice.
+    # why this migration is one-way in practice. The restored triggers do the
+    # recompute; the UPDATE only has to touch the row.
     op.execute(
         """
         UPDATE farms
-           SET boundary_utm = ST_Multi(ST_Transform(boundary, 32636)),
-               area_m2      = ST_Area(ST_Transform(boundary, 32636)),
-               aoi_hash     = encode(
-                   digest(ST_AsText(ST_Multi(ST_Transform(boundary, 32636))), 'sha256'),
-                   'hex'
-               )
+           SET boundary_utm = ST_Multi(ST_Transform(boundary, 32636))
          WHERE ST_SRID(boundary_utm) <> 32636
         """
     )
     op.execute(
         """
         UPDATE blocks
-           SET boundary_utm = ST_Transform(boundary, 32636),
-               area_m2      = ST_Area(ST_Transform(boundary, 32636)),
-               aoi_hash     = encode(
-                   digest(ST_AsText(ST_Transform(boundary, 32636)), 'sha256'),
-                   'hex'
-               )
+           SET boundary_utm = ST_Transform(boundary, 32636)
          WHERE ST_SRID(boundary_utm) <> 32636
         """
     )
@@ -259,4 +266,3 @@ def downgrade() -> None:
         "ALTER COLUMN boundary_utm TYPE geometry(MultiPolygon, 32636) USING boundary_utm"
     )
     op.drop_column("farms", "utm_srid")
-    op.execute("DROP FUNCTION IF EXISTS utm_srid_for_geometry(geometry)")
