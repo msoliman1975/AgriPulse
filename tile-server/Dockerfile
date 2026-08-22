@@ -4,6 +4,8 @@
 #
 # Wraps the upstream TiTiler image and adds:
 #  - Our config overrides (CORS, max-zoom, S3 endpoint defaults).
+#  - Our own application module, which serves upstream's /cog endpoints
+#    plus the `cutline` algorithm (agripulse_tiles/cutline.py).
 #  - A non-root runtime user (matches K8s runAsNonRoot pod security).
 #  - A small health-only entrypoint shim.
 #
@@ -21,10 +23,28 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     VSI_CACHE=TRUE \
     VSI_CACHE_SIZE=536870912
 
-# Drop our config + entrypoint in. The upstream image already exposes
-# uvicorn at :8000; we only override env defaults.
+# The cutline reads one small GeoJSON object per farm from the same
+# bucket the rasters come from. GDAL reads rasters over its own /vsis3/
+# driver, which cannot hand a plain file back to Python, so the boundary
+# read needs an S3 client of its own. Upstream does not ship one.
+RUN pip install --no-cache-dir "boto3>=1.34,<2"
+
+# Drop our config + application + entrypoint in. The upstream image
+# already exposes uvicorn at :8000; we only override env defaults.
 COPY config/ /opt/agripulse/config/
+COPY agripulse_tiles/ /opt/agripulse/lib/agripulse_tiles/
 COPY scripts/healthcheck.sh /usr/local/bin/healthcheck.sh
+
+# `MODULE_NAME` is what the upstream image's gunicorn command imports.
+# Setting it here rather than in the Helm chart keeps the image and its
+# entrypoint in one piece: a rollback to an older tag restores the older
+# module with it, and no ordering between image and ConfigMap matters.
+#
+# The path points at `lib/`, which holds nothing but our package, so no
+# dependency's `import <common name>` can be answered by a file of ours.
+ENV PYTHONPATH=/opt/agripulse/lib \
+    MODULE_NAME=agripulse_tiles.main \
+    VARIABLE_NAME=app
 
 # Healthcheck script is invoked by the K8s probe and the local Dockerfile
 # HEALTHCHECK directive (handy for `docker compose` smokes).

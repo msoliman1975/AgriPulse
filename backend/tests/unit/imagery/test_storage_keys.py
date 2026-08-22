@@ -6,6 +6,7 @@ import pytest
 
 from app.modules.imagery.storage import (
     AssetKeyError,
+    aoi_boundary_key,
     build_asset_key,
     raw_bands_key,
 )
@@ -86,3 +87,19 @@ def test_band_or_index_must_be_lower_snake() -> None:
             aoi_hash=_VALID_AOI,
             band_or_index="NDVI",
         )
+
+
+def test_aoi_boundary_key_is_content_addressed() -> None:
+    """One outline per polygon, shared by every scene cut from it."""
+    assert aoi_boundary_key(aoi_hash=_VALID_AOI) == f"aoi/{_VALID_AOI}.geojson"
+
+
+@pytest.mark.parametrize("bad", ["", "abc", "has.dot", "has/slash", "x" * 129])
+def test_aoi_boundary_key_refuses_what_the_tile_server_would_refuse(bad: str) -> None:
+    """The writer's rule matches `AOI_RE` in the tile server's cutline.
+
+    A key accepted here but refused there would write an object nothing can
+    read, and the only symptom would be an uncut border.
+    """
+    with pytest.raises(AssetKeyError):
+        aoi_boundary_key(aoi_hash=bad)

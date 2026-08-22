@@ -199,6 +199,30 @@ jobs:
       - name: Build
         run: pnpm build
 
+  tile-server:
+    name: tile-server
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tile-server
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # Pinned to the versions the image's base carries (see Dockerfile),
+      # so the cutline is tested against the rio-tiler that renders it.
+      # boto3 is not installed here: the tests stand in for the boundary
+      # read, and the module imports boto3 only when it reaches storage.
+      - name: Install
+        run: pip install "titiler.core==0.21.1" "rio-tiler==7.4.0" pytest==8.3.4
+
+      - name: Test
+        run: python -m pytest tests -q
+
   helm:
     name: helm
     runs-on: ubuntu-24.04

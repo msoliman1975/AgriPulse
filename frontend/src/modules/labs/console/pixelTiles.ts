@@ -80,14 +80,52 @@ export function blockTileUrl(input: {
   /** A block asset or a whole-farm raster — only the prefix is read. */
   asset: { stac_item_id: string };
   code: ApiIndexCode;
+  /** Cut the tile to this AOI's boundary. See `cutlineParams`. */
+  cutlineAoi?: string | null;
 }): string {
   const params = new URLSearchParams({
     url: assetUri(input.s3Bucket, input.asset, input.code),
     colormap: titilerColormap(input.code),
     reproject: REPROJECT,
     tilesize: String(TILE_SIZE),
+    ...cutlineParams(input.cutlineAoi),
   });
   return `${trimTrailingSlash(input.tileServerBaseUrl)}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?${params.toString()}`;
+}
+
+/**
+ * Ask the tile server to cut what it renders to the farm's own outline.
+ *
+ * The stored raster is cut on its own 10 m pixel grid, so a pixel whose
+ * centre is inside the farm is kept whole and colour runs up to 5 m past the
+ * border — 15 m on the 30 m thermal product. `algorithm=cutline` cuts again
+ * on the grid of the image being returned, which is screen pixels, so the
+ * edge follows the boundary at any zoom.
+ *
+ * The boundary is looked up by AOI hash, which the pipeline writes as the
+ * last segment of `stac_item_id` and publishes as `aoi/<hash>.geojson` beside
+ * the rasters. A farm whose boundary is not published yet renders uncut, so
+ * this can never empty the map.
+ *
+ * Passed to `/cog/statistics` as well, so one rule cuts both the picture and
+ * the legend. Measured on a prod farm raster the areas do not move: the
+ * statistics are read at the raster's own resolution, where the stored mask
+ * already applied this rule. It is sent so the two cannot drift apart.
+ */
+export function cutlineParams(aoi: string | null | undefined): Record<string, string> {
+  return aoi ? { algorithm: "cutline", algorithm_params: JSON.stringify({ aoi }) } : {};
+}
+
+/**
+ * The AOI hash an asset was cut from — the last segment of its item id.
+ *
+ * `build_asset_key` (app/modules/imagery/storage.py) fixes that layout as
+ * `{provider}/{product}/{scene}/{aoi_hash}`, and `indexAssetKey` already
+ * depends on it.
+ */
+export function aoiHashFromStacItemId(stacItemId: string): string | null {
+  const last = stacItemId.split("/").pop();
+  return last && last.length >= 4 ? last : null;
 }
 
 /**
@@ -103,11 +141,14 @@ export function blockStatsUrl(input: {
   s3Bucket: string;
   asset: { stac_item_id: string };
   code: ApiIndexCode;
+  /** Count only the pixels inside this AOI's boundary. */
+  cutlineAoi?: string | null;
 }): string {
   const params = new URLSearchParams({
     url: assetUri(input.s3Bucket, input.asset, input.code),
     histogram_bins: histogramBins(input.code).join(","),
     max_size: "4096",
+    ...cutlineParams(input.cutlineAoi),
   });
   return `${trimTrailingSlash(input.tileServerBaseUrl)}/cog/statistics?${params.toString()}`;
 }

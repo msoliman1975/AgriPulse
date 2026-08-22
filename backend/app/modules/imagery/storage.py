@@ -22,6 +22,8 @@ import re
 # is a programmer error, not user input.
 _SAFE_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 _BAND_OR_INDEX_RE = re.compile(r"^[a-z0-9_]+$")
+# Mirrors `AOI_RE` in tile-server/agripulse_tiles/cutline.py.
+_AOI_HASH_RE = re.compile(r"^[A-Za-z0-9_-]{4,128}$")
 
 
 class AssetKeyError(ValueError):
@@ -55,6 +57,22 @@ def build_asset_key(
             f"band_or_index={band_or_index!r} contains characters outside [a-z0-9_]"
         )
     return f"{provider_code}/{product_code}/{scene_id}/{aoi_hash}/{band_or_index}.tif"
+
+
+def aoi_boundary_key(*, aoi_hash: str) -> str:
+    """Where the tile server looks for an AOI's outline.
+
+    One object per distinct polygon, outside the per-scene prefixes,
+    because every scene cut from that polygon shares one boundary.
+
+    The character class is narrower than `_SAFE_RE` on purpose: it has to
+    match what the tile server accepts in its `cutline` parameter, so a
+    key that would be refused there fails here instead of writing an
+    object nothing can read.
+    """
+    if not _AOI_HASH_RE.fullmatch(aoi_hash):
+        raise AssetKeyError(f"aoi_hash={aoi_hash!r} is not 4-128 chars of [A-Za-z0-9_-]")
+    return f"aoi/{aoi_hash}.geojson"
 
 
 def raw_bands_key(*, provider_code: str, product_code: str, scene_id: str, aoi_hash: str) -> str:

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { FarmSceneAsset } from "@/api/imagery";
 import { classesFor } from "./indexClasses";
 import {
+  aoiHashFromStacItemId,
   blockStatsUrl,
   blockTileUrl,
   indexAssetKey,
@@ -193,5 +194,43 @@ describe("summariseClassAreas", () => {
   it("falls back to masked pixels when the farm area is unknown", () => {
     expect(summariseClassAreas(counts, 3, null, null).noDataM2).toBe(200);
     expect(summariseClassAreas(counts, 3, null, 0).noDataM2).toBe(200);
+  });
+});
+
+describe("cutline", () => {
+  it("reads the AOI hash off the end of the item id", () => {
+    expect(aoiHashFromStacItemId(ASSET.stac_item_id)).toBe("aoihash");
+  });
+
+  it("has no hash to send when the item id carries no AOI segment", () => {
+    expect(aoiHashFromStacItemId("")).toBeNull();
+    expect(aoiHashFromStacItemId("abc")).toBeNull();
+  });
+
+  it("sends the cutline on both the tiles and the statistics", () => {
+    const tile = new URL(
+      blockTileUrl({ ...BASE, asset: ASSET, code: "ndvi", cutlineAoi: "aoihash" }).replace(
+        "{z}/{x}/{y}",
+        "0/0/0",
+      ),
+    ).searchParams;
+    const stats = new URL(
+      blockStatsUrl({ ...BASE, asset: ASSET, code: "ndvi", cutlineAoi: "aoihash" }),
+    ).searchParams;
+
+    // One rule cuts both. The areas do not move today, because statistics
+    // are read at the raster's own resolution — this keeps them tied.
+    for (const p of [tile, stats]) {
+      expect(p.get("algorithm")).toBe("cutline");
+      expect(JSON.parse(p.get("algorithm_params") as string)).toEqual({ aoi: "aoihash" });
+    }
+  });
+
+  it("sends nothing at all when there is no AOI to cut to", () => {
+    // A raster with no published boundary must render as it did before the
+    // cutline existed, rather than not at all.
+    const url = blockTileUrl({ ...BASE, asset: ASSET, code: "ndvi" });
+    expect(url).not.toContain("algorithm");
+    expect(blockStatsUrl({ ...BASE, asset: ASSET, code: "ndvi" })).not.toContain("algorithm");
   });
 });

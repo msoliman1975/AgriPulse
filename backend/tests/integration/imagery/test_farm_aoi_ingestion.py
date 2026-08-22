@@ -18,6 +18,7 @@ The provider and the rasterio reader are stubbed; the database is real.
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -322,6 +323,14 @@ async def test_an_acquired_pass_is_recorded_as_fetched_under_the_farm_hash(
         assert seen_hashes == [farm_hash]
         assert capture.uploads, "raw bands were never written"
         assert farm_hash in capture.uploads[0][0]
+
+        # The outline the tile server cuts this scene's tiles with, written
+        # beside the rasters under the same hash. Without it every tile is
+        # served uncut, which is only visible as colour outside the border.
+        boundaries = [u for u in capture.uploads if u[0] == f"aoi/{farm_hash}.geojson"]
+        assert len(boundaries) == 1
+        assert boundaries[0][2] == "application/geo+json"
+        assert json.loads(boundaries[0][1])["type"] in {"Polygon", "MultiPolygon"}
 
         # The fetch asked for the farm boundary, not a block's.
         assert len(provider.fetched_aois) == 1
