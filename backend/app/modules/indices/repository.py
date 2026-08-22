@@ -289,6 +289,33 @@ class IndicesRepository:
         )
         return int(cast("CursorResult[Any]", result).rowcount or 0)
 
+    async def list_distinct_block_index_pairs_for_farm(
+        self, *, farm_id: UUID
+    ) -> tuple[tuple[UUID, str], ...]:
+        """Every (block_id, index_code) combo on one farm's blocks.
+
+        The farm-scoped half of :meth:`list_distinct_block_index_pairs`, so a
+        backfill can refresh the farm it just touched without walking the
+        whole tenant. Deleted blocks are excluded; their aggregates are not
+        read anywhere.
+        """
+        rows = (
+            await self._session.execute(
+                text(
+                    """
+                    SELECT DISTINCT a.block_id, a.index_code
+                    FROM block_index_aggregates a
+                    JOIN blocks b ON b.id = a.block_id
+                    WHERE b.farm_id = :farm_id
+                      AND b.deleted_at IS NULL
+                      AND a.mean IS NOT NULL
+                    """
+                ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                {"farm_id": farm_id},
+            )
+        ).all()
+        return tuple((row.block_id, row.index_code) for row in rows)
+
     async def list_distinct_block_index_pairs(
         self,
     ) -> tuple[tuple[UUID, str], ...]:

@@ -126,6 +126,8 @@ async def _seed_block(
     *,
     block_id: UUID,
     farm_id: UUID,
+    farm_code: str = "PR4-FARM",
+    block_code: str = "B-PR4",
 ) -> None:
     """Insert a minimal block + farm row directly via SQL.
 
@@ -137,19 +139,19 @@ async def _seed_block(
     await admin_session.execute(
         text(
             "INSERT INTO farms (id, code, name, boundary, boundary_utm, centroid, area_m2) "
-            "VALUES (:fid, 'PR4-FARM', 'PR-4 Farm', "
+            "VALUES (:fid, :farm_code, 'PR-4 Farm', "
             "        'SRID=4326;MULTIPOLYGON(((31.2 30.1, 31.21 30.1, 31.21 30.11, 31.2 30.11, 31.2 30.1)))'::geometry, "
             "        'SRID=32636;MULTIPOLYGON(((0 0, 1 0, 1 1, 0 1, 0 0)))'::geometry, "
             "        'SRID=4326;POINT(31.205 30.105)'::geometry, "
             "        100)"
         ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True))),
-        {"fid": farm_id},
+        {"fid": farm_id, "farm_code": farm_code},
     )
     await admin_session.execute(
         text(
             "INSERT INTO blocks (id, farm_id, code, boundary, boundary_utm, centroid, area_m2, "
             "                    aoi_hash, unit_type) "
-            "VALUES (:bid, :fid, 'B-PR4', "
+            "VALUES (:bid, :fid, :block_code, "
             "        'SRID=4326;POLYGON((31.2 30.1, 31.21 30.1, 31.21 30.11, 31.2 30.11, 31.2 30.1))'::geometry, "
             "        'SRID=32636;POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))'::geometry, "
             "        'SRID=4326;POINT(31.205 30.105)'::geometry, "
@@ -158,7 +160,7 @@ async def _seed_block(
             bindparam("bid", type_=PG_UUID(as_uuid=True)),
             bindparam("fid", type_=PG_UUID(as_uuid=True)),
         ),
-        {"bid": block_id, "fid": farm_id},
+        {"bid": block_id, "fid": farm_id, "block_code": block_code},
     )
     await admin_session.commit()
 
@@ -616,3 +618,105 @@ async def test_tenant_sweep_task_fills_deviations(
 
     after = await _deviations(admin_session, tenant.schema_name, block_id=block_id)
     assert all(v is not None for v in after.values()), after
+
+
+# ---------------------------------------------------------------------------
+# Integration: the farm-scoped task a backfill queues
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_farm_task_fills_one_farm_and_leaves_the_other_alone(
+    admin_session: AsyncSession,
+) -> None:
+    """`indices.recompute_baselines_for_farm` must not reach past its farm.
+
+    A backfill is per farm. If the farm-scoped task walked every pair in the
+    tenant it would cost the same as the hourly sweep, which measured 420s for
+    828 pairs on production.
+    """
+    from app.modules.indices import tasks as indices_tasks
+
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug="dev-rederive-farm",
+        name="Deviation Re-derive Farm",
+        contact_email="ops@dev-rederive-farm.test",
+    )
+    product_id = uuid4()
+
+    target_farm, target_block = uuid4(), uuid4()
+    other_farm, other_block = uuid4(), uuid4()
+    await _seed_block(admin_session, tenant.schema_name, block_id=target_block, farm_id=target_farm)
+    await _seed_block(
+        admin_session,
+        tenant.schema_name,
+        block_id=other_block,
+        farm_id=other_farm,
+        farm_code="PR4-FARM-2",
+        block_code="B-PR4-2",
+    )
+
+    history = [
+        (datetime(2023, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.60")),
+        (datetime(2024, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.62")),
+        (datetime(2025, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.58")),
+    ]
+    for block in (target_block, other_block):
+        await _seed_aggregate_history(
+            admin_session,
+            tenant.schema_name,
+            block_id=block,
+            product_id=product_id,
+            rows=history,
+        )
+
+    out = await indices_tasks._recompute_baselines_for_farm_async(
+        str(target_farm), tenant.schema_name
+    )
+    assert out["pairs_processed"] == 1, out
+    assert out["deviations_updated"] == 3, out
+
+    filled = await _deviations(admin_session, tenant.schema_name, block_id=target_block)
+    assert all(v is not None for v in filled.values()), filled
+
+    untouched = await _deviations(admin_session, tenant.schema_name, block_id=other_block)
+    assert list(untouched.values()) == [None, None, None], untouched
+
+
+@pytest.mark.asyncio
+async def test_farm_task_ignores_a_deleted_block(
+    admin_session: AsyncSession,
+) -> None:
+    """A soft-deleted block's aggregates are read nowhere, so skip them."""
+    from app.modules.indices import tasks as indices_tasks
+
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug="dev-rederive-deleted",
+        name="Deviation Re-derive Deleted",
+        contact_email="ops@dev-rederive-deleted.test",
+    )
+    farm_id, block_id, product_id = uuid4(), uuid4(), uuid4()
+    await _seed_block(admin_session, tenant.schema_name, block_id=block_id, farm_id=farm_id)
+    await _seed_aggregate_history(
+        admin_session,
+        tenant.schema_name,
+        block_id=block_id,
+        product_id=product_id,
+        rows=[
+            (datetime(2023, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.60")),
+            (datetime(2024, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.62")),
+            (datetime(2025, 1, 15, 12, 0, tzinfo=UTC), Decimal("0.58")),
+        ],
+    )
+    await admin_session.execute(
+        text(
+            f'UPDATE "{tenant.schema_name}".blocks SET deleted_at = now() WHERE id = :bid'
+        ).bindparams(bindparam("bid", type_=PG_UUID(as_uuid=True))),
+        {"bid": block_id},
+    )
+    await admin_session.commit()
+
+    out = await indices_tasks._recompute_baselines_for_farm_async(str(farm_id), tenant.schema_name)
+    assert out["pairs_processed"] == 0, out
