@@ -23,6 +23,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -150,9 +151,14 @@ async def _existing_farms_in_schema(
     """
     if not farm_ids:
         return set()
+    # `ANY(:ids)` needs an ARRAY-typed bind. `expanding=True` is for
+    # `IN :ids`; against ANY it renders `ANY($1::UUID)`, a scalar on the
+    # right-hand side, and Postgres answers "op ANY/ALL (array) requires
+    # array on right side". This task therefore raised on the first tenant
+    # that had any farm scopes at all, on every run since it was written.
     stmt = text(
         f"SELECT id FROM {schema}.farms "  # noqa: S608  -- schema is sanitized
         "WHERE deleted_at IS NULL AND id = ANY(:ids)"
-    ).bindparams(bindparam("ids", type_=PG_UUID(as_uuid=True), expanding=True))
+    ).bindparams(bindparam("ids", type_=ARRAY(PG_UUID(as_uuid=True))))
     rows = (await session.execute(stmt, {"ids": farm_ids})).all()
     return {r.id for r in rows}
