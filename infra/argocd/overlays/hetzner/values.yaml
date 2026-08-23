@@ -2642,11 +2642,49 @@ global:
   #   No migrations.
   #   Rollback is these two tags back to 3dc25cf. Nothing to unwind: the task
   #   is additive and the data it writes is correct either way.
+  # ee2cd41 = #561, the three problems on the Platform alerts page.
+  #   CARRIES TENANT MIGRATION 0083. It adds `attempts` to both imagery job
+  #   tables and one partial index on the farm table. Additive only; it runs
+  #   on the api PreSync for every tenant.
+  #   (1) Seven imagery jobs sat in `running` in agrosina, the oldest 575
+  #     hours. A worker killed between `mark_running` and the terminal write
+  #     leaves a row nothing can reach: re-discovery hits ON CONFLICT DO
+  #     NOTHING, the re-dispatch query reads only `status = 'pending'`, and
+  #     `acquire_scene` no-ops on anything that is not `pending`. The scene
+  #     is then lost for that block. Checked on prod: 3 of the 7 blocks had
+  #     0 index rows for their scene day while 35 sibling blocks on the same
+  #     farm had a full set. New Beat sweep `imagery.reap_stuck_jobs`, every
+  #     10 minutes on the light queue, returns those rows to `pending` and
+  #     dispatches them again, capped at 3 attempts by the new column.
+  #     EXPECT THE 7 ROWS TO MOVE within 10 minutes of the workers rolling.
+  #   (2) `indices.recompute_baselines_for_tenant` deadlocked against the
+  #     TimescaleDB columnstore policy (job 1161, every 12h) on a chunk of
+  #     `block_index_aggregates`, and the exception escaped
+  #     `_recompute_pairs`, so every pair after it was skipped. 828 pairs at
+  #     about 420s per run against a 12-hourly policy is a regular meeting.
+  #     The loop now retries a pair on SQLSTATE 40001/40P01 and charges any
+  #     other error to that pair alone.
+  #   (3) `stream_silent` read `last_successful_ingest_at`, which is stamped
+  #     when a poll QUEUES work and is never written by a backfill. Mango
+  #     Republic had 216 succeeded optical and 217 succeeded thermal jobs,
+  #     newest 29h old, and the column was NULL, so the page said the farm
+  #     had never worked. It now reads `max(completed_at)` from the jobs, on
+  #     both the block path and the farm path. The new query was run
+  #     read-only on prod first: 53.750 ms on the largest tenant, the two
+  #     false alarms go, and no real staleness is hidden.
+  #   API AND WORKERS ONLY for the code in #561 -- it is backend-only. This
+  #   range also carries #559's `admins_router` / `admins_service` change,
+  #   whose frontend half is NOT taken here; frontend stays 3dc25cf and
+  #   tile-server stays 676746a, unchanged since 676746a.
+  #   Rollback is these two tags back to d4512a8. 0083 has a downgrade but
+  #   leaving it applied is harmless: the old code never reads `attempts`.
+  #   Rolling back does NOT re-strand any job the reaper has already fixed.
+  #   Image CONFIRMED by pulling on the node: api:ee2cd41 @ sha256:5a3a1d83.
   images:
     api:
-      tag: "d4512a8"
+      tag: "ee2cd41"
     workers:
-      tag: "d4512a8"
+      tag: "ee2cd41"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
