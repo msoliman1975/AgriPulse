@@ -6,22 +6,48 @@
 # NDVI, so NDVI flattens and hides chlorophyll/N variation. NDRE penetrates
 # deeper and stays sensitive to medium-high chlorophyll — the right index
 # for late-season / post-harvest nitrogen decisions in tree crops.
+#
+# v2 SPLITS THE THRESHOLD BY TREE SIZE. Until now the rule compared every
+# mango block against one NDRE floor of 0.30. The mango index guide
+# (tatoo Docs/AgriPulse_Mango_Indices_Full_EN.xlsx, 10 m column) gives the
+# expected NDRE band per tree size:
+#
+#   small   0.08–0.18
+#   medium  0.18–0.30
+#   large   0.38–0.52
+#
+# So the single 0.30 floor was wrong in both directions at once. It sits
+# ABOVE the entire normal band for a small tree and above almost all of a
+# medium tree's band, so every young orchard was flagged nitrogen-deficient
+# on every post-harvest scene; and it sits BELOW the whole normal band for a
+# large tree, so a big block could drop from 0.45 to 0.31 — a real loss of
+# canopy nitrogen — and never be flagged. Same mixed-pixel cause as the other
+# size-aware rules: a small tree's pixel is mostly bare soil.
+#
+# The floors are the lower bound of each size's band, so the rule now fires
+# when a block falls out of the range expected for its own size.
+#
+# Needs the block's Tree size attribute (`tree_size_class`). With it unset
+# the rule reaches a no-action leaf that says so rather than guessing.
 
 code: mango_post_harvest_nitrogen_v1
 name_en: Mango — post-harvest nitrogen / chlorophyll deficiency
 name_ar: المانجو — نقص النيتروجين/الكلوروفيل بعد الحصاد
 description_en: >-
-  During the post-harvest flush, a low NDRE indicates weak canopy
-  chlorophyll / nitrogen status just when the tree is rebuilding reserves
-  for the next season. Warns so the grower can act on post-harvest
-  fertilization. NDRE is used because mango's dense canopy saturates NDVI.
+  During the post-harvest flush, an NDRE below the range expected for this
+  tree size indicates weak canopy chlorophyll / nitrogen status just when the
+  tree is rebuilding reserves for the next season. Warns so the grower can
+  act on post-harvest fertilization. NDRE is used because mango's dense
+  canopy saturates NDVI. Needs the block's Tree size attribute to be set.
 description_ar: >-
-  خلال النمو بعد الحصاد، يشير انخفاض NDRE إلى ضعف الكلوروفيل/النيتروجين في
-  المجموع الخضري في وقت تبني فيه الشجرة احتياطيها للموسم القادم. يُحذّر
-  ليتصرّف المزارع بالتسميد بعد الحصاد. يُستخدم NDRE لأن كثافة مجموع المانجو
-  تُشبع NDVI.
+  خلال النمو بعد الحصاد، يشير NDRE دون النطاق المتوقع لهذا حجم الأشجار إلى
+  ضعف الكلوروفيل/النيتروجين في المجموع الخضري في وقت تبني فيه الشجرة
+  احتياطيها للموسم القادم. يُحذّر ليتصرّف المزارع بالتسميد بعد الحصاد.
+  يُستخدم NDRE لأن كثافة مجموع المانجو تُشبع NDVI. يحتاج ضبط خاصية حجم
+  الشجرة على القطعة.
 
 crop_path: mango
+country_codes: [EG]
 applicable_regions: []
 
 evidence:
@@ -31,8 +57,10 @@ evidence:
     it loses sensitivity to chlorophyll/N in mango. NDRE's red-edge band
     penetrates deeper and stays sensitive to medium-high chlorophyll,
     making it the standard index for late-season nitrogen mapping in
-    orchards. Absolute NDRE thresholds are cultivar/site dependent — tune
-    per tenant; the default is a conservative low-chlorophyll cutoff.
+    orchards — that part is well supported. The per-size floors come from
+    the AgriPulse mango index guide, which rates NDRE Medium-High but states
+    that no published study measures these bands for these varieties. They
+    are therefore tunable parameters and the tree's confidence stays medium.
   citations:
     - source_type: remote_sensing
       title: "EOS — NDVI vs NDRE: saturation and red-edge sensitivity"
@@ -42,21 +70,41 @@ evidence:
       title: "Aerobotics — NDRE vs NDVI for dense tree canopies"
       url: https://blog.aerobotics.com/ndre-vs-ndvi-whats-the-difference
       year: 2022
+    - source_type: remote_sensing
+      title: >-
+        AgriPulse — Comprehensive Satellite Vegetation-Index Guide for Mango
+        Farms (10 m column, NDRE rows)
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
 
 transferability:
   egypt: high
-  middle_east: high
-  global: high
+  middle_east: medium
+  global: low
 
 parameters:
-  low_ndre:
+  small_ndre_floor:
     type: number
-    default: 0.30
+    default: 0.08
     min: -1.0
     max: 1.0
     description: >-
-      NDRE mean below which canopy chlorophyll/nitrogen is considered
-      deficient during the post-harvest flush.
+      NDRE mean below which a SMALL-tree mango block reads deficient during
+      the post-harvest flush (index-guide band 0.08–0.18 at 10 m).
+  medium_ndre_floor:
+    type: number
+    default: 0.18
+    min: -1.0
+    max: 1.0
+    description: >-
+      NDRE floor for a MEDIUM-tree block (index-guide band 0.18–0.30 at 10 m).
+  large_ndre_floor:
+    type: number
+    default: 0.38
+    min: -1.0
+    max: 1.0
+    description: >-
+      NDRE floor for a LARGE-tree block (index-guide band 0.38–0.52 at 10 m).
 
 root: root
 nodes:
@@ -70,12 +118,54 @@ nodes:
           source: block
           field: growth_stage
         right: post_harvest_flush
-    on_match: ndre_check
+    on_match: size_small
     on_miss: leaf_no_action
 
-  ndre_check:
-    label_en: Is canopy NDRE below the deficiency threshold?
-    label_ar: هل NDRE للمجموع أقل من عتبة النقص؟
+  size_small:
+    label_en: Are the trees in the small size class?
+    label_ar: هل الأشجار في فئة الحجم الصغير؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: small
+    on_match: small_ndre
+    on_miss: size_medium
+
+  size_medium:
+    label_en: Are the trees in the medium size class?
+    label_ar: هل الأشجار في فئة الحجم المتوسط؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: medium
+    on_match: medium_ndre
+    on_miss: size_large
+
+  size_large:
+    label_en: Are the trees in the large size class?
+    label_ar: هل الأشجار في فئة الحجم الكبير؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: large
+    on_match: large_ndre
+    on_miss: leaf_size_unknown
+
+  small_ndre:
+    label_en: Is NDRE below the small-tree floor?
+    label_ar: هل NDRE دون حدّ الشجرة الصغيرة؟
     condition:
       tree:
         op: lt
@@ -85,7 +175,39 @@ nodes:
           key: mean
         right:
           source: params
-          name: low_ndre
+          name: small_ndre_floor
+    on_match: leaf_warn
+    on_miss: leaf_no_action
+
+  medium_ndre:
+    label_en: Is NDRE below the medium-tree floor?
+    label_ar: هل NDRE دون حدّ الشجرة المتوسطة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndre
+          key: mean
+        right:
+          source: params
+          name: medium_ndre_floor
+    on_match: leaf_warn
+    on_miss: leaf_no_action
+
+  large_ndre:
+    label_en: Is NDRE below the large-tree floor?
+    label_ar: هل NDRE دون حدّ الشجرة الكبيرة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndre
+          key: mean
+        right:
+          source: params
+          name: large_ndre_floor
     on_match: leaf_warn
     on_miss: leaf_no_action
 
@@ -100,16 +222,16 @@ nodes:
       parameters:
         priority: medium
       text_en: >-
-        Canopy NDRE is low during the post-harvest flush, suggesting weak
-        chlorophyll / nitrogen status while the tree rebuilds reserves.
-        Review the post-harvest fertilization program and confirm with
-        leaf analysis. (NDRE is used because mango's dense canopy
-        saturates NDVI.)
+        Canopy NDRE is below the range expected for this tree size during the
+        post-harvest flush, suggesting weak chlorophyll / nitrogen status
+        while the tree rebuilds reserves. Review the post-harvest
+        fertilization program and confirm with leaf analysis. (NDRE is used
+        because mango's dense canopy saturates NDVI.)
       text_ar: >-
-        NDRE للمجموع منخفض خلال النمو بعد الحصاد، ما يشير لضعف
-        الكلوروفيل/النيتروجين بينما تبني الشجرة احتياطيها. راجع برنامج
-        التسميد بعد الحصاد وأكّد بتحليل الأوراق. (يُستخدم NDRE لأن كثافة
-        مجموع المانجو تُشبع NDVI.)
+        NDRE للمجموع دون النطاق المتوقع لهذا حجم الأشجار خلال النمو بعد
+        الحصاد، ما يشير لضعف الكلوروفيل/النيتروجين بينما تبني الشجرة
+        احتياطيها. راجع برنامج التسميد بعد الحصاد وأكّد بتحليل الأوراق.
+        (يُستخدم NDRE لأن كثافة مجموع المانجو تُشبع NDVI.)
       actions:
         immediate:
           - text_en: Confirm with a leaf-tissue nitrogen analysis on affected trees.
@@ -124,6 +246,21 @@ nodes:
         monitoring:
           - text_en: Re-check NDRE 2–3 weeks after fertilization to confirm recovery.
             text_ar: أعد فحص NDRE بعد 2–3 أسابيع من التسميد لتأكيد التعافي.
+
+  leaf_size_unknown:
+    label_en: No action — tree size not recorded, so no range to compare against
+    label_ar: لا إجراء — حجم الشجرة غير مسجّل، فلا يوجد نطاق للمقارنة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        This rule needs the block's Tree size attribute. Set it on the crop
+        assignment and the rule will start running.
+      text_ar: >-
+        تحتاج هذه القاعدة خاصية حجم الشجرة للقطعة. اضبطها على تخصيص المحصول
+        لتبدأ القاعدة في العمل.
 
   leaf_no_action:
     label_en: No action — NDRE adequate or not post-harvest
