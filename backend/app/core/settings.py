@@ -418,6 +418,29 @@ class Settings(BaseSettings):
     # overrides the discovery window explicitly and ignores this floor.
     imagery_backfill_floor_days: int = 90
 
+    # --- Stuck-job reaper -------------------------------------------------
+    # `imagery.reap_stuck_jobs` returns jobs left in a non-terminal state to
+    # `pending` and dispatches them again. A worker killed between
+    # `mark_running` and the terminal write leaves a row nothing else can
+    # reach, so without this the scene is lost for that block for good.
+    #
+    # This matches `platform_alert_stuck_job_hours` on purpose. The alert and
+    # the recovery should agree on what "stuck" means: if they differ, the
+    # page shows a problem that is already being fixed, or the fix runs on
+    # rows the page calls healthy.
+    imagery_stuck_job_reap_hours: int = 6
+
+    # How many times the reaper may reset one job before it gives up and
+    # marks it `failed` with `error_code = 'stuck_no_progress'`. Without a
+    # cap, a job that can never succeed is reset every sweep for ever. Three
+    # attempts covers a worker restart and a redeploy landing on the same job.
+    imagery_stuck_job_max_attempts: int = 3
+
+    # Cadence for `imagery.reap_stuck_jobs`. 10 minutes matches
+    # `platform_alert_sweep_seconds`, so a reaped job clears its alert on the
+    # next sweep rather than a cycle later.
+    imagery_reap_stuck_jobs_seconds: int = 600
+
     # Native ground sample distance (metres) requested from the provider's
     # Process API per scene. The fetch payload previously omitted output
     # resolution, so Sentinel Hub defaulted to a fixed 256x256 grid — every

@@ -30,6 +30,7 @@ from uuid import UUID
 
 from celery import shared_task
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 
 from app.core.logging import get_logger
 from app.modules.indices.service import get_indices_service
@@ -101,6 +102,30 @@ async def _recompute_baselines_for_tenant_async(tenant_schema: str) -> dict[str,
     return counts
 
 
+# Postgres SQLSTATEs that mean "this transaction lost a race and can be run
+# again unchanged": 40001 serialization_failure, 40P01 deadlock_detected.
+_RETRYABLE_SQLSTATES = frozenset({"40001", "40P01"})
+
+# Attempts per pair, and the wait before each retry. The pair is retried
+# `_PAIR_ATTEMPTS - 1` times, so at most 1.5s is added to a pair that keeps
+# losing. No jitter: the contending party is a TimescaleDB policy job on a
+# fixed schedule, not another copy of this loop, so spreading retries out
+# buys nothing.
+_PAIR_ATTEMPTS = 3
+_RETRY_BASE_SECONDS = 0.5
+
+
+def _is_retryable_conflict(exc: DBAPIError) -> bool:
+    """True for a deadlock or serialization failure.
+
+    Read off SQLSTATE rather than the driver's exception class. asyncpg,
+    psycopg and the SQLAlchemy wrapper all name these differently, and the
+    production failure arrived wrapped twice — as a
+    `sqlalchemy.dialects.postgresql.asyncpg.Error` inside a `DBAPIError`.
+    """
+    return getattr(exc.orig, "sqlstate", None) in _RETRYABLE_SQLSTATES
+
+
 async def _recompute_pairs(tenant_schema: str, pairs: tuple[Any, ...]) -> dict[str, int]:
     """Recompute baselines, then re-derive deviations, for each pair.
 
@@ -108,31 +133,82 @@ async def _recompute_pairs(tenant_schema: str, pairs: tuple[Any, ...]) -> dict[s
     transaction open, and one bad pair cannot lose the counters of the ones
     before it. Shared by the tenant-wide sweep and the farm-scoped task a
     backfill queues.
+
+    That second promise needed the error handling below to be true. Until
+    2026-08-23 an exception from any pair escaped and killed the whole run,
+    so every pair after it was skipped. Production hit that: this task's
+    UPDATE on `block_index_aggregates` deadlocked against the TimescaleDB
+    columnstore policy converting the same chunk, and the sweep stopped at
+    that pair. The sweep walks 828 pairs in about 420 seconds on the largest
+    tenant, and the policy runs every 12 hours, so the two meet regularly.
+
+    A deadlock is retried, because re-running the pair is the documented cure
+    and the statement is safe to run more than once. Any other error is
+    counted and skipped, so one broken pair costs one pair.
     """
     factory = AsyncSessionLocal()
     written_total = 0
     deviations_total = 0
     pairs_processed = 0
+    pairs_failed = 0
+    conflict_retries = 0
     for block_id, index_code in pairs:
-        async with factory() as session, session.begin():
-            await _set_tenant_context(session, tenant_schema)
-            svc = get_indices_service(tenant_session=session)
-            written = await svc.recompute_block_index_baselines(
-                block_id=block_id, index_code=index_code
-            )
-            # Push the fresh baselines back onto the rows already stored.
-            # `record_aggregate_row` derives the z-score once, at write
-            # time, so a row written before its day-of-year had enough
-            # samples keeps NULL until this runs. Same catch-up the
-            # weather sweep already does for `weather_index_daily`.
-            deviations = await svc.recompute_block_index_deviations(
-                block_id=block_id, index_code=index_code
-            )
-        written_total += written
-        deviations_total += deviations
-        pairs_processed += 1
+        for attempt in range(1, _PAIR_ATTEMPTS + 1):
+            try:
+                async with factory() as session, session.begin():
+                    await _set_tenant_context(session, tenant_schema)
+                    svc = get_indices_service(tenant_session=session)
+                    written = await svc.recompute_block_index_baselines(
+                        block_id=block_id, index_code=index_code
+                    )
+                    # Push the fresh baselines back onto the rows already
+                    # stored. `record_aggregate_row` derives the z-score once,
+                    # at write time, so a row written before its day-of-year
+                    # had enough samples keeps NULL until this runs. Same
+                    # catch-up the weather sweep already does for
+                    # `weather_index_daily`.
+                    deviations = await svc.recompute_block_index_deviations(
+                        block_id=block_id, index_code=index_code
+                    )
+            except DBAPIError as exc:
+                if _is_retryable_conflict(exc) and attempt < _PAIR_ATTEMPTS:
+                    conflict_retries += 1
+                    _log.warning(
+                        "indices_baseline_pair_conflict_retry",
+                        tenant_schema=tenant_schema,
+                        block_id=str(block_id),
+                        index_code=index_code,
+                        attempt=attempt,
+                    )
+                    await asyncio.sleep(_RETRY_BASE_SECONDS * attempt)
+                    continue
+                pairs_failed += 1
+                _log.exception(
+                    "indices_baseline_pair_failed",
+                    tenant_schema=tenant_schema,
+                    block_id=str(block_id),
+                    index_code=index_code,
+                    attempts=attempt,
+                )
+                break
+            except Exception:
+                pairs_failed += 1
+                _log.exception(
+                    "indices_baseline_pair_failed",
+                    tenant_schema=tenant_schema,
+                    block_id=str(block_id),
+                    index_code=index_code,
+                    attempts=attempt,
+                )
+                break
+            written_total += written
+            deviations_total += deviations
+            pairs_processed += 1
+            break
     return {
         "pairs_processed": pairs_processed,
+        "pairs_failed": pairs_failed,
+        "conflict_retries": conflict_retries,
         "baselines_written": written_total,
         "deviations_updated": deviations_total,
     }

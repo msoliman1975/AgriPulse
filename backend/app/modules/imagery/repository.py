@@ -1898,6 +1898,99 @@ class ImageryRepository:
             "utm_srid": int(row["utm_srid"]),
         }
 
+    # ---- Stuck-job recovery ------------------------------------------------
+    #
+    # A job whose worker dies between `mark_running` and the terminal write
+    # stays non-terminal for ever. Nothing else recovers it: re-discovery
+    # cannot re-create the row (ON CONFLICT DO NOTHING on
+    # (subscription_id, scene_id)), the re-dispatch query reads only
+    # `status = 'pending'`, and `acquire_scene` no-ops on any job that is not
+    # `pending`. So the row must be moved back to `pending` by hand, which is
+    # what these two methods do.
+    #
+    # Both take the same shape, because both job tables have the same
+    # problem. The farm table is not a copy for its own sake: thermal has no
+    # block-path rows at all, so a block-only reaper would leave every
+    # thermal job unprotected.
+
+    async def fail_exhausted_stuck_jobs(
+        self,
+        *,
+        stuck_hours: int,
+        max_attempts: int,
+        farm_path: bool,
+    ) -> int:
+        """Mark stuck jobs that have used up their resets as failed.
+
+        Without this a job that can never succeed is reset on every sweep for
+        ever. `error_code` is `stuck_no_progress` so the failure-streak
+        detector can see it; a job silently parked in `pending` would be
+        invisible to every detector we have.
+        """
+        table = "imagery_farm_ingestion_jobs" if farm_path else "imagery_ingestion_jobs"
+        result = await self._session.execute(
+            text(
+                f"""
+                UPDATE {table}
+                   SET status = 'failed',
+                       completed_at = now(),
+                       error_message =
+                           'reaped after ' || attempts ||
+                           ' attempt(s) with no terminal status',
+                       error_code = 'stuck_no_progress'
+                 WHERE status IN ('pending', 'running', 'requested')
+                   AND requested_at < now() - make_interval(hours => :stuck_hours)
+                   AND attempts >= :max_attempts
+                """  # noqa: S608 - `table` is one of two literals
+            ),
+            {"stuck_hours": stuck_hours, "max_attempts": max_attempts},
+        )
+        # Same shape as `reset_ingest_watermarks` earlier in this file:
+        # SQLAlchemy 2.x only defines `rowcount` on a DML result.
+        return int(getattr(result, "rowcount", 0) or 0)
+
+    async def reset_stuck_jobs(
+        self,
+        *,
+        stuck_hours: int,
+        max_attempts: int,
+        farm_path: bool,
+    ) -> tuple[UUID, ...]:
+        """Return stuck jobs to `pending` and return their ids to re-dispatch.
+
+        `started_at` and the previous error are cleared so the retried run
+        reads like a first run rather than carrying a half-finished one's
+        state. `attempts` is incremented in the same statement, so a crash
+        between the reset and the dispatch still costs the job one attempt
+        and cannot loop.
+
+        Call `fail_exhausted_stuck_jobs` first. The two predicates are
+        disjoint on `attempts`, so the order only decides whether a job that
+        crosses the limit this sweep is failed now or on the next one.
+        """
+        table = "imagery_farm_ingestion_jobs" if farm_path else "imagery_ingestion_jobs"
+        rows = (
+            await self._session.execute(
+                text(
+                    f"""
+                    UPDATE {table}
+                       SET status = 'pending',
+                           attempts = attempts + 1,
+                           started_at = NULL,
+                           completed_at = NULL,
+                           error_message = NULL,
+                           error_code = NULL
+                     WHERE status IN ('pending', 'running', 'requested')
+                       AND requested_at < now() - make_interval(hours => :stuck_hours)
+                       AND attempts < :max_attempts
+                    RETURNING id
+                    """  # noqa: S608 - `table` is one of two literals
+                ),
+                {"stuck_hours": stuck_hours, "max_attempts": max_attempts},
+            )
+        ).all()
+        return tuple(UUID(str(r[0])) for r in rows)
+
 
 # ---- Row → dict projections ----------------------------------------------
 
