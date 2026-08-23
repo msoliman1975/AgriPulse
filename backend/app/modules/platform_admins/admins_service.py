@@ -31,6 +31,15 @@ class PlatformAdminNotFoundError(LookupError):
     pass
 
 
+class PlatformAdminProvisioningError(RuntimeError):
+    """Keycloak refused the (re)provisioning call.
+
+    Distinct from the invite path, which degrades to `pending` and lets
+    the UI show a warning. A retry is an explicit "fix this row" action,
+    so a failure has to surface the Keycloak reason to the operator.
+    """
+
+
 class PlatformAdminsRoleService:
     """List/invite/remove platform admins.
 
@@ -168,6 +177,26 @@ class PlatformAdminsRoleService:
                     error=str(exc),
                 )
                 provisioning_status = "pending"
+        else:
+            # The global user row exists but carries a `pending::` stub
+            # subject — an earlier invite reached the DB and never reached
+            # Keycloak. Retry the create, otherwise the row stays pending
+            # for ever and the user can never sign in.
+            try:
+                invite_result = await self._kc.invite_platform_admin(
+                    email=email, full_name=full_name, role=role
+                )
+                kc_subject = invite_result.keycloak_user_id
+                keycloak_email_sent = invite_result.email_sent
+                temporary_password = invite_result.temporary_password
+                provisioning_status = "succeeded"
+            except KeycloakError as exc:
+                self._log.warning(
+                    "platform_admin_invite_keycloak_retry_failed",
+                    email=email,
+                    error=str(exc),
+                )
+                provisioning_status = "pending"
 
         # Upsert the public.users row.
         if global_user is None:
@@ -194,6 +223,20 @@ class PlatformAdminsRoleService:
             )
         else:
             user_id = global_user.id
+            if provisioning_status == "succeeded" and kc_subject != global_user.keycloak_subject:
+                await self._public.execute(
+                    text(
+                        """
+                        UPDATE public.users
+                        SET keycloak_subject = :sub, updated_by = :actor
+                        WHERE id = :uid
+                        """
+                    ).bindparams(
+                        bindparam("uid", type_=PG_UUID(as_uuid=True)),
+                        bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {"sub": kc_subject, "uid": user_id, "actor": actor_user_id},
+                )
 
         # Insert the role assignment. Partial-unique index makes
         # re-invites safe — a UniqueViolation here means the role was
@@ -240,6 +283,101 @@ class PlatformAdminsRoleService:
             "user_id": user_id,
             "keycloak_subject": kc_subject,
             "keycloak_provisioning": provisioning_status,
+            "keycloak_email_sent": keycloak_email_sent,
+            "temporary_password": temporary_password,
+            "role": role,
+        }
+
+    async def retry_provisioning(
+        self,
+        *,
+        user_id: UUID,
+        role: str,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Re-run Keycloak provisioning for an admin stuck at `pending`.
+
+        `invite_admin` degrades to `pending` when Keycloak is unreachable
+        or misconfigured (for example the `agripulse-tenancy` client
+        secret drifting from the one the api holds). Without this the row
+        keeps its `pending::<email>` stub subject for ever: re-inviting
+        the same person hits the 409 "already a platform admin" branch,
+        so nothing ever retries and the person can never sign in.
+        """
+        if role not in ("PlatformAdmin", "PlatformSupport"):
+            raise ValueError(f"Invalid platform role: {role!r}")
+
+        row = (
+            await self._public.execute(
+                text(
+                    """
+                    SELECT u.id AS user_id,
+                           u.email::text AS email,
+                           u.full_name,
+                           u.keycloak_subject
+                    FROM public.platform_role_assignments pra
+                    JOIN public.users u ON u.id = pra.user_id
+                    WHERE pra.user_id = :uid
+                      AND pra.role = :role
+                      AND pra.revoked_at IS NULL
+                      AND u.deleted_at IS NULL
+                    """
+                ).bindparams(bindparam("uid", type_=PG_UUID(as_uuid=True))),
+                {"uid": user_id, "role": role},
+            )
+        ).first()
+        if row is None:
+            raise PlatformAdminNotFoundError(f"user {user_id} is not an active {role}")
+
+        keycloak_email_sent = False
+        temporary_password: str | None = None
+        kc_subject = row.keycloak_subject
+
+        try:
+            if kc_subject and not kc_subject.startswith("pending::"):
+                # Already provisioned — re-assert the attribute so the
+                # JWT claim is right, and report success.
+                await self._kc.set_platform_role(keycloak_user_id=kc_subject, role=role)
+            else:
+                invite_result = await self._kc.invite_platform_admin(
+                    email=row.email, full_name=row.full_name, role=role
+                )
+                kc_subject = invite_result.keycloak_user_id
+                keycloak_email_sent = invite_result.email_sent
+                temporary_password = invite_result.temporary_password
+                await self._public.execute(
+                    text(
+                        """
+                        UPDATE public.users
+                        SET keycloak_subject = :sub, updated_by = :actor
+                        WHERE id = :uid
+                        """
+                    ).bindparams(
+                        bindparam("uid", type_=PG_UUID(as_uuid=True)),
+                        bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {"sub": kc_subject, "uid": user_id, "actor": actor_user_id},
+                )
+        except KeycloakError as exc:
+            self._log.warning(
+                "platform_admin_retry_provisioning_failed",
+                user_id=str(user_id),
+                email=row.email,
+                error=str(exc),
+            )
+            raise PlatformAdminProvisioningError(str(exc)) from exc
+
+        await self._audit.record_archive(
+            event_type="platform.platform_admin_reprovisioned",
+            actor_user_id=actor_user_id,
+            subject_kind="user",
+            subject_id=user_id,
+            details={"email": row.email, "role": role, "keycloak_provisioning": "succeeded"},
+        )
+        return {
+            "user_id": user_id,
+            "keycloak_subject": kc_subject,
+            "keycloak_provisioning": "succeeded",
             "keycloak_email_sent": keycloak_email_sent,
             "temporary_password": temporary_password,
             "role": role,

@@ -4,6 +4,7 @@ import {
   invitePlatformAdmin,
   listPlatformAdmins,
   removePlatformAdmin,
+  retryPlatformAdminProvisioning,
   setPlatformAdminAlertEmails,
   type AlertEmailsResponse,
   type InvitePlatformAdminPayload,
@@ -24,6 +25,16 @@ export function useInvitePlatformAdmin() {
   const qc = useQueryClient();
   return useMutation<InvitePlatformAdminResponse, Error, InvitePlatformAdminPayload>({
     mutationFn: invitePlatformAdmin,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["platform_admins_roles"] });
+    },
+  });
+}
+
+export function useRetryPlatformAdminProvisioning() {
+  const qc = useQueryClient();
+  return useMutation<InvitePlatformAdminResponse, Error, { userId: string; role: PlatformRole }>({
+    mutationFn: ({ userId, role }) => retryPlatformAdminProvisioning(userId, role),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["platform_admins_roles"] });
     },

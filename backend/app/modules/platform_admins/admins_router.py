@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.iam.users_service import TenantUserAlreadyExistsError
 from app.modules.platform_admins.admins_service import (
     PlatformAdminNotFoundError,
+    PlatformAdminProvisioningError,
     PlatformAdminsRoleService,
     get_platform_admins_role_service,
 )
@@ -121,6 +122,43 @@ async def invite_platform_admin(
             title="Already a platform admin",
             detail=f"{exc.email!r} already has an active platform role.",
             type_="https://agripulse.cloud/problems/platform-admin-already-exists",
+        ) from exc
+
+
+@router.post(
+    "/{user_id}:retry-provisioning",
+    response_model=InvitePlatformAdminResponse,
+)
+async def retry_platform_admin_provisioning(
+    user_id: UUID,
+    role: Literal["PlatformAdmin", "PlatformSupport"] = Query(default="PlatformAdmin"),
+    context: RequestContext = Depends(requires_capability("platform.manage_platform_admins")),
+    service: PlatformAdminsRoleService = Depends(_service),
+) -> dict[str, Any]:
+    """Re-run Keycloak provisioning for an admin stuck at `pending`."""
+    try:
+        return await service.retry_provisioning(
+            user_id=user_id,
+            role=role,
+            actor_user_id=context.user_id,
+        )
+    except PlatformAdminNotFoundError as exc:
+        from app.core.errors import APIError
+
+        raise APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Platform admin not found",
+            detail=str(exc),
+            type_="https://agripulse.cloud/problems/platform-admin-not-found",
+        ) from exc
+    except PlatformAdminProvisioningError as exc:
+        from app.core.errors import APIError
+
+        raise APIError(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            title="Keycloak provisioning failed",
+            detail=str(exc),
+            type_="https://agripulse.cloud/problems/keycloak-provisioning-failed",
         ) from exc
 
 

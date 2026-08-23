@@ -27,6 +27,8 @@ export interface InvitePlatformAdminResponse {
   keycloak_subject: string | null;
   keycloak_provisioning: "succeeded" | "pending";
   role: PlatformRole;
+  keycloak_email_sent: boolean;
+  temporary_password: string | null;
 }
 
 const base = "/v1/admin/platform-admins";
@@ -40,6 +42,18 @@ export async function invitePlatformAdmin(
   payload: InvitePlatformAdminPayload,
 ): Promise<InvitePlatformAdminResponse> {
   const { data } = await apiClient.post<InvitePlatformAdminResponse>(`${base}:invite`, payload);
+  return data;
+}
+
+export async function retryPlatformAdminProvisioning(
+  userId: string,
+  role: PlatformRole,
+): Promise<InvitePlatformAdminResponse> {
+  const { data } = await apiClient.post<InvitePlatformAdminResponse>(
+    `${base}/${userId}:retry-provisioning`,
+    null,
+    { params: { role } },
+  );
   return data;
 }
 
