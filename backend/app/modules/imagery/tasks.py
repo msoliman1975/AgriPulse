@@ -2734,6 +2734,106 @@ async def _discover_active_subscriptions_async() -> dict[str, int]:
     return {"tenants_scanned": len(tenant_schemas), "enqueued": enqueued}
 
 
+# --- reap_stuck_jobs (Beat sweep) -------------------------------------------
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="imagery.reap_stuck_jobs",
+    bind=False,
+    ignore_result=False,
+)
+def reap_stuck_jobs() -> dict[str, int]:
+    """Return jobs stranded in a non-terminal state to `pending` and re-run them.
+
+    A worker that dies between `mark_running` and the terminal write leaves
+    the job row in `running`. That row is unreachable afterwards: re-discovery
+    hits `ON CONFLICT (subscription_id, scene_id) DO NOTHING`, the re-dispatch
+    query reads only `status = 'pending'`, and `acquire_scene` no-ops on
+    anything that is not `pending`. The scene is then missing for that block
+    for good, which is what production showed on 2026-08-23 — 7 rows in one
+    tenant, the oldest 575 hours old, 3 of them with no index rows for a day
+    when 35 sibling blocks had a full set.
+
+    Deliberately NOT on the `platform_admins.task_registry` allowlist. It
+    walks every active tenant, and that registry's rule is that a
+    cross-tenant sweep must never be reachable from a tenant-scoped endpoint.
+    The result is kept anyway so a hand-sent run from a worker shell can be
+    read back; a reaper that reports nothing is hard to trust.
+    """
+    return _run_task(_reap_stuck_jobs_async())
+
+
+async def _reap_stuck_jobs_async() -> dict[str, int]:
+    settings = get_settings()
+    stuck_hours = settings.imagery_stuck_job_reap_hours
+    max_attempts = settings.imagery_stuck_job_max_attempts
+
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT schema_name FROM public.tenants "
+                    "WHERE status = 'active' AND deleted_at IS NULL"
+                )
+            )
+        ).all()
+    tenant_schemas = [str(r[0]) for r in rows]
+
+    reset_block = 0
+    reset_farm = 0
+    failed_out = 0
+    for tenant_schema in tenant_schemas:
+        try:
+            sanitize_tenant_schema(tenant_schema)
+        except ValueError:
+            continue
+        # One tenant must not end the sweep for the others. A schema behind
+        # on migrations has no `attempts` column and raises here.
+        try:
+            async with AsyncSessionLocal()() as session2, session2.begin():
+                await _set_tenant_context(session2, tenant_schema)
+                repo = ImageryRepository(session2)
+                for farm_path in (False, True):
+                    failed_out += await repo.fail_exhausted_stuck_jobs(
+                        stuck_hours=stuck_hours,
+                        max_attempts=max_attempts,
+                        farm_path=farm_path,
+                    )
+                block_ids = await repo.reset_stuck_jobs(
+                    stuck_hours=stuck_hours, max_attempts=max_attempts, farm_path=False
+                )
+                farm_ids = await repo.reset_stuck_jobs(
+                    stuck_hours=stuck_hours, max_attempts=max_attempts, farm_path=True
+                )
+        except Exception:
+            _log.exception("imagery_reap_tenant_failed", tenant_schema=tenant_schema)
+            continue
+
+        # Dispatch outside the transaction, so the worker that picks the job
+        # up can see the `pending` row. Same ordering as `discover_scenes`.
+        for job_id in block_ids:
+            acquire_scene.delay(str(job_id), tenant_schema)
+        for job_id in farm_ids:
+            acquire_farm_scene.delay(str(job_id), tenant_schema)
+        reset_block += len(block_ids)
+        reset_farm += len(farm_ids)
+        if block_ids or farm_ids or failed_out:
+            _log.info(
+                "imagery_stuck_jobs_reaped",
+                tenant_schema=tenant_schema,
+                block_jobs_reset=len(block_ids),
+                farm_jobs_reset=len(farm_ids),
+            )
+
+    return {
+        "tenants_scanned": len(tenant_schemas),
+        "block_jobs_reset": reset_block,
+        "farm_jobs_reset": reset_farm,
+        "jobs_failed_out": failed_out,
+    }
+
+
 # --- publish_farm_boundaries (one-off / on demand) --------------------------
 
 

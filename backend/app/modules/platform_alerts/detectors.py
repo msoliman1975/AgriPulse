@@ -136,6 +136,23 @@ def _age_phrase(hours: float) -> str:
 #
 # The imagery halves UNION the block path and the farm path before taking a
 # max, so a farm cut from one to the other keeps a continuous watermark.
+#
+# Imagery freshness is read from the ingestion jobs, NOT from the
+# subscription's `last_successful_ingest_at`. That column is a discovery
+# bookkeeping value with two properties that make it wrong for alerting:
+#
+#   1. It is stamped when a poll QUEUES new jobs, not when a job succeeds.
+#      A farm whose jobs all fail therefore looks healthy on it.
+#   2. `_touch_farm_if_live` / `_touch_if_live` skip it entirely during a
+#      backfill (`bump_watermark=False`), and a live poll only bumps it when
+#      it created a job. So a farm whose backfill already covered every
+#      published scene keeps NULL until the next NEW pass arrives.
+#
+# Production hit the second case on 2026-08-23. Mango Republic had 216
+# succeeded optical jobs and 217 succeeded thermal jobs, the newest finished
+# 29 hours earlier, and both subscriptions still read NULL. The page said the
+# farm had never worked. Measure what the stream produced, which is the same
+# argument the `idx` part of this query already makes for itself.
 _SILENT_SQL = """
 WITH thermal_products AS (
     SELECT p.id
@@ -148,9 +165,15 @@ img_block AS (
     SELECT b.farm_id,
            (s.product_id IN (SELECT id FROM thermal_products)) AS is_thermal,
            count(*) FILTER (WHERE s.is_active) AS active_subs,
-           max(s.last_successful_ingest_at) FILTER (WHERE s.is_active) AS last_ok
+           max(j.last_ok) FILTER (WHERE s.is_active) AS last_ok
       FROM imagery_aoi_subscriptions s
       JOIN blocks b ON b.id = s.block_id AND b.deleted_at IS NULL
+      LEFT JOIN LATERAL (
+            SELECT max(ij.completed_at) AS last_ok
+              FROM imagery_ingestion_jobs ij
+             WHERE ij.subscription_id = s.id
+               AND ij.status = 'succeeded'
+      ) j ON TRUE
      WHERE s.deleted_at IS NULL
      GROUP BY 1, 2
 ),
@@ -158,8 +181,14 @@ img_farm AS (
     SELECT s.farm_id,
            (s.product_id IN (SELECT id FROM thermal_products)) AS is_thermal,
            count(*) FILTER (WHERE s.is_active) AS active_subs,
-           max(s.last_successful_ingest_at) FILTER (WHERE s.is_active) AS last_ok
+           max(j.last_ok) FILTER (WHERE s.is_active) AS last_ok
       FROM imagery_farm_subscriptions s
+      LEFT JOIN LATERAL (
+            SELECT max(fj.completed_at) AS last_ok
+              FROM imagery_farm_ingestion_jobs fj
+             WHERE fj.subscription_id = s.id
+               AND fj.status = 'succeeded'
+      ) j ON TRUE
      WHERE s.deleted_at IS NULL
      GROUP BY 1, 2
 ),

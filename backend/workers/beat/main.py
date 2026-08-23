@@ -234,4 +234,15 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.platform_alert_sweep_seconds),
         "options": {"queue": "light"},
     },
+    # The recovery half of the `stuck_job` alert. A worker killed between
+    # `mark_running` and the terminal write leaves a job row that nothing
+    # else can reach, so the scene never lands for that block. This returns
+    # those rows to `pending` and dispatches them again, up to a capped
+    # number of attempts. Runs on `light`: it only writes status rows and
+    # queues work, the acquisitions themselves go to `heavy`.
+    "imagery.reap_stuck_jobs": {
+        "task": "imagery.reap_stuck_jobs",
+        "schedule": float(_settings.imagery_reap_stuck_jobs_seconds),
+        "options": {"queue": "light"},
+    },
 }

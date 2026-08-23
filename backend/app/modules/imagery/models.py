@@ -146,3 +146,7 @@ class ImageryIngestionJob(Base):
     error_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     stac_item_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     assets_written: Mapped[dict[str, Any] | list[Any] | None] = mapped_column(JSONB, nullable=True)
+    # How many times `imagery.reap_stuck_jobs` has returned this job to
+    # `pending`. Counts reaper resets only — a job that fails normally is
+    # already terminal and is never reaped (migration 0083).
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
