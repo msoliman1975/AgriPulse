@@ -127,13 +127,30 @@ workloads:
       - --loglevel=INFO
       - --queues=light
       - --concurrency=4
+    # Memory measured on the live cluster 2026-08-23, not estimated.
+    # `--concurrency=4` means five Python processes share this cgroup, and
+    # each imports the whole app. Per-process RSS was 146/154/135/133/131 MiB;
+    # RSS double-counts the pages shared by fork, so the cgroup charged
+    # 449 MiB of `anon`, plus 12 MiB of page cache = 469 MiB AT IDLE.
+    #
+    # At 512Mi that left 43 MiB of headroom, and only the 12 MiB of cache was
+    # reclaimable. A full `indices.recompute_baselines_sweep` adds ~35 MiB and
+    # gives it all back (anon 449.5 MiB before, 449.3 MiB after — no leak),
+    # but it peaks at 504 MiB, i.e. 8 MiB short of the limit. Anything else
+    # scheduled in that window goes over: the pod was OOMKilled (exit 137) on
+    # 2026-08-22 and `memory.peak` had reached 511.99 MiB.
+    #
+    # So the sweep is the trigger, not the cause — the idle baseline is. 1Gi
+    # leaves ~555 MiB of headroom over that baseline. The request moves to
+    # 512Mi because 256Mi told the scheduler less than half the truth.
+    # For scale: the heavy worker is allowed 4Gi and uses 229 MiB.
     resources:
       requests:
         cpu: 100m
-        memory: 256Mi
+        memory: 512Mi
       limits:
         cpu: "1"
-        memory: 512Mi
+        memory: 1Gi
     pdb:
       enabled: true
       minAvailable: 1
