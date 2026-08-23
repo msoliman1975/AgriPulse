@@ -88,6 +88,9 @@
     "empty": "No platform admins yet — bootstrap one via env vars.",
     "removeButton": "Revoke",
     "pendingKc": "(pending Keycloak provisioning)",
+    "pendingKcHint": "Keycloak never received this invite, so the person cannot sign in yet. Use Retry to provision them.",
+    "retryButton": "Retry",
+    "retrying": "Retrying…",
     "col": {
       "user": "User",
       "role": "Role",
@@ -102,6 +105,7 @@
       "role": "Role",
       "submit": "Send invite",
       "submitting": "Sending…",
+      "tempPassword": "Temporary password (no email was sent):",
       "cancel": "Cancel",
       "kcOk": "Welcome email queued via Keycloak.",
       "kcPending": "Operator must finish provisioning via kcadm.sh — DB rows landed."

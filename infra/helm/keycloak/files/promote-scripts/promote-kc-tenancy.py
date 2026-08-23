@@ -82,27 +82,15 @@ def upsert_tenancy_client(c: httpx.Client, token: str) -> str:
             json=existing,
         )
         r.raise_for_status()
-        # The client PUT above already set `secret` to our value. Also hit
-        # the dedicated client-secret endpoint (POST) for KC versions that
-        # prefer it; fall back to a client-rep PUT below if POST isn't
-        # supported. (PUT on /client-secret is not valid in KC 26 — it 404s.)
-        r = c.post(
-            f"{KC_BASE}/admin/realms/{REALM}/clients/{uuid}/client-secret",
-            headers=h,
-            json={"type": "secret", "value": TENANCY_SECRET},
-        )
-        # POST may 404 in some KC versions; fall back to PUT with rep
-        if r.status_code in (404, 405):
-            rep = c.get(
-                f"{KC_BASE}/admin/realms/{REALM}/clients/{uuid}", headers=h
-            ).json()
-            rep["secret"] = TENANCY_SECRET
-            r2 = c.put(
-                f"{KC_BASE}/admin/realms/{REALM}/clients/{uuid}",
-                headers=h,
-                json=rep,
-            )
-            r2.raise_for_status()
+        # Do NOT call /clients/{uuid}/client-secret here. In Keycloak 26
+        # that endpoint REGENERATES a random secret and ignores any value
+        # in the request body — both POST and PUT. Calling it after the
+        # client-representation PUT above replaces the secret we just set
+        # with a random one, and since this Job is a PostSync hook the
+        # api's KEYCLOAK_ADMIN_CLIENT_SECRET silently stops matching on
+        # every ArgoCD sync (401 unauthorized_client on every provisioning
+        # call). The client-representation PUT is the only way to set a
+        # known secret value.
         print(f"updated client {TENANCY_CLIENT_ID} (uuid={uuid})")
         return uuid
     # Create
@@ -195,6 +183,29 @@ def configure_smtp(c: httpx.Client, token: str) -> None:
     print("realm emailTheme set: agripulse")
 
 
+def verify_client_credentials(c: httpx.Client) -> None:
+    """Prove the secret we just wrote is the one Keycloak accepts.
+
+    Without this the whole script can report success while leaving the
+    api unable to get an admin token, which degrades every user invite
+    to `pending` with no visible error until someone reads the api logs.
+    """
+    r = c.post(
+        f"{KC_BASE}/realms/{REALM}/protocol/openid-connect/token",
+        data={
+            "grant_type": "client_credentials",
+            "client_id": TENANCY_CLIENT_ID,
+            "client_secret": TENANCY_SECRET,
+        },
+    )
+    if r.status_code != 200:
+        raise RuntimeError(
+            f"{TENANCY_CLIENT_ID} client_credentials grant failed with the "
+            f"secret this script wrote: HTTP {r.status_code} {r.text}"
+        )
+    print(f"verified: {TENANCY_CLIENT_ID} client_credentials grant works")
+
+
 def main() -> None:
     with httpx.Client(timeout=30.0) as c:
         tok = admin_token(c)
@@ -202,6 +213,7 @@ def main() -> None:
         uuid = upsert_tenancy_client(c, tok)
         grant_realm_mgmt_roles(c, tok, uuid)
         configure_smtp(c, tok)
+        verify_client_credentials(c)
     print("DONE")
 
 

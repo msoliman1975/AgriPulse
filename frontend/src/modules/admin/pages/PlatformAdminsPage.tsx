@@ -17,6 +17,7 @@ import {
   usePlatformAdmins,
   useRemovePlatformAdmin,
   useSetPlatformAdminAlertEmails,
+  useRetryPlatformAdminProvisioning,
   type PlatformAdminRow,
 } from "@/queries/platformAdminsRoles";
 
@@ -34,6 +35,7 @@ export function PlatformAdminsPage(): ReactNode {
   const invite = useInvitePlatformAdmin();
   const remove = useRemovePlatformAdmin();
   const alertEmails = useSetPlatformAdminAlertEmails();
+  const retry = useRetryPlatformAdminProvisioning();
 
   const [openInvite, setOpenInvite] = useState(false);
   const [email, setEmail] = useState("");
@@ -93,6 +95,13 @@ export function PlatformAdminsPage(): ReactNode {
                     alertEmails.mutate({ userId: row.user_id, role: row.role, enabled })
                   }
                   savingAlertEmails={alertEmails.isPending}
+                  onRetry={() => retry.mutate({ userId: row.user_id, role: row.role })}
+                  retrying={retry.isPending && retry.variables?.userId === row.user_id}
+                  retryError={
+                    retry.isError && retry.variables?.userId === row.user_id
+                      ? retry.error.message
+                      : null
+                  }
                 />
               ))}
             </Tbody>
@@ -199,6 +208,14 @@ export function PlatformAdminsPage(): ReactNode {
                   : t("platformAdmins.invite.kcPending")}
               </p>
             ) : null}
+            {invite.data?.temporary_password ? (
+              <p className="text-xs text-ap-ink">
+                {t("platformAdmins.invite.tempPassword")}{" "}
+                <code className="rounded bg-ap-panel px-1 py-0.5">
+                  {invite.data.temporary_password}
+                </code>
+              </p>
+            ) : null}
           </form>
         </Modal>
       ) : null}
@@ -213,6 +230,9 @@ function Row({
   removing,
   onAlertEmailsChange,
   savingAlertEmails,
+  onRetry,
+  retrying,
+  retryError,
 }: {
   row: PlatformAdminRow;
   canManage: boolean;
@@ -220,15 +240,23 @@ function Row({
   removing: boolean;
   onAlertEmailsChange: (enabled: boolean) => void;
   savingAlertEmails: boolean;
+  onRetry: () => void;
+  retrying: boolean;
+  retryError: string | null;
 }): ReactNode {
   const { t } = useTranslation("admin");
+  const pending = row.keycloak_subject?.startsWith("pending::") ?? false;
   return (
     <Tr>
       <Td className="text-ap-ink">
         {row.full_name ? `${row.full_name} ` : ""}
         <span className="text-ap-muted">&lt;{row.email}&gt;</span>
-        {row.keycloak_subject?.startsWith("pending::") ? (
-          <span className="ms-2 text-[11px] text-ap-warn">{t("platformAdmins.pendingKc")}</span>
+        {pending ? (
+          <>
+            <span className="ms-2 text-[11px] text-ap-warn">{t("platformAdmins.pendingKc")}</span>
+            <p className="mt-1 text-[11px] text-ap-muted">{t("platformAdmins.pendingKcHint")}</p>
+            {retryError ? <p className="mt-1 text-[11px] text-ap-crit">{retryError}</p> : null}
+          </>
         ) : null}
       </Td>
       <Td>
@@ -252,6 +280,16 @@ function Row({
         </label>
       </Td>
       <Td className="text-end">
+        {canManage && pending ? (
+          <button
+            type="button"
+            onClick={onRetry}
+            disabled={retrying}
+            className="me-2 rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-ink hover:bg-ap-line/40 disabled:opacity-60"
+          >
+            {retrying ? t("platformAdmins.retrying") : t("platformAdmins.retryButton")}
+          </button>
+        ) : null}
         {canManage ? (
           <button
             type="button"
