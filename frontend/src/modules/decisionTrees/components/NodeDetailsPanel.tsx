@@ -311,7 +311,7 @@ function LeafOutcomeSection({
     action_type?: string;
     severity?: string;
     confidence?: number | string;
-    text_en?: string;
+    text_en?: string | null;
     text_ar?: string | null;
   } = {
     action_type: pending.action_type ?? outcome.action_type,

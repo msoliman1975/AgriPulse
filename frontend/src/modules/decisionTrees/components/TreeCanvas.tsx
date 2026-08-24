@@ -49,6 +49,7 @@ import {
   type Viewport,
 } from "../lib/canvasViewport";
 import { exportCanvasPng } from "../lib/exportCanvasPng";
+import { localizedField } from "@/lib/localizedField";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 
@@ -752,6 +753,7 @@ function NodeRect({
 }: NodeRectProps): JSX.Element {
   const { x, y, role, data } = node;
   const palette = paletteFor(role);
+  const clipId = `tree-node-clip-${nodeIdToken(node.id)}`;
   const isInteractive = onClick !== undefined;
   const cursor = moving ? "grabbing" : movable ? "grab" : isInteractive ? "pointer" : "default";
   // During a drag, dim nodes that aren't eligible drop targets to
@@ -825,21 +827,31 @@ function NodeRect({
         stroke={palette.border}
         strokeWidth={1.5}
       />
-      <text
-        x={x + 12}
-        y={y + 16}
-        fontSize={10}
-        fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
-        fill={palette.dim}
-      >
-        {node.id}
-      </text>
-      <RoleChip x={x + NODE_WIDTH - 90} y={y + 8} role={role} data={data} />
-      {role === "decision" ? (
-        <DecisionBody x={x} y={y} data={data} />
-      ) : (
-        <LeafBody x={x} y={y} role={role} data={data} />
-      )}
+      {/* Everything with text is clipped to the box. A label longer
+          than the box, in any language, is cut at the edge instead of
+          painting over the neighbouring boxes. The clipPath lives
+          inside this <g> so the PNG export, which clones only the
+          world group, keeps it. */}
+      <clipPath id={clipId}>
+        <rect x={x} y={y} width={NODE_WIDTH} height={NODE_HEIGHT} rx={10} ry={10} />
+      </clipPath>
+      <g clipPath={`url(#${clipId})`}>
+        <text
+          x={x + 12}
+          y={y + 16}
+          fontSize={10}
+          fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+          fill={palette.dim}
+        >
+          {node.id}
+        </text>
+        <RoleChip x={x + NODE_WIDTH - 90} y={y + 8} role={role} data={data} />
+        {role === "decision" ? (
+          <DecisionBody x={x} y={y} data={data} />
+        ) : (
+          <LeafBody x={x} y={y} role={role} data={data} />
+        )}
+      </g>
       {dirty ? (
         <circle cx={x + NODE_WIDTH - 12} cy={y + NODE_HEIGHT - 12} r={4} fill="#2563eb" />
       ) : null}
@@ -928,11 +940,14 @@ function DecisionBody({
   y: number;
   data: PositionedNode["data"];
 }): JSX.Element {
-  const summary = data.label_en ?? "(unlabelled decision)";
+  const { t, i18n } = useTranslation("decisionTrees");
+  const summary =
+    localizedField(i18n.language, data.label_en ?? null, data.label_ar ?? null) ||
+    t("viewer.body.unlabelledDecision");
   return (
     <>
       <text x={x + 12} y={y + 42} fontSize={13} fontWeight={600} fill="#0f172a">
-        Decision
+        {t("viewer.body.decision")}
       </text>
       <text x={x + 12} y={y + 64} fontSize={12} fill="#475569">
         {truncate(summary, 32)}
@@ -952,9 +967,16 @@ function LeafBody({
   role: PositionedNode["role"];
   data: PositionedNode["data"];
 }): JSX.Element {
+  const { i18n } = useTranslation("decisionTrees");
   const outcome = data.outcome ?? {};
   const actionType = outcome.action_type ?? "—";
-  const text = outcome.text_en ?? data.label_en ?? "";
+  // The outcome text wins over the node label, and each pair picks its
+  // own language. Resolving the pair first, then falling back, keeps a
+  // node with an Arabic outcome text and an English label readable.
+  const text =
+    localizedField(i18n.language, outcome.text_en ?? null, outcome.text_ar ?? null) ||
+    localizedField(i18n.language, data.label_en ?? null, data.label_ar ?? null) ||
+    "";
   void role;
   return (
     <>
@@ -1074,6 +1096,14 @@ function paletteFor(role: PositionedNode["role"]): Palette {
         chipText: "#3730a3",
       };
   }
+}
+
+/** Make a node id safe to use inside an SVG id and a url(#…) reference.
+ *  Node ids come from the YAML, so they can hold characters that break
+ *  the reference. Covered through the rendered DOM in TreeCanvas.test. */
+function nodeIdToken(id: string): string {
+  const token = id.replace(/[^A-Za-z0-9_-]/g, "_");
+  return token || "node";
 }
 
 function truncate(s: string, n: number): string {

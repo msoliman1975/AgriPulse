@@ -194,6 +194,10 @@
     "emptyTree": "Tree has no nodes to display yet.",
     "compiledMissing": "The published version is missing its compiled body — re-publish the version to regenerate it.",
     "svgAria": "Decision-tree diagram",
+    "body": {
+      "decision": "Decision",
+      "unlabelledDecision": "(unlabelled decision)"
+    },
     "header": {
       "draftOnly": "draft only",
       "openYamlEditor": "Open YAML editor"

@@ -194,6 +194,10 @@
     "emptyTree": "لا توجد عُقد لعرضها بعد.",
     "compiledMissing": "الإصدار المنشور تنقصه النسخة المُجمَّعة — أعد نشر الإصدار لإعادة توليدها.",
     "svgAria": "رسم بياني لشجرة القرار",
+    "body": {
+      "decision": "قرار",
+      "unlabelledDecision": "(قرار بدون تسمية)"
+    },
     "header": {
       "draftOnly": "مسودَّة فقط",
       "openYamlEditor": "فتح محرر YAML"
