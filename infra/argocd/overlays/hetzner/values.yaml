@@ -2680,11 +2680,64 @@ global:
   #   leaving it applied is harmless: the old code never reads `attempts`.
   #   Rolling back does NOT re-strand any job the reaper has already fixed.
   #   Image CONFIRMED by pulling on the node: api:ee2cd41 @ sha256:5a3a1d83.
+  # ba0a524 = #563 mango index-guide decision trees, a maturation stage, and
+  #   a catalogue cleanup.
+  #   THREE NEW TREES plus one rewrite, built from
+  #   `tatoo Docs/AgriPulse_Mango_Indices_Full_EN.xlsx`. That workbook's
+  #   38,880 rows reduce to one axis that matters: tree size. Variety changes
+  #   nothing -- 0 of 4,320 keys differ across its nine varieties, and the file
+  #   says as much -- and establishment method shifts values a flat 5-8% it
+  #   calls an unmeasured estimate. NDVI runs 0.10-0.22 on a small tree and
+  #   0.65-0.81 on a big one, so a rule with one floor is comparing a sapling
+  #   against an orchard.
+  #   `mango_post_harvest_nitrogen_v1` was exactly that: one NDRE floor of 0.30,
+  #   which sits ABOVE a small tree's whole normal band (0.08-0.18) and BELOW a
+  #   large tree's (0.38-0.52). It flagged every young orchard on every
+  #   post-harvest scene and could not see a large block fall from 0.45 to 0.31.
+  #   TWO NEW CROP ATTRIBUTES on mango (public 0072): `tree_size_class` and
+  #   `bearing_status`. `block_crops.canopy_size_class` was built for the first
+  #   and is still a validated column, but no screen writes it and it was
+  #   dropped from the decision-tree vocabulary; a crop attribute renders its
+  #   own field and is already a condition source. Five hand-authored mango
+  #   attributes that shadowed each other are retired, and tenant 0084 copies
+  #   their 306 recorded values onto the curated ones first.
+  #   Size is taken from `tree_age` where recorded and from the old `003` label
+  #   only where it is not: every prod block with an age reads 2 or 3 years
+  #   while 100 carry `003 = 02`, and the imagery agrees with the age (NDVI
+  #   0.17-0.21, the guide's small-tree band). Taking the label would have put
+  #   100 of 108 blocks below their expected range on the first sweep. Both
+  #   mappings were measured against real readings before choosing.
+  #   MANGO GAINS A `maturation` STAGE (public 0073). It had six stages and no
+  #   maturity: fruit_development ran to 15 July and post_harvest_flush picked
+  #   up on 16 July, so the calendar called the whole Egyptian harvest
+  #   "post-harvest". 0064 already seeds mango a Kc of 0.85 for `maturation`
+  #   and its docstring claims 0033 created it -- that row has been unreachable
+  #   since it was written and now resolves. Generic curve 07-01 to 09-15,
+  #   Keitt 08-16 to 10-31.
+  #   Fruit fly and anthracnose both scored fruit_development as susceptible.
+  #   Shortening it without adding `maturation` to their sets would have
+  #   dropped both scores exactly when ripening fruit is most at risk; both
+  #   sets were widened in the same change.
+  #   `demo_cell_low_ndvi_v1` and `scout_for_stress_v1` archived, seed files
+  #   deleted. Deleting the file is required: sync_from_disk looks up a tree
+  #   with `deleted_at IS NULL`, so a file left on disk inserts a fresh row on
+  #   the next boot and undoes the archive.
+  #   The CWSI tree is written and tested but HELD in seeds/held/, which
+  #   startup sync does not glob: `cwsi` reads exactly 1.0000 on 7,225 of 7,320
+  #   prod rows because its canopy-to-air bounds are uncalibrated constants.
+  #   Both migrations were dry-run against prod inside a rolled-back
+  #   transaction, on both tenants, before merge.
+  #   API AND WORKERS ONLY -- migrations, seed YAML and risk models are all
+  #   backend. Frontend stays 3dc25cf and tile-server stays 676746a.
+  #   Rollback is these two tags back to ee2cd41. Both migrations have
+  #   downgrades, but rolling the image back alone is enough: the old code
+  #   never reads `tree_size_class`, and leaving `maturation` applied only
+  #   changes which stage a block reports.
   images:
     api:
-      tag: "ee2cd41"
+      tag: "ba0a524"
     workers:
-      tag: "ee2cd41"
+      tag: "ba0a524"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
