@@ -150,8 +150,10 @@ async def test_preview_and_apply_stage_anchored(admin_session: AsyncSession) -> 
     assert preview["total_activities"] == 2
     acts = preview["blocks"][0]["activities"]
     stage_act = next(a for a in acts if a["anchored_stage_code"] == "post_harvest_flush")
-    # mango post_harvest_flush start_doy '07-16' (migration 0033) + 7 days.
-    assert stage_act["scheduled_date"] == date(2026, 7, 23)
+    # mango post_harvest_flush start_doy '09-16' + 7 days. The stage moved
+    # from 07-16 in migration 0073, which gave mango a `maturation` stage for
+    # the harvest months the flush used to cover.
+    assert stage_act["scheduled_date"] == date(2026, 9, 23)
 
     # Apply: materialises plan + activities.
     res = await svc.apply(

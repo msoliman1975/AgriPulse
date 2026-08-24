@@ -60,7 +60,8 @@ async def test_seeded_mango_template_resolves(admin_session: AsyncSession) -> No
     assert skipped == []
     assert len(resolved) == 5
     by_stage = {a.anchored_stage_code: a.scheduled_date for a in resolved if a.anchored_stage_code}
-    # post_harvest_flush starts 07-16 (+7d) -> 2026-07-23.
-    assert by_stage["post_harvest_flush"] == date(2026, 7, 23)
+    # post_harvest_flush starts 09-16 (+7d) -> 2026-09-23. It started 07-16
+    # until migration 0073 gave mango a `maturation` stage for the harvest.
+    assert by_stage["post_harvest_flush"] == date(2026, 9, 23)
     # fruit_development starts 05-01 (+0) -> 2026-05-01.
     assert by_stage["fruit_development"] == date(2026, 5, 1)

@@ -17,6 +17,7 @@ dry-run and from the nightly sweep:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -51,10 +52,14 @@ pytestmark = [pytest.mark.integration]
 # raises an alert rather than a recommendation. So the fixture now carries
 # its own tree, authored per tenant by `_make_tenant`. That also removes the
 # old coupling where a change to a shipped seed could move these assertions.
-TREE = "farm_run_fixture_v1"
+# `public.decision_trees` still carries a legacy UNIQUE(code) that a migration
+# test re-adds on downgrade, so two tenants may not both author the same code.
+# Each tenant therefore gets its own, and `_make_tenant` hands it back on the
+# returned object.
+_TREE_CODE_PREFIX = "farm_run_fixture"
 
-RUN_TREE_YAML = f"""
-code: {TREE}
+RUN_TREE_YAML = """
+code: {code}
 name_en: Farm-run fixture — NDVI below baseline
 name_ar: قاعدة اختبار — NDVI دون خط الأساس
 root: root
@@ -167,7 +172,7 @@ async def _seed_farm(
     return farm_id, block_ids
 
 
-async def _run(schema: str, tenant_id: UUID, *, farm_id: UUID, tree_code: str = TREE) -> dict:
+async def _run(schema: str, tenant_id: UUID, *, farm_id: UUID, tree_code: str) -> dict:
     """Drive the run through its own session pair, as the route does."""
     factory = AsyncSessionLocal()
     async with factory() as session, session.begin():
@@ -201,7 +206,16 @@ async def _open_recommendations(admin: AsyncSession, schema: str, farm_id: UUID)
     return [dict(r) for r in rows]
 
 
-async def _make_tenant(admin: AsyncSession, slug: str):
+@dataclass(frozen=True, slots=True)
+class _Fixture:
+    """The tenant plus the code of the tree authored inside it."""
+
+    tenant_id: UUID
+    schema_name: str
+    tree_code: str
+
+
+async def _make_tenant(admin: AsyncSession, slug: str) -> _Fixture:
     await sync_from_disk(admin)
     tenancy = get_tenant_service(admin)
     tenant = await tenancy.create_tenant(
@@ -209,12 +223,13 @@ async def _make_tenant(admin: AsyncSession, slug: str):
         name="Tree run",
         contact_email="ops@tree-run.test",
     )
-    await _publish_run_tree(tenant.tenant_id)
-    return tenant
+    code = f"{_TREE_CODE_PREFIX}_{uuid4().hex[:8]}"
+    await _publish_run_tree(tenant.tenant_id, code)
+    return _Fixture(tenant_id=tenant.tenant_id, schema_name=tenant.schema_name, tree_code=code)
 
 
-async def _publish_run_tree(tenant_id: UUID) -> None:
-    """Author + publish ``TREE`` for this tenant.
+async def _publish_run_tree(tenant_id: UUID, code: str) -> None:
+    """Author + publish the fixture tree for this tenant.
 
     Tenant-scoped rather than platform-scoped so each test owns its own copy:
     `public.decision_trees` is shared across tenants in this database, and a
@@ -226,9 +241,12 @@ async def _publish_run_tree(tenant_id: UUID) -> None:
             public_session=public_session, tenant_id=tenant_id
         )
         await author.create_tree(
-            code=TREE, crop_code=None, tree_yaml=RUN_TREE_YAML, actor_user_id=None
+            code=code,
+            crop_code=None,
+            tree_yaml=RUN_TREE_YAML.format(code=code),
+            actor_user_id=None,
         )
-        await author.publish_version(code=TREE, version=1, actor_user_id=None)
+        await author.publish_version(code=code, version=1, actor_user_id=None)
 
 
 @pytest.mark.asyncio
@@ -245,14 +263,16 @@ async def test_run_opens_recommendations_for_every_block_of_the_named_farm(
         admin_session, tenant.schema_name, code="OTH", block_count=2, deviation=Decimal("-2.0")
     )
 
-    result = await _run(tenant.schema_name, tenant.tenant_id, farm_id=target_farm)
+    result = await _run(
+        tenant.schema_name, tenant.tenant_id, farm_id=target_farm, tree_code=tenant.tree_code
+    )
 
     assert result["blocks_evaluated"] == 3
     assert result["blocks_targeted"] == 3
     assert result["recommendations_opened"] == 3
     assert result["deduped"] == 0
     assert result["errors"] == 0
-    assert result["tree_code"] == TREE
+    assert result["tree_code"] == tenant.tree_code
     assert {b["block_id"] for b in result["blocks"]} == set(target_blocks)
 
     opened = await _open_recommendations(admin_session, tenant.schema_name, target_farm)
@@ -273,13 +293,15 @@ async def test_run_walks_only_the_named_tree(admin_session: AsyncSession) -> Non
         admin_session, tenant.schema_name, code="ONE", block_count=2, deviation=Decimal("-2.0")
     )
 
-    result = await _run(tenant.schema_name, tenant.tenant_id, farm_id=farm_id)
+    result = await _run(
+        tenant.schema_name, tenant.tenant_id, farm_id=farm_id, tree_code=tenant.tree_code
+    )
 
     # One tree per block, not "every visible tree" per block.
     assert result["blocks_evaluated"] == 2
     assert result["blocks"][0]["trees_evaluated"] == 1
     opened = await _open_recommendations(admin_session, tenant.schema_name, farm_id)
-    assert {r["tree_code"] for r in opened} == {TREE}
+    assert {r["tree_code"] for r in opened} == {tenant.tree_code}
 
 
 @pytest.mark.asyncio
@@ -291,8 +313,12 @@ async def test_rerun_reports_dedup_rather_than_a_silent_zero(
         admin_session, tenant.schema_name, code="RPT", block_count=2, deviation=Decimal("-2.0")
     )
 
-    first = await _run(tenant.schema_name, tenant.tenant_id, farm_id=farm_id)
-    second = await _run(tenant.schema_name, tenant.tenant_id, farm_id=farm_id)
+    first = await _run(
+        tenant.schema_name, tenant.tenant_id, farm_id=farm_id, tree_code=tenant.tree_code
+    )
+    second = await _run(
+        tenant.schema_name, tenant.tenant_id, farm_id=farm_id, tree_code=tenant.tree_code
+    )
 
     assert first["recommendations_opened"] == 2
     # The tree fired both times; the partial UNIQUE on the open state
@@ -313,7 +339,9 @@ async def test_run_records_a_closed_eval_run(admin_session: AsyncSession) -> Non
         admin_session, tenant.schema_name, code="LIN", block_count=2, deviation=Decimal("-2.0")
     )
 
-    result = await _run(tenant.schema_name, tenant.tenant_id, farm_id=farm_id)
+    result = await _run(
+        tenant.schema_name, tenant.tenant_id, farm_id=farm_id, tree_code=tenant.tree_code
+    )
 
     await admin_session.execute(text(f'SET LOCAL search_path TO "{tenant.schema_name}", public'))
     run = (
@@ -342,7 +370,7 @@ async def test_run_records_a_closed_eval_run(admin_session: AsyncSession) -> Non
                 "SELECT count(*) FROM decision_tree_eval_traces "
                 "WHERE run_id = :rid AND tree_code = :code"
             ).bindparams(bindparam("rid", type_=PG_UUID(as_uuid=True))),
-            {"rid": result["run_id"], "code": TREE},
+            {"rid": result["run_id"], "code": tenant.tree_code},
         )
     ).scalar_one()
     assert traces == 2
@@ -444,7 +472,9 @@ async def test_a_tree_that_blows_up_closes_the_run_as_failed(
 async def test_run_on_unknown_farm_is_rejected(admin_session: AsyncSession) -> None:
     tenant = await _make_tenant(admin_session, "tree-run-nofarm")
     with pytest.raises(FarmNotFoundError):
-        await _run(tenant.schema_name, tenant.tenant_id, farm_id=uuid4())
+        await _run(
+            tenant.schema_name, tenant.tenant_id, farm_id=uuid4(), tree_code=tenant.tree_code
+        )
 
 
 @pytest.mark.asyncio
@@ -462,12 +492,14 @@ async def test_run_of_a_tree_the_sweep_would_skip_is_rejected(
             "UPDATE public.decision_trees SET is_active = FALSE "
             "WHERE code = :code AND tenant_id = :tid"
         ),
-        {"code": TREE, "tid": tenant.tenant_id},
+        {"code": tenant.tree_code, "tid": tenant.tenant_id},
     )
     await admin_session.commit()
     try:
         with pytest.raises(DecisionTreeNotRunnableError):
-            await _run(tenant.schema_name, tenant.tenant_id, farm_id=farm_id)
+            await _run(
+                tenant.schema_name, tenant.tenant_id, farm_id=farm_id, tree_code=tenant.tree_code
+            )
     finally:
         # Restore even though the row is this tenant's own copy: the run
         # helper resolves by code, and a later assertion in this test file
@@ -477,7 +509,7 @@ async def test_run_of_a_tree_the_sweep_would_skip_is_rejected(
                 "UPDATE public.decision_trees SET is_active = TRUE "
                 "WHERE code = :code AND tenant_id = :tid"
             ),
-            {"code": TREE, "tid": tenant.tenant_id},
+            {"code": tenant.tree_code, "tid": tenant.tenant_id},
         )
         await admin_session.commit()
 
@@ -498,7 +530,7 @@ async def test_candidate_farms_reports_targeted_block_counts(
             author = get_decision_trees_author_service(
                 public_session=public_session, tenant_id=tenant.tenant_id
             )
-            farms = await author.candidate_farms(code=TREE, tenant_session=session)
+            farms = await author.candidate_farms(code=tenant.tree_code, tenant_session=session)
 
     entry = next(f for f in farms if f["farm_id"] == farm_id)
     # Crop-agnostic tree: every block of the farm is in scope.

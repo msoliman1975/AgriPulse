@@ -83,9 +83,14 @@ _NITRO = _tree("mango_post_harvest_nitrogen_v1.yaml")
 
 
 def test_post_harvest_low_ndre_warns() -> None:
+    # NDRE 0.2 is under the large-tree floor of 0.38 and inside the medium
+    # band, so the size the block records decides the verdict. The tree gained
+    # the per-size floors from the mango index guide; a single 0.30 floor used
+    # to condemn every young orchard and miss a large block sliding to 0.31.
     ctx = ConditionContext(
         block_id="b1",
         block_attributes={"growth_stage": "post_harvest_flush"},
+        crop_attributes={"tree_size_class": "large"},
         indices=_idx(ndre=0.2),
     )
     r = evaluate_tree(_NITRO, ctx)
@@ -93,10 +98,32 @@ def test_post_harvest_low_ndre_warns() -> None:
     assert r.outcome.severity == "warning"
 
 
+def test_post_harvest_same_ndre_is_fine_on_a_medium_tree() -> None:
+    ctx = ConditionContext(
+        block_id="b1",
+        block_attributes={"growth_stage": "post_harvest_flush"},
+        crop_attributes={"tree_size_class": "medium"},
+        indices=_idx(ndre=0.2),
+    )
+    assert evaluate_tree(_NITRO, ctx).outcome.action_type == "no_action"
+
+
+def test_post_harvest_without_a_recorded_size_never_guesses() -> None:
+    ctx = ConditionContext(
+        block_id="b1",
+        block_attributes={"growth_stage": "post_harvest_flush"},
+        indices=_idx(ndre=0.01),
+    )
+    r = evaluate_tree(_NITRO, ctx)
+    assert r.path[-1].node_id == "leaf_size_unknown"
+    assert r.outcome.action_type == "no_action"
+
+
 def test_post_harvest_healthy_ndre_silent() -> None:
     ctx = ConditionContext(
         block_id="b1",
         block_attributes={"growth_stage": "post_harvest_flush"},
+        crop_attributes={"tree_size_class": "large"},
         indices=_idx(ndre=0.5),
     )
     assert evaluate_tree(_NITRO, ctx).outcome.action_type == "no_action"
