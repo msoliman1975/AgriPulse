@@ -2733,11 +2733,43 @@ global:
   #   downgrades, but rolling the image back alone is enough: the old code
   #   never reads `tree_size_class`, and leaving `maturation` applied only
   #   changes which stage a block reports.
+  # c1b811f = #564 the recommendation sweep had never run.
+  #   `workers/celery_factory.py` listed `app.modules.recommendations` -- the
+  #   PACKAGE. Celery's `include=` imports the literal module name and does
+  #   not recurse, and that `__init__.py` is a docstring, so `tasks.py` was
+  #   never imported and its three @shared_task decorators never ran. The
+  #   rule was already written as a comment three lines below the entry that
+  #   broke it.
+  #   Nothing failed loudly. Every hour Beat dispatched
+  #   `recommendations.evaluate_sweep` and the light worker answered
+  #   "Received unregistered task of type ... KeyError" into its log and
+  #   carried on: queue drained, pod Ready, no alert. Confirmed on prod by
+  #   asking the running worker what it answers to via the Celery control
+  #   API -- 55 tasks registered, none of them `recommendations.*`, while
+  #   `phenology.*` and `irrigation.*` are there because their entries name
+  #   `.tasks`. Building the app object shows nothing: `include=` is lazy.
+  #   NET EFFECT: no decision tree has ever been evaluated automatically in
+  #   production. Every mango, potato and date-palm tree was inert since it
+  #   shipped, which is why the whole catalogue showed zero recommendations.
+  #   The 435 cards on the archived `testv01` came from manual run-on-farm
+  #   calls, not the sweep. `evaluate_for_tenant` and `prune_eval_runs` were
+  #   dead the same way.
+  #   EXPECT CARDS ON THE FIRST SWEEP. Measured against prod data before this
+  #   promote: ~54 canopy-vigour, ~28 canopy-moisture, ~36 critical fruit-fly
+  #   (score 100 on green-valley), plus ~29 NDVI-below-baseline alerts.
+  #   Anthracnose, powdery mildew, canopy health and stress induction all
+  #   score below their thresholds today.
+  #   The test walks `beat_schedule` and asserts each task resolves on the
+  #   queue Beat routes it to, so a wrong queue is caught as well as a wrong
+  #   module name -- both fail the same silent way.
+  #   API AND WORKERS ONLY. Frontend stays 3dc25cf, tile-server 676746a.
+  #   Rollback is these two tags back to ba0a524, which returns the sweep to
+  #   doing nothing. No migration in this one.
   images:
     api:
-      tag: "ba0a524"
+      tag: "c1b811f"
     workers:
-      tag: "ba0a524"
+      tag: "c1b811f"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
