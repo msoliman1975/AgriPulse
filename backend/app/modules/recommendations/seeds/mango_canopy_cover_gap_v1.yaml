@@ -1,0 +1,255 @@
+# mango_canopy_cover_gap_v1 — more bare ground showing than a block of this
+# tree size should show.
+#
+# Source: tatoo Docs/AgriPulse_Mango_Indices_Full_EN.xlsx, 10 m column.
+# BSI band per size: small 0.35–0.55, medium 0.15–0.30, large 0.04–0.14.
+# BSI runs the other way from the vegetation indices — HIGH means more
+# exposed soil — so this rule fires on a CEILING, not a floor.
+#
+# This is not a restatement of the vigour rule. Vigour asks "are the trees
+# green"; this asks "are the trees THERE". A block can pass the vigour check
+# on its surviving trees while a fifth of the planting has died, been
+# removed, or never established: the survivors are green, the gaps are sand,
+# and only the soil fraction moves. That is what BSI measures.
+#
+# It is deliberately slow to alarm. Canopy cover changes over seasons, not
+# over one scene, so the window is long and the severity is info-level
+# warning rather than something to act on today.
+#
+# BSI needs SWIR, so this is Sentinel-2 only.
+
+code: mango_canopy_cover_gap_v1
+name_en: Mango — more bare soil than expected for the tree size
+name_ar: المانجو — تربة عارية أكثر من المتوقع لحجم الشجرة
+description_en: >-
+  Flags a mango block showing more bare ground between the trees than the
+  mango index guide expects for that tree size. Points at missing, failed or
+  removed trees rather than at the health of the trees still standing. Needs
+  the block's Tree size attribute to be set.
+description_ar: >-
+  ينبّه إلى قطعة مانجو تُظهر تربة عارية بين الأشجار أكثر مما يتوقعه دليل
+  مؤشرات المانجو لهذا حجم الأشجار. يشير إلى أشجار مفقودة أو فاشلة أو مُزالة،
+  لا إلى صحة الأشجار القائمة. يحتاج ضبط خاصية حجم الشجرة.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    Ceilings are the upper bound of each size's 10 m BSI band in the
+    AgriPulse mango index guide, which rates BSI Medium-High. BSI as a
+    bare-soil fraction index is established; the per-size band is inferential,
+    so the ceilings are tunable parameters. Read as a canopy-cover signal,
+    not a health signal — a healthy block with dead gaps in it fails this
+    check and passes the vigour check, which is the point.
+  citations:
+    - source_type: peer_reviewed
+      title: >-
+        Rikimaru, A. et al. — Tropical forest cover density mapping
+        (Bare Soil Index)
+      url: https://www.tropecol.com/pdf/open/PDF_43_1/jtropecol43_1_5.pdf
+      year: 2002
+    - source_type: peer_reviewed
+      title: >-
+        Nguyen, C.T. et al. — Modification of the Bare Soil Index to identify
+        bare land, Land 10(3)
+      url: https://www.mdpi.com/2073-445X/10/3/231
+      year: 2021
+    - source_type: remote_sensing
+      title: >-
+        AgriPulse — Comprehensive Satellite Vegetation-Index Guide for Mango
+        Farms (10 m column, BSI rows)
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: medium
+  global: low
+
+parameters:
+  small_bsi_ceiling:
+    type: number
+    default: 0.55
+    min: -1.0
+    max: 1.0
+    description: >-
+      BSI mean above which a SMALL-tree mango block shows more bare soil than
+      the index guide expects (guide band 0.35–0.55 at 10 m).
+  medium_bsi_ceiling:
+    type: number
+    default: 0.30
+    min: -1.0
+    max: 1.0
+    description: >-
+      BSI mean above which a MEDIUM-tree mango block shows more bare soil than
+      the index guide expects (guide band 0.15–0.30 at 10 m).
+  large_bsi_ceiling:
+    type: number
+    default: 0.14
+    min: -1.0
+    max: 1.0
+    description: >-
+      BSI mean above which a LARGE-tree mango block shows more bare soil than
+      the index guide expects (guide band 0.04–0.14 at 10 m).
+
+root: size_small
+nodes:
+  size_small:
+    label_en: Are the trees in the small size class?
+    label_ar: هل الأشجار في فئة الحجم الصغير؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: small
+    on_match: small_bsi
+    on_miss: size_medium
+
+  size_medium:
+    label_en: Are the trees in the medium size class?
+    label_ar: هل الأشجار في فئة الحجم المتوسط؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: medium
+    on_match: medium_bsi
+    on_miss: size_large
+
+  size_large:
+    label_en: Are the trees in the large size class?
+    label_ar: هل الأشجار في فئة الحجم الكبير؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: large
+    on_match: large_bsi
+    on_miss: leaf_size_unknown
+
+  small_bsi:
+    label_en: Is BSI above the small-tree ceiling?
+    label_ar: هل BSI فوق سقف الشجرة الصغيرة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: bsi
+          key: mean
+        right:
+          source: params
+          name: small_bsi_ceiling
+    on_match: leaf_gap
+    on_miss: leaf_no_action
+
+  medium_bsi:
+    label_en: Is BSI above the medium-tree ceiling?
+    label_ar: هل BSI فوق سقف الشجرة المتوسطة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: bsi
+          key: mean
+        right:
+          source: params
+          name: medium_bsi_ceiling
+    on_match: leaf_gap
+    on_miss: leaf_no_action
+
+  large_bsi:
+    label_en: Is BSI above the large-tree ceiling?
+    label_ar: هل BSI فوق سقف الشجرة الكبيرة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: bsi
+          key: mean
+        right:
+          source: params
+          name: large_bsi_ceiling
+    on_match: leaf_gap
+    on_miss: leaf_no_action
+
+  leaf_gap:
+    label_en: More bare soil than expected — check for missing trees
+    label_ar: تربة عارية أكثر من المتوقع — افحص الأشجار المفقودة
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.5
+      valid_for_hours: 336
+      parameters:
+        priority: low
+      text_en: >-
+        This block shows more bare ground between the trees than the mango
+        index guide expects for its tree size. That usually means trees are
+        missing rather than that the standing trees are unwell: gaps from
+        failed establishment, dead or removed trees, or a planting density
+        below what was intended. Count the gaps on the ground and decide
+        whether to replant. Check the recorded Tree size first — if the trees
+        are smaller than recorded, the reading is correct and the record is
+        not.
+      text_ar: >-
+        تُظهر هذه القطعة تربة عارية بين الأشجار أكثر مما يتوقعه دليل مؤشرات
+        المانجو لحجم أشجارها. يعني ذلك عادةً أن هناك أشجارًا مفقودة لا أن
+        الأشجار القائمة مريضة: فجوات من فشل التأسيس، أو أشجار ميتة أو مُزالة،
+        أو كثافة زراعة أقل من المقصود. عُدّ الفجوات في الأرض وقرّر إعادة
+        الزراعة. تأكد أولًا من حجم الشجرة المسجّل — إن كانت الأشجار أصغر من
+        المسجّل فالقراءة صحيحة والسجلّ خطأ.
+      actions:
+        immediate:
+          - text_en: Walk the block and count missing or dead trees.
+            text_ar: تجوّل في القطعة وعُدّ الأشجار المفقودة أو الميتة.
+        short_term:
+          - text_en: >-
+              Plan replanting for the gaps, and check why establishment
+              failed there before replanting into the same spots.
+            text_ar: >-
+              خطّط لإعادة زراعة الفجوات، وافحص سبب فشل التأسيس فيها قبل
+              إعادة الزراعة في المواضع نفسها.
+        monitoring:
+          - text_en: Re-check after the next vegetative flush closes the canopy.
+            text_ar: أعد الفحص بعد أن يغلق النمو الخضري القادم المجموع.
+
+  leaf_size_unknown:
+    label_en: No action — tree size not recorded, so no range to compare against
+    label_ar: لا إجراء — حجم الشجرة غير مسجّل، فلا يوجد نطاق للمقارنة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        This rule needs the block's Tree size attribute. Set it on the crop
+        assignment and the rule will start running.
+      text_ar: >-
+        تحتاج هذه القاعدة خاصية حجم الشجرة للقطعة. اضبطها على تخصيص المحصول
+        لتبدأ القاعدة في العمل.
+
+  leaf_no_action:
+    label_en: No action — bare-soil fraction within the expected range
+    label_ar: لا إجراء — نسبة التربة العارية ضمن النطاق المتوقع
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: Bare-soil fraction is within the expected range for this tree size.
+      text_ar: نسبة التربة العارية ضمن النطاق المتوقع لهذا الحجم.

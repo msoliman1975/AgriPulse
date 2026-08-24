@@ -25,7 +25,7 @@ def _load_seed() -> dict[str, object]:
         / "modules"
         / "recommendations"
         / "seeds"
-        / "scout_for_stress_v1.yaml"
+        / "mango_canopy_health_v1.yaml"
     )
     return yaml.safe_load(seed_path.read_text(encoding="utf-8"))
 
@@ -46,11 +46,17 @@ def _seeds_dir() -> Path:
 
 
 def test_seed_yaml_compiles() -> None:
+    """One named seed, compiled in full.
+
+    Was `scout_for_stress_v1` until public migration 0073 archived it. The
+    stand-in has to carry an `evidence` block and an `actions` block, because
+    two tests further down read those off the same seed; `mango_canopy_health_v1`
+    is the smallest that does. `test_all_seed_files_compile` covers the rest."""
     spec = _load_seed()
     compiled = compile_tree(spec, source_path="seed")
-    assert compiled["code"] == "scout_for_stress_v1"
-    assert compiled["root"] == "root"
-    assert set(compiled["nodes"]) >= {"root", "severity_check", "leaf_no_action"}
+    assert compiled["code"] == "mango_canopy_health_v1"
+    assert compiled["root"] == "soil_check"
+    assert set(compiled["nodes"]) >= {"soil_check", "savi_check", "ndvi_check"}
 
 
 def test_all_seed_files_compile() -> None:
@@ -161,7 +167,7 @@ def test_scope_rejects_unknown_value() -> None:
 
 def test_seed_carries_evidence_and_transferability() -> None:
     compiled = compile_tree(_load_seed(), source_path="seed")
-    assert compiled["evidence"]["confidence"] == "high"
+    assert compiled["evidence"]["confidence"] == "medium"
     assert compiled["evidence"]["citations"]  # at least one citation
     assert compiled["transferability"]["egypt"] == "high"
 
@@ -271,9 +277,9 @@ def _leaf_with_actions(actions: object) -> dict[str, object]:
 
 
 def test_seed_actions_compile() -> None:
-    # The scout seed demonstrates the actions block on its critical leaf.
+    # The scout seed demonstrates the actions block on its firing leaf.
     compiled = compile_tree(_load_seed(), source_path="seed")
-    crit = compiled["nodes"]["leaf_scout_critical"]["outcome"]["actions"]
+    crit = compiled["nodes"]["leaf_scout"]["outcome"]["actions"]
     assert crit["immediate"][0]["text_en"]
 
 

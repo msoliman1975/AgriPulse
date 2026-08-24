@@ -1,0 +1,417 @@
+# mango_irrigation_stress_cwsi_v1 — canopy temperature stress against the
+# range the mango index guide expects for THIS tree size and THIS fruit load.
+#
+# Source: tatoo Docs/AgriPulse_Mango_Indices_Full_EN.xlsx, 10 m column.
+# CWSI runs the other way from the vegetation indices — HIGH means thirstier
+# — so this rule fires on a CEILING.
+#
+#   size    resting / outside maturation   bearing, in maturation
+#   small   0.15–0.35                0.38–0.63
+#   medium  0.10–0.30                0.25–0.54
+#   large   0.10–0.25                0.25–0.45
+#
+# The workbook is the only source in this catalogue that carries the second
+# column, and it is the reason `bearing_status` exists as a field. A tree
+# carrying fruit transpires harder and runs hotter than the same tree resting
+# through an alternate-bearing year. Judging a bearing tree in July against a
+# resting tree's ceiling produces an irrigation alarm on every productive
+# block in the country, every summer.
+#
+# CWSI measures the tree's own temperature rather than its colour, which is
+# why the workbook rates it the most reliable irrigation index (High
+# confidence, Idso/Jackson 1981) while rating its own numeric bands much
+# lower. It comes from the Landsat thermal product, not Sentinel-2, so this
+# rule is silent on a farm with no thermal subscription — `cwsi` resolves to
+# None and every comparison fails closed.
+#
+# SMI gets no tree of its own. The workbook's own SMI entry says there is no
+# single standardised formula under that name and rates it Medium-Low, the
+# lowest confidence in the file. An absolute-threshold alarm on a number with
+# no agreed definition would be an alarm on an arbitrary scale, and CWSI
+# already answers the question SMI would be asked (irrigate or not) at High
+# confidence.
+#
+# The relaxed ceiling is gated on the `maturation` stage, which mango gained
+# in public migration 0073 for exactly this reason — the workbook keys these
+# bands on a "Maturity/Harvest" phase and the platform had no stage to map it
+# onto. Generic mango: 1 July – 15 September. Keitt, a late cultivar:
+# 16 August – 31 October. Both are the Egyptian harvest window rather than
+# the workbook's own 8 June – 27 September, which comes from a Ghana study.
+
+code: mango_irrigation_stress_cwsi_v1
+name_en: Mango — irrigation stress above the expected range (thermal)
+name_ar: المانجو — إجهاد الريّ فوق النطاق المتوقع (حراري)
+description_en: >-
+  Compares canopy temperature stress (CWSI) against the range the mango index
+  guide expects for this tree size, using a higher ceiling for a bearing tree
+  in the maturation stage, when a hot canopy is normal. Needs the Landsat
+  thermal product and the block's Tree size attribute.
+description_ar: >-
+  يقارن إجهاد حرارة المجموع (CWSI) بالنطاق الذي يتوقعه دليل مؤشرات المانجو
+  لهذا حجم الأشجار، مع سقف أعلى للشجرة المثمرة في مرحلة امتلاء الثمار أو
+  الحصاد حيث يكون ارتفاع حرارة المجموع طبيعيًا. يحتاج المنتج الحراري
+  (لاندسات) وخاصية حجم الشجرة.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    CWSI itself is well established for irrigation scheduling (Idso 1981,
+    Jackson 1981) and the AgriPulse mango index guide rates it High. The
+    per-size and per-fruit-load bands are that workbook's own inference and
+    are not measured, so every ceiling is a tunable parameter and the tree's
+    confidence is medium. The bearing split is agronomically sound
+    independent of the numbers: fruit load raises transpiration demand, and
+    mango alternate bearing means a mature tree can be either state in any
+    given year.
+  citations:
+    - source_type: peer_reviewed
+      title: >-
+        Idso, S.B. et al. — Normalizing the stress-degree-day parameter for
+        environmental variability
+      url: https://www.sciencedirect.com/science/article/abs/pii/0002157181900321
+      year: 1981
+    - source_type: peer_reviewed
+      title: >-
+        Jackson, R.D. et al. — Canopy temperature as a crop water stress
+        indicator, Water Resources Research 17(4)
+      url: https://agupubs.onlinelibrary.wiley.com/doi/10.1029/WR017i004p01133
+      year: 1981
+    - source_type: remote_sensing
+      title: >-
+        AgriPulse — Comprehensive Satellite Vegetation-Index Guide for Mango
+        Farms (10 m column, CWSI rows)
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: medium
+  global: low
+
+parameters:
+  small_cwsi_ceiling:
+    type: number
+    default: 0.35
+    min: 0.0
+    max: 1.0
+    description: >-
+      CWSI mean above which a SMALL-tree mango block is more water-stressed
+      than the index guide expects while resting or early in the season
+      (guide band 0.15–0.35).
+  medium_cwsi_ceiling:
+    type: number
+    default: 0.30
+    min: 0.0
+    max: 1.0
+    description: >-
+      CWSI ceiling for a MEDIUM-tree block while outside the maturation
+      window (guide band 0.10–0.30).
+  large_cwsi_ceiling:
+    type: number
+    default: 0.25
+    min: 0.0
+    max: 1.0
+    description: >-
+      CWSI ceiling for a LARGE-tree block while outside the maturation
+      window (guide band 0.10–0.25).
+  small_cwsi_ceiling_bearing:
+    type: number
+    default: 0.63
+    min: 0.0
+    max: 1.0
+    description: >-
+      CWSI ceiling for a SMALL-tree block that is bearing and in maturation,
+      when a hotter canopy is normal (guide band 0.38–0.63).
+  medium_cwsi_ceiling_bearing:
+    type: number
+    default: 0.54
+    min: 0.0
+    max: 1.0
+    description: >-
+      CWSI ceiling for a MEDIUM-tree block that is bearing and in maturation
+      (guide band 0.25–0.54).
+  large_cwsi_ceiling_bearing:
+    type: number
+    default: 0.45
+    min: 0.0
+    max: 1.0
+    description: >-
+      CWSI ceiling for a LARGE-tree block that is bearing and in maturation
+      (guide band 0.25–0.45).
+
+root: fruit_load
+nodes:
+  fruit_load:
+    label_en: Is the block bearing fruit and in the maturation stage?
+    label_ar: هل القطعة مثمرة وفي مرحلة النضج؟
+    condition:
+      tree:
+        all_of:
+          - op: eq
+            left:
+              source: crop_attribute
+              code: bearing_status
+              key: value
+            right: bearing
+          - op: in
+            left:
+              source: block
+              field: growth_stage
+            values:
+              - maturation
+    on_match: bearing_small
+    on_miss: resting_small
+
+  # --- bearing and in maturation: the relaxed ceilings --------------------
+
+  bearing_small:
+    label_en: Are the trees in the small size class?
+    label_ar: هل الأشجار في فئة الحجم الصغير؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: small
+    on_match: bearing_small_cwsi
+    on_miss: bearing_medium
+
+  bearing_medium:
+    label_en: Are the trees in the medium size class?
+    label_ar: هل الأشجار في فئة الحجم المتوسط؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: medium
+    on_match: bearing_medium_cwsi
+    on_miss: bearing_large
+
+  bearing_large:
+    label_en: Are the trees in the large size class?
+    label_ar: هل الأشجار في فئة الحجم الكبير؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: large
+    on_match: bearing_large_cwsi
+    on_miss: leaf_size_unknown
+
+  bearing_small_cwsi:
+    label_en: Is CWSI above the bearing small-tree ceiling?
+    label_ar: هل CWSI فوق سقف الشجرة الصغيرة المثمرة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: cwsi
+          key: mean
+        right:
+          source: params
+          name: small_cwsi_ceiling_bearing
+    on_match: leaf_stress
+    on_miss: leaf_no_action
+
+  bearing_medium_cwsi:
+    label_en: Is CWSI above the bearing medium-tree ceiling?
+    label_ar: هل CWSI فوق سقف الشجرة المتوسطة المثمرة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: cwsi
+          key: mean
+        right:
+          source: params
+          name: medium_cwsi_ceiling_bearing
+    on_match: leaf_stress
+    on_miss: leaf_no_action
+
+  bearing_large_cwsi:
+    label_en: Is CWSI above the bearing large-tree ceiling?
+    label_ar: هل CWSI فوق سقف الشجرة الكبيرة المثمرة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: cwsi
+          key: mean
+        right:
+          source: params
+          name: large_cwsi_ceiling_bearing
+    on_match: leaf_stress
+    on_miss: leaf_no_action
+
+  # --- resting or outside maturation: the tighter ceilings ----------------
+
+  resting_small:
+    label_en: Are the trees in the small size class?
+    label_ar: هل الأشجار في فئة الحجم الصغير؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: small
+    on_match: resting_small_cwsi
+    on_miss: resting_medium
+
+  resting_medium:
+    label_en: Are the trees in the medium size class?
+    label_ar: هل الأشجار في فئة الحجم المتوسط؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: medium
+    on_match: resting_medium_cwsi
+    on_miss: resting_large
+
+  resting_large:
+    label_en: Are the trees in the large size class?
+    label_ar: هل الأشجار في فئة الحجم الكبير؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: large
+    on_match: resting_large_cwsi
+    on_miss: leaf_size_unknown
+
+  resting_small_cwsi:
+    label_en: Is CWSI above the small-tree ceiling?
+    label_ar: هل CWSI فوق سقف الشجرة الصغيرة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: cwsi
+          key: mean
+        right:
+          source: params
+          name: small_cwsi_ceiling
+    on_match: leaf_stress
+    on_miss: leaf_no_action
+
+  resting_medium_cwsi:
+    label_en: Is CWSI above the medium-tree ceiling?
+    label_ar: هل CWSI فوق سقف الشجرة المتوسطة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: cwsi
+          key: mean
+        right:
+          source: params
+          name: medium_cwsi_ceiling
+    on_match: leaf_stress
+    on_miss: leaf_no_action
+
+  resting_large_cwsi:
+    label_en: Is CWSI above the large-tree ceiling?
+    label_ar: هل CWSI فوق سقف الشجرة الكبيرة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: cwsi
+          key: mean
+        right:
+          source: params
+          name: large_cwsi_ceiling
+    on_match: leaf_stress
+    on_miss: leaf_no_action
+
+  leaf_stress:
+    label_en: Canopy hotter than expected — irrigate
+    label_ar: المجموع أسخن من المتوقع — اروِ
+    outcome:
+      action_type: irrigate
+      severity: warning
+      confidence: 0.65
+      valid_for_hours: 72
+      parameters:
+        priority: high
+        direction: increase
+      text_en: >-
+        The canopy is running hotter than the mango index guide expects for a
+        block of this tree size and fruit load, which means the trees are not
+        transpiring enough to cool themselves. Irrigate. Canopy temperature
+        responds within days, so check the next thermal pass to confirm the
+        block came back down.
+      text_ar: >-
+        حرارة المجموع أعلى مما يتوقعه دليل مؤشرات المانجو لقطعة بهذا حجم
+        الأشجار وحمل الثمار، ما يعني أن الأشجار لا تنتح بما يكفي لتبريد
+        نفسها. اروِ القطعة. تستجيب حرارة المجموع خلال أيام، فتحقق من المرور
+        الحراري القادم للتأكد من انخفاضها.
+      actions:
+        immediate:
+          - text_en: Irrigate this block and check the emitters are delivering.
+            text_ar: اروِ هذه القطعة وتأكد أن النقاطات تصرّف فعليًا.
+        short_term:
+          - text_en: >-
+              Raise the run time or frequency while the heat lasts, and
+              confirm the block is not short on its share of the line.
+            text_ar: >-
+              ارفع زمن التشغيل أو التكرار طوال موجة الحرارة، وتأكد أن القطعة
+              لا تنقصها حصتها من الخط.
+        monitoring:
+          - text_en: Check CWSI on the next thermal pass to confirm recovery.
+            text_ar: افحص CWSI في المرور الحراري القادم لتأكيد التعافي.
+
+  leaf_size_unknown:
+    label_en: No action — tree size not recorded, so no range to compare against
+    label_ar: لا إجراء — حجم الشجرة غير مسجّل، فلا يوجد نطاق للمقارنة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        This rule needs the block's Tree size attribute. Set it on the crop
+        assignment and the rule will start running.
+      text_ar: >-
+        تحتاج هذه القاعدة خاصية حجم الشجرة للقطعة. اضبطها على تخصيص المحصول
+        لتبدأ القاعدة في العمل.
+
+  leaf_no_action:
+    label_en: No action — canopy temperature within the expected range
+    label_ar: لا إجراء — حرارة المجموع ضمن النطاق المتوقع
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        Canopy temperature stress is within the expected range for this tree
+        size and fruit load.
+      text_ar: >-
+        إجهاد حرارة المجموع ضمن النطاق المتوقع لهذا حجم الأشجار وحمل الثمار.

@@ -10,11 +10,12 @@
 # trigger thresholds use PR-C parameter overrides on this tree
 # rather than the now-retired `rule_overrides` table.
 #
-# Pairs with scout_for_stress_v1: that tree emits a *recommendation*
-# (kind: recommendation) to scout; this tree emits an *alert* (kind:
-# alert) on the same signal. Both fire together when a block is in
-# trouble — the existing notifications fan-out (alerts + recs both
-# render via `notifications`) surfaces them in the inbox together.
+# This tree emits an *alert* (kind: alert). It used to pair with
+# `scout_for_stress_v1`, which raised a scouting *recommendation* on the
+# same signal; that tree was archived in public migration 0073 because its
+# thresholds were hardcoded rather than tunable and it asked the same
+# question as `mango_canopy_health_v1` on a mango block. This tree is now
+# the only crop-agnostic NDVI-drop rule, and it is the alert half.
 
 code: ndvi_baseline_alert_v1
 name_en: NDVI below seasonal baseline
