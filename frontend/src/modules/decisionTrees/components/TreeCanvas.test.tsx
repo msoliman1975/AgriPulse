@@ -262,3 +262,85 @@ describe("TreeCanvas ports still work", () => {
     expect(props.onAddChild).toHaveBeenCalledWith("skip", "miss");
   });
 });
+
+// A tree whose nodes carry both languages, plus one node that has only
+// English and one that has only Arabic.
+const BILINGUAL: CompiledTree = {
+  root: "root",
+  nodes: {
+    root: {
+      label_en: "ndvi below floor",
+      label_ar: "المؤشر تحت الحد",
+      on_match: "hit",
+      on_miss: "englishOnly",
+    },
+    hit: {
+      outcome: { action_type: "irrigate", text_en: "water it", text_ar: "اسق القطعة" },
+    },
+    englishOnly: { label_en: "second check", label_ar: null, on_match: "arabicOnly" },
+    arabicOnly: { outcome: { action_type: "scout", text_en: null, text_ar: "افحص القطعة" } },
+  },
+};
+
+const BILINGUAL_LAYOUT = layoutTree(BILINGUAL);
+
+function renderBilingual(): void {
+  render(
+    <TreeCanvas
+      layout={BILINGUAL_LAYOUT}
+      height={560}
+      onHeightChange={vi.fn()}
+      exportFileName="tree.png"
+    />,
+  );
+}
+
+describe("TreeCanvas node text follows the interface language", () => {
+  it("draws the Arabic fields on the Arabic page", async () => {
+    await setupTestI18n("ar");
+    renderBilingual();
+    expect(screen.getByText("المؤشر تحت الحد")).toBeInTheDocument();
+    expect(screen.getByText("اسق القطعة")).toBeInTheDocument();
+    expect(screen.queryByText("ndvi below floor")).not.toBeInTheDocument();
+    expect(screen.queryByText("water it")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the other language when one field is empty", async () => {
+    await setupTestI18n("ar");
+    renderBilingual();
+    // Arabic page, node has no Arabic label.
+    expect(screen.getByText("second check")).toBeInTheDocument();
+  });
+
+  it("draws the English fields on the English page", async () => {
+    await setupTestI18n("en");
+    renderBilingual();
+    expect(screen.getByText("ndvi below floor")).toBeInTheDocument();
+    expect(screen.getByText("water it")).toBeInTheDocument();
+    // The English page does not fall back to Arabic. This matches
+    // localizedField, which every other screen uses.
+    expect(screen.queryByText("افحص القطعة")).not.toBeInTheDocument();
+  });
+});
+
+describe("TreeCanvas keeps node text inside the box", () => {
+  beforeEach(async () => {
+    await setupTestI18n("ar");
+  });
+
+  it("draws the canvas surface left-to-right so text anchors on the left", () => {
+    renderBilingual();
+    const surface = screen.getByRole("application");
+    expect(surface.getAttribute("dir")).toBe("ltr");
+  });
+
+  it("clips every box's text to the box", () => {
+    renderBilingual();
+    const label = screen.getByText("root");
+    const clipped = label.closest("g[clip-path]");
+    expect(clipped).not.toBeNull();
+    expect(clipped!.getAttribute("clip-path")).toBe("url(#tree-node-clip-root)");
+    const container = screen.getByRole("application");
+    expect(container.querySelector("clipPath#tree-node-clip-root")).not.toBeNull();
+  });
+});

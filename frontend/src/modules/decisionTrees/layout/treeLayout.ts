@@ -29,11 +29,11 @@ export interface CompiledNode {
     kind?: string; // "alert" | "recommendation" (PR-E); default "recommendation"
     severity?: string;
     confidence?: number | string;
-    text_en?: string;
+    text_en?: string | null;
     text_ar?: string | null;
     parameters?: Record<string, unknown>;
   };
-  label_en?: string;
+  label_en?: string | null;
   label_ar?: string | null;
 }
 
