@@ -188,6 +188,13 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   const selectedBlock = c.selectedId ? summary.blocks.find((b) => b.id === c.selectedId) : null;
   const reshaping = m.reshapeTarget != null;
 
+  // The legend is labelled by the scope it was SERVED, not the one requested.
+  // A farm drawn from one stitched surface is measured once for the whole
+  // farm, so selecting a block cannot narrow these numbers — and naming the
+  // block over farm-wide areas would be a wrong caption on right figures.
+  const legendAreas = c.pixels.classAreas(c.selectedId);
+  const legendScopeBlockId = legendAreas.scopedToBlock ? c.selectedId : null;
+
   return (
     <Page width="bleed">
       <ViewBar
@@ -309,9 +316,11 @@ function Console({ farmId }: { farmId: string }): ReactNode {
             <IndexLegend
               className="absolute end-3 top-3 z-10 w-[268px] bg-ap-panel/95 shadow-card"
               code={c.activeIndex}
-              areas={c.pixels.classAreas(c.selectedId)}
-              scopeBlockId={c.selectedId}
-              scopeBlockName={c.selectedId ? (c.blockNameById.get(c.selectedId) ?? null) : null}
+              areas={legendAreas}
+              scopeBlockId={legendScopeBlockId}
+              scopeBlockName={
+                legendScopeBlockId ? (c.blockNameById.get(legendScopeBlockId) ?? null) : null
+              }
               showPixels={c.showPixels}
               assetCount={c.pixels.assetCount}
               indexUnit={c.activeIndexUnit}

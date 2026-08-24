@@ -62,7 +62,10 @@ export interface IndexPixels {
   counts: BlockPixelCounts[] | undefined;
   /** Block id → mean index value for this scene, for the block-fill class. */
   meanByBlockId: Map<string, number>;
-  /** Class areas across the farm, or narrowed to one block. */
+  /**
+   * Class areas across the farm, or narrowed to one block where the readings
+   * are held per block. Read `scopedToBlock` on the result to see which.
+   */
   classAreas: (scopeBlockId: string | null) => ClassAreaSummary;
   assetsLoading: boolean;
   statsLoading: boolean;
@@ -269,18 +272,16 @@ export function useIndexPixels(input: {
     return m;
   }, [statsQ.data]);
 
+  // Asking for a block does not guarantee getting one. On the farm-raster
+  // path the whole farm is measured once, under FARM_SCOPE_ID, so there is no
+  // per-block row to narrow to and the answer is the farm — which the summary
+  // reports through `scopedToBlock` so the legend can label what it got. The
+  // farm area goes in unconditionally for the same reason: whether it applies
+  // is decided by the scope that was actually served, not the one requested.
   const classAreas = useMemo(() => {
     const classCount = classesFor(code).length;
     return (scopeBlockId: string | null): ClassAreaSummary =>
-      summariseClassAreas(
-        statsQ.data?.counts ?? [],
-        classCount,
-        scopeBlockId,
-        // Only the whole-farm scope has a known area to measure against; a
-        // block scope falls back to masked pixels until per-block zonal
-        // statistics over the farm raster land.
-        scopeBlockId ? null : farmAreaM2,
-      );
+      summariseClassAreas(statsQ.data?.counts ?? [], classCount, scopeBlockId, farmAreaM2);
   }, [statsQ.data, code, farmAreaM2]);
 
   return {

@@ -10,12 +10,13 @@ import type { ClassAreaSummary } from "./pixelTiles";
 /** One feddan is 4200.83 m², which keeps the expected strings readable. */
 const FEDDAN = 4200.83;
 
-function areas(perClass: number[], noDataFeddan = 0): ClassAreaSummary {
+function areas(perClass: number[], noDataFeddan = 0, scopedToBlock = false): ClassAreaSummary {
   const areaM2ByClass = perClass.map((f) => f * FEDDAN);
   return {
     areaM2ByClass,
     coveredM2: areaM2ByClass.reduce((a, b) => a + b, 0),
     noDataM2: noDataFeddan * FEDDAN,
+    scopedToBlock,
   };
 }
 
@@ -67,6 +68,30 @@ describe("IndexLegend", () => {
     const names = [...document.querySelectorAll("li")].map((li) => li.textContent ?? "");
     expect(names[0]).toContain("Very dense");
     expect(names[names.length - 1]).toContain("Water");
+  });
+
+  it("names the block when the areas are the block's", () => {
+    renderLegend({
+      areas: areas([0, 1, 2, 0, 0, 0, 0], 0, true),
+      scopeBlockId: "block-1",
+      scopeBlockName: "B-07",
+    });
+    expect(screen.getByText("B-07 only")).toBeInTheDocument();
+  });
+
+  it("says whole farm when a block was selected but the areas are farm-wide", () => {
+    // A farm drawn from one stitched surface is measured once for the whole
+    // farm, so selecting a block cannot narrow the legend. It used to answer
+    // that by rendering 0.0 on every class under the block's name — a farm
+    // reporting no land in any colour. The caller now hands the scope it was
+    // SERVED, so the numbers are the farm's and so is the caption.
+    renderLegend({
+      areas: areas([0, 8.5, 93.1, 76.6, 0.1, 0, 0], 0, false),
+      scopeBlockId: null,
+      scopeBlockName: null,
+    });
+    expect(screen.getByText("Whole farm")).toBeInTheDocument();
+    expect(screen.getByText("93.1")).toBeInTheDocument();
   });
 
   it("totals only what it can account for", () => {

@@ -45,7 +45,11 @@ describe("farm raster and block asset are interchangeable", () => {
     expect(p(farmUrl).get("url")).toContain("/farmhash/ndvi.tif");
     // Everything that decides what the pixels LOOK like is identical, so a
     // farm draws in exactly the classes its blocks did.
-    for (const key of ["colormap", "reproject", "tilesize"]) {
+    for (const key of ["colormap", "reproject", "scale"]) {
+      // Not `toBe` alone: two nulls would satisfy that, which is how the old
+      // `tilesize` spelling passed this test while sending nothing the server
+      // understood. Each value has to be present as well as equal.
+      expect(p(farmUrl).get(key)).not.toBeNull();
       expect(p(farmUrl).get(key)).toBe(p(blockUrl).get(key));
     }
   });

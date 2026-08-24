@@ -9,6 +9,7 @@ import {
   indexAssetKey,
   readBlockCounts,
   summariseClassAreas,
+  TILE_SIZE,
   type BlockPixelCounts,
 } from "./pixelTiles";
 
@@ -61,8 +62,17 @@ describe("blockTileUrl", () => {
     // The cost is per REQUEST, not per pixel: measured on prod, one 512 tile
     // renders in ~246ms while the four 256 tiles covering the same ground cost
     // ~1288ms in total. A farm view drops from ~92 tiles to ~25.
+    //
+    // In TiTiler's own spelling. This test used to assert `tilesize=512`, a
+    // parameter the tile endpoint does not have — FastAPI dropped it, the
+    // server returned its 256 default, and MapLibre stretched that over the
+    // 512 footprint its source declares, which is what put the pixel grid
+    // back on the map. Checked against the prod tile server: `tilesize=512`
+    // returns a 256x256 PNG byte-identical to sending nothing at all.
     const p = new URL(url.replace("{z}/{x}/{y}", "0/0/0")).searchParams;
-    expect(p.get("tilesize")).toBe("512");
+    expect(p.get("scale")).toBe("2");
+    expect(Number(p.get("scale")) * 256).toBe(TILE_SIZE);
+    expect(p.get("tilesize")).toBeNull();
   });
 
   it("never sends rescale, which would break the interval colormap", () => {
@@ -160,6 +170,51 @@ describe("summariseClassAreas", () => {
     const s = summariseClassAreas(counts, 3, "a");
     expect(s.areaM2ByClass).toEqual([0, 200, 100]);
     expect(s.coveredM2).toBe(300);
+    expect(s.scopedToBlock).toBe(true);
+  });
+
+  it("measures a block against its masked pixels, not the farm area", () => {
+    // A block has no surveyed area of its own here, so the farm's must not be
+    // borrowed: 600 m² of FARM minus 300 m² read is not this block's unread
+    // ground.
+    const s = summariseClassAreas(counts, 3, "a", 600);
+    expect(s.noDataM2).toBe(200);
+  });
+
+  it("gives the whole farm when the reading is not held per block", () => {
+    // A farm drawn from one stitched surface is measured once, under
+    // FARM_SCOPE_ID. Filtering that to a block matched nothing and every
+    // class read 0.0 — a farm with 219 measured passes reporting no land in
+    // any colour. The farm figures are the honest answer, and `scopedToBlock`
+    // is how the legend knows not to caption them with the block's name.
+    const farmOnly: BlockPixelCounts[] = [
+      {
+        blockId: "__farm__",
+        perClass: [1, 2, 1],
+        validPixels: 4,
+        maskedPixels: 2,
+        pixelAreaM2: 100,
+        meanValue: 0.3,
+      },
+    ];
+    const s = summariseClassAreas(farmOnly, 3, "a", 600);
+    expect(s.scopedToBlock).toBe(false);
+    expect(s.areaM2ByClass).toEqual([100, 200, 100]);
+    expect(s.coveredM2).toBe(400);
+    // Farm-wide, so the farm's own area applies.
+    expect(s.noDataM2).toBe(200);
+  });
+
+  it("gives the whole farm when the scoped block's statistics failed", () => {
+    // Same rule, other cause: a block absent from `counts` cannot be narrowed
+    // to. Zero would read as "no land in any class" rather than "not measured".
+    const s = summariseClassAreas(counts, 3, "missing");
+    expect(s.scopedToBlock).toBe(false);
+    expect(s.coveredM2).toBe(400);
+  });
+
+  it("reports no block scope when none was asked for", () => {
+    expect(summariseClassAreas(counts, 3, null).scopedToBlock).toBe(false);
   });
 
   it("counts covered area as exactly the sum of the classes", () => {
