@@ -2820,7 +2820,21 @@ global:
       #
       # f04a739 = #538, the platform alerts list and the red bar. Moves with
       #   the api and the workers - see the note above the `images` key.
-      tag: "3dc25cf"
+      #
+      # 188a2fe = FRONTEND ONLY. The tag sat at 3dc25cf through four frontend
+      #   commits, so this one bump ships all four:
+      #     b5d78627 #559 Keycloak promote hook
+      #     2976f2a  #565 farm console tile size + legend scope
+      #     1127a10  #566 decision tree canvas: zoom, pan, hand-placed boxes
+      #     188a2fe  #567 decision tree canvas: Arabic node text + clip to box
+      #   None of them needs a newer api. The api is already ahead at c1b811f,
+      #   and every commit here is an ancestor of it or of this tag.
+      #   #566 and #567 are one screen: /settings/decision-trees/<code>. #567
+      #   fixes Arabic text drawn outside the boxes; #566 reset the canvas to
+      #   left-to-right, which is what put the text back inside them. Shipping
+      #   #566 without #567 leaves Arabic boxes holding English words.
+      #   Rollback is this tag back to 3dc25cf. No migration in any of them.
+      tag: "188a2fe"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
