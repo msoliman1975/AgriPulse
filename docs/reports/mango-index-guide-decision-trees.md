@@ -309,6 +309,23 @@ Fixed in PR #564, one line plus a test that walks `beat_schedule` and asserts
 each task resolves on the queue Beat routes it to. A wrong queue fails the
 same silent way as a wrong module name, so both are covered.
 
+Deployed as `c1b811f`. The light worker went from 55 to 58 registered tasks
+with all three `recommendations.*` present, and one dispatched sweep opened:
+
+| Source | Opened |
+|---|---|
+| `mango_canopy_vigour_by_size_v1` | 42 recommendations |
+| `mango_canopy_moisture_by_size_v1` | 28 recommendations |
+| `mango_fruit_fly_risk_v1` (critical) | 36 recommendations |
+| `ndvi_baseline_alert_v1` | 29 alerts |
+| Anthracnose, powdery mildew, canopy health, stress induction | 0 |
+
+106 recommendations and 29 alerts, across 8 evaluation runs all recorded
+`ok`, with 684 lineage traces on one tenant alone. The fruit-fly score reads
+100 on green-valley: August in Egypt with fruit on the tree is the peak of
+that risk, and `maturation` entering the susceptible set is what lets the
+model say so.
+
 ## 10. Left to do by hand on prod
 
 **Done.** `testv01` on tenant `019eafdc…` was a tenant-authored tree named
@@ -318,4 +335,7 @@ migration was the wrong tool; it was archived and its 435 open cards
 soft-deleted directly against prod, in one transaction. Applied and dismissed
 rows were left alone — those record something a person did.
 
-Nothing else is outstanding.
+**One thing left, and it is yours to call.** 34 open alerts remain from
+`monitor_mango_in_egypt`, a tenant-authored tree archived before this work
+started. The tree cannot open more; these are stale rows of the same kind as
+the `testv01` cards. Say the word and they go the same way.
