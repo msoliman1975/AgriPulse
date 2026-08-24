@@ -40,10 +40,55 @@ from app.shared.db.session import AsyncSessionLocal
 
 pytestmark = [pytest.mark.integration]
 
-# Crop-agnostic, block-scoped, and its stressed leaves are
+# Crop-agnostic, block-scoped, and its stressed leaf is
 # `kind: recommendation` — so it fires on a bare seeded block with no crop
 # assignment, which is what keeps this fixture small.
-TREE = "scout_for_stress_v1"
+#
+# This used to borrow `scout_for_stress_v1` from the shipped catalogue. That
+# tree was archived in public migration 0073 (hardcoded thresholds, and it
+# asked the same question as `mango_canopy_health_v1` on a mango block), and
+# no other shipped tree has this shape: the remaining crop-agnostic one
+# raises an alert rather than a recommendation. So the fixture now carries
+# its own tree, authored per tenant by `_make_tenant`. That also removes the
+# old coupling where a change to a shipped seed could move these assertions.
+TREE = "farm_run_fixture_v1"
+
+RUN_TREE_YAML = f"""
+code: {TREE}
+name_en: Farm-run fixture — NDVI below baseline
+name_ar: قاعدة اختبار — NDVI دون خط الأساس
+root: root
+nodes:
+  root:
+    label_en: Is NDVI far below its seasonal baseline?
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndvi
+          key: baseline_deviation
+        right: -1.5
+    on_match: leaf_scout
+    on_miss: leaf_no_action
+  leaf_scout:
+    label_en: Severe drop — scout
+    outcome:
+      action_type: scout
+      severity: critical
+      confidence: 0.85
+      valid_for_hours: 72
+      text_en: Scout this block.
+      text_ar: استكشف هذه القطعة.
+  leaf_no_action:
+    label_en: No action
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      text_en: Within baseline.
+      text_ar: ضمن خط الأساس.
+"""
 
 
 async def _seed_farm(
@@ -159,11 +204,31 @@ async def _open_recommendations(admin: AsyncSession, schema: str, farm_id: UUID)
 async def _make_tenant(admin: AsyncSession, slug: str):
     await sync_from_disk(admin)
     tenancy = get_tenant_service(admin)
-    return await tenancy.create_tenant(
+    tenant = await tenancy.create_tenant(
         slug=f"{slug}-{uuid4().hex[:6]}",
         name="Tree run",
         contact_email="ops@tree-run.test",
     )
+    await _publish_run_tree(tenant.tenant_id)
+    return tenant
+
+
+async def _publish_run_tree(tenant_id: UUID) -> None:
+    """Author + publish ``TREE`` for this tenant.
+
+    Tenant-scoped rather than platform-scoped so each test owns its own copy:
+    `public.decision_trees` is shared across tenants in this database, and a
+    test that deactivates the tree would otherwise break every later test.
+    """
+    factory = AsyncSessionLocal()
+    async with factory() as public_session, public_session.begin():
+        author = get_decision_trees_author_service(
+            public_session=public_session, tenant_id=tenant_id
+        )
+        await author.create_tree(
+            code=TREE, crop_code=None, tree_yaml=RUN_TREE_YAML, actor_user_id=None
+        )
+        await author.publish_version(code=TREE, version=1, actor_user_id=None)
 
 
 @pytest.mark.asyncio
@@ -393,19 +458,26 @@ async def test_run_of_a_tree_the_sweep_would_skip_is_rejected(
         admin_session, tenant.schema_name, code="OFF", block_count=1, deviation=Decimal("-2.0")
     )
     await admin_session.execute(
-        text("UPDATE public.decision_trees SET is_active = FALSE WHERE code = :code"),
-        {"code": TREE},
+        text(
+            "UPDATE public.decision_trees SET is_active = FALSE "
+            "WHERE code = :code AND tenant_id = :tid"
+        ),
+        {"code": TREE, "tid": tenant.tenant_id},
     )
     await admin_session.commit()
     try:
         with pytest.raises(DecisionTreeNotRunnableError):
             await _run(tenant.schema_name, tenant.tenant_id, farm_id=farm_id)
     finally:
-        # public.decision_trees is shared across tenants in this DB; leaving
-        # the seed tree deactivated would break every later test.
+        # Restore even though the row is this tenant's own copy: the run
+        # helper resolves by code, and a later assertion in this test file
+        # reading a deactivated row would be hard to trace back to here.
         await admin_session.execute(
-            text("UPDATE public.decision_trees SET is_active = TRUE WHERE code = :code"),
-            {"code": TREE},
+            text(
+                "UPDATE public.decision_trees SET is_active = TRUE "
+                "WHERE code = :code AND tenant_id = :tid"
+            ),
+            {"code": TREE, "tid": tenant.tenant_id},
         )
         await admin_session.commit()
 

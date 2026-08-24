@@ -43,11 +43,17 @@ before any tenant reads them. The copy matches definitions by code and does
 not filter on `is_active`, so retiring the sources here does not hide them
 from it.
 
-Two more hand-authored definitions are **left alone** on purpose:
-`tree_age` (117 values) and `implantation_date` (72 values). Neither is an
-axis in the workbook, but both hold data somebody typed, and neither shadows
-another field. Retiring them is a product decision, not a consequence of
-reading the workbook.
+The curated `establishment_method` is **re-activated** here. Somebody had
+retired it on prod, which was reasonable while `004` existed and shadowed it
+-- but `004` is the copy that goes now, and establishment is one of the
+workbook's own axes: its Varieties sheet turns on which cultivars can be
+seed-propagated at all. Leaving it retired would hide the 153 values that
+tenant migration 0084 copies into it and drop the axis entirely.
+
+`tree_age` is left alone on purpose: 117 recorded values, not an axis in the
+workbook, and it shadows nothing. `implantation_date` is retired in migration
+0073, where its reason belongs -- it duplicates `block_crops.planting_date`,
+and the two agree on 71 of the 72 rows on prod.
 
 Revision ID: 0072
 Revises: 0071
@@ -71,8 +77,11 @@ depends_on: str | Sequence[str] | None = None
 
 _GROUP = ("canopy", "Canopy & bearing", "المجموع والإثمار")
 
-# Codes retired below. Every one is `path = 'mango'`.
+# Codes retired below, and the one re-activated. Every one is
+# `path = 'mango'`. Three of the five are already inactive on prod; the
+# UPDATE is safe to run more than once either way.
 _RETIRED = ("001", "002", "003", "004", "testyyy")
+_REACTIVATED = ("establishment_method",)
 
 
 def _opt(code: str, en: str, ar: str, order: int) -> dict[str, Any]:
@@ -164,8 +173,12 @@ _RETIRE = sa.text(
     "UPDATE public.crop_attribute_definitions SET is_active = FALSE "
     "WHERE path = 'mango' AND code = ANY(:codes)"
 )
-_UNRETIRE = sa.text(
+_ACTIVATE = sa.text(
     "UPDATE public.crop_attribute_definitions SET is_active = TRUE "
+    "WHERE path = 'mango' AND code = ANY(:codes)"
+)
+_DEACTIVATE = sa.text(
+    "UPDATE public.crop_attribute_definitions SET is_active = FALSE "
     "WHERE path = 'mango' AND code = ANY(:codes)"
 )
 _DELETE_NEW = sa.text(
@@ -196,9 +209,11 @@ def upgrade() -> None:
             },
         )
     bind.execute(_RETIRE, {"codes": list(_RETIRED)})
+    bind.execute(_ACTIVATE, {"codes": list(_REACTIVATED)})
 
 
 def downgrade() -> None:
     bind = op.get_bind()
-    bind.execute(_UNRETIRE, {"codes": list(_RETIRED)})
+    bind.execute(_DEACTIVATE, {"codes": list(_REACTIVATED)})
+    bind.execute(_ACTIVATE, {"codes": list(_RETIRED)})
     bind.execute(_DELETE_NEW, {"codes": [d["code"] for d in _NEW]})

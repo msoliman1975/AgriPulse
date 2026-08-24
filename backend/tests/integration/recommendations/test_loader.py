@@ -25,7 +25,7 @@ def _load_seed() -> dict[str, object]:
         / "modules"
         / "recommendations"
         / "seeds"
-        / "scout_for_stress_v1.yaml"
+        / "ndvi_baseline_alert_v1.yaml"
     )
     return yaml.safe_load(seed_path.read_text(encoding="utf-8"))
 
@@ -46,11 +46,16 @@ def _seeds_dir() -> Path:
 
 
 def test_seed_yaml_compiles() -> None:
+    """One named seed, compiled in full.
+
+    Was `scout_for_stress_v1` until public migration 0073 archived it; this
+    now reads `ndvi_baseline_alert_v1`, the remaining crop-agnostic seed.
+    `test_all_seed_files_compile` below covers the rest of the catalogue."""
     spec = _load_seed()
     compiled = compile_tree(spec, source_path="seed")
-    assert compiled["code"] == "scout_for_stress_v1"
+    assert compiled["code"] == "ndvi_baseline_alert_v1"
     assert compiled["root"] == "root"
-    assert set(compiled["nodes"]) >= {"root", "severity_check", "leaf_no_action"}
+    assert set(compiled["nodes"]) >= {"root", "severity_gate"}
 
 
 def test_all_seed_files_compile() -> None:

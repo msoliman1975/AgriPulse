@@ -35,7 +35,7 @@ def _scout_rec(env: ScoutingFixture, **overrides: Any) -> RecommendationOpenedV1
         "block_id": UUID(env.block_id),
         "farm_id": UUID(env.farm_id),
         "tree_id": uuid4(),
-        "tree_code": "scout_for_stress_v1",
+        "tree_code": "ndvi_drop_scout_fixture_v1",
         "tree_version": 1,
         "action_type": "scout",
         "severity": "critical",

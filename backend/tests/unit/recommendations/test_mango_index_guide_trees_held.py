@@ -80,34 +80,34 @@ def _outcome(result: EvaluationResult) -> TreeOutcome:
 
 _CWSI = _tree("mango_irrigation_stress_cwsi_v1.yaml")
 
-_LOADED_STAGES = ("fruit_development", "post_harvest_flush")
 
-
-@pytest.mark.parametrize("stage", _LOADED_STAGES)
-def test_cwsi_bearing_tree_in_fruit_fill_tolerates_a_hot_canopy(stage: str) -> None:
+def test_cwsi_bearing_tree_in_maturation_tolerates_a_hot_canopy() -> None:
     """0.40 is well over the resting large-tree ceiling of 0.25 and inside
     the bearing band. Judging a fruiting tree against the resting ceiling
     would alarm every productive block in Egypt, every summer."""
-    ctx = _ctx(size="large", bearing="bearing", stage=stage, cwsi=0.40)
+    ctx = _ctx(size="large", bearing="bearing", stage="maturation", cwsi=0.40)
     assert _leaf(evaluate_tree(_CWSI, ctx)) == "leaf_no_action"
 
 
 def test_cwsi_same_reading_fires_on_a_resting_tree() -> None:
-    ctx = _ctx(size="large", bearing="not_bearing", stage="fruit_development", cwsi=0.40)
+    ctx = _ctx(size="large", bearing="not_bearing", stage="maturation", cwsi=0.40)
     r = evaluate_tree(_CWSI, ctx)
     assert _leaf(r) == "leaf_stress"
     assert _outcome(r).action_type == "irrigate"
 
 
-def test_cwsi_bearing_tree_outside_fruit_fill_uses_the_tight_ceiling() -> None:
-    """Bearing alone is not enough — the relaxation is tied to the fruit
-    being on the tree, so flowering keeps the resting ceiling."""
-    ctx = _ctx(size="large", bearing="bearing", stage="flowering", cwsi=0.40)
+@pytest.mark.parametrize("stage", ["flowering", "fruit_development", "post_harvest_flush"])
+def test_cwsi_bearing_tree_outside_maturation_uses_the_tight_ceiling(stage: str) -> None:
+    """Bearing alone is not enough — the relaxation is tied to ripe fruit
+    hanging on the tree, so every other stage keeps the resting ceiling.
+    `fruit_development` and `post_harvest_flush` are named here because the
+    tree used to accept both before mango gained a `maturation` stage."""
+    ctx = _ctx(size="large", bearing="bearing", stage=stage, cwsi=0.40)
     assert _leaf(evaluate_tree(_CWSI, ctx)) == "leaf_stress"
 
 
 def test_cwsi_bearing_tree_still_fires_above_the_relaxed_ceiling() -> None:
-    ctx = _ctx(size="large", bearing="bearing", stage="fruit_development", cwsi=0.60)
+    ctx = _ctx(size="large", bearing="bearing", stage="maturation", cwsi=0.60)
     assert _leaf(evaluate_tree(_CWSI, ctx)) == "leaf_stress"
 
 
@@ -119,7 +119,7 @@ def test_cwsi_small_tree_tolerates_more_than_a_large_one() -> None:
 def test_cwsi_unrecorded_bearing_falls_to_the_tight_ceiling() -> None:
     """An absent bearing status must not buy the relaxed band — the safe
     default is to keep alarming."""
-    ctx = _ctx(size="large", stage="fruit_development", cwsi=0.40)
+    ctx = _ctx(size="large", stage="maturation", cwsi=0.40)
     assert _leaf(evaluate_tree(_CWSI, ctx)) == "leaf_stress"
 
 

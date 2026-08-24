@@ -174,12 +174,12 @@ async def test_alert_open_creates_inbox_item_and_skipped_dispatches(
     await _evaluate_via_tree(tenant.schema_name, tenant.tenant_id, block_id)
 
     # ---- inbox row ---------------------------------------------------
-    # The seed catalog now ships TWO trees that both fire on a severe
-    # NDVI drop: ``ndvi_baseline_alert_v1`` (kind=alert → inbox row
-    # with `alert_id` set) and ``scout_for_stress_v1`` (kind=
-    # recommendation → inbox row with `recommendation_id` set). The
-    # subscriber dispatches each one independently, so we expect one
-    # inbox row per fire-source. Filter to the alert row for this test.
+    # ``ndvi_baseline_alert_v1`` fires on a severe NDVI drop with
+    # kind=alert, so it writes an inbox row with `alert_id` set. Other
+    # trees in the catalogue can fire on the same block with
+    # kind=recommendation, and the subscriber dispatches each source
+    # independently — one inbox row per fire-source. Filter to the alert
+    # row so this test does not move when the catalogue changes.
     alert_rows = (
         (
             await admin_session.execute(

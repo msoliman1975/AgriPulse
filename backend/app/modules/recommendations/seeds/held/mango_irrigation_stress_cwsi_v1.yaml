@@ -5,7 +5,7 @@
 # CWSI runs the other way from the vegetation indices — HIGH means thirstier
 # — so this rule fires on a CEILING.
 #
-#   size    resting / early season   bearing, fruit fill onward
+#   size    resting / outside maturation   bearing, in maturation
 #   small   0.15–0.35                0.38–0.63
 #   medium  0.10–0.30                0.25–0.54
 #   large   0.10–0.25                0.25–0.45
@@ -31,14 +31,12 @@
 # already answers the question SMI would be asked (irrigate or not) at High
 # confidence.
 #
-# PHASE MAPPING CAVEAT. The workbook's "Maturity/Harvest" phase is weeks
-# 15–30, which is 8 June – 27 September. The platform's mango phenology has
-# no maturity stage; the nearest cover is `fruit_development` (1 May – 15
-# July) plus `post_harvest_flush` (16 July – 31 October), so the relaxed
-# ceiling starts about five weeks earlier than the workbook does and runs
-# about five weeks later. Earlier is the safer error: a bearing tree in early
-# fruit fill is already under real transpiration demand, so relaxing then
-# suppresses false alarms rather than hiding real ones.
+# The relaxed ceiling is gated on the `maturation` stage, which mango gained
+# in public migration 0073 for exactly this reason — the workbook keys these
+# bands on a "Maturity/Harvest" phase and the platform had no stage to map it
+# onto. Generic mango: 1 July – 15 September. Keitt, a late cultivar:
+# 16 August – 31 October. Both are the Egyptian harvest window rather than
+# the workbook's own 8 June – 27 September, which comes from a Ghana study.
 
 code: mango_irrigation_stress_cwsi_v1
 name_en: Mango — irrigation stress above the expected range (thermal)
@@ -46,7 +44,7 @@ name_ar: المانجو — إجهاد الريّ فوق النطاق المتو
 description_en: >-
   Compares canopy temperature stress (CWSI) against the range the mango index
   guide expects for this tree size, using a higher ceiling for a bearing tree
-  in fruit fill or harvest, when a hot canopy is normal. Needs the Landsat
+  in the maturation stage, when a hot canopy is normal. Needs the Landsat
   thermal product and the block's Tree size attribute.
 description_ar: >-
   يقارن إجهاد حرارة المجموع (CWSI) بالنطاق الذي يتوقعه دليل مؤشرات المانجو
@@ -110,46 +108,46 @@ parameters:
     min: 0.0
     max: 1.0
     description: >-
-      CWSI ceiling for a MEDIUM-tree block while resting or early in the
-      season (guide band 0.10–0.30).
+      CWSI ceiling for a MEDIUM-tree block while outside the maturation
+      window (guide band 0.10–0.30).
   large_cwsi_ceiling:
     type: number
     default: 0.25
     min: 0.0
     max: 1.0
     description: >-
-      CWSI ceiling for a LARGE-tree block while resting or early in the
-      season (guide band 0.10–0.25).
+      CWSI ceiling for a LARGE-tree block while outside the maturation
+      window (guide band 0.10–0.25).
   small_cwsi_ceiling_bearing:
     type: number
     default: 0.63
     min: 0.0
     max: 1.0
     description: >-
-      CWSI ceiling for a SMALL-tree block that is bearing, from fruit fill
-      onward, when a hotter canopy is normal (guide band 0.38–0.63).
+      CWSI ceiling for a SMALL-tree block that is bearing and in maturation,
+      when a hotter canopy is normal (guide band 0.38–0.63).
   medium_cwsi_ceiling_bearing:
     type: number
     default: 0.54
     min: 0.0
     max: 1.0
     description: >-
-      CWSI ceiling for a MEDIUM-tree block that is bearing, from fruit fill
-      onward (guide band 0.25–0.54).
+      CWSI ceiling for a MEDIUM-tree block that is bearing and in maturation
+      (guide band 0.25–0.54).
   large_cwsi_ceiling_bearing:
     type: number
     default: 0.45
     min: 0.0
     max: 1.0
     description: >-
-      CWSI ceiling for a LARGE-tree block that is bearing, from fruit fill
-      onward (guide band 0.25–0.45).
+      CWSI ceiling for a LARGE-tree block that is bearing and in maturation
+      (guide band 0.25–0.45).
 
 root: fruit_load
 nodes:
   fruit_load:
-    label_en: Is the block bearing fruit and past the start of fruit fill?
-    label_ar: هل القطعة مثمرة وتجاوزت بداية امتلاء الثمار؟
+    label_en: Is the block bearing fruit and in the maturation stage?
+    label_ar: هل القطعة مثمرة وفي مرحلة النضج؟
     condition:
       tree:
         all_of:
@@ -164,12 +162,11 @@ nodes:
               source: block
               field: growth_stage
             values:
-              - fruit_development
-              - post_harvest_flush
+              - maturation
     on_match: bearing_small
     on_miss: resting_small
 
-  # --- bearing, fruit fill onward: the relaxed ceilings -------------------
+  # --- bearing and in maturation: the relaxed ceilings --------------------
 
   bearing_small:
     label_en: Are the trees in the small size class?
@@ -261,7 +258,7 @@ nodes:
     on_match: leaf_stress
     on_miss: leaf_no_action
 
-  # --- resting or early season: the tighter ceilings ----------------------
+  # --- resting or outside maturation: the tighter ceilings ----------------
 
   resting_small:
     label_en: Are the trees in the small size class?

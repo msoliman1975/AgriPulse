@@ -46,7 +46,7 @@ phenological phase**. That is what the trees below are built from.
 |---|---|---|
 | Tree size (Small/Medium/Big) | `block_crops.canopy_size_class` exists but **no screen writes it** and it was removed from the decision-tree field list | New crop attribute `tree_size_class` on `mango` |
 | Productivity (Productive / Non-productive) | Nothing | New crop attribute `bearing_status` on `mango` |
-| Phenological phase (A/B/C) | `block.growth_stage` — 6 mango stages | Reuse. See parked question P2 |
+| Phenological phase (A/B/C) | `block.growth_stage` had 6 mango stages and no maturity | Added a `maturation` stage (migration 0073) |
 | Establishment (Grafted/Seedling) | Crop attribute `establishment_method` | Reuse. Not branched on — see §5 |
 | Imaging resolution (10 m / 3 m) | Sentinel-2 10 m only | Use the 10 m column. See §5 |
 | Variety | Crop taxonomy | Not branched on — the workbook says the values do not differ |
@@ -73,28 +73,39 @@ what the screens' own delete does, so the rows and their values survive):
 Nothing is thrown away. Tenant migration 0084 copies the 306 recorded values
 onto the curated definitions:
 
-* `003` `01` Young non-productive → `tree_size_class=small`, `bearing_status=not_bearing`
-* `003` `02` Young new-productive → `tree_size_class=small`, `bearing_status=bearing`
-* `003` `03` Mature productive → `tree_size_class=large`, `bearing_status=bearing`
-* `004` `01`…`06` → `seed` / `seedling` / `grafted_tree` / `rootstock` / `cutting` / `tissue_culture`
+**Size comes from `tree_age` first**, and from `003` only where no age was
+recorded. Age bands follow the size classes mango already carries: under 4
+years → small, 4–8 → medium, over 8 → large.
 
-`medium` is unreachable from that mapping because `003` had no middle option.
-**Worth a spot check** — see parked question P1.
+Where `003` is the only signal:
 
-Dry-run against both prod tenants inside a rolled-back transaction:
+* `01` Young non-productive → `tree_size_class=small`, `bearing_status=not_bearing`
+* `02` Young new-productive → `tree_size_class=medium`, `bearing_status=bearing`
+* `03` Mature productive → `tree_size_class=large`, `bearing_status=bearing`
 
-```
-tenant_019eafdc  tree_size_class  small 73  large 8
-                 bearing_status   bearing 73  not_bearing 8
-                 establishment_method  grafted_tree 44  seedling 28  seed 8  tissue_culture 1
-tenant_01a025a4  tree_size_class  small 72
-                 bearing_status   bearing 36  not_bearing 36
-                 establishment_method  grafted_tree 72
-```
+`004` `01`…`06` → `seed` / `seedling` / `grafted_tree` / `rootstock` /
+`cutting` / `tissue_culture`. Bearing always comes from `003`; only the size
+half is superseded by age.
 
-Two hand-authored attributes are **left alone**: `tree_age` (117 values) and
-`implantation_date` (72 values). Neither is an axis in the workbook, but both
-hold data somebody typed and neither shadows another field. See P3.
+**Why age wins where both exist.** Every prod block carrying `tree_age` reads
+2 or 3 years, while 100 of them carry `003 = 02`. Mapping that straight to
+medium would call a three-year-old planting a 2–4 m canopy. The imagery
+agrees with the age, not the label: those blocks read NDVI 0.17–0.21 and SAVI
+0.16–0.19, which are the guide's small-tree bands. Taking the label over the
+age would have put 100 of 108 blocks below their expected range on the first
+sweep — a size error reported as a crop problem. Measured both ways before
+choosing.
+
+Result across both tenants: 125 small, 28 medium, 0 large. The 28 medium are
+the blocks with a hand-entered `003 = 02` and no recorded age.
+
+The curated `establishment_method` had been retired on prod while `004`
+shadowed it. It is re-activated, because `004` is the copy that goes and
+establishment is one of the workbook's own axes.
+
+`tree_age` is kept (117 values, shadows nothing). `implantation_date` is
+retired: it duplicates `block_crops.planting_date`, and on prod the two agree
+on 71 of the 72 rows, so no data is lost by removing the field.
 
 ## 4. Trees built
 
@@ -108,7 +119,7 @@ irrigation cards on the same block on the same day.
 | `mango_canopy_moisture_by_size_v1` | NDMI | Below that size's floor | New |
 | `mango_canopy_cover_gap_v1` | BSI | Above that size's ceiling | New |
 | `mango_post_harvest_nitrogen_v1` | NDRE | Below that size's floor during post-harvest flush | Rewritten |
-| `mango_irrigation_stress_cwsi_v1` | CWSI | Above that size's ceiling, relaxed for a bearing tree in fruit fill | **Held** — see §6 |
+| `mango_irrigation_stress_cwsi_v1` | CWSI | Above that size's ceiling, relaxed for a bearing tree in maturation | **Held** — see §6 |
 
 Each tree gates on `tree_size_class` first. If the field is empty the tree
 reaches a `no_action` leaf that says so, so it never opens a card on a guess.
@@ -129,14 +140,24 @@ workbook's bands are 0.08–0.18 small, 0.18–0.30 medium, 0.38–0.52 large, s
 
 Compiled trees walked against the latest 45-day index means for the 108 mango
 blocks on prod that have recent imagery, using the migrated size and bearing
-values:
+values and the `maturation` stage those blocks reach under the new curve:
 
 | Tree | Would open |
 |---|---|
-| `mango_canopy_vigour_by_size_v1` | 36 of 108 |
-| `mango_canopy_moisture_by_size_v1` | 0 of 108 |
+| `mango_canopy_vigour_by_size_v1` | 54 of 108 |
+| `mango_canopy_moisture_by_size_v1` | 28 of 108 |
 | `mango_canopy_cover_gap_v1` | 0 of 108 |
-| `mango_post_harvest_nitrogen_v1` | 19 of 108 (was 89 under the old 0.30 floor) |
+| `mango_post_harvest_nitrogen_v1` | 0 of 108 |
+
+82 cards on the first sweep. Two things to read into that number:
+
+* The 28 moisture cards are exactly the 28 blocks sized `medium` from the
+  hand-entered `003` label with no age to check it against. If those trees
+  are in fact small, all 28 disappear. Worth checking on the ground.
+* The nitrogen tree opens nothing because these blocks are now in
+  `maturation`, not `post_harvest_flush`. It becomes live again on
+  16 September. Under the old 0.30 floor and the old calendar it would have
+  opened 89.
 
 Observed ranges on those blocks: MSAVI 0.113–0.210, NDMI −0.116 to −0.034,
 BSI 0.129–0.186, NDRE 0.051–0.142.
@@ -189,6 +210,9 @@ canopy on bright sand puts the difference well past +6 °C, so the value
 clips to 1.0. That comment already says the output must be read as a relative
 signal over time and "must not drive" irrigation volumes.
 
+It now gates its relaxed ceiling on the `maturation` stage added in
+migration 0073, so the phase mismatch that was open at review time is closed.
+
 Release condition and the test that keeps it honest are in
 `backend/app/modules/recommendations/seeds/held/README.md`.
 
@@ -204,52 +228,62 @@ Release condition and the test that keeps it honest are in
 | `mango_post_harvest_nitrogen_v1` | **Rewritten** — see §4. |
 | `date_palm_*` (3), `potato_*` (6) | Reviewed, no change. Different crops, outside this workbook. |
 | `ndvi_baseline_alert_v1` | Keep. Emits an *alert*, not a recommendation, so it does not duplicate a scouting card. |
-| `scout_for_stress_v1` | **Question P4.** |
-| `demo_cell_low_ndvi_v1` | **Question P5.** |
-| `testv01` (tenant-authored, live on prod) | **Question P6.** |
+| `scout_for_stress_v1` | **Archived.** Thresholds hardcoded at -0.5 / -1.5 rather than tunable, and on a mango block it asks the same question as `mango_canopy_health_v1`. |
+| `demo_cell_low_ndvi_v1` | **Archived.** Fires on a hardcoded NDVI below 0.15, which the workbook calls normal for a small mango tree. |
+| `testv01` (tenant-authored, live on prod) | **Removed by hand on prod** — see §9. |
 
-## 8. Parked — needs your decision
+## 8. The maturation stage
 
-**P1 — the `003` → size mapping.** "Mature productive" is mapped to `large`
-and both "Young" options to `small`, so no block lands on `medium`. That is
-faithful to what was recorded (there was no middle option) but it means every
-migrated block reads small or large. Worth spot-checking a few real blocks
-before this ships. If you would rather start clean, say so and I will drop
-the copy and leave the new fields empty for manual entry.
+Mango had six stages and no maturity: `fruit_development` ran 1 May – 15 July
+and `post_harvest_flush` picked up on 16 July. Egyptian mango is harvested
+across July, August and September, so that calendar called the whole harvest
+"post-harvest" and had no stage for ripe fruit on the tree.
 
-**P2 — the phase offset.** The workbook's "Maturity/Harvest" phase is weeks
-15–30, which is 8 June – 27 September. The platform's mango phenology has no
-maturity stage: the nearest cover is `fruit_development` (1 May – 15 July)
-plus `post_harvest_flush` (16 July – 31 October). The held CWSI tree uses
-those two stages, so its relaxed band starts about five weeks early and ends
-about five weeks late. The alternative is adding a `maturity` stage to the
-mango phenology, which changes the auto-advance task and the plan templates
-anchored to those stage codes. Not done.
+Two things were already written as if the stage existed. Migration 0064 seeds
+mango a Kc of 0.85 for `maturation`, and its own docstring lists that stage
+among the ones 0033 supposedly created — that row has been unreachable since
+it was written, and now resolves. And the workbook keys its CWSI and SMI
+bands on a "Maturity/Harvest" phase that had nothing to map onto.
 
-**P3 — `tree_age` and `implantation_date`.** 117 and 72 recorded values.
-Neither is in the workbook. `tree_age` also carries a placeholder Arabic
-label ("omer ahhahhsa"). Retire them, keep them, or fix the labels?
+The code is `maturation`, matching the Kc seed and potato's stage of the same
+name.
 
-**P4 — `scout_for_stress_v1`.** Crop-agnostic, scouts on NDVI z-score, with
-the thresholds **hardcoded** at −0.5 and −1.5 rather than declared as tunable
-parameters. On a mango block it fires alongside `mango_canopy_health_v1`,
-which asks the same question with a soil-aware index and a tunable threshold.
-Removing it would also remove the rule from potato and date palm, so I have
-not touched it. Options: retire it, or give it a `parameters` block and
-accept the mango overlap.
+| Stage | Was | Now |
+|---|---|---|
+| `fruit_development` | 05-01 – 07-15 | 05-01 – 06-30 |
+| `maturation` | — | **07-01 – 09-15** |
+| `post_harvest_flush` | 07-16 – 10-31 | 09-16 – 11-15 |
+| `veg_flush` | 11-01 – 11-30 | 11-16 – 11-30 |
 
-**P5 — `demo_cell_low_ndvi_v1`.** Named "Demo", targets `mango`, cell-scoped,
-fires on a hardcoded NDVI below 0.15. The workbook puts 0.10–0.22 as the
-*normal* band for a small mango tree, so on a young orchard this flags cells
-that are behaving exactly as expected. It has opened nothing on prod so far.
-It is also the only cell-scoped tree in the catalogue, so retiring it removes
-the only worked example of per-cell scope. Retire, or re-target it away from
-mango?
+Keitt keeps its own late-cultivar override: it is picked in September and
+October, so its `maturation` runs 08-16 – 10-31 and its flush is compressed
+into November.
 
-**P6 — `testv01` on prod.** A tenant-authored tree on
-`tenant_019eafdc…`, named "My new tree", whose recommendation text is
-"me testing one more time". It is **not archived and is live**, and it has
-**435 open spray recommendations**. That is the largest single source of
-noise in the Action Center today. Archiving the tree stops it opening more
-but does not clear the 435 rows, which is a second decision. I have not
-touched prod data. The commands are ready on request.
+Windows come from the Egyptian harvest calendar rather than the workbook's
+own 8 June – 27 September, whose phenology source is a Sentinel-2 study in
+Ghana.
+
+Two consequences that would have been silent:
+
+* **Fruit fly and anthracnose.** Both models scored `fruit_development` as a
+  susceptible stage. Shortening it without adding `maturation` to their
+  susceptible sets would have dropped both scores to the off-stage factor
+  exactly when ripening fruit is most at risk. Both sets were widened.
+* **The nitrogen tree.** It gates on `post_harvest_flush`, which now starts
+  16 September instead of 16 July. Blocks in August go quiet, which is
+  correct — they are in harvest, not rebuilding reserves.
+
+Every existing stage code survives, so the two plan templates that anchor
+activities to `fruit_development` and `post_harvest_flush` keep working; their
+resolved dates move, which is the point. A test walks every day of a leap year
+through both curves, new and old, and asserts each day lands in exactly one
+stage — the auto-advance task holds a block's stage silently if a day matches
+none.
+
+## 9. Left to do by hand on prod
+
+`testv01` on tenant `019eafdc…` is a tenant-authored tree named "My new tree"
+whose recommendation text is "me testing one more time". It is live and has
+435 open spray recommendations. It exists only in that tenant's data, so a
+migration is the wrong tool. Archiving the tree and clearing its open cards is
+done directly against prod and recorded in the deploy notes.

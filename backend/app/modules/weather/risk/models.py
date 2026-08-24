@@ -171,7 +171,13 @@ _AN_WET_RAIN_MM = Decimal("1")  # measurable rain == leaf wetness
 # pathogens need a sustained wet spell rather than a damp moment; 6h is the
 # low end of the range the literature reports for Colletotrichum.
 _AN_WET_HOURS = Decimal("6")
-_AN_SUSCEPTIBLE_STAGES = frozenset({"flowering", "fruit_set", "fruit_development"})
+# `maturation` joined this set when mango gained the stage (public migration
+# 0073). Anthracnose infects the fruit early and stays latent until the fruit
+# ripens, which is when the lesions appear and the crop is lost -- so the
+# ripening window is the most susceptible one, not an off-stage. Without it
+# here, splitting `fruit_development` would have dropped the score to the
+# off-stage factor exactly when the fruit is most at risk.
+_AN_SUSCEPTIBLE_STAGES = frozenset({"flowering", "fruit_set", "fruit_development", "maturation"})
 
 
 def anthracnose(window: Sequence[RiskWeatherDay], ctx: RiskBlockContext) -> RiskScore | None:
@@ -233,7 +239,10 @@ _FF_BASE_C = Decimal("13")
 _FF_DD_SATURATION = Decimal("210")
 _FF_RH_BOOST_MIN = Decimal("50")
 _FF_DRY_FACTOR = Decimal("0.6")  # humidity below the boost floor damps DD
-_FF_SUSCEPTIBLE_STAGES = frozenset({"fruit_set", "fruit_development"})
+# `maturation` joined this set when mango gained the stage (public migration
+# 0073). Fruit flies lay into ripening fruit, so the harvest window is the
+# peak of the risk, not its end.
+_FF_SUSCEPTIBLE_STAGES = frozenset({"fruit_set", "fruit_development", "maturation"})
 
 
 def fruit_fly(window: Sequence[RiskWeatherDay], ctx: RiskBlockContext) -> RiskScore | None:

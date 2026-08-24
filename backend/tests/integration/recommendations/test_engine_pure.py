@@ -22,7 +22,7 @@ pytestmark = [pytest.mark.integration]
 
 
 _NDVI_TREE: dict[str, object] = {
-    "code": "scout_for_stress_v1",
+    "code": "ndvi_drop_scout_fixture_v1",
     "name_en": "Scout for stress",
     "root": "root",
     "nodes": {
