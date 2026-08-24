@@ -23,9 +23,22 @@ QueueName = Literal["light", "heavy", "beat"]
 
 _TASK_PACKAGES: tuple[str, ...] = (
     "workers.tasks",
+    # `app.modules.recommendations` was named as the package for its whole
+    # life, and its `__init__.py` is a docstring, so `tasks.py` was never
+    # imported, the three @shared_task decorators never ran, and
+    # `recommendations.evaluate_sweep` was unregistered on every worker.
+    # Beat dispatched it hourly and the light worker answered "Received
+    # unregistered task ... KeyError" every time, which is a log line and
+    # not an alert. Net effect: the sweep has never evaluated a decision
+    # tree in production. `evaluate_for_tenant` and `prune_eval_runs` were
+    # dead the same way. The rule stated in the comment below was already
+    # written; these three entries predate it.
+    #
+    # `audit` and `notifications` stay as packages on purpose: neither owns
+    # a tasks module, so there is nothing for a `.tasks` suffix to name.
     "app.modules.audit",
     "app.modules.notifications",
-    "app.modules.recommendations",
+    "app.modules.recommendations.tasks",
     # Celery's `include=` imports the literal module name â€” packages are
     # NOT recursed. Point at the submodule that owns the @shared_task
     # decorators so Beat-dispatched tasks resolve on workers.
