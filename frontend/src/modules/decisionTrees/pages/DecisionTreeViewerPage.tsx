@@ -66,6 +66,9 @@ import { TreeCanvas } from "../components/TreeCanvas";
 import { TreeMetadataPanel } from "../components/TreeMetadataPanel";
 import { applyTreeMetaToYaml, readTreeMeta, type TreeMetaFields } from "../lib/metadataEdit";
 import { layoutTree, type CompiledTree } from "../layout/treeLayout";
+import { applyManualPositions } from "../layout/manualPositions";
+import { pngFileName } from "../lib/exportCanvasPng";
+import { useTreeCanvasPrefs } from "../lib/useTreeCanvasPrefs";
 import {
   applyParameterEditsToYaml,
   hasParameterEdits,
@@ -256,7 +259,17 @@ export function DecisionTreeViewerPage(): ReactNode {
     return doc as CompiledTree;
   }, [draftYaml]);
 
-  const layout = useMemo(() => layoutTree(draftCompiled), [draftCompiled]);
+  const autoLayout = useMemo(() => layoutTree(draftCompiled), [draftCompiled]);
+  const layoutNodeIds = useMemo(() => autoLayout.nodes.map((n) => n.id), [autoLayout.nodes]);
+  // Hand-dragged box positions + canvas height. Browser-local, keyed
+  // by tree code — moving a box never touches the draft or its dirty
+  // state. Nodes with no manual position keep their auto slot, so a
+  // node added after a drag still lands somewhere sensible.
+  const canvasPrefs = useTreeCanvasPrefs(code, layoutNodeIds);
+  const layout = useMemo(
+    () => applyManualPositions(autoLayout, canvasPrefs.positions),
+    [autoLayout, canvasPrefs.positions],
+  );
   const dirtyIds = useMemo(
     () => new Set(Object.keys(editBuffer).filter((id) => Object.keys(editBuffer[id]).length > 0)),
     [editBuffer],
@@ -820,6 +833,12 @@ export function DecisionTreeViewerPage(): ReactNode {
                 pathNodeIds={highlight?.nodes}
                 pathEdgeKeys={highlight?.edges}
                 terminalNodeId={highlight?.terminalNodeId ?? null}
+                height={canvasPrefs.height}
+                onHeightChange={canvasPrefs.setHeight}
+                onNodeMove={canvasPrefs.moveNode}
+                onResetLayout={canvasPrefs.resetLayout}
+                canResetLayout={canvasPrefs.hasManualPositions}
+                exportFileName={pngFileName(tree.code)}
               />
               {unreachableNodes.length > 0 ? (
                 <div className="flex items-start justify-between gap-3 rounded-md border border-ap-warn/40 bg-ap-warn/5 p-3 text-xs">
