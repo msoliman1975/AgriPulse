@@ -280,10 +280,42 @@ through both curves, new and old, and asserts each day lands in exactly one
 stage — the auto-advance task holds a block's stage silently if a day matches
 none.
 
-## 9. Left to do by hand on prod
+## 9. The sweep that never ran
 
-`testv01` on tenant `019eafdc…` is a tenant-authored tree named "My new tree"
-whose recommendation text is "me testing one more time". It is live and has
-435 open spray recommendations. It exists only in that tenant's data, so a
-migration is the wrong tool. Archiving the tree and clearing its open cards is
-done directly against prod and recorded in the deploy notes.
+Found while verifying the deploy. `recommendations.evaluate_sweep` is
+scheduled hourly by Beat but was **not registered on any worker**, so it has
+never evaluated a decision tree in production.
+
+`workers/celery_factory.py` listed `app.modules.recommendations` — the
+package. Celery's `include=` imports the literal module name and does not
+recurse, and that package's `__init__.py` is a docstring, so `tasks.py` was
+never imported and its three `@shared_task` decorators never ran. The rule
+was already written as a comment three lines below the entry that broke it.
+
+Nothing failed loudly. Every hour the light worker answered
+`Received unregistered task of type 'recommendations.evaluate_sweep' ...
+KeyError` into its log and carried on: queue drained, pod Ready, no alert.
+Asked directly, the running worker lists 55 tasks and none of them are
+`recommendations.*`, while `phenology.*` and `irrigation.*` are there because
+their entries name `.tasks`.
+
+This explains something that looked like good news earlier in this work: none
+of the mango seed trees had opened a single recommendation on prod. That was
+not because they never matched — they were never run. The 435 cards on the
+archived `testv01` came from manual "run tree on farm" calls, which is why
+they were the only recommendations that existed anywhere.
+
+Fixed in PR #564, one line plus a test that walks `beat_schedule` and asserts
+each task resolves on the queue Beat routes it to. A wrong queue fails the
+same silent way as a wrong module name, so both are covered.
+
+## 10. Left to do by hand on prod
+
+**Done.** `testv01` on tenant `019eafdc…` was a tenant-authored tree named
+"My new tree" whose recommendation text was "me testing one more time", live
+with 435 open spray cards. It existed only in that tenant's data, so a
+migration was the wrong tool; it was archived and its 435 open cards
+soft-deleted directly against prod, in one transaction. Applied and dismissed
+rows were left alone — those record something a person did.
+
+Nothing else is outstanding.
