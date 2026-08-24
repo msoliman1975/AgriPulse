@@ -265,7 +265,17 @@
       "addMiss": "Add miss child",
       "dragMatch": "Drag to rewire match branch",
       "dragMiss": "Drag to rewire miss branch",
-      "rewireFailed": "Couldn't rewire — see the structural error list."
+      "rewireFailed": "Couldn't rewire — see the structural error list.",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fit": "Fit",
+      "resetLayout": "Reset layout",
+      "resetLayoutHint": "Put every box back where the automatic layout puts it.",
+      "exportPng": "Export PNG",
+      "exportFailed": "Could not export the PNG. Try again.",
+      "nodeCount": "{{count}} nodes",
+      "resizeGrip": "Drag to change the canvas height",
+      "hint": "Drag a box to move it. Drag the background to pan. Ctrl + wheel to zoom."
     },
     "errors": {
       "heading": "Structural issues — save is blocked"
