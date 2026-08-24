@@ -1251,8 +1251,15 @@ export function MapCanvas({
           map.addSource(id, {
             type: "raster",
             tiles: [layer.tileUrl],
-            // Must match the `tilesize` the URL asks the server for, or
-            // MapLibre scales every tile and the pixels blur.
+            // Must match the size the URL asks the server for — TiTiler's
+            // `scale`, times 256. Declaring 512 does two things: it fetches
+            // one pyramid level LOWER, so each tile covers twice the ground
+            // per axis, and it draws whatever comes back across a 512 CSS
+            // footprint. Handed a 256 image for that, MapLibre stretches it
+            // with the `nearest` resampling below, and every raster pixel is
+            // drawn at four times its area with hard edges — the pixel grid
+            // `reproject=bilinear` exists to remove. See `SCALE` in
+            // pixelTiles.ts for how the two got out of step.
             tileSize: layer.tileSize ?? 256,
             // The COG covers one block; asking beyond its native resolution
             // buys blank tiles, so let MapLibre overzoom the last real level.

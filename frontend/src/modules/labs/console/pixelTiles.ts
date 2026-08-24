@@ -65,6 +65,27 @@ const REPROJECT = "bilinear";
 export const TILE_SIZE = 512;
 
 /**
+ * How the tile server is ASKED for that size.
+ *
+ * TiTiler has no `tilesize` parameter. Its tile endpoint takes `scale`, and
+ * computes `tilesize = scale * tms.tileWidth` — so 512 on the 256-wide
+ * WebMercatorQuad is `scale=2`. Sending `tilesize=512` instead is not an
+ * error anyone sees: FastAPI drops an unknown query parameter, the server
+ * returns its 256 default, and only the picture is wrong.
+ *
+ * That is worth spelling out because of what MapLibre does with the answer.
+ * A source declaring `tileSize: 512` fetches one pyramid level LOWER than a
+ * 256 source at the same screen zoom, so each tile covers twice the ground
+ * per axis. Handed a 256 image for it, MapLibre stretches that image over a
+ * 512 footprint with `raster-resampling: nearest` — so every raster pixel is
+ * drawn four times its area with hard edges, which is the mosaic of boxes the
+ * `reproject` above exists to remove. Verified against the prod tile server:
+ * `tilesize=512` returns a 256x256 PNG byte-identical to sending nothing,
+ * while `scale=2` returns 512x512.
+ */
+const SCALE = String(TILE_SIZE / 256);
+
+/**
  * XYZ template for one block's index raster, for a MapLibre raster source.
  *
  * `{z}/{x}/{y}` are left intact for MapLibre to interpolate. There is
@@ -87,7 +108,7 @@ export function blockTileUrl(input: {
     url: assetUri(input.s3Bucket, input.asset, input.code),
     colormap: titilerColormap(input.code),
     reproject: REPROJECT,
-    tilesize: String(TILE_SIZE),
+    scale: SCALE,
     ...cutlineParams(input.cutlineAoi),
   });
   return `${trimTrailingSlash(input.tileServerBaseUrl)}/cog/tiles/WebMercatorQuad/{z}/{x}/{y}.png?${params.toString()}`;
@@ -247,36 +268,61 @@ export interface ClassAreaSummary {
   coveredM2: number;
   /** Ground in scope with no reading for this scene. */
   noDataM2: number;
+  /**
+   * Whether these numbers describe the block that was asked for.
+   *
+   * False whenever no block was asked for, AND whenever one was asked for
+   * that `counts` holds no row of — the whole-farm figures are returned
+   * instead. The caller must label the panel from THIS rather than from the
+   * block it selected, or the reader is told a farm's area belongs to one
+   * block. See `summariseClassAreas` for when the second case happens.
+   */
+  scopedToBlock: boolean;
 }
 
 /**
  * Sum per-class areas across blocks.
  *
- * `scopeBlockId` narrows to one block; pass null for the whole farm. A block
- * whose statistics failed is simply absent from `counts` and contributes
- * nothing — better an area that is short by one block than one inflated by a
- * block counted with a guessed resolution.
+ * `scopeBlockId` narrows to one block; pass null for the whole farm.
  *
- * `scopeAreaM2` is the ground the scope actually occupies, and it exists
- * because masked pixels are not it. A COG is a rectangle; the raster inside
- * it is clipped to a polygon, so every pixel in the bounding box that the
- * polygon misses counts as masked. Reported raw, that says a farm has
- * unread ground where it has no ground at all — on Bashier Elkhier, 56.9
- * feddan of "no reading" against a 203.4 feddan farm that only adds up if
- * you include six feddan of neighbouring desert. Given the farm's own area,
- * the honest figure is what is left of it after the readings.
+ * A block `counts` has no row for CANNOT be narrowed to, and the answer then
+ * is the whole farm rather than nothing. Two ways to get there:
+ *
+ *  * A farm drawn from one stitched surface is measured once, under
+ *    `FARM_SCOPE_ID` — there are no per-block rows to pick from at all, and
+ *    on a farm cut over to farm-AOI fetching that is every pass. Filtering
+ *    to a block matched nothing and the legend read 0.0 on every class:
+ *    a farm with 219 measured passes reporting no land in any colour.
+ *  * A block whose statistics call failed is absent from `counts`.
+ *
+ * Zero is the wrong answer to both. It is not "this block has no land in any
+ * class"; it is "this reading is not held per block", and the honest thing
+ * to show beside the colours is the farm they were measured over. The caller
+ * reads `scopedToBlock` to say which it got.
+ *
+ * `farmAreaM2` is the ground the FARM occupies, and it exists because masked
+ * pixels are not it. A COG is a rectangle; the raster inside it is clipped to
+ * a polygon, so every pixel in the bounding box that the polygon misses
+ * counts as masked. Reported raw, that says a farm has unread ground where it
+ * has no ground at all — on Bashier Elkhier, 56.9 feddan of "no reading"
+ * against a 203.4 feddan farm that only adds up if you include six feddan of
+ * neighbouring desert. Given the farm's own area, the honest figure is what
+ * is left of it after the readings. It is used only when the summary is
+ * farm-wide; a block scope falls back to masked pixels, having no surveyed
+ * area of its own to measure against.
  */
 export function summariseClassAreas(
   counts: readonly BlockPixelCounts[],
   classCount: number,
   scopeBlockId: string | null,
-  scopeAreaM2?: number | null,
+  farmAreaM2?: number | null,
 ): ClassAreaSummary {
+  const scopedToBlock = scopeBlockId !== null && counts.some((c) => c.blockId === scopeBlockId);
   const areaM2ByClass = new Array<number>(classCount).fill(0);
   let coveredM2 = 0;
   let maskedM2 = 0;
   for (const c of counts) {
-    if (scopeBlockId && c.blockId !== scopeBlockId) continue;
+    if (scopedToBlock && c.blockId !== scopeBlockId) continue;
     for (let i = 0; i < classCount; i += 1) {
       const area = (c.perClass[i] ?? 0) * c.pixelAreaM2;
       areaM2ByClass[i] += area;
@@ -287,6 +333,6 @@ export function summariseClassAreas(
   // Pixels straddling the boundary are counted whole, so coverage can edge
   // past the surveyed area — clamp rather than report negative unread ground.
   const noDataM2 =
-    scopeAreaM2 && scopeAreaM2 > 0 ? Math.max(0, scopeAreaM2 - coveredM2) : maskedM2;
-  return { areaM2ByClass, coveredM2, noDataM2 };
+    !scopedToBlock && farmAreaM2 && farmAreaM2 > 0 ? Math.max(0, farmAreaM2 - coveredM2) : maskedM2;
+  return { areaM2ByClass, coveredM2, noDataM2, scopedToBlock };
 }
