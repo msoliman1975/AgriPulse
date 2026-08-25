@@ -219,15 +219,20 @@ class Settings(BaseSettings):
     # 86400 = once per day; pure accumulation math, light queue.
     weather_risk_compute_seconds: int = 86400
 
-    # Cadence for `alerts.evaluate_alerts_sweep`. Nightly in production;
-    # 30 minutes in dev so a freshly-ingested scene flips into alerts
-    # within one Beat cycle.
+    # Cadence for `alerts.evaluate_alerts_sweep`. Dormant: the rules-based
+    # alerts sweep was unscheduled by the rules sunset (see the commented
+    # entry in `workers/beat/main.py`), so this value drives nothing.
+    # Kept so that re-adding that Beat entry for parity debugging needs
+    # no new setting. Trees open alerts now, on the recommendations
+    # cadence below.
     alerts_evaluate_sweep_seconds: int = 1800
 
-    # Cadence for `irrigation.generate_sweep`. Once per day suffices
-    # in production (recommendations target a calendar day); hourly in
-    # dev for fast iteration. The partial UNIQUE on schedules keeps
-    # re-runs within the same day from duplicating.
+    # Cadence for `irrigation.generate_sweep`. Hourly, in every
+    # environment. No deployment overrides this. An earlier comment here
+    # said once per day sufficed in production; nothing ever set that.
+    # Schedules target a calendar day, so the extra runs re-derive the
+    # same day, and the partial UNIQUE on schedules keeps them from
+    # duplicating.
     irrigation_generate_sweep_seconds: int = 3600
 
     # Cadence for `irrigation.water_balance_sweep`. Targets YESTERDAY, so
@@ -241,11 +246,17 @@ class Settings(BaseSettings):
     # rescores the previous day rather than a partial one.
     weather_spi_sweep_seconds: int = 86400
 
-    # Cadence for `recommendations.evaluate_sweep`. Daily in production
-    # â€” decision trees consume slow-moving signals (NDVI baselines).
-    # Hourly in dev so a fresh aggregate triggers a recommendation
-    # within one Beat cycle. Partial UNIQUE on (block_id, tree_id)
-    # WHERE state='open' keeps re-runs idempotent.
+    # Cadence for `recommendations.evaluate_sweep`. Hourly, in every
+    # environment. No deployment overrides this, so the default below is
+    # what runs in production. An earlier comment here claimed "daily in
+    # production"; nothing ever set that.
+    #
+    # Hourly costs little: the partial UNIQUE on (block_id, tree_id)
+    # WHERE state='open' makes a re-run a no-op while the prior
+    # recommendation is still open, and the signals the trees read (NDVI
+    # baselines, daily weather indices) move slower than an hour anyway.
+    # What hourly buys is latency: a fresh aggregate becomes a
+    # recommendation within one Beat cycle instead of up to a day later.
     recommendations_evaluate_sweep_seconds: int = 3600
 
     # Cadence for `recommendations.prune_eval_runs`. Daily — the rows it

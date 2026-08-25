@@ -63,7 +63,7 @@ class RecommendationsRepository:
         ``only_code`` narrows the result to one tree. That is the whole
         mechanism behind the authoring "run this tree now" path: the
         evaluation walks the *same* code the sweep does, with the tree set
-        cut to one, so a targeted run cannot drift from the nightly one.
+        cut to one, so a targeted run cannot drift from the scheduled one.
         Filtered in SQL rather than in Python because the caller runs this
         once per block, and the per-tree parameter-override bulk load
         downstream keys off whatever this returns.

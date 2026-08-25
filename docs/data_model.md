@@ -1049,7 +1049,7 @@ The Beat sweep `alerts.evaluate_alerts_sweep` fans out per active tenant; the pe
 3. Snapshot the block's signals: `latest_aggregate_per_index`, `crop_category` from the current `block_crops`.
 4. For each merged rule, dispatch on predicate `type`; insert an alert if it fires.
 
-The insertion is idempotent (partial UNIQUE), so the sweep can run as often as the operator likes without flooding the alert list. Cadence is set in `workers/beat/main.py` against `alerts_evaluate_sweep_seconds` (30 minutes in dev; nightly in production).
+The insertion is idempotent (partial UNIQUE), so the sweep can run as often as the operator likes without flooding the alert list. This sweep is no longer scheduled: the rules sunset removed its Beat entry, and decision-tree leaves with `kind: alert` open alerts instead, on the `recommendations.evaluate_sweep` cadence (hourly, in every environment). `alerts_evaluate_sweep_seconds` is kept so re-adding the Beat entry for parity debugging needs no new setting.
 
 ---
 

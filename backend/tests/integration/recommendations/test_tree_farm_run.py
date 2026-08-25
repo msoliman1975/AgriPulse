@@ -3,7 +3,7 @@
 The dry-run answers "what would this tree decide here?" and writes
 nothing. ``run_tree_on_farm`` decides it and puts the result in the
 Action Center. These tests cover the four things that separate it from a
-dry-run and from the nightly sweep:
+dry-run and from the scheduled sweep:
 
   * it writes real ``recommendations`` rows, for every targeted block of
     the farm and no block outside it;

@@ -382,7 +382,7 @@ async def evaluate_block(
     # A single-block run, traced like the sweep. This is the debug path, so it
     # is the one an author reaches for first — leaving it untraced would mean
     # the button labelled "run this now" produced less evidence than the
-    # unattended nightly job.
+    # unattended scheduled job.
     run_id = await service.repo.open_eval_run(kind="on_demand", actor_user_id=context.user_id)
     summary = await service.evaluate_block(
         block_id=block_id,

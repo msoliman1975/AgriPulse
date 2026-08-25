@@ -337,7 +337,7 @@ class RecommendationsServiceImpl:
         ``only_tree_code`` narrows the pass to a single tree. Everything
         downstream - targeting, parameter overrides, dedup, traces, audit,
         notifications - is unchanged, which is the point: the authoring
-        "run this tree now" button must produce the same rows the nightly
+        "run this tree now" button must produce the same rows the scheduled
         sweep would, not a parallel implementation of them.
 
         ``tally``, when supplied, accumulates per-outcome counts
@@ -443,7 +443,7 @@ class RecommendationsServiceImpl:
         This is the authoring counterpart to ``:dry-run``. The dry-run
         answers "what would this tree decide here?"; this answers "decide it
         and put the work in front of the team." Every block of the farm goes
-        through the same ``evaluate_block`` the nightly sweep drives, with
+        through the same ``evaluate_block`` the scheduled sweep drives, with
         the tree set cut to one — so what lands in the Action Center is
         indistinguishable in kind from what the sweep produces, including
         traces, audit rows and notifications.
@@ -1004,7 +1004,7 @@ class RecommendationsServiceImpl:
             return None
         if result.outcome is None or result.outcome.action_type == "no_action":
             # Either a malformed leaf or an explicit "no action" leaf — record
-            # nothing; the daily evaluator re-walks tomorrow as signals change.
+            # nothing; the sweep re-walks next hour as signals change.
             _trace("clear")
             return None
 
