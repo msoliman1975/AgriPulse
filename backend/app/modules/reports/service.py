@@ -22,15 +22,28 @@ from app.modules.farms.repository import FarmsRepository
 from app.modules.grid.anomaly import DEFAULT_K, DEFAULT_MIN_CELLS, DEFAULT_MIN_STD
 from app.shared.crop_taxonomy import path_matches
 
+from .custom_fields import (
+    CustomFieldRef,
+    list_custom_fields,
+    load_custom_values,
+    parse_field_refs,
+)
 from .schemas import (
     CropHealthBlockRow,
     CropHealthReportResponse,
     CropHealthStatus,
     CropHealthSummary,
+    CustomFieldDef,
+    CustomFieldsResponse,
+    CustomFieldValue,
     OperationsLogReportResponse,
     OpsLogEntry,
     OpsLogSummary,
     ReportPeriod,
+    SignalDetailFilters,
+    SignalDetailRow,
+    SignalDetailsReportResponse,
+    SignalDetailSummary,
     WaterBalanceBlockRow,
     WaterBalanceReportResponse,
     WaterBalanceSummary,
@@ -47,6 +60,11 @@ from .schemas import (
     ZoneAnomalyStatus,
     ZoneAnomalySummary,
 )
+from .signal_details import (
+    SIGNAL_DETAIL_LIMIT,
+    select_signal_details,
+    signal_detail_stats,
+)
 
 # Default window when the caller omits since/until. 30 days matches the
 # insights trend window so the two surfaces line up.
@@ -62,6 +80,19 @@ _BLOCK_LIMIT = 200
 # to watch/stressed.
 _Z_WATCH = Decimal("-1")
 _Z_STRESSED = Decimal("-2")
+
+# Indices where a *higher* reading is the bad one, so the status thresholds
+# above apply to the flipped z. Everything else in the catalog reads
+# higher-is-healthier.
+#
+#   msi  — SWIR1/NIR ratio, higher = drier leaf (see indices.computation.msi)
+#   bsi  — bare-soil index, higher = less canopy over the soil
+#   lst  — land-surface temperature in °C, higher = hotter
+#   cwsi — crop water stress index, higher = more stress
+#
+# `smi` is *not* here: it is scaled 0 (dry edge) to 1 (wet edge), so higher is
+# wetter, which is the normal polarity.
+INVERTED_INDEX_CODES: frozenset[str] = frozenset({"msi", "bsi", "lst", "cwsi"})
 
 
 def resolve_period(since: datetime | None, until: datetime | None) -> ReportPeriod:
@@ -100,6 +131,54 @@ class ReportsService:
             include_inactive=False,
         )
 
+    # ---- Custom (tenant-defined) report columns ------------------------
+
+    async def get_custom_fields(self, *, farm_id: UUID) -> CustomFieldsResponse:
+        """The column picker's menu for one farm.
+
+        Goes through `_load_farm` like every report, so an unknown farm 404s
+        here rather than returning an empty picker that reads as "this farm has
+        no custom fields".
+        """
+        await self._load_farm(farm_id)
+        return CustomFieldsResponse(
+            farm_id=farm_id,
+            fields=await list_custom_fields(self._session, farm_id=farm_id),
+        )
+
+    async def _load_custom(
+        self, *, farm_id: UUID, refs: list[CustomFieldRef], period: ReportPeriod
+    ) -> dict[UUID, dict[str, CustomFieldValue]]:
+        """``{block_id: {ref_key: value}}`` for the picked columns, or ``{}``.
+
+        Thin passthrough so every block-grained report asks for its custom
+        columns the same way, and so the "no columns picked, no query" short
+        circuit lives in one place.
+        """
+        return await load_custom_values(
+            self._session,
+            farm_id=farm_id,
+            refs=refs,
+            since=period.since,
+            until=period.until,
+        )
+
+    async def _custom_field_defs(
+        self, *, farm_id: UUID, refs: list[CustomFieldRef]
+    ) -> list[CustomFieldDef]:
+        """The picked columns' definitions, in the order the caller asked for.
+
+        Resolved from the farm's catalog rather than echoed back from the
+        param, so the response carries the label, unit and option list the FE
+        needs to render a header and a cell. A ref naming a definition that no
+        longer resolves on this farm is dropped here — the same
+        outlives-its-definition tolerance `parse_field_refs` applies.
+        """
+        if not refs:
+            return []
+        available = {d.key: d for d in await list_custom_fields(self._session, farm_id=farm_id)}
+        return [available[ref.key] for ref in refs if ref.key in available]
+
     # ---- PR-1: Seasonal Crop Health ------------------------------------
 
     async def get_crop_health_report(
@@ -110,6 +189,7 @@ class ReportsService:
         since: datetime | None,
         until: datetime | None,
         crop_path: str | None = None,
+        fields: str | None = None,
     ) -> CropHealthReportResponse:
         """Per-block vegetation summary for one index over the window.
 
@@ -135,6 +215,8 @@ class ReportsService:
             until=period.until,
         )
         crops = await _select_block_current_crops(self._session, farm_id=farm_id)
+        refs = parse_field_refs(fields)
+        custom = await self._load_custom(farm_id=farm_id, refs=refs, period=period)
 
         if crop_path:
             blocks = [
@@ -176,13 +258,14 @@ class ReportsService:
                         avg_valid_pixel_pct=None,
                         avg_cloud_pct=None,
                         scene_count=0,
+                        custom=custom.get(block_id, {}),
                     )
                 )
                 continue
 
             with_data += 1
             z = s["last_z"]
-            status = _status_from_z(z)
+            status = _status_from_z(z, index_code=index_code)
             counts[status] += 1
             last_value = s["last_mean"]
             if last_value is not None:
@@ -209,6 +292,7 @@ class ReportsService:
                     avg_valid_pixel_pct=_q2(s["avg_valid_pct"]),
                     avg_cloud_pct=_q2(s["avg_cloud_pct"]),
                     scene_count=s["scene_count"],
+                    custom=custom.get(block_id, {}),
                 )
             )
 
@@ -234,6 +318,7 @@ class ReportsService:
             crop_path=crop_path,
             blocks=rows,
             summary=summary,
+            custom_fields=await self._custom_field_defs(farm_id=farm_id, refs=refs),
         )
 
     # ---- PR-2: Field Variability / Zone Anomaly ------------------------
@@ -245,6 +330,7 @@ class ReportsService:
         index_code: str,
         since: datetime | None,
         until: datetime | None,
+        fields: str | None = None,
     ) -> ZoneAnomalyReportResponse:
         """Per-block within-field variability on the latest grid scene.
 
@@ -265,6 +351,8 @@ class ReportsService:
             until=period.until,
         )
         gridded = await _select_blocks_with_grid(self._session, farm_id=farm_id)
+        refs = parse_field_refs(fields)
+        custom = await self._load_custom(farm_id=farm_id, refs=refs, period=period)
 
         rows: list[ZoneAnomalyBlockRow] = []
         total_flagged_cells = 0
@@ -291,6 +379,7 @@ class ReportsService:
                         block_mean=None,
                         block_std=None,
                         threshold_k=None,
+                        custom=custom.get(block_id, {}),
                     )
                 )
                 continue
@@ -331,6 +420,7 @@ class ReportsService:
                     block_mean=_q3(s["bmean"]),
                     block_std=_q3(bstd),
                     threshold_k=s["z_thr"],
+                    custom=custom.get(block_id, {}),
                 )
             )
 
@@ -353,6 +443,7 @@ class ReportsService:
             period=period,
             blocks=rows,
             summary=summary,
+            custom_fields=await self._custom_field_defs(farm_id=farm_id, refs=refs),
         )
 
     # ---- PR-3: Irrigation & Water Balance ------------------------------
@@ -363,6 +454,7 @@ class ReportsService:
         farm_id: UUID,
         since: datetime | None,
         until: datetime | None,
+        fields: str | None = None,
     ) -> WaterBalanceReportResponse:
         """Farm water demand (ET₀) vs rainfall, plus per-block irrigation
         adherence (recommended vs applied mm) over the window."""
@@ -379,6 +471,8 @@ class ReportsService:
         sched = await _select_water_balance_blocks(
             self._session, farm_id=farm_id, since=since_d, until=until_d
         )
+        refs = parse_field_refs(fields)
+        custom = await self._load_custom(farm_id=farm_id, refs=refs, period=period)
 
         days = wx["days"] or 0
         et0_total = wx["et0_total"]
@@ -413,6 +507,7 @@ class ReportsService:
                         applied_mm_total=None,
                         adherence_pct=None,
                         last_scheduled_for=None,
+                        custom=custom.get(block_id, {}),
                     )
                 )
                 continue
@@ -440,6 +535,7 @@ class ReportsService:
                         (app / rec * Decimal(100)).quantize(Decimal("0.1")) if rec > 0 else None
                     ),
                     last_scheduled_for=s["last_scheduled_for"],
+                    custom=custom.get(block_id, {}),
                 )
             )
 
@@ -462,6 +558,7 @@ class ReportsService:
             weather=weather,
             blocks=rows,
             summary=summary,
+            custom_fields=await self._custom_field_defs(farm_id=farm_id, refs=refs),
         )
 
     # ---- PR-R5: Disease & Pest Pressure -------------------------------
@@ -472,6 +569,7 @@ class ReportsService:
         farm_id: UUID,
         since: datetime | None,
         until: datetime | None,
+        fields: str | None = None,
     ) -> WeatherRiskPressureReportResponse:
         """Per-(block, pathogen) disease/pest pressure over the window.
 
@@ -491,6 +589,8 @@ class ReportsService:
             since=period.since.date(),
             until=period.until.date(),
         )
+        refs = parse_field_refs(fields)
+        custom = await self._load_custom(farm_id=farm_id, refs=refs, period=period)
 
         rows: list[WeatherRiskPressureRow] = []
         blocks_at_risk: set[UUID] = set()
@@ -515,6 +615,10 @@ class ReportsService:
                     latest_level=d["latest_level"],
                     latest_score=d["latest_score"],
                     latest_date=d["latest_date"],
+                    # Every row of one block repeats that block's custom
+                    # values — the grain here is (block, pathogen), and a
+                    # crop attribute has no pathogen dimension to vary over.
+                    custom=custom.get(block_id, {}),
                 )
             )
 
@@ -537,6 +641,7 @@ class ReportsService:
             period=period,
             rows=rows,
             summary=summary,
+            custom_fields=await self._custom_field_defs(farm_id=farm_id, refs=refs),
         )
 
     # ---- PR-4: Weather & Growing-Degree-Days Summary -------------------
@@ -700,6 +805,122 @@ class ReportsService:
             summary=summary,
         )
 
+    # ---- PR-R6: Signal Details -----------------------------------------
+
+    async def get_signal_details_report(
+        self,
+        *,
+        farm_id: UUID,
+        since: datetime | None,
+        until: datetime | None,
+        signal_codes: list[str] | None = None,
+        block_ids: list[UUID] | None = None,
+        categorical_values: list[str] | None = None,
+        min_value: Decimal | None = None,
+        max_value: Decimal | None = None,
+        recorded_by: UUID | None = None,
+        location_mode: str | None = None,
+        with_notes_only: bool = False,
+        with_attachment_only: bool = False,
+        limit: int = SIGNAL_DETAIL_LIMIT,
+    ) -> SignalDetailsReportResponse:
+        """Every signal observation on the farm that matches the filters.
+
+        The one report whose rows are observations rather than blocks. Custom
+        signals were previously only ever visible collapsed to one value per
+        block, which cannot answer "what did the scouts actually record" — the
+        four readings that produced today's average, who took them, and what
+        they wrote in the notes.
+
+        Rows are newest-first and capped at ``limit``. The per-signal stats are
+        computed over the **returned** rows, and ``summary.truncated`` says
+        when that is a partial view: an average taken over a cut-off page,
+        presented as the period's average, is the kind of number somebody makes
+        an irrigation decision on.
+
+        ``block_ids`` is not re-checked against the farm; the SQL is already
+        farm-scoped, so a block id from another farm simply matches nothing
+        rather than leaking a row.
+        """
+        farm = await self._load_farm(farm_id)
+        period = resolve_period(since, until)
+
+        # Fetch one extra row to tell "exactly at the cap" from "cut off",
+        # rather than reporting every full page as truncated.
+        raw = await select_signal_details(
+            self._session,
+            farm_id=farm_id,
+            since=period.since,
+            until=period.until,
+            signal_codes=signal_codes or [],
+            block_ids=block_ids or [],
+            categorical_values=categorical_values or [],
+            min_value=min_value,
+            max_value=max_value,
+            recorded_by=recorded_by,
+            location_mode=location_mode,
+            with_notes_only=with_notes_only,
+            with_attachment_only=with_attachment_only,
+            limit=limit + 1,
+        )
+        truncated = len(raw) > limit
+        raw = raw[:limit]
+
+        rows = [
+            SignalDetailRow(
+                observation_id=r["id"],
+                observed_at=r["observed_at"],
+                recorded_at=r["recorded_at"],
+                signal_code=r["signal_code"],
+                signal_name=r["signal_name"],
+                value_kind=r["value_kind"],
+                unit=r["unit"],
+                value_numeric=r["value_numeric"],
+                value_categorical=r["value_categorical"],
+                value_event=r["value_event"],
+                value_boolean=r["value_boolean"],
+                block_id=r["block_id"],
+                block_name=r["block_name"],
+                crop_path=r["crop_path"] or None,
+                notes=r["notes"],
+                recorded_by=r["recorded_by"],
+                recorded_by_name=r["recorded_by_name"],
+                location_mode=r["location_mode"],
+                has_attachment=r["attachment_s3_key"] is not None,
+                template_observation_id=r["template_observation_id"],
+                import_batch_id=r["import_batch_id"],
+            )
+            for r in raw
+        ]
+
+        stats = signal_detail_stats(rows)
+        summary = SignalDetailSummary(
+            observation_count=len(rows),
+            signal_count=len(stats),
+            block_count=len({r.block_id for r in rows if r.block_id is not None}),
+            recorder_count=len({r.recorded_by for r in rows}),
+            truncated=truncated,
+        )
+        return SignalDetailsReportResponse(
+            farm_id=farm_id,
+            farm_name=farm["name"],
+            period=period,
+            filters=SignalDetailFilters(
+                signal_codes=list(signal_codes or []),
+                block_ids=list(block_ids or []),
+                categorical_values=list(categorical_values or []),
+                min_value=min_value,
+                max_value=max_value,
+                recorded_by=recorded_by,
+                location_mode=location_mode,
+                with_notes_only=with_notes_only,
+                with_attachment_only=with_attachment_only,
+            ),
+            rows=rows,
+            stats=stats,
+            summary=summary,
+        )
+
 
 def get_reports_service(
     *, tenant_session: AsyncSession, public_session: AsyncSession
@@ -717,14 +938,31 @@ def _crop_path_of(crop: tuple[str, str | None, str] | None) -> str | None:
     return crop[2] if crop else None
 
 
-def _status_from_z(z: Decimal | None) -> CropHealthStatus:
-    """Map a baseline z-score to a vegetation status. Only the negative
-    side (below normal) is a concern."""
+def _status_from_z(z: Decimal | None, *, index_code: str = "ndvi") -> CropHealthStatus:
+    """Map a baseline z-score to a vegetation status.
+
+    For the higher-is-healthier majority only the negative side (below normal)
+    is a concern. For the four inverted indices the concern is *above* normal,
+    so the z is flipped before the thresholds are applied — the reported
+    `baseline_z` stays raw, because a sign-flipped number under a column
+    headed "Baseline z" would disagree with the same block's trend chart.
+
+    Getting this wrong is not cosmetic: without the flip, the hottest, driest
+    block on the farm reads "Normal" and the coolest reads "Stressed".
+
+    >>> _status_from_z(Decimal("-2.5"))
+    'stressed'
+    >>> _status_from_z(Decimal("-2.5"), index_code="lst")
+    'normal'
+    >>> _status_from_z(Decimal("2.5"), index_code="cwsi")
+    'stressed'
+    """
     if z is None:
         return "unknown"
-    if z <= _Z_STRESSED:
+    effective = -z if index_code in INVERTED_INDEX_CODES else z
+    if effective <= _Z_STRESSED:
         return "stressed"
-    if z <= _Z_WATCH:
+    if effective <= _Z_WATCH:
         return "watch"
     return "normal"
 

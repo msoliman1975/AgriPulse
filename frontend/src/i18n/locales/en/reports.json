@@ -49,6 +49,10 @@
     "operations-log": {
       "title": "Operations Log",
       "description": "Activities, alerts and recommendations across the period."
+    },
+    "signal-details": {
+      "title": "Signal Details",
+      "description": "Every custom-signal observation on the farm, with filters and a per-signal summary."
     }
   },
   "weatherRiskPressure": {
@@ -213,5 +217,65 @@
     "info": "info",
     "warning": "warning",
     "critical": "critical"
+  },
+  "index": {
+    "group": {
+      "optical": "Optical (Sentinel-2)",
+      "thermal": "Thermal (Landsat)"
+    }
+  },
+  "customFields": {
+    "button": "Custom columns",
+    "buttonCount": "Custom columns ({{count}})",
+    "selectedOf": "{{count}} of {{max}} selected",
+    "clear": "Clear",
+    "noValue": "—",
+    "source": {
+      "crop_attribute": "Crop attributes",
+      "signal": "Signals"
+    }
+  },
+  "signalDetails": {
+    "empty": "No signal observations recorded for this farm in the period.",
+    "emptyFiltered": "No observations match these filters.",
+    "truncated": "Showing the most recent {{count}} observations. Narrow the filters or the date range to see the rest; the totals below cover only these rows.",
+    "statsTitle": "Per-signal summary",
+    "farmLevel": "Whole farm",
+    "cards": {
+      "observations": "Observations",
+      "signals": "Signals",
+      "blocks": "Blocks",
+      "recorders": "Recorders"
+    },
+    "filters": {
+      "signal": "Signal",
+      "allSignals": "all",
+      "block": "Block",
+      "allBlocks": "all",
+      "value": "Value",
+      "allValues": "all",
+      "min": "Min",
+      "max": "Max",
+      "withNotes": "With notes",
+      "withAttachment": "With photo",
+      "clear": "Clear filters"
+    },
+    "headers": {
+      "observed": "Observed",
+      "signal": "Signal",
+      "value": "Value",
+      "unit": "Unit",
+      "block": "Block",
+      "crop": "Crop",
+      "recordedBy": "Recorded by",
+      "notes": "Notes",
+      "location": "Location mode",
+      "attachment": "Photo",
+      "count": "Readings",
+      "blocks": "Blocks",
+      "range": "Min – max",
+      "mean": "Mean",
+      "breakdown": "Values"
+    }
   }
 }

@@ -49,6 +49,10 @@
     "operations-log": {
       "title": "سجل العمليات",
       "description": "الأنشطة والتنبيهات والتوصيات خلال الفترة."
+    },
+    "signal-details": {
+      "title": "تفاصيل الإشارات",
+      "description": "كل قراءات الإشارات المخصصة في المزرعة، مع فلاتر وملخص لكل إشارة."
     }
   },
   "weatherRiskPressure": {
@@ -213,5 +217,65 @@
     "info": "معلومة",
     "warning": "تحذير",
     "critical": "حرج"
+  },
+  "index": {
+    "group": {
+      "optical": "بصري (سنتينل-2)",
+      "thermal": "حراري (لاندسات)"
+    }
+  },
+  "customFields": {
+    "button": "أعمدة مخصصة",
+    "buttonCount": "أعمدة مخصصة ({{count}})",
+    "selectedOf": "تم اختيار {{count}} من {{max}}",
+    "clear": "مسح",
+    "noValue": "—",
+    "source": {
+      "crop_attribute": "خصائص المحصول",
+      "signal": "الإشارات"
+    }
+  },
+  "signalDetails": {
+    "empty": "لا توجد قراءات إشارات مسجلة لهذه المزرعة في هذه الفترة.",
+    "emptyFiltered": "لا توجد قراءات تطابق هذه الفلاتر.",
+    "truncated": "يعرض أحدث {{count}} قراءة. ضيّق الفلاتر أو المدة لرؤية الباقي؛ الإجماليات أدناه تشمل هذه الصفوف فقط.",
+    "statsTitle": "ملخص لكل إشارة",
+    "farmLevel": "المزرعة كاملة",
+    "cards": {
+      "observations": "القراءات",
+      "signals": "الإشارات",
+      "blocks": "القطع",
+      "recorders": "المسجّلون"
+    },
+    "filters": {
+      "signal": "الإشارة",
+      "allSignals": "الكل",
+      "block": "القطعة",
+      "allBlocks": "الكل",
+      "value": "القيمة",
+      "allValues": "الكل",
+      "min": "الحد الأدنى",
+      "max": "الحد الأقصى",
+      "withNotes": "بها ملاحظات",
+      "withAttachment": "بها صورة",
+      "clear": "مسح الفلاتر"
+    },
+    "headers": {
+      "observed": "وقت القراءة",
+      "signal": "الإشارة",
+      "value": "القيمة",
+      "unit": "الوحدة",
+      "block": "القطعة",
+      "crop": "المحصول",
+      "recordedBy": "سجّلها",
+      "notes": "ملاحظات",
+      "location": "نوع الموقع",
+      "attachment": "صورة",
+      "count": "عدد القراءات",
+      "blocks": "القطع",
+      "range": "الأدنى – الأقصى",
+      "mean": "المتوسط",
+      "breakdown": "القيم"
+    }
   }
 }

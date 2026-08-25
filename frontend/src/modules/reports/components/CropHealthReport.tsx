@@ -1,20 +1,21 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { INDEX_CODES } from "@/api/indices";
-import type { CropHealthBlockRow, CropHealthStatus } from "@/api/reports";
+import type { CropHealthBlockRow, CropHealthStatus, CustomFieldDef } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
+import { formatIndexValue } from "@/lib/indexFormat";
 import { useCropHealthReport } from "@/queries/reports";
 
+import { customCsvCells, customCsvHeaders, fieldsParam } from "../customFields";
+import { useIndexUnit } from "../useIndexUnit";
 import type { ReportProps } from "../registry";
 import { CropPathFilter } from "./CropPathFilter";
+import { CustomBodyCells, CustomHeaderCells } from "./CustomColumns";
+import { CustomFieldPicker } from "./CustomFieldPicker";
+import { ReportIndexSelect } from "./ReportIndexSelect";
 import { ReportShell } from "./ReportShell";
-
-// Indices the report can run on: everything the platform computes. This was a
-// hardcoded copy of the original six and had gone stale — the report could not
-// be run on ndmi at all, despite the data being there.
 
 const STATUS_CHIP: Record<CropHealthStatus, string> = {
   normal: "bg-ap-primary-soft text-ap-primary",
@@ -30,15 +31,23 @@ function fmt(value: string | null, digits = 3): string {
 }
 
 export function CropHealthReport({ farmId, since, until }: ReportProps): ReactNode {
-  const { t } = useTranslation("reports");
+  const { t, i18n } = useTranslation("reports");
   const [indexCode, setIndexCode] = useState("ndvi");
   const [cropPath, setCropPath] = useState<string | null>(null);
+  const [fieldKeys, setFieldKeys] = useState<string[]>([]);
+  const unit = useIndexUnit(indexCode);
+  const fields = fieldsParam(fieldKeys);
   const { data, isLoading, isError } = useCropHealthReport(farmId, {
     index_code: indexCode,
     since,
     until,
     ...(cropPath ? { crop_path: cropPath } : {}),
+    ...(fields ? { fields } : {}),
   });
+  // Render from the response, not from `fieldKeys`: the backend drops a column
+  // whose definition the farm no longer offers, and a header with no matching
+  // cell would push every value one column left.
+  const customFields = data?.custom_fields ?? [];
 
   const handleExport = (): void => {
     if (!data) return;
@@ -59,6 +68,7 @@ export function CropHealthReport({ farmId, since, until }: ReportProps): ReactNo
       t("cropHealth.headers.valid"),
       t("cropHealth.headers.cloud"),
       t("cropHealth.headers.scenes"),
+      ...customCsvHeaders(customFields, i18n.language),
     ];
     const rows: CsvCell[][] = data.blocks.map((b) => [
       b.block_name,
@@ -77,6 +87,7 @@ export function CropHealthReport({ farmId, since, until }: ReportProps): ReactNo
       b.avg_valid_pixel_pct ?? "",
       b.avg_cloud_pct ?? "",
       b.scene_count,
+      ...customCsvCells(customFields, b.custom, i18n.language),
     ]);
     downloadCsv(
       `crop-health_${indexCode}_${since.slice(0, 10)}_${until.slice(0, 10)}`,
@@ -92,21 +103,9 @@ export function CropHealthReport({ farmId, since, until }: ReportProps): ReactNo
       onExportCsv={data ? handleExport : undefined}
     >
       <div className="print-hide mb-4 flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <span className="label mb-0">{t("cropHealth.index")}</span>
-          <select
-            className="input w-auto"
-            value={indexCode}
-            onChange={(e) => setIndexCode(e.target.value)}
-          >
-            {INDEX_CODES.map((code) => (
-              <option key={code} value={code}>
-                {code.toUpperCase()}
-              </option>
-            ))}
-          </select>
-        </div>
+        <ReportIndexSelect value={indexCode} onChange={setIndexCode} />
         <CropPathFilter value={cropPath} onChange={setCropPath} />
+        <CustomFieldPicker farmId={farmId} value={fieldKeys} onChange={setFieldKeys} />
       </div>
 
       {isLoading ? (
@@ -118,7 +117,12 @@ export function CropHealthReport({ farmId, since, until }: ReportProps): ReactNo
       ) : (
         <>
           <Summary data={data.summary} />
-          <CropHealthTable rows={data.blocks} indexCode={indexCode} />
+          <CropHealthTable
+            rows={data.blocks}
+            indexCode={indexCode}
+            unit={unit}
+            customFields={customFields}
+          />
         </>
       )}
     </ReportShell>
@@ -154,9 +158,13 @@ function Summary({ data }: { data: import("@/api/reports").CropHealthSummary }):
 function CropHealthTable({
   rows,
   indexCode,
+  unit,
+  customFields,
 }: {
   rows: CropHealthBlockRow[];
   indexCode: string;
+  unit: string;
+  customFields: CustomFieldDef[];
 }): ReactNode {
   const { t } = useTranslation("reports");
   return (
@@ -184,6 +192,7 @@ function CropHealthTable({
             <Th scope="col" className="text-end">
               {t("cropHealth.headers.scenes")}
             </Th>
+            <CustomHeaderCells defs={customFields} />
           </Tr>
         </Thead>
         <Tbody>
@@ -207,7 +216,12 @@ function CropHealthTable({
                   {t(`cropHealth.status.${b.status}`)}
                 </span>
               </Td>
-              <Td className="text-end tabular-nums text-ap-ink">{fmt(b.last_value)}</Td>
+              <Td className="text-end tabular-nums text-ap-ink">
+                {/* `lst` is degrees Celsius at one decimal; every other index
+                    is a dimensionless ratio at three. One toFixed(3) for both
+                    printed a temperature to a precision the sensor lacks. */}
+                {formatIndexValue(b.last_value === null ? null : Number(b.last_value), unit)}
+              </Td>
               <Td className="text-end tabular-nums">
                 <ZScore value={b.baseline_z} />
               </Td>
@@ -221,6 +235,7 @@ function CropHealthTable({
                 {b.avg_valid_pixel_pct ? `${fmt(b.avg_valid_pixel_pct, 0)}%` : "—"}
               </Td>
               <Td className="text-end tabular-nums">{b.scene_count}</Td>
+              <CustomBodyCells defs={customFields} cells={b.custom} />
             </Tr>
           ))}
         </Tbody>

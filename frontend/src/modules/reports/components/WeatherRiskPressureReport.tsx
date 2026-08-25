@@ -1,13 +1,20 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { WeatherRiskPressureRow, WeatherRiskPressureSummary } from "@/api/reports";
+import type {
+  CustomFieldDef,
+  WeatherRiskPressureRow,
+  WeatherRiskPressureSummary,
+} from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useWeatherRiskPressureReport } from "@/queries/reports";
 
+import { customCsvCells, customCsvHeaders, fieldsParam } from "../customFields";
 import type { ReportProps } from "../registry";
+import { CustomBodyCells, CustomHeaderCells } from "./CustomColumns";
+import { CustomFieldPicker } from "./CustomFieldPicker";
 import { ReportShell } from "./ReportShell";
 
 const LEVEL_CLASS: Record<WeatherRiskPressureRow["latest_level"], string> = {
@@ -17,9 +24,16 @@ const LEVEL_CLASS: Record<WeatherRiskPressureRow["latest_level"], string> = {
 };
 
 export function WeatherRiskPressureReport({ farmId, since, until }: ReportProps): ReactNode {
-  const { t } = useTranslation("reports");
+  const { t, i18n } = useTranslation("reports");
   const wr = useTranslation("weatherRisk").t;
-  const { data, isLoading, isError } = useWeatherRiskPressureReport(farmId, { since, until });
+  const [fieldKeys, setFieldKeys] = useState<string[]>([]);
+  const fields = fieldsParam(fieldKeys);
+  const { data, isLoading, isError } = useWeatherRiskPressureReport(farmId, {
+    since,
+    until,
+    ...(fields ? { fields } : {}),
+  });
+  const customFields = data?.custom_fields ?? [];
 
   const pathogenName = (code: string): string => {
     const name = wr(`pathogen.${code}`);
@@ -40,6 +54,7 @@ export function WeatherRiskPressureReport({ farmId, since, until }: ReportProps)
       t("weatherRiskPressure.headers.daysModerate"),
       t("weatherRiskPressure.headers.latest"),
       t("weatherRiskPressure.headers.latestDate"),
+      ...customCsvHeaders(customFields, i18n.language),
     ];
     const rows: CsvCell[][] = data.rows.map((r) => [
       r.block_name,
@@ -49,6 +64,7 @@ export function WeatherRiskPressureReport({ farmId, since, until }: ReportProps)
       r.days_moderate,
       levelName(r.latest_level),
       r.latest_date,
+      ...customCsvCells(customFields, r.custom, i18n.language),
     ]);
     downloadCsv(
       `disease-pest-pressure_${since.slice(0, 10)}_${until.slice(0, 10)}`,
@@ -63,6 +79,10 @@ export function WeatherRiskPressureReport({ farmId, since, until }: ReportProps)
       period={{ since, until }}
       onExportCsv={data && data.rows.length > 0 ? handleExport : undefined}
     >
+      <div className="print-hide mb-4 flex flex-wrap items-center gap-4">
+        <CustomFieldPicker farmId={farmId} value={fieldKeys} onChange={setFieldKeys} />
+      </div>
+
       {isLoading ? (
         <Skeleton className="h-48 w-full" />
       ) : isError ? (
@@ -72,7 +92,12 @@ export function WeatherRiskPressureReport({ farmId, since, until }: ReportProps)
       ) : (
         <>
           <SummaryCards summary={data.summary} />
-          <PressureTable rows={data.rows} pathogenName={pathogenName} levelName={levelName} />
+          <PressureTable
+            rows={data.rows}
+            pathogenName={pathogenName}
+            levelName={levelName}
+            customFields={customFields}
+          />
         </>
       )}
     </ReportShell>
@@ -103,10 +128,12 @@ function PressureTable({
   rows,
   pathogenName,
   levelName,
+  customFields,
 }: {
   rows: WeatherRiskPressureRow[];
   pathogenName: (code: string) => string;
   levelName: (level: string) => string;
+  customFields: CustomFieldDef[];
 }): ReactNode {
   const { t } = useTranslation("reports");
   return (
@@ -125,6 +152,7 @@ function PressureTable({
             <Th scope="col" className="text-end">
               {t("weatherRiskPressure.headers.latest")}
             </Th>
+            <CustomHeaderCells defs={customFields} />
           </Tr>
         </Thead>
         <Tbody>
@@ -137,6 +165,7 @@ function PressureTable({
               <Td className={`px-3 py-2 text-end font-medium ${LEVEL_CLASS[r.latest_level]}`}>
                 {levelName(r.latest_level)} · {r.latest_score}
               </Td>
+              <CustomBodyCells defs={customFields} cells={r.custom} />
             </Tr>
           ))}
         </Tbody>

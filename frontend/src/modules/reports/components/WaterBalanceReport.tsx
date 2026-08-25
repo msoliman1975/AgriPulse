@@ -1,13 +1,21 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { WaterBalanceBlockRow, WaterBalanceSummary, WaterBalanceWeather } from "@/api/reports";
+import type {
+  CustomFieldDef,
+  WaterBalanceBlockRow,
+  WaterBalanceSummary,
+  WaterBalanceWeather,
+} from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useWaterBalanceReport } from "@/queries/reports";
 
+import { customCsvCells, customCsvHeaders, fieldsParam } from "../customFields";
 import type { ReportProps } from "../registry";
+import { CustomBodyCells, CustomHeaderCells } from "./CustomColumns";
+import { CustomFieldPicker } from "./CustomFieldPicker";
 import { ReportShell } from "./ReportShell";
 
 function fmt(value: string | null, digits = 1, suffix = ""): string {
@@ -17,8 +25,15 @@ function fmt(value: string | null, digits = 1, suffix = ""): string {
 }
 
 export function WaterBalanceReport({ farmId, since, until }: ReportProps): ReactNode {
-  const { t } = useTranslation("reports");
-  const { data, isLoading, isError } = useWaterBalanceReport(farmId, { since, until });
+  const { t, i18n } = useTranslation("reports");
+  const [fieldKeys, setFieldKeys] = useState<string[]>([]);
+  const fields = fieldsParam(fieldKeys);
+  const { data, isLoading, isError } = useWaterBalanceReport(farmId, {
+    since,
+    until,
+    ...(fields ? { fields } : {}),
+  });
+  const customFields = data?.custom_fields ?? [];
 
   const handleExport = (): void => {
     if (!data) return;
@@ -32,6 +47,7 @@ export function WaterBalanceReport({ farmId, since, until }: ReportProps): React
       t("waterBalance.headers.appliedMm"),
       t("waterBalance.headers.adherence"),
       t("waterBalance.headers.last"),
+      ...customCsvHeaders(customFields, i18n.language),
     ];
     const rows: CsvCell[][] = data.blocks.map((b) => [
       b.block_name,
@@ -43,6 +59,7 @@ export function WaterBalanceReport({ farmId, since, until }: ReportProps): React
       b.applied_mm_total ?? "",
       b.adherence_pct ?? "",
       b.last_scheduled_for ?? "",
+      ...customCsvCells(customFields, b.custom, i18n.language),
     ]);
     downloadCsv(`water-balance_${since.slice(0, 10)}_${until.slice(0, 10)}`, toCsv(headers, rows));
   };
@@ -54,6 +71,10 @@ export function WaterBalanceReport({ farmId, since, until }: ReportProps): React
       period={{ since, until }}
       onExportCsv={data ? handleExport : undefined}
     >
+      <div className="print-hide mb-4 flex flex-wrap items-center gap-4">
+        <CustomFieldPicker farmId={farmId} value={fieldKeys} onChange={setFieldKeys} />
+      </div>
+
       {isLoading ? (
         <Skeleton className="h-48 w-full" />
       ) : isError ? (
@@ -66,7 +87,7 @@ export function WaterBalanceReport({ farmId, since, until }: ReportProps): React
           {data.blocks.length === 0 ? (
             <p className="py-8 text-center text-sm text-ap-muted">{t("waterBalance.empty")}</p>
           ) : (
-            <WaterBalanceTable rows={data.blocks} />
+            <WaterBalanceTable rows={data.blocks} customFields={customFields} />
           )}
         </>
       )}
@@ -100,7 +121,13 @@ function WeatherCards({
   );
 }
 
-function WaterBalanceTable({ rows }: { rows: WaterBalanceBlockRow[] }): ReactNode {
+function WaterBalanceTable({
+  rows,
+  customFields,
+}: {
+  rows: WaterBalanceBlockRow[];
+  customFields: CustomFieldDef[];
+}): ReactNode {
   const { t } = useTranslation("reports");
   return (
     <div className="overflow-x-auto">
@@ -126,6 +153,7 @@ function WaterBalanceTable({ rows }: { rows: WaterBalanceBlockRow[] }): ReactNod
             <Th scope="col" className="text-end">
               {t("waterBalance.headers.last")}
             </Th>
+            <CustomHeaderCells defs={customFields} />
           </Tr>
         </Thead>
         <Tbody>
@@ -146,6 +174,7 @@ function WaterBalanceTable({ rows }: { rows: WaterBalanceBlockRow[] }): ReactNod
                 <Adherence value={b.adherence_pct} />
               </Td>
               <Td className="text-end text-[11px]">{b.last_scheduled_for ?? "—"}</Td>
+              <CustomBodyCells defs={customFields} cells={b.custom} />
             </Tr>
           ))}
         </Tbody>

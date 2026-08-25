@@ -1,18 +1,18 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { INDEX_CODES } from "@/api/indices";
-import type { ZoneAnomalyBlockRow, ZoneAnomalyStatus } from "@/api/reports";
+import type { CustomFieldDef, ZoneAnomalyBlockRow, ZoneAnomalyStatus } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useZoneAnomalyReport } from "@/queries/reports";
 
+import { customCsvCells, customCsvHeaders, fieldsParam } from "../customFields";
 import type { ReportProps } from "../registry";
+import { CustomBodyCells, CustomHeaderCells } from "./CustomColumns";
+import { CustomFieldPicker } from "./CustomFieldPicker";
+import { ReportIndexSelect } from "./ReportIndexSelect";
 import { ReportShell } from "./ReportShell";
-
-// Everything the platform computes. Previously a hardcoded copy of the
-// original six, so ndmi was never selectable here.
 
 const STATUS_CHIP: Record<ZoneAnomalyStatus, string> = {
   anomalies: "bg-ap-crit-soft text-ap-crit",
@@ -29,13 +29,17 @@ function fmt(value: string | null, digits = 3): string {
 }
 
 export function ZoneAnomalyReport({ farmId, since, until }: ReportProps): ReactNode {
-  const { t } = useTranslation("reports");
+  const { t, i18n } = useTranslation("reports");
   const [indexCode, setIndexCode] = useState("ndvi");
+  const [fieldKeys, setFieldKeys] = useState<string[]>([]);
+  const fields = fieldsParam(fieldKeys);
   const { data, isLoading, isError } = useZoneAnomalyReport(farmId, {
     index_code: indexCode,
     since,
     until,
+    ...(fields ? { fields } : {}),
   });
+  const customFields = data?.custom_fields ?? [];
 
   const handleExport = (): void => {
     if (!data) return;
@@ -50,6 +54,7 @@ export function ZoneAnomalyReport({ farmId, since, until }: ReportProps): ReactN
       t("zoneAnomaly.headers.mean"),
       t("zoneAnomaly.headers.std"),
       t("zoneAnomaly.headers.threshold"),
+      ...customCsvHeaders(customFields, i18n.language),
     ];
     const rows: CsvCell[][] = data.blocks.map((b) => [
       b.block_name,
@@ -62,6 +67,7 @@ export function ZoneAnomalyReport({ farmId, since, until }: ReportProps): ReactN
       b.block_mean ?? "",
       b.block_std ?? "",
       b.threshold_k ?? "",
+      ...customCsvCells(customFields, b.custom, i18n.language),
     ]);
     downloadCsv(
       `zone-anomaly_${indexCode}_${since.slice(0, 10)}_${until.slice(0, 10)}`,
@@ -76,19 +82,9 @@ export function ZoneAnomalyReport({ farmId, since, until }: ReportProps): ReactN
       period={{ since, until }}
       onExportCsv={data ? handleExport : undefined}
     >
-      <div className="print-hide mb-4 flex items-center gap-2">
-        <span className="label mb-0">{t("cropHealth.index")}</span>
-        <select
-          className="input w-auto"
-          value={indexCode}
-          onChange={(e) => setIndexCode(e.target.value)}
-        >
-          {INDEX_CODES.map((code) => (
-            <option key={code} value={code}>
-              {code.toUpperCase()}
-            </option>
-          ))}
-        </select>
+      <div className="print-hide mb-4 flex flex-wrap items-center gap-4">
+        <ReportIndexSelect value={indexCode} onChange={setIndexCode} />
+        <CustomFieldPicker farmId={farmId} value={fieldKeys} onChange={setFieldKeys} />
       </div>
 
       {isLoading ? (
@@ -100,7 +96,7 @@ export function ZoneAnomalyReport({ farmId, since, until }: ReportProps): ReactN
       ) : (
         <>
           <Summary data={data.summary} />
-          <ZoneAnomalyTable rows={data.blocks} />
+          <ZoneAnomalyTable rows={data.blocks} customFields={customFields} />
         </>
       )}
     </ReportShell>
@@ -139,7 +135,13 @@ function Summary({ data }: { data: import("@/api/reports").ZoneAnomalySummary })
   );
 }
 
-function ZoneAnomalyTable({ rows }: { rows: ZoneAnomalyBlockRow[] }): ReactNode {
+function ZoneAnomalyTable({
+  rows,
+  customFields,
+}: {
+  rows: ZoneAnomalyBlockRow[];
+  customFields: CustomFieldDef[];
+}): ReactNode {
   const { t } = useTranslation("reports");
   return (
     <div className="overflow-x-auto">
@@ -166,6 +168,7 @@ function ZoneAnomalyTable({ rows }: { rows: ZoneAnomalyBlockRow[] }): ReactNode 
             <Th scope="col" className="text-end">
               {t("zoneAnomaly.headers.meanStd")}
             </Th>
+            <CustomHeaderCells defs={customFields} />
           </Tr>
         </Thead>
         <Tbody>
@@ -203,6 +206,7 @@ function ZoneAnomalyTable({ rows }: { rows: ZoneAnomalyBlockRow[] }): ReactNode 
               <Td className="text-end tabular-nums">
                 {b.block_mean !== null ? `${fmt(b.block_mean)} ± ${fmt(b.block_std)}` : "—"}
               </Td>
+              <CustomBodyCells defs={customFields} cells={b.custom} />
             </Tr>
           ))}
         </Tbody>
