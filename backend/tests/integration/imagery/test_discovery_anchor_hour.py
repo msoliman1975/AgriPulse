@@ -168,3 +168,17 @@ async def test_the_anchor_leaves_a_sub_daily_cadence_alone(
         await _is_due(admin_session, schema, now=day.replace(hour=17), anchor_hour_utc=ANCHOR_HOUR)
         is False
     )
+
+
+@pytest.mark.asyncio
+async def test_the_configured_anchor_clears_sentinel_2_publication() -> None:
+    """Pin the shipped hour, because the first value chosen was too early.
+
+    14:00 UTC was picked against Sentinel-2's documented 3-6h L2A publication
+    latency. Measured on prod 2026-08-25: the Mango Republic pass was sensed
+    at 08:41 UTC and processed at 13:51 UTC, and the 14:32 UTC poll still did
+    not find it in the Copernicus catalogue. The same search at 22:21 UTC did.
+    """
+    from app.core.settings import get_settings
+
+    assert get_settings().imagery_discovery_anchor_hour_utc == 20

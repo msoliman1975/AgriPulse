@@ -262,9 +262,14 @@ async def test_the_live_poll_still_moves_its_own_watermark(
 ) -> None:
     """The other half of the contract — `bump_watermark` defaults to on.
 
-    Without this, a change that quietly stopped the live path recording its
-    attempts would look identical to a correct one: the sweep would re-fetch
-    the same window on every beat, forever.
+    Without this, a change that stopped the live path recording its attempts
+    would look identical to a correct one: the sweep would re-fetch the same
+    window on every beat, forever.
+
+    The ingest watermark stays NULL here. Discovery queues a `pending` job;
+    it does not fetch one. The watermark is the sensing time of the newest
+    SUCCEEDED scene, so it moves when `acquire_farm_scene` closes the job,
+    which this test stubs out.
     """
     schema, farm_id, product_id, _sub_id = await _setup(admin_session, "bf-shape-live")
     farm_sub_id = await _add_farm_subscription(
@@ -298,7 +303,7 @@ async def test_the_live_poll_still_moves_its_own_watermark(
     )
     assert row["last_attempted_at"] is not None
     assert row["last_attempted_at"] >= before
-    assert row["last_successful_ingest_at"] is not None
+    assert row["last_successful_ingest_at"] is None
 
 
 # --- "Compute indices" on a cut-over farm ------------------------------------

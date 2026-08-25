@@ -390,10 +390,12 @@ class Settings(BaseSettings):
     imagery_cloud_cover_visualization_max_pct: int = 60
     imagery_cloud_cover_aggregation_max_pct: int = 20
     # Discovery re-scans `[last_successful_ingest_at - lookback, now]` on every
-    # poll. The watermark is wall-clock, but the catalogue `from` filter is
-    # scene *sensing* time — a scene sensed before a poll but published to the
-    # catalogue after it would otherwise fall behind the watermark and be
-    # skipped forever. The lookback re-covers that publication-latency gap;
+    # poll. The watermark is the sensing time of the newest scene the
+    # subscription holds, and the catalogue `from` filter is sensing time too,
+    # so the two are the same clock. A scene sensed before that one but
+    # published to the catalogue later would still fall behind the watermark
+    # and be skipped forever. The lookback re-covers that publication-latency
+    # gap;
     # `upsert_pending_ingestion_job` is idempotent on (subscription_id,
     # scene_id), so the overlap costs one cheap catalogue search and no
     # re-acquisition. 48h comfortably covers a 24h cadence + L2A latency and
@@ -410,12 +412,23 @@ class Settings(BaseSettings):
     # before the scene existed, so the newest reading in the product was three
     # days old while a same-day scene sat in the catalogue.
     #
-    # 14:00 UTC clears Sentinel-2's typical 3-6h L2A publication latency for
-    # EMEA longitudes (sensing ~08:30 UTC over Egypt). It is a single global
-    # hour, so a fleet spread over many longitudes wants either a later value
-    # or a per-subscription column; set it to None to switch the rule off and
-    # keep pure cadence behaviour.
-    imagery_discovery_anchor_hour_utc: int | None = 14
+    # 20:00 UTC. The first value here was 14:00, chosen against Sentinel-2's
+    # documented 3-6h L2A publication latency for EMEA longitudes (sensing
+    # ~08:30 UTC over Egypt). Measured on prod 2026-08-25, that is not enough
+    # margin: the Mango Republic pass was sensed at 08:41 UTC and processed at
+    # 13:51 UTC, but was still absent from the Copernicus catalogue when the
+    # 14:32 UTC poll searched it. The same search from a worker pod at 22:21
+    # UTC returned it. The product therefore served 20 August imagery for a
+    # whole extra day with a 25 August scene sitting in the catalogue.
+    #
+    # 20:00 UTC leaves 11.5h after sensing, and 6h after the latest processing
+    # time seen on this farm. It is late evening in EMEA, so the scene is in
+    # the product before the next working morning.
+    #
+    # It is a single global hour, so a fleet spread over many longitudes wants
+    # either a later value or a per-subscription column; set it to None to
+    # switch the rule off and keep pure cadence behaviour.
+    imagery_discovery_anchor_hour_utc: int | None = 20
 
     # Cold-start floor: how far back a *fresh* subscription's discovery reaches
     # when it has no `last_successful_ingest_at` watermark yet. Normal daily

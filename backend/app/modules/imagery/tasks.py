@@ -276,14 +276,18 @@ def _resolve_discovery_window(
     watermark/floor is ignored. Otherwise the window runs from the
     subscription's watermark (or the cold-start floor when it has none),
     pulled back by the publication-lag lookback buffer, up to ``now``.
+
+    The watermark is the sensing time of the newest scene we hold, so on a
+    farm the satellite has not passed over for a while the window naturally
+    widens. `imagery_backfill_floor_days` caps that: a subscription whose
+    imagery stopped months ago searches the floor, not its whole history.
     """
     if window_start_override is not None:
         return window_start_override, (window_end_override or now)
-    start = (
-        subscription["last_successful_ingest_at"]
-        or (now - timedelta(days=settings.imagery_backfill_floor_days))
-    ) - timedelta(hours=settings.imagery_discovery_lookback_hours)
-    return start, now
+    floor = now - timedelta(days=settings.imagery_backfill_floor_days)
+    watermark = subscription["last_successful_ingest_at"] or floor
+    start = watermark - timedelta(hours=settings.imagery_discovery_lookback_hours)
+    return max(start, floor), now
 
 
 async def _touch_if_live(
@@ -291,19 +295,30 @@ async def _touch_if_live(
     *,
     subscription_id: UUID,
     now: datetime,
-    ingested: bool,
     bump_watermark: bool,
 ) -> None:
     """Record the subscription attempt for a live poll only.
 
-    A backfill (``bump_watermark=False``) must never move the live
-    watermark — it ingests old scenes and would otherwise bury recent
-    publication-lagged ones.
+    A backfill (``bump_watermark=False``) is not a poll, so it must not move
+    the heartbeat the "overdue" check reads.
+
+    The watermark is rebuilt here as well as on job success. It reads only
+    jobs already `succeeded`, so it cannot run ahead of what the poll has
+    fetched, and the window for THIS poll was resolved before the search.
+    Two things need it:
+
+    * `imagery.subscribers` sets the watermark to NULL when a block's
+      boundary moves, to force one wide re-scan. Without a repair here that
+      NULL is permanent — the re-scan re-sees the same scenes, the job key is
+      UNIQUE(subscription_id, scene_id) with no aoi_hash in it, so nothing new
+      succeeds and nothing rewrites the column. The subscription would then
+      search the 90-day floor every day for the rest of its life.
+    * Any row that predates this behaviour heals on its next poll, without
+      waiting for a new pass.
     """
     if bump_watermark:
-        await repo.touch_subscription_attempt(
-            subscription_id=subscription_id, attempted_at=now, ingested=ingested
-        )
+        await repo.touch_subscription_attempt(subscription_id=subscription_id, attempted_at=now)
+        await repo.refresh_ingest_watermark(subscription_id=subscription_id)
 
 
 # --- discover_scenes --------------------------------------------------------
@@ -418,7 +433,6 @@ async def _discover_scenes_async(
                     repo,
                     subscription_id=subscription_id,
                     now=now,
-                    ingested=False,
                     bump_watermark=bump_watermark,
                 )
                 bus.publish(
@@ -492,22 +506,13 @@ async def _discover_scenes_async(
             else:
                 queued += 1
 
-        # `ingested=bool(queued)`: advance the ingest watermark only when this
-        # poll actually queued usable imagery. An empty or all-cloud poll still
-        # records the attempt (heartbeat) but must NOT bump the watermark —
-        # otherwise it would lie about staleness and bury publication-lagged
-        # scenes (the original bug). Already-ingested scenes re-seen via the
-        # lookback are created=False and don't count toward `queued`.
-        #
-        # A one-shot backfill (`bump_watermark=False`) is ingesting *old*
-        # scenes, so it must not touch the live watermark at all — otherwise it
-        # would fast-forward `last_successful_ingest_at` to `now` and make the
-        # daily poll skip recent publication-lagged scenes.
+        # Heartbeat only. Discovery queues jobs; it does not ingest, so it has
+        # nothing to say about the ingest watermark. That is written when a
+        # job reaches `succeeded` — see `refresh_ingest_watermark`.
         await _touch_if_live(
             repo,
             subscription_id=subscription_id,
             now=now,
-            ingested=bool(queued),
             bump_watermark=bump_watermark,
         )
 
@@ -1206,6 +1211,9 @@ async def _register_stac_item_async(
             stac_item_id=item_id,
             assets_written=assets_written,
         )
+        # Same transaction as the status write, so the watermark can never
+        # disagree with the jobs it is derived from.
+        await repo.refresh_ingest_watermark(subscription_id=job["subscription_id"])
 
     bus.publish(
         SceneIngestedV1(
@@ -1751,6 +1759,9 @@ async def _record_farm_scene_success(
             # "ndvi" where an object path belonged.
             assets_written=[raw_bands_s3_key, *sorted(index_keys.values())],
         )
+        # Same transaction as the status write, so the watermark can never
+        # disagree with the jobs it is derived from.
+        await repo.refresh_farm_ingest_watermark(subscription_id=job["subscription_id"])
 
 
 class _FarmJobFailed(Exception):
@@ -1868,19 +1879,14 @@ async def _touch_farm_if_live(
     *,
     subscription_id: UUID,
     now: datetime,
-    ingested: bool,
     bump_watermark: bool,
 ) -> None:
-    """Farm-path twin of `_touch_if_live`.
-
-    A backfill (``bump_watermark=False``) reaches back over old passes, so
-    letting it move `last_successful_ingest_at` forward would make the next
-    live poll start after scenes it has never seen.
-    """
+    """Farm-path twin of `_touch_if_live` — read that one."""
     if bump_watermark:
         await repo.touch_farm_subscription_attempt(
-            subscription_id=subscription_id, attempted_at=now, ingested=ingested
+            subscription_id=subscription_id, attempted_at=now
         )
+        await repo.refresh_farm_ingest_watermark(subscription_id=subscription_id)
 
 
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
@@ -1949,7 +1955,6 @@ async def _discover_farm_scenes_async(
                     repo,
                     subscription_id=subscription_id,
                     now=datetime.now(UTC),
-                    ingested=False,
                     bump_watermark=bump_watermark,
                 )
                 # Logged, not audited. The audit service opens its own session,
@@ -1989,7 +1994,6 @@ async def _discover_farm_scenes_async(
                     repo,
                     subscription_id=subscription_id,
                     now=now,
-                    ingested=False,
                     bump_watermark=bump_watermark,
                 )
                 return empty
@@ -2011,7 +2015,6 @@ async def _discover_farm_scenes_async(
             repo,
             subscription_id=subscription_id,
             now=now,
-            ingested=bool(queued),
             bump_watermark=bump_watermark,
         )
 

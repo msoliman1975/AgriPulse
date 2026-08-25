@@ -464,28 +464,68 @@ class ImageryRepository:
         *,
         subscription_id: UUID,
         attempted_at: datetime,
-        ingested: bool,
     ) -> None:
         """Record a discovery poll against the subscription.
 
         `last_attempted_at` is the wall-clock heartbeat — it advances on
         *every* completed poll (success or not) and is what the
         integration-health "overdue" check keys off, since polling on
-        cadence is the part we control. `last_successful_ingest_at`
-        advances only when the poll actually queued usable imagery; it is
-        the discovery-window watermark and the honest "last imagery we
-        pulled" signal. Conflating the two (the pre-fix behaviour) bumped
-        the watermark on every empty poll, which both hid genuine staleness
-        and let publication-lagged scenes slip behind the watermark.
+        cadence is the part we control.
+
+        It no longer touches `last_successful_ingest_at`. That column is now
+        derived from the job rows by `refresh_ingest_watermark`, which runs
+        when a job succeeds. See that method for why.
         """
-        values: dict[str, Any] = {"last_attempted_at": attempted_at}
-        if ingested:
-            values["last_successful_ingest_at"] = attempted_at
         await self._session.execute(
             update(ImageryAoiSubscription)
             .where(ImageryAoiSubscription.id == subscription_id)
-            .values(**values)
+            .values(last_attempted_at=attempted_at)
         )
+
+    async def refresh_ingest_watermark(self, *, subscription_id: UUID) -> datetime | None:
+        """Recompute `last_successful_ingest_at` from the job rows.
+
+        The column means: **the sensing time of the newest scene this
+        subscription has successfully ingested**. It is derived, not
+        remembered, so it cannot drift away from what the product actually
+        holds. Returns the new value.
+
+        It used to be a wall-clock stamp written by a poll that queued work,
+        and it was wrong twice over:
+
+        1. A farm whose whole history came from `imagery.backfill_scenes`
+           kept NULL for ever. The backfill deliberately does not stamp it,
+           and a live poll only stamped it when it created a job, so a farm
+           already caught up never got one. Prod, 2026-08-25: Mango Republic
+           had 216 succeeded optical jobs and a NULL watermark.
+        2. NULL sends `_resolve_discovery_window` to the 90-day cold-start
+           floor, so that farm re-searched a 90-day window every single day
+           and read back 27 scenes it already had, for ever.
+
+        A sensing time also cannot bury a publication-lagged scene the way a
+        wall clock could, which is the hazard `bump_watermark=False` exists
+        to avoid. The window subtracts the lookback from this value, so a
+        scene sensed before the newest one we hold is still inside the next
+        search.
+        """
+        return (
+            await self._session.execute(
+                text(
+                    """
+                    UPDATE imagery_aoi_subscriptions s
+                       SET last_successful_ingest_at = (
+                               SELECT max(j.scene_datetime)
+                                 FROM imagery_ingestion_jobs j
+                                WHERE j.subscription_id = s.id
+                                  AND j.status = 'succeeded'
+                           )
+                     WHERE s.id = :id
+                 RETURNING s.last_successful_ingest_at
+                    """
+                ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+                {"id": subscription_id},
+            )
+        ).scalar_one_or_none()
 
     # ---- Ingestion jobs -----------------------------------------------
 
@@ -1713,24 +1753,38 @@ class ImageryRepository:
         *,
         subscription_id: UUID,
         attempted_at: datetime,
-        ingested: bool,
     ) -> None:
-        """Record the poll; advance the ingest watermark only if it found work.
-
-        Same contract as the block path: an empty or all-cloud poll is a
-        heartbeat, not an ingest, and bumping the watermark on one would bury
-        publication-lagged scenes.
-        """
-        sets = ["last_attempted_at = :at", "updated_at = now()"]
-        if ingested:
-            sets.append("last_successful_ingest_at = :at")
+        """Record the poll heartbeat. Same contract as the block path."""
         await self._session.execute(
             text(
-                f"UPDATE imagery_farm_subscriptions SET {', '.join(sets)} "  # noqa: S608
+                "UPDATE imagery_farm_subscriptions "
+                "SET last_attempted_at = :at, updated_at = now() "
                 "WHERE id = :id"
             ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
             {"id": subscription_id, "at": attempted_at},
         )
+
+    async def refresh_farm_ingest_watermark(self, *, subscription_id: UUID) -> datetime | None:
+        """Farm-path twin of `refresh_ingest_watermark` — read that one."""
+        return (
+            await self._session.execute(
+                text(
+                    """
+                    UPDATE imagery_farm_subscriptions s
+                       SET last_successful_ingest_at = (
+                               SELECT max(j.scene_datetime)
+                                 FROM imagery_farm_ingestion_jobs j
+                                WHERE j.subscription_id = s.id
+                                  AND j.status = 'succeeded'
+                           ),
+                           updated_at = now()
+                     WHERE s.id = :id
+                 RETURNING s.last_successful_ingest_at
+                    """
+                ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+                {"id": subscription_id},
+            )
+        ).scalar_one_or_none()
 
     async def upsert_pending_farm_job(
         self,
