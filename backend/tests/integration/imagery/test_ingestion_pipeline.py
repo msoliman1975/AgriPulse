@@ -343,7 +343,11 @@ async def test_discovery_window_applies_lookback_buffer(
     sub_id, _block_id, tenant_schema, _product_id = await _set_up_subscription(
         admin_session, slug="imagery-lookback"
     )
-    watermark = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)
+    # Relative to now, not a fixed calendar date: the window start is clamped
+    # to the `imagery_backfill_floor_days` floor, so a hard-coded watermark
+    # would silently fall behind the floor as the calendar moved and this
+    # test would then be asserting the clamp instead of the lookback.
+    watermark = datetime.now(UTC).replace(microsecond=0) - timedelta(days=5)
     await admin_session.execute(
         text(
             f'UPDATE "{tenant_schema}".imagery_aoi_subscriptions '
@@ -396,19 +400,25 @@ async def test_empty_poll_does_not_advance_ingest_watermark(
 
 
 @pytest.mark.asyncio
-async def test_successful_poll_advances_both_timestamps(
+async def test_a_poll_that_queues_a_scene_moves_only_the_heartbeat(
     admin_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A poll that queues a usable scene advances both the heartbeat and the
-    ingest watermark."""
+    """Queuing is not ingesting, so only `last_attempted_at` moves here.
+
+    The ingest watermark is the sensing time of the newest SUCCEEDED scene.
+    It is written when a job closes, and this test stubs `acquire_scene` out,
+    so the queued job never gets past `pending`. The same poll then rebuilds
+    the watermark from the job rows, which still hold nothing succeeded.
+    """
     sub_id, _block_id, tenant_schema, _product_id = await _set_up_subscription(
         admin_session, slug="imagery-ingest-poll"
     )
+    scene_time = datetime(2026, 3, 1, 8, 30, tzinfo=UTC)
     scenes = (
         DiscoveredScene(
             scene_id="S2A_INGEST_20260301",
-            scene_datetime=datetime(2026, 3, 1, 8, 30, tzinfo=UTC),
+            scene_datetime=scene_time,
             cloud_cover_pct=Decimal("5.00"),
             geometry_geojson={"type": "Polygon", "coordinates": []},
         ),
@@ -426,4 +436,26 @@ async def test_successful_poll_advances_both_timestamps(
         admin_session, tenant_schema=tenant_schema, sub_id=sub_id
     )
     assert after_attempt is not None
-    assert after_ingest is not None
+    assert after_ingest is None
+
+    # Close the job the way `acquire_scene` does, then poll again. Now the
+    # watermark is the scene's sensing time — not the time of either poll.
+    await admin_session.execute(
+        text(
+            f'UPDATE "{tenant_schema}".imagery_ingestion_jobs '
+            "SET status = 'succeeded' WHERE subscription_id = :id"
+        ),
+        {"id": sub_id},
+    )
+    await admin_session.commit()
+
+    imagery_tasks.set_provider_factory(lambda _code: _CapturingProvider(()))
+    try:
+        await imagery_tasks._discover_scenes_async(sub_id, tenant_schema)
+    finally:
+        imagery_tasks.reset_provider_factory()
+
+    _attempt, healed = await _read_sub_timestamps(
+        admin_session, tenant_schema=tenant_schema, sub_id=sub_id
+    )
+    assert healed == scene_time

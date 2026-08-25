@@ -36,8 +36,8 @@
     "revoking": "Revoking…",
     "productLabel": "Product",
     "createdAt": "Subscribed {{date}}",
-    "lastIngest": "Last successful: {{date}}",
-    "neverIngested": "Last successful: never",
+    "lastIngest": "Newest scene: {{date}}",
+    "neverIngested": "Newest scene: none yet",
     "alreadySubscribed": "An active subscription for this product already exists.",
     "denied": "You do not have permission to manage subscriptions."
   },

@@ -61,7 +61,13 @@ def test_watermark_window_pulls_back_by_lookback() -> None:
     assert got_end == _NOW
 
 
-def test_cold_start_uses_floor_minus_lookback() -> None:
+def test_cold_start_uses_the_floor() -> None:
+    """No watermark means reach back to the cold-start floor, and no further.
+
+    The floor used to be pulled back by the lookback as well, which put the
+    start 48h beyond the documented bound. It is a floor, so it is now the
+    limit for every branch.
+    """
     settings = get_settings()
     got_start, got_end = _resolve_discovery_window(
         subscription={"last_successful_ingest_at": None},
@@ -70,10 +76,34 @@ def test_cold_start_uses_floor_minus_lookback() -> None:
         window_start_override=None,
         window_end_override=None,
     )
-    expected = (
-        _NOW
-        - timedelta(days=settings.imagery_backfill_floor_days)
-        - timedelta(hours=settings.imagery_discovery_lookback_hours)
-    )
-    assert got_start == expected
+    assert got_start == _NOW - timedelta(days=settings.imagery_backfill_floor_days)
     assert got_end == _NOW
+
+
+def test_a_watermark_older_than_the_floor_is_clamped_to_it() -> None:
+    """The watermark is now a scene sensing time, so it stops moving when the
+    imagery stops. A subscription whose last scene was two years ago must not
+    ask the catalogue for two years."""
+    settings = get_settings()
+    got_start, _ = _resolve_discovery_window(
+        subscription={"last_successful_ingest_at": _NOW - timedelta(days=730)},
+        settings=settings,
+        now=_NOW,
+        window_start_override=None,
+        window_end_override=None,
+    )
+    assert got_start == _NOW - timedelta(days=settings.imagery_backfill_floor_days)
+
+
+def test_a_recent_watermark_still_wins_over_the_floor() -> None:
+    """The clamp must not swallow the normal case."""
+    settings = get_settings()
+    watermark = _NOW - timedelta(days=5)
+    got_start, _ = _resolve_discovery_window(
+        subscription={"last_successful_ingest_at": watermark},
+        settings=settings,
+        now=_NOW,
+        window_start_override=None,
+        window_end_override=None,
+    )
+    assert got_start == watermark - timedelta(hours=settings.imagery_discovery_lookback_hours)

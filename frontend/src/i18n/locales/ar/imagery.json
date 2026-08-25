@@ -36,8 +36,8 @@
     "revoking": "جارٍ الإلغاء…",
     "productLabel": "المنتج",
     "createdAt": "تم الاشتراك في {{date}}",
-    "lastIngest": "آخر استيعاب ناجح: {{date}}",
-    "neverIngested": "آخر استيعاب ناجح: لا يوجد",
+    "lastIngest": "أحدث مشهد: {{date}}",
+    "neverIngested": "أحدث مشهد: لا يوجد",
     "alreadySubscribed": "يوجد اشتراك نشط لهذا المنتج بالفعل.",
     "denied": "ليست لديك صلاحية لإدارة الاشتراكات."
   },
