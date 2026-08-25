@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import { INDEX_META, isThermalIndex } from "./constants";
+import { MarkerLegend } from "../map/MarkerLegend";
 import { Popover, PopHeading, PopItem, PopDivider } from "./ui";
 
 export interface LayerState {
@@ -22,6 +23,11 @@ export interface LayerState {
   // working through a season accumulates finished pins. This is the one
   // checkbox that clears them without hiding the layer.
   flagsOpenOnly: boolean;
+  // Signal observations. The map draws every signal type at once now, so the
+  // picker below narrows the layer rather than revealing it, and this is what
+  // turns it off. Without it, "no signal picked" was the only off switch and
+  // that made the layer invisible until somebody guessed the right type.
+  signals: boolean;
 }
 
 interface Props {
@@ -147,9 +153,9 @@ export function ViewBar({
       <Chip
         innerRef={signalsRef}
         onClick={() => setOpen(open === "signals" ? null : "signals")}
-        active={Boolean(signalDefId)}
+        active={layers.signals}
       >
-        📡 {activeSignalName ?? t("layers.signals")} ▾
+        ◇ {activeSignalName ?? t("layers.signals")} ▾
       </Chip>
 
       {trailing}
@@ -234,6 +240,11 @@ export function ViewBar({
             onClick={() => onLayersChange({ flagsOpenOnly: !layers.flagsOpenOnly })}
           />
         ) : null}
+        <Toggle
+          label={`◇ ${t("layers.signals")}`}
+          on={layers.signals}
+          onClick={() => onLayersChange({ signals: !layers.signals })}
+        />
         <PopDivider />
         <Toggle label={`◫ ${t("layers.grid")}`} on={showGrid} onClick={onToggleGrid} />
         <div className="px-2.5 pb-1 pt-0.5 text-xs text-ap-muted">
@@ -250,11 +261,20 @@ export function ViewBar({
           value={layers.fillOpacity}
           onChange={(v) => onLayersChange({ fillOpacity: v })}
         />
+        {/* The legend lives here rather than behind its own chip: this is
+            already the menu holding the switches for the very layers it
+            explains, so somebody asking "what is that mark" and somebody
+            asking "how do I turn it off" end up in the same place. */}
+        <PopDivider />
+        <MarkerLegend />
       </Popover>
 
       {/* Signals popover — pick a signal to overlay its observations */}
       <Popover open={open === "signals"} onClose={close} anchorRef={signalsRef}>
         <PopHeading>{t("layers.signals")}</PopHeading>
+        {/* Top item shows everything. It used to hide everything, which is
+            why nobody saw an observation without first guessing which signal
+            somebody had recorded. */}
         <PopItem
           icon={signalDefId == null ? "✓" : ""}
           onClick={() => {
@@ -262,7 +282,7 @@ export function ViewBar({
             onSignalDefChange(null);
           }}
         >
-          {t("layers.signalsNone")}
+          {t("layers.signalsAll")}
         </PopItem>
         {signalDefs.map((d) => (
           <PopItem

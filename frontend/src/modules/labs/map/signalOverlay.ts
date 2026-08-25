@@ -49,7 +49,16 @@ export interface BuildOverlayResult {
 export function buildSignalOverlay(
   observations: readonly SignalObservation[],
   blockCentroids: ReadonlyMap<string, [number, number]>,
-  options: { valueKind?: ValueKind | null } = {},
+  options: {
+    /** Value kind per signal definition id.
+     *
+     * A map rather than one kind for the whole call, because the overlay now
+     * carries every signal type at once and a single kind would label a
+     * categorical observation as numeric. Falls back to `valueKind` for the
+     * one-definition callers that predate that. */
+    valueKindByDefinitionId?: ReadonlyMap<string, ValueKind>;
+    valueKind?: ValueKind | null;
+  } = {},
 ): BuildOverlayResult {
   const features: Feature<Point, SignalOverlayProps>[] = [];
   let skippedCount = 0;
@@ -66,7 +75,10 @@ export function buildSignalOverlay(
       properties: {
         observation_id: obs.id,
         signal_code: obs.signal_code,
-        value_kind: options.valueKind ?? null,
+        value_kind:
+          options.valueKindByDefinitionId?.get(obs.signal_definition_id) ??
+          options.valueKind ??
+          null,
         value_display: formatObservationValue(obs),
         observed_at: obs.time,
         location_mode: obs.location_mode ?? "entity",

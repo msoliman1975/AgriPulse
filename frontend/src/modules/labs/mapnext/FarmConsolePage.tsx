@@ -117,6 +117,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     // recently dealt with.
     flags: true,
     flagsOpenOnly: false,
+    signals: true,
   });
   // Grid overlay. Defaults ON for a farm that has any sub-block grid
   // configured — someone who went to the trouble of zoning a block wants to
@@ -382,15 +383,13 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     queryFn: () => listSignalDefinitions(),
     staleTime: 5 * 60_000,
   });
+  // One fetch for the whole farm, not one per signal definition. The layer
+  // shows every signal type at once, and re-fetching on every pick would
+  // spend a round trip to narrow a list the client already holds.
   const signalObsQ = useQuery({
-    queryKey: ["labs/mapnext/signalObs", farmId, signalDefId],
-    queryFn: () =>
-      listSignalObservations({
-        farm_id: farmId,
-        signal_definition_id: signalDefId ?? undefined,
-        limit: 500,
-      }),
-    enabled: Boolean(farmId && signalDefId),
+    queryKey: ["labs/mapnext/signalObs", farmId],
+    queryFn: () => listSignalObservations({ farm_id: farmId, limit: 500 }),
+    enabled: Boolean(farmId && layers.signals),
     staleTime: 30_000,
   });
   // Flags are fetched whenever the layer is on. `pinned_only` is the map's
@@ -418,13 +417,27 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     return buildFlagOverlay(flagsQ.data, blockCentroids);
   }, [layers.flags, flagsQ.data, blockCentroids]);
 
+  // Value kind per definition, so a mixed overlay labels each observation
+  // against its OWN signal rather than against whichever one is picked.
+  const valueKindByDefId = useMemo(
+    () => new Map((signalDefsQ.data ?? []).map((d) => [d.id, d.value_kind])),
+    [signalDefsQ.data],
+  );
+
   const signalOverlayFc = useMemo(() => {
-    if (!signalDefId) return null;
+    if (!layers.signals) return null;
     if (!signalObsQ.data) return { type: "FeatureCollection" as const, features: [] };
-    return buildSignalOverlay(signalObsQ.data, blockCentroids, {
-      valueKind: selectedSignalDef?.value_kind ?? null,
+    // The picker NARROWS the layer; it no longer reveals it. Every farm's
+    // observations are fetched in one call and filtered here, so an operator
+    // sees that a scout recorded something without first guessing which
+    // signal they used.
+    const rows = signalDefId
+      ? signalObsQ.data.filter((o) => o.signal_definition_id === signalDefId)
+      : signalObsQ.data;
+    return buildSignalOverlay(rows, blockCentroids, {
+      valueKindByDefinitionId: valueKindByDefId,
     }).features;
-  }, [signalDefId, signalObsQ.data, blockCentroids, selectedSignalDef]);
+  }, [layers.signals, signalDefId, signalObsQ.data, blockCentroids, valueKindByDefId]);
   const selectedObs = useMemo(
     () =>
       selectedObsId && signalObsQ.data

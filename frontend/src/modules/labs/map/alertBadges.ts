@@ -9,11 +9,29 @@
 // anchor.)
 //
 // So the badges get their own point source, derived here.
+//
+// The badge is now a symbol, not a circle — see markerIcons.ts for why the
+// three overlays needed three shapes — so this also resolves each block's
+// marker image and count label. Resolving them HERE rather than in a
+// MapLibre `match` expression keeps the image ids in one place: an id the
+// layer asks for but the registration loop never created renders as nothing
+// at all, with no error, which would drop the alert off the map silently.
 
 import { pointOnFeature } from "@turf/turf";
 import type { Feature, FeatureCollection, Point, Polygon } from "geojson";
 
+import { alertActionGlyph, alertChipImageId, markerSeverity } from "./markerIcons";
 import type { UnitFeatureProps } from "./types";
+
+/** What the symbol layer reads off each badge feature. */
+export interface AlertBadgeProps extends UnitFeatureProps {
+  /** Registered marker image id — glyph from the verb, colour from severity. */
+  marker_icon: string;
+  /** The count, pre-rendered. MapLibre can `to-string` a number itself, but
+   *  a block carrying more than 99 open alerts would make the chip wider than
+   *  the block, so the cap happens here where it can be explained. */
+  marker_count: string;
+}
 
 /**
  * One badge anchor per alerting block.
@@ -30,15 +48,25 @@ import type { UnitFeatureProps } from "./types";
  */
 export function buildAlertBadgePoints(
   units: FeatureCollection<Polygon, UnitFeatureProps>,
-): FeatureCollection<Point, UnitFeatureProps> {
-  const features: Feature<Point, UnitFeatureProps>[] = [];
+): FeatureCollection<Point, AlertBadgeProps> {
+  const features: Feature<Point, AlertBadgeProps>[] = [];
   for (const f of units.features) {
     if (!f.properties.has_alert) continue;
+    const count = f.properties.alert_count;
     features.push({
       type: "Feature",
       id: f.id,
       geometry: pointOnFeature(f).geometry,
-      properties: f.properties,
+      properties: {
+        ...f.properties,
+        marker_icon: alertChipImageId(
+          alertActionGlyph(f.properties.alert_action_type),
+          markerSeverity(f.properties.alert_severity),
+        ),
+        // `has_alert` is derived from a count > 0, so a badge with a count of
+        // 0 cannot occur; guard anyway rather than print "0" on the map.
+        marker_count: count > 99 ? "99+" : String(Math.max(count, 1)),
+      },
     });
   }
   return { type: "FeatureCollection", features };

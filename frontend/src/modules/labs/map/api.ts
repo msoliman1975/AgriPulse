@@ -152,6 +152,7 @@ export async function loadMapSummary(farmId: string): Promise<MapSummary> {
       has_alert: !isLogicalPivot && (apiSummary?.alert_count ?? 0) > 0,
       alert_severity: isLogicalPivot ? null : (apiSummary?.alert_severity ?? null),
       alert_count: isLogicalPivot ? 0 : (apiSummary?.alert_count ?? 0),
+      alert_action_type: isLogicalPivot ? null : (apiSummary?.alert_action_type ?? null),
       ndvi_current: apiSummary?.ndvi_current ?? null,
       ndre_current: apiSummary?.ndre_current ?? null,
       ndwi_current: apiSummary?.ndwi_current ?? null,
@@ -174,6 +175,8 @@ export async function loadMapSummary(farmId: string): Promise<MapSummary> {
         health: summary.health,
         has_alert: summary.has_alert,
         alert_severity: summary.alert_severity ?? "none",
+        alert_count: summary.alert_count,
+        alert_action_type: summary.alert_action_type,
         is_future: isFuture,
         // Overwritten per-block by the page from the weather-risk summary
         // (PR-R4b); "none" is the no-risk default the fill expression treats

@@ -6,7 +6,7 @@ map-first frontend needs to color polygons + show alert badges:
   GET /api/v1/farms/{farm_id}/blocks/summary
 
   → { farm_id, as_of, units: [{
-        id, health, alert_count, alert_severity,
+        id, health, alert_count, alert_severity, alert_action_type,
         ndvi_current, ndre_current, ndwi_current,
         last_index_at,
       }, ...] }
@@ -97,6 +97,12 @@ class BlockSummary(BaseModel):
     health: Health
     alert_count: int
     alert_severity: MapSeverity | None
+    # The verb the worst open alert's decision-tree leaf chose — one of the
+    # `recommendations.action_type` values (migration 0015), carried on the
+    # alert row since 0063. The map picks the marker's glyph from it, so a
+    # water-stress alert and a pest alert stop looking like the same dot.
+    # Null when the block has no open alert, or when the leaf named no verb.
+    alert_action_type: str | None = None
     ndvi_current: float | None
     ndre_current: float | None
     ndwi_current: float | None
@@ -227,7 +233,25 @@ async def get_blocks_summary(
                                WHERE a.severity IN ('warning', 'critical')
                            ) AS alert_count,
                            bool_or(a.severity = 'critical') AS has_critical,
-                           bool_or(a.severity = 'warning')  AS has_warning
+                           bool_or(a.severity = 'warning')  AS has_warning,
+                           -- The verb of the WORST, then NEWEST, open alert.
+                           -- The map draws one glyph per block, so it has to
+                           -- pick one of a mixed bag; picking the worst one
+                           -- matches what the badge's colour already says,
+                           -- and the count beside it says there are others.
+                           -- NULLs are filtered rather than ordered last so
+                           -- a block whose worst alert names no verb still
+                           -- shows the verb of the next one down instead of
+                           -- falling back to the neutral glyph.
+                           (array_agg(a.action_type ORDER BY
+                               CASE a.severity
+                                   WHEN 'critical' THEN 0
+                                   WHEN 'warning' THEN 1
+                                   ELSE 2
+                               END,
+                               a.created_at DESC
+                           ) FILTER (WHERE a.action_type IS NOT NULL))[1]
+                               AS alert_action_type
                     FROM alerts a
                     JOIN blocks b ON b.id = a.block_id
                     WHERE b.farm_id = :farm_id
@@ -308,6 +332,7 @@ async def get_blocks_summary(
         alerts_by_block[r["block_id"]] = {
             "alert_count": int(r["alert_count"] or 0),
             "alert_severity": sev,
+            "alert_action_type": r["alert_action_type"],
         }
 
     grid_by_block: dict[UUID, UUID] = {r["block_id"]: r["product_id"] for r in grid_rows}
@@ -329,6 +354,7 @@ async def get_blocks_summary(
         a = alerts_by_block.get(bid, {})
         alert_count = int(a.get("alert_count", 0))
         alert_severity: MapSeverity | None = a.get("alert_severity")
+        alert_action_type: str | None = a.get("alert_action_type")
 
         health = _classify_health(worst_alert_severity=alert_severity, ndvi_current=ndvi_current)
 
@@ -338,6 +364,7 @@ async def get_blocks_summary(
                 health=health,
                 alert_count=alert_count,
                 alert_severity=alert_severity,
+                alert_action_type=alert_action_type,
                 ndvi_current=ndvi_current,
                 ndre_current=ndre_current,
                 ndwi_current=ndwi_current,

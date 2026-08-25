@@ -9,6 +9,7 @@
 import type { Feature, FeatureCollection, Point } from "geojson";
 
 import type { FieldFlag } from "@/api/fieldFlags";
+import { flagImageId, markerSeverity } from "./markerIcons";
 
 export interface FlagOverlayProps {
   flag_id: string;
@@ -20,6 +21,9 @@ export interface FlagOverlayProps {
   /** Where the coordinate came from, so a reader can tell a GPS fix from a
    *  block-centre approximation rather than trusting a pin that is neither. */
   source: "point" | "block_centroid";
+  /** Registered pennant image id - colour from the scout's severity,
+   *  filled while the flag is open and hollow once it is closed. */
+  marker_icon: string;
 }
 
 export function buildFlagOverlay(
@@ -54,6 +58,7 @@ export function buildFlagOverlay(
         open: f.status === "open",
         title: f.note.split("\n")[0].slice(0, 120),
         source,
+        marker_icon: flagImageId(markerSeverity(f.severity), f.status === "open"),
       },
     });
   }

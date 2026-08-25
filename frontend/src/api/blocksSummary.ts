@@ -10,6 +10,10 @@ export interface BlockSummary {
   health: Health;
   alert_count: number;
   alert_severity: MapSeverity | null;
+  /** Verb of the worst open alert (`irrigate`, `spray`, ...). Drives the map
+   *  marker's glyph. Null when there is no open alert, or the tree leaf that
+   *  opened it named no verb. */
+  alert_action_type?: string | null;
   ndvi_current: number | null;
   ndre_current: number | null;
   ndwi_current: number | null;

@@ -12,18 +12,18 @@ import { griddedBlocks } from "./gridOverlay";
 
 const block = (id: string): Block => ({ id }) as Block;
 
-const summary = (id: string, gridProductId: string | null): UnitSummary =>
-  ({
-    id,
-    health: "unknown",
-    has_alert: false,
-    alert_severity: null,
-    alert_count: 0,
-    ndvi_current: null,
-    ndre_current: null,
-    ndwi_current: null,
-    grid_product_id: gridProductId,
-  });
+const summary = (id: string, gridProductId: string | null): UnitSummary => ({
+  id,
+  health: "unknown",
+  has_alert: false,
+  alert_severity: null,
+  alert_count: 0,
+  alert_action_type: null,
+  ndvi_current: null,
+  ndre_current: null,
+  ndwi_current: null,
+  grid_product_id: gridProductId,
+});
 
 describe("griddedBlocks", () => {
   it("returns the gridded blocks with the product each is zoned against", () => {

@@ -18,6 +18,7 @@ function summary(
     has_alert: (opts.alerts ?? 0) > 0,
     alert_severity: null,
     alert_count: opts.alerts ?? 0,
+    alert_action_type: null,
     ndvi_current: opts.ndvi ?? null,
     ndre_current: null,
     ndwi_current: null,

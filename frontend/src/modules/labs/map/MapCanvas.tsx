@@ -12,6 +12,7 @@ import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 
 import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import { buildAlertBadgePoints } from "./alertBadges";
+import { registerMarkerImages, SIGNAL_IMAGE_ID } from "./markerIcons";
 import { gridRampExpression } from "./gridRamp";
 import { HEALTH_FILL, HEALTH_FILL_OPACITY, HEALTH_STROKE } from "./health";
 import { approxPolygonAreaM2, haversineMeters, polygonPerimeterM } from "./geo";
@@ -189,11 +190,12 @@ const AOI_LINE_LAYER = "farm-aoi-line";
 // per active overlay; the map page swaps the source data when the
 // operator picks a different signal definition.
 const FLAG_SOURCE_ID = "field-flag-overlay";
-const FLAG_CIRCLE_LAYER = "field-flag-circle";
-const FLAG_HALO_LAYER = "field-flag-halo";
+// One symbol layer each, where there used to be a circle plus a halo. A
+// baked marker image carries its own white keyline, so the halo layer that
+// used to buy contrast over satellite imagery has nothing left to do.
+const FLAG_LAYER = "field-flag-symbol";
 const SIGNAL_SOURCE_ID = "signal-overlay";
-const SIGNAL_CIRCLE_LAYER = "signal-overlay-circle";
-const SIGNAL_HALO_LAYER = "signal-overlay-halo";
+const SIGNAL_LAYER = "signal-overlay-symbol";
 // Sub-block grid overlay layers.
 const GRID_SOURCE_ID = "subblock-grid";
 const GRID_FILL_LAYER = "subblock-grid-fill";
@@ -259,24 +261,6 @@ const CLASS_FILL_OPACITY = 0.8;
 
 const AOI_STROKE = "#0ea5e9"; // cyan-500 — distinct from block strokes
 const AOI_FILL = "#0ea5e9";
-// Visually distinct from block fills + alert badges. Amber-500 chosen
-// because the existing alert palette uses red/orange and we want the
-// overlay to read as informational, not warning-level.
-const SIGNAL_OVERLAY_COLOR = "#f59e0b";
-// Colour carries SEVERITY and fill carries STATE. An open flag is filled; a
-// closed one is a hollow ring in the same colour, because a closed pin stays
-// on the map for the rest of its lifetime and the map has to say which pins
-// are finished without changing what they are about.
-const FLAG_COLOR_BY_SEVERITY: (string | string[])[] = [
-  "match",
-  ["get", "severity"],
-  "critical",
-  "#b24430",
-  "warning",
-  "#c98a18",
-  "#356b30",
-];
-
 // PR-R4b risk-overlay fill. Mirrors the health palette (green/amber/red) so
 // the map reads consistently; "none" is transparent so unscored blocks fall
 // back to the bare satellite base while the overlay is on.
@@ -464,6 +448,12 @@ export function MapCanvas({
     if (containerRef.current) resizeObserver.observe(containerRef.current);
 
     map.on("load", () => {
+      // Marker artwork first: MapLibre resolves `icon-image` at draw time,
+      // and a symbol whose image is missing renders as nothing at all with
+      // no error, so registering after the layers would leave the map blank
+      // until the next repaint that happened to follow registration.
+      registerMarkerImages(map);
+
       // Farm AOI source + layers — placed first so block layers render above.
       map.addSource(AOI_SOURCE_ID, {
         type: "geojson",
@@ -591,60 +581,65 @@ export function MapCanvas({
         },
       });
 
-      // Alert badges — circles with severity-driven size. Bound to the
-      // derived point source, never to `units`: see BADGE_SOURCE_ID.
+      // Alert markers. A severity-coloured chip carrying the glyph for the
+      // worst open alert's action_type, with the number of open alerts
+      // fitted into it. Replaces a plain circle that could say neither what
+      // the alert was about nor how many there were.
+      //
+      // Bound to the derived point source, never to `units`: see
+      // BADGE_SOURCE_ID for what a circle layer did to a polygon source.
       map.addSource(BADGE_SOURCE_ID, {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
       });
       map.addLayer({
         id: ALERT_BADGE_LAYER,
-        type: "circle",
+        type: "symbol",
         source: BADGE_SOURCE_ID,
-        filter: ["==", ["get", "has_alert"], true],
+        layout: {
+          // The id is resolved in alertBadges.ts rather than by a `match`
+          // here, so the ids the layer asks for and the ids registered with
+          // the map come from the same function.
+          "icon-image": ["get", "marker_icon"],
+          // Grows the chip around the count. The image's stretch region sits
+          // to the right of the glyph, so a three-digit count widens the
+          // chip without distorting the droplet.
+          "icon-text-fit": "both",
+          "icon-text-fit-padding": [2, 6, 2, 2],
+          "text-field": ["get", "marker_count"],
+          "text-size": 12,
+          // An alert is the one thing on this map that must never be hidden
+          // by label collision. If two blocks are small and adjacent, seeing
+          // both chips overlap is better than one of them vanishing.
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+          "text-allow-overlap": true,
+          "text-ignore-placement": true,
+          // Up and to the right of the block's anchor point, so the chip
+          // does not bury the block's name label. Ems, because the offset
+          // moves the text and the fitted icon follows it.
+          "text-offset": [1.1, -1.1],
+        },
         paint: {
-          "circle-color": [
-            "match",
-            ["get", "alert_severity"],
-            "critical",
-            "#A32D2D",
-            "watch",
-            "#854F0B",
-            "#999999",
-          ],
-          "circle-radius": ["match", ["get", "alert_severity"], "critical", 10, "watch", 8, 6],
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 1.5,
-          "circle-translate": [12, -12],
+          "text-color": "#ffffff",
         },
       });
 
-      // CS-8: signal overlay source + two layers. The halo is a wider
-      // semi-transparent ring under the solid circle so markers stay
-      // visible against satellite imagery without dominating the map.
+      // CS-8: signal observations. A hollow diamond in one neutral colour —
+      // a reading somebody took, not a problem somebody found, so it is the
+      // quietest of the three marker shapes.
       map.addSource(SIGNAL_SOURCE_ID, {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
       });
       map.addLayer({
-        id: SIGNAL_HALO_LAYER,
-        type: "circle",
+        id: SIGNAL_LAYER,
+        type: "symbol",
         source: SIGNAL_SOURCE_ID,
-        paint: {
-          "circle-color": SIGNAL_OVERLAY_COLOR,
-          "circle-radius": 10,
-          "circle-opacity": 0.25,
-        },
-      });
-      map.addLayer({
-        id: SIGNAL_CIRCLE_LAYER,
-        type: "circle",
-        source: SIGNAL_SOURCE_ID,
-        paint: {
-          "circle-color": SIGNAL_OVERLAY_COLOR,
-          "circle-radius": 5,
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 1.5,
+        layout: {
+          "icon-image": SIGNAL_IMAGE_ID,
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
         },
       });
 
@@ -654,43 +649,40 @@ export function MapCanvas({
       map.on("mouseleave", FILL_LAYER, () => {
         map.getCanvas().style.cursor = "";
       });
-      // Field flags. Two layers for the same reason the signal overlay has
-      // two: a wide soft halo keeps a pin readable over satellite imagery
-      // without the pin itself having to be large.
+      // Field flags — a pennant, planted on the spot the scout marked.
+      //
+      // Colour is the severity THEY chose (`field_flags.severity`, tenant
+      // migration 0081), so the pin says how bad they thought it was, not
+      // how bad anything downstream decided it was. Open flags are filled;
+      // a closed one is a hollow outline in the same colour, because a
+      // closed pin stays on the map until its `pin_until` runs out and the
+      // layer has to say which work is finished without changing what the
+      // pin is about.
       map.addSource(FLAG_SOURCE_ID, {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
       });
       map.addLayer({
-        id: FLAG_HALO_LAYER,
-        type: "circle",
+        id: FLAG_LAYER,
+        type: "symbol",
         source: FLAG_SOURCE_ID,
-        paint: {
-          "circle-color": FLAG_COLOR_BY_SEVERITY as never,
-          "circle-radius": 13,
-          // Only an OPEN flag gets a halo. It is what makes unfinished work
-          // findable at a glance on a farm carrying a season of closed pins.
-          "circle-opacity": ["case", ["get", "open"], 0.28, 0] as never,
+        layout: {
+          "icon-image": ["get", "marker_icon"],
+          // The image puts the foot of the pole on its bottom centre, so a
+          // bottom anchor plants the pole on the coordinate itself. A centre
+          // anchor would float the pin half its height north of the spot.
+          "icon-anchor": "bottom",
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
         },
       });
-      map.addLayer({
-        id: FLAG_CIRCLE_LAYER,
-        type: "circle",
-        source: FLAG_SOURCE_ID,
-        paint: {
-          "circle-color": ["case", ["get", "open"], FLAG_COLOR_BY_SEVERITY, "rgba(0,0,0,0)"] as never,
-          "circle-radius": 7,
-          "circle-stroke-color": FLAG_COLOR_BY_SEVERITY as never,
-          "circle-stroke-width": 3,
-        },
-      });
-      map.on("mousemove", FLAG_CIRCLE_LAYER, () => {
+      map.on("mousemove", FLAG_LAYER, () => {
         map.getCanvas().style.cursor = "pointer";
       });
-      map.on("mouseleave", FLAG_CIRCLE_LAYER, () => {
+      map.on("mouseleave", FLAG_LAYER, () => {
         map.getCanvas().style.cursor = "";
       });
-      map.on("click", FLAG_CIRCLE_LAYER, (ev) => {
+      map.on("click", FLAG_LAYER, (ev) => {
         const f = ev.features?.[0];
         if (!f) return;
         const props = f.properties as { flag_id?: string };
@@ -699,10 +691,10 @@ export function MapCanvas({
         }
       });
 
-      map.on("mousemove", SIGNAL_CIRCLE_LAYER, () => {
+      map.on("mousemove", SIGNAL_LAYER, () => {
         map.getCanvas().style.cursor = "pointer";
       });
-      map.on("mouseleave", SIGNAL_CIRCLE_LAYER, () => {
+      map.on("mouseleave", SIGNAL_LAYER, () => {
         map.getCanvas().style.cursor = "";
       });
 
@@ -819,10 +811,8 @@ export function MapCanvas({
       // clickable. Order ends up grid < signals < labels — labels still win
       // a click (the GRID handler guards on them), the signal dots win over
       // grid cells (the GRID handler also guards on them).
-      if (map.getLayer(SIGNAL_HALO_LAYER)) map.moveLayer(SIGNAL_HALO_LAYER);
-      if (map.getLayer(SIGNAL_CIRCLE_LAYER)) map.moveLayer(SIGNAL_CIRCLE_LAYER);
-      if (map.getLayer(FLAG_HALO_LAYER)) map.moveLayer(FLAG_HALO_LAYER);
-      if (map.getLayer(FLAG_CIRCLE_LAYER)) map.moveLayer(FLAG_CIRCLE_LAYER);
+      if (map.getLayer(SIGNAL_LAYER)) map.moveLayer(SIGNAL_LAYER);
+      if (map.getLayer(FLAG_LAYER)) map.moveLayer(FLAG_LAYER);
       map.moveLayer(LABEL_LAYER);
       map.on("mousemove", GRID_FILL_LAYER, () => {
         map.getCanvas().style.cursor = "pointer";
@@ -847,7 +837,7 @@ export function MapCanvas({
         // Observation dots sit above the heatmap and have their own click
         // handler; if the click also landed on a dot, let the signal
         // handler win so a dot opens the observation, not a cell.
-        if (map.queryRenderedFeatures(ev.point, { layers: [SIGNAL_CIRCLE_LAYER] }).length > 0) {
+        if (map.queryRenderedFeatures(ev.point, { layers: [SIGNAL_LAYER] }).length > 0) {
           return;
         }
         const f = ev.features?.[0];
@@ -871,7 +861,7 @@ export function MapCanvas({
       map.on("mouseleave", LABEL_LAYER, () => {
         map.getCanvas().style.cursor = "";
       });
-      map.on("click", SIGNAL_CIRCLE_LAYER, (ev) => {
+      map.on("click", SIGNAL_LAYER, (ev) => {
         const f = ev.features?.[0];
         if (!f) return;
         const props = f.properties as { observation_id?: string };
@@ -1043,7 +1033,7 @@ export function MapCanvas({
       const visible = signalOverlay !== null;
       const fc = signalOverlay ?? { type: "FeatureCollection", features: [] };
       src.setData(fc);
-      for (const layerId of [SIGNAL_CIRCLE_LAYER, SIGNAL_HALO_LAYER]) {
+      for (const layerId of [SIGNAL_LAYER]) {
         if (!map.getLayer(layerId)) continue;
         map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
       }
@@ -1063,7 +1053,7 @@ export function MapCanvas({
       if (!src) return;
       const visible = flagOverlay !== null;
       src.setData(flagOverlay ?? { type: "FeatureCollection", features: [] });
-      for (const layerId of [FLAG_CIRCLE_LAYER, FLAG_HALO_LAYER]) {
+      for (const layerId of [FLAG_LAYER]) {
         if (!map.getLayer(layerId)) continue;
         map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
       }
