@@ -146,6 +146,13 @@ async def test_a_signal_with_observations_but_no_assignment_is_offered(
         name="Reports Signal Columns",
         contact_email="ops@rep-sig.test",
     )
+    # `create_tenant` only flushes — it leaves the commit to the caller's
+    # `session.begin()` block, and the fixture has none. Without this commit
+    # the `public.tenants` row is invisible to the second connection below, so
+    # the catalog's `current_schema()` tenant lookup returns NULL and every
+    # tenant-authored definition is filtered out. That is a harness artifact,
+    # not the behaviour under test, and it costs a CI round trip to rediscover.
+    await admin_session.commit()  # type: ignore[attr-defined]
     schema = schema_name_for(tenant.tenant_id)
 
     from app.shared.db.session import AsyncSessionLocal
