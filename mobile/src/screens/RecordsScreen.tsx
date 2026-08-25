@@ -9,6 +9,8 @@ import {
   type Observation,
 } from "@/api/client";
 import type { FarmScope } from "@/api/me";
+import { ALL_FARMS, FarmRail, type FarmCount } from "@/components/FarmRail";
+import { HomeHeader } from "@/components/HomeHeader";
 import { t, type Lang } from "@/i18n";
 import { FlagDetailScreen } from "@/screens/FlagDetailScreen";
 
@@ -17,39 +19,54 @@ import { FlagDetailScreen } from "@/screens/FlagDetailScreen";
  *
  * Two jobs, both of them the scout's rather than the office's: proving a day's
  * work, and letting somebody find a reading they described badly so they can
- * add another. Until now nothing a scout recorded was ever visible to them
- * again — it went into a hypertable and that was the last they saw of it.
+ * add another. Until the flag screen arrived, nothing a scout recorded was ever
+ * visible to them again — it went into a hypertable and that was the last they
+ * saw of it.
  *
  * The observations endpoint has no `recorded_by` filter, so this asks for the
  * farm's recent rows and keeps its own. When the signed-in user id is unknown
  * the screen says so instead of showing the whole farm's readings as if they
  * were yours.
  *
- * Every granted farm, not one. This screen used to show whichever farm was
- * selected in the settings tab, which meant a scout who worked two farms in a
- * day could only ever prove half of it — and nothing on screen said the other
- * half had been left out. A farm that fails is skipped rather than emptying
- * the list; the rows that did arrive are still a real day's work.
+ * Every granted farm is loaded, and the **rail** decides which are shown — the
+ * same control, in the same place, as on Tasks. This screen used to show
+ * whichever farm was selected in a settings tab, which meant a scout who worked
+ * two farms in a day could only ever prove half of it, with nothing on screen
+ * saying the other half had been left out. A farm that fails is skipped rather
+ * than emptying the list; the rows that did arrive are still a real day's work.
  */
 export function RecordsScreen({
   lang,
+  onLangChange,
+  name,
   farms,
   farmName,
+  farm,
+  onFarmChange,
+  onOpenAccount,
   userId,
 }: {
   lang: Lang;
+  onLangChange: (lang: Lang) => void;
+  name: string | null;
   /** Every farm this scout is granted. Never empty — the caller handles that. */
   farms: FarmScope[];
   farmName: (farmId: string) => string;
+  /** The rail's position: a farm id, or `ALL_FARMS`. */
+  farm: string;
+  onFarmChange: (farmId: string) => void;
+  onOpenAccount: () => void;
   userId: string | null;
 }): ReactNode {
   const [rows, setRows] = useState<Observation[] | null>(null);
   const [flags, setFlags] = useState<FieldFlag[]>([]);
+  const [failed, setFailed] = useState<string[]>([]);
   const [openFlagId, setOpenFlagId] = useState<string | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const single = farms.length === 1;
+  const single = farms.length === 1 ? farms[0].farm_id : null;
+  const current = single ?? farm;
   const farmIds = farms.map((f) => f.farm_id).join(",");
 
   useEffect(() => {
@@ -69,20 +86,23 @@ export function RecordsScreen({
           // Flags this scout raised. The endpoint returns the farm's, so the
           // filter is the same honest one the readings use.
           listFieldFlags(f.farm_id).catch(() => [] as FieldFlag[]),
-        ]).catch(() => null),
+        ])
+          .then((r) => ({ farmId: f.farm_id, r }))
+          .catch(() => ({ farmId: f.farm_id, r: null })),
       ),
     )
       .then((perFarm) => {
         if (!live) return;
-        const ok = perFarm.filter((r): r is NonNullable<typeof r> => r !== null);
+        const ok = perFarm.filter((p): p is { farmId: string; r: NonNullable<typeof p.r> } => p.r !== null);
+        setFailed(perFarm.filter((p) => p.r === null).map((p) => p.farmId));
         if (ok.length === 0) {
           setError(t(lang, "records.loadFailed"));
           setRows([]);
           return;
         }
-        const obs = ok.flatMap(([o]) => o);
-        const blockList = ok.flatMap(([, b]) => b);
-        const flagList = ok.flatMap(([, , f]) => f);
+        const obs = ok.flatMap(({ r }) => r[0]);
+        const blockList = ok.flatMap(({ r }) => r[1]);
+        const flagList = ok.flatMap(({ r }) => r[2]);
         setBlocks(blockList);
         // Newest first across farms — a day's work is one sequence to the
         // person who did it, whichever farm each row came from.
@@ -107,6 +127,39 @@ export function RecordsScreen({
     return (id: string | null): string => (id ? (byId.get(id) ?? "") : "");
   }, [blocks]);
 
+  /**
+   * What each pill says here: how much this scout filed on that farm in the
+   * window, which is what the list below is showing.
+   *
+   * **No tone.** The rail's colours mean work that is late or urgent, and
+   * nothing in this list is owed to anybody — it is a receipt. Painting a pill
+   * amber because a filed reading happened to carry a warning severity would
+   * send a scout to a farm that needs nothing from them.
+   */
+  const counts = useMemo(() => {
+    const out: Record<string, FarmCount> = {};
+    for (const f of farms) {
+      if (failed.includes(f.farm_id)) {
+        out[f.farm_id] = { count: null, tone: "", failed: true };
+      } else if (rows === null) {
+        out[f.farm_id] = { count: null, tone: "" };
+      } else {
+        out[f.farm_id] = {
+          count:
+            rows.filter((o) => o.farm_id === f.farm_id).length +
+            flags.filter((fl) => fl.farm_id === f.farm_id).length,
+          tone: "",
+        };
+      }
+    }
+    return out;
+  }, [farms, failed, rows, flags]);
+
+  const shownFlags = current === ALL_FARMS ? flags : flags.filter((f) => f.farm_id === current);
+  const shownRows = (rows ?? []).filter((o) => current === ALL_FARMS || o.farm_id === current);
+  /** Only under "All farms" — otherwise the rail already said it, on every row. */
+  const showFarm = current === ALL_FARMS;
+
   if (openFlagId) {
     return (
       <FlagDetailScreen
@@ -120,27 +173,62 @@ export function RecordsScreen({
 
   return (
     <div className="screen records">
-      <h1>{t(lang, "records.title")}</h1>
+      {/* The same header as Tasks, so the name is the door to the account
+          sheet in the same place on every screen. The old "My records" title
+          said what the tab bar already said. */}
+      <HomeHeader
+        lang={lang}
+        onLangChange={onLangChange}
+        name={name}
+        farmName={single ? farmName(single) : null}
+        onOpenAccount={onOpenAccount}
+      />
+
+      <FarmRail
+        lang={lang}
+        farms={farms}
+        farmName={farmName}
+        value={current}
+        counts={counts}
+        onChange={onFarmChange}
+      />
+
       {error ? <p className="error">{error}</p> : null}
+      {failed.length > 0 ? (
+        <p className="warnline">
+          {t(lang, "tasks.someFarmsFailed")}
+          <span className="which">{failed.map(farmName).join(" · ")}</span>
+        </p>
+      ) : null}
 
       {rows === null && !error ? <p className="empty">{t(lang, "farms.loading")}</p> : null}
-      {rows !== null && rows.length === 0 && flags.length === 0 ? (
+      {rows !== null && shownRows.length === 0 && shownFlags.length === 0 ? (
         <p className="empty">{t(lang, "records.empty")}</p>
       ) : null}
 
       {/* Flags first: they are the only records that can still be waiting on
           somebody, so they are the ones a scout opens this tab to check. */}
       <ul>
-        {flags.map((f) => (
-          <li key={`${f.farm_id}-${f.id}`} className={`visit record flag sev-${f.severity} tappable`} onClick={() => setOpenFlagId(f.id)}>
+        {shownFlags.map((f) => (
+          <li
+            key={`${f.farm_id}-${f.id}`}
+            className={`visit record flag sev-${f.severity} tappable`}
+            onClick={() => setOpenFlagId(f.id)}
+          >
             <span className="ring">⚑</span>
             <div className="body">
-              <div className="title" dir="auto">{firstLine(f.note)}</div>
+              <div className="title" dir="auto">
+                {firstLine(f.note)}
+              </div>
               <div className="meta">
-                {!single && f.farm_id ? (
-                  <span className="atfarm" dir="auto">{farmName(f.farm_id)}</span>
+                {showFarm && f.farm_id ? (
+                  <span className="atfarm" dir="auto">
+                    {farmName(f.farm_id)}
+                  </span>
                 ) : null}
-                <span className="where" dir="auto">{f.block_name}</span>
+                <span className="where" dir="auto">
+                  {f.block_name}
+                </span>
                 <span className="src">
                   {t(lang, f.status === "open" ? "flag.open" : "flag.closed")}
                   {f.comment_count > 0 ? ` · ${f.comment_count}` : ""}
@@ -152,7 +240,7 @@ export function RecordsScreen({
       </ul>
 
       <ul>
-        {(rows ?? []).map((o) => (
+        {shownRows.map((o) => (
           <li key={`${o.farm_id}-${o.id}`} className="visit record">
             {o.attachment_download_url ? (
               <img className="thumb" src={o.attachment_download_url} alt="" />
@@ -164,14 +252,24 @@ export function RecordsScreen({
                 {o.signal_code}
                 {readableValue(o) ? `: ${readableValue(o)}` : ""}
               </div>
-              {o.notes ? <div className="instruction" dir="auto">{o.notes}</div> : null}
+              {o.notes ? (
+                <div className="instruction" dir="auto">
+                  {o.notes}
+                </div>
+              ) : null}
               <div className="meta">
-                {/* Which farm, once there is more than one. Two farms can both
-                    have a "North 3", so the block name alone is ambiguous. */}
-                {!single && o.farm_id ? (
-                  <span className="atfarm" dir="auto">{farmName(o.farm_id)}</span>
+                {/* Which farm, only when the list holds more than one. Two
+                    farms can both have a "North 3", so the block name alone is
+                    ambiguous — but with the rail on one farm the chip repeats
+                    the same word on every row. */}
+                {showFarm && o.farm_id ? (
+                  <span className="atfarm" dir="auto">
+                    {farmName(o.farm_id)}
+                  </span>
                 ) : null}
-                <span className="where" dir="auto">{nameOf(o.block_id)}</span>
+                <span className="where" dir="auto">
+                  {nameOf(o.block_id)}
+                </span>
                 {/* The app's language, not the handset's. A phone set to
                     English rendering an Arabic screen's timestamps in Latin
                     digits and month names is the same two-typefaces problem

@@ -50,11 +50,13 @@ export const ar: Messages = {
   "visits.signingOut": "جارٍ الخروج…",
   "farms.none": "لم يتم تعيينك إلى مزرعة بعد. اطلب من المشرف إضافتك.",
   "farms.loading": "جارٍ التحميل…",
-  "farms.pick": "اختر المزرعة",
 
   "tab.tasks": "المهام",
   "tab.records": "سجلاتي",
-  "tab.me": "حسابي",
+
+  "rail.label": "أي مزرعة",
+  "rail.allFarms": "كل المزارع",
+  "rail.failed": "هذه المزرعة لم تستجب",
 
   "seg.mine": "مهامي",
   "seg.available": "متاحة",
@@ -73,9 +75,8 @@ export const ar: Messages = {
   "group.byBlock": "حسب القطعة",
   "group.byDue": "حسب الموعد",
   "group.noBlock": "بدون قطعة",
-  "group.farms": "مزارعك",
-  "group.oneFarm": "مزرعة واحدة",
-  "group.farmsCount": "{n} مزارع",
+  "group.farmsStart": "من أين يبدأ اليوم",
+  "group.farmsDone": "ما أنجزته",
 
   "empty.mine": "لا توجد مهام عليك الآن.",
   "empty.available": "لا توجد مهام متاحة للأخذ.",
@@ -89,6 +90,10 @@ export const ar: Messages = {
   "record.readingHint": "قياس واحد: عدد مصائد، نسبة إصابة، رطوبة تربة.",
   "record.cancel": "إلغاء",
   "record.whichFarm": "أي مزرعة؟",
+  "record.filingTo": "التسجيل في",
+  "record.changeFarm": "تغيير",
+  "record.pickFarm": "اختر مزرعة",
+  "record.farmFirst": "اختر المزرعة أولاً",
   "record.whichBlock": "أي قطعة؟",
   "record.start": "ابدأ",
   "record.noBlocks": "لا توجد قطع في هذه المزرعة.",
@@ -140,7 +145,6 @@ export const ar: Messages = {
   "flag.chooserHint": "شيء غير متوقع ويحتاج من يتصرف فيه.",
 
   "tasks.someFarmsFailed": "تعذّر تحميل بعض المزارع. أعد المحاولة.",
-  "tasks.allFarms": "كل المزارع",
 
   "records.title": "سجلاتي",
   "records.empty": "لم تسجل شيئًا خلال آخر ٣٠ يومًا.",
@@ -149,7 +153,9 @@ export const ar: Messages = {
   "me.title": "حسابي",
   "me.farm": "المزرعة",
   "me.farms": "مزارعك",
-  "me.farmsHint": "مهامك مُجمّعة حسب المزرعة في تبويب المهام.",
+  "me.farmsHint": "دورك في كل مزرعة. بدّل المزرعة من الشريط أعلى قائمة عملك.",
+  "me.roleHint": "دورك في هذه المزرعة.",
+  "me.close": "إغلاق",
 
   "work.why": "لماذا هذه المهمة",
   "work.photos": "صور",

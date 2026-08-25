@@ -37,27 +37,27 @@ export function RecordSheet({
   lang,
   farms,
   farmName,
-  defaultFarmId,
-  onPickedFarm,
+  farm,
   onClose,
 }: {
   lang: Lang;
   /** Every farm this scout is granted. Never empty — the caller handles that. */
   farms: FarmScope[];
   farmName: (farmId: string) => string;
-  /** The farm to open on: the last one recorded against, when it is still
-   *  granted. Saves a tap for the common case of working one farm all week. */
-  defaultFarmId: string;
-  /** Remembered for next time, so the default above stays useful. */
-  onPickedFarm: (farmId: string) => void;
+  /** The rail's position, inherited rather than re-asked. Empty when the rail
+   *  is on "All farms", which is the one case this sheet asks outright. */
+  farm: string;
   onClose: () => void;
 }): ReactNode {
   const single = farms.length === 1 ? farms[0].farm_id : null;
 
   const [mode, setMode] = useState<Mode>("choose");
   const [intent, setIntent] = useState<"round" | "reading">("round");
+  // Inherited, never defaulted. A farm picked for the scout is a wrong answer
+  // waiting to be accepted, and a reading filed against the wrong farm is not
+  // visibly wrong afterwards.
   const [farmId, setFarmId] = useState<string>(
-    () => single ?? (farms.some((f) => f.farm_id === defaultFarmId) ? defaultFarmId : farms[0].farm_id),
+    () => single ?? (farms.some((f) => f.farm_id === farm) ? farm : ""),
   );
   const [blocks, setBlocks] = useState<Block[] | null>(null);
   const [blockId, setBlockId] = useState("");
@@ -72,6 +72,8 @@ export function RecordSheet({
     let live = true;
     setBlocks(null);
     setBlockId("");
+    // Nothing to ask for until a farm is settled.
+    if (!farmId) return;
     void listBlocks(farmId)
       .then((b) => {
         if (!live) return;
@@ -89,8 +91,7 @@ export function RecordSheet({
   }, [farmId, lang]);
 
   async function go(): Promise<void> {
-    if (!blockId) return;
-    onPickedFarm(farmId);
+    if (!farmId || !blockId) return;
     if (intent === "reading") {
       setMode("reading");
       return;
@@ -141,8 +142,7 @@ export function RecordSheet({
         lang={lang}
         farms={farms}
         farmName={farmName}
-        defaultFarmId={farmId}
-        onPickedFarm={onPickedFarm}
+        farm={farmId}
         onClose={onClose}
         onRaised={onClose}
       />
@@ -237,10 +237,12 @@ export function RecordSheet({
               // Nothing to choose between until the farm's blocks arrive, and a
               // select that is empty for a moment invites a tap that does
               // nothing.
-              disabled={blocks === null || blocks.length === 0}
+              disabled={!farmId || blocks === null || blocks.length === 0}
               onChange={(e) => setBlockId(e.target.value)}
             >
-              {blocks === null ? (
+              {!farmId ? (
+                <option value="">{t(lang, "record.farmFirst")}</option>
+              ) : blocks === null ? (
                 <option value="">{t(lang, "farms.loading")}</option>
               ) : (
                 blocks.map((b) => (
@@ -254,7 +256,7 @@ export function RecordSheet({
               <p className="hint">{t(lang, "record.noBlocks")}</p>
             ) : null}
 
-            <button type="button" disabled={busy || !blockId} onClick={() => void go()}>
+            <button type="button" disabled={busy || !farmId || !blockId} onClick={() => void go()}>
               {busy ? t(lang, "work.saving") : t(lang, "record.start")}
             </button>
             <button type="button" className="link" onClick={() => setMode("choose")}>

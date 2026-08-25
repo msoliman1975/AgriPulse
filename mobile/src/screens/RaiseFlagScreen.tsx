@@ -34,8 +34,7 @@ export function RaiseFlagScreen({
   lang,
   farms,
   farmName,
-  defaultFarmId,
-  onPickedFarm,
+  farm,
   onClose,
   onRaised,
 }: {
@@ -43,16 +42,15 @@ export function RaiseFlagScreen({
   /** Every farm this scout is granted. Never empty — the caller handles that. */
   farms: FarmScope[];
   farmName: (farmId: string) => string;
-  /** The farm to open on, when it is still granted. */
-  defaultFarmId: string;
-  /** Remembered for next time. */
-  onPickedFarm: (farmId: string) => void;
+  /** The rail's position, inherited rather than re-asked. Empty when the rail
+   *  is on "All farms". */
+  farm: string;
   onClose: () => void;
   onRaised: () => void;
 }): ReactNode {
   const single = farms.length === 1 ? farms[0].farm_id : null;
   const [farmId, setFarmId] = useState<string>(
-    () => single ?? (farms.some((f) => f.farm_id === defaultFarmId) ? defaultFarmId : farms[0].farm_id),
+    () => single ?? (farms.some((f) => f.farm_id === farm) ? farm : ""),
   );
   const [blocks, setBlocks] = useState<Block[] | null>(null);
   const [blockId, setBlockId] = useState("");
@@ -75,6 +73,7 @@ export function RaiseFlagScreen({
     let live = true;
     setBlocks(null);
     setBlockId("");
+    if (!farmId) return;
     void listBlocks(farmId)
       .then((b) => {
         if (!live) return;
@@ -112,7 +111,7 @@ export function RaiseFlagScreen({
   }
 
   async function raise(): Promise<void> {
-    if (!blockId) return;
+    if (!farmId || !blockId) return;
     if (note.trim() === "") {
       setError(t(lang, "flag.needNote"));
       return;
@@ -137,7 +136,6 @@ export function RaiseFlagScreen({
         accuracy_m: fix ? fix.accuracy_m : null,
         attachment_s3_keys: keys,
       });
-      onPickedFarm(farmId);
       onRaised();
     } catch (e) {
       setError(e instanceof ApiError && e.message ? e.message : t(lang, "flag.raiseFailed"));
