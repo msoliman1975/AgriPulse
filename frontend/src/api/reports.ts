@@ -8,6 +8,71 @@ export interface ReportPeriod {
   until: string;
 }
 
+// ---- Custom (tenant-defined) report columns ------------------------------
+//
+// Crop attributes and custom signals, the two catalogs a tenant defines for
+// itself. Both render as one more column on a block-grained report, so they
+// share one envelope regardless of which catalog they came from.
+
+export type CustomFieldSource = "crop_attribute" | "signal";
+
+export interface CustomFieldOption {
+  code: string;
+  name_en: string;
+  name_ar: string | null;
+}
+
+export interface CustomFieldDef {
+  /** `"{source}:{code}"` — the column id, and what `fields` carries. */
+  key: string;
+  source: CustomFieldSource;
+  code: string;
+  name_en: string;
+  /** Always null for a signal: that catalog has no Arabic name column. */
+  name_ar: string | null;
+  /** The source's own type name — see backend schemas.CustomFieldDef. */
+  value_type: string;
+  unit_en: string | null;
+  unit_ar: string | null;
+  decimal_places: number | null;
+  options: CustomFieldOption[] | null;
+}
+
+export interface CustomFieldValue {
+  key: string;
+  source: CustomFieldSource;
+  code: string;
+  value_numeric: string | null;
+  value_text: string | null;
+  value_boolean: boolean | null;
+  value_date: string | null;
+  value_options: string[] | null;
+  /** Signals only: when the observation behind this cell was taken. */
+  observed_at: string | null;
+}
+
+/** A block's custom cells, keyed by `CustomFieldDef.key`. A key that is
+ * absent means no value — which is not the same as zero. */
+export type CustomFieldCells = Record<string, CustomFieldValue | undefined>;
+
+export interface CustomFieldsResponse {
+  farm_id: string;
+  fields: CustomFieldDef[];
+}
+
+/** The column picker's menu for one farm. */
+export async function getReportCustomFields(farmId: string): Promise<CustomFieldsResponse> {
+  const { data } = await apiClient.get<CustomFieldsResponse>(
+    `/v1/farms/${farmId}/reports/custom-fields`,
+  );
+  return data;
+}
+
+/** Comma-separated `source:code` list. Every block-grained report takes it. */
+export interface CustomFieldParams {
+  fields?: string;
+}
+
 // ---- PR-1: Seasonal Crop Health ------------------------------------------
 
 export type CropHealthStatus = "normal" | "watch" | "stressed" | "unknown";
@@ -31,6 +96,7 @@ export interface CropHealthBlockRow {
   avg_valid_pixel_pct: string | null;
   avg_cloud_pct: string | null;
   scene_count: number;
+  custom: CustomFieldCells;
 }
 
 export interface CropHealthSummary {
@@ -51,9 +117,10 @@ export interface CropHealthReportResponse {
   crop_path: string | null;
   blocks: CropHealthBlockRow[];
   summary: CropHealthSummary;
+  custom_fields: CustomFieldDef[];
 }
 
-export interface CropHealthParams {
+export interface CropHealthParams extends CustomFieldParams {
   index_code?: string;
   since?: string;
   until?: string;
@@ -88,6 +155,7 @@ export interface ZoneAnomalyBlockRow {
   block_mean: string | null;
   block_std: string | null;
   threshold_k: string | null;
+  custom: CustomFieldCells;
 }
 
 export interface ZoneAnomalySummary {
@@ -105,6 +173,7 @@ export interface ZoneAnomalyReportResponse {
   period: ReportPeriod;
   blocks: ZoneAnomalyBlockRow[];
   summary: ZoneAnomalySummary;
+  custom_fields: CustomFieldDef[];
 }
 
 export async function getZoneAnomalyReport(
@@ -126,6 +195,9 @@ export interface RangeParams {
   until?: string;
 }
 
+/** Date range plus custom columns — the block-grained non-index reports. */
+export interface BlockRangeParams extends RangeParams, CustomFieldParams {}
+
 export interface WaterBalanceWeather {
   days_with_data: number;
   et0_mm_total: string | null;
@@ -144,6 +216,7 @@ export interface WaterBalanceBlockRow {
   applied_mm_total: string | null;
   adherence_pct: string | null;
   last_scheduled_for: string | null;
+  custom: CustomFieldCells;
 }
 
 export interface WaterBalanceSummary {
@@ -163,11 +236,12 @@ export interface WaterBalanceReportResponse {
   weather: WaterBalanceWeather;
   blocks: WaterBalanceBlockRow[];
   summary: WaterBalanceSummary;
+  custom_fields: CustomFieldDef[];
 }
 
 export async function getWaterBalanceReport(
   farmId: string,
-  params: RangeParams = {},
+  params: BlockRangeParams = {},
 ): Promise<WaterBalanceReportResponse> {
   const { data } = await apiClient.get<WaterBalanceReportResponse>(
     `/v1/farms/${farmId}/reports/water-balance`,
@@ -304,6 +378,7 @@ export interface WeatherRiskPressureRow {
   latest_level: "low" | "moderate" | "high";
   latest_score: number;
   latest_date: string;
+  custom: CustomFieldCells;
 }
 
 export interface WeatherRiskPressureSummary {
@@ -320,14 +395,129 @@ export interface WeatherRiskPressureReportResponse {
   period: ReportPeriod;
   rows: WeatherRiskPressureRow[];
   summary: WeatherRiskPressureSummary;
+  custom_fields: CustomFieldDef[];
 }
 
 export async function getWeatherRiskPressureReport(
   farmId: string,
-  params: RangeParams = {},
+  params: BlockRangeParams = {},
 ): Promise<WeatherRiskPressureReportResponse> {
   const { data } = await apiClient.get<WeatherRiskPressureReportResponse>(
     `/v1/farms/${farmId}/reports/weather-risk-pressure`,
+    { params },
+  );
+  return data;
+}
+
+// ---- PR-R6: Signal Details -----------------------------------------------
+//
+// The one report whose rows are observations rather than blocks. Every other
+// report collapses custom signals to one value per block, which cannot answer
+// what the scouts actually recorded, who recorded it, and what they wrote.
+
+export interface SignalDetailFilters {
+  signal_codes: string[];
+  block_ids: string[];
+  categorical_values: string[];
+  min_value: string | null;
+  max_value: string | null;
+  recorded_by: string | null;
+  location_mode: string | null;
+  with_notes_only: boolean;
+  with_attachment_only: boolean;
+}
+
+export interface SignalDetailRow {
+  observation_id: string;
+  observed_at: string;
+  recorded_at: string;
+  signal_code: string;
+  signal_name: string;
+  /** numeric | categorical | event | boolean | geopoint. Pick the value
+   * column from this rather than probing for the non-null one: `false` and
+   * `0` are real values. */
+  value_kind: string;
+  unit: string | null;
+  value_numeric: string | null;
+  value_categorical: string | null;
+  value_event: string | null;
+  value_boolean: boolean | null;
+  /** Null for a farm-level observation. */
+  block_id: string | null;
+  block_name: string | null;
+  crop_path: string | null;
+  notes: string | null;
+  recorded_by: string;
+  recorded_by_name: string | null;
+  location_mode: string;
+  has_attachment: boolean;
+  /** Set when the row was part of a grouped template submission. */
+  template_observation_id: string | null;
+  /** Set when the row came from a CSV upload. */
+  import_batch_id: string | null;
+}
+
+export interface SignalDetailCategoryCount {
+  value: string;
+  count: number;
+}
+
+export interface SignalDetailStat {
+  signal_code: string;
+  signal_name: string;
+  value_kind: string;
+  unit: string | null;
+  observation_count: number;
+  block_count: number;
+  recorder_count: number;
+  first_observed_at: string;
+  last_observed_at: string;
+  min_value: string | null;
+  mean_value: string | null;
+  max_value: string | null;
+  categories: SignalDetailCategoryCount[];
+}
+
+export interface SignalDetailSummary {
+  observation_count: number;
+  signal_count: number;
+  block_count: number;
+  recorder_count: number;
+  /** True when the row cap cut the table short — the stats above then
+   * describe the returned page, not the whole period. */
+  truncated: boolean;
+}
+
+export interface SignalDetailsReportResponse {
+  farm_id: string;
+  farm_name: string;
+  period: ReportPeriod;
+  filters: SignalDetailFilters;
+  rows: SignalDetailRow[];
+  stats: SignalDetailStat[];
+  summary: SignalDetailSummary;
+}
+
+export interface SignalDetailsParams extends RangeParams {
+  /** Repeatable: axios serialises an array as `?signal_code=a&signal_code=b`. */
+  signal_code?: string[];
+  block_id?: string[];
+  value?: string[];
+  min_value?: string;
+  max_value?: string;
+  recorded_by?: string;
+  location_mode?: string;
+  with_notes_only?: boolean;
+  with_attachment_only?: boolean;
+  limit?: number;
+}
+
+export async function getSignalDetailsReport(
+  farmId: string,
+  params: SignalDetailsParams = {},
+): Promise<SignalDetailsReportResponse> {
+  const { data } = await apiClient.get<SignalDetailsReportResponse>(
+    `/v1/farms/${farmId}/reports/signal-details`,
     { params },
   );
   return data;

@@ -2,15 +2,21 @@ import { useQuery } from "@tanstack/react-query";
 
 import {
   getCropHealthReport,
+  getReportCustomFields,
+  getSignalDetailsReport,
   getOperationsLogReport,
   getWaterBalanceReport,
   getWeatherRiskPressureReport,
   getWeatherSummaryReport,
   getZoneAnomalyReport,
+  type BlockRangeParams,
   type CropHealthParams,
   type CropHealthReportResponse,
+  type CustomFieldsResponse,
   type OperationsLogReportResponse,
   type RangeParams,
+  type SignalDetailsParams,
+  type SignalDetailsReportResponse,
   type WaterBalanceReportResponse,
   type WeatherRiskPressureReportResponse,
   type WeatherSummaryParams,
@@ -48,7 +54,7 @@ export function useZoneAnomalyReport(
 /** Irrigation & water-balance report for a farm over a date range. */
 export function useWaterBalanceReport(
   farmId: string,
-  params: RangeParams,
+  params: BlockRangeParams,
 ): ReturnType<typeof useQuery<WaterBalanceReportResponse>> {
   return useQuery({
     queryKey: ["reports", "water-balance", farmId, params] as const,
@@ -61,7 +67,7 @@ export function useWaterBalanceReport(
 /** Disease & pest pressure report for a farm over a date range. */
 export function useWeatherRiskPressureReport(
   farmId: string,
-  params: RangeParams,
+  params: BlockRangeParams,
 ): ReturnType<typeof useQuery<WeatherRiskPressureReportResponse>> {
   return useQuery({
     queryKey: ["reports", "weather-risk-pressure", farmId, params] as const,
@@ -92,6 +98,35 @@ export function useOperationsLogReport(
   return useQuery({
     queryKey: ["reports", "operations-log", farmId, params] as const,
     queryFn: () => getOperationsLogReport(farmId, params),
+    enabled: Boolean(farmId),
+    staleTime: 60_000,
+  });
+}
+
+/** The custom columns a farm offers, for the report column picker.
+
+ * Long `staleTime`: crop-attribute definitions are platform-curated and
+ * signal definitions change when somebody authors one, so re-fetching this on
+ * every report switch would be pure noise. */
+export function useReportCustomFields(
+  farmId: string,
+): ReturnType<typeof useQuery<CustomFieldsResponse>> {
+  return useQuery({
+    queryKey: ["reports", "custom-fields", farmId] as const,
+    queryFn: () => getReportCustomFields(farmId),
+    enabled: Boolean(farmId),
+    staleTime: 10 * 60_000,
+  });
+}
+
+/** Signal-details report for a farm — every observation matching the filters. */
+export function useSignalDetailsReport(
+  farmId: string,
+  params: SignalDetailsParams,
+): ReturnType<typeof useQuery<SignalDetailsReportResponse>> {
+  return useQuery({
+    queryKey: ["reports", "signal-details", farmId, params] as const,
+    queryFn: () => getSignalDetailsReport(farmId, params),
     enabled: Boolean(farmId),
     staleTime: 60_000,
   });

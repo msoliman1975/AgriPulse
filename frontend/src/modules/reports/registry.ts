@@ -4,6 +4,7 @@ import type { Capability } from "@/rbac/capabilities";
 
 import { CropHealthReport } from "./components/CropHealthReport";
 import { OperationsLogReport } from "./components/OperationsLogReport";
+import { SignalDetailsReport } from "./components/SignalDetailsReport";
 import { WaterBalanceReport } from "./components/WaterBalanceReport";
 import { WeatherRiskPressureReport } from "./components/WeatherRiskPressureReport";
 import { WeatherSummaryReport } from "./components/WeatherSummaryReport";
@@ -48,4 +49,9 @@ export const REPORTS: readonly ReportDef[] = [
     Component: WeatherRiskPressureReport,
   },
   { id: "operations-log", capability: "plan.read", Component: OperationsLogReport },
+  // Gated on `signal.read`, the same capability the signals module uses.
+  // A tenant that has never authored a signal still sees the report; it
+  // renders its own empty state, which reads better than a report that
+  // appears only after the first observation lands.
+  { id: "signal-details", capability: "signal.read", Component: SignalDetailsReport },
 ];

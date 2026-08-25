@@ -26,6 +26,27 @@ def test_status_from_z_thresholds() -> None:
     assert _status_from_z(Decimal("-3.2")) == "stressed"
 
 
+def test_status_from_z_flips_for_an_inverted_index() -> None:
+    """`msi`/`bsi`/`lst`/`cwsi` read higher-is-worse.
+
+    Without the flip the hottest, driest block on the farm reads "Normal" and
+    the coolest reads "Stressed" — the report inverts exactly the judgement it
+    exists to make.
+    """
+    for code in ("msi", "bsi", "lst", "cwsi"):
+        assert _status_from_z(Decimal("2.5"), index_code=code) == "stressed"
+        assert _status_from_z(Decimal("1.5"), index_code=code) == "watch"
+        assert _status_from_z(Decimal("-2.5"), index_code=code) == "normal"
+        assert _status_from_z(None, index_code=code) == "unknown"
+
+
+def test_status_from_z_keeps_normal_polarity_for_smi() -> None:
+    # smi is scaled 0 (dry edge) to 1 (wet edge), so higher is wetter — the
+    # same polarity as every vegetation index, not the thermal one.
+    assert _status_from_z(Decimal("-2.5"), index_code="smi") == "stressed"
+    assert _status_from_z(Decimal("2.5"), index_code="smi") == "normal"
+
+
 def test_trend_pct() -> None:
     assert _trend_pct(first=Decimal("0.5"), last=Decimal("0.6")) == Decimal("20.00")
     assert _trend_pct(first=Decimal("0.6"), last=Decimal("0.3")) == Decimal("-50.00")
