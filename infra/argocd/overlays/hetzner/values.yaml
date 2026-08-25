@@ -2997,7 +2997,24 @@ global:
       # 698e8f6 = #579, custom report columns, the Signal Details report, and
       #   the thermal indices in the two report index pickers. See the note
       #   above `global.images` for the whole change.
-      tag: "698e8f6"
+      #
+      # 1d0ed72 = #581, two fixes to the marks #578 put on the map.
+      #   First, the alert glyph was inert. I built its verb list from the
+      #   `recommendations.action_type` CHECK in migration 0015, but
+      #   `alerts.action_type` has NO constraint and three tree leaves name
+      #   `inspect`, which that enum omits. Counted on prod: of 154 open
+      #   alerts, 29 name a verb and every one says `inspect`, so every chip
+      #   on every farm drew the neutral glyph. `inspect` now has an eye.
+      #   Second, the marks piled on each other and on the block names.
+      #   Every marker layer had `icon-ignore-placement: true`, which I set so
+      #   an alert could never be hidden. Such a symbol is never hidden but it
+      #   also RESERVES NO SPACE, so names, flags and observation diamonds
+      #   drew straight through it. All four layers now collide, and layer
+      #   order sets priority: signals < labels < flags < alerts.
+      #   FRONTEND ONLY. No backend file changed, so api stays 698e8f6,
+      #   workers 1363ebe and tile-server 676746a; none of them restart.
+      #   Rollback is this tag back to 698e8f6. No migration.
+      tag: "1d0ed72"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
