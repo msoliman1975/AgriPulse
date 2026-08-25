@@ -11,6 +11,7 @@
     "backfill": "Backfill",
     "observer": "Observer",
     "roles": "Roles & permissions",
+    "platformSignals": "Signal catalog",
     "platformAlerts": "Platform alerts"
   },
   "crops": {

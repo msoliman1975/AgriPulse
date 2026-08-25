@@ -6,8 +6,7 @@
   "nav": {
     "home": "Home",
     "skipToContent": "Skip to main content",
-    "noTenants": "No tenants yet.",
-    "platformSignals": "Signal catalog"
+    "noTenants": "No tenants yet."
   },
   "workspaceNav": {
     "workspace": "Workspace",

@@ -49,6 +49,7 @@ TH = Thresholds(
     peer_lag_hours=26,
     stuck_job_hours=6,
     streak_threshold=3,
+    new_subscription_grace_hours=26,
 )
 
 

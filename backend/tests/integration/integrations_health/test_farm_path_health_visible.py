@@ -307,8 +307,13 @@ async def test_the_later_of_the_two_paths_wins_the_last_sync(
     assert abs((row["weather_last_sync_at"] - fresh).total_seconds()) < 1
     # Both rows are real subscriptions and both are counted.
     assert row["weather_active_subs"] == 2
-    # The farm row is current; only the abandoned block row is overdue.
-    assert row["weather_overdue_count"] == 1
+    # 0085: the abandoned block row is NOT overdue. Nothing polls it any
+    # more — `list_due_farm_provider_pairs` skips a block row once its farm
+    # has an active farm row for the same provider — so its watermark can
+    # never advance and counting it produced a number that only grew. On
+    # prod this read "36 overdue" on farms whose weather had synced within
+    # the hour. See test_overdue_skips_cutover_rows.py.
+    assert row["weather_overdue_count"] == 0
 
 
 # --- the block path must not start double-counting -------------------------

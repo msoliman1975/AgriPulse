@@ -348,6 +348,12 @@ class Settings(BaseSettings):
     # same tile can legitimately sit up to a full day apart -- that is a
     # phase offset, not a fault. Anything past 26h is no longer explained
     # by the cadence.
+    # A subscription created less than this many hours ago is not yet
+    # reported as silent or as lagging its peers. One daily discovery
+    # poll plus slack: below it, "never succeeded" only means "has not
+    # run yet". Enabling thermal on a farm used to open a critical
+    # alert on the sweep that ran one minute later.
+    platform_alert_new_subscription_grace_hours: int = 26
     platform_alert_peer_lag_hours: int = 26
 
     # An imagery job still in a non-terminal state after this long has
@@ -440,6 +446,13 @@ class Settings(BaseSettings):
     # `platform_alert_sweep_seconds`, so a reaped job clears its alert on the
     # next sweep rather than a cycle later.
     imagery_reap_stuck_jobs_seconds: int = 600
+
+    # `weather.reap_stale_attempts`. A weather fetch is one provider call
+    # per farm on a cadence, so six hours is far longer than any live
+    # attempt and short enough that the health page self-corrects the
+    # same day. Matches the imagery reaper's window on purpose.
+    weather_stale_attempt_reap_hours: int = 6
+    weather_reap_stale_attempts_seconds: int = 600
 
     # Native ground sample distance (metres) requested from the provider's
     # Process API per scene. The fetch payload previously omitted output
