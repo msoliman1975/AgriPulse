@@ -2765,9 +2765,30 @@ global:
   #   API AND WORKERS ONLY. Frontend stays 3dc25cf, tile-server 676746a.
   #   Rollback is these two tags back to ba0a524, which returns the sweep to
   #   doing nothing. No migration in this one.
+  #
+  # 09bfe6b = #569, two RBAC faults the Scout app hit on a real handset.
+  #   (1) GET /signals/observations asked for `signal.read` with no
+  #   farm_id_param, so the check stopped at the tenant tier. A Scout holds no
+  #   tenant role, so the app's own Records tab returned 403 for the only
+  #   people who file records. Measured in the prod api log: three
+  #   /scouting/visits calls at 200 and every /signals/observations call at
+  #   403, same token, same minute.
+  #   (2) Granting a farm in a second tenant rebuilt the `farm_scopes`
+  #   Keycloak attribute from one membership. The attribute is per user and is
+  #   replaced whole, so the scope held in the first tenant was deleted with no
+  #   error anywhere. Postgres kept both rows and the token kept one.
+  #   Fault (2) had already happened in prod; the affected scout's attribute
+  #   was repaired by hand before this promote. Only two prod accounts hold
+  #   farm scopes and both now match Postgres.
+  #   API ONLY. Workers stay c1b811f -- no worker task reads either path.
+  #   Frontend stays 188a2fe, tile-server 676746a. The rest of this promote
+  #   range is frontend and ArgoCD bookkeeping; the only backend files that
+  #   changed since c1b811f are the two fixed here.
+  #   Rollback is this tag back to c1b811f. No migration in this one, so
+  #   nothing to unwind.
   images:
     api:
-      tag: "c1b811f"
+      tag: "09bfe6b"
     workers:
       tag: "c1b811f"
     frontend:
