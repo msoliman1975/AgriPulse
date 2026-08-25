@@ -411,6 +411,28 @@ export function createSelfInitiatedVisit(
   });
 }
 
+export interface Farm {
+  id: string;
+  code: string;
+  name: string | null;
+}
+
+/**
+ * A farm's own name.
+ *
+ * The token carries farm *ids* and nothing else, so every screen that had to
+ * name a farm showed the first eight characters of a UUID. Nobody in a field
+ * knows a farm by `019fe30d`. `farm.read` is a Scout capability, so the app
+ * can ask directly rather than the API growing a name onto the scope claim.
+ *
+ * A scout who belongs to two tenants has one `tenant_id` in their token, so
+ * this 404s for the farm in the other tenant. Callers must treat a failure as
+ * "no name known" and fall back, never as a broken screen.
+ */
+export function getFarm(farmId: string) {
+  return request<Farm>(`/farms/${encodeURIComponent(farmId)}`);
+}
+
 /** A block, as far as the phone needs to know about one. */
 export interface Block {
   id: string;

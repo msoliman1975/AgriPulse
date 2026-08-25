@@ -20,6 +20,7 @@ export function MeScreen({
   name,
   farms,
   farmId,
+  farmName,
   onPickFarm,
 }: {
   lang: Lang;
@@ -27,6 +28,8 @@ export function MeScreen({
   name: string | null;
   farms: FarmScope[];
   farmId: string;
+  /** Id -> the name people call it, falling back to the id when unknown. */
+  farmName: (farmId: string) => string;
   onPickFarm: (farmId: string) => void;
 }): ReactNode {
   const [signingOut, setSigningOut] = useState(false);
@@ -35,7 +38,13 @@ export function MeScreen({
   return (
     <div className="screen me">
       <h1>{name || t(lang, "me.title")}</h1>
-      {current ? <p className="hint">{current.role}</p> : null}
+      {/* Role and farm together: "Scout" alone never said *where*, which is
+          the half a scout on two farms actually needs. */}
+      {current ? (
+        <p className="hint">
+          {current.role} · {farmName(current.farm_id)}
+        </p>
+      ) : null}
 
       {/* Only shown when there is a choice to make. A single-farm scout does
           not need to be told which farm they are on twice. */}
@@ -50,8 +59,8 @@ export function MeScreen({
                   className={f.farm_id === farmId ? "on" : ""}
                   onClick={() => onPickFarm(f.farm_id)}
                 >
+                  <span className="fname">{farmName(f.farm_id)}</span>
                   <span className="role">{f.role}</span>
-                  <span className="fid">{f.farm_id.slice(0, 8)}</span>
                 </button>
               </li>
             ))}

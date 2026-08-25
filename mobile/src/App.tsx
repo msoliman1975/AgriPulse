@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 
+import { getFarm } from "@/api/client";
 import { fetchMe, type FarmScope } from "@/api/me";
 import { currentSession } from "@/auth/session";
 import { dirOf, t, type Lang } from "@/i18n";
@@ -42,6 +43,15 @@ export function App(): ReactNode {
   const [farmId, setFarmId] = useState<string>(
     () => localStorage.getItem(PICKED_FARM_KEY) ?? "",
   );
+  /**
+   * Farm id -> the name people call it.
+   *
+   * The token carries ids and nothing else, so every screen that named a farm
+   * showed eight characters of a UUID. Nobody knows a farm by `019fe30d`.
+   * A missing entry is normal, not an error — see the lookup below — so the
+   * callers take an id and hand back the best label they have.
+   */
+  const [farmNames, setFarmNames] = useState<Record<string, string>>({});
 
   // One call answers both questions the app has after sign-in: where this
   // person may work, and which language to open in. Runs on every launch, not
@@ -86,6 +96,32 @@ export function App(): ReactNode {
     if (signedIn && farmId) void ensureDeviceRegistered(farmId);
   }, [signedIn, farmId]);
 
+  // Names for every farm the scout holds, not just the current one: the Me tab
+  // and the picker list all of them, and a list where one row has a name and
+  // the rest have hex is worse than either.
+  //
+  // Per-farm failure is expected and survivable. A scout who belongs to two
+  // tenants carries one `tenant_id` in their token, so the farm in the other
+  // tenant genuinely cannot be read and keeps its id as a label rather than
+  // taking the whole screen down with it.
+  useEffect(() => {
+    if (!farms || farms.length === 0) return;
+    let live = true;
+    void Promise.all(
+      farms.map((f) =>
+        getFarm(f.farm_id)
+          .then((farm) => [f.farm_id, farm.name || farm.code] as const)
+          .catch(() => null),
+      ),
+    ).then((pairs) => {
+      if (!live) return;
+      setFarmNames(Object.fromEntries(pairs.filter((p): p is [string, string] => p !== null)));
+    });
+    return () => {
+      live = false;
+    };
+  }, [farms]);
+
   // The document, not just the container: the keyboard, scrollbars and text
   // selection follow the root direction, and Capacitor renders into a plain
   // index.html whose static dir="rtl" would otherwise outlive a switch to
@@ -105,6 +141,8 @@ export function App(): ReactNode {
 
   // `farms === null` is "still asking"; an empty array is a real answer.
   const resolved = farmId || (farms === null ? FALLBACK_FARM_ID : "");
+  /** The farm's name once known, its id until then — never an empty label. */
+  const nameOfFarm = (id: string): string => farmNames[id] ?? id.slice(0, 8);
 
   if (resolved) {
     return (
@@ -115,6 +153,7 @@ export function App(): ReactNode {
             onLangChange={setLang}
             name={name}
             farmId={resolved}
+            farmName={nameOfFarm(resolved)}
             onFullScreen={setFullScreen}
           />
         ) : tab === "records" ? (
@@ -126,6 +165,7 @@ export function App(): ReactNode {
             name={name}
             farms={farms ?? []}
             farmId={resolved}
+            farmName={nameOfFarm}
             onPickFarm={(id) => {
               localStorage.setItem(PICKED_FARM_KEY, id);
               setFarmId(id);
@@ -174,6 +214,7 @@ export function App(): ReactNode {
         <FarmPicker
           lang={lang}
           farms={farms}
+          farmName={nameOfFarm}
           onPick={(id) => {
             localStorage.setItem(PICKED_FARM_KEY, id);
             setFarmId(id);
@@ -187,17 +228,19 @@ export function App(): ReactNode {
 }
 
 /**
- * Shown only when a scout genuinely holds more than one farm. The farm id is
- * all the token carries, so the list shows the role alongside it rather than
- * pretending to know farm names the app has never fetched.
+ * Shown only when a scout genuinely holds more than one farm. The name comes
+ * from `farmName`, which falls back to the id when the farm could not be read
+ * — the honest label, and still enough to tell two rows apart.
  */
 function FarmPicker({
   lang,
   farms,
+  farmName,
   onPick,
 }: {
   lang: Lang;
   farms: FarmScope[];
+  farmName: (farmId: string) => string;
   onPick: (farmId: string) => void;
 }): ReactNode {
   return (
@@ -207,8 +250,8 @@ function FarmPicker({
         {farms.map((f) => (
           <li key={f.farm_id}>
             <button type="button" onClick={() => onPick(f.farm_id)}>
+              <span className="fname">{farmName(f.farm_id)}</span>
               <span className="role">{f.role}</span>
-              <span className="fid">{f.farm_id.slice(0, 8)}</span>
             </button>
           </li>
         ))}

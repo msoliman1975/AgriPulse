@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import install_exception_handlers
 from app.modules.iam import field_enrolment
 from app.modules.iam.router import router as iam_router
+from app.modules.tenancy.service import get_tenant_service
 from app.shared.keycloak import FakeKeycloakClient
 from app.shared.keycloak.field_identity import SYNTHETIC_EMAIL_DOMAIN
 from tests.integration.farms.conftest import (
@@ -811,3 +812,75 @@ async def test_a_deleted_scout_returns_to_ready_to_enrol(
     assert "Leaver Layth" not in {w["name"] for w in after["enrolled"]}
     # And they are offered for re-enrolment rather than disappearing.
     assert "Leaver Layth" in {w["name"] for w in after["ready_to_enrol"]}
+
+
+@pytest.mark.asyncio
+async def test_second_tenant_grant_keeps_the_first_tenant_scope(
+    scouting_env: ScoutingFixture,
+    admin_session: AsyncSession,
+    fake_keycloak: FakeKeycloakClient,
+) -> None:
+    """Granting a farm in tenant B must not strip the scope held in tenant A.
+
+    The `farm_scopes` Keycloak attribute is per **user** and `set_farm_scopes`
+    replaces it whole, so rebuilding it from a single membership's rows deletes
+    every scope the person holds elsewhere. That is silent: Postgres still says
+    they hold farm A, the JWT no longer does, and the app 403s on every visit
+    call with "could not load your visits".
+
+    Seen in production on 2026-08-24 — one scout, two tenants, three 403s.
+    """
+    env = scouting_env
+    enrolled = await _enrol(env, phone=_unique_phone(), full_name="Two Tenant Tarek")
+    assert enrolled.status_code == 201, enrolled.text
+    user_id = UUID(enrolled.json()["user_id"])
+
+    # A second tenant the same person also belongs to, the way an invite
+    # leaves it: a membership row and nothing else.
+    other = await get_tenant_service(admin_session).create_tenant(
+        slug=f"other-{uuid4().hex[:8]}",
+        name="Other tenant",
+        contact_email="ops@other.test",
+    )
+    other_membership = uuid4()
+    await admin_session.execute(
+        text(
+            "INSERT INTO public.tenant_memberships (id, tenant_id, user_id, status, joined_at) "
+            "VALUES (:id, :tid, :uid, 'active', now())"
+        ).bindparams(
+            bindparam("id", type_=PG_UUID(as_uuid=True)),
+            bindparam("tid", type_=PG_UUID(as_uuid=True)),
+            bindparam("uid", type_=PG_UUID(as_uuid=True)),
+        ),
+        {"id": other_membership, "tid": other.tenant_id, "uid": user_id},
+    )
+    await admin_session.commit()
+
+    # `public.farm_scopes.farm_id` is a logical cross-schema reference, so the
+    # grant needs a farm id, not a farm row in this tenant's schema.
+    other_farm = uuid4()
+    await admin_session.execute(text(f"SET LOCAL search_path TO {other.schema_name}, public"))
+    service = field_enrolment.get_field_enrolment_service(
+        public_session=admin_session,
+        tenant_session=admin_session,
+        keycloak=fake_keycloak,
+    )
+    await service.grant_farm_access(
+        tenant_id=other.tenant_id,
+        user_id=user_id,
+        farm_id=other_farm,
+        role="Scout",
+        actor_user_id=None,
+    )
+    await admin_session.commit()
+
+    kc_subject = (
+        await admin_session.execute(
+            text("SELECT keycloak_subject FROM public.users WHERE id = :uid").bindparams(
+                bindparam("uid", type_=PG_UUID(as_uuid=True))
+            ),
+            {"uid": user_id},
+        )
+    ).scalar_one()
+    projected = {s["farm_id"] for s in fake_keycloak.users[kc_subject].farm_scopes}
+    assert projected == {env.farm_id, str(other_farm)}
