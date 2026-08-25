@@ -2904,7 +2904,21 @@ global:
       #   Rollback is this tag back to 3dc25cf. No migration in any of them.
       # 1363ebe = #571, the health-page ceilings and the raw nav key. See the
       #   api note earlier in this block for the whole change.
-      tag: "1363ebe"
+      # f47e385 = #573, the per-tenant health page had a SECOND copy of the
+      #   fixed 24h imagery rule #571 replaced. Found by opening the page
+      #   after that promote: the cross-tenant rollup said agrosina imagery
+      #   was OK and the drill-down said "Failing, synced 4 days ago" about
+      #   the same tenant on the same screen refresh.
+      #   `modules/integrationsHealth/OverviewTab.tsx` carried its own
+      #   `statusFor`. Both pages now call `src/lib/healthStatus.ts`. The
+      #   per-tenant page also warns when the newest attempt failed within the
+      #   day, so `lastFailedIso` is an optional argument rather than a second
+      #   implementation; the rollup passes null because its endpoint has no
+      #   such column.
+      #   FRONTEND ONLY. No backend file changed since 1363ebe, so api,
+      #   workers and tile-server stay where they are and do not restart.
+      #   Rollback is this tag back to 1363ebe. No migration.
+      tag: "f47e385"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
