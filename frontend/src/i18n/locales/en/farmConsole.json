@@ -88,6 +88,7 @@
       "fertilize": "Feed",
       "spray": "Spray",
       "scout": "Go and look",
+      "inspect": "Inspect closely",
       "harvest_window": "Harvest",
       "prune": "Prune",
       "no_action": "Nothing to do",

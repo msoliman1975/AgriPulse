@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { FeatureCollection, Polygon } from "geojson";
 
 import { buildAlertBadgePoints } from "./alertBadges";
+import { alertActionGlyph } from "./markerIcons";
 import type { UnitFeatureProps } from "./types";
 
 function props(over: Partial<UnitFeatureProps> = {}): UnitFeatureProps {
@@ -156,6 +157,17 @@ describe("buildAlertBadgePoints", () => {
 
     expect(out.features[0].properties.marker_icon).toBe("ap-alert-unknown-watch");
     expect(out.features[1].properties.marker_icon).toBe("ap-alert-unknown-ok");
+  });
+
+  it("has a glyph for every verb the decision-tree seeds actually emit", () => {
+    // `alerts.action_type` has no check constraint, so the real verb set is
+    // whatever a tree leaf names — NOT the recommendations enum in migration
+    // 0015. Reading the constraint instead of the seeds shipped a build where
+    // every alert on production fell back to the neutral glyph, because the
+    // only verb those farms carry is `inspect`, which the enum omits.
+    for (const verb of ["irrigate", "fertilize", "scout", "inspect", "no_action", "other"]) {
+      expect(alertActionGlyph(verb)).toBe(verb);
+    }
   });
 
   it("caps the count so one bad block cannot draw a chip wider than the farm", () => {
