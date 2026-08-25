@@ -70,10 +70,19 @@ export const en = {
   "bucket.week": "This week",
   "bucket.next": "Next week",
   "bucket.later": "Later",
+  // Finished work is grouped by the day it was closed, not by a deadline it
+  // can no longer miss, so it needs buckets that point backwards.
+  "bucket.doneToday": "Today",
+  "bucket.doneWeek": "This week",
+  "bucket.doneEarlier": "Earlier",
+  "bucket.doneUnknown": "No date",
 
-  "group.byBlock": "Group by block",
-  "group.byDue": "Group by time",
+  "group.byBlock": "By block",
+  "group.byDue": "By time",
   "group.noBlock": "No block",
+  "group.farms": "Your farms",
+  "group.oneFarm": "1 farm",
+  "group.farmsCount": "{n} farms",
 
   "empty.mine": "Nothing to walk right now.",
   "empty.available": "Nothing open to take.",
@@ -86,6 +95,7 @@ export const en = {
   "record.reading": "Enter a reading",
   "record.readingHint": "One measurement — trap count, incidence, soil feel.",
   "record.cancel": "Cancel",
+  "record.whichFarm": "Which farm?",
   "record.whichBlock": "Which block?",
   "record.start": "Start",
   "record.noBlocks": "This farm has no blocks.",
@@ -140,12 +150,19 @@ export const en = {
   "flag.chooser": "Flag something I saw",
   "flag.chooserHint": "Unexpected, and somebody else needs to deal with it.",
 
+  "tasks.someFarmsFailed": "Some farms could not be loaded. Pull down and retry.",
+  "tasks.allFarms": "All farms",
+
   "records.title": "My records",
   "records.empty": "You have not recorded anything in the last 30 days.",
   "records.loadFailed": "Could not load your records.",
 
   "me.title": "My account",
   "me.farm": "Farm",
+  // Read-only now. Choosing a farm happens where the work is — on the Tasks
+  // tab — rather than in a settings screen two taps away from it.
+  "me.farms": "Your farms",
+  "me.farmsHint": "Your work is grouped by farm on the Tasks tab.",
 
   "work.why": "Why you are going",
   "work.photos": "Photos",

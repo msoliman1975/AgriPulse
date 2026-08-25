@@ -65,10 +65,17 @@ export const ar: Messages = {
   "bucket.week": "هذا الأسبوع",
   "bucket.next": "الأسبوع القادم",
   "bucket.later": "لاحقًا",
+  "bucket.doneToday": "اليوم",
+  "bucket.doneWeek": "هذا الأسبوع",
+  "bucket.doneEarlier": "قبل ذلك",
+  "bucket.doneUnknown": "بدون تاريخ",
 
-  "group.byBlock": "تجميع حسب القطعة",
-  "group.byDue": "تجميع حسب الموعد",
+  "group.byBlock": "حسب القطعة",
+  "group.byDue": "حسب الموعد",
   "group.noBlock": "بدون قطعة",
+  "group.farms": "مزارعك",
+  "group.oneFarm": "مزرعة واحدة",
+  "group.farmsCount": "{n} مزارع",
 
   "empty.mine": "لا توجد مهام عليك الآن.",
   "empty.available": "لا توجد مهام متاحة للأخذ.",
@@ -81,6 +88,7 @@ export const ar: Messages = {
   "record.reading": "إدخال قياس",
   "record.readingHint": "قياس واحد: عدد مصائد، نسبة إصابة، رطوبة تربة.",
   "record.cancel": "إلغاء",
+  "record.whichFarm": "أي مزرعة؟",
   "record.whichBlock": "أي قطعة؟",
   "record.start": "ابدأ",
   "record.noBlocks": "لا توجد قطع في هذه المزرعة.",
@@ -131,12 +139,17 @@ export const ar: Messages = {
   "flag.chooser": "ملاحظة رأيتها",
   "flag.chooserHint": "شيء غير متوقع ويحتاج من يتصرف فيه.",
 
+  "tasks.someFarmsFailed": "تعذّر تحميل بعض المزارع. أعد المحاولة.",
+  "tasks.allFarms": "كل المزارع",
+
   "records.title": "سجلاتي",
   "records.empty": "لم تسجل شيئًا خلال آخر ٣٠ يومًا.",
   "records.loadFailed": "تعذر تحميل سجلاتك.",
 
   "me.title": "حسابي",
   "me.farm": "المزرعة",
+  "me.farms": "مزارعك",
+  "me.farmsHint": "مهامك مُجمّعة حسب المزرعة في تبويب المهام.",
 
   "work.why": "لماذا هذه المهمة",
   "work.photos": "صور",
