@@ -70,7 +70,7 @@
     "flags": "Field flags",
     "flagsOpenOnly": "Open flags only"
   },
-  "legend": {
+  "markerLegend": {
     "title": "What the marks mean",
     "alerts": "Alert",
     "alertsHint": "Colour is severity. The picture is what to do. The number is how many are open on that block.",

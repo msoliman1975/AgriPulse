@@ -68,15 +68,15 @@ export function MarkerLegend(): React.ReactNode {
 
   return (
     <div className="max-w-xs px-2.5 py-2 text-xs text-ap-fg">
-      <div className="pb-1.5 font-medium">{t("legend.title")}</div>
+      <div className="pb-1.5 font-medium">{t("markerLegend.title")}</div>
 
-      <div className="pb-1 font-medium">{t("legend.alerts")}</div>
-      <p className="pb-1.5 text-ap-muted">{t("legend.alertsHint")}</p>
+      <div className="pb-1 font-medium">{t("markerLegend.alerts")}</div>
+      <p className="pb-1.5 text-ap-muted">{t("markerLegend.alertsHint")}</p>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pb-2">
         {art.alerts.map(({ severity, src }) => (
           <span key={severity} className="flex items-center gap-1.5">
             <Swatch src={src} alt="" />
-            <span>{t(`legend.severity.${severity}`)}</span>
+            <span>{t(`markerLegend.severity.${severity}`)}</span>
           </span>
         ))}
       </div>
@@ -84,18 +84,18 @@ export function MarkerLegend(): React.ReactNode {
         {art.actions.map(({ action, src }) => (
           <span key={action} className="flex items-center gap-1.5">
             <Swatch src={src} alt="" />
-            <span className="text-ap-muted">{t(`legend.action.${action}`)}</span>
+            <span className="text-ap-muted">{t(`markerLegend.action.${action}`)}</span>
           </span>
         ))}
       </div>
 
-      <div className="pb-1 font-medium">{t("legend.flags")}</div>
-      <p className="pb-1.5 text-ap-muted">{t("legend.flagsHint")}</p>
+      <div className="pb-1 font-medium">{t("markerLegend.flags")}</div>
+      <p className="pb-1.5 text-ap-muted">{t("markerLegend.flagsHint")}</p>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pb-2">
         {art.flags.map(({ severity, src }) => (
           <span key={severity} className="flex items-center gap-1.5">
             <Swatch src={src} alt="" />
-            <span>{t(`legend.severity.${severity}`)}</span>
+            <span>{t(`markerLegend.severity.${severity}`)}</span>
           </span>
         ))}
         <span className="flex items-center gap-1.5">
@@ -104,10 +104,10 @@ export function MarkerLegend(): React.ReactNode {
         </span>
       </div>
 
-      <div className="pb-1 font-medium">{t("legend.signals")}</div>
+      <div className="pb-1 font-medium">{t("markerLegend.signals")}</div>
       <div className="flex items-center gap-1.5">
         <Swatch src={art.signal} alt="" />
-        <span className="text-ap-muted">{t("legend.signalsHint")}</span>
+        <span className="text-ap-muted">{t("markerLegend.signalsHint")}</span>
       </div>
     </div>
   );
