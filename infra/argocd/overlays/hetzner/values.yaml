@@ -2871,9 +2871,44 @@ global:
   #   image, so for these two charts the two commits are the same code.
   #   Rollback is api back to a62260b and frontend back to f47e385.
   #   No migration.
+  #
+  # 698e8f6 = #579, reports show the fields a tenant defines for itself.
+  #   Every report listed first-class columns only — block name, index
+  #   numbers, irrigation counters. Crop attributes and custom signals, the
+  #   two catalogs a tenant authors, appeared in no report at all, though they
+  #   are the fields the agronomist keys in.
+  #   Four block-grained reports (crop-health, zone-anomaly, water-balance,
+  #   weather-risk-pressure) take a `fields` param naming up to 12 columns as
+  #   `source:code`. A new `GET /farms/{id}/reports/custom-fields` lists what a
+  #   farm offers, so the picker is data-driven. Weather-summary and
+  #   operations-log are NOT wired up: both sources key on a block and neither
+  #   report has block rows.
+  #   A crop attribute reads as of now; a signal reads the latest observation
+  #   INSIDE the report period, and the cell carries its date. Reading the
+  #   latest ever would print last season's number with nothing saying so.
+  #   New report, Signal Details: rows are observations, not blocks, with nine
+  #   filters and a per-signal summary. Row cap 2000; the response says when
+  #   the cap cut the table short, because the statistics cover the returned
+  #   rows and a mean over a cut-off page is a number somebody acts on.
+  #   Also fixes a wrong reading that had been on screen since the report
+  #   shipped: crop-health treated a LOW value as stress for every index. For
+  #   msi, bsi, lst and cwsi a HIGH value is the bad one, so the hottest,
+  #   driest block read "Normal" and the coolest read "Stressed". The z-score
+  #   is now flipped for those four before the thresholds apply; the number
+  #   shown stays raw so it still agrees with the trend chart.
+  #   The two index pickers also gained lst/cwsi/smi, which the platform has
+  #   been computing and storing but no report could select.
+  #   API + FRONTEND. Workers stay 1363ebe and tile-server 676746a: no worker
+  #   task and no tile-server file changed. The api bump also carries #578's
+  #   `blocks_summary_router.py`, which the 9838a5c frontend already expects.
+  #   ORDER DOES NOT MATTER. `fields` is optional and `custom_fields` defaults
+  #   to an empty list, so an old frontend against the new api is unchanged,
+  #   and a new frontend against the old api gets 404 on the two new routes
+  #   and renders its own empty state.
+  #   Rollback is both tags back to 9838a5c. No migration.
   images:
     api:
-      tag: "9838a5c"
+      tag: "698e8f6"
     workers:
       tag: "1363ebe"
     frontend:
@@ -2959,7 +2994,10 @@ global:
       #
       # 9838a5c = #578, three marks for three things. See the note above
       #   `global.images` for the whole change.
-      tag: "9838a5c"
+      # 698e8f6 = #579, custom report columns, the Signal Details report, and
+      #   the thermal indices in the two report index pickers. See the note
+      #   above `global.images` for the whole change.
+      tag: "698e8f6"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
