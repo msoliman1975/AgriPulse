@@ -227,7 +227,45 @@ async def test_a_signal_with_observations_but_no_assignment_is_offered(
                 "recorded_by": uuid4(),
             },
         )
-        await session.commit()
+        # Deliberately NOT committed. `list_custom_fields` reads through this
+        # same session, so it sees these rows inside the open transaction, and
+        # they roll back when the session closes rather than leaving a platform
+        # catalog row behind for every other test.
+        #
+        # An earlier version committed here and the test failed with an empty
+        # list three runs running. `Session.commit()` ends the transaction and
+        # returns the connection to the pool, so the next statement can run on a
+        # connection that never received the `SET search_path` above — and the
+        # catalog then resolves `current_schema()` to something that matches no
+        # tenant, which drops every tenant-authored definition.
+
+        # Re-assert the two facts the catalog depends on at the point of use,
+        # not only at the top of the test. They are what a lost search_path
+        # would break, and an empty list on its own does not say which.
+        still = (
+            (
+                await session.execute(
+                    text(
+                        """
+                        SELECT current_schema() AS schema_name,
+                               (SELECT count(*) FROM public.signal_definitions d
+                                 WHERE d.id = :definition_id) AS definitions,
+                               (SELECT count(*) FROM signal_observations o
+                                 WHERE o.farm_id = :farm_id) AS observations
+                        """
+                    ),
+                    {"definition_id": definition_id, "farm_id": farm_id},
+                )
+            )
+            .mappings()
+            .one()
+        )
+        assert still["schema_name"] == schema, (
+            f"search_path was lost before the read: current_schema() is "
+            f"{still['schema_name']!r}, expected {schema!r}"
+        )
+        assert still["definitions"] == 1, "the definition row is not visible to the read"
+        assert still["observations"] == 1, "the observation row is not visible to the read"
 
         fields = await list_custom_fields(session, farm_id=farm_id)
         assert [f.key for f in fields] == [f"signal:{code}"]
