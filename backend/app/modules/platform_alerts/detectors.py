@@ -108,6 +108,12 @@ class Thresholds:
     peer_lag_hours: int
     stuck_job_hours: int
     streak_threshold: int
+    # How long a brand-new subscription is left alone before "never
+    # succeeded" counts as a fault. It is a separate knob from the
+    # per-stream ceilings because those are measured in days for imagery,
+    # and waiting twelve days to report a thermal feed that was never
+    # provisioned is not monitoring.
+    new_subscription_grace_hours: int
 
     def for_stream(self, stream: str) -> tuple[int, int]:
         if stream == STREAM_WEATHER:
@@ -165,14 +171,17 @@ img_block AS (
     SELECT b.farm_id,
            (s.product_id IN (SELECT id FROM thermal_products)) AS is_thermal,
            count(*) FILTER (WHERE s.is_active) AS active_subs,
-           max(j.last_ok) FILTER (WHERE s.is_active) AS last_ok
+           min(s.created_at) FILTER (WHERE s.is_active) AS first_subscribed_at,
+           max(j.last_ok) FILTER (WHERE s.is_active) AS last_ok,
+           sum(j.attempts) FILTER (WHERE s.is_active) AS attempts
       FROM imagery_aoi_subscriptions s
       JOIN blocks b ON b.id = s.block_id AND b.deleted_at IS NULL
       LEFT JOIN LATERAL (
-            SELECT max(ij.completed_at) AS last_ok
+            SELECT max(ij.completed_at) FILTER (WHERE ij.status = 'succeeded')
+                     AS last_ok,
+                   count(*) AS attempts
               FROM imagery_ingestion_jobs ij
              WHERE ij.subscription_id = s.id
-               AND ij.status = 'succeeded'
       ) j ON TRUE
      WHERE s.deleted_at IS NULL
      GROUP BY 1, 2
@@ -181,13 +190,16 @@ img_farm AS (
     SELECT s.farm_id,
            (s.product_id IN (SELECT id FROM thermal_products)) AS is_thermal,
            count(*) FILTER (WHERE s.is_active) AS active_subs,
-           max(j.last_ok) FILTER (WHERE s.is_active) AS last_ok
+           min(s.created_at) FILTER (WHERE s.is_active) AS first_subscribed_at,
+           max(j.last_ok) FILTER (WHERE s.is_active) AS last_ok,
+           sum(j.attempts) FILTER (WHERE s.is_active) AS attempts
       FROM imagery_farm_subscriptions s
       LEFT JOIN LATERAL (
-            SELECT max(fj.completed_at) AS last_ok
+            SELECT max(fj.completed_at) FILTER (WHERE fj.status = 'succeeded')
+                     AS last_ok,
+                   count(*) AS attempts
               FROM imagery_farm_ingestion_jobs fj
              WHERE fj.subscription_id = s.id
-               AND fj.status = 'succeeded'
       ) j ON TRUE
      WHERE s.deleted_at IS NULL
      GROUP BY 1, 2
@@ -196,30 +208,49 @@ img AS (
     SELECT farm_id,
            CASE WHEN is_thermal THEN 'imagery_thermal' ELSE 'imagery_optical' END AS stream,
            sum(active_subs) AS active_subs,
-           max(last_ok) AS last_ok
+           min(first_subscribed_at) AS first_subscribed_at,
+           max(last_ok) AS last_ok,
+           sum(attempts) AS attempts
       FROM (SELECT * FROM img_block UNION ALL SELECT * FROM img_farm) u
      GROUP BY 1, 2
 ),
 wx_block AS (
     SELECT b.farm_id,
            count(*) FILTER (WHERE s.is_active) AS active_subs,
-           max(s.last_successful_ingest_at) FILTER (WHERE s.is_active) AS last_ok
+           min(s.created_at) FILTER (WHERE s.is_active) AS first_subscribed_at,
+           max(s.last_successful_ingest_at) FILTER (WHERE s.is_active) AS last_ok,
+           sum(a.attempts) FILTER (WHERE s.is_active) AS attempts
       FROM weather_subscriptions s
       JOIN blocks b ON b.id = s.block_id AND b.deleted_at IS NULL
+      LEFT JOIN LATERAL (
+            SELECT count(*) AS attempts
+              FROM weather_ingestion_attempts wa
+             WHERE wa.subscription_id = s.id
+      ) a ON TRUE
      WHERE s.deleted_at IS NULL
      GROUP BY 1
 ),
 wx_farm AS (
     SELECT s.farm_id,
            count(*) FILTER (WHERE s.is_active) AS active_subs,
-           max(s.last_successful_ingest_at) FILTER (WHERE s.is_active) AS last_ok
+           min(s.created_at) FILTER (WHERE s.is_active) AS first_subscribed_at,
+           max(s.last_successful_ingest_at) FILTER (WHERE s.is_active) AS last_ok,
+           sum(a.attempts) FILTER (WHERE s.is_active) AS attempts
       FROM weather_farm_subscriptions s
+      LEFT JOIN LATERAL (
+            SELECT count(*) AS attempts
+              FROM weather_ingestion_attempts wa
+             WHERE wa.subscription_id = s.id
+      ) a ON TRUE
      WHERE s.deleted_at IS NULL
      GROUP BY 1
 ),
 wx AS (
     SELECT farm_id, 'weather' AS stream,
-           sum(active_subs) AS active_subs, max(last_ok) AS last_ok
+           sum(active_subs) AS active_subs,
+           min(first_subscribed_at) AS first_subscribed_at,
+           max(last_ok) AS last_ok,
+           sum(attempts) AS attempts
       FROM (SELECT * FROM wx_block UNION ALL SELECT * FROM wx_farm) u
      GROUP BY 1
 ),
@@ -230,7 +261,9 @@ wx AS (
 idx AS (
     SELECT b.farm_id, 'index_calc' AS stream,
            NULL::bigint AS active_subs,
-           max(a.inserted_at) AS last_ok
+           NULL::timestamptz AS first_subscribed_at,
+           max(a.inserted_at) AS last_ok,
+           NULL::numeric AS attempts
       FROM block_index_aggregates a
       JOIN blocks b ON b.id = a.block_id AND b.deleted_at IS NULL
      WHERE a.inserted_at > now() - interval '120 days'
@@ -239,14 +272,19 @@ idx AS (
 streams AS (
     SELECT * FROM img
     UNION ALL SELECT * FROM wx
-    UNION ALL SELECT farm_id, stream, active_subs, last_ok FROM idx
+    UNION ALL SELECT farm_id, stream, active_subs, first_subscribed_at,
+                     last_ok, attempts
+      FROM idx
 )
 SELECT f.id AS farm_id,
        f.name AS farm_name,
        s.stream,
        s.active_subs,
        s.last_ok,
-       EXTRACT(epoch FROM (now() - s.last_ok)) / 3600.0 AS age_hours
+       EXTRACT(epoch FROM (now() - s.last_ok)) / 3600.0 AS age_hours,
+       EXTRACT(epoch FROM (now() - s.first_subscribed_at)) / 3600.0
+         AS subscribed_hours,
+       COALESCE(s.attempts, 0) AS attempts
   FROM streams s
   JOIN farms f ON f.id = s.farm_id AND f.deleted_at IS NULL
 """
@@ -266,6 +304,20 @@ async def detect_stream_silent(
         warn_h, crit_h = th.for_stream(stream)
 
         if r["last_ok"] is None:
+            # A subscription switched on minutes ago has not succeeded yet
+            # because nothing has run, not because anything is broken. Give
+            # the stream its own warning window from the moment the oldest
+            # active subscription was created before saying it is silent.
+            # Prod, 2026-08-25: thermal was enabled on B-Elkair-Suez at
+            # 07:20:41 and the 07:21 sweep reported it silent, ten minutes
+            # before the hourly discovery poll first ran.
+            subscribed_hours = r["subscribed_hours"]
+            if (
+                subscribed_hours is not None
+                and float(subscribed_hours) < th.new_subscription_grace_hours
+                and not int(r["attempts"] or 0)
+            ):
+                continue
             # Never succeeded. Real, but it is a provisioning problem rather
             # than a regression, so it opens at warning and says so.
             age_hours = None
@@ -333,14 +385,18 @@ WITH thermal_products AS (
 ),
 -- Every farm with a live feed for a product, over BOTH subscription paths.
 active_farm_product AS (
-    SELECT DISTINCT b.farm_id, s.product_id
-      FROM imagery_aoi_subscriptions s
-      JOIN blocks b ON b.id = s.block_id AND b.deleted_at IS NULL
-     WHERE s.deleted_at IS NULL AND s.is_active
-    UNION
-    SELECT DISTINCT s.farm_id, s.product_id
-      FROM imagery_farm_subscriptions s
-     WHERE s.deleted_at IS NULL AND s.is_active
+    SELECT farm_id, product_id, min(subscribed_at) AS subscribed_at
+      FROM (
+            SELECT b.farm_id, s.product_id, s.created_at AS subscribed_at
+              FROM imagery_aoi_subscriptions s
+              JOIN blocks b ON b.id = s.block_id AND b.deleted_at IS NULL
+             WHERE s.deleted_at IS NULL AND s.is_active
+            UNION ALL
+            SELECT s.farm_id, s.product_id, s.created_at AS subscribed_at
+              FROM imagery_farm_subscriptions s
+             WHERE s.deleted_at IS NULL AND s.is_active
+      ) u
+     GROUP BY 1, 2
 ),
 -- Scene days a farm actually holds, over BOTH job paths.
 farm_scene AS (
@@ -389,6 +445,14 @@ SELECT f.id AS farm_id,
            AND fs.scene_day = n.scene_day
  )
    AND n.peer_ingested_at < now() - make_interval(hours => :peer_lag_hours)
+   -- A farm cannot be behind on a scene its peer ingested before this farm
+   -- had a subscription at all. Without this, switching a product on for a
+   -- farm opens a critical alert on the very next sweep, minutes later and
+   -- before the first poll has run. Measured on prod 2026-08-25: thermal was
+   -- enabled on B-Elkair-Suez at 07:20:41 and the 07:21 sweep called it
+   -- critical, naming a scene day from six days before the subscription
+   -- existed.
+   AND afp.subscribed_at < n.peer_ingested_at
 """
 
 

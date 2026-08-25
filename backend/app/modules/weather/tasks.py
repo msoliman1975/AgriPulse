@@ -1048,6 +1048,70 @@ async def _discover_due_subscriptions_async() -> dict[str, int]:
     }
 
 
+# --- reap_stale_attempts (Beat sweep) ---------------------------------------
+
+
+@shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
+    name="weather.reap_stale_attempts",
+    bind=False,
+    ignore_result=False,
+)
+def reap_stale_attempts() -> dict[str, int]:
+    """Close weather attempts stranded in `running`.
+
+    The counterpart to `imagery.reap_stuck_jobs`. Imagery got a reaper when
+    stuck rows were found to lose scenes; weather never did, because a
+    stranded weather attempt loses nothing. It does make the Integration
+    Health page permanently wrong, and an operator who cannot trust the
+    running count cannot use the page at all.
+
+    Unlike the imagery reaper this re-runs nothing. A weather fetch is one
+    provider call for the whole farm on a cadence, so the next scheduled
+    poll already covers whatever the dead attempt would have written.
+    """
+    return _run_task(_reap_stale_attempts_async())
+
+
+async def _reap_stale_attempts_async() -> dict[str, int]:
+    stale_hours = get_settings().weather_stale_attempt_reap_hours
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT schema_name FROM public.tenants "
+                    "WHERE status = 'active' AND deleted_at IS NULL"
+                )
+            )
+        ).all()
+    tenant_schemas = [str(r[0]) for r in rows]
+
+    closed = 0
+    for tenant_schema in tenant_schemas:
+        try:
+            sanitize_tenant_schema(tenant_schema)
+        except ValueError:
+            continue
+        try:
+            async with factory() as session, session.begin():
+                await _set_tenant_context(session, tenant_schema)
+                n = await WeatherRepository(session).close_stale_running_attempts(
+                    stale_hours=stale_hours
+                )
+        except Exception:
+            _log.exception("weather_reap_tenant_failed", tenant_schema=tenant_schema)
+            continue
+        if n:
+            _log.info(
+                "weather_stale_attempts_reaped",
+                tenant_schema=tenant_schema,
+                attempts_closed=n,
+            )
+        closed += n
+
+    return {"tenants_scanned": len(tenant_schemas), "attempts_closed": closed}
+
+
 # --- compute_weather_risk (Phase 2) ----------------------------------------
 
 # Trailing daily window the risk accumulation models integrate over. Matches

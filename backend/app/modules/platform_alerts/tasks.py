@@ -79,6 +79,7 @@ def _thresholds() -> Thresholds:
         peer_lag_hours=s.platform_alert_peer_lag_hours,
         stuck_job_hours=s.platform_alert_stuck_job_hours,
         streak_threshold=s.integration_failure_streak_threshold,
+        new_subscription_grace_hours=s.platform_alert_new_subscription_grace_hours,
     )
 
 

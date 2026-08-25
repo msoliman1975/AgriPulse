@@ -245,4 +245,12 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.imagery_reap_stuck_jobs_seconds),
         "options": {"queue": "light"},
     },
+    # Same idea for weather, which never had one. A stranded weather attempt
+    # loses no data, but it is counted as `running` for ever and that is the
+    # number the Integration Health page shows an operator.
+    "weather.reap_stale_attempts": {
+        "task": "weather.reap_stale_attempts",
+        "schedule": float(_settings.weather_reap_stale_attempts_seconds),
+        "options": {"queue": "light"},
+    },
 }

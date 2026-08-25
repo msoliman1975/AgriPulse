@@ -312,6 +312,21 @@ class IntegrationsHealthService:
                         WHERE ias.is_active
                           AND ias.deleted_at IS NULL
                           AND b.deleted_at IS NULL
+                          -- Same exclusion the weather arm above makes, and
+                          -- the same one `list_active_subscriptions_due`
+                          -- makes: once a farm fetches this product as one
+                          -- AOI, its block rows stop being polled and their
+                          -- watermarks freeze, so every one of them would
+                          -- read overdue for ever. The farm arm below is
+                          -- what monitors those farms.
+                          AND NOT EXISTS (
+                              SELECT 1 FROM imagery_farm_subscriptions ifs
+                              WHERE ifs.farm_id = b.farm_id
+                                AND ifs.product_id = ias.product_id
+                                AND ifs.is_active
+                                AND ifs.fetch_farm_aoi
+                                AND ifs.deleted_at IS NULL
+                          )
                           AND (ias.last_successful_ingest_at IS NULL
                                OR ias.last_successful_ingest_at <
                                   now() - make_interval(

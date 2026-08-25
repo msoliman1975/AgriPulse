@@ -1,4 +1,4 @@
-import { differenceInHours, formatDistanceToNow, parseISO } from "date-fns";
+import { formatDistanceToNow, parseISO } from "date-fns";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -10,19 +10,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { queryState } from "@/components/asyncState";
 import { useDateLocale } from "@/hooks/useDateLocale";
+import type { Status } from "@/modules/admin/lib/healthStatus";
+import { statusFor } from "@/modules/admin/lib/healthStatus";
 import { useCrossTenantHealth } from "@/queries/platformHealthRollup";
-
-type Status = "ok" | "warn" | "crit" | "neutral";
-
-function statusFor(lastSyncIso: string | null, failed24h: number, activeSubs: number): Status {
-  if (activeSubs === 0) return "neutral";
-  if (failed24h > 0) return "crit";
-  if (!lastSyncIso) return "crit";
-  const hours = differenceInHours(new Date(), parseISO(lastSyncIso));
-  if (hours > 24) return "crit";
-  if (hours > 6) return "warn";
-  return "ok";
-}
 
 /**
  * /platform/integrations/health — cross-tenant integration rollup.
@@ -64,6 +54,7 @@ export function PlatformHealthPage(): ReactNode {
             cell: (row) => (
               <Cell
                 status={statusFor(
+                  "weather",
                   row.weather_last_sync_at,
                   row.weather_failed_24h,
                   row.weather_active_subs,
@@ -81,6 +72,7 @@ export function PlatformHealthPage(): ReactNode {
             cell: (row) => (
               <Cell
                 status={statusFor(
+                  "imagery",
                   row.imagery_last_sync_at,
                   row.imagery_failed_24h,
                   row.imagery_active_subs,

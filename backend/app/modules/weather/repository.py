@@ -271,6 +271,43 @@ class WeatherRepository:
             {"id": r.id, "block_id": r.block_id, "cadence_hours": r.cadence_hours} for r in rows
         )
 
+    async def close_stale_running_attempts(self, *, stale_hours: int) -> int:
+        """Close attempt rows left in `running` by a worker that died.
+
+        A weather attempt is a log row, not a queue row: the next poll is
+        governed by the subscription's `last_attempted_at`, so an orphan
+        never blocks a fetch. It does pin the Integration Health page,
+        which counts `status = 'running'` with no age limit. Production
+        carried 36 such rows from 2026-08-13 to 2026-08-25 — one per block
+        of a farm that had just cut over to the farm path — and the page
+        read "36 running" on a farm whose weather had synced an hour
+        earlier.
+
+        They are closed as `failed` because that is what happened. The
+        error code names the reaper so the row is not mistaken for a
+        provider fault, and 12-day-old rows fall outside every 24h failure
+        window, so closing them raises no alert.
+        """
+        rows = (
+            await self._session.execute(
+                text(
+                    """
+                UPDATE weather_ingestion_attempts
+                   SET status = 'failed',
+                       completed_at = now(),
+                       error_code = 'reaped_stale',
+                       error_message = 'Attempt left running by a worker '
+                                       'that did not report a result.'
+                 WHERE status = 'running'
+                   AND started_at < now() - make_interval(hours => :stale_hours)
+             RETURNING id
+                """
+                ),
+                {"stale_hours": stale_hours},
+            )
+        ).all()
+        return len(rows)
+
     async def list_due_farm_provider_pairs(
         self,
         *,
