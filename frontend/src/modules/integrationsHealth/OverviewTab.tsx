@@ -1,4 +1,4 @@
-import { formatDistanceToNow, parseISO, differenceInHours } from "date-fns";
+import { formatDistanceToNow, parseISO } from "date-fns";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -8,29 +8,9 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { useDateLocale } from "@/hooks/useDateLocale";
+import type { Status } from "@/lib/healthStatus";
+import { statusFor } from "@/lib/healthStatus";
 import { useBlockIntegrationHealth, useFarmIntegrationHealth } from "@/queries/integrationsHealth";
-
-type Status = "ok" | "warn" | "crit" | "neutral";
-
-function statusFor(
-  lastSyncIso: string | null,
-  lastFailedIso: string | null,
-  failed24h: number,
-  activeSubs: number,
-): Status {
-  if (activeSubs === 0) return "neutral";
-  const now = new Date();
-  if (failed24h > 0) return "crit";
-  if (!lastSyncIso) return "crit";
-  const hours = differenceInHours(now, parseISO(lastSyncIso));
-  if (hours > 24) return "crit";
-  if (hours > 6) return "warn";
-  if (lastFailedIso) {
-    const failedHours = differenceInHours(now, parseISO(lastFailedIso));
-    if (failedHours < 24) return "warn";
-  }
-  return "ok";
-}
 
 export interface OverviewTabProps {
   basePath: string;
@@ -129,10 +109,11 @@ function FarmsTable({
               <Td>
                 <StatusCell
                   status={statusFor(
+                    "weather",
                     r.weather_last_sync_at,
-                    r.weather_last_failed_at,
                     r.weather_failed_24h,
                     r.weather_active_subs,
+                    r.weather_last_failed_at,
                   )}
                   lastSync={r.weather_last_sync_at}
                   activeSubs={r.weather_active_subs}
@@ -144,8 +125,8 @@ function FarmsTable({
               <Td>
                 <StatusCell
                   status={statusFor(
+                    "imagery",
                     r.imagery_last_sync_at,
-                    null,
                     r.imagery_failed_24h,
                     r.imagery_active_subs,
                   )}
@@ -248,10 +229,11 @@ function BlocksTable({
                   <Td>
                     <StatusCell
                       status={statusFor(
+                        "weather",
                         r.weather_last_sync_at,
-                        r.weather_last_failed_at,
                         r.weather_failed_24h,
                         r.weather_active_subs,
+                        r.weather_last_failed_at,
                       )}
                       lastSync={r.weather_last_sync_at}
                       activeSubs={r.weather_active_subs}
@@ -263,8 +245,8 @@ function BlocksTable({
                   <Td>
                     <StatusCell
                       status={statusFor(
+                        "imagery",
                         r.imagery_last_sync_at,
-                        null,
                         r.imagery_failed_24h,
                         r.imagery_active_subs,
                       )}

@@ -10,8 +10,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { queryState } from "@/components/asyncState";
 import { useDateLocale } from "@/hooks/useDateLocale";
-import type { Status } from "@/modules/admin/lib/healthStatus";
-import { statusFor } from "@/modules/admin/lib/healthStatus";
+import type { Status } from "@/lib/healthStatus";
+import { statusFor } from "@/lib/healthStatus";
 import { useCrossTenantHealth } from "@/queries/platformHealthRollup";
 
 /**

@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { AGE_HOURS, statusFor } from "@/modules/admin/lib/healthStatus";
+import { AGE_HOURS, statusFor } from "@/lib/healthStatus";
 
 /**
  * Lock-step with the backend.
@@ -18,7 +18,7 @@ import { AGE_HOURS, statusFor } from "@/modules/admin/lib/healthStatus";
  *
  * So read the backend's own defaults rather than a copy of them.
  */
-const SETTINGS = join(__dirname, "../../../../../backend/app/core/settings.py");
+const SETTINGS = join(__dirname, "../../../backend/app/core/settings.py");
 
 function backendDefault(name: string): number {
   const src = readFileSync(SETTINGS, "utf8");
@@ -27,7 +27,7 @@ function backendDefault(name: string): number {
   return Number(m[1]);
 }
 
-describe("PlatformHealthPage age ceilings", () => {
+describe("health page age ceilings", () => {
   it("match the platform-alert thresholds in the backend", () => {
     expect(AGE_HOURS.weather).toEqual({
       warn: backendDefault("platform_alert_weather_warn_hours"),
@@ -53,5 +53,12 @@ describe("PlatformHealthPage age ceilings", () => {
     expect(statusFor("weather", hoursAgo(4), 0, 1)).toBe("ok");
     expect(statusFor("weather", hoursAgo(30), 0, 1)).toBe("warn");
     expect(statusFor("weather", hoursAgo(60), 0, 1)).toBe("crit");
+  });
+
+  it("keeps the per-tenant page's recent-failure warning", () => {
+    const hoursAgo = (h: number) => new Date(Date.now() - h * 3600 * 1000).toISOString();
+    // A sync 4h ago is fresh, but the newest attempt before it failed today.
+    expect(statusFor("weather", hoursAgo(4), 0, 1, hoursAgo(5))).toBe("warn");
+    expect(statusFor("weather", hoursAgo(4), 0, 1, hoursAgo(40))).toBe("ok");
   });
 });
