@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { ApiError, listBlocks, raiseFieldFlag, type Block, type FlagSeverity } from "@/api/client";
+import type { FarmScope } from "@/api/me";
 import { currentFix, type Fix } from "@/capture/location";
+import { FarmField } from "@/components/FarmField";
 import { MAX_PHOTOS, uploadFlagPhoto } from "@/capture/photos";
 import { t, type Lang, type MessageKey } from "@/i18n";
 
@@ -13,9 +15,13 @@ import { t, type Lang, type MessageKey } from "@/i18n";
  * platform's — "needs attention" is a judgement a person can make standing in
  * a block; `warning` is a token they would have to learn.
  *
- * A block is required. Every flag belongs to one, so a broken gate is attached
- * to the block it sits beside; the picker therefore has to resolve to
- * something, and it defaults to the first block rather than to nothing.
+ * A farm and then a block are required, in that order. Every flag belongs to a
+ * block, so a broken gate is attached to the block it sits beside — and a
+ * block name is only unique inside a farm, so the farm has to be settled
+ * first. Both pickers resolve to something rather than to nothing.
+ *
+ * A scout with one farm is not asked: the farm control is filled in and
+ * disabled, which still says what the flag will be filed against.
  */
 
 const SEVERITIES: { key: FlagSeverity; label: MessageKey }[] = [
@@ -26,16 +32,29 @@ const SEVERITIES: { key: FlagSeverity; label: MessageKey }[] = [
 
 export function RaiseFlagScreen({
   lang,
-  farmId,
+  farms,
+  farmName,
+  defaultFarmId,
+  onPickedFarm,
   onClose,
   onRaised,
 }: {
   lang: Lang;
-  farmId: string;
+  /** Every farm this scout is granted. Never empty — the caller handles that. */
+  farms: FarmScope[];
+  farmName: (farmId: string) => string;
+  /** The farm to open on, when it is still granted. */
+  defaultFarmId: string;
+  /** Remembered for next time. */
+  onPickedFarm: (farmId: string) => void;
   onClose: () => void;
   onRaised: () => void;
 }): ReactNode {
-  const [blocks, setBlocks] = useState<Block[]>([]);
+  const single = farms.length === 1 ? farms[0].farm_id : null;
+  const [farmId, setFarmId] = useState<string>(
+    () => single ?? (farms.some((f) => f.farm_id === defaultFarmId) ? defaultFarmId : farms[0].farm_id),
+  );
+  const [blocks, setBlocks] = useState<Block[] | null>(null);
   const [blockId, setBlockId] = useState("");
   const [severity, setSeverity] = useState<FlagSeverity>("warning");
   const [note, setNote] = useState("");
@@ -49,15 +68,24 @@ export function RaiseFlagScreen({
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
+  // Blocks belong to a farm, so changing the farm invalidates the block. A
+  // flag raised against a block id from the previously selected farm would be
+  // filed somewhere nobody is looking.
   useEffect(() => {
     let live = true;
+    setBlocks(null);
+    setBlockId("");
     void listBlocks(farmId)
       .then((b) => {
         if (!live) return;
         setBlocks(b);
         if (b.length > 0) setBlockId(b[0].id);
       })
-      .catch(() => setError(t(lang, "record.blocksFailed")));
+      .catch(() => {
+        if (!live) return;
+        setBlocks([]);
+        setError(t(lang, "record.blocksFailed"));
+      });
     return () => {
       live = false;
     };
@@ -109,6 +137,7 @@ export function RaiseFlagScreen({
         accuracy_m: fix ? fix.accuracy_m : null,
         attachment_s3_keys: keys,
       });
+      onPickedFarm(farmId);
       onRaised();
     } catch (e) {
       setError(e instanceof ApiError && e.message ? e.message : t(lang, "flag.raiseFailed"));
@@ -144,15 +173,35 @@ export function RaiseFlagScreen({
         </div>
         <p className="hint">{t(lang, "flag.severityHint")}</p>
 
+        <FarmField
+          lang={lang}
+          farms={farms}
+          farmName={farmName}
+          value={farmId}
+          disabled={single !== null}
+          onChange={setFarmId}
+        />
+
         <label htmlFor="flagblk">{t(lang, "record.whichBlock")}</label>
-        <select id="flagblk" value={blockId} onChange={(e) => setBlockId(e.target.value)}>
-          {blocks.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name || b.code}
-            </option>
-          ))}
+        <select
+          id="flagblk"
+          value={blockId}
+          disabled={blocks === null || blocks.length === 0}
+          onChange={(e) => setBlockId(e.target.value)}
+        >
+          {blocks === null ? (
+            <option value="">{t(lang, "farms.loading")}</option>
+          ) : (
+            blocks.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name || b.code}
+              </option>
+            ))
+          )}
         </select>
-        {blocks.length === 0 ? <p className="hint">{t(lang, "record.noBlocks")}</p> : null}
+        {blocks !== null && blocks.length === 0 ? (
+          <p className="hint">{t(lang, "record.noBlocks")}</p>
+        ) : null}
 
         <label htmlFor="flagnote">{t(lang, "flag.whatDidYouSee")}</label>
         <textarea

@@ -96,6 +96,9 @@ export interface Visit {
   priority: "low" | "medium" | "high";
   due_by: string | null;
   status: string;
+  /** When it was closed. Null while it is still open — which is why the Done
+   *  list groups on this and every other list groups on `due_by`. */
+  completed_at: string | null;
   assigned_to: string | null;
   source: VisitSource;
   template_id: string | null;
@@ -119,6 +122,12 @@ export interface WorkItem {
   /** Filled in by the client from the block list — `/me/work` sends only the
    *  id, and a scout cannot walk to a UUID. */
   block_name?: string | null;
+  /** Filled in by the client the same way and for the same reason. The app
+   *  now holds work from every farm a scout is granted at once, so the farm is
+   *  part of what a row *is*, not a global setting it was fetched under. */
+  farm_name?: string | null;
+  /** Closure time, carried across from the visit. Board work has none. */
+  completed_at?: string | null;
   /** Zone count, spread and streak. `/me/work` does not send these either, so
    *  the Tasks list joins them on from the visit list. Board work has none. */
   source?: VisitSource | null;
@@ -377,6 +386,10 @@ export interface Observation {
   notes: string | null;
   recorded_by: string;
   attachment_download_url: string | null;
+  /** Filled in by the client, not the API: the endpoint is farm-scoped, so the
+   *  farm is in the request rather than the response. The Records screen holds
+   *  rows from several farms at once and has to be able to name each one. */
+  farm_id?: string;
 }
 
 /**

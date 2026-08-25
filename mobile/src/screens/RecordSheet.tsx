@@ -1,7 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 import { createSelfInitiatedVisit, listBlocks, type Block, type WorkItem } from "@/api/client";
+import type { FarmScope } from "@/api/me";
 import { CaptureForm } from "@/components/CaptureForm";
+import { FarmField } from "@/components/FarmField";
 import { RaiseFlagScreen } from "@/screens/RaiseFlagScreen";
 import { t, type Lang } from "@/i18n";
 import { WorkDetailScreen } from "@/screens/WorkDetailScreen";
@@ -18,38 +20,69 @@ import { WorkDetailScreen } from "@/screens/WorkDetailScreen";
  *     the same history as assigned work instead of vanishing.
  *   * **A reading** — one measurement, no visit and no outcome.
  *
- * Both need a block. Every observation and every visit is block-scoped, and a
- * reading attributed to nowhere cannot be aggregated with anything.
+ * Both need a **farm and then a block**, in that order, because a block name
+ * is only unique inside a farm — two farms can both have a "North 3" and
+ * filing a reading against the wrong one is a silent, unfixable mistake.
+ * The farm used to be implicit: whatever was chosen in a settings screen,
+ * possibly days earlier. Now it is asked here, where the answer is being used.
+ *
+ * A scout with one farm is not asked. The control is filled in and disabled
+ * rather than hidden, so what the reading will be filed against is on screen
+ * either way — a disabled field that states the answer beats no field at all.
  */
 
-type Mode = "choose" | "block" | "round" | "reading" | "flag";
+type Mode = "choose" | "where" | "round" | "reading" | "flag";
 
 export function RecordSheet({
   lang,
-  farmId,
+  farms,
+  farmName,
+  defaultFarmId,
+  onPickedFarm,
   onClose,
 }: {
   lang: Lang;
-  farmId: string;
+  /** Every farm this scout is granted. Never empty — the caller handles that. */
+  farms: FarmScope[];
+  farmName: (farmId: string) => string;
+  /** The farm to open on: the last one recorded against, when it is still
+   *  granted. Saves a tap for the common case of working one farm all week. */
+  defaultFarmId: string;
+  /** Remembered for next time, so the default above stays useful. */
+  onPickedFarm: (farmId: string) => void;
   onClose: () => void;
 }): ReactNode {
+  const single = farms.length === 1 ? farms[0].farm_id : null;
+
   const [mode, setMode] = useState<Mode>("choose");
   const [intent, setIntent] = useState<"round" | "reading">("round");
-  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [farmId, setFarmId] = useState<string>(
+    () => single ?? (farms.some((f) => f.farm_id === defaultFarmId) ? defaultFarmId : farms[0].farm_id),
+  );
+  const [blocks, setBlocks] = useState<Block[] | null>(null);
   const [blockId, setBlockId] = useState("");
   const [visit, setVisit] = useState<WorkItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Blocks belong to a farm, so changing the farm invalidates the block —
+  // keeping the old id would post a reading to a block in a farm the scout is
+  // no longer naming, which the server accepts only by coincidence of ids.
   useEffect(() => {
     let live = true;
+    setBlocks(null);
+    setBlockId("");
     void listBlocks(farmId)
       .then((b) => {
         if (!live) return;
         setBlocks(b);
         if (b.length > 0) setBlockId(b[0].id);
       })
-      .catch(() => setError(t(lang, "record.blocksFailed")));
+      .catch(() => {
+        if (!live) return;
+        setBlocks([]);
+        setError(t(lang, "record.blocksFailed"));
+      });
     return () => {
       live = false;
     };
@@ -57,6 +90,7 @@ export function RecordSheet({
 
   async function go(): Promise<void> {
     if (!blockId) return;
+    onPickedFarm(farmId);
     if (intent === "reading") {
       setMode("reading");
       return;
@@ -65,11 +99,12 @@ export function RecordSheet({
     setError(null);
     try {
       const created = await createSelfInitiatedVisit(farmId, { block_id: blockId });
-      const name = blocks.find((b) => b.id === blockId);
+      const name = (blocks ?? []).find((b) => b.id === blockId);
       setVisit({
         kind: "scouting_visit",
         id: created.id,
         farm_id: farmId,
+        farm_name: farmName(farmId),
         block_id: created.block_id,
         block_name: name ? name.name || name.code : null,
         title: created.title,
@@ -79,6 +114,7 @@ export function RecordSheet({
         severity: created.severity,
         priority: created.priority,
         due_at: created.due_by,
+        completed_at: null,
         template_id: created.template_id,
       });
       setMode("round");
@@ -101,7 +137,15 @@ export function RecordSheet({
 
   if (mode === "flag") {
     return (
-      <RaiseFlagScreen lang={lang} farmId={farmId} onClose={onClose} onRaised={onClose} />
+      <RaiseFlagScreen
+        lang={lang}
+        farms={farms}
+        farmName={farmName}
+        defaultFarmId={farmId}
+        onPickedFarm={onPickedFarm}
+        onClose={onClose}
+        onRaised={onClose}
+      />
     );
   }
 
@@ -116,7 +160,12 @@ export function RecordSheet({
           </button>
         </header>
         <h1>{t(lang, "record.reading")}</h1>
-        <p className="where">{blocks.find((b) => b.id === blockId)?.name || ""}</p>
+        {/* Farm as well as block: a reading filed against the wrong farm is
+            not visibly wrong afterwards, so it is stated before it is taken. */}
+        <p className="where">
+          {(blocks ?? []).find((b) => b.id === blockId)?.name || ""}
+          {single ? "" : ` · ${farmName(farmId)}`}
+        </p>
         <CaptureForm
           lang={lang}
           farmId={farmId}
@@ -149,7 +198,7 @@ export function RecordSheet({
               className="opt"
               onClick={() => {
                 setIntent("round");
-                setMode("block");
+                setMode("where");
               }}
             >
               <b>{t(lang, "record.round")}</b>
@@ -160,7 +209,7 @@ export function RecordSheet({
               className="opt"
               onClick={() => {
                 setIntent("reading");
-                setMode("block");
+                setMode("where");
               }}
             >
               <b>{t(lang, "record.reading")}</b>
@@ -172,15 +221,39 @@ export function RecordSheet({
           </>
         ) : (
           <>
+            <FarmField
+              lang={lang}
+              farms={farms}
+              farmName={farmName}
+              value={farmId}
+              disabled={single !== null}
+              onChange={setFarmId}
+            />
+
             <label htmlFor="blk">{t(lang, "record.whichBlock")}</label>
-            <select id="blk" value={blockId} onChange={(e) => setBlockId(e.target.value)}>
-              {blocks.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name || b.code}
-                </option>
-              ))}
+            <select
+              id="blk"
+              value={blockId}
+              // Nothing to choose between until the farm's blocks arrive, and a
+              // select that is empty for a moment invites a tap that does
+              // nothing.
+              disabled={blocks === null || blocks.length === 0}
+              onChange={(e) => setBlockId(e.target.value)}
+            >
+              {blocks === null ? (
+                <option value="">{t(lang, "farms.loading")}</option>
+              ) : (
+                blocks.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name || b.code}
+                  </option>
+                ))
+              )}
             </select>
-            {blocks.length === 0 ? <p className="hint">{t(lang, "record.noBlocks")}</p> : null}
+            {blocks !== null && blocks.length === 0 ? (
+              <p className="hint">{t(lang, "record.noBlocks")}</p>
+            ) : null}
+
             <button type="button" disabled={busy || !blockId} onClick={() => void go()}>
               {busy ? t(lang, "work.saving") : t(lang, "record.start")}
             </button>

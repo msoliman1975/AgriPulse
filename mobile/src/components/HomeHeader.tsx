@@ -32,8 +32,8 @@ export function HomeHeader({
     <header className="homehead">
       <div className="who">
         <span className="lbl">{t(lang, "home.greeting")}</span>
-        <span className="nm">{name ?? "—"}</span>
-        {farmName ? <span className="farm">{farmName}</span> : null}
+        <span className="nm" dir="auto">{name ?? "—"}</span>
+        {farmName ? <span className="farm" dir="auto">{farmName}</span> : null}
       </div>
       <div className="langpick">
         {LANGS.map((code) => (

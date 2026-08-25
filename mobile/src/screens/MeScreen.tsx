@@ -7,66 +7,53 @@ import { chooseLang, resetLangOnSignOut } from "@/i18n/preference";
 import { releaseDevice } from "@/push/register";
 
 /**
- * The scout's own settings: which farm, which language, and the way out.
+ * The scout's own settings: which language, and the way out.
  *
  * These used to live in the header of the work list, where sign-out sat one
  * mis-tap away from the rows a scout taps all day. Everything here is
  * deliberate and rarely used, which is why it has a tab of its own rather
  * than a corner of a screen that is used constantly.
+ *
+ * **Choosing a farm used to live here too, and should not have.** A farm is
+ * not a preference — it is where the work is. Picking one in a settings screen
+ * made every other farm's work invisible until the scout came back and changed
+ * it, and nothing on the Tasks tab said that was happening. The farms are now
+ * the outer grouping of the work itself, so this screen only *states* them:
+ * which farms this person holds, and in what role.
  */
 export function MeScreen({
   lang,
   onLangChange,
   name,
   farms,
-  farmId,
   farmName,
-  onPickFarm,
 }: {
   lang: Lang;
   onLangChange: (lang: Lang) => void;
   name: string | null;
   farms: FarmScope[];
-  farmId: string;
   /** Id -> the name people call it, falling back to the id when unknown. */
   farmName: (farmId: string) => string;
-  onPickFarm: (farmId: string) => void;
 }): ReactNode {
   const [signingOut, setSigningOut] = useState(false);
-  const current = farms.find((f) => f.farm_id === farmId);
 
   return (
     <div className="screen me">
       <h1>{name || t(lang, "me.title")}</h1>
-      {/* Role and farm together: "Scout" alone never said *where*, which is
-          the half a scout on two farms actually needs. */}
-      {current ? (
-        <p className="hint">
-          {current.role} · {farmName(current.farm_id)}
-        </p>
-      ) : null}
 
-      {/* Only shown when there is a choice to make. A single-farm scout does
-          not need to be told which farm they are on twice. */}
-      {farms.length > 1 ? (
-        <>
-          <h2 className="section">{t(lang, "me.farm")}</h2>
-          <ul className="farms">
-            {farms.map((f) => (
-              <li key={f.farm_id}>
-                <button
-                  type="button"
-                  className={f.farm_id === farmId ? "on" : ""}
-                  onClick={() => onPickFarm(f.farm_id)}
-                >
-                  <span className="fname">{farmName(f.farm_id)}</span>
-                  <span className="role">{f.role}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
+      {/* Read-only. The rows are not buttons and must not look like them: a
+          control here that changed what the Tasks tab showed is exactly the
+          thing that was wrong with this screen. */}
+      <h2 className="section">{farms.length === 1 ? t(lang, "me.farm") : t(lang, "me.farms")}</h2>
+      <ul className="farms">
+        {farms.map((f) => (
+          <li key={f.farm_id} className="static">
+            <span className="fname" dir="auto">{farmName(f.farm_id)}</span>
+            <span className="role">{f.role}</span>
+          </li>
+        ))}
+      </ul>
+      {farms.length > 1 ? <p className="hint">{t(lang, "me.farmsHint")}</p> : null}
 
       <h2 className="section">{t(lang, "signIn.language")}</h2>
       <div className="langpick">
