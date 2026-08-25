@@ -2849,9 +2849,31 @@ global:
   #   no frontend file changed since f47e385. Workers stay 1363ebe, frontend
   #   f47e385, tile-server 676746a.
   #   Rollback is this tag back to 1363ebe. No migration.
+  #
+  # 9838a5c = #578, the map drew three different things as the same circle.
+  #   An open alert, a field flag a scout raised, and a signal observation
+  #   were all coloured dots, and nothing on screen said which was which.
+  #   Now shape carries the kind: a chip for an alert, a pennant for a flag,
+  #   a hollow diamond for an observation. Colour still carries severity, and
+  #   the alert chip's glyph is the verb of its worst open alert.
+  #   The block summary endpoint gained one field, `alert_action_type`. The
+  #   verb already sat on every alert row from tenant migration 0063; the map
+  #   had no way to read it. `alert_count` was already on the feature too, so
+  #   the count in the chip needed no new data either.
+  #   API + FRONTEND. Workers stay 1363ebe and tile-server 676746a; no worker
+  #   task and no tile-server file changed.
+  #   ORDER DOES NOT MATTER. The frontend reads `alert_action_type` with a
+  #   null fallback, so a frontend that lands before the api draws the neutral
+  #   glyph instead of failing.
+  #   The tag is 9838a5c, not 8cf2284, because the merge build for 8cf2284 was
+  #   CANCELLED by #577's run and its frontend image never reached GHCR.
+  #   #577 changes only `mobile/`, which ships as an APK and is in neither
+  #   image, so for these two charts the two commits are the same code.
+  #   Rollback is api back to a62260b and frontend back to f47e385.
+  #   No migration.
   images:
     api:
-      tag: "a62260b"
+      tag: "9838a5c"
     workers:
       tag: "1363ebe"
     frontend:
@@ -2934,7 +2956,10 @@ global:
       #   FRONTEND ONLY. No backend file changed since 1363ebe, so api,
       #   workers and tile-server stay where they are and do not restart.
       #   Rollback is this tag back to 1363ebe. No migration.
-      tag: "f47e385"
+      #
+      # 9838a5c = #578, three marks for three things. See the note above
+      #   `global.images` for the whole change.
+      tag: "9838a5c"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
