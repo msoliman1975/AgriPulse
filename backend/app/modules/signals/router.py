@@ -651,7 +651,14 @@ async def list_observations(
     # the FE can pass it back through here to hydrate the full group.
     template_observation_id: UUID | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
-    context: RequestContext = Depends(requires_capability("signal.read")),
+    # `farm_id_param` for the same reason the definitions list above has it: a
+    # Scout holds no tenant role, so with no farm to resolve against, the check
+    # stops at the tenant tier and denies. That made the app's own Records
+    # screen 403 for the only people who file the records. When `farm_id` is
+    # absent the farm tier is skipped and a tenant role is required, exactly as
+    # before; the query ANDs `farm_id` in, so a farm-scoped caller reads only
+    # the farm they named.
+    context: RequestContext = Depends(requires_capability("signal.read", farm_id_param="farm_id")),
     service: SignalsServiceImpl = Depends(_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)

@@ -12,21 +12,28 @@ import { chooseLang } from "@/i18n/preference";
  * on the first screen, in each language's own name. The name is here for the
  * same reason: it is how somebody notices the phone is still signed in as the
  * scout who had it yesterday.
+ *
+ * The farm sits under the name for the third version of that problem: a scout
+ * who works two farms had no way to tell, from the screen they spend the day
+ * on, which one's work they were looking at.
  */
 export function HomeHeader({
   lang,
   onLangChange,
   name,
+  farmName,
 }: {
   lang: Lang;
   onLangChange: (lang: Lang) => void;
   name: string | null;
+  farmName: string | null;
 }): ReactNode {
   return (
     <header className="homehead">
       <div className="who">
         <span className="lbl">{t(lang, "home.greeting")}</span>
         <span className="nm">{name ?? "—"}</span>
+        {farmName ? <span className="farm">{farmName}</span> : null}
       </div>
       <div className="langpick">
         {LANGS.map((code) => (

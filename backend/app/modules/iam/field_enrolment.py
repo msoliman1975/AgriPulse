@@ -272,14 +272,11 @@ class FieldEnrolmentService:
         )
 
         # The JWT carries farm_scopes, so without this sync the scout signs in
-        # successfully and is then 403 on every farm endpoint.
-        try:
-            await self._kc.set_farm_scopes(
-                keycloak_user_id=kc_subject,
-                scopes=[{"farm_id": str(farm_id), "role": role}],
-            )
-        except KeycloakRequestError:
-            _log.exception("field_enrolment_scope_sync_failed", user_id=str(user_id))
+        # successfully and is then 403 on every farm endpoint. It goes through
+        # `_sync_scopes` rather than sending just the farm enrolled here: the
+        # same person can already be a scout in another tenant, and the
+        # attribute is a full replace.
+        await self._sync_scopes(keycloak_subject=kc_subject, membership_id=membership_id)
 
         _log.info(
             "field_worker_enrolled",
@@ -639,14 +636,31 @@ class FieldEnrolmentService:
         }
 
     async def _sync_scopes(self, *, keycloak_subject: str | None, membership_id: UUID) -> None:
-        """Re-project this membership's active scopes into Keycloak."""
+        """Re-project the *user's* active scopes into Keycloak.
+
+        `set_farm_scopes` replaces the whole attribute, and the attribute is
+        per-user, not per-membership. Rebuilding it from one membership's rows
+        therefore deletes every scope the person holds in their other tenants:
+        they keep the grant in Postgres, the JWT loses it, and the app 403s on
+        a farm the database still says they hold. So the query starts from the
+        user behind `membership_id` and walks back out to all of their active
+        memberships.
+        """
         if not keycloak_subject or keycloak_subject.startswith("pending::"):
             return
         rows = (
             await self._public.execute(
                 text(
-                    "SELECT farm_id, role FROM public.farm_scopes "
-                    "WHERE membership_id = :mid AND revoked_at IS NULL"
+                    """
+                    SELECT DISTINCT fs.farm_id, fs.role
+                      FROM public.tenant_memberships m0
+                      JOIN public.tenant_memberships m ON m.user_id = m0.user_id
+                      JOIN public.farm_scopes fs ON fs.membership_id = m.id
+                     WHERE m0.id = :mid
+                       AND fs.revoked_at IS NULL
+                       AND m.deleted_at IS NULL
+                       AND m.status = 'active'
+                    """
                 ).bindparams(bindparam("mid", type_=PG_UUID(as_uuid=True))),
                 {"mid": membership_id},
             )

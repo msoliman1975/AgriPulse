@@ -116,11 +116,15 @@ function tileTone(items: WorkItem[], now: number): string {
 
 function Tile({
   label,
+  sub,
   count,
   tone,
   onOpen,
 }: {
   label: string;
+  /** The place the label sits inside — the farm, for a block tile. Omitted on
+   *  the time buckets, where "Today" belongs to no farm in particular. */
+  sub?: string | null;
   count: number;
   tone: string;
   onOpen: () => void;
@@ -129,6 +133,7 @@ function Tile({
     <button type="button" className={`tile ${tone}`} disabled={count === 0} onClick={onOpen}>
       <span className="n">{count}</span>
       <span className="lbl">{label}</span>
+      {sub ? <span className="sub">{sub}</span> : null}
     </button>
   );
 }
@@ -208,12 +213,15 @@ export function TasksScreen({
   onLangChange,
   name,
   farmId,
+  farmName,
   onFullScreen,
 }: {
   lang: Lang;
   onLangChange: (lang: Lang) => void;
   name: string | null;
   farmId: string;
+  /** Already resolved by the caller: the farm's name, or its id if unknown. */
+  farmName: string;
   onFullScreen: (full: boolean) => void;
 }): ReactNode {
   const [segment, setSegment] = useState<Segment>("mine");
@@ -299,7 +307,7 @@ export function TasksScreen({
 
   return (
     <div className="screen tasks">
-      <HomeHeader lang={lang} onLangChange={onLangChange} name={name} />
+      <HomeHeader lang={lang} onLangChange={onLangChange} name={name} farmName={farmName} />
       <div className="seg">
         {(["mine", "available", "done"] as Segment[]).map((s) => (
           <button
@@ -335,7 +343,14 @@ export function TasksScreen({
             {shown.length === 0 ? (
               <p className="empty">{t(lang, "empty.mine")}</p>
             ) : (
-              <TileGrid lang={lang} items={shown} groupBy={groupBy} now={now} onOpenGroup={setOpenGroup} />
+              <TileGrid
+                lang={lang}
+                items={shown}
+                groupBy={groupBy}
+                farmName={farmName}
+                now={now}
+                onOpenGroup={setOpenGroup}
+              />
             )}
           </>
         ) : (
@@ -399,12 +414,14 @@ function TileGrid({
   lang,
   items,
   groupBy,
+  farmName,
   now,
   onOpenGroup,
 }: {
   lang: Lang;
   items: WorkItem[];
   groupBy: GroupBy;
+  farmName: string;
   now: number;
   onOpenGroup: (key: string) => void;
 }): ReactNode {
@@ -449,6 +466,7 @@ function TileGrid({
         <Tile
           key={key || "none"}
           label={key || t(lang, "group.noBlock")}
+          sub={farmName}
           count={rows.length}
           tone={tileTone(rows, now)}
           onOpen={() => onOpenGroup(key)}
