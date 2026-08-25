@@ -10,9 +10,10 @@
   lineage written by the two above (tenant migration 0062).
 
 Cadence is set in ``workers/beat/main.py`` against
-``recommendations_evaluate_sweep_seconds``. Daily in production; hourly
-in dev so a fresh signal turns into a recommendation within one Beat
-cycle.
+``recommendations_evaluate_sweep_seconds``, which is hourly in every
+environment -- no deployment overrides the default. A fresh signal turns
+into a recommendation within one Beat cycle. Re-runs are cheap because
+the partial UNIQUE above makes them no-ops.
 """
 
 from __future__ import annotations

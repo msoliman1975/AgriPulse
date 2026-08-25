@@ -500,7 +500,7 @@ class DecisionTreeRunResponse(BaseModel):
 class EvalRunResponse(BaseModel):
     """One recorded evaluation pass.
 
-    ``kind='sweep'`` is the nightly Beat run over every block;
+    ``kind='sweep'`` is the hourly Beat run over every block;
     ``'on_demand'`` is a single block evaluated through the API. Dry-runs
     never produce a run — they write nothing.
     """

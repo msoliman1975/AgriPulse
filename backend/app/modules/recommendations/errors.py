@@ -159,7 +159,7 @@ class DecisionTreeNotRunnableError(APIError):
     """The tree exists but the evaluator would never reach it.
 
     Archived, deactivated, or never published — the three states in which
-    the nightly sweep silently skips a tree. Running one on demand has to
+    the scheduled sweep silently skips a tree. Running one on demand has to
     refuse for the same reason: the run would write nothing and the author
     would read that as "my conditions did not match."
     """

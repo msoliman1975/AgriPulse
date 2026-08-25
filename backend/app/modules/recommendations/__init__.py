@@ -1,9 +1,9 @@
-"""Recommendations module — decision-tree-driven, per-block daily evaluation.
+"""Recommendations module — decision-tree-driven, per-block evaluation.
 
 Trees are authored as YAML in ``seeds/`` and synced into the
 ``public.decision_trees`` catalog at app startup via
 ``loader.sync_from_disk``. The Beat task ``recommendations.evaluate_sweep``
-walks every tenant's active blocks daily and writes open recommendations.
+walks every tenant's active blocks hourly and writes open recommendations.
 
 Public surface (importable by other modules):
 
