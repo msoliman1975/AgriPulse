@@ -2906,9 +2906,32 @@ global:
   #   and a new frontend against the old api gets 404 on the two new routes
   #   and renders its own empty state.
   #   Rollback is both tags back to 9838a5c. No migration.
+  #
+  # d286e3c = #582, a recorded signal was missing from the report column
+  #   picker. Found by checking 698e8f6 on prod the day it deployed, which is
+  #   the only reason it was caught: the catalog required an active
+  #   `signal_assignments` row, and that row is not required to record
+  #   anything. `signal_observations` has no foreign key to it and no write
+  #   path checks for one, so a CSV import, a template submission or an API
+  #   call can record against a definition that was never assigned or whose
+  #   assignment was later retired.
+  #   On Bashier Elkhier, `fruit_tss_brix` had 145 observations across 36
+  #   blocks and no assignment row, so the picker offered eight crop
+  #   attributes and none of the one signal that farm actually uses. The data
+  #   was there and the column was unreachable.
+  #   A definition now qualifies on either an assignment matching the farm or
+  #   an observation already on the farm. Both arms stay farm-scoped and the
+  #   two-tier platform/tenant shadowing is unchanged.
+  #   Checked in the prod api pod before promoting: Bashier Elkhier went from
+  #   0 signal columns to 1, and B-Elkair-Suez still returns its 9, so the
+  #   assignment arm is intact.
+  #   API ONLY. One file, `reports/custom_fields.py`. No frontend file changed
+  #   since 1d0ed72, so frontend stays there; workers stay 1363ebe and
+  #   tile-server 676746a.
+  #   Rollback is this tag back to 698e8f6. No migration.
   images:
     api:
-      tag: "698e8f6"
+      tag: "d286e3c"
     workers:
       tag: "1363ebe"
     frontend:
