@@ -2786,11 +2786,58 @@ global:
   #   changed since c1b811f are the two fixed here.
   #   Rollback is this tag back to c1b811f. No migration in this one, so
   #   nothing to unwind.
+  #
+  # 1363ebe = #571, four things the health pages called faults that were not.
+  #   Found by reading /platform/alerts and /platform/integrations/health on
+  #   prod. In every case the acquisition pipeline was working; the reads were
+  #   wrong.
+  #   (1) A subscription switched on minutes ago was reported as a failure.
+  #   Thermal was enabled on B-Elkair-Suez at 07:20:41 on 2026-08-25 and the
+  #   07:21 sweep opened a CRITICAL peer_lag naming scene day 2026-08-15, six
+  #   days older than the subscription, plus a warning that the farm had never
+  #   worked. The first poll ran at 07:31 and all 21 jobs succeeded by 07:33.
+  #   peer_lag now ignores a scene the peer ingested before this farm
+  #   subscribed. stream_silent waits 26h, and only while nothing has been
+  #   attempted at all, so a farm whose jobs fail still alerts at once.
+  #   (2) 36 weather attempts sat in `running` from 2026-08-13 04:07, one per
+  #   block of a farm that had cut over to the farm path. Nothing closed them,
+  #   so the page read "36 running" on a farm that synced at 04:33 that day.
+  #   New beat task `weather.reap_stale_attempts` on the light queue closes
+  #   them as failed with error_code 'reaped_stale'. EXPECT 36 ROWS TO CLOSE
+  #   ON THE FIRST RUN. They are 12 days old, and both the failed_24h window
+  #   and the streak threshold of 3 filter on rows newer or denser than that,
+  #   so no alert and no inbox message follows.
+  #   (3) TENANT MIGRATION 0085. Overdue counted block rows the sweeps no
+  #   longer poll: both sweeps skip a block row once its farm acquires on its
+  #   own behalf, and those watermarks then freeze. Both agrosina farms read
+  #   "36 overdue" weather and one read "36 overdue" imagery while both
+  #   streams worked. The view now applies the sweeps' own predicates. Checked
+  #   against the prod tenant read-only before this promote: 36 -> 0 on both
+  #   farms, and B-Elkair-Suez imagery stayed at 0, so it does not blanket
+  #   zero the count. `list_queue` gains the imagery half of an exclusion it
+  #   already had for weather.
+  #   (4) The cross-tenant page called a four-day imagery gap "Failing". It
+  #   used one fixed 24h ceiling for both streams. Sentinel-2 revisits every 2
+  #   to 5 days and a clouded pass is rejected, so agrosina read Failing with
+  #   zero failed jobs and no matching platform alert. Ceilings now come per
+  #   stream from the platform-alert defaults, and a frontend test reads
+  #   backend/app/core/settings.py so the two cannot drift apart again.
+  #   Also: the platform sidebar rendered `nav.platformSignals` as a raw key.
+  #   The label was in common.json, but that sidebar's default namespace is
+  #   admin, so the lookup missed. Moved it.
+  #   API, WORKERS AND FRONTEND. The api serves the health endpoints and runs
+  #   the 0085 PreSync migration, the workers run the sweep and the new
+  #   reaper, and the frontend holds the ceilings and the nav label.
+  #   Tile-server stays 676746a.
+  #   Rollback is the three tags back to 09bfe6b / c1b811f / 188a2fe, plus
+  #   `alembic downgrade 0084` per tenant if the view has to go back. 0085 is
+  #   read-side only, so leaving it applied under the old images is safe: it
+  #   changes two numbers on a page, no data.
   images:
     api:
-      tag: "09bfe6b"
+      tag: "1363ebe"
     workers:
-      tag: "c1b811f"
+      tag: "1363ebe"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -2855,7 +2902,9 @@ global:
       #   left-to-right, which is what put the text back inside them. Shipping
       #   #566 without #567 leaves Arabic boxes holding English words.
       #   Rollback is this tag back to 3dc25cf. No migration in any of them.
-      tag: "188a2fe"
+      # 1363ebe = #571, the health-page ceilings and the raw nav key. See the
+      #   api note earlier in this block for the whole change.
+      tag: "1363ebe"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
