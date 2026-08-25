@@ -217,33 +217,62 @@ def _attribute_options(raw: Any) -> list[CustomFieldOption] | None:
 
 
 async def _select_farm_signals(session: AsyncSession, *, farm_id: UUID) -> list[CustomFieldDef]:
-    """Signal definitions assigned to this farm, tenant rows shadowing platform.
+    """Signal definitions this farm can show a column for.
 
-    Same two-tier resolution as ``signals.repository``: platform rows
+    Two-tier resolution as in ``signals.repository``: platform rows
     (``tenant_id IS NULL``) plus this tenant's, one row per ``code``, the
-    tenant's winning a collision. An assignment matches when it names the farm,
-    names a block on the farm, or is tenant-wide (both NULL).
+    tenant's winning a collision.
+
+    A definition qualifies on **either** of two grounds, and the second is not
+    a nicety:
+
+    1. An active assignment names the farm, names a block on the farm, or is
+       tenant-wide (both NULL). This is what the entry surfaces read.
+    2. The farm already holds an observation of it.
+
+    Ground 2 exists because an observation does **not** require an assignment.
+    ``signal_observations`` has no foreign key to ``signal_assignments`` and
+    nothing on the write path checks one, so a signal can be recorded — by CSV
+    import, by a template submission, by the API — against a definition that
+    was never assigned, or whose assignment was later retired. Found on prod
+    the day this shipped: ``fruit_tss_brix`` on Bashier Elkhier had 145
+    observations across 36 blocks and no assignment row at all, so the picker
+    offered eight crop attributes and not the one signal the farm actually
+    uses. The data was there and the column was unreachable.
+
+    The tell for this shape of bug is always the same: the rows exist and the
+    read that is keyed on a different table says the farm has nothing.
     """
     sql = text(
         """
         SELECT DISTINCT ON (d.code)
                d.code, d.name, d.value_kind, d.unit, d.categorical_values
         FROM public.signal_definitions d
-        JOIN signal_assignments a ON a.signal_definition_id = d.id
         WHERE d.deleted_at IS NULL
           AND d.is_active IS TRUE
           AND (d.tenant_id IS NULL OR d.tenant_id = (
                 SELECT x.id FROM public.tenants x
                  WHERE replace(x.id::text, '-', '')
                        = replace(current_schema(), 'tenant_', '')))
-          AND a.deleted_at IS NULL
-          AND a.is_active IS TRUE
           AND (
-                (a.farm_id IS NULL AND a.block_id IS NULL)
-             OR (a.farm_id = :farm_id)
-             OR (a.block_id IN (
-                    SELECT b.id FROM blocks b
-                     WHERE b.farm_id = :farm_id AND b.deleted_at IS NULL))
+            EXISTS (
+                SELECT 1 FROM signal_assignments a
+                 WHERE a.signal_definition_id = d.id
+                   AND a.deleted_at IS NULL
+                   AND a.is_active IS TRUE
+                   AND (
+                         (a.farm_id IS NULL AND a.block_id IS NULL)
+                      OR (a.farm_id = :farm_id)
+                      OR (a.block_id IN (
+                             SELECT b.id FROM blocks b
+                              WHERE b.farm_id = :farm_id AND b.deleted_at IS NULL))
+                   )
+            )
+            OR EXISTS (
+                SELECT 1 FROM signal_observations o
+                 WHERE o.signal_definition_id = d.id
+                   AND o.farm_id = :farm_id
+            )
           )
         ORDER BY d.code, d.tenant_id NULLS LAST
         """

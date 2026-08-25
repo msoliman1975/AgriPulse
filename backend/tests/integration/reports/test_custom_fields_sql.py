@@ -122,3 +122,75 @@ async def test_custom_field_and_signal_detail_sql_runs_against_asyncpg(
             )
             == []
         )
+
+
+@pytest.mark.asyncio
+async def test_a_signal_with_observations_but_no_assignment_is_offered(
+    admin_session: object,
+) -> None:
+    """A recorded signal must reach the column picker without an assignment.
+
+    `signal_observations` has no foreign key to `signal_assignments`, and no
+    write path checks for one, so a signal can be recorded against a definition
+    that was never assigned or whose assignment was later retired.
+
+    This is not hypothetical. On the day the feature shipped, `fruit_tss_brix`
+    on the Bashier Elkhier farm had 145 observations across 36 blocks and no
+    assignment row, so the picker offered eight crop attributes and none of the
+    one signal the farm actually used. An assignment-only catalog reports that
+    a farm has no signals while its observations sit in the next table.
+    """
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug=f"rep-sig-{uuid4().hex[:8]}",
+        name="Reports Signal Columns",
+        contact_email="ops@rep-sig.test",
+    )
+    schema = schema_name_for(tenant.tenant_id)
+
+    from app.shared.db.session import AsyncSessionLocal
+
+    factory = AsyncSessionLocal()
+    async with factory() as session:
+        await session.execute(text(f'SET search_path TO "{schema}", public'))
+        farm_id = uuid4()
+        definition_id = uuid4()
+        code = f"brix_{uuid4().hex[:8]}"
+
+        await session.execute(
+            text(
+                """
+                INSERT INTO public.signal_definitions
+                    (id, tenant_id, code, name, value_kind, unit, is_active)
+                VALUES (:id, :tenant_id, :code, 'Fruit Brix', 'numeric', NULL, TRUE)
+                """
+            ),
+            {"id": definition_id, "tenant_id": tenant.tenant_id, "code": code},
+        )
+        # Deliberately no signal_assignments row.
+        await session.execute(
+            text(
+                """
+                INSERT INTO signal_observations
+                    (time, id, signal_definition_id, block_id, farm_id,
+                     value_numeric, recorded_by, location_mode)
+                VALUES (now(), :id, :definition_id, :block_id, :farm_id,
+                        7.9, :recorded_by, 'entity')
+                """
+            ),
+            {
+                "id": uuid4(),
+                "definition_id": definition_id,
+                "block_id": uuid4(),
+                "farm_id": farm_id,
+                "recorded_by": uuid4(),
+            },
+        )
+        await session.commit()
+
+        fields = await list_custom_fields(session, farm_id=farm_id)
+        assert [f.key for f in fields] == [f"signal:{code}"]
+
+        # A different farm must not pick it up: the second arm is farm-scoped
+        # on the observation, not tenant-wide.
+        assert await list_custom_fields(session, farm_id=uuid4()) == []
