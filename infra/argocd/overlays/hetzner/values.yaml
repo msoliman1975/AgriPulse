@@ -2833,9 +2833,25 @@ global:
   #   `alembic downgrade 0084` per tenant if the view has to go back. 0085 is
   #   read-side only, so leaving it applied under the old images is safe: it
   #   changes two numbers on a page, no data.
+  #
+  # a62260b = #575, the Queue tab measured imagery overdue on the wrong clock.
+  #   Migration 0042 re-pointed imagery overdue from the ingest clock to the
+  #   poll clock in June, because ingest time measures the satellite revisit
+  #   and not our poller. `list_queue` was written after 0042 and kept the old
+  #   clock. Checked on prod after the 1363ebe promote: the Overview tab said
+  #   0 overdue and the Queue tab said 38 for agrosina on the same afternoon.
+  #   36 of those were B-Elkair-Suez blocks polled 17 hours earlier on a 24h
+  #   cadence whose last new scene was 4 days old, which is an ordinary week
+  #   for Sentinel-2. Both imagery arms now read `last_attempted_at`. Weather
+  #   keeps the ingest clock, as 0042 says: it delivers every cadence, so a
+  #   gap there is a real fault.
+  #   API ONLY. The change is one endpoint's SQL; no worker task reads it and
+  #   no frontend file changed since f47e385. Workers stay 1363ebe, frontend
+  #   f47e385, tile-server 676746a.
+  #   Rollback is this tag back to 1363ebe. No migration.
   images:
     api:
-      tag: "1363ebe"
+      tag: "a62260b"
     workers:
       tag: "1363ebe"
     frontend:
