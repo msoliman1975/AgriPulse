@@ -306,7 +306,7 @@ class IntegrationsHealthService:
                                  WHERE f2.id = b.farm_id) AS farm_name,
                                (SELECT ip.code FROM public.imagery_products ip
                                 WHERE ip.id = ias.product_id) AS provider_code,
-                               ias.last_successful_ingest_at AS since
+                               ias.last_attempted_at AS since
                         FROM imagery_aoi_subscriptions ias
                         JOIN blocks b ON b.id = ias.block_id
                         WHERE ias.is_active
@@ -327,8 +327,22 @@ class IntegrationsHealthService:
                                 AND ifs.fetch_farm_aoi
                                 AND ifs.deleted_at IS NULL
                           )
-                          AND (ias.last_successful_ingest_at IS NULL
-                               OR ias.last_successful_ingest_at <
+                        -- Imagery overdue keys off the POLL clock, not the
+                        -- ingest clock. Migration 0042 made exactly this
+                        -- change to the health views and this scan, written
+                        -- later, did not follow: `last_successful_ingest_at`
+                        -- advances only on a real ingest, so a subscription
+                        -- polled on time reads overdue for the whole
+                        -- satellite revisit gap. Sentinel-2 revisits every 2
+                        -- to 5 days and a clouded pass is rejected, so that
+                        -- is most of an ordinary week. Prod, 2026-08-25: the
+                        -- Overview tab said 0 overdue and the Queue tab said
+                        -- 38 for the same tenant, 36 of them B-Elkair-Suez
+                        -- blocks polled 17 hours earlier. Weather keeps the
+                        -- ingest clock, as 0042 says: it delivers data every
+                        -- cadence, so a gap there is a real fault.
+                          AND (ias.last_attempted_at IS NULL
+                               OR ias.last_attempted_at <
                                   now() - make_interval(
                                     hours => COALESCE(ias.cadence_hours,
                                                       :default_cadence)))
@@ -343,15 +357,16 @@ class IntegrationsHealthService:
                                f.name AS farm_name,
                                (SELECT ip.code FROM public.imagery_products ip
                                 WHERE ip.id = ifs.product_id) AS provider_code,
-                               ifs.last_successful_ingest_at AS since
+                               ifs.last_attempted_at AS since
                         FROM imagery_farm_subscriptions ifs
                         JOIN farms f ON f.id = ifs.farm_id
                         WHERE ifs.is_active
                           AND ifs.fetch_farm_aoi
                           AND ifs.deleted_at IS NULL
                           AND f.deleted_at IS NULL
-                          AND (ifs.last_successful_ingest_at IS NULL
-                               OR ifs.last_successful_ingest_at <
+                          -- Poll clock here too; see the block arm.
+                          AND (ifs.last_attempted_at IS NULL
+                               OR ifs.last_attempted_at <
                                   now() - make_interval(
                                     hours => COALESCE(ifs.cadence_hours,
                                                       :default_cadence)))
