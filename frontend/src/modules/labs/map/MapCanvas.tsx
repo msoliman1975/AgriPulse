@@ -564,6 +564,12 @@ export function MapCanvas({
       });
 
       // Unit labels — keep cheap; just the short name.
+      //
+      // The label is the LOWEST priority symbol on the map, so it is the one
+      // that moves. `text-variable-anchor` lets MapLibre try the label in
+      // several positions around the block's anchor point before giving up
+      // and hiding it, which is what keeps a name readable on a block that
+      // also carries an alert chip and two flags.
       map.addLayer({
         id: LABEL_LAYER,
         type: "symbol",
@@ -573,6 +579,28 @@ export function MapCanvas({
           "text-field": ["get", "name"],
           "text-size": 12,
           "text-allow-overlap": false,
+          "text-variable-anchor": [
+            "center",
+            "bottom",
+            "top",
+            "left",
+            "right",
+            "bottom-left",
+            "bottom-right",
+            "top-left",
+            "top-right",
+          ],
+          // Ems from the anchor for every position except "center", which is
+          // tried first so an uncrowded block keeps its label where it has
+          // always been. 1.8 rather than something smaller because the alert
+          // chip is ~60px wide and anchors near the same point: at 0.9 every
+          // candidate position still landed inside the chip's box, and ten of
+          // twelve names on a dense farm were dropped.
+          "text-radial-offset": 1.8,
+          "text-justify": "auto",
+          // Keeps a name off the edge of the mark beside it. Without it two
+          // symbols can sit flush and still read as one blob.
+          "text-padding": 2,
         },
         paint: {
           "text-color": "#1a1916",
@@ -608,16 +636,38 @@ export function MapCanvas({
           "icon-text-fit-padding": [2, 6, 2, 2],
           "text-field": ["get", "marker_count"],
           "text-size": 12,
-          // An alert is the one thing on this map that must never be hidden
-          // by label collision. If two blocks are small and adjacent, seeing
-          // both chips overlap is better than one of them vanishing.
-          "icon-allow-overlap": true,
-          "icon-ignore-placement": true,
-          "text-allow-overlap": true,
-          "text-ignore-placement": true,
+          // The alert takes part in collision like everything else.
+          //
+          // It used to be exempt — `ignore-placement: true` — on the argument
+          // that an alert must never be hidden. That was wrong twice over: a
+          // symbol that ignores placement also RESERVES NO SPACE, so the
+          // block's name label drew straight underneath it, and so did the
+          // flags. Three marks landed on one spot and none of them could be
+          // read. An alert nobody can read is not more visible than an alert
+          // that decluttered at this zoom and comes back on the next one.
+          //
+          // The alert is still the FIRST symbol placed, so it wins every
+          // contest it enters: see the moveLayer order later in this handler.
+          "icon-allow-overlap": false,
+          "icon-ignore-placement": false,
+          "text-allow-overlap": false,
+          "text-ignore-placement": false,
+          "icon-padding": 4,
+          // Lower sorts first, and first placed wins. So on a crowded map the
+          // chip that survives is the worst one, not whichever block happened
+          // to come back first from the summary endpoint.
+          "symbol-sort-key": [
+            "match",
+            ["get", "alert_severity"],
+            "critical",
+            0,
+            "watch",
+            1,
+            2,
+          ],
           // Up and to the right of the block's anchor point, so the chip
-          // does not bury the block's name label. Ems, because the offset
-          // moves the text and the fitted icon follows it.
+          // does not start on top of the block's name label. Ems, because the
+          // offset moves the text and the fitted icon follows it.
           "text-offset": [1.1, -1.1],
         },
         paint: {
@@ -638,8 +688,9 @@ export function MapCanvas({
         source: SIGNAL_SOURCE_ID,
         layout: {
           "icon-image": SIGNAL_IMAGE_ID,
-          "icon-allow-overlap": true,
-          "icon-ignore-placement": true,
+          "icon-allow-overlap": false,
+          "icon-ignore-placement": false,
+          "icon-padding": 4,
         },
       });
 
@@ -672,8 +723,17 @@ export function MapCanvas({
           // bottom anchor plants the pole on the coordinate itself. A centre
           // anchor would float the pin half its height north of the spot.
           "icon-anchor": "bottom",
-          "icon-allow-overlap": true,
-          "icon-ignore-placement": true,
+          "icon-allow-overlap": false,
+          "icon-ignore-placement": false,
+          "icon-padding": 4,
+          // Open before closed, and worse before milder. A flag still waiting
+          // on somebody is the one worth the space; a closed pin riding out
+          // the rest of its lifetime is the one that can wait for a zoom.
+          "symbol-sort-key": [
+            "+",
+            ["case", ["get", "open"], 0, 10],
+            ["match", ["get", "severity"], "critical", 0, "warning", 1, 2],
+          ],
         },
       });
       map.on("mousemove", FLAG_LAYER, () => {
@@ -805,15 +865,28 @@ export function MapCanvas({
         paint: { "line-color": BULK_COLOR_EXPR, "line-width": 1.6 },
       });
 
-      // Keep block name labels above the grid heatmap so they stay legible
-      // (and clickable as the block-open affordance) when the overlay is on.
-      // Raise the signal dots above the heatmap too so they stay visible +
-      // clickable. Order ends up grid < signals < labels — labels still win
-      // a click (the GRID handler guards on them), the signal dots win over
-      // grid cells (the GRID handler also guards on them).
+      // Lift every symbol layer above the grid heatmap, and while doing it,
+      // fix the order they contend for space in.
+      //
+      // MapLibre runs its placement pass from the TOPMOST layer down, and
+      // whatever is placed first keeps its spot. So layer order is priority
+      // order, and the order below reads bottom to top:
+      //
+      //   signals  <  labels  <  flags  <  alerts
+      //
+      // An alert always wins. A flag beats a block's name, because somebody
+      // is waiting on the flag. The name beats an observation, because a
+      // reading is the quietest thing here and a mark you cannot attach to a
+      // named block tells you less than the name does. Ranking the name below
+      // all three was the first thing I tried, and on a farm of twelve small
+      // blocks it hid ten of the twelve names.
+      //
+      // `moveLayer` with no second argument moves a layer to the top, so the
+      // LAST call here ends up topmost.
       if (map.getLayer(SIGNAL_LAYER)) map.moveLayer(SIGNAL_LAYER);
-      if (map.getLayer(FLAG_LAYER)) map.moveLayer(FLAG_LAYER);
       map.moveLayer(LABEL_LAYER);
+      if (map.getLayer(FLAG_LAYER)) map.moveLayer(FLAG_LAYER);
+      if (map.getLayer(ALERT_BADGE_LAYER)) map.moveLayer(ALERT_BADGE_LAYER);
       map.on("mousemove", GRID_FILL_LAYER, () => {
         map.getCanvas().style.cursor = "pointer";
       });

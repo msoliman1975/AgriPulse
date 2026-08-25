@@ -34,14 +34,23 @@ import type { Map as MlMap } from "maplibre-gl";
 export type MarkerSeverity = "critical" | "watch" | "ok";
 
 // The verb a decision-tree leaf chose, which the alert row carries in
-// `action_type` (tenant migration 0063). The list is the recommendations
-// CHECK constraint from migration 0015; `unknown` is ours, for the rows that
-// predate 0063 or came from a leaf that named no verb.
+// `action_type` (tenant migration 0063).
+//
+// `alerts.action_type` has NO check constraint. Migration 0015 constrains
+// `recommendations.action_type`, and taking that list as the alert list was
+// wrong: a tree leaf can name any verb, and three seeded leaves name
+// `inspect`, which is not in the recommendations enum. On production every
+// open alert that names a verb at all names `inspect`, so reading the
+// constraint instead of the data made the glyph inert on the farms that
+// have it. When adding a verb here, grep the tree seeds, not migration 0015.
+//
+// `unknown` is ours, for a leaf that named no verb.
 export const ALERT_ACTION_TYPES = [
   "irrigate",
   "fertilize",
   "spray",
   "scout",
+  "inspect",
   "harvest_window",
   "prune",
   "no_action",
@@ -121,8 +130,15 @@ const GLYPH_PATHS: Record<AlertActionType, string[]> = {
   // a can outline at this size fills in with its own stroke and reads as a
   // solid blob. Two long strokes and three dots survive the shrink.
   spray: ["M3 21 L 11 13", "M9 15 L 13 19", "M15 5 h .01", "M20 7 h .01", "M17 11 h .01"],
-  // A magnifier — going to look.
+  // A magnifier — going out to look over the block.
   scout: ["M11 18 a 7 7 0 1 1 0 -14 a 7 7 0 0 1 0 14 z", "M16.5 16.5 L 21 21"],
+  // An eye — looking closely at one thing. Kept distinct from `scout`
+  // because the two verbs send somebody to different work: scouting walks
+  // the block, inspecting examines what is already suspected.
+  inspect: [
+    "M2 12 s 4 -6 10 -6 s 10 6 10 6 s -4 6 -10 6 s -10 -6 -10 -6 z",
+    "M12 15 a 3 3 0 1 1 0 -6 a 3 3 0 0 1 0 6 z",
+  ],
   // A basket.
   harvest_window: ["M3 9 h 18 l -2 11 H 5 z", "M8 9 L 12 3 L 16 9"],
   // Open shears.
