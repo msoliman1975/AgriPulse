@@ -160,6 +160,40 @@ async def test_a_signal_with_observations_but_no_assignment_is_offered(
     factory = AsyncSessionLocal()
     async with factory() as session:
         await session.execute(text(f'SET search_path TO "{schema}", public'))
+
+        # The catalog resolves the tenant by matching `current_schema()` against
+        # `public.tenants`, the same predicate `signals.repository` uses. If that
+        # lookup returns NULL, every tenant-authored definition is filtered out
+        # and the test below fails with an empty list that says nothing about
+        # why. Assert the two facts it depends on, so a harness problem names
+        # itself instead of looking like a query bug.
+        resolved = (
+            (
+                await session.execute(
+                    text(
+                        """
+                        SELECT current_schema() AS schema_name,
+                               (SELECT x.id FROM public.tenants x
+                                 WHERE replace(x.id::text, '-', '')
+                                       = replace(current_schema(), 'tenant_', '')
+                               ) AS resolved_tenant_id
+                        """
+                    )
+                )
+            )
+            .mappings()
+            .one()
+        )
+        assert resolved["schema_name"] == schema, (
+            f"search_path did not take: current_schema() is {resolved['schema_name']!r}, "
+            f"expected {schema!r}"
+        )
+        assert resolved["resolved_tenant_id"] == tenant.tenant_id, (
+            "the tenant row is not visible to this connection, so the two-tier "
+            f"filter drops every tenant definition: lookup returned "
+            f"{resolved['resolved_tenant_id']!r}, expected {tenant.tenant_id!r}"
+        )
+
         farm_id = uuid4()
         definition_id = uuid4()
         code = f"brix_{uuid4().hex[:8]}"
