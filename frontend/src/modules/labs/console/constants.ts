@@ -35,8 +35,10 @@ export const CONSOLE_QK = {
   pixelStats: (farmId: string, index: string, at: string | null, assetCount: number) =>
     ["labs/console/pixelStats", farmId, index, at, assetCount] as const,
   signalDefs: () => ["labs/console/signalDefs"] as const,
-  signalObs: (farmId: string, defId: string | null) =>
-    ["labs/console/signalObs", farmId, defId] as const,
+  // Not keyed on the signal definition: the console fetches the farm's whole
+  // observation set once and filters client-side, so keying on the picker
+  // would split one cache entry into one per signal type.
+  signalObs: (farmId: string) => ["labs/console/signalObs", farmId] as const,
   farm: (farmId: string) => ["labs/console/farm", farmId] as const,
   block: (blockId: string) => ["labs/console/block", blockId] as const,
   inactivatePreview: (blockId: string | null) =>

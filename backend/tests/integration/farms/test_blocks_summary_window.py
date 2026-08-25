@@ -157,6 +157,39 @@ async def _insert_index(
     await session.commit()
 
 
+async def _insert_alert(
+    session: AsyncSession,
+    *,
+    schema: str,
+    block_id: UUID,
+    severity: str,
+    action_type: str | None,
+    created_at: datetime,
+) -> None:
+    await session.execute(text(f'SET LOCAL search_path TO "{schema}", public'))
+    await session.execute(
+        text(
+            "INSERT INTO alerts "
+            "(id, block_id, rule_code, severity, action_type, status, created_at, updated_at) "
+            "VALUES (:id, :b, :rule, :sev, :action, 'open', :at, :at)"
+        ).bindparams(
+            bindparam("id", type_=PG_UUID(as_uuid=True)),
+            bindparam("b", type_=PG_UUID(as_uuid=True)),
+        ),
+        {
+            "id": uuid4(),
+            "b": block_id,
+            # Unique per row: `uq_alerts_block_rule_open` is partial on the
+            # open statuses, so two alerts on one block need two rule codes.
+            "rule": f"tree:t:{severity}:{action_type}:{created_at.isoformat()}",
+            "sev": severity,
+            "action": action_type,
+            "at": created_at,
+        },
+    )
+    await session.commit()
+
+
 async def _make_farm_with_block(client: AsyncClient) -> tuple[str, str]:
     farm = await client.post(
         "/api/v1/farms",
@@ -276,3 +309,104 @@ async def test_block_with_no_readings_is_unknown(admin_session: AsyncSession) ->
     assert unit["ndvi_current"] is None
     assert unit["health"] == "unknown"
     assert unit["last_index_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_alert_action_type_names_the_worst_alerts_verb(
+    admin_session: AsyncSession,
+) -> None:
+    """The map draws ONE glyph per block, so the summary has to pick one verb.
+
+    It picks the worst alert's, because that is the one whose severity the
+    marker's colour is already showing. Picking the newest instead would
+    colour a chip critical and draw the picture of an unrelated warning.
+    """
+    tenant, context = await _bootstrap(admin_session, "bsw-verb")
+    app = _build_app(context)
+    now = datetime.now(UTC)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        farm_id, block_id = await _make_farm_with_block(c)
+        # The warning is NEWER, so a plain "latest" rule would pick it.
+        await _insert_alert(
+            admin_session,
+            schema=tenant.schema_name,
+            block_id=UUID(block_id),
+            severity="critical",
+            action_type="irrigate",
+            created_at=now - timedelta(days=3),
+        )
+        await _insert_alert(
+            admin_session,
+            schema=tenant.schema_name,
+            block_id=UUID(block_id),
+            severity="warning",
+            action_type="spray",
+            created_at=now,
+        )
+
+        resp = await c.get(f"/api/v1/farms/{farm_id}/blocks/summary")
+
+    assert resp.status_code == 200, resp.text
+    unit = next(u for u in resp.json()["units"] if u["id"] == block_id)
+    assert unit["alert_action_type"] == "irrigate"
+    assert unit["alert_severity"] == "critical"
+    assert unit["alert_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_alert_action_type_skips_a_worst_alert_that_named_no_verb(
+    admin_session: AsyncSession,
+) -> None:
+    """A null verb must not win, or the block draws the neutral glyph.
+
+    Alert rows predate `action_type` (tenant migration 0063) and a tree leaf
+    can still omit it, so the worst alert is often the one with nothing to
+    draw. Falling through to the next alert down keeps the marker informative
+    instead of showing the "not stated" glyph on a block we could describe.
+    """
+    tenant, context = await _bootstrap(admin_session, "bsw-verb-null")
+    app = _build_app(context)
+    now = datetime.now(UTC)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        farm_id, block_id = await _make_farm_with_block(c)
+        await _insert_alert(
+            admin_session,
+            schema=tenant.schema_name,
+            block_id=UUID(block_id),
+            severity="critical",
+            action_type=None,
+            created_at=now,
+        )
+        await _insert_alert(
+            admin_session,
+            schema=tenant.schema_name,
+            block_id=UUID(block_id),
+            severity="warning",
+            action_type="scout",
+            created_at=now - timedelta(days=1),
+        )
+
+        resp = await c.get(f"/api/v1/farms/{farm_id}/blocks/summary")
+
+    assert resp.status_code == 200, resp.text
+    unit = next(u for u in resp.json()["units"] if u["id"] == block_id)
+    assert unit["alert_action_type"] == "scout"
+    assert unit["alert_severity"] == "critical"
+
+
+@pytest.mark.asyncio
+async def test_block_with_no_alerts_reports_no_verb(admin_session: AsyncSession) -> None:
+    """Null, not a default verb: the marker is not drawn at all in this case."""
+    _tenant, context = await _bootstrap(admin_session, "bsw-verb-none")
+    app = _build_app(context)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        farm_id, block_id = await _make_farm_with_block(c)
+        resp = await c.get(f"/api/v1/farms/{farm_id}/blocks/summary")
+
+    assert resp.status_code == 200, resp.text
+    unit = next(u for u in resp.json()["units"] if u["id"] == block_id)
+    assert unit["alert_action_type"] is None
+    assert unit["alert_count"] == 0

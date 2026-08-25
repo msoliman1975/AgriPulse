@@ -105,7 +105,15 @@ class TestGridSignal:
         # b1 has a recent reading, so no unbounded fallback sweep: four sets,
         # not five. A fifth call here would exhaust side_effect and fail.
         session = _session(
-            [{"block_id": b1, "alert_count": 2, "has_critical": True, "has_warning": False}],
+            [
+                {
+                    "block_id": b1,
+                    "alert_count": 2,
+                    "has_critical": True,
+                    "has_warning": False,
+                    "alert_action_type": "irrigate",
+                }
+            ],
             [{"block_id": b1, "product_id": product}],  # grid configs
             [b1],  # roster
             [{"block_id": b1, "index_code": "ndvi", "mean": 0.3, "time": now}],  # recent
@@ -118,4 +126,5 @@ class TestGridSignal:
         # The pre-existing composition still holds around the new field.
         assert unit.health == "critical"
         assert unit.alert_count == 2
+        assert unit.alert_action_type == "irrigate"
         assert unit.ndvi_current == pytest.approx(0.3)

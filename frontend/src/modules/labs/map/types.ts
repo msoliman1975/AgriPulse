@@ -17,6 +17,8 @@ export interface UnitSummary {
   has_alert: boolean;
   alert_severity: MapSeverity | null;
   alert_count: number;
+  /** Verb of the worst open alert. Picks the marker glyph — see markerIcons. */
+  alert_action_type: string | null;
   ndvi_current: number | null;
   ndre_current: number | null;
   ndwi_current: number | null;
@@ -136,6 +138,13 @@ export interface UnitFeatureProps {
   health: Health;
   has_alert: boolean;
   alert_severity: MapSeverity | "none";
+  // How many open alerts the block carries, and the verb of the worst one.
+  // Both are read by the alert marker: the count is fitted into the chip and
+  // the verb picks its glyph. The summary endpoint has published the count
+  // since it shipped, but the old circle badge had nowhere to draw it, so a
+  // block with one alert and a block with eleven looked the same.
+  alert_count: number;
+  alert_action_type: string | null;
   // True when active_from is in the future — block exists but not yet
   // operational. Rendered ghosted on the map.
   is_future: boolean;

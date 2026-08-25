@@ -14,6 +14,8 @@ function props(over: Partial<UnitFeatureProps> = {}): UnitFeatureProps {
     health: "healthy",
     has_alert: false,
     alert_severity: "none",
+    alert_count: 0,
+    alert_action_type: null,
     is_future: false,
     risk_level: "none",
     ...over,
@@ -90,9 +92,7 @@ describe("buildAlertBadgePoints", () => {
   });
 
   it("is empty when the farm is healthy", () => {
-    const out = buildAlertBadgePoints(
-      fc([{ id: "b1", geometry: SQUARE, properties: props() }]),
-    );
+    const out = buildAlertBadgePoints(fc([{ id: "b1", geometry: SQUARE, properties: props() }]));
 
     expect(out.features).toEqual([]);
   });
@@ -109,6 +109,67 @@ describe("buildAlertBadgePoints", () => {
     );
 
     expect(out.features[0].properties.alert_severity).toBe("critical");
+  });
+
+  it("resolves the marker image from the verb and the severity", () => {
+    const out = buildAlertBadgePoints(
+      fc([
+        {
+          id: "b1",
+          geometry: SQUARE,
+          properties: props({
+            has_alert: true,
+            alert_count: 3,
+            alert_severity: "critical",
+            alert_action_type: "irrigate",
+          }),
+        },
+      ]),
+    );
+
+    expect(out.features[0].properties.marker_icon).toBe("ap-alert-irrigate-critical");
+    expect(out.features[0].properties.marker_count).toBe("3");
+  });
+
+  it("falls back to the neutral glyph for a verb we have no artwork for", () => {
+    // MapLibre draws NOTHING for an unresolvable icon-image and reports no
+    // error, so a verb the backend grows later must not reach the layer as
+    // an id nobody registered — the alert would vanish off the map.
+    const out = buildAlertBadgePoints(
+      fc([
+        {
+          id: "b1",
+          geometry: SQUARE,
+          properties: props({
+            has_alert: true,
+            alert_severity: "watch",
+            alert_action_type: "mulch",
+          }),
+        },
+        {
+          id: "b2",
+          geometry: SQUARE,
+          properties: props({ id: "b2", has_alert: true, alert_action_type: null }),
+        },
+      ]),
+    );
+
+    expect(out.features[0].properties.marker_icon).toBe("ap-alert-unknown-watch");
+    expect(out.features[1].properties.marker_icon).toBe("ap-alert-unknown-ok");
+  });
+
+  it("caps the count so one bad block cannot draw a chip wider than the farm", () => {
+    const out = buildAlertBadgePoints(
+      fc([
+        {
+          id: "b1",
+          geometry: SQUARE,
+          properties: props({ has_alert: true, alert_count: 240 }),
+        },
+      ]),
+    );
+
+    expect(out.features[0].properties.marker_count).toBe("99+");
   });
 
   it("anchors inside a concave block rather than in its notch", () => {

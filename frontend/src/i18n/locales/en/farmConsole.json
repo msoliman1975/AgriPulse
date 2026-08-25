@@ -66,9 +66,34 @@
     "grid": "Sub-block grid",
     "gridUsesIndex": "Colours cells by the selected index ({{code}}).",
     "signals": "Signals",
-    "signalsNone": "— none —",
+    "signalsAll": "All signals",
     "flags": "Field flags",
     "flagsOpenOnly": "Open flags only"
+  },
+  "markerLegend": {
+    "title": "What the marks mean",
+    "alerts": "Alert",
+    "alertsHint": "Colour is severity. The picture is what to do. The number is how many are open on that block.",
+    "flags": "Field flag",
+    "flagsHint": "Raised by someone in the field, in the severity they chose. Filled while open, hollow once closed.",
+    "signals": "Signal reading",
+    "signalsHint": "An observation somebody recorded. A reading, not a problem.",
+    "severity": {
+      "critical": "Critical",
+      "watch": "Watch",
+      "ok": "Low"
+    },
+    "action": {
+      "irrigate": "Water",
+      "fertilize": "Feed",
+      "spray": "Spray",
+      "scout": "Go and look",
+      "harvest_window": "Harvest",
+      "prune": "Prune",
+      "no_action": "Nothing to do",
+      "other": "Other",
+      "unknown": "Not stated"
+    }
   },
   "add": {
     "block": "Draw block",
