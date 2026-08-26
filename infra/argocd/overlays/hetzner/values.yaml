@@ -3235,7 +3235,30 @@ global:
       #   imagery" rather than as a bug.
       #   Carries 76ec8de forward - that tag is an ancestor, checked with
       #   `git merge-base --is-ancestor` before this edit. No migration.
-      tag: "a3680d2"
+      # 2026-08-26 - c84b3e3 = #599, the other half of a3680d2's farm-raster
+      #   bug. a3680d2 fixed the surface failing to DRAW; this fixes it failing
+      #   to be CHOSEN. `farmRasterForPass` judged the surface by comparing its
+      #   acquisition day against the first BLOCK asset's day. A farm on
+      #   farm-level fetching writes no block ingestion jobs, so its block rows
+      #   freeze on the cut-over day while the surfaces carry on daily - the
+      #   two stopped being the same clock. On prod, agrosina's Bashier Elkhier
+      #   has s2_l2a surfaces for 08-25, 08-20 and 08-17 with every aoi_hash
+      #   matching, and a newest block job from 08-10: fifteen days apart, so
+      #   every pass was rejected and the console drew 36 block rasters and
+      #   made 36 TiTiler statistics calls where one of each would do, under a
+      #   date bar naming another day. Mango Republic looked right only because
+      #   it never had block ingestion, so there were no block rows to lose to.
+      #   The surface is now judged against the date the reader asked for.
+      #   The index replay timeline carried the same rule and is fixed with it.
+      #   FRONTEND ONLY. No backend file changed, so api and workers stay
+      #   a3680d2, tile-server stays 676746a and keycloak stays 677c7dc.
+      #   NO MIGRATION.
+      #   Image CONFIRMED by pulling it on the node before the bump:
+      #   frontend @ c84b3e3 -> sha256:358249cc.
+      #   a3680d2 is an ancestor of c84b3e3, checked with
+      #   `git merge-base --is-ancestor` before this edit.
+      #   Rollback is the frontend tag back to a3680d2.
+      tag: "c84b3e3"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
