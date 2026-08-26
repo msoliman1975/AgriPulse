@@ -14,12 +14,21 @@ export function AppShell(): ReactNode {
   // internal scrolling. That's a shell-level concern — an inner element can't
   // opt its ancestors into `h-screen` — so it stays keyed off the pathname.
   //
+  // The Farm Timeline is the third such surface and it was missed. Without a
+  // ceiling the shell is only `min-h-screen`, so a `<Page width="bleed">`
+  // whose `h-full` resolves against an auto-height parent has unbounded room:
+  // MapLibre sizes its canvas to the container, the container grows, the
+  // ResizeObserver calls `map.resize()`, and it runs away. Measured on prod
+  // at 1600x950 the map reached 15983px tall against a 950px viewport, which
+  // put the farm several screens below the fold and left the visible strip
+  // showing empty desert. Adding the prefix here is the whole fix.
+  //
   // Page *padding* is no longer decided here. <main> used to apply
   // `px-4 py-6`, which meant every page that added its own `p-6` double-padded
   // and every /settings/* page triple-padded. <Page> owns the inset now, so a
   // page's declared width is also its declared padding.
   const { pathname } = useLocation();
-  const viewportPinned = pathname.startsWith("/labs/map");
+  const viewportPinned = pathname.startsWith("/labs/map") || pathname.startsWith("/timeline");
   return (
     <div
       className={

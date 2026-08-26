@@ -39,6 +39,27 @@ def _text(value: Any) -> str | None:
     return s or None
 
 
+def _trim_number(value: str) -> str:
+    """Drop the trailing zeros a NUMERIC(14,4) brings with it.
+
+    `value_numeric::text` renders 6.4 as "6.4000", because the column keeps
+    four decimal places whether or not the reading has them. Every test
+    asserted on the structure of the payload and passed; the line was still
+    wrong to read on the page. Only trailing zeros AFTER a decimal point are
+    touched, so an integer reading stays "28" and a scale reading like
+    "0.1200" becomes "0.12" without ever turning 120 into 12.
+    """
+    if "." not in value:
+        return value
+    try:
+        float(value)
+    except ValueError:
+        # Not a number at all — a categorical value that happens to contain
+        # a dot. Return it untouched rather than trimming somebody's text.
+        return value
+    return value.rstrip("0").rstrip(".")
+
+
 def _signal_title(row: dict[str, Any]) -> str:
     """A definition name, its value, and its unit — every part optional.
 
@@ -51,6 +72,7 @@ def _signal_title(row: dict[str, Any]) -> str:
     value = _text(row.get("value_text"))
     if value is None:
         return name
+    value = _trim_number(value)
     unit = _text(row.get("unit"))
     return f"{name}: {value} {unit}".rstrip() if unit else f"{name}: {value}"
 
