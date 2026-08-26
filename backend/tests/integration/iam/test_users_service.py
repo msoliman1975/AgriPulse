@@ -4,15 +4,15 @@ Covers the full lifecycle of tenant user management:
 
   * Invite — fresh user, KC succeeds → DB rows + KC user + provisioning="succeeded"
   * Invite — KC down → DB rows still land, kc_subject="pending::<email>", provisioning="pending"
-  * Invite — existing global user (member of another tenant) attaches to new
-    tenant via add_existing_user_to_group; provisioning="succeeded"
+  * Invite — an email live in another tenant is refused; nothing is written
+  * Invite — an offboarded person is revived and re-provisioned in the new tenant
   * Invite — existing global user whose KC subject is itself pending → stays pending
   * Invite — duplicate in same tenant raises TenantUserAlreadyExistsError
   * List — surfaces all active memberships + roles + preferences
   * Update — patches user row and upserts user_preferences (lazy-create)
   * Suspend / Reactivate — flips membership.status + KC enable/disable
-  * Delete (single-tenant) — soft-deletes membership + global user + KC user
-  * Delete (multi-tenant) — soft-deletes membership only; global user + KC stay
+  * Delete — soft-deletes membership + global user + KC user, and empties the
+    farm_scopes claim so a live token stops granting the farms just revoked
   * Cross-tenant safety — admin cannot mutate user in a different tenant
 
 Each test creates its own tenant(s) via the tenancy service so DB state
@@ -29,6 +29,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.iam.users_service import (
+    AlreadyInAnotherTenantError,
     FarmsNotInTenantError,
     LastTenantOwnerError,
     TenantUserAlreadyExistsError,
@@ -507,71 +508,21 @@ async def test_invite_falls_back_to_pending_when_keycloak_fails(
 
 
 @pytest.mark.asyncio
-async def test_invite_existing_global_user_attaches_to_new_tenant(
-    admin_session: AsyncSession,
-) -> None:
-    """The bug this test pins: re-inviting the same email to a second tenant
-    used to leave the user pending::<email> with a TODO for the operator.
-    Now it calls add_existing_user_to_group so the user can sign in to
-    both tenants without manual kcadm.sh."""
-    fake = FakeKeycloakClient()
-    tenant_a, schema_a = await _make_tenant(admin_session, fake, prefix="cross-a")
-    tenant_b, schema_b = await _make_tenant(admin_session, fake, prefix="cross-b")
-    svc = _users_service(admin_session, fake)
-
-    # Tenant A invite — fresh user, succeeds.
-    a_result = await svc.invite_user(
-        email="cross@cross.test",
-        full_name="Cross Tenant",
-        phone=None,
-        tenant_role="TenantOwner",
-        tenant_schema=schema_a,
-        actor_user_id=None,
-    )
-    assert a_result["keycloak_provisioning"] == "succeeded"
-    kc_subject = a_result["keycloak_subject"]
-    assert kc_subject is not None
-
-    # Tenant B invite — same email. Should reuse global user + attach to B's group.
-    b_result = await svc.invite_user(
-        email="cross@cross.test",
-        full_name="Cross Tenant",
-        phone=None,
-        tenant_role="TenantAdmin",
-        tenant_schema=schema_b,
-        actor_user_id=None,
-    )
-    assert b_result["keycloak_provisioning"] == "succeeded"
-    # Same global keycloak subject — not a new user.
-    assert b_result["keycloak_subject"] == kc_subject
-
-    # KC state: one user, member of two groups, both roles.
-    assert len(fake.users) == 1
-    user = fake.users[kc_subject]
-    assert {"TenantOwner", "TenantAdmin"} <= set(user.realm_roles)
-    member_groups = [g for g in fake.groups.values() if kc_subject in g.member_ids]
-    assert len(member_groups) == 2
-
-    # DB: same user_id appears in both tenants' membership lists.
-    a_rows = await svc.list_users(tenant_id=tenant_a)
-    b_rows = await svc.list_users(tenant_id=tenant_b)
-    assert len(a_rows) == 1
-    assert len(b_rows) == 1
-    assert a_rows[0]["id"] == b_rows[0]["id"]
-    assert a_rows[0]["tenant_roles"] == ["TenantOwner"]
-    assert b_rows[0]["tenant_roles"] == ["TenantAdmin"]
-
-
-@pytest.mark.asyncio
 async def test_invite_existing_pending_user_stays_pending(
     admin_session: AsyncSession,
 ) -> None:
-    """If the original invite couldn't reach KC (subject = pending::<email>),
-    re-inviting to a second tenant has nothing to attach to. Stays pending —
-    operator runbook fixes both at once."""
+    """A first invite that never reached Keycloak leaves `pending::<email>`.
+
+    Re-inviting that person elsewhere has nothing to attach to, so it stays
+    pending and the operator runbook fixes both rows at once.
+
+    The move goes through an offboarding, because a person belongs to one
+    tenant: the membership in A is archived before B invites them. That is
+    the only route between tenants, so it is the one this pins.
+    """
     fake = FakeKeycloakClient()
-    _, schema_a = await _make_tenant(admin_session, fake, prefix="pa")
-    _, schema_b = await _make_tenant(admin_session, fake, prefix="pb")
+    tenant_a, schema_a = await _make_tenant(admin_session, fake, prefix="pa")
+    tenant_b, schema_b = await _make_tenant(admin_session, fake, prefix="pb")
     svc = _users_service(admin_session, fake)
 
     fake.fail_on = "ensure_group"
@@ -585,8 +536,17 @@ async def test_invite_existing_pending_user_stays_pending(
     )
     assert a_result["keycloak_provisioning"] == "pending"
 
-    # Tenant B invite — same email, KC is back online but the existing
-    # global user has a pending:: subject. Still pending.
+    await svc.delete_user(
+        user_id=a_result["user_id"],
+        tenant_id=tenant_a,
+        actor_user_id=None,
+        tenant_schema=schema_a,
+    )
+
+    # `fail_on` is one-shot, so it has to be re-armed: the point of this test
+    # is a second invite with Keycloak *still* down, not a second invite that
+    # happens to find it back up.
+    fake.fail_on = "ensure_group"
     b_result = await svc.invite_user(
         email="ghost@pend.test",
         full_name="Ghost",
@@ -596,7 +556,11 @@ async def test_invite_existing_pending_user_stays_pending(
         actor_user_id=None,
     )
     assert b_result["keycloak_provisioning"] == "pending"
-    assert b_result["keycloak_subject"] == "pending::ghost@pend.test"
+    # The response reports None for a provision that did not happen; the row
+    # is what carries the `pending::` marker the operator runbook looks for.
+    assert b_result["keycloak_subject"] is None
+    b_rows = await svc.list_users(tenant_id=tenant_b)
+    assert b_rows[0]["keycloak_subject"] == "pending::ghost@pend.test"
 
 
 @pytest.mark.asyncio
@@ -867,129 +831,6 @@ async def test_delete_last_tenant_keeps_user_when_platform_admin(
     assert kc_subject in fake.users
 
 
-@pytest.mark.asyncio
-async def test_delete_user_in_multi_tenant_keeps_global_and_kc(
-    admin_session: AsyncSession,
-) -> None:
-    fake = FakeKeycloakClient()
-    tenant_a, schema_a = await _make_tenant(admin_session, fake, prefix="delm-a")
-    tenant_b, schema_b = await _make_tenant(admin_session, fake, prefix="delm-b")
-    svc = _users_service(admin_session, fake)
-
-    a_result = await svc.invite_user(
-        email="delm@delm.test",
-        full_name="Delm",
-        phone=None,
-        tenant_role="TenantOwner",
-        tenant_schema=schema_a,
-        actor_user_id=None,
-    )
-    kc_subject = a_result["keycloak_subject"]
-    await svc.invite_user(
-        email="delm@delm.test",
-        full_name="Delm",
-        phone=None,
-        tenant_role="TenantAdmin",
-        tenant_schema=schema_b,
-        actor_user_id=None,
-    )
-
-    # Delete from tenant A only.
-    await svc.delete_user(
-        user_id=a_result["user_id"],
-        tenant_id=tenant_a,
-        actor_user_id=None,
-        tenant_schema=schema_a,
-    )
-
-    # A: gone. B: still there.
-    assert await svc.list_users(tenant_id=tenant_a) == []
-    b_rows = await svc.list_users(tenant_id=tenant_b)
-    assert len(b_rows) == 1
-    assert b_rows[0]["id"] == a_result["user_id"]
-
-    # Global user row still active.
-    user_status = (
-        await admin_session.execute(
-            text("SELECT status, deleted_at FROM public.users WHERE id = :uid").bindparams(
-                bindparam("uid", type_=PG_UUID(as_uuid=True))
-            ),
-            {"uid": a_result["user_id"]},
-        )
-    ).first()
-    assert user_status.status == "active"
-    assert user_status.deleted_at is None
-
-    # KC user still present (other tenant still relies on them).
-    assert kc_subject in fake.users
-
-    # W1-D: and their sessions were ended. Authorization is read from the
-    # token — `_build_context` takes tenant_id and farm_scopes off the claims
-    # and never queries Postgres — so revoking the rows above changes nothing
-    # until Keycloak is told. Without the logout the departed member keeps
-    # refreshing, and a field session carries `offline_access` for months.
-    assert kc_subject in fake.logged_out
-
-
-@pytest.mark.asyncio
-async def test_delete_reprojects_surviving_farm_scopes_into_keycloak(
-    admin_session: AsyncSession,
-) -> None:
-    """Removing someone from tenant A must strip A's farms from their claims
-    while leaving tenant B's intact — the claim is a property of the person,
-    so it cannot be rebuilt from one tenant's rows alone."""
-    fake = FakeKeycloakClient()
-    tenant_a, schema_a = await _make_tenant(admin_session, fake, prefix="proj-a")
-    tenant_b, schema_b = await _make_tenant(admin_session, fake, prefix="proj-b")
-    svc = _users_service(admin_session, fake)
-
-    a_result = await svc.invite_user(
-        email="proj@proj.test",
-        full_name="Projected",
-        phone=None,
-        tenant_role="TenantOwner",
-        tenant_schema=schema_a,
-        actor_user_id=None,
-    )
-    b_result = await svc.invite_user(
-        email="proj@proj.test",
-        full_name="Projected",
-        phone=None,
-        tenant_role="TenantAdmin",
-        tenant_schema=schema_b,
-        actor_user_id=None,
-    )
-    kc_subject = a_result["keycloak_subject"]
-
-    farm_a, farm_b = uuid4(), uuid4()
-    for membership_id, farm_id in (
-        (a_result["membership_id"], farm_a),
-        (b_result["membership_id"], farm_b),
-    ):
-        await admin_session.execute(
-            text(
-                "INSERT INTO public.farm_scopes (membership_id, farm_id, role) "
-                "VALUES (:m, :f, 'FarmManager')"
-            ).bindparams(
-                bindparam("m", type_=PG_UUID(as_uuid=True)),
-                bindparam("f", type_=PG_UUID(as_uuid=True)),
-            ),
-            {"m": membership_id, "f": farm_id},
-        )
-    await admin_session.commit()
-
-    await svc.delete_user(
-        user_id=a_result["user_id"],
-        tenant_id=tenant_a,
-        actor_user_id=None,
-        tenant_schema=schema_a,
-    )
-
-    projected = {s["farm_id"] for s in fake.users[kc_subject].farm_scopes}
-    assert str(farm_a) not in projected, "the farm they were removed from must leave the token"
-    assert str(farm_b) in projected, "the other tenant's farm must survive"
-
-
 # =====================================================================
 # Cross-tenant safety
 # =====================================================================
@@ -1043,3 +884,208 @@ async def test_admin_in_one_tenant_cannot_modify_user_in_another(
     a_rows = await svc.list_users(tenant_id=tenant_a)
     assert a_rows[0]["full_name"] == "Iso"
     assert a_rows[0]["membership_status"] == "active"
+
+
+# =====================================================================
+# One person, one tenant
+# =====================================================================
+
+
+@pytest.mark.asyncio
+async def test_invite_refuses_an_email_live_in_another_tenant(
+    admin_session: AsyncSession,
+) -> None:
+    """A person belongs to one tenant, and nothing is written when refused.
+
+    This replaces a test that asserted the opposite. Attaching the same person
+    to a second tenant looked like a feature and could not work: `tenant_id`
+    is a single-valued Keycloak attribute so the token names one tenant, while
+    `farm_scopes` is multi-valued and spans both. The person got a token that
+    named farms it could not reach, and every request against them resolved
+    the wrong schema and found nothing.
+
+    The refusal comes before Keycloak is touched. Provisioning first would
+    write `tenant_id` on the attach path and point them at the tenant that
+    just refused them.
+    """
+    fake = FakeKeycloakClient()
+    tenant_a, schema_a = await _make_tenant(admin_session, fake, prefix="one-a")
+    tenant_b, schema_b = await _make_tenant(admin_session, fake, prefix="one-b")
+    svc = _users_service(admin_session, fake)
+
+    a_result = await svc.invite_user(
+        email="one@one.test",
+        full_name="One Tenant",
+        phone=None,
+        tenant_role="TenantOwner",
+        tenant_schema=schema_a,
+        actor_user_id=None,
+    )
+    kc_subject = a_result["keycloak_subject"]
+    groups_before = [g for g in fake.groups.values() if kc_subject in g.member_ids]
+
+    with pytest.raises(AlreadyInAnotherTenantError) as caught:
+        await svc.invite_user(
+            email="one@one.test",
+            full_name="One Tenant",
+            phone=None,
+            tenant_role="TenantAdmin",
+            tenant_schema=schema_b,
+            actor_user_id=None,
+        )
+    assert caught.value.email == "one@one.test"
+
+    # Tenant B gained nobody, tenant A is untouched.
+    assert await svc.list_users(tenant_id=tenant_b) == []
+    assert len(await svc.list_users(tenant_id=tenant_a)) == 1
+
+    # And Keycloak was not touched: no second group, no second realm role.
+    groups_after = [g for g in fake.groups.values() if kc_subject in g.member_ids]
+    assert len(groups_after) == len(groups_before) == 1
+    assert "TenantAdmin" not in set(fake.users[kc_subject].realm_roles)
+
+
+@pytest.mark.asyncio
+async def test_invite_revives_a_person_offboarded_from_their_last_tenant(
+    admin_session: AsyncSession,
+) -> None:
+    """Offboard, then invite elsewhere — the only way to move between tenants.
+
+    Because that is now the only route, it has to work end to end, and it did
+    not. `delete_user` soft-deletes `public.users` and deletes the Keycloak
+    account once no membership survives; the invite path then reused the
+    archived row as it stood. The person got a membership, a `deleted_at`
+    that makes `get_me` raise, and a `keycloak_subject` pointing at an
+    account that no longer exists — a member who cannot sign in, with nothing
+    reporting it.
+
+    The local id survives on purpose. Audit rows and every logical reference
+    to `public.users.id` point at it, so a new row would orphan them.
+    """
+    fake = FakeKeycloakClient()
+    tenant_a, schema_a = await _make_tenant(admin_session, fake, prefix="rev-a")
+    tenant_b, schema_b = await _make_tenant(admin_session, fake, prefix="rev-b")
+    svc = _users_service(admin_session, fake)
+
+    a_result = await svc.invite_user(
+        email="rev@rev.test",
+        full_name="Revived Rania",
+        phone="+201000000001",
+        tenant_role="TenantOwner",
+        tenant_schema=schema_a,
+        actor_user_id=None,
+    )
+    old_subject = a_result["keycloak_subject"]
+    user_id = a_result["user_id"]
+
+    await svc.delete_user(
+        user_id=user_id,
+        tenant_id=tenant_a,
+        actor_user_id=None,
+        tenant_schema=schema_a,
+    )
+    archived = (
+        await admin_session.execute(
+            text("SELECT status, deleted_at FROM public.users WHERE id = :uid").bindparams(
+                bindparam("uid", type_=PG_UUID(as_uuid=True))
+            ),
+            {"uid": user_id},
+        )
+    ).first()
+    assert archived.deleted_at is not None, "precondition: offboarding archives the person"
+
+    b_result = await svc.invite_user(
+        email="rev@rev.test",
+        full_name="Revived Rania",
+        phone=None,
+        tenant_role="TenantAdmin",
+        tenant_schema=schema_b,
+        actor_user_id=None,
+    )
+
+    assert b_result["user_id"] == user_id, "the same person, not a second row"
+    assert b_result["keycloak_provisioning"] == "succeeded"
+    assert b_result["keycloak_subject"] != old_subject, "the old account was deleted"
+
+    row = (
+        await admin_session.execute(
+            text(
+                "SELECT status, deleted_at, phone, keycloak_subject "
+                "FROM public.users WHERE id = :uid"
+            ).bindparams(bindparam("uid", type_=PG_UUID(as_uuid=True))),
+            {"uid": user_id},
+        )
+    ).first()
+    assert row.deleted_at is None
+    assert row.status == "active"
+    assert row.keycloak_subject == b_result["keycloak_subject"]
+    # `phone=None` on the invite means "not stated", not "clear it".
+    assert row.phone == "+201000000001"
+
+    assert len(await svc.list_users(tenant_id=tenant_b)) == 1
+    assert await svc.list_users(tenant_id=tenant_a) == []
+
+
+@pytest.mark.asyncio
+async def test_delete_empties_the_farm_scopes_claim(
+    admin_session: AsyncSession,
+) -> None:
+    """Offboarding has to reach Keycloak, or the token keeps granting.
+
+    Authorization is read from the token: `_build_context` takes `tenant_id`
+    and `farm_scopes` off the claims and never queries Postgres. Revoking the
+    rows changes nothing on its own, and a field session carries
+    `offline_access` for months.
+
+    The person holds a platform role, which is what keeps their account alive
+    through the offboarding — otherwise `delete_user` deletes the Keycloak
+    user outright and there is no claim left to inspect. That is also the only
+    shape where this can go wrong, now that a person belongs to one tenant:
+    an account that survives its last membership.
+    """
+    fake = FakeKeycloakClient()
+    tenant_a, schema_a = await _make_tenant(admin_session, fake, prefix="proj")
+    svc = _users_service(admin_session, fake)
+
+    result = await svc.invite_user(
+        email="proj@proj.test",
+        full_name="Projected",
+        phone=None,
+        tenant_role="TenantOwner",
+        tenant_schema=schema_a,
+        actor_user_id=None,
+    )
+    kc_subject = result["keycloak_subject"]
+    await admin_session.execute(
+        text(
+            "INSERT INTO public.platform_role_assignments (user_id, role) "
+            "VALUES (:uid, 'PlatformSupport')"
+        ).bindparams(bindparam("uid", type_=PG_UUID(as_uuid=True))),
+        {"uid": result["user_id"]},
+    )
+
+    farm_one, farm_two = uuid4(), uuid4()
+    for farm_id in (farm_one, farm_two):
+        await admin_session.execute(
+            text(
+                "INSERT INTO public.farm_scopes (membership_id, farm_id, role) "
+                "VALUES (:m, :f, 'FarmManager')"
+            ).bindparams(
+                bindparam("m", type_=PG_UUID(as_uuid=True)),
+                bindparam("f", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"m": result["membership_id"], "f": farm_id},
+        )
+    await admin_session.commit()
+
+    await svc.delete_user(
+        user_id=result["user_id"],
+        tenant_id=tenant_a,
+        actor_user_id=None,
+        tenant_schema=schema_a,
+    )
+
+    assert kc_subject in fake.users, "the platform role keeps the account alive"
+    projected = {s["farm_id"] for s in fake.users[kc_subject].farm_scopes}
+    assert projected == set(), "every revoked farm must leave the token"
+    assert kc_subject in fake.logged_out

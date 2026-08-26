@@ -90,6 +90,34 @@ class PhoneAlreadyEnrolledError(APIError):
         )
 
 
+class PhoneBelongsToAnotherTenantError(APIError):
+    """This number already works somewhere else, and cannot work in two places.
+
+    Separate from ``PhoneAlreadyEnrolledError`` because the fix is different
+    and neither message fits the other case. "Re-issue their PIN" is the right
+    advice for a number already enrolled *here*; it is wrong here, where the
+    account exists but belongs to another tenant and reissuing would hand out
+    a PIN for somebody else's worker.
+
+    The other tenant is deliberately not named. A farm manager enrolling a
+    crew must not be able to discover which of AgriPulse's customers employs a
+    given phone number by typing it into this form.
+    """
+
+    def __init__(self, phone: str) -> None:
+        super().__init__(
+            status_code=409,
+            title="Phone already in use",
+            detail=(
+                f"{phone} already has an AgriPulse account with another "
+                "organisation. One person works for one organisation, so this "
+                "number cannot be enrolled here. Use a different number, or "
+                "ask support to release the account."
+            ),
+            type_="https://agripulse.cloud/problems/phone-in-another-tenant",
+        )
+
+
 class InvalidEnrolmentError(APIError):
     def __init__(self, detail: str) -> None:
         super().__init__(
@@ -144,11 +172,24 @@ class FieldEnrolmentService:
         ).first()
 
         if existing is not None:
-            already = (
+            # One query for both cases, because they differ only in which
+            # tenant the live membership sits in and the caller needs to be
+            # told apart which one it is. Checking only this tenant — what
+            # this did before — let the same phone be enrolled again under
+            # another customer, producing the second membership the whole
+            # one-tenant rule forbids.
+            #
+            # Archived memberships do not count: a scout who left one farm
+            # business can be taken on by another, and that is the case this
+            # `deleted_at IS NULL` keeps open.
+            membership = (
                 await self._public.execute(
                     text(
-                        "SELECT 1 FROM public.tenant_memberships "
-                        "WHERE user_id = :uid AND tenant_id = :tid AND status = 'active'"
+                        "SELECT tenant_id FROM public.tenant_memberships "
+                        "WHERE user_id = :uid AND status = 'active' "
+                        "  AND deleted_at IS NULL "
+                        "ORDER BY (tenant_id = :tid) DESC "
+                        "LIMIT 1"
                     ).bindparams(
                         bindparam("uid", type_=PG_UUID(as_uuid=True)),
                         bindparam("tid", type_=PG_UUID(as_uuid=True)),
@@ -156,8 +197,10 @@ class FieldEnrolmentService:
                     {"uid": existing.id, "tid": tenant_id},
                 )
             ).first()
-            if already is not None:
-                raise PhoneAlreadyEnrolledError(phone_e164)
+            if membership is not None:
+                if membership.tenant_id == tenant_id:
+                    raise PhoneAlreadyEnrolledError(phone_e164)
+                raise PhoneBelongsToAnotherTenantError(phone_e164)
 
         pin = generate_pin()
         # Keycloak first: if it fails there is nothing local to unwind, whereas
@@ -776,5 +819,6 @@ __all__ = [
     "FieldEnrolmentService",
     "InvalidEnrolmentError",
     "PhoneAlreadyEnrolledError",
+    "PhoneBelongsToAnotherTenantError",
     "get_field_enrolment_service",
 ]

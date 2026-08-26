@@ -33,6 +33,7 @@ from app.core.errors import install_exception_handlers
 from app.modules.iam import field_enrolment
 from app.modules.iam.router import router as iam_router
 from app.modules.tenancy.service import get_tenant_service
+from app.shared.auth.context import TenantRole
 from app.shared.keycloak import FakeKeycloakClient
 from app.shared.keycloak.field_identity import SYNTHETIC_EMAIL_DOMAIN
 from tests.integration.farms.conftest import (
@@ -41,7 +42,7 @@ from tests.integration.farms.conftest import (
     StubAuth,
     make_context,
 )
-from tests.integration.farms.test_farms_crud import _square
+from tests.integration.farms.test_farms_crud import _create_user_in_tenant, _square
 from tests.integration.scouting.conftest import ScoutingFixture, build_app
 
 pytestmark = [pytest.mark.integration]
@@ -414,8 +415,14 @@ async def test_audit_carries_what_the_next_action_needs(
 def _unique_phone() -> str:
     """`public.users` is global, not per-tenant, and the synthetic email is
     derived from the number. A fixed literal therefore collides with the row a
-    previous run left behind, and enrolment silently adopts that row — keeping
-    its stale Keycloak subject, which then 404s on PIN reissue."""
+    previous run left behind, and enrolment used to silently adopt that row —
+    keeping its stale Keycloak subject, which then 404s on PIN reissue.
+
+    Since one person belongs to one tenant, that collision is a 409 instead:
+    every test in this module builds its own tenant, so any two of them
+    sharing a literal now means the second is enrolling a number that already
+    works somewhere else. Use this in any test that does not assert on the
+    number itself."""
     return "010" + f"{uuid4().int % 10**8:08d}"
 
 
@@ -743,7 +750,7 @@ async def test_enrolment_sets_the_persons_language(
     this back from GET /me and opens in it.
     """
     env = scouting_env
-    default = await _enrol(env)
+    default = await _enrol(env, phone=_unique_phone())
     assert default.status_code == 201, default.text
     lang = (
         await admin_session.execute(
@@ -753,7 +760,7 @@ async def test_enrolment_sets_the_persons_language(
     ).scalar_one()
     assert lang == "ar"
 
-    chosen = await _enrol(env, phone="01009998877", full_name="Hala Mansour", language="en")
+    chosen = await _enrol(env, phone=_unique_phone(), full_name="Hala Mansour", language="en")
     assert chosen.status_code == 201, chosen.text
     lang2 = (
         await admin_session.execute(
@@ -772,7 +779,7 @@ async def test_an_untranslated_language_is_refused(scouting_env: ScoutingFixture
     language setting silently does nothing — the app falls back to English and
     the supervisor has no way to tell that from a bug.
     """
-    resp = await _enrol(scouting_env, phone="01007776655", full_name="Karim Fahmy", language="fr")
+    resp = await _enrol(scouting_env, phone=_unique_phone(), full_name="Karim Fahmy", language="fr")
     assert resp.status_code == 422, resp.text
 
 
@@ -815,72 +822,76 @@ async def test_a_deleted_scout_returns_to_ready_to_enrol(
 
 
 @pytest.mark.asyncio
-async def test_second_tenant_grant_keeps_the_first_tenant_scope(
+async def test_a_phone_already_working_in_another_tenant_is_refused(
     scouting_env: ScoutingFixture,
     admin_session: AsyncSession,
-    fake_keycloak: FakeKeycloakClient,
 ) -> None:
-    """Granting a farm in tenant B must not strip the scope held in tenant A.
+    """One person belongs to one tenant, and the phone is the person.
 
-    The `farm_scopes` Keycloak attribute is per **user** and `set_farm_scopes`
-    replaces it whole, so rebuilding it from a single membership's rows deletes
-    every scope the person holds elsewhere. That is silent: Postgres still says
-    they hold farm A, the JWT no longer does, and the app 403s on every visit
-    call with "could not load your visits".
+    This replaces a test that pinned the opposite. Until now the check looked
+    only for a membership in *this* tenant, so the same number could be
+    enrolled again under a second customer. That produced the one shape the
+    system cannot serve: `tenant_id` is a single-valued Keycloak attribute, so
+    the token names one tenant, while `farm_scopes` is multi-valued and spans
+    both. The scout's app listed a farm it could never load, and every call
+    against it resolved the wrong schema and found nothing.
 
-    Seen in production on 2026-08-24 — one scout, two tenants, three 403s.
+    Seen in production on 2026-08-24: one scout, two tenants, three 403s. The
+    earlier fix kept the other tenant's scopes in the attribute, which made
+    the token honest and the farm no more reachable. This refuses the second
+    enrolment instead.
+
+    The response must not name the other tenant. A farm manager enrolling a
+    crew would otherwise be able to discover which AgriPulse customer employs
+    any number they can type.
     """
     env = scouting_env
-    enrolled = await _enrol(env, phone=_unique_phone(), full_name="Two Tenant Tarek")
-    assert enrolled.status_code == 201, enrolled.text
-    user_id = UUID(enrolled.json()["user_id"])
+    phone = _unique_phone()
+    first = await _enrol(env, phone=phone, full_name="Two Tenant Tarek")
+    assert first.status_code == 201, first.text
 
-    # A second tenant the same person also belongs to, the way an invite
-    # leaves it: a membership row and nothing else.
     other = await get_tenant_service(admin_session).create_tenant(
         slug=f"other-{uuid4().hex[:8]}",
         name="Other tenant",
         contact_email="ops@other.test",
     )
-    other_membership = uuid4()
-    await admin_session.execute(
-        text(
-            "INSERT INTO public.tenant_memberships (id, tenant_id, user_id, status, joined_at) "
-            "VALUES (:id, :tid, :uid, 'active', now())"
-        ).bindparams(
-            bindparam("id", type_=PG_UUID(as_uuid=True)),
-            bindparam("tid", type_=PG_UUID(as_uuid=True)),
-            bindparam("uid", type_=PG_UUID(as_uuid=True)),
-        ),
-        {"id": other_membership, "tid": other.tenant_id, "uid": user_id},
-    )
     await admin_session.commit()
 
-    # `public.farm_scopes.farm_id` is a logical cross-schema reference, so the
-    # grant needs a farm id, not a farm row in this tenant's schema.
-    other_farm = uuid4()
-    await admin_session.execute(text(f"SET LOCAL search_path TO {other.schema_name}, public"))
-    service = field_enrolment.get_field_enrolment_service(
-        public_session=admin_session,
-        tenant_session=admin_session,
-        keycloak=fake_keycloak,
-    )
-    await service.grant_farm_access(
+    other_admin = uuid4()
+    await _create_user_in_tenant(admin_session, tenant_id=other.tenant_id, user_id=other_admin)
+    other_context = make_context(
+        user_id=other_admin,
         tenant_id=other.tenant_id,
-        user_id=user_id,
-        farm_id=other_farm,
-        role="Scout",
-        actor_user_id=None,
+        tenant_role=TenantRole.TENANT_ADMIN,
     )
-    await admin_session.commit()
+    async with _client(other_context) as client:
+        second = await client.post(
+            "/api/v1/users/field-enrolment",
+            json={
+                "phone": phone,
+                "full_name": "Two Tenant Tarek",
+                "farm_id": str(uuid4()),
+                "role": "Scout",
+            },
+        )
 
-    kc_subject = (
+    assert second.status_code == 409, second.text
+    body = second.json()
+    assert body["type"].endswith("/phone-in-another-tenant")
+    assert other.slug not in body["detail"]
+    # And "re-issue their PIN" must not be the advice here: the account exists
+    # but is somebody else's worker.
+    assert "PIN" not in body["detail"]
+
+    # Nothing was written. A refused enrolment leaves no second membership.
+    count = (
         await admin_session.execute(
-            text("SELECT keycloak_subject FROM public.users WHERE id = :uid").bindparams(
-                bindparam("uid", type_=PG_UUID(as_uuid=True))
+            text(
+                "SELECT count(*) FROM public.tenant_memberships m "
+                "  JOIN public.users u ON u.id = m.user_id "
+                " WHERE u.phone = :p AND m.deleted_at IS NULL"
             ),
-            {"uid": user_id},
+            {"p": first.json()["phone"]},
         )
     ).scalar_one()
-    projected = {s["farm_id"] for s in fake_keycloak.users[kc_subject].farm_scopes}
-    assert projected == {env.farm_id, str(other_farm)}
+    assert count == 1

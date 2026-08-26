@@ -13,10 +13,17 @@
  *
  * **Per-farm failure is not total failure.** Farms are fetched independently
  * and a farm that throws is named in `failed` rather than taking the other
- * farms' work down with it. A scout who belongs to two tenants carries one
- * `tenant_id` in their token, so the farm in the other tenant genuinely cannot
- * be read — a real and permanent state, not a blip, and the four farms that
- * did answer are still a usable day's work.
+ * farms' work down with it. A scout stands in a field on one bar of signal,
+ * so one farm timing out while four answer is the normal case, and four
+ * farms' work is still a usable day.
+ *
+ * This used to also cover a farm that could *never* load: a scout in two
+ * tenants carries one `tenant_id` in their token, so the other tenant's farm
+ * was unreadable for ever and sat in `failed` looking like a network problem.
+ * A person now belongs to one tenant — refused at both enrolment doors and
+ * enforced by a unique index — and `/me` returns only the scopes of their
+ * active membership. So everything in `failed` is a retry away from working,
+ * which is what the warning on the Tasks screen now means.
  */
 
 import {

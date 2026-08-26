@@ -33,6 +33,7 @@ from app.modules.iam.schemas import (
 )
 from app.modules.iam.service import UserNotFoundError, UserService, get_user_service
 from app.modules.iam.users_service import (
+    AlreadyInAnotherTenantError,
     FarmsNotInTenantError,
     LastTenantOwnerError,
     TenantUserAlreadyExistsError,
@@ -320,6 +321,22 @@ async def invite_tenant_user(
             title="User already a tenant member",
             detail=str(exc),
             type_="https://agripulse.cloud/problems/iam/user-already-exists",
+            extras={"email": exc.email},
+        ) from exc
+    except AlreadyInAnotherTenantError as exc:
+        # The other tenant's slug stays out of the response. An inviter must
+        # not be able to learn which AgriPulse customer employs an address by
+        # typing it into this form.
+        raise APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            title="User belongs to another organisation",
+            detail=(
+                f"{exc.email} already has an AgriPulse account with another "
+                "organisation. A person can belong to only one organisation. "
+                "Ask them to be removed from it first, or invite a different "
+                "address."
+            ),
+            type_="https://agripulse.cloud/problems/iam/user-in-another-tenant",
             extras={"email": exc.email},
         ) from exc
     except FarmsNotInTenantError as exc:
