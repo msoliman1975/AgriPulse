@@ -41,7 +41,35 @@ def postgres_container() -> Iterator[object]:
         pytest.skip("testcontainers not installed")
     # `driver="psycopg"` matches our psycopg[binary] dep â€” without it
     # testcontainers falls back to psycopg2 for its readiness probe.
-    container = PostgresContainer(_TIMESCALE_IMAGE, driver="psycopg")
+    # `shm_size` is not optional here, despite looking like tuning.
+    #
+    # Docker gives every container 64 MB of /dev/shm regardless of how much
+    # the host has, and Postgres allocates parallel-query shared memory out
+    # of it. A gather node asking for a 16 MB segment against a 64 MB
+    # /dev/shm that is already partly used fails with
+    #
+    #   DiskFull: could not resize shared memory segment ... to 16777216 bytes
+    #
+    # Postgres treats that as a backend crash and goes into recovery, so
+    # every test after it fails on CannotConnectNowError. The result reads
+    # as a dozen-plus broken tests in whichever module happened to be
+    # running, most often tests/integration/weather, because its date-range
+    # scans over hypertables are the widest in the tree and so the likeliest
+    # to earn a parallel plan.
+    #
+    # It is load-dependent, which is what made it look like flakiness: the
+    # ceiling is identical everywhere, and the only variable is whether that
+    # run's planner went parallel. It passed locally and on some runners and
+    # failed on others, on identical code.
+    #
+    # Measured, same commit, one argument apart:
+    #
+    #   64 MB default    15 failed, 1110 passed   (PR #597, PR #603's merge build)
+    #   shm_size=1g      1125 passed, 0 failed    (PR #600)
+    #
+    # 1g is well past what any test here needs; the point is to be nowhere
+    # near the ceiling, not to size it precisely.
+    container = PostgresContainer(_TIMESCALE_IMAGE, driver="psycopg").with_kwargs(shm_size="1g")
     container.with_env("POSTGRES_DB", "agripulse_test")
     container.start()
     try:
