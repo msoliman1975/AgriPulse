@@ -57,30 +57,45 @@
     U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* --- The palette -----------------------------------------------------------
+   The same token NAMES and the same MEANINGS as the web app's `ap.*` scale in
+   `frontend/tailwind.config.ts`. Only the surface ramp inverts: the web app is
+   read at a desk, this one is read outdoors, and a white screen at midday is a
+   mirror.
+
+   So `ap.bg` is the dark cousin of the web's #f7f6f1 rather than a different
+   idea, and a rule that says "border: 1px solid var(--ap-line)" means the same
+   thing in both codebases. That is what stops the two products drifting into
+   two visual languages while sharing one name. */
 :root {
   /* Ground, raised surface, and the well a control sits in. Three steps, not
      two: cards used to be 4% off the background and disappeared in sunlight. */
-  --field: #0b1712;
-  --field2: #16261d;
-  --well: #0d1d16;
-  --line: #2a3f34;
+  --ap-bg: #0e1512;
+  --ap-panel: #17201b;
+  --ap-well: #101a15;
+  --ap-line: #2a3730;
   /* A hairline that reads as a division rather than a border. */
-  --line-soft: #1f3129;
-  --ink: #eaf3ed;
-  --muted: #93ab9e;
-  /* The brand green. Borders, chosen states, the good-news trend — never a
-     fill behind white text: at #4a7c59 that pairing is 3.6:1 and the primary
-     action in the app was the least legible thing on the screen. */
-  --sage: #4a7c59;
-  /* So the fill is bright and the label is dark. 8:1, and it reads as
-     high-visibility, which is the right register for a tool used outdoors. */
-  --act: #56c47f;
-  --on-act: #05200e;
-  /* All three lifted off the web palette: a mid-weight red or amber on a very
-     dark ground goes muddy long before it goes subtle. */
-  --crit: #f0564a;
-  --watch: #f0b429;
-  --sand: #d4b78a;
+  --ap-line-soft: #1f2d26;
+  --ap-ink: #eef2ec;
+  --ap-muted: #93a094;
+  /* The brand green, lifted off the web's #356b30 far enough to hold 4.9:1 on
+     this ground. Borders, chosen states, the good-news trend — never a fill
+     behind white text: even lifted, that pairing is 3.8:1 and the primary
+     action in the app would be the least legible thing on the screen. */
+  --ap-primary: #4f9147;
+  /* So the fill is bright and the label is dark. 7.7:1, and it reads as
+     high-visibility, which is the right register for a tool used outdoors.
+     No web equivalent: the web app puts white on `ap.primary` because it is
+     doing it over a light panel, where the contrast lands the other way up. */
+  --ap-action: #56c47f;
+  --ap-on-action: #05200e;
+  /* Both lifted off the web's #b24430 / #c98a18: a mid-weight red or amber on
+     a very dark ground goes muddy long before it goes subtle. */
+  --ap-crit: #d9604a;
+  --ap-warn: #e0a52a;
+  /* No web equivalent. The one warm surface in the app, reserved for text a
+     person wrote rather than a rule emitted. */
+  --ap-sand: #d4b78a;
 
   --ui: "Cairo", "Segoe UI", Roboto, system-ui, sans-serif;
   font-family: var(--ui);
@@ -90,7 +105,7 @@
   -webkit-text-size-adjust: 100%;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--field); color: var(--ink); font-family: var(--ui); }
+body { background: var(--ap-bg); color: var(--ap-ink); font-family: var(--ui); }
 /* Every control, or the browser hands them the platform UI font and the app
    renders in two typefaces again — this time inside a single row. */
 button, input, select, textarea { font-family: inherit; }
@@ -98,7 +113,8 @@ button, input, select, textarea { font-family: inherit; }
 /* Any number a scout compares against another number: tile counts, the due
    ring, an accuracy in metres. Proportional digits change width as the value
    changes, so a column of counts shifts on every refresh. */
-.tile .n, .visit .ring, .crumb .count, .gps { font-variant-numeric: tabular-nums; }
+.tile .n, .visit .ring, .crumb .count, .gps,
+.rail .pill .n, .fcard .n { font-variant-numeric: tabular-nums; }
 
 /* Latin tracking and uppercasing are hierarchy devices that do nothing in
    Arabic: `text-transform` is a no-op on an Arabic string, and letter-spacing
@@ -119,78 +135,78 @@ button, input, select, textarea { font-family: inherit; }
 
 .signin { display: flex; flex-direction: column; min-height: 100vh; }
 .signin .logo { width: 52px; height: 52px; border-radius: 15px; margin-top: 56px;
-  background: linear-gradient(135deg, var(--sage), #22c55e); }
+  background: linear-gradient(135deg, var(--ap-primary), #22c55e); }
 .signin h1 { font-size: 25px; margin-top: 22px; }
-.signin .sub { color: var(--muted); font-size: 14px; margin-top: 6px; }
-.signin label { font-size: 12px; color: var(--muted); margin-top: 18px; }
+.signin .sub { color: var(--ap-muted); font-size: 14px; margin-top: 6px; }
+.signin label { font-size: 12px; color: var(--ap-muted); margin-top: 18px; }
 .signin input { margin-top: 6px; padding: 14px; font-size: 17px; border-radius: 12px;
-  border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--ink); }
+  border: 1px solid var(--ap-line); background: rgba(255,255,255,.06); color: var(--ap-ink); }
 .signin button { margin-top: auto; padding: 16px; font-size: 16px; font-weight: 700;
-  border: 0; border-radius: 12px; background: var(--act); color: var(--on-act); }
+  border: 0; border-radius: 12px; background: var(--ap-action); color: var(--ap-on-action); }
 .signin button:disabled { opacity: .5; }
 
 .visits header { display: flex; align-items: center; justify-content: space-between; }
 .visits h1 { font-size: 20px; }
-.visits .link { background: none; border: 0; color: var(--muted); font-size: 13px; }
+.visits .link { background: none; border: 0; color: var(--ap-muted); font-size: 13px; }
 /* A heading small enough to stay out of the way and strong enough to divide.
    Tracked-out uppercase was the whole device before, and it is invisible in
    Arabic — `text-transform` does nothing to an Arabic string. Weight and a
    short rule do the same job in both scripts. */
 .section { display: flex; align-items: center; gap: 10px;
   font-size: 12px; font-weight: 700; letter-spacing: var(--track);
-  text-transform: uppercase; color: var(--muted); margin: 22px 0 8px; }
-.section::after { content: ""; flex: 1; height: 1px; background: var(--line-soft); }
-.section.overdue { color: var(--crit); }
+  text-transform: uppercase; color: var(--ap-muted); margin: 22px 0 8px; }
+.section::after { content: ""; flex: 1; height: 1px; background: var(--ap-line-soft); }
+.section.overdue { color: var(--ap-crit); }
 .visits ul { list-style: none; }
 .visit { display: flex; gap: 12px; align-items: flex-start;
-  padding: 14px 0; border-bottom: 1px solid var(--line); }
+  padding: 14px 0; border-bottom: 1px solid var(--ap-line); }
 .visit .ring { flex: 0 0 46px; height: 46px; border-radius: 50%; display: grid;
   place-items: center; padding: 0 3px; font-size: 11.5px; font-weight: 700;
   line-height: 1.15; text-align: center; overflow: hidden;
-  border: 2px solid var(--muted); color: var(--muted); }
-.visit.sev-critical .ring { border-color: var(--crit); color: var(--crit); }
-.visit.sev-warning .ring { border-color: var(--watch); color: var(--watch); }
+  border: 2px solid var(--ap-muted); color: var(--ap-muted); }
+.visit.sev-critical .ring { border-color: var(--ap-crit); color: var(--ap-crit); }
+.visit.sev-warning .ring { border-color: var(--ap-warn); color: var(--ap-warn); }
 .visit .body { flex: 1; min-width: 0; }
 .visit .title { font-size: 15px; font-weight: 650; }
 /* A person wrote this — the only warm surface in the app. */
-.visit .instruction { font-size: 13px; color: var(--sand); margin-top: 4px; }
+.visit .instruction { font-size: 13px; color: var(--ap-sand); margin-top: 4px; }
 .visit .meta { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;
   align-items: center; }
 .visit .origin { font-size: 10px; text-transform: uppercase; letter-spacing: var(--track-sm);
-  padding: 3px 7px; border-radius: 5px; background: var(--field2); color: var(--muted); }
-.visit .origin-ad_hoc { background: #3a3222; color: var(--sand); }
+  padding: 3px 7px; border-radius: 5px; background: var(--ap-panel); color: var(--ap-muted); }
+.visit .origin-ad_hoc { background: #3a3222; color: var(--ap-sand); }
 /* Extent and age. Neither is a severity, so neither borrows the severity
    palette — a nine-zone info visit is wide, not urgent, and colouring it red
    would teach a scout to read the wrong thing first. */
 .visit .zones, .visit .streak, .visit .trend { font-size: 10px; letter-spacing: var(--track-sm);
-  padding: 3px 7px; border-radius: 5px; background: var(--field2); color: var(--sand); }
-.visit .streak { color: var(--watch); }
+  padding: 3px 7px; border-radius: 5px; background: var(--ap-panel); color: var(--ap-sand); }
+.visit .streak { color: var(--ap-warn); }
 /* Getting worse borrows the watch colour; getting better is the one place on
    this row that reads as good news. */
-.visit .trend-spreading { color: var(--watch); }
-.visit .trend-receding { color: var(--sage); }
+.visit .trend-spreading { color: var(--ap-warn); }
+.visit .trend-receding { color: var(--ap-primary); }
 .visit button { padding: 10px 14px; border: 0; border-radius: 10px;
-  background: var(--act); color: var(--on-act); font-size: 13px; font-weight: 700; }
-.error { color: var(--crit); font-size: 13px; margin-top: 12px; }
-.empty { color: var(--muted); font-size: 14px; margin-top: 28px; text-align: center; }
+  background: var(--ap-action); color: var(--ap-on-action); font-size: 13px; font-weight: 700; }
+.error { color: var(--ap-crit); font-size: 13px; margin-top: 12px; }
+.empty { color: var(--ap-muted); font-size: 14px; margin-top: 28px; text-align: center; }
 
 /* Reachability, on the sign-in screen. Deliberately quiet when everything is
    fine — a green line nobody reads is fine; a red one has to be noticed. */
 .health { font-size: 12px; margin: -4px 0 14px; }
-.health.checking { color: var(--muted); }
-.health.ok { color: var(--sage); }
-.health.bad { color: var(--crit); }
+.health.checking { color: var(--ap-muted); }
+.health.ok { color: var(--ap-primary); }
+.health.bad { color: var(--ap-crit); }
 .health .linkish { background: none; border: 0; padding: 0; font: inherit;
   color: inherit; text-decoration: underline; }
 
 /* Language picker. Below the button, because it is the least likely thing a
    returning scout needs and the most likely to be tapped by accident up top. */
 .langpick { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
-.langpick .lang { background: none; border: 1px solid var(--line); border-radius: 999px;
-  padding: 7px 16px; color: var(--muted); font-size: 13px; }
+.langpick .lang { background: none; border: 1px solid var(--ap-line); border-radius: 999px;
+  padding: 7px 16px; color: var(--ap-muted); font-size: 13px; }
 /* The current language reads as chosen, not merely highlighted: this control is
    used by people who may not read the label next to it. */
-.langpick .lang.on { border-color: var(--sage); color: var(--ink); background: var(--field2); }
+.langpick .lang.on { border-color: var(--ap-primary); color: var(--ap-ink); background: var(--ap-panel); }
 
 /* --- Work detail -----------------------------------------------------------
    A scout reads this standing in a block, in sun, often one-handed. Controls
@@ -199,79 +215,82 @@ button, input, select, textarea { font-family: inherit; }
 .visit.tappable { cursor: pointer; }
 /* A row that opens something has to look like it does — without this the list
    is indistinguishable from the read-only one it used to be. */
-.visit.tappable:active { background: var(--field2); }
+.visit.tappable:active { background: var(--ap-panel); }
 
 .detail { display: flex; flex-direction: column; gap: 14px; }
 .detail header { display: flex; align-items: center; justify-content: space-between; }
 .detail h1 { font-size: 20px; line-height: 1.3; margin: 0; }
-.detail .instruction { color: var(--ink); font-size: 15px; line-height: 1.5; }
+.detail .instruction { color: var(--ap-ink); font-size: 15px; line-height: 1.5; }
 .detail .meta { display: flex; gap: 10px; align-items: center; margin: 0; }
-.detail .hint { color: var(--muted); font-size: 13px; }
-.status { font-size: 12px; color: var(--muted); text-transform: uppercase;
+.detail .hint { color: var(--ap-muted); font-size: 13px; }
+.status { font-size: 12px; color: var(--ap-muted); text-transform: uppercase;
   letter-spacing: var(--track-sm); }
 
 .actions { display: flex; flex-direction: column; gap: 12px; }
 /* Every action is a full-width target: a mis-tap in a field costs a walk back. */
 .actions > button { width: 100%; padding: 15px; font-size: 16px; font-weight: 650;
-  border-radius: 10px; border: 0; background: var(--act); color: var(--on-act); }
+  border-radius: 10px; border: 0; background: var(--ap-action); color: var(--ap-on-action); }
 .actions > button:disabled { opacity: .55; }
 
-.capture { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line);
-  border-radius: 12px; padding: 14px; background: var(--field2); }
+.capture { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--ap-line);
+  border-radius: 12px; padding: 14px; background: var(--ap-panel); }
 .capture h2 { font-size: 15px; margin: 0 0 4px; }
-.capture label { font-size: 13px; color: var(--muted); }
+.capture label { font-size: 13px; color: var(--ap-muted); }
 .capture input, .capture select, .capture textarea { font-size: 16px; padding: 12px;
-  border: 1px solid var(--line); border-radius: 8px; background: var(--well); color: var(--ink); }
+  border: 1px solid var(--ap-line); border-radius: 8px; background: var(--ap-well); color: var(--ap-ink); }
 /* A control that cannot be changed still has to be readable — it is stating
    the answer, not withholding it, so it dims the frame and not the text. */
-.capture select:disabled, .sheet select:disabled { opacity: 1; color: var(--ink);
-  border-style: dashed; border-color: var(--line-soft); }
+.capture select:disabled, .sheet select:disabled { opacity: 1; color: var(--ap-ink);
+  border-style: dashed; border-color: var(--ap-line-soft); }
 .capture .row { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
 .capture .row button:first-child { flex: 1; padding: 13px; border: 0; border-radius: 8px;
-  background: var(--act); color: var(--on-act); font-size: 15px; font-weight: 650; }
+  background: var(--ap-action); color: var(--ap-on-action); font-size: 15px; font-weight: 650; }
 
 .submitbar { display: flex; flex-direction: column; gap: 8px; }
-.submitbar label { font-size: 13px; color: var(--muted); }
-.submitbar textarea { font-size: 16px; padding: 12px; border: 1px solid var(--line);
-  border-radius: 8px; background: var(--field); color: var(--ink); }
+.submitbar label { font-size: 13px; color: var(--ap-muted); }
+.submitbar textarea { font-size: 16px; padding: 12px; border: 1px solid var(--ap-line);
+  border-radius: 8px; background: var(--ap-bg); color: var(--ap-ink); }
 /* Three outcomes side by side, not a dropdown: "found nothing" and "could not
    get to it" are different facts and both need to be one tap away. */
 .outcomes { display: flex; flex-direction: column; gap: 8px; }
 .outcomes button { padding: 14px; font-size: 15px; border-radius: 10px;
-  border: 1px solid var(--line); background: var(--field); color: var(--ink); }
+  border: 1px solid var(--ap-line); background: var(--ap-bg); color: var(--ap-ink); }
 
 /* --- Shell: three tabs and one button --------------------------------------
    Tabs sit under the thumb; the capture button floats above them because it
    is an action taken from wherever you are, not a place you go. Both are
    fixed, so `.screen` has to reserve room or the last row hides behind them. */
 .screen { padding-bottom: 96px; }
+/* Two, not three. The Me tab held the farms (now the rail), the language (now
+   the header) and sign-out (now behind the name), and nothing that was only
+   its own. */
 .tabs { position: fixed; inset-inline: 0; bottom: 0; display: grid;
-  grid-template-columns: repeat(3, 1fr); background: var(--field2);
-  border-top: 1px solid var(--line);
+  grid-template-columns: repeat(2, 1fr); background: var(--ap-panel);
+  border-top: 1px solid var(--ap-line);
   /* Clear the gesture bar as well as the screen edge. */
   padding-bottom: env(safe-area-inset-bottom); }
 .tabs button { padding: 14px 0 18px; background: none; border: 0;
-  color: var(--muted); font-size: 13px; }
-.tabs button.on { color: var(--ink); font-weight: 650;
-  box-shadow: inset 0 2px 0 var(--sage); }
+  color: var(--ap-muted); font-size: 13px; }
+.tabs button.on { color: var(--ap-ink); font-weight: 650;
+  box-shadow: inset 0 2px 0 var(--ap-primary); }
 .fab { position: fixed; inset-inline-end: 16px; bottom: calc(74px + env(safe-area-inset-bottom)); z-index: 2;
-  padding: 13px 20px; border: 0; border-radius: 999px; background: var(--act);
-  color: var(--on-act); font-size: 15px; font-weight: 700;
+  padding: 13px 20px; border: 0; border-radius: 999px; background: var(--ap-action);
+  color: var(--ap-on-action); font-size: 15px; font-weight: 700;
   box-shadow: 0 6px 18px rgba(0,0,0,.5); }
 
 /* Segmented control. Three states of the same list, not three screens. */
 .seg { display: flex; gap: 3px; padding: 3px; border-radius: 11px;
-  background: var(--field2); margin-bottom: 6px; }
+  background: var(--ap-panel); margin-bottom: 6px; }
 .seg button { flex: 1; padding: 10px 0; border: 0; border-radius: 9px;
-  background: none; color: var(--muted); font-size: 14px; }
-.seg button.on { background: var(--field); color: var(--ink); font-weight: 650; }
+  background: none; color: var(--ap-muted); font-size: 14px; }
+.seg button.on { background: var(--ap-bg); color: var(--ap-ink); font-weight: 650; }
 
 /* How the tiles are grouped. Two words, always both visible: the scout has to
    see that the other way of looking exists, or they will never find it. */
 .groupby { display: flex; gap: 8px; margin: 14px 0 2px; }
 .groupby button { padding: 8px 14px; border-radius: 999px; font-size: 13px;
-  border: 1px solid var(--line); background: none; color: var(--muted); }
-.groupby button.on { border-color: var(--sage); color: var(--ink); background: var(--field2); }
+  border: 1px solid var(--ap-line); background: none; color: var(--ap-muted); }
+.groupby button.on { border-color: var(--ap-primary); color: var(--ap-ink); background: var(--ap-panel); }
 
 /* --- Tiles ---------------------------------------------------------------
    The landing. A count first and the place second, because the count is what
@@ -279,15 +298,15 @@ button, input, select, textarea { font-family: inherit; }
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
 .tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
   min-height: 92px; padding: 14px; border-radius: 14px; text-align: start;
-  border: 1px solid var(--line); background: var(--field2); color: var(--ink); }
+  border: 1px solid var(--ap-line); background: var(--ap-panel); color: var(--ap-ink); }
 .tile .n { font-size: 30px; font-weight: 700; line-height: 1; }
-.tile .lbl { font-size: 13px; color: var(--muted); line-height: 1.3;
+.tile .lbl { font-size: 13px; color: var(--ap-muted); line-height: 1.3;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Tone is the worst thing inside, so a tile warns before it is opened. */
-.tile.warn { border-color: var(--watch); }
-.tile.warn .n { color: var(--watch); }
-.tile.crit { border-color: var(--crit); }
-.tile.crit .n { color: var(--crit); }
+.tile.warn { border-color: var(--ap-warn); }
+.tile.warn .n { color: var(--ap-warn); }
+.tile.crit { border-color: var(--ap-crit); }
+.tile.crit .n { color: var(--ap-crit); }
 /* An empty bucket stays visible in time mode — "Today 0" is a fact worth
    having — but it must not look tappable. */
 .tile:disabled { opacity: .4; }
@@ -296,32 +315,32 @@ button, input, select, textarea { font-family: inherit; }
    never loses track of which pile is on show. */
 .crumb { display: flex; align-items: center; gap: 8px; width: 100%; margin: 12px 0 2px;
   padding: 11px 12px; border-radius: 10px; font-size: 15px; font-weight: 650;
-  border: 1px solid var(--line); background: var(--field2); color: var(--ink); }
-.crumb .back { color: var(--sage); font-size: 19px; line-height: 1; flex: none; }
+  border: 1px solid var(--ap-line); background: var(--ap-panel); color: var(--ap-ink); }
+.crumb .back { color: var(--ap-primary); font-size: 19px; line-height: 1; flex: none; }
 .crumb .lbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.crumb .count { margin-inline-start: auto; color: var(--muted); font-weight: 400; flex: none;
+.crumb .count { margin-inline-start: auto; color: var(--ap-muted); font-weight: 400; flex: none;
   font-variant-numeric: tabular-nums; }
 
-.section .count { color: var(--muted); font-weight: 400; }
+.section .count { color: var(--ap-muted); font-weight: 400; }
 .visit .src { font-size: 13px; }
-.visit .where { font-size: 12px; color: var(--muted); }
+.visit .where { font-size: 12px; color: var(--ap-muted); }
 .visit .meta { display: flex; gap: 8px; align-items: center; }
-.detail .where { color: var(--muted); font-size: 14px; margin: -6px 0 0; }
+.detail .where { color: var(--ap-muted); font-size: 14px; margin: -6px 0 0; }
 
 /* Why the job exists. Ahead of the actions because a scout decides whether to
    walk on this, and behind the title because they already know the what. */
-.why { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
-  background: var(--field2); }
+.why { border: 1px solid var(--ap-line); border-radius: 12px; padding: 12px 14px;
+  background: var(--ap-panel); }
 .why h2 { font-size: 11px; letter-spacing: var(--track); text-transform: uppercase;
-  color: var(--muted); margin-bottom: 6px; }
+  color: var(--ap-muted); margin-bottom: 6px; }
 .why p { font-size: 14px; margin-top: 4px; }
-.why .k { color: var(--muted); }
+.why .k { color: var(--ap-muted); }
 
 /* Photos. Square thumbnails with the remove control on the image itself —
    a separate delete button beside each one is a mis-tap in gloves. */
 .thumbs { display: flex; gap: 8px; flex-wrap: wrap; }
 .thumb { position: relative; width: 62px; height: 62px; padding: 0; border: 0;
-  border-radius: 10px; overflow: hidden; background: var(--field); }
+  border-radius: 10px; overflow: hidden; background: var(--ap-bg); }
 .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .thumb .x { position: absolute; top: 2px; inset-inline-end: 2px; width: 18px;
   height: 18px; border-radius: 50%; background: rgba(0,0,0,.62); color: #fff;
@@ -330,64 +349,63 @@ button, input, select, textarea { font-family: inherit; }
 /* Position. Opt-in, and always showing its accuracy: a fix presented without
    one reads as exact when it may be 40 m out. */
 .gps { display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 11px 12px; border-radius: 10px; border: 1px dashed var(--line);
-  color: var(--muted); font-size: 13px; }
-.gps.on { border-style: solid; border-color: var(--sage); color: var(--ink); }
-.gps .link { background: none; border: 0; color: var(--sage); font-size: 13px; }
+  padding: 11px 12px; border-radius: 10px; border: 1px dashed var(--ap-line);
+  color: var(--ap-muted); font-size: 13px; }
+.gps.on { border-style: solid; border-color: var(--ap-primary); color: var(--ap-ink); }
+.gps .link { background: none; border: 0; color: var(--ap-primary); font-size: 13px; }
 
 /* The capture chooser, as a bottom sheet: it is reached with a thumb. */
 .sheet-wrap { position: fixed; inset: 0; z-index: 3; background: rgba(0,0,0,.55);
   display: flex; align-items: flex-end; }
-.sheet { width: 100%; background: var(--field); border-radius: 18px 18px 0 0;
+.sheet { width: 100%; background: var(--ap-bg); border-radius: 18px 18px 0 0;
   padding: 12px 16px calc(26px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; }
-.sheet .grab { width: 38px; height: 4px; border-radius: 2px; background: var(--line);
+.sheet .grab { width: 38px; height: 4px; border-radius: 2px; background: var(--ap-line);
   align-self: center; }
 .sheet h2 { font-size: 17px; }
-.sheet label { font-size: 13px; color: var(--muted); }
-.sheet select { font-size: 16px; padding: 13px; border: 1px solid var(--line);
-  border-radius: 10px; background: var(--field2); color: var(--ink); }
-.sheet select:disabled { background: var(--well); }
+.sheet label { font-size: 13px; color: var(--ap-muted); }
+.sheet select { font-size: 16px; padding: 13px; border: 1px solid var(--ap-line);
+  border-radius: 10px; background: var(--ap-panel); color: var(--ap-ink); }
+.sheet select:disabled { background: var(--ap-well); }
 .sheet > button { padding: 15px; font-size: 16px; font-weight: 650; border: 0;
-  border-radius: 11px; background: var(--act); color: var(--on-act); }
-.sheet > button.link { background: none; color: var(--muted); font-weight: 400; }
+  border-radius: 11px; background: var(--ap-action); color: var(--ap-on-action); }
+.sheet > button.link { background: none; color: var(--ap-muted); font-weight: 400; }
 /* Each choice is named by the situation that produces it, with the
    explanation underneath — a scout should not have to learn the data model. */
 .sheet .opt { display: flex; flex-direction: column; gap: 3px; text-align: start;
-  padding: 14px; border: 1px solid var(--line); border-radius: 12px;
-  background: var(--field2); color: var(--ink); }
+  padding: 14px; border: 1px solid var(--ap-line); border-radius: 12px;
+  background: var(--ap-panel); color: var(--ap-ink); }
 .sheet .opt b { font-size: 15px; font-weight: 650; }
-.sheet .opt span { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.sheet .opt span { font-size: 12.5px; color: var(--ap-muted); line-height: 1.45; }
 
 /* Records: the scout's own filings, proof of a day's work. */
 .records ul { list-style: none; }
 .record .thumb { flex: 0 0 46px; height: 46px; }
 .record .ring { font-size: 15px; }
 
-.me h1 { font-size: 21px; }
-.me .farms { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.acct .farms { list-style: none; display: flex; flex-direction: column; gap: 8px; }
 /* Rows, not buttons. This list used to change what the whole app showed, and
    nothing on the Tasks tab said so. It now states a fact, so it must not carry
    a single affordance that suggests otherwise — no fill, no chosen state, no
    press feedback. */
-.me .farms li.static { display: flex; justify-content: space-between; gap: 12px;
-  padding: 13px 0; border-bottom: 1px solid var(--line-soft); font-size: 14px; }
+.acct .farms li.static { display: flex; justify-content: space-between; gap: 12px;
+  padding: 13px 0; border-bottom: 1px solid var(--ap-line-soft); font-size: 14px; }
 /* The name leads and the role follows it: a scout reading two farms is reading
    places, not job titles. */
-.me .farms .fname { font-weight: 650; min-width: 0; overflow: hidden;
+.acct .farms .fname { font-weight: 650; min-width: 0; overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
-.me .farms .role { color: var(--muted); flex: none; }
-.me > .hint { color: var(--muted); font-size: 13px; margin-top: 10px; }
+.acct .farms .role { color: var(--ap-muted); flex: none; }
+.acct > .hint { color: var(--ap-muted); font-size: 13px; margin-top: 10px; }
 /* Sign-out is destructive and rarely wanted: it reads as an exit, not a
-   primary action, and it sits at the bottom of a screen nobody opens by
+   primary action, and it sits at the bottom of a sheet nobody opens by
    accident. */
-.me .signout { margin-top: 28px; width: 100%; padding: 15px; border-radius: 11px;
-  border: 1px solid var(--crit); background: none; color: var(--crit); font-size: 15px; }
+.acct .signout { margin-top: 28px; width: 100%; padding: 15px; border-radius: 11px;
+  border: 1px solid var(--ap-crit); background: none; color: var(--ap-crit); font-size: 15px; }
 
 /* A screen that replaces everything under it. The capture sheet renders
    alongside the tab content rather than instead of it, so a detail opened
    from the sheet has to cover the list it came from. */
 .screen.overlay { position: fixed; inset: 0; z-index: 4; overflow-y: auto;
-  background: var(--field); }
+  background: var(--ap-bg); }
 /* A fixed overlay does not inherit the flow padding, so it needs the inset
    again or its Back control sits under the status bar. */
 .screen.overlay { padding-top: calc(20px + env(safe-area-inset-top)); }
@@ -397,7 +415,7 @@ button, input, select, textarea { font-family: inherit; }
    default — a white block in a dark app — because only the first button in
    the row is styled as the primary one. */
 .capture .row button.link { flex: 0 0 auto; padding: 13px 10px; border: 0;
-  background: none; color: var(--muted); font-size: 14px; }
+  background: none; color: var(--ap-muted); font-size: 14px; }
 
 /* Clear the floating Record button as well as the tab bar: 96px cleared the
    tabs but left the button sitting on top of the last row. */
@@ -409,13 +427,21 @@ button, input, select, textarea { font-family: inherit; }
    change it. */
 .homehead { display: flex; align-items: center; justify-content: space-between;
   gap: 12px; margin-bottom: 14px; }
-.homehead .who { display: flex; flex-direction: column; min-width: 0; }
-.homehead .lbl { font-size: 11px; color: var(--muted); letter-spacing: var(--track-sm); }
+/* The name is a control now: it opens the account sheet. It still has to read
+   as a name and not as a button — a filled control here would compete with the
+   rail directly below it, which is the thing on this screen worth tapping. So
+   the only affordance is the chevron and the press state. */
+.homehead .who { display: flex; align-items: center; gap: 6px; min-width: 0;
+  background: none; border: 0; padding: 0; color: inherit; text-align: start; }
+.homehead .who .txt { display: flex; flex-direction: column; min-width: 0; }
+.homehead .chev { flex: none; color: var(--ap-muted); }
+.homehead .who:active .chev { color: var(--ap-primary); }
+.homehead .lbl { font-size: 11px; color: var(--ap-muted); letter-spacing: var(--track-sm); }
 .homehead .nm { font-size: 16px; font-weight: 650;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Which farm's work is on screen. Quieter than the name above it — it is
    checked once on opening, not read all day. */
-.homehead .farm { font-size: 12px; color: var(--muted);
+.homehead .farm { font-size: 12px; color: var(--ap-muted);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Tighter than the sign-in screen's copy of this control: here it shares a row
    with a name rather than owning one. */
@@ -424,14 +450,14 @@ button, input, select, textarea { font-family: inherit; }
 
 /* A flag in the records list. The ring carries the severity colour so an
    urgent one is findable without reading, matching the pin on the map. */
-.record.flag .ring { border-color: var(--sage); color: var(--sage); }
-.record.flag.sev-warning .ring { border-color: var(--watch); color: var(--watch); }
-.record.flag.sev-critical .ring { border-color: var(--crit); color: var(--crit); }
+.record.flag .ring { border-color: var(--ap-primary); color: var(--ap-primary); }
+.record.flag.sev-warning .ring { border-color: var(--ap-warn); color: var(--ap-warn); }
+.record.flag.sev-critical .ring { border-color: var(--ap-crit); color: var(--ap-crit); }
 /* Severity chips on the raise screen, coloured like the pin they produce. */
-.chip.sev-warning.on { background: var(--watch); border-color: var(--watch); color: #1a1205; }
-.chip.sev-critical.on { background: var(--crit); border-color: var(--crit); color: #fff; }
-.btn-raise { padding: 15px; border: 0; border-radius: 11px; background: var(--act);
-  color: var(--on-act); font-size: 16px; font-weight: 700; }
+.chip.sev-warning.on { background: var(--ap-warn); border-color: var(--ap-warn); color: #1a1205; }
+.chip.sev-critical.on { background: var(--ap-crit); border-color: var(--ap-crit); color: #fff; }
+.btn-raise { padding: 15px; border: 0; border-radius: 11px; background: var(--ap-action);
+  color: var(--ap-on-action); font-size: 16px; font-weight: 700; }
 .btn-raise:disabled { opacity: .55; }
 
 
@@ -444,15 +470,15 @@ button, input, select, textarea { font-family: inherit; }
    is never urgent — it is orientation, read once — and colouring it like a
    warning would put it ahead of the thing that actually is one. */
 .visit .atfarm { font-size: 10px; font-weight: 650; padding: 3px 7px;
-  border-radius: 5px; background: rgba(74,124,89,.22); color: #a7d3b4; }
+  border-radius: 5px; background: rgba(79,145,71,.22); color: #a9d4ac; }
 
 /* Farms that did not answer. A short list that looks complete is worse than an
    error, so this names them rather than saying "something went wrong" — a
    scout who knows the north farm is missing can still work the south one. */
 .warnline { display: flex; flex-direction: column; gap: 2px; margin-top: 12px;
   padding: 10px 12px; border-radius: 10px; font-size: 13px;
-  border: 1px solid var(--watch); color: var(--watch); background: rgba(240,180,41,.08); }
-.warnline .which { color: var(--muted); font-size: 12px; }
+  border: 1px solid var(--ap-warn); color: var(--ap-warn); background: rgba(224,165,42,.08); }
+.warnline .which { color: var(--ap-muted); font-size: 12px; }
 
 /* --- Type scale ------------------------------------------------------------
    Set after the component rules so it holds regardless of source order. Sizes
@@ -461,19 +487,126 @@ button, input, select, textarea { font-family: inherit; }
 h1 { line-height: 1.35; font-weight: 700; }
 .visit .title { line-height: 1.45; }
 .visit .instruction { line-height: 1.5; }
-.tile .lbl { font-weight: 650; color: var(--ink); }
+.tile .lbl { font-weight: 650; color: var(--ap-ink); }
 /* The count is what a scout scans for, so it leads; the place it counts is
    read second. That was already the order — this only makes the gap wider. */
 .tile .n { line-height: 1; letter-spacing: -0.01em; }
 /* The tile is the primary control on the landing screen and has to answer a
    press. Without this a tap that opens a group and a tap on a disabled tile
    look identical. */
-.tile:active:not(:disabled) { border-color: var(--sage); background: var(--well); }
+.tile:active:not(:disabled) { border-color: var(--ap-primary); background: var(--ap-well); }
 
 /* Focus, for a keyboard and for the accessibility services that draw it. The
    app is a phone app, which is not a reason for the outline to be missing. */
-:focus-visible { outline: 2px solid var(--act); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--ap-action); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+
+/* --- The farm rail ---------------------------------------------------------
+   Which farm's work is on screen, and how much of it there is. On every
+   farm-scoped screen, in the same place, carrying the same numbers.
+
+   It replaced a tile level that could only be reached by backing out of
+   wherever you were. A scout on three farms answered that question once in the
+   morning and lived with the answer all day; now it is one tap from any depth.
+
+   Scrolls horizontally rather than wrapping: two rows of pills would push the
+   segmented control off the first screen, and the farms past the third are
+   rare enough that a scroll is the right cost. */
+.rail { display: flex; gap: 8px; margin-top: 12px; padding-bottom: 2px;
+  overflow-x: auto; scrollbar-width: none; }
+.rail::-webkit-scrollbar { display: none; }
+/* 44px is the floor for a gloved hand, so the pill is sized by height rather
+   than by padding — a shorter label must not make a smaller target. */
+.rail .pill { display: flex; align-items: center; gap: 8px; flex: none;
+  height: 44px; padding: 0 14px; border-radius: 12px; font-size: 14px;
+  font-weight: 600; border: 1px solid var(--ap-line); background: var(--ap-panel);
+  color: var(--ap-muted); }
+/* Chosen, not merely highlighted: this control decides what every number below
+   it means, so it has to be unambiguous at a glance in sunlight. */
+.rail .pill.on { border-color: var(--ap-primary); background: var(--ap-well);
+  color: var(--ap-ink); }
+.rail .pill:active { border-color: var(--ap-primary); }
+.rail .pill .nm { max-width: 11ch; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+/* The count is the reason the rail exists, so it is a filled badge rather than
+   text: it survives being read at arm's length without the name being read. */
+.rail .pill .n { min-width: 26px; height: 22px; padding: 0 7px; border-radius: 7px;
+  display: grid; place-items: center; font-size: 13px; font-weight: 700;
+  background: rgba(147,160,148,.14); color: var(--ap-muted); }
+/* Tone is `farmTone`: red ONLY for work already late. A farm is dozens of
+   blocks, so "something critical here" is the normal state — if red meant that,
+   every pill would be red every day and the rail would carry no signal at all. */
+.rail .pill .n.warn { background: rgba(224,165,42,.16); color: var(--ap-warn); }
+.rail .pill .n.crit { background: rgba(217,96,74,.18); color: var(--ap-crit); }
+/* A farm with nothing in this pile stays on the rail and stays tappable —
+   "nothing on the north farm" is the answer that stops a scout driving there —
+   but it must not compete with the farms that do want them. */
+.rail .pill.empty { opacity: .55; }
+/* Not yet known. Three dots rather than a spinner: the pill is already
+   tappable, and a spinner reads as "wait", which is the wrong instruction. */
+.rail .pill .dots { display: flex; gap: 3px; padding: 0 6px; }
+.rail .pill .dots i { width: 4px; height: 4px; border-radius: 50%;
+  background: var(--ap-muted); opacity: .6; }
+/* Asked and refused, which is not the same as zero. A count here would be a
+   lie in the one direction that matters: it would read as "nothing to do". */
+.rail .pill .n.bad { background: rgba(224,165,42,.16); color: var(--ap-warn); }
+
+/* --- "All farms": where the day starts --------------------------------------
+   One card per farm, with the split that decides which one to drive to. Every
+   granted farm appears, including the empty ones — the opposite of the rule
+   for block tiles, and deliberately: an empty block is noise, an empty farm is
+   an answer. */
+.farmsum { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.fcard { display: flex; flex-direction: column; gap: 9px; width: 100%;
+  padding: 14px; border-radius: 12px; text-align: start;
+  border: 1px solid var(--ap-line); background: var(--ap-panel); color: var(--ap-ink); }
+.fcard:active { border-color: var(--ap-primary); background: var(--ap-well); }
+.fcard .top { display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; width: 100%; }
+.fcard .fname { font-size: 16px; font-weight: 700; min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.fcard .n { font-size: 24px; font-weight: 700; line-height: 1; flex: none; }
+.fcard .n.warn { color: var(--ap-warn); }
+.fcard .n.crit { color: var(--ap-crit); }
+.fcard .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.fcard .chip { padding: 4px 9px; border-radius: 7px; font-size: 12px;
+  font-weight: 600; background: var(--ap-bg); color: var(--ap-muted); }
+.fcard .chip.crit { background: rgba(217,96,74,.18); color: var(--ap-crit); }
+
+/* --- Filing to -------------------------------------------------------------
+   The farm, stated rather than asked. The capture sheet used to put a dropdown
+   here holding whatever was chosen in a settings screen days earlier, and
+   leaving it alone was the commonest way to file a reading against the wrong
+   farm. The rail has already answered; this repeats the answer where it is
+   about to be used, and offers one way to change it. */
+.filing { display: flex; align-items: center; gap: 9px; padding: 11px 14px;
+  border-radius: 12px; border: 1px dashed var(--ap-line); background: var(--ap-panel); }
+.filing .lbl { font-size: 13px; color: var(--ap-muted); flex: none; }
+.filing .nm { font-size: 14px; font-weight: 700; min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.filing .link { margin-inline-start: auto; flex: none; background: none; border: 0;
+  padding: 6px 0 6px 10px; color: var(--ap-primary); font-size: 13px; font-weight: 600; }
+
+/* --- The account sheet -----------------------------------------------------
+   What was left of the Me tab once the rail took the farms and the header took
+   the language: signing out, and the one fact nothing else on screen carries —
+   the role held on each farm. */
+.acct h2 { font-size: 19px; }
+.acct h3.section { margin: 14px 0 0; }
+.acct .farms { margin-top: -4px; }
+/* Asked and refused. Not a button — there is nothing behind it to open — and
+   not a zero, which is the one number that would send a scout past the farm
+   that may need them most. */
+.fcard.bad { border-style: dashed; }
+.fcard .chip.warn { background: rgba(224,165,42,.16); color: var(--ap-warn); }
+
+/* A disabled primary in a sheet used to look exactly like an enabled one. It
+   barely showed before, because the only way to reach it was the instant
+   between opening the sheet and the blocks arriving. "All farms" made it a
+   real, resting state — the farm is genuinely unanswered — so a scout can now
+   sit looking at a full-strength green button that does nothing. */
+.sheet > button:disabled { opacity: .5; }

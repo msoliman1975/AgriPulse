@@ -55,11 +55,16 @@ export const en = {
   "visits.signingOut": "Signing out…",
   "farms.none": "You are not assigned to a farm yet. Ask your supervisor to add you.",
   "farms.loading": "Loading…",
-  "farms.pick": "Choose a farm",
 
   "tab.tasks": "Tasks",
   "tab.records": "Records",
-  "tab.me": "Me",
+
+  // The farm rail: one control, on every farm-scoped screen. `rail.label`
+  // is never drawn — it names the control for a screen reader, which
+  // otherwise announces a row of farm names with no idea what they do.
+  "rail.label": "Which farm",
+  "rail.allFarms": "All farms",
+  "rail.failed": "This farm did not answer",
 
   "seg.mine": "My work",
   "seg.available": "Available",
@@ -80,9 +85,10 @@ export const en = {
   "group.byBlock": "By block",
   "group.byDue": "By time",
   "group.noBlock": "No block",
-  "group.farms": "Your farms",
-  "group.oneFarm": "1 farm",
-  "group.farmsCount": "{n} farms",
+  // "All farms" is an overview, not a gate. Named for the question it
+  // answers rather than for what it lists.
+  "group.farmsStart": "Where the day starts",
+  "group.farmsDone": "What you closed",
 
   "empty.mine": "Nothing to walk right now.",
   "empty.available": "Nothing open to take.",
@@ -96,6 +102,13 @@ export const en = {
   "record.readingHint": "One measurement — trap count, incidence, soil feel.",
   "record.cancel": "Cancel",
   "record.whichFarm": "Which farm?",
+  // The farm is inherited from the rail and stated, not asked. It is only
+  // asked outright when the rail is on "All farms", which is the one time
+  // the app genuinely does not know.
+  "record.filingTo": "Filing to",
+  "record.changeFarm": "Change",
+  "record.pickFarm": "Choose a farm",
+  "record.farmFirst": "Choose a farm first",
   "record.whichBlock": "Which block?",
   "record.start": "Start",
   "record.noBlocks": "This farm has no blocks.",
@@ -151,7 +164,6 @@ export const en = {
   "flag.chooserHint": "Unexpected, and somebody else needs to deal with it.",
 
   "tasks.someFarmsFailed": "Some farms could not be loaded. Pull down and retry.",
-  "tasks.allFarms": "All farms",
 
   "records.title": "My records",
   "records.empty": "You have not recorded anything in the last 30 days.",
@@ -159,10 +171,14 @@ export const en = {
 
   "me.title": "My account",
   "me.farm": "Farm",
-  // Read-only now. Choosing a farm happens where the work is — on the Tasks
-  // tab — rather than in a settings screen two taps away from it.
+  // Read-only. Choosing a farm happens where the work is — on the rail at
+  // the top of the list — rather than in a settings screen two taps away.
+  // The hints say what this list is NOT, which is the thing a scout who
+  // remembers the old settings screen will assume it still is.
   "me.farms": "Your farms",
-  "me.farmsHint": "Your work is grouped by farm on the Tasks tab.",
+  "me.farmsHint": "Your role on each. Switch farms on the rail above your work.",
+  "me.roleHint": "Your role on this farm.",
+  "me.close": "Close",
 
   "work.why": "Why you are going",
   "work.photos": "Photos",

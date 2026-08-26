@@ -3,10 +3,11 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { getFarm } from "@/api/client";
 import { fetchMe, type FarmScope } from "@/api/me";
 import { currentSession } from "@/auth/session";
+import { ALL_FARMS } from "@/components/FarmRail";
 import { dirOf, t, type Lang } from "@/i18n";
 import { adoptServerLang, initialLang } from "@/i18n/preference";
 import { ensureDeviceRegistered } from "@/push/register";
-import { MeScreen } from "@/screens/MeScreen";
+import { AccountSheet } from "@/screens/AccountSheet";
 import { RecordSheet } from "@/screens/RecordSheet";
 import { RecordsScreen } from "@/screens/RecordsScreen";
 import { SignInScreen } from "@/screens/SignInScreen";
@@ -22,26 +23,35 @@ import { TasksScreen } from "@/screens/TasksScreen";
 const FALLBACK_FARM_ID = import.meta.env.VITE_FARM_ID ?? "";
 
 /**
- * The farm last recorded against.
+ * Which farm the rail is on, or `ALL_FARMS`.
  *
- * This used to be the app's *mode*: one farm chosen in a settings screen, and
- * every list, count and capture silently meant that farm until it was changed.
- * A scout on two farms saw half their work and nothing said so. The lists now
- * hold every granted farm and group by it, so this key no longer decides what
- * anything shows — it only pre-fills the farm picker in the capture sheet, so
- * somebody working one farm all week does not answer the same question daily.
+ * This key has had three meanings and is on its last one. It began as the
+ * app's *mode*: one farm chosen in a settings screen, and every list, count and
+ * capture silently meant that farm until it was changed — a scout on two farms
+ * saw half their work and nothing said so. It then became a picker default
+ * only, while the lists held every farm and grouped by it.
+ *
+ * Now it is the farm rail's position, and it is one piece of state rather than
+ * two on purpose. The farm the lists are filtered to and the farm a reading is
+ * filed against are the same question asked twice, and the way to file a
+ * reading against the wrong farm was for those two answers to differ.
+ *
+ * `ALL_FARMS` is a real, remembered answer: cross-farm lists, and the capture
+ * sheet asks outright.
  */
-const LAST_FARM_KEY = "agripulse.scout.farm";
+const FARM_KEY = "agripulse.scout.farm";
 
-/** The three places a scout can be. Capture is a button, not a tab: it is an
- *  action taken from wherever you are, not a place you go. */
-type Tab = "tasks" | "records" | "me";
+/** The two places a scout can be. Capture is a button, not a tab: it is an
+ *  action taken from wherever you are, not a place you go. And the account is
+ *  a sheet, not a tab — see `AccountSheet`. */
+type Tab = "tasks" | "records";
 
 export function App(): ReactNode {
   const [signedIn, setSignedIn] = useState(() => currentSession() !== null);
   const [lang, setLang] = useState<Lang>(initialLang);
   const [tab, setTab] = useState<Tab>("tasks");
   const [recording, setRecording] = useState(false);
+  const [account, setAccount] = useState(false);
   // A work item open full-screen owns the whole viewport: the tab bar would
   // otherwise sit under a capture form and take a scout out of it mid-reading.
   const [fullScreen, setFullScreen] = useState(false);
@@ -49,8 +59,8 @@ export function App(): ReactNode {
   const [userId, setUserId] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(null);
   const [farms, setFarms] = useState<FarmScope[] | null>(null);
-  const [lastFarm, setLastFarm] = useState<string>(
-    () => localStorage.getItem(LAST_FARM_KEY) ?? "",
+  const [farm, setFarm] = useState<string>(
+    () => localStorage.getItem(FARM_KEY) ?? ALL_FARMS,
   );
   /**
    * Farm id -> the name people call it.
@@ -84,11 +94,11 @@ export function App(): ReactNode {
       // A choice made on this device wins — `adoptServerLang` enforces that,
       // not this call site.
       if (me.language) setLang(adoptServerLang(me.language));
-      // Drop a remembered farm the scout no longer holds. It is only a picker
-      // default now, but a default naming a revoked farm would 403 on the
-      // first capture of the day.
-      setLastFarm((current) =>
-        current && me.farms.some((s) => s.farm_id === current) ? current : "",
+      // Drop a remembered farm the scout no longer holds. Falling back to
+      // ALL_FARMS rather than to some other farm: the app must not quietly
+      // start meaning a farm nobody chose.
+      setFarm((current) =>
+        current && !me.farms.some((s) => s.farm_id === current) ? ALL_FARMS : current,
       );
     });
     return () => {
@@ -107,11 +117,11 @@ export function App(): ReactNode {
 
   // Registration is farm-gated: a Scout holds no tenant role, so a token
   // registered against a farm they do not hold is a 403 and a phone that never
-  // buzzes. Every granted farm is registered, not just one — the app no longer
-  // has a "current" farm, and picking one would have silently stopped pushes
-  // for the others. FCM also rotates tokens on reinstall and restore, so this
-  // runs on every launch; a register-once app quietly stops buzzing months
-  // later.
+  // buzzes. Every granted farm is registered, not just the one the rail is on
+  // — the rail is a view, not a subscription, and keying pushes off it would
+  // silently stop them for every other farm.  FCM also rotates tokens on
+  // reinstall and restore, so this runs on every launch; a register-once app
+  // quietly stops buzzing months later.
   const farmKey = scopes.map((f) => f.farm_id).join(",");
   useEffect(() => {
     if (!signedIn || !farmKey) return;
@@ -158,10 +168,19 @@ export function App(): ReactNode {
     [farmNames],
   );
 
-  const rememberFarm = useCallback((id: string) => {
-    localStorage.setItem(LAST_FARM_KEY, id);
-    setLastFarm(id);
+  const pickFarm = useCallback((id: string) => {
+    localStorage.setItem(FARM_KEY, id);
+    setFarm(id);
   }, []);
+
+  // A scout granted exactly one farm is never asked which. The rail is not
+  // rendered for them, so the filter has to follow the grant rather than wait
+  // for a tap that cannot happen — and losing a second farm mid-session lands
+  // here too.
+  const only = scopes.length === 1 ? scopes[0].farm_id : null;
+  useEffect(() => {
+    if (only) setFarm(only);
+  }, [only]);
 
   if (!signedIn) {
     return (
@@ -196,17 +215,22 @@ export function App(): ReactNode {
           name={name}
           farms={scopes}
           farmName={nameOfFarm}
+          farm={farm}
+          onFarmChange={pickFarm}
+          onOpenAccount={() => setAccount(true)}
           onFullScreen={setFullScreen}
         />
-      ) : tab === "records" ? (
-        <RecordsScreen lang={lang} farms={scopes} farmName={nameOfFarm} userId={userId} />
       ) : (
-        <MeScreen
+        <RecordsScreen
           lang={lang}
           onLangChange={setLang}
           name={name}
           farms={scopes}
           farmName={nameOfFarm}
+          farm={farm}
+          onFarmChange={pickFarm}
+          onOpenAccount={() => setAccount(true)}
+          userId={userId}
         />
       )}
 
@@ -215,23 +239,30 @@ export function App(): ReactNode {
           lang={lang}
           farms={scopes}
           farmName={nameOfFarm}
-          defaultFarmId={lastFarm}
-          onPickedFarm={rememberFarm}
+          farm={farm}
           onClose={() => setRecording(false)}
+        />
+      ) : null}
+
+      {account ? (
+        <AccountSheet
+          lang={lang}
+          name={name}
+          farms={scopes}
+          farmName={nameOfFarm}
+          onClose={() => setAccount(false)}
         />
       ) : null}
 
       {!fullScreen && !recording ? (
         <>
-          {/* Recording is reachable from both list screens, because the
-              thing worth recording is noticed while reading either one. */}
-          {tab !== "me" ? (
-            <button type="button" className="fab" onClick={() => setRecording(true)}>
-              {t(lang, "record.fab")}
-            </button>
-          ) : null}
+          {/* Recording is reachable from both screens, because the thing worth
+              recording is noticed while reading either one. */}
+          <button type="button" className="fab" onClick={() => setRecording(true)}>
+            {t(lang, "record.fab")}
+          </button>
           <nav className="tabs">
-            {(["tasks", "records", "me"] as Tab[]).map((k) => (
+            {(["tasks", "records"] as Tab[]).map((k) => (
               <button
                 key={k}
                 type="button"
