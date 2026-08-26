@@ -3006,11 +3006,36 @@ global:
   #   Image CONFIRMED by pulling it on the node before the bump:
   #   frontend @ f40c68e.
   #   Rollback is the frontend tag back to e6735c0.
+  # 2026-08-26 - e8ec32c = #592, Farm Console v2 controls split in two.
+  #   The console spread one job over three places: the index was a chip in
+  #   the top bar, pixels and the sub-block mesh were BOTH a picture card in
+  #   the map's bottom-left corner and a button on the rail on the right, and
+  #   borders, labels and opacity sat nine rows down a popover behind a "More"
+  #   card. Alert chips had no switch at all.
+  #   The top bar now carries the map's frame as plain checkboxes and sliders
+  #   - farm borders, block/pivot borders, cells, two opacities, labels - and
+  #   the rail carries every datapoint: index (its "None" is the pixel off
+  #   switch), alerts, field flags as Current/Historical/None, signals, the
+  #   mark legend, full screen. The Satellite card and the three "not built
+  #   yet" buttons are gone.
+  #   That is why api and workers move too: block labels can now read the CROP
+  #   rather than the block name, and a console scrubbed back to a past season
+  #   must name the crop that was in the ground then. New route
+  #   `GET /farms/{id}/crop-assignments?on=<date>` answers the whole farm in
+  #   one request - the per-block route would be the N+1 that exhausted the
+  #   connection pool on this page before.
+  #   Backend + frontend, so api, workers and frontend all move together.
+  #   Tile-server stays 676746a and keycloak stays 677c7dc.
+  #   NO MIGRATION. The route reads `block_crops` and `public.crops` as they
+  #   already are.
+  #   Images CONFIRMED by pulling both on the node before the bump:
+  #   api @ e8ec32c, frontend @ e8ec32c.
+  #   Rollback is api and workers back to e6735c0, frontend back to f40c68e.
   images:
     api:
-      tag: "e6735c0"
+      tag: "e8ec32c"
     workers:
-      tag: "e6735c0"
+      tag: "e8ec32c"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3114,7 +3139,10 @@ global:
       #   FRONTEND ONLY. No backend file changed, so api stays 698e8f6,
       #   workers 1363ebe and tile-server 676746a; none of them restart.
       #   Rollback is this tag back to 698e8f6. No migration.
-      tag: "f40c68e"
+      # e8ec32c = #592. See the note above `global.images` - this tag moves
+      # with api and workers, because the crop label the top bar can now
+      # switch to is served by a new route.
+      tag: "e8ec32c"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
