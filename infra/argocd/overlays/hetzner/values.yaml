@@ -3086,10 +3086,19 @@ global:
   #   0087 are additive columns and are harmless left behind. 0074's unique
   #   index is not - dropping it needs its own migration, not a tag revert.
   images:
+    # a3680d2 = #603, three fixes to the Timeline screen, all found by opening
+    #   the page on prod rather than by any test. The api half is ONE file,
+    #   modules/timeline/service.py: a NUMERIC(14,4) reading reached the rail
+    #   as "fruit tss brix: 6.4000", so trailing zeros after a decimal point
+    #   are trimmed. An integer reading and a categorical value containing a
+    #   dot are both left alone.
+    #   The other two fixes are frontend and are described on that tag below.
+    #   NO MIGRATION between ccbb935 and a3680d2 - rollback really is just
+    #   these tags back to ccbb935.
     api:
-      tag: "ccbb935"
+      tag: "a3680d2"
     workers:
-      tag: "ccbb935"
+      tag: "a3680d2"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3208,7 +3217,25 @@ global:
       # FRONTEND ONLY. api and workers stay on ccbb935: every column was
       # already on the wire, this is the read side catching up. No migration,
       # so rollback really is just this tag back to ccbb935.
-      tag: "76ec8de"
+      # a3680d2 = #603, the two defects that made the Timeline screen unusable.
+      #   (1) The map grew without bound. AppShell pins the viewport off a
+      #   `/labs/map` prefix and `/timeline` was not in it, so the shell stayed
+      #   `min-h-screen` - a floor, not a ceiling - and a `<Page width="bleed">`
+      #   whose `h-full` resolves against an auto-height parent had infinite
+      #   room. Measured on prod at 1600x950 the map reached 15983px inside a
+      #   950px viewport, putting the farm several screens below the fold.
+      #   It looked fine narrow, because the rail is `hidden lg:block`.
+      #   (2) No index pixel ever drew on a farm using a whole-farm raster,
+      #   which is every farm cut over to farm-AOI fetching. The source was
+      #   built with `bounds: raster.bounds` and a farm raster has no per-block
+      #   extent; MapLibre validates the PRESENCE of `bounds`, so an explicit
+      #   undefined threw in addSource and took addLayer with it. Both errors
+      #   go to the console and neither reaches React, so the satellite, the
+      #   outlines and the marks still drew and it read as "this farm has no
+      #   imagery" rather than as a bug.
+      #   Carries 76ec8de forward - that tag is an ancestor, checked with
+      #   `git merge-base --is-ancestor` before this edit. No migration.
+      tag: "a3680d2"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
