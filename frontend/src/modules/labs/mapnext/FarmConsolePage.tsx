@@ -53,6 +53,7 @@ import { CreateFarmFlow } from "./CreateFarmFlow";
 import { BulkAoiUploadPanel } from "./BulkAoiUploadPanel";
 import type { BulkPreviewProps } from "../map/MapCanvas";
 import type { ExistingBlock } from "@/lib/aoi/bulk";
+import { localizedName } from "@/lib/localizedField";
 import { BlockDock } from "./BlockDock";
 import { UnitsRail } from "./UnitsRail";
 import { ViewBar, type LayerState } from "./ViewBar";
@@ -199,9 +200,10 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   }, [summaryQ.data]);
   const blockNameById = useMemo(() => {
     const m = new Map<string, string>();
-    for (const b of summaryQ.data?.blocks ?? []) m.set(b.id, b.name?.trim() || b.code);
+    for (const b of summaryQ.data?.blocks ?? [])
+      m.set(b.id, localizedName(i18n.language, b.name?.trim() || b.code, b.name_ar));
     return m;
-  }, [summaryQ.data]);
+  }, [summaryQ.data, i18n.language]);
 
   const detailQ = useQuery({
     // Language is part of the key: loadUnitDetail bakes localized alert text
@@ -724,7 +726,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   }
 
   const summary = summaryQ.data;
-  const farmName = summary.farm.name;
+  const farmName = localizedName(i18n.language, summary.farm.name, summary.farm.name_ar);
   const selectedBlock = selectedId ? summary.blocks.find((b) => b.id === selectedId) : null;
   const reshaping = reshapeTarget != null;
 

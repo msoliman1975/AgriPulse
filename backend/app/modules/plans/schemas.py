@@ -39,6 +39,9 @@ class PlanCreateRequest(BaseModel):
     season_label: str = Field(min_length=1, max_length=64)
     season_year: int = Field(ge=2020, le=2100)
     name: str | None = Field(default=None, max_length=255)
+    # Arabic display name (tenant migration 0087). Optional; the read path
+    # falls back to `name`.
+    name_ar: str | None = Field(default=None, max_length=255)
     notes: str | None = Field(default=None, max_length=4000)
 
 
@@ -48,6 +51,7 @@ class PlanUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, max_length=255)
+    name_ar: str | None = Field(default=None, max_length=255)
     notes: str | None = Field(default=None, max_length=4000)
     status: PlanStatus | None = None
 
@@ -60,6 +64,7 @@ class PlanResponse(BaseModel):
     season_label: str
     season_year: int
     name: str | None
+    name_ar: str | None = None
     notes: str | None
     status: PlanStatus
     created_at: datetime
@@ -193,6 +198,7 @@ class BoardBlockResponse(BaseModel):
     id: UUID
     code: str
     name: str | None
+    name_ar: str | None = None
     unit_type: str
 
 
@@ -200,6 +206,7 @@ class BoardResourceChip(BaseModel):
     id: UUID
     kind: Literal["worker", "equipment"]
     name: str
+    name_ar: str | None = None
     role: str | None = None
     equipment_type: str | None = None
 

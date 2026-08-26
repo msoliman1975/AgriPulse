@@ -166,7 +166,9 @@ async def create_farm(
     return await service.create_farm(
         code=payload.code,
         name=payload.name,
+        name_ar=payload.name_ar,
         description=payload.description,
+        description_ar=payload.description_ar,
         boundary=payload.boundary,
         elevation_m=payload.elevation_m,
         country_code=payload.country_code,
@@ -365,6 +367,7 @@ async def create_block(
         farm_id=farm_id,
         code=payload.code,
         name=payload.name,
+        name_ar=payload.name_ar,
         boundary=payload.boundary,
         elevation_m=payload.elevation_m,
         irrigation_system=payload.irrigation_system,

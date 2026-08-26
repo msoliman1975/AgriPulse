@@ -3,7 +3,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ApiError,
   getSignalTemplate,
+  categoricalLabel,
   listSignalDefinitions,
+  signalName,
   recordObservation,
   type Geopoint,
   type SignalDefinition,
@@ -108,6 +110,9 @@ export function CaptureForm({
   // for every categorical definition, so an empty list here means a legacy row
   // — fall back to free text rather than showing a picker with nothing in it.
   const options = chosen?.categorical_values ?? [];
+  // `chosen` is set whenever `options` is non-empty, but the compiler cannot
+  // see that, and a guard is cheaper than a non-null assertion.
+  const optionLabel = (v: string): string => (chosen ? categoricalLabel(lang, chosen, v) : v);
   const usePicker = kind === "categorical" && options.length > 0;
   // Decimal-as-string on the wire. `Number(null)` is 0, which would silently
   // impose a floor of zero on every unbounded signal, so the null check is
@@ -290,7 +295,7 @@ export function CaptureForm({
       >
         {defs.map((d) => (
           <option key={d.id} value={d.id}>
-            {d.name}
+            {signalName(lang, d)}
           </option>
         ))}
       </select>
@@ -321,7 +326,9 @@ export function CaptureForm({
           <option value="">—</option>
           {options.map((v) => (
             <option key={v} value={v}>
-              {v}
+              {/* The label is translated; `value` stays the English code the
+                  server validates against. */}
+              {optionLabel(v)}
             </option>
           ))}
         </select>

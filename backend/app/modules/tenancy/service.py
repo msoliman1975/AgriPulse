@@ -56,6 +56,7 @@ class TenantService(Protocol):
         *,
         slug: str,
         name: str,
+        name_ar: str | None = None,
         contact_email: str,
         owner_email: str | None = None,
         owner_full_name: str | None = None,
@@ -150,6 +151,7 @@ class TenantCreatedResult:
         "tenant_id",
         "slug",
         "name",
+        "name_ar",
         "schema_name",
         "contact_email",
         "default_locale",
@@ -174,10 +176,12 @@ class TenantCreatedResult:
         created_at: datetime,
         provisioning_failed: bool = False,
         owner_user_id: str | None = None,
+        name_ar: str | None = None,
     ) -> None:
         self.tenant_id = tenant_id
         self.slug = slug
         self.name = name
+        self.name_ar = name_ar
         self.schema_name = schema_name
         self.contact_email = contact_email
         self.default_locale = default_locale
@@ -195,6 +199,8 @@ class TenantSnapshot:
     id: UUID
     slug: str
     name: str
+    # Arabic display name (public migration 0075). Null falls back to `name`.
+    name_ar: str | None
     legal_name: str | None
     tax_id: str | None
     contact_email: str
@@ -316,6 +322,7 @@ def _to_snapshot(t: Tenant) -> TenantSnapshot:
         id=t.id,
         slug=t.slug,
         name=t.name,
+        name_ar=t.name_ar,
         legal_name=t.legal_name,
         tax_id=t.tax_id,
         contact_email=t.contact_email,
@@ -378,6 +385,7 @@ class TenantServiceImpl:
         *,
         slug: str,
         name: str,
+        name_ar: str | None = None,
         contact_email: str,
         owner_email: str | None = None,
         owner_full_name: str | None = None,
@@ -400,6 +408,7 @@ class TenantServiceImpl:
             tenant_id=tenant_id,
             slug=slug,
             name=name,
+            name_ar=name_ar,
             contact_email=contact_email,
             schema_name=schema_name,
             legal_name=legal_name,
@@ -531,6 +540,7 @@ class TenantServiceImpl:
             tenant_id=tenant_id,
             slug=slug,
             name=name,
+            name_ar=name_ar,
             schema_name=schema_name,
             contact_email=contact_email,
             default_locale=default_locale,

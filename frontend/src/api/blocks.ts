@@ -37,6 +37,8 @@ export interface Block {
   farm_id: string;
   code: string;
   name: string | null;
+  /** Arabic display name. Null when nobody wrote one — fall back to `name`. */
+  name_ar: string | null;
   centroid: GeoJSON.Point;
   area_m2: number;
   area_value: number;
@@ -70,6 +72,7 @@ export interface BlockDetail extends Block {
 export interface BlockCreatePayload {
   code: string;
   name?: string | null;
+  name_ar?: string | null;
   boundary: Polygon;
   elevation_m?: number | null;
   irrigation_system?: IrrigationSystem | null;

@@ -18,6 +18,7 @@ import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
+import { localizedName } from "@/lib/localizedField";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useCapability } from "@/rbac/useCapability";
 import { useBoard } from "@/queries/board";
@@ -645,7 +646,7 @@ function BoardGrid({
   onChipClick,
   onRecDrop,
 }: BoardGridProps): ReactNode {
-  const { t } = useTranslation("board");
+  const { t, i18n } = useTranslation("board");
   const dateLocale = useDateLocale();
   if (blocks.length === 0) {
     return (
@@ -714,9 +715,9 @@ function BoardGrid({
               >
                 <div
                   className="truncate"
-                  title={block.name ? `${block.name} (${block.code})` : block.code}
+                  title={`${localizedName(i18n.language, block.name ?? block.code, block.name_ar)} (${block.code})`}
                 >
-                  {block.name ?? block.code}
+                  {localizedName(i18n.language, block.name ?? block.code, block.name_ar)}
                 </div>
               </th>
               {columns.map((col) => {

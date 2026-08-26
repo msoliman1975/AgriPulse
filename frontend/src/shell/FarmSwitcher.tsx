@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { listFarms } from "@/api/farms";
+import { localizedName } from "@/lib/localizedField";
 import { useCapability } from "@/rbac/useCapability";
 import { ChevronIcon } from "./icons";
 
@@ -35,7 +36,7 @@ export function FarmSwitcher(): ReactNode {
   const { farmId } = useParams<{ farmId?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useTranslation("common");
+  const { t, i18n } = useTranslation("common");
   const canCreateFarm = useCapability("farm.create");
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -115,7 +116,11 @@ export function FarmSwitcher(): ReactNode {
         aria-expanded={open}
         className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-ap-ink hover:bg-ap-line/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ap-primary"
       >
-        <span className="truncate">{active?.name ?? t("farmSwitcher.placeholder")}</span>
+        <span className="truncate" dir="auto">
+          {active
+            ? localizedName(i18n.language, active.name, active.name_ar)
+            : t("farmSwitcher.placeholder")}
+        </span>
         <ChevronIcon className="h-3 w-3 rotate-90" />
       </button>
       {open ? (
@@ -140,7 +145,9 @@ export function FarmSwitcher(): ReactNode {
                   selected ? "bg-ap-primary-soft" : ""
                 }`}
               >
-                <span className="font-medium text-ap-ink">{f.name}</span>
+                <span className="font-medium text-ap-ink" dir="auto">
+                  {localizedName(i18n.language, f.name, f.name_ar)}
+                </span>
                 <span className="text-[11px] text-ap-muted">{f.code}</span>
               </button>
             );

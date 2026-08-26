@@ -41,10 +41,19 @@ class SignalDefinitionResponse(BaseModel):
     id: UUID
     code: str
     name: str
+    # Arabic labels (public migration 0075). Nullable on every one: a row
+    # written by an older API image has none, and the client falls back to
+    # the English field.
+    name_ar: str | None = None
     description: str | None
+    description_ar: str | None = None
     value_kind: ValueKind
     unit: str | None
+    unit_ar: str | None = None
     categorical_values: list[str] | None
+    # Same length and order as `categorical_values`, one Arabic label per
+    # code. Null when nobody has translated the list.
+    categorical_values_ar: list[str] | None = None
     value_min: Decimal | None
     value_max: Decimal | None
     attachment_allowed: bool
@@ -64,10 +73,14 @@ class SignalDefinitionCreateRequest(BaseModel):
 
     code: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9][a-z0-9_-]*$")
     name: str = Field(min_length=1, max_length=200)
+    name_ar: str | None = Field(default=None, max_length=200)
     description: str | None = Field(default=None, max_length=1000)
+    description_ar: str | None = Field(default=None, max_length=1000)
     value_kind: ValueKind
     unit: str | None = Field(default=None, max_length=32)
+    unit_ar: str | None = Field(default=None, max_length=32)
     categorical_values: list[str] | None = None
+    categorical_values_ar: list[str] | None = None
     value_min: Decimal | None = None
     value_max: Decimal | None = None
     attachment_allowed: bool = False
@@ -83,9 +96,13 @@ class SignalDefinitionUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, min_length=1, max_length=200)
+    name_ar: str | None = Field(default=None, max_length=200)
     description: str | None = Field(default=None, max_length=1000)
+    description_ar: str | None = Field(default=None, max_length=1000)
     unit: str | None = Field(default=None, max_length=32)
+    unit_ar: str | None = Field(default=None, max_length=32)
     categorical_values: list[str] | None = None
+    categorical_values_ar: list[str] | None = None
     value_min: Decimal | None = None
     value_max: Decimal | None = None
     attachment_allowed: bool | None = None
@@ -183,7 +200,9 @@ class SignalTemplateResponse(BaseModel):
     id: UUID
     code: str
     name: str
+    name_ar: str | None = None
     description: str | None
+    description_ar: str | None = None
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -204,7 +223,9 @@ class SignalTemplateCreateRequest(BaseModel):
 
     code: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9][a-z0-9_-]*$")
     name: str = Field(min_length=1, max_length=200)
+    name_ar: str | None = Field(default=None, max_length=200)
     description: str | None = Field(default=None, max_length=1000)
+    description_ar: str | None = Field(default=None, max_length=1000)
     # Members are required at create time so a template never lives
     # in a broken half-defined state. Positions must be unique within
     # the template; the service rejects duplicates with a 400.
@@ -217,7 +238,9 @@ class SignalTemplateUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, min_length=1, max_length=200)
+    name_ar: str | None = Field(default=None, max_length=200)
     description: str | None = Field(default=None, max_length=1000)
+    description_ar: str | None = Field(default=None, max_length=1000)
     is_active: bool | None = None
     # When provided, replaces the full member list atomically (the
     # service performs delete-then-insert in one transaction). Null =

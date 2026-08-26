@@ -18,6 +18,7 @@ class CreateTenantRequest(BaseModel):
 
     slug: str = Field(description="URL-safe identifier, 3-32 chars, [a-z0-9-].")
     name: str = Field(min_length=1, max_length=255, description="Display name.")
+    name_ar: str | None = Field(default=None, max_length=255, description="Arabic display name.")
     contact_email: EmailStr
     legal_name: str | None = None
     tax_id: str | None = None
@@ -47,6 +48,7 @@ class UpdateTenantRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, min_length=1, max_length=255)
+    name_ar: str | None = Field(default=None, max_length=255)
     legal_name: str | None = None
     tax_id: str | None = None
     contact_email: EmailStr | None = None
@@ -97,6 +99,7 @@ class TenantResponse(BaseModel):
     id: UUID
     slug: str
     name: str
+    name_ar: str | None = None
     schema_name: str
     contact_email: str
     default_locale: str
@@ -115,6 +118,7 @@ class TenantDetailResponse(BaseModel):
     id: UUID
     slug: str
     name: str
+    name_ar: str | None = None
     legal_name: str | None
     tax_id: str | None
     contact_email: str

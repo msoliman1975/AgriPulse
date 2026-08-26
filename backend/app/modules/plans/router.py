@@ -92,6 +92,7 @@ async def create_plan(
         season_label=payload.season_label,
         season_year=payload.season_year,
         name=payload.name,
+        name_ar=payload.name_ar,
         notes=payload.notes,
         actor_user_id=context.user_id,
         tenant_schema=schema,

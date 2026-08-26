@@ -11,10 +11,16 @@ export interface SignalDefinition {
   id: string;
   code: string;
   name: string;
+  /** Arabic labels. Null when nobody wrote one — fall back to English. */
+  name_ar: string | null;
   description: string | null;
+  description_ar: string | null;
   value_kind: ValueKind;
   unit: string | null;
+  unit_ar: string | null;
   categorical_values: string[] | null;
+  /** Same length and order as `categorical_values`, one Arabic label each. */
+  categorical_values_ar: string[] | null;
   // Pydantic Decimal serialises as string.
   value_min: string | null;
   value_max: string | null;
@@ -29,10 +35,14 @@ export interface SignalDefinition {
 export interface SignalDefinitionCreatePayload {
   code: string;
   name: string;
+  name_ar?: string | null;
   description?: string | null;
+  description_ar?: string | null;
   value_kind: ValueKind;
   unit?: string | null;
+  unit_ar?: string | null;
   categorical_values?: string[] | null;
+  categorical_values_ar?: string[] | null;
   value_min?: string | null;
   value_max?: string | null;
   attachment_allowed?: boolean;
@@ -42,9 +52,13 @@ export interface SignalDefinitionCreatePayload {
 
 export interface SignalDefinitionUpdatePayload {
   name?: string;
+  name_ar?: string | null;
   description?: string | null;
+  description_ar?: string | null;
   unit?: string | null;
+  unit_ar?: string | null;
   categorical_values?: string[] | null;
+  categorical_values_ar?: string[] | null;
   value_min?: string | null;
   value_max?: string | null;
   attachment_allowed?: boolean;
@@ -349,7 +363,9 @@ export interface SignalTemplate {
   id: string;
   code: string;
   name: string;
+  name_ar: string | null;
   description: string | null;
+  description_ar: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -369,13 +385,17 @@ export interface SignalTemplateWithMembers {
 export interface SignalTemplateCreatePayload {
   code: string;
   name: string;
+  name_ar?: string | null;
   description?: string | null;
+  description_ar?: string | null;
   members: SignalTemplateMember[];
 }
 
 export interface SignalTemplateUpdatePayload {
   name?: string;
+  name_ar?: string | null;
   description?: string | null;
+  description_ar?: string | null;
   is_active?: boolean;
   members?: SignalTemplateMember[];
 }

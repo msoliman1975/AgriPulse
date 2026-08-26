@@ -251,7 +251,12 @@ class Farm(Base, TimestampedMixin):
     )
     code: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    # Arabic display name (tenant migration 0087). Nullable: a rolling
+    # deploy leaves rows written by the older image at NULL, so every
+    # reader falls back with COALESCE(NULLIF(name_ar, ''), name).
+    name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     boundary: Mapped[Any] = mapped_column(
         Geometry(geometry_type="MULTIPOLYGON", srid=4326, spatial_index=False),
         nullable=False,
@@ -348,6 +353,8 @@ class Block(Base, TimestampedMixin):
     )
     code: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # See Farm.name_ar (tenant migration 0087).
+    name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     boundary: Mapped[Any] = mapped_column(
         Geometry(geometry_type="POLYGON", srid=4326, spatial_index=False),
         nullable=False,

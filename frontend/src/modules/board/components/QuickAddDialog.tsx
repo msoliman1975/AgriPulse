@@ -1,16 +1,11 @@
-import {
-  endOfMonth,
-  format,
-  isWithinInterval,
-  parseISO,
-  startOfMonth,
-} from "date-fns";
+import { endOfMonth, format, isWithinInterval, parseISO, startOfMonth } from "date-fns";
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ActivityType } from "@/api/plans";
 import type { Resource } from "@/api/resources";
 import { Modal } from "@/components/Modal";
+import { localizedName } from "@/lib/localizedField";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCreateFlatActivity, useAttachResource } from "@/queries/board";
 import { useResources } from "@/queries/resources";
@@ -81,21 +76,15 @@ export function QuickAddDialog({
 
   const [scheduledIso, setScheduledIso] = useState(initialScheduledIso);
   const [activityType, setActivityType] = useState<ActivityType>("irrigation");
-  const [selectedResourceIds, setSelectedResourceIds] = useState<Set<string>>(
-    new Set(),
-  );
+  const [selectedResourceIds, setSelectedResourceIds] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState("");
 
   // Month-mode date bounds: lock to this column's month so the user
   // can't accidentally schedule into the next column.
   const monthInputMin =
-    columnUnit === "month"
-      ? format(startOfMonth(colStartDate), "yyyy-MM-dd")
-      : undefined;
+    columnUnit === "month" ? format(startOfMonth(colStartDate), "yyyy-MM-dd") : undefined;
   const monthInputMax =
-    columnUnit === "month"
-      ? format(endOfMonth(colStartDate), "yyyy-MM-dd")
-      : undefined;
+    columnUnit === "month" ? format(endOfMonth(colStartDate), "yyyy-MM-dd") : undefined;
 
   const resourcesQ = useResources(farmId, { include_archived: false });
   const workers = useMemo(
@@ -183,9 +172,7 @@ export function QuickAddDialog({
           {resourcesQ.isLoading ? (
             <p className="text-xs text-ap-muted">…</p>
           ) : workers.length + equipment.length === 0 ? (
-            <p className="text-xs text-ap-muted">
-              {t("quickAdd.noResources")}
-            </p>
+            <p className="text-xs text-ap-muted">{t("quickAdd.noResources")}</p>
           ) : (
             <div className="flex max-h-40 flex-col gap-1 overflow-y-auto rounded border border-ap-line p-2">
               <ResourceGroup
@@ -228,9 +215,7 @@ export function QuickAddDialog({
           />
         </label>
 
-        {create.isError ? (
-          <p className="text-xs text-ap-crit">{t("quickAdd.failed")}</p>
-        ) : null}
+        {create.isError ? <p className="text-xs text-ap-crit">{t("quickAdd.failed")}</p> : null}
 
         <div className="mt-2 flex justify-end gap-2">
           <button
@@ -261,36 +246,23 @@ interface ResourceGroupProps {
   onToggle: (id: string) => void;
 }
 
-function ResourceGroup({
-  label,
-  items,
-  selected,
-  onToggle,
-}: ResourceGroupProps): ReactNode {
+function ResourceGroup({ label, items, selected, onToggle }: ResourceGroupProps): ReactNode {
+  const { i18n } = useTranslation("board");
   if (items.length === 0) return null;
   return (
     <div>
-      <div className="px-1 text-[11px] uppercase tracking-wider text-ap-muted">
-        {label}
-      </div>
+      <div className="px-1 text-[11px] uppercase tracking-wider text-ap-muted">{label}</div>
       <ul className="flex flex-col">
         {items.map((r) => (
           <li key={r.id}>
             <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-ap-bg/50">
-              <input
-                type="checkbox"
-                checked={selected.has(r.id)}
-                onChange={() => onToggle(r.id)}
-              />
+              <input type="checkbox" checked={selected.has(r.id)} onChange={() => onToggle(r.id)} />
               <span className="text-sm">
-                {r.kind === "worker" ? "👤" : "🔧"} {r.name}
-                {r.role ? (
-                  <span className="ms-1 text-xs text-ap-muted">({r.role})</span>
-                ) : null}
+                {r.kind === "worker" ? "👤" : "🔧"}{" "}
+                {localizedName(i18n.language, r.name, r.name_ar)}
+                {r.role ? <span className="ms-1 text-xs text-ap-muted">({r.role})</span> : null}
                 {r.equipment_type ? (
-                  <span className="ms-1 text-xs text-ap-muted">
-                    ({r.equipment_type})
-                  </span>
+                  <span className="ms-1 text-xs text-ap-muted">({r.equipment_type})</span>
                 ) : null}
               </span>
             </label>

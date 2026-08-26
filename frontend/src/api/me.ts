@@ -23,6 +23,8 @@ export interface TenantMembership {
   tenant_id: string;
   tenant_slug: string;
   tenant_name: string;
+  /** Arabic org name. Null when nobody wrote one — fall back to tenant_name. */
+  tenant_name_ar: string | null;
   status: string;
   joined_at: string | null;
   tenant_roles: TenantRole[];

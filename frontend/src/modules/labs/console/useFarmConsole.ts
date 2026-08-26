@@ -16,6 +16,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+
+import { localizedName } from "@/lib/localizedField";
 import type { FeatureCollection, Polygon } from "geojson";
 
 import type { Block } from "@/api/blocks";
@@ -197,9 +199,10 @@ export function useFarmConsole(farmId: string) {
 
   const blockNameById = useMemo(() => {
     const m = new Map<string, string>();
-    for (const b of summaryQ.data?.blocks ?? []) m.set(b.id, b.name?.trim() || b.code);
+    for (const b of summaryQ.data?.blocks ?? [])
+      m.set(b.id, localizedName(i18n.language, b.name?.trim() || b.code, b.name_ar));
     return m;
-  }, [summaryQ.data]);
+  }, [summaryQ.data, i18n.language]);
 
   const detailQ = useQuery({
     // Language is part of the key: loadUnitDetail bakes localized alert text

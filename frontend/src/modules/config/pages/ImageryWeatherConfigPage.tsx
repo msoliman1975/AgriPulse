@@ -22,6 +22,7 @@ import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { useConfig } from "@/config/ConfigContext";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
+import { localizedName } from "@/lib/localizedField";
 
 export function ImageryWeatherConfigPage(): ReactNode {
   const farmId = useActiveFarmId();
@@ -99,7 +100,7 @@ export function ImageryWeatherConfigPage(): ReactNode {
 }
 
 function BlocksTable({ farmId, blocks }: { farmId: string; blocks: Block[] }): ReactNode {
-  const { t } = useTranslation("imageryWeatherConfig");
+  const { t, i18n } = useTranslation("imageryWeatherConfig");
   const dateLocale = useDateLocale();
 
   // Fan out one imagery + one weather query per block. Ten blocks ⇒ 20
@@ -141,7 +142,11 @@ function BlocksTable({ farmId, blocks }: { farmId: string; blocks: Block[] }): R
               <Tr key={b.id}>
                 <Td>
                   <span className="font-mono text-xs text-ap-muted">{b.code}</span>
-                  {b.name ? <span className="ms-2 text-ap-ink">{b.name}</span> : null}
+                  {b.name ? (
+                    <span className="ms-2 text-ap-ink">
+                      {localizedName(i18n.language, b.name, b.name_ar)}
+                    </span>
+                  ) : null}
                 </Td>
                 <SubsCell query={imagery} />
                 <LastCell

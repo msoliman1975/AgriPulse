@@ -35,6 +35,8 @@ class VegetationPlan(Base, TimestampedMixin):
     season_label: Mapped[str] = mapped_column(Text, nullable=False)
     season_year: Mapped[int] = mapped_column(Integer, nullable=False)
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # See Farm.name_ar (tenant migration 0087).
+    name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'draft'"))
     # Set when the plan was created/refreshed by applying a plan template

@@ -29,6 +29,9 @@ import {
 
 interface MilestoneRow extends MilestoneInput {
   key: string;
+  // Narrowed from the optional field on MilestoneInput: the row is a form
+  // model, so the control always has a string to bind to.
+  name_ar: string;
 }
 interface ActivityRow extends ActivityInput {
   key: string;
@@ -70,10 +73,12 @@ export function PlanTemplateEditorPage(): ReactNode {
 
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const [nameAr, setNameAr] = useState("");
   const [cropPath, setCropPath] = useState<string | null>(null);
   const [country, setCountry] = useState("");
   const [region, setRegion] = useState("");
   const [description, setDescription] = useState("");
+  const [descriptionAr, setDescriptionAr] = useState("");
   const [milestones, setMilestones] = useState<MilestoneRow[]>([]);
   const [activities, setActivities] = useState<ActivityRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -87,16 +92,19 @@ export function PlanTemplateEditorPage(): ReactNode {
     if (!d || loaded) return;
     setCode(d.code);
     setName(d.name);
+    setNameAr(d.name_ar ?? "");
     setCropPath(d.crop_path);
     setCountry(d.country ?? "");
     setRegion(d.region ?? "");
     setDescription(d.description ?? "");
+    setDescriptionAr(d.description_ar ?? "");
     const msById = new Map(d.milestones.map((m) => [m.id, m.code]));
     setMilestones(
       d.milestones.map((m) => ({
         key: nextKey(),
         code: m.code,
         name: m.name,
+        name_ar: m.name_ar ?? "",
         day_from_start: m.day_from_start,
         sort_order: m.sort_order,
       })),
@@ -135,13 +143,16 @@ export function PlanTemplateEditorPage(): ReactNode {
     return {
       code: code.trim(),
       name: name.trim(),
+      name_ar: nameAr.trim() || null,
       crop_path: (cropPath ?? "").trim(),
       country: country.trim() || null,
       region: region.trim() || null,
       description: description.trim() || null,
+      description_ar: descriptionAr.trim() || null,
       milestones: milestones.map((m, i) => ({
         code: m.code.trim(),
         name: m.name.trim(),
+        name_ar: m.name_ar.trim() || null,
         day_from_start: Number(m.day_from_start) || 0,
         sort_order: i,
       })),
@@ -271,6 +282,18 @@ export function PlanTemplateEditorPage(): ReactNode {
               />
             )}
           </Field>
+          <Field label={t("editor.field.nameAr")} help={t("editor.field.nameArHint")}>
+            {(props) => (
+              <input
+                {...props}
+                className={FIELD_CONTROL_CLASS}
+                dir="rtl"
+                lang="ar"
+                value={nameAr}
+                onChange={(e) => setNameAr(e.target.value)}
+              />
+            )}
+          </Field>
           <Field label={t("editor.field.code")} help={t("editor.field.codeHint")}>
             {(props) => (
               <input
@@ -330,7 +353,14 @@ export function PlanTemplateEditorPage(): ReactNode {
             onClick={() =>
               setMilestones((prev) => [
                 ...prev,
-                { key: nextKey(), code: "", name: "", day_from_start: 0, sort_order: prev.length },
+                {
+                  key: nextKey(),
+                  code: "",
+                  name: "",
+                  name_ar: "",
+                  day_from_start: 0,
+                  sort_order: prev.length,
+                },
               ])
             }
             className="rounded-md border border-ap-line px-2 py-1 text-xs text-ap-primary hover:bg-ap-primary-soft"
@@ -361,6 +391,18 @@ export function PlanTemplateEditorPage(): ReactNode {
                   onChange={(e) =>
                     setMilestones((prev) =>
                       prev.map((x, i) => (i === idx ? { ...x, name: e.target.value } : x)),
+                    )
+                  }
+                />
+                <input
+                  className="input flex-1"
+                  dir="rtl"
+                  lang="ar"
+                  placeholder={t("editor.field.nameAr")}
+                  value={m.name_ar}
+                  onChange={(e) =>
+                    setMilestones((prev) =>
+                      prev.map((x, i) => (i === idx ? { ...x, name_ar: e.target.value } : x)),
                     )
                   }
                 />

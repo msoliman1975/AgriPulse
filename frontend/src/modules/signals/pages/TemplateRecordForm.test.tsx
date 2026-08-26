@@ -3,11 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type {
-  SignalDefinition,
-  SignalTemplate,
-  SignalTemplateWithMembers,
-} from "@/api/signals";
+import type { SignalDefinition, SignalTemplate, SignalTemplateWithMembers } from "@/api/signals";
 import { setupTestI18n } from "@/i18n/testing";
 
 const createTemplateObservationMock = vi.hoisted(() =>
@@ -54,10 +50,14 @@ function defn(id: string, code: string, name: string): SignalDefinition {
     id,
     code,
     name,
+    name_ar: null,
     description: null,
+    description_ar: null,
     value_kind: "numeric",
     unit: null,
+    unit_ar: null,
     categorical_values: null,
+    categorical_values_ar: null,
     value_min: null,
     value_max: null,
     attachment_allowed: false,
@@ -73,7 +73,9 @@ const template: SignalTemplate = {
   id: TEMPLATE_ID,
   code: "soil_test",
   name: "Soil test",
+  name_ar: null,
   description: "Lab panel",
+  description_ar: null,
   is_active: true,
   created_at: "2026-05-01T00:00:00Z",
   updated_at: "2026-05-01T00:00:00Z",
@@ -151,9 +153,9 @@ describe("<TemplateRecordForm>", () => {
     const user = userEvent.setup();
     renderForm();
 
-    const inputs = await screen.findAllByRole("textbox").then((els) =>
-      els.filter((el) => (el as HTMLInputElement).inputMode === "decimal"),
-    );
+    const inputs = await screen
+      .findAllByRole("textbox")
+      .then((els) => els.filter((el) => (el as HTMLInputElement).inputMode === "decimal"));
     // Only fill the optional member; required ph stays empty.
     await user.type(inputs[1], "12");
 
@@ -168,9 +170,9 @@ describe("<TemplateRecordForm>", () => {
     const user = userEvent.setup();
     renderForm();
 
-    const inputs = await screen.findAllByRole("textbox").then((els) =>
-      els.filter((el) => (el as HTMLInputElement).inputMode === "decimal"),
-    );
+    const inputs = await screen
+      .findAllByRole("textbox")
+      .then((els) => els.filter((el) => (el as HTMLInputElement).inputMode === "decimal"));
     await user.type(inputs[0], "6.8");
 
     await user.click(screen.getByRole("button", { name: /record observations/i }));

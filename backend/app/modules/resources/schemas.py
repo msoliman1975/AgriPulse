@@ -35,6 +35,9 @@ class ResourceCreateRequest(BaseModel):
 
     kind: ResourceKind
     name: str = Field(min_length=1, max_length=120)
+    # Arabic display name (tenant migration 0087). Optional; the read path
+    # falls back to `name`.
+    name_ar: str | None = Field(default=None, max_length=120)
     role: WorkerRole | None = None
     equipment_type: EquipmentType | None = None
     phone: str | None = Field(default=None, max_length=40)
@@ -83,6 +86,7 @@ class ResourceUpdateRequest(BaseModel):
     """
 
     name: str | None = Field(default=None, min_length=1, max_length=120)
+    name_ar: str | None = Field(default=None, max_length=120)
     role: WorkerRole | None = None
     equipment_type: EquipmentType | None = None
     phone: str | None = Field(default=None, max_length=40)
@@ -106,6 +110,7 @@ class ResourceResponse(BaseModel):
     farm_ids: list[UUID] = Field(default_factory=list)
     kind: ResourceKind
     name: str
+    name_ar: str | None = None
     role: WorkerRole | None
     equipment_type: EquipmentType | None
     phone: str | None

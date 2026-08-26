@@ -58,7 +58,9 @@ from app.modules.farms.validity import is_active_on, state_on
 _FARM_UPDATABLE_COLUMNS: frozenset[str] = frozenset(
     {
         "name",
+        "name_ar",
         "description",
+        "description_ar",
         "elevation_m",
         "country_code",
         "governorate",
@@ -76,6 +78,7 @@ _FARM_UPDATABLE_COLUMNS: frozenset[str] = frozenset(
 _BLOCK_UPDATABLE_COLUMNS: frozenset[str] = frozenset(
     {
         "name",
+        "name_ar",
         "elevation_m",
         "irrigation_system",
         "irrigation_source",
@@ -123,7 +126,9 @@ def _row_geom_select_for_farm(*, with_boundary: bool) -> tuple[Any, ...]:
         Farm.id,
         Farm.code,
         Farm.name,
+        Farm.name_ar,
         Farm.description,
+        Farm.description_ar,
         Farm.area_m2,
         Farm.elevation_m,
         Farm.country_code,
@@ -154,6 +159,7 @@ def _row_geom_select_for_block(*, with_boundary: bool) -> tuple[Any, ...]:
         Block.farm_id,
         Block.code,
         Block.name,
+        Block.name_ar,
         Block.area_m2,
         Block.elevation_m,
         Block.aoi_hash,
@@ -228,11 +234,16 @@ class FarmsRepository:
         tags: list[str],
         actor_user_id: UUID | None,
         active_from: _date | None = None,
+        # Keyword-only with a default so the bulk / pivot callers that do not
+        # collect an Arabic name still compile. NULL there, and the read path
+        # falls back to `name`.
+        name_ar: str | None = None,
+        description_ar: str | None = None,
     ) -> dict[str, Any]:
         stmt = text(
             """
             INSERT INTO farms (
-                id, code, name, description, boundary,
+                id, code, name, name_ar, description, description_ar, boundary,
                 boundary_utm, centroid, area_m2,
                 elevation_m, country_code, governorate, district, nearest_city,
                 address_line,
@@ -240,7 +251,8 @@ class FarmsRepository:
                 tags, active_from, created_by, updated_by
             )
             VALUES (
-                :id, :code, :name, :description, ST_GeomFromEWKT(:boundary),
+                :id, :code, :name, :name_ar, :description, :description_ar,
+                ST_GeomFromEWKT(:boundary),
                 -- Placeholder. `farms_geom_compute` overwrites it BEFORE INSERT
                 -- with the boundary transformed into the farm's own UTM zone.
                 -- SRID 0 rather than a real one: if the trigger were ever
@@ -270,7 +282,9 @@ class FarmsRepository:
                     "id": farm_id,
                     "code": code,
                     "name": name,
+                    "name_ar": name_ar,
                     "description": description,
+                    "description_ar": description_ar,
                     "boundary": boundary_ewkt,
                     "elevation_m": elevation_m,
                     "country_code": country_code,
@@ -470,6 +484,8 @@ class FarmsRepository:
         parent_unit_id: UUID | None = None,
         irrigation_geometry: dict[str, Any] | None = None,
         active_from: _date | None = None,
+        # See insert_farm: bulk block create and pivot create pass nothing.
+        name_ar: str | None = None,
     ) -> dict[str, Any]:
         # Confirm the farm exists in this tenant first.
         farm_exists = await self._tenant.execute(
@@ -481,7 +497,7 @@ class FarmsRepository:
         sql = text(
             """
             INSERT INTO blocks (
-                id, farm_id, code, name, boundary,
+                id, farm_id, code, name, name_ar, boundary,
                 boundary_utm, centroid, area_m2, aoi_hash,
                 elevation_m, irrigation_system, irrigation_source,
                 soil_texture, salinity_class, soil_ph,
@@ -490,7 +506,7 @@ class FarmsRepository:
                 created_by, updated_by
             )
             VALUES (
-                :id, :farm_id, :code, :name, ST_GeomFromEWKT(:boundary),
+                :id, :farm_id, :code, :name, :name_ar, ST_GeomFromEWKT(:boundary),
                 -- Placeholder; see the note in create_farm. `blocks_geom_compute`
                 -- overwrites it with the parent farm's zone.
                 'SRID=0;POLYGON((0 0,1 0,1 1,0 1,0 0))'::geometry,
@@ -521,6 +537,7 @@ class FarmsRepository:
                     "farm_id": farm_id,
                     "code": code,
                     "name": name,
+                    "name_ar": name_ar,
                     "boundary": boundary_ewkt,
                     "elevation_m": elevation_m,
                     "irrigation_system": irrigation_system,
@@ -2300,7 +2317,9 @@ def _farm_row_to_dict(row: Any, *, with_boundary: bool) -> dict[str, Any]:
         "id": row.id,
         "code": row.code,
         "name": row.name,
+        "name_ar": row.name_ar,
         "description": row.description,
+        "description_ar": row.description_ar,
         "centroid": _decode_geojson(row.centroid_geojson),
         "area_m2": row.area_m2,
         "elevation_m": row.elevation_m,
@@ -2331,6 +2350,7 @@ def _block_row_to_dict(row: Any, *, with_boundary: bool) -> dict[str, Any]:
         "farm_id": row.farm_id,
         "code": row.code,
         "name": row.name,
+        "name_ar": row.name_ar,
         "centroid": _decode_geojson(row.centroid_geojson),
         "area_m2": row.area_m2,
         "elevation_m": row.elevation_m,

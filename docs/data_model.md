@@ -396,7 +396,9 @@ The top-level operational unit owned by a tenant.
 | `id` | UUID | PK | |
 | `code` | TEXT | NOT NULL | Short reference, e.g. `FARM-NW-01` — unique within tenant |
 | `name` | TEXT | NOT NULL | |
+| `name_ar` | TEXT | | Arabic display name (0087). Readers use `COALESCE(NULLIF(name_ar, ''), name)` |
 | `description` | TEXT | | |
+| `description_ar` | TEXT | | |
 | `boundary` | geometry(MultiPolygon, 4326) | NOT NULL | WGS84 |
 | `boundary_utm` | geometry(MultiPolygon) | NOT NULL | The farm's UTM zone, for accurate area math; computed by trigger from `boundary`. No SRID in the type — see `utm_srid` |
 | `utm_srid` | INTEGER | NOT NULL | EPSG code of that zone. Derived once from the boundary centroid on insert and never recomputed: a change here moves `aoi_hash` and orphans stored imagery |
@@ -436,6 +438,7 @@ The operational subdivision of a farm — what gets monitored, alerted, and fore
 | `farm_id` | UUID | NOT NULL, FK → `farms.id` ON DELETE RESTRICT | |
 | `code` | TEXT | NOT NULL | Unique within farm, e.g. `B-12` |
 | `name` | TEXT | | Display name; falls back to `code` |
+| `name_ar` | TEXT | | Arabic display name (0087) |
 | `boundary` | geometry(Polygon, 4326) | NOT NULL | |
 | `boundary_utm` | geometry(Polygon) | NOT NULL | In the parent farm's `utm_srid`, so a farm and its blocks share one coordinate system |
 | `centroid` | geometry(Point, 4326) | NOT NULL | |
@@ -886,11 +889,15 @@ What kind of signal exists. Defined by the tenant, scoped to their data. Example
 |---|---|---|---|
 | `id` | UUID | PK | |
 | `code` | TEXT | NOT NULL | Unique within tenant; stable identifier |
-| `name` | TEXT | NOT NULL | Display name (user-provided, not translated) |
+| `name` | TEXT | NOT NULL | Display name |
+| `name_ar` | TEXT | | Arabic display name (public 0075) |
 | `description` | TEXT | | |
+| `description_ar` | TEXT | | |
 | `value_kind` | TEXT | NOT NULL, CHECK (`value_kind IN ('numeric','categorical','event','boolean','geopoint')`) | |
 | `unit` | TEXT | | For numeric: "mm", "ppm", "count", "m3" |
+| `unit_ar` | TEXT | | |
 | `categorical_values` | TEXT[] | | For categorical only |
+| `categorical_values_ar` | TEXT[] | CHECK: same length as `categorical_values` | One Arabic label per code, same order. The stored reading is always the English code |
 | `value_min` | NUMERIC(12,4) | | Validation bound for numeric |
 | `value_max` | NUMERIC(12,4) | | |
 | `attachment_allowed` | BOOLEAN | NOT NULL, DEFAULT FALSE | Whether observations can attach photos |

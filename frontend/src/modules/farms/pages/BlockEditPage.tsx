@@ -73,6 +73,7 @@ export function BlockEditPage(): JSX.Element {
           initial={{
             code: block.code,
             name: block.name,
+            name_ar: block.name_ar,
             irrigation_system: block.irrigation_system,
             irrigation_source: block.irrigation_source,
             soil_texture: block.soil_texture,

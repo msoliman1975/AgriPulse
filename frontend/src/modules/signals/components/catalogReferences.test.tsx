@@ -10,12 +10,18 @@ import { setupTestI18n } from "@/i18n/testing";
 import { filterDefinitions } from "./catalogFilter";
 import { ArchiveConflictModal, refCount, referencesFromError } from "./ReferenceWidgets";
 
-function defn(p: Partial<SignalDefinition> & Pick<SignalDefinition, "id" | "code" | "name">): SignalDefinition {
+function defn(
+  p: Partial<SignalDefinition> & Pick<SignalDefinition, "id" | "code" | "name">,
+): SignalDefinition {
   return {
+    name_ar: null,
     description: null,
+    description_ar: null,
     value_kind: "numeric",
     unit: null,
+    unit_ar: null,
     categorical_values: null,
+    categorical_values_ar: null,
     value_min: null,
     value_max: null,
     attachment_allowed: false,
@@ -44,7 +50,9 @@ describe("filterDefinitions", () => {
 
   it("matches name / code / description case-insensitively", () => {
     expect(filterDefinitions(DEFS, { ...base, search: "PH" }).map((d) => d.id)).toEqual(["1"]);
-    expect(filterDefinitions(DEFS, { ...base, search: "scout_sev" }).map((d) => d.id)).toEqual(["2"]);
+    expect(filterDefinitions(DEFS, { ...base, search: "scout_sev" }).map((d) => d.id)).toEqual([
+      "2",
+    ]);
     expect(filterDefinitions(DEFS, { ...base, search: "acidity" }).map((d) => d.id)).toEqual(["1"]);
   });
 
@@ -69,7 +77,10 @@ describe("referencesFromError", () => {
 
   it("extracts the reference list from a 409", () => {
     const refs = referencesFromError(
-      err409({ decision_trees: [{ id: "t", code: "w", name: "W", kind: "decision_tree" }], templates: [] }),
+      err409({
+        decision_trees: [{ id: "t", code: "w", name: "W", kind: "decision_tree" }],
+        templates: [],
+      }),
     );
     expect(refCount(refs)).toBe(1);
   });
@@ -102,7 +113,12 @@ describe("ArchiveConflictModal", () => {
     };
     const onForce = vi.fn();
     render(
-      <ArchiveConflictModal references={refs} pending={false} onCancel={vi.fn()} onForce={onForce} />,
+      <ArchiveConflictModal
+        references={refs}
+        pending={false}
+        onCancel={vi.fn()}
+        onForce={onForce}
+      />,
     );
     expect(screen.getByText("Wheat tree")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Archive anyway/i }));

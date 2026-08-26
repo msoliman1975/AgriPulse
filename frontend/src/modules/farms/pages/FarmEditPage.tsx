@@ -74,7 +74,9 @@ export function FarmEditPage(): JSX.Element {
           initial={{
             code: farm.code,
             name: farm.name,
+            name_ar: farm.name_ar,
             description: farm.description,
+            description_ar: farm.description_ar,
             governorate: farm.governorate,
             district: farm.district,
             nearest_city: farm.nearest_city,

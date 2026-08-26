@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { listFarms, type Farm } from "@/api/farms";
 import type { TenantUser, UserUpdatePayload } from "@/api/users";
 import { AsyncBoundary } from "@/components/AsyncBoundary";
+import { localizedName } from "@/lib/localizedField";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
@@ -49,11 +50,13 @@ function useFarmOptions(enabled: boolean) {
 /** Farm id -> name, for rendering a grant the API returns as ids only. */
 function useFarmNames(): Map<string, string> {
   const farms = useFarmOptions(true);
+  const { i18n } = useTranslation("users");
   return useMemo(() => {
     const map = new Map<string, string>();
-    for (const farm of farms.data?.items ?? []) map.set(farm.id, farm.name);
+    for (const farm of farms.data?.items ?? [])
+      map.set(farm.id, localizedName(i18n.language, farm.name, farm.name_ar));
     return map;
-  }, [farms.data]);
+  }, [farms.data, i18n.language]);
 }
 
 /**
@@ -76,7 +79,7 @@ function RolePicker({
   onFarmIdsChange: (farmIds: string[]) => void;
   idPrefix: string;
 }): ReactNode {
-  const { t } = useTranslation("users");
+  const { t, i18n } = useTranslation("users");
   const wantsFarms = needsFarms(role);
   const farms = useFarmOptions(wantsFarms);
 
@@ -136,7 +139,7 @@ function RolePicker({
                     checked={farmIds.includes(farm.id)}
                     onChange={() => toggle(farm.id)}
                   />
-                  <span>{farm.name}</span>
+                  <span>{localizedName(i18n.language, farm.name, farm.name_ar)}</span>
                   <span className="font-mono text-xs text-ap-muted">{farm.code}</span>
                 </label>
               ))}

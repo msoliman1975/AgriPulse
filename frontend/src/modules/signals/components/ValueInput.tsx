@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SignalDefinition } from "@/api/signals";
+import { categoricalLabel } from "../lib/signalLabels";
 
 const inputCls =
   "w-full rounded-md border border-ap-line bg-white px-2 py-1 text-sm shadow-sm focus:border-ap-primary focus:outline-none focus:ring-1 focus:ring-ap-primary";
@@ -41,7 +42,7 @@ export function ValueInput({
   setLon,
   optional = false,
 }: ValueInputProps): ReactNode {
-  const { t } = useTranslation("signals");
+  const { t, i18n } = useTranslation("signals");
   const req = !optional;
   if (defn.value_kind === "numeric") {
     // CS-13: non-blocking out-of-expected-range hint. The server is still
@@ -88,7 +89,7 @@ export function ValueInput({
           </option>
           {(defn.categorical_values ?? []).map((v) => (
             <option key={v} value={v}>
-              {v}
+              {categoricalLabel(i18n.language, defn, v)}
             </option>
           ))}
         </select>

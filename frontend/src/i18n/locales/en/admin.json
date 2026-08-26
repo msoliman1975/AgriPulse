@@ -236,6 +236,7 @@
         "slug": "Slug",
         "slugHelp": "URL-safe identifier, 3–32 chars, lowercase letters/digits/hyphens. Permanent.",
         "name": "Display name",
+        "nameAr": "Arabic name",
         "legalName": "Legal name",
         "taxId": "Tax ID",
         "contactEmail": "Contact email",

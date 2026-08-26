@@ -128,10 +128,14 @@ class SignalsRepository:
         definition_id: UUID,
         code: str,
         name: str,
+        name_ar: str | None,
         description: str | None,
+        description_ar: str | None,
         value_kind: str,
         unit: str | None,
+        unit_ar: str | None,
         categorical_values: list[str] | None,
+        categorical_values_ar: list[str] | None,
         value_min: Decimal | None,
         value_max: Decimal | None,
         attachment_allowed: bool,
@@ -144,8 +148,10 @@ class SignalsRepository:
                 text(
                     """
                     INSERT INTO public.signal_definitions (
-                        id, tenant_id, code, name, description, value_kind, unit,
-                        categorical_values, value_min, value_max,
+                        id, tenant_id, code, name, name_ar,
+                        description, description_ar, value_kind, unit, unit_ar,
+                        categorical_values, categorical_values_ar,
+                        value_min, value_max,
                         attachment_allowed, is_active,
                         aggregation, aggregation_window_days,
                         created_by, updated_by
@@ -154,8 +160,10 @@ class SignalsRepository:
                         (SELECT t.id FROM public.tenants t
                           WHERE replace(t.id::text, '-', '')
                                 = replace(current_schema(), 'tenant_', '')),
-                        :code, :name, :description, :value_kind, :unit,
-                        :categorical_values, :value_min, :value_max,
+                        :code, :name, :name_ar,
+                        :description, :description_ar, :value_kind, :unit, :unit_ar,
+                        :categorical_values, :categorical_values_ar,
+                        :value_min, :value_max,
                         :attachment_allowed, TRUE,
                         :aggregation, :aggregation_window_days,
                         :actor, :actor
@@ -169,10 +177,14 @@ class SignalsRepository:
                     "id": definition_id,
                     "code": code,
                     "name": name,
+                    "name_ar": name_ar,
                     "description": description,
+                    "description_ar": description_ar,
                     "value_kind": value_kind,
                     "unit": unit,
+                    "unit_ar": unit_ar,
                     "categorical_values": categorical_values,
+                    "categorical_values_ar": categorical_values_ar,
                     "value_min": value_min,
                     "value_max": value_max,
                     "attachment_allowed": attachment_allowed,
@@ -207,9 +219,13 @@ class SignalsRepository:
         # Static set of allowed columns — no caller-supplied identifiers.
         allowed = {
             "name",
+            "name_ar",
             "description",
+            "description_ar",
             "unit",
+            "unit_ar",
             "categorical_values",
+            "categorical_values_ar",
             "value_min",
             "value_max",
             "attachment_allowed",
@@ -468,7 +484,9 @@ class SignalsRepository:
         template_id: UUID,
         code: str,
         name: str,
+        name_ar: str | None,
         description: str | None,
+        description_ar: str | None,
         members: tuple[tuple[UUID, int, bool], ...],
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
@@ -484,14 +502,16 @@ class SignalsRepository:
                 text(
                     """
                     INSERT INTO public.signal_templates (
-                        id, tenant_id, code, name, description,
+                        id, tenant_id, code, name, name_ar,
+                        description, description_ar,
                         is_active, created_by, updated_by
                     ) VALUES (
                         :id,
                         (SELECT t.id FROM public.tenants t
                           WHERE replace(t.id::text, '-', '')
                                 = replace(current_schema(), 'tenant_', '')),
-                        :code, :name, :description,
+                        :code, :name, :name_ar,
+                        :description, :description_ar,
                         TRUE, :actor, :actor
                     )
                     """
@@ -503,7 +523,9 @@ class SignalsRepository:
                     "id": template_id,
                     "code": code,
                     "name": name,
+                    "name_ar": name_ar,
                     "description": description,
+                    "description_ar": description_ar,
                     "actor": actor_user_id,
                 },
             )
@@ -532,7 +554,7 @@ class SignalsRepository:
         """Patch template scalars + optionally replace the member list
         atomically (delete-then-insert). `members=None` leaves members
         untouched."""
-        allowed = {"name", "description", "is_active"}
+        allowed = {"name", "name_ar", "description", "description_ar", "is_active"}
         sets: list[str] = []
         params: dict[str, Any] = {"id": template_id, "actor": actor_user_id}
         for col, value in updates.items():
@@ -993,11 +1015,17 @@ def _definition_to_dict(row: SignalDefinition) -> dict[str, Any]:
         "id": row.id,
         "code": row.code,
         "name": row.name,
+        "name_ar": row.name_ar,
         "description": row.description,
+        "description_ar": row.description_ar,
         "value_kind": row.value_kind,
         "unit": row.unit,
+        "unit_ar": row.unit_ar,
         "categorical_values": (
             list(row.categorical_values) if row.categorical_values is not None else None
+        ),
+        "categorical_values_ar": (
+            list(row.categorical_values_ar) if row.categorical_values_ar is not None else None
         ),
         "value_min": row.value_min,
         "value_max": row.value_max,
@@ -1030,7 +1058,9 @@ def _template_to_dict(row: SignalTemplate) -> dict[str, Any]:
         "id": row.id,
         "code": row.code,
         "name": row.name,
+        "name_ar": row.name_ar,
         "description": row.description,
+        "description_ar": row.description_ar,
         "is_active": row.is_active,
         "created_at": row.created_at,
         "updated_at": row.updated_at,

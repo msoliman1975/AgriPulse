@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listFarms } from "@/api/farms";
 import type { EquipmentType } from "@/api/resources";
 import { AsyncBoundary } from "@/components/AsyncBoundary";
+import { localizedName } from "@/lib/localizedField";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
@@ -149,9 +150,10 @@ interface EquipmentRowProps {
 }
 
 function EquipmentRow({ row, farmId, canManage }: EquipmentRowProps): ReactNode {
-  const { t } = useTranslation("resources");
+  const { t, i18n } = useTranslation("resources");
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(row.name);
+  const [nameAr, setNameAr] = useState(row.name_ar ?? "");
   const [type, setType] = useState<EquipmentType>(row.equipment_type ?? "other");
   const update = useUpdateResource(farmId);
 
@@ -159,10 +161,21 @@ function EquipmentRow({ row, farmId, canManage }: EquipmentRowProps): ReactNode 
     return (
       <Tr className="border-t border-ap-line">
         <Td>
+          {/* Both names in one cell — see ResourcesWorkersPage. */}
           <input
             className="w-full rounded border border-ap-line px-2 py-1"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            aria-label={t("col.name")}
+          />
+          <input
+            className="mt-1 w-full rounded border border-ap-line px-2 py-1"
+            dir="rtl"
+            lang="ar"
+            placeholder={t("col.nameAr")}
+            aria-label={t("col.nameAr")}
+            value={nameAr}
+            onChange={(e) => setNameAr(e.target.value)}
           />
         </Td>
         <Td>
@@ -190,7 +203,7 @@ function EquipmentRow({ row, farmId, canManage }: EquipmentRowProps): ReactNode 
               update.mutate(
                 {
                   resourceId: row.id,
-                  payload: { name, equipment_type: type },
+                  payload: { name, name_ar: nameAr.trim() || null, equipment_type: type },
                 },
                 { onSuccess: () => setEditing(false) },
               )
@@ -212,7 +225,7 @@ function EquipmentRow({ row, farmId, canManage }: EquipmentRowProps): ReactNode 
 
   return (
     <Tr className="border-t border-ap-line">
-      <Td>{row.name}</Td>
+      <Td>{localizedName(i18n.language, row.name, row.name_ar)}</Td>
       <Td className="text-ap-muted">{t(`equipmentType.${row.equipment_type}`)}</Td>
       <Td className="text-ap-muted">
         {row.archived_at ? t("status.archived") : t("status.active")}
@@ -253,6 +266,7 @@ interface AddEquipmentRowProps {
 function AddEquipmentRow({ farmId, onDone }: AddEquipmentRowProps): ReactNode {
   const { t } = useTranslation("resources");
   const [name, setName] = useState("");
+  const [nameAr, setNameAr] = useState("");
   const [type, setType] = useState<EquipmentType>("tractor");
   const create = useCreateResource(farmId);
 
@@ -264,6 +278,15 @@ function AddEquipmentRow({ farmId, onDone }: AddEquipmentRowProps): ReactNode {
           placeholder={t("equipment.namePlaceholder")}
           value={name}
           onChange={(e) => setName(e.target.value)}
+        />
+        <input
+          className="mt-1 w-full rounded border border-ap-line px-2 py-1"
+          dir="rtl"
+          lang="ar"
+          placeholder={t("col.nameAr")}
+          aria-label={t("col.nameAr")}
+          value={nameAr}
+          onChange={(e) => setNameAr(e.target.value)}
         />
       </Td>
       <Td>
@@ -290,6 +313,7 @@ function AddEquipmentRow({ farmId, onDone }: AddEquipmentRowProps): ReactNode {
               {
                 kind: "equipment",
                 name: name.trim(),
+                name_ar: nameAr.trim() || null,
                 equipment_type: type,
               },
               { onSuccess: onDone },

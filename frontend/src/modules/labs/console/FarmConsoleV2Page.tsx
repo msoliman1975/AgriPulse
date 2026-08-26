@@ -21,6 +21,7 @@ import type { FeatureCollection, Polygon } from "geojson";
 
 import { listFarms } from "@/api/farms";
 import type { ExistingBlock } from "@/lib/aoi/bulk";
+import { localizedName } from "@/lib/localizedField";
 import { GridCellPopup } from "@/modules/grid/GridCellPopup";
 import { Page } from "@/components/Page";
 import { usePrefs } from "@/prefs/PrefsContext";
@@ -100,7 +101,7 @@ function ConsoleV2Redirect(): ReactNode {
 }
 
 function Console({ farmId }: { farmId: string }): ReactNode {
-  const { t } = useTranslation("farmConsole");
+  const { t, i18n } = useTranslation("farmConsole");
   const navigate = useNavigate();
   const { unit: areaUnit } = usePrefs();
   const [, setSearch] = useSearchParams();
@@ -187,7 +188,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   }
 
   const summary = c.summaryQ.data;
-  const farmName = summary.farm.name;
+  const farmName = localizedName(i18n.language, summary.farm.name, summary.farm.name_ar);
   const selectedBlock = c.selectedId ? summary.blocks.find((b) => b.id === c.selectedId) : null;
   const reshaping = m.reshapeTarget != null;
 

@@ -513,7 +513,12 @@ class FarmCreateRequest(BaseModel):
 
     code: str
     name: str = Field(min_length=1, max_length=255)
+    # Arabic display name. Optional: a tenant that has no Arabic name yet
+    # must still be able to create a farm, and the read path falls back to
+    # `name`. Tenant migration 0087.
+    name_ar: str | None = Field(default=None, max_length=255)
     description: str | None = None
+    description_ar: str | None = None
     boundary: dict[str, Any] = Field(description="GeoJSON MultiPolygon (SRID 4326).")
     elevation_m: Decimal | None = None
     country_code: str | None = None
@@ -545,7 +550,9 @@ class FarmUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, min_length=1, max_length=255)
+    name_ar: str | None = Field(default=None, max_length=255)
     description: str | None = None
+    description_ar: str | None = None
     boundary: dict[str, Any] | None = None
     elevation_m: Decimal | None = None
     country_code: str | None = None
@@ -583,7 +590,9 @@ class FarmResponse(BaseModel):
     id: UUID
     code: str
     name: str
+    name_ar: str | None = None
     description: str | None
+    description_ar: str | None = None
     centroid: dict[str, Any] = Field(description="GeoJSON Point (SRID 4326).")
     area_m2: Decimal
     area_value: Decimal
@@ -676,6 +685,7 @@ class BlockCreateRequest(BaseModel):
 
     code: str
     name: str | None = Field(default=None, max_length=255)
+    name_ar: str | None = Field(default=None, max_length=255)
     boundary: dict[str, Any] = Field(description="GeoJSON Polygon (SRID 4326).")
     elevation_m: Decimal | None = None
     irrigation_system: IrrigationSystem | None = None
@@ -714,6 +724,7 @@ class BlockUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, max_length=255)
+    name_ar: str | None = Field(default=None, max_length=255)
     boundary: dict[str, Any] | None = None
     elevation_m: Decimal | None = None
     irrigation_system: IrrigationSystem | None = None
@@ -760,6 +771,7 @@ class BlockResponse(BaseModel):
     farm_id: UUID
     code: str
     name: str | None
+    name_ar: str | None = None
     centroid: dict[str, Any]
     area_m2: Decimal
     area_value: Decimal

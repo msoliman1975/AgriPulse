@@ -17,6 +17,8 @@ export interface AdminTenant {
   id: string;
   slug: string;
   name: string;
+  /** Arabic org name. Null when nobody wrote one — fall back to `name`. */
+  name_ar: string | null;
   legal_name: string | null;
   tax_id: string | null;
   contact_email: string;
@@ -103,6 +105,7 @@ export interface ListAdminTenantsParams {
 export interface CreateAdminTenantPayload {
   slug: string;
   name: string;
+  name_ar?: string | null;
   contact_email: string;
   legal_name?: string | null;
   tax_id?: string | null;
@@ -118,6 +121,7 @@ export interface CreateAdminTenantResponse {
   id: string;
   slug: string;
   name: string;
+  name_ar: string | null;
   schema_name: string;
   contact_email: string;
   default_locale: string;

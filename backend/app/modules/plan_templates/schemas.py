@@ -24,6 +24,7 @@ class PlanTemplateMilestoneResponse(BaseModel):
     id: UUID
     code: str
     name: str
+    name_ar: str | None = None
     day_from_start: int
     sort_order: int = 0
 
@@ -53,11 +54,15 @@ class PlanTemplateSummary(BaseModel):
     id: UUID
     code: str
     name: str
+    # Arabic display name (public migration 0075). Null when nobody has
+    # written one; the client falls back to `name`.
+    name_ar: str | None = None
     crop_path: str
     crop_id: UUID | None = None
     country: str | None = None
     region: str | None = None
     description: str | None = None
+    description_ar: str | None = None
     status: TemplateStatus
     created_at: datetime
     updated_at: datetime
@@ -78,6 +83,7 @@ class PlanTemplateMilestoneInput(BaseModel):
 
     code: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=255)
+    name_ar: str | None = Field(default=None, max_length=255)
     day_from_start: int = Field(ge=0)
     sort_order: int = 0
 
@@ -107,10 +113,12 @@ class PlanTemplateWriteRequest(BaseModel):
 
     code: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=255)
+    name_ar: str | None = Field(default=None, max_length=255)
     crop_path: str = Field(min_length=1, max_length=128)
     country: str | None = Field(default=None, max_length=64)
     region: str | None = Field(default=None, max_length=64)
     description: str | None = None
+    description_ar: str | None = None
     milestones: list[PlanTemplateMilestoneInput] = Field(default_factory=list)
     activities: list[PlanTemplateActivityInput] = Field(default_factory=list)
 

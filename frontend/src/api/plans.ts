@@ -25,6 +25,8 @@ export interface Plan {
   season_label: string;
   season_year: number;
   name: string | null;
+  /** Arabic display name. Null when nobody wrote one — fall back to `name`. */
+  name_ar: string | null;
   notes: string | null;
   status: PlanStatus;
   created_at: string;
@@ -59,11 +61,13 @@ export interface PlanCreatePayload {
   season_label: string;
   season_year: number;
   name?: string | null;
+  name_ar?: string | null;
   notes?: string | null;
 }
 
 export interface PlanUpdatePayload {
   name?: string | null;
+  name_ar?: string | null;
   notes?: string | null;
   status?: PlanStatus;
 }
@@ -152,6 +156,7 @@ export interface BoardBlock {
   id: string;
   code: string;
   name: string | null;
+  name_ar: string | null;
   unit_type: string;
 }
 
@@ -159,6 +164,7 @@ export interface BoardResourceChip {
   id: string;
   kind: "worker" | "equipment";
   name: string;
+  name_ar: string | null;
   role: string | null;
   equipment_type: string | null;
 }

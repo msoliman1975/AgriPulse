@@ -70,6 +70,7 @@ export function BlockForm({
   const { t } = useTranslation("farms");
   const [code, setCode] = useState(initial?.code ?? "");
   const [name, setName] = useState(initial?.name ?? "");
+  const [nameAr, setNameAr] = useState(initial?.name_ar ?? "");
   const [irrigationSystem, setIrrigationSystem] = useState<IrrigationSystem | "">(
     initial?.irrigation_system ?? "",
   );
@@ -138,6 +139,8 @@ export function BlockForm({
     const payload: BlockFormValues = {
       code,
       name: name || null,
+      // Blank means "not written yet"; the Arabic screens fall back to `name`.
+      name_ar: nameAr.trim() || null,
       boundary: polygon,
       irrigation_system: irrigationSystem || null,
       irrigation_source: irrigationSource || null,
@@ -176,6 +179,20 @@ export function BlockForm({
             className="input"
             value={name ?? ""}
             onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="label" htmlFor="block-name-ar">
+            {t("form.blockNameAr")}
+          </label>
+          <input
+            id="block-name-ar"
+            className="input"
+            // Always RTL: the field holds Arabic whatever the page language is.
+            dir="rtl"
+            lang="ar"
+            value={nameAr ?? ""}
+            onChange={(e) => setNameAr(e.target.value)}
           />
         </div>
         <div>

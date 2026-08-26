@@ -7,6 +7,7 @@ import { Navigate } from "react-router-dom";
 import { getFarm } from "@/api/farms";
 import type { SeasonContextCrop } from "@/api/insights";
 import { ErrorState } from "@/components/ErrorState";
+import { localizedName } from "@/lib/localizedField";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
@@ -35,7 +36,7 @@ import { WeatherSection } from "../components/WeatherSection";
 // summary).
 export function InsightsPage(): ReactNode {
   const farmId = useActiveFarmId();
-  const { t } = useTranslation("insights");
+  const { t, i18n } = useTranslation("insights");
   const dateLocale = useDateLocale();
   const {
     data: farm,
@@ -59,10 +60,7 @@ export function InsightsPage(): ReactNode {
   const [selectedCrops, setSelectedCrops] = useState<string[]>([]);
   const [crops, setCrops] = useState<readonly SeasonContextCrop[]>();
   const onCropsLoaded = useCallback((next: readonly SeasonContextCrop[]) => setCrops(next), []);
-  const blockIds = useMemo(
-    () => blocksForCrops(crops, selectedCrops),
-    [crops, selectedCrops],
-  );
+  const blockIds = useMemo(() => blocksForCrops(crops, selectedCrops), [crops, selectedCrops]);
 
   if (!farmId) {
     return <Navigate to="/" replace />;
@@ -93,7 +91,9 @@ export function InsightsPage(): ReactNode {
               <Skeleton className="inline-block h-4 w-64" />
             ) : (
               <>
-                <span className="font-medium text-ap-ink">{farm?.name ?? "—"}</span>
+                <span className="font-medium text-ap-ink">
+                  {farm ? localizedName(i18n.language, farm.name, farm.name_ar) : "—"}
+                </span>
                 {farm ? (
                   <>
                     {" · "}
@@ -126,12 +126,7 @@ export function InsightsPage(): ReactNode {
       {/* One section for all of it: now → trend → outlook → risk. These were
           four sibling cards saying "weather" four times over the same data. */}
       {canReadWeather ? (
-        <WeatherSection
-          farmId={farmId}
-          range={range}
-          showRisk={canReadRisk}
-          blockIds={blockIds}
-        />
+        <WeatherSection farmId={farmId} range={range} showRisk={canReadRisk} blockIds={blockIds} />
       ) : null}
 
       <BlockHealthScorecard farmId={farmId} blockIds={blockIds} />
