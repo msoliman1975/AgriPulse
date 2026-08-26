@@ -3031,11 +3031,36 @@ global:
   #   Images CONFIRMED by pulling both on the node before the bump:
   #   api @ e8ec32c, frontend @ e8ec32c.
   #   Rollback is api and workers back to e6735c0, frontend back to f40c68e.
+  # 2026-08-26 - b9e03bf = #594, three things the production check of #592
+  #   found.
+  #   The index legend covered the datapoint rail. Both were absolute boxes
+  #   pinned to `end-3`, the legend at the top and the rail at the vertical
+  #   middle, and the legend grows to thirteen class rows - so on any map with
+  #   the block dock open it reached the middle and sat on the rail. They are
+  #   one flex column now, so they cannot overlap.
+  #   The Cells box greyed out for reasons that were not about cells: any
+  #   thermal index, and after #592 also "None", because None keeps the last
+  #   index code. The mesh is geometry and this console never fills it, so it
+  #   is now fetched with its own index that falls back to ndvi. Cells greys
+  #   out for one reason now - the farm has no zoning - and the bar says so.
+  #   A crop label read "Mango" for every block on a farm with three
+  #   varieties. The route returned the crop level only; it now returns
+  #   variety and strain, and the label reads "Mango - Alphonso - Short
+  #   Alphonso".
+  #   That last one is why api and workers move: the response schema gained
+  #   four fields.
+  #   Backend + frontend, so api, workers and frontend all move together.
+  #   Tile-server stays 676746a and keycloak stays 677c7dc.
+  #   NO MIGRATION. The added fields are read from `public.crop_varieties`
+  #   and `public.crop_variety_strains` as they already are.
+  #   Images CONFIRMED by pulling both on the node before the bump:
+  #   api @ b9e03bf, frontend @ b9e03bf.
+  #   Rollback is api, workers and frontend all back to e8ec32c.
   images:
     api:
-      tag: "e8ec32c"
+      tag: "b9e03bf"
     workers:
-      tag: "e8ec32c"
+      tag: "b9e03bf"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3139,10 +3164,10 @@ global:
       #   FRONTEND ONLY. No backend file changed, so api stays 698e8f6,
       #   workers 1363ebe and tile-server 676746a; none of them restart.
       #   Rollback is this tag back to 698e8f6. No migration.
-      # e8ec32c = #592. See the note above `global.images` - this tag moves
-      # with api and workers, because the crop label the top bar can now
-      # switch to is served by a new route.
-      tag: "e8ec32c"
+      # b9e03bf = #594. See the note above `global.images` - this tag moves
+      # with api and workers, because the crop label now names every level of
+      # the assignment and the route gained the fields to say so.
+      tag: "b9e03bf"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
