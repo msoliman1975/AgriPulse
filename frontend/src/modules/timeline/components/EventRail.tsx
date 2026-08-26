@@ -82,6 +82,19 @@ export function EventRail({
     <Card
       className="flex h-full min-h-0 flex-col"
       noPadding
+      // `bodyClassName` is what makes the rail scroll instead of growing.
+      //
+      // A Card WITH a title wraps its children in a plain <div>. That div is
+      // a flex child of the Card but is not itself a flex container, so the
+      // `flex-1 min-h-0 overflow-y-auto` below had a non-flex parent: its
+      // `flex-1` did nothing, its height resolved to content, and
+      // `overflow-y-auto` never had a bounded box to scroll inside.
+      //
+      // On a quiet day that is invisible — seven rows fit. On 5 August this
+      // farm has 108 alerts, and the rail grew to 108 rows tall, took the
+      // page with it, and pushed the scrubber and its play button far below
+      // the fold. The screen that opened was one you had to scroll to use.
+      bodyClassName="flex min-h-0 flex-1 flex-col"
       title={frameDay ? t("rail.title", { date: formatDay(frameDay) }) : t("rail.titleNoDay")}
     >
       <div className="min-h-0 flex-1 overflow-y-auto">
