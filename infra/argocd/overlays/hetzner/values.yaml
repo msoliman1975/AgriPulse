@@ -3200,7 +3200,15 @@ global:
       # Arabic-names change reads name_ar on the farm switcher, farm and
       # block screens, the console rail, the board, insights and the signals
       # catalog. Moves with api and workers.
-      tag: "ccbb935"
+      # 76ec8de = #602, found by opening the signals catalog in production in
+      # Arabic. #597 wired the Arabic NAME and left three columns beside it
+      # unread: the definition description, the categorical values - so a row
+      # read "القيم: none, emitter_blocked" under "عطل في الري", the exact
+      # string #597 set out to stop a scout seeing - and the template name.
+      # FRONTEND ONLY. api and workers stay on ccbb935: every column was
+      # already on the wire, this is the read side catching up. No migration,
+      # so rollback really is just this tag back to ccbb935.
+      tag: "76ec8de"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
