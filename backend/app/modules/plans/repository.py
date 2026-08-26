@@ -32,6 +32,7 @@ class PlansRepository:
         season_label: str,
         season_year: int,
         name: str | None,
+        name_ar: str | None,
         notes: str | None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
@@ -41,6 +42,7 @@ class PlansRepository:
             season_label=season_label,
             season_year=season_year,
             name=name,
+            name_ar=name_ar,
             notes=notes,
             status="draft",
             created_by=actor_user_id,
@@ -233,7 +235,7 @@ class PlansRepository:
                 await self._session.execute(
                     text(
                         """
-                        SELECT id, code, name, unit_type
+                        SELECT id, code, name, name_ar, unit_type
                         FROM blocks
                         WHERE farm_id = :farm_id
                           AND deleted_at IS NULL
@@ -280,6 +282,7 @@ class PlansRepository:
                                   'id', r.id,
                                   'kind', r.kind,
                                   'name', r.name,
+                                  'name_ar', r.name_ar,
                                   'role', r.role,
                                   'equipment_type', r.equipment_type
                                 )
@@ -354,6 +357,7 @@ def _plan_to_dict(row: VegetationPlan) -> dict[str, Any]:
         "season_label": row.season_label,
         "season_year": row.season_year,
         "name": row.name,
+        "name_ar": row.name_ar,
         "notes": row.notes,
         "status": row.status,
         "created_at": row.created_at,

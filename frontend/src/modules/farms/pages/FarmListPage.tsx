@@ -12,11 +12,12 @@ import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Toolbar } from "@/components/Toolbar";
 import { mapAsyncState, useAsyncData } from "@/components/asyncState";
+import { localizedName } from "@/lib/localizedField";
 import { useCapability } from "@/rbac/useCapability";
 import { AreaDisplay } from "../components/AreaDisplay";
 
 export function FarmListPage(): JSX.Element {
-  const { t } = useTranslation("farms");
+  const { t, i18n } = useTranslation("farms");
   const canCreate = useCapability("farm.create");
   const [includeArchived, setIncludeArchived] = useState(false);
 
@@ -27,7 +28,11 @@ export function FarmListPage(): JSX.Element {
 
   const columns: Column<Farm>[] = [
     { key: "code", header: t("list.columns.code"), cell: (f) => f.code },
-    { key: "name", header: t("list.columns.name"), cell: (f) => f.name },
+    {
+      key: "name",
+      header: t("list.columns.name"),
+      cell: (f) => localizedName(i18n.language, f.name, f.name_ar),
+    },
     {
       key: "governorate",
       header: t("list.columns.governorate"),

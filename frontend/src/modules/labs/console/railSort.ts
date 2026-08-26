@@ -6,6 +6,7 @@
 //
 // Pure functions in a .ts file so they can be tested without a DOM.
 import type { Block } from "@/api/blocks";
+import { localizedName } from "@/lib/localizedField";
 import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import type { Health, UnitSummary } from "../map/types";
 
@@ -39,13 +40,21 @@ export function unitValue(summary: UnitSummary | undefined, code: ApiIndexCode):
   return null;
 }
 
-/** Case- and accent-insensitive match over the visible name and the code. */
+/**
+ * Case- and accent-insensitive match over the visible names and the code.
+ *
+ * Both names are searched, not only the displayed one. Somebody reading the
+ * Arabic rail may still type the English name they know, and the reverse is
+ * true for a tenant whose blocks are named in Arabic.
+ */
 export function filterUnits(units: readonly Block[], query: string): Block[] {
   const q = query.trim().toLocaleLowerCase();
   if (!q) return [...units];
   return units.filter((b) => {
-    const name = (b.name?.trim() || b.code).toLocaleLowerCase();
-    return name.includes(q) || b.code.toLocaleLowerCase().includes(q);
+    const haystack = [b.name, b.name_ar, b.code]
+      .filter((v): v is string => !!v && v.trim() !== "")
+      .map((v) => v.toLocaleLowerCase());
+    return haystack.some((v) => v.includes(q));
   });
 }
 
@@ -56,7 +65,8 @@ export function sortUnits(
   code: ApiIndexCode,
   locale = "en",
 ): Block[] {
-  const name = (b: Block): string => b.name?.trim() || b.code;
+  // Sort by whatever the rail is showing, so the order matches the labels.
+  const name = (b: Block): string => localizedName(locale, b.name?.trim() || b.code, b.name_ar);
   const out = [...units];
 
   // Every comparator falls back to name so the order is total and therefore

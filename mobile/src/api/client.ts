@@ -229,12 +229,21 @@ export interface SignalDefinition {
   id: string;
   code: string;
   name: string;
+  /** Arabic display name. Null when nobody wrote one; see `signalName`. */
+  name_ar: string | null;
   description: string | null;
+  description_ar: string | null;
   value_kind: ValueKind;
   unit: string | null;
+  unit_ar: string | null;
   /** The lookup list. Non-empty for every `categorical` definition — the
    *  server refuses to create one without it — and null for every other kind. */
   categorical_values: string[] | null;
+  /** Arabic labels for `categorical_values`: same length, same order, one
+   *  per code. A CHECK on the table keeps the lengths equal. Null when the
+   *  list has not been translated. Read it through `categoricalLabel`, never
+   *  by index at the call site. */
+  categorical_values_ar: string[] | null;
   /** Inclusive bounds on a `numeric` reading. Decimal-as-string; see above. */
   value_min: string | null;
   value_max: string | null;
@@ -279,6 +288,39 @@ export function getSignalTemplate(templateId: string) {
   return request<{ template: { id: string; name: string }; members: TemplateMember[] }>(
     `/signals/templates/${templateId}`,
   );
+}
+
+/**
+ * The definition's name in the scout's language.
+ *
+ * A blank Arabic value counts as absent: an edit that clears the field sends
+ * `""`, and rendering that would leave the picker option empty.
+ */
+export function signalName(lang: string, d: Pick<SignalDefinition, "name" | "name_ar">): string {
+  if (lang !== "ar") return d.name;
+  return d.name_ar && d.name_ar.trim() !== "" ? d.name_ar : d.name;
+}
+
+/**
+ * The label for one categorical value.
+ *
+ * The stored reading is always the English code — that is what the server
+ * validates against and what every decision tree compares — so the Arabic
+ * label is looked up by position and never replaces the posted value.
+ */
+export function categoricalLabel(
+  lang: string,
+  d: Pick<SignalDefinition, "categorical_values" | "categorical_values_ar">,
+  value: string,
+): string {
+  if (lang !== "ar") return value;
+  const values = d.categorical_values;
+  const labels = d.categorical_values_ar;
+  if (!values || !labels || values.length !== labels.length) return value;
+  const i = values.indexOf(value);
+  if (i < 0) return value;
+  const label = labels[i];
+  return label && label.trim() !== "" ? label : value;
 }
 
 export function listSignalDefinitions(farmId: string) {

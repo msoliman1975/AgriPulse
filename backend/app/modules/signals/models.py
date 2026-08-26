@@ -84,10 +84,19 @@ class SignalDefinition(Base, TimestampedMixin):
     tenant_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     code: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    # Arabic display name (public migration 0074). Nullable; readers fall
+    # back with COALESCE(NULLIF(name_ar, ''), name).
+    name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     value_kind: Mapped[str] = mapped_column(Text, nullable=False)
     unit: Mapped[str | None] = mapped_column(Text, nullable=True)
+    unit_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     categorical_values: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    # Parallel to `categorical_values`: same length, same order, one Arabic
+    # label per code. A CHECK in migration 0074 enforces the equal length,
+    # because a shorter array would render a blank option, not an error.
+    categorical_values_ar: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
     value_min: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
     value_max: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
     attachment_allowed: Mapped[bool] = mapped_column(
@@ -238,7 +247,10 @@ class SignalTemplate(Base, TimestampedMixin):
     tenant_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     code: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    # See SignalDefinition.name_ar (public migration 0074).
+    name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
 
 

@@ -16,6 +16,7 @@ from app.modules.tenancy.models import Tenant, TenantSettings, TenantSubscriptio
 _UPDATABLE_FIELDS: frozenset[str] = frozenset(
     {
         "name",
+        "name_ar",
         "legal_name",
         "tax_id",
         "contact_email",
@@ -84,6 +85,7 @@ class TenantRepository:
         tenant_id: UUID,
         slug: str,
         name: str,
+        name_ar: str | None,
         contact_email: str,
         schema_name: str,
         legal_name: str | None,
@@ -99,6 +101,7 @@ class TenantRepository:
             id=tenant_id,
             slug=slug,
             name=name,
+            name_ar=name_ar,
             contact_email=contact_email,
             schema_name=schema_name,
             legal_name=legal_name,

@@ -59,6 +59,8 @@
     },
     "field": {
       "name": "Name",
+      "nameAr": "Arabic name",
+      "nameArHint": "Shown when the interface language is Arabic. Leave blank to use the name.",
       "code": "Code",
       "codeHint": "Permanent unique key. Cannot be changed after creation.",
       "cropPath": "Crop targeting",

@@ -27,11 +27,13 @@ def _template_dict(t: PlanTemplate) -> dict[str, Any]:
         "id": t.id,
         "code": t.code,
         "name": t.name,
+        "name_ar": t.name_ar,
         "crop_path": t.crop_path,
         "crop_id": t.crop_id,
         "country": t.country,
         "region": t.region,
         "description": t.description,
+        "description_ar": t.description_ar,
         "status": t.status,
         "created_at": t.created_at,
         "updated_at": t.updated_at,
@@ -43,6 +45,7 @@ def _milestone_dict(m: PlanTemplateMilestone) -> dict[str, Any]:
         "id": m.id,
         "code": m.code,
         "name": m.name,
+        "name_ar": m.name_ar,
         "day_from_start": m.day_from_start,
         "sort_order": m.sort_order,
     }
@@ -171,6 +174,7 @@ class PlanTemplatesRepository:
                     template_id=template_id,
                     code=m["code"],
                     name=m["name"],
+                    name_ar=m.get("name_ar"),
                     day_from_start=int(m["day_from_start"]),
                     sort_order=int(m.get("sort_order", 0)),
                     created_by=actor_user_id,
@@ -222,11 +226,13 @@ class PlanTemplatesRepository:
                 id=template_id,
                 code=header["code"],
                 name=header["name"],
+                name_ar=header.get("name_ar"),
                 crop_path=header["crop_path"],
                 crop_id=crop_id,
                 country=header.get("country"),
                 region=header.get("region"),
                 description=header.get("description"),
+                description_ar=header.get("description_ar"),
                 status="draft",
                 created_by=actor_user_id,
                 updated_by=actor_user_id,
@@ -260,11 +266,13 @@ class PlanTemplatesRepository:
         )
         template.code = header["code"]
         template.name = header["name"]
+        template.name_ar = header.get("name_ar")
         template.crop_path = header["crop_path"]
         template.crop_id = await self._crop_id_for_path(crop_path=header["crop_path"])
         template.country = header.get("country")
         template.region = header.get("region")
         template.description = header.get("description")
+        template.description_ar = header.get("description_ar")
         template.updated_by = actor_user_id
         await self._public.flush()
         await self._insert_children(

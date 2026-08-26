@@ -14,6 +14,7 @@ import type {
   ValueKind,
 } from "@/api/signals";
 import { Button } from "@/components/Button";
+import { signalName } from "../lib/signalLabels";
 import { Card } from "@/components/Card";
 import { Field } from "@/components/Field";
 import { Page } from "@/components/Page";
@@ -45,15 +46,28 @@ import {
 import { filterDefinitions } from "../components/catalogFilter";
 
 const VALUE_KINDS: ValueKind[] = ["numeric", "categorical", "event", "boolean", "geopoint"];
+
+/** Split a comma-separated field into trimmed, non-empty entries. */
+function splitValues(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
 const AGGREGATIONS: Aggregation[] = ["latest", "mean", "median", "max", "min", "count", "sum"];
 
 interface FormState {
   code: string;
   name: string;
+  name_ar: string;
   description: string;
+  description_ar: string;
   value_kind: ValueKind;
   unit: string;
+  unit_ar: string;
   categorical_values: string;
+  /** Comma-separated Arabic labels, in the same order as categorical_values. */
+  categorical_values_ar: string;
   value_min: string;
   value_max: string;
   attachment_allowed: boolean;
@@ -64,10 +78,14 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   code: "",
   name: "",
+  name_ar: "",
   description: "",
+  description_ar: "",
   value_kind: "numeric",
   unit: "",
+  unit_ar: "",
   categorical_values: "",
+  categorical_values_ar: "",
   value_min: "",
   value_max: "",
   attachment_allowed: false,
@@ -137,15 +155,21 @@ export function SignalsConfigPage(): ReactNode {
     const payload: SignalDefinitionCreatePayload = {
       code: form.code.trim(),
       name: form.name.trim(),
+      name_ar: form.name_ar.trim() || null,
       description: form.description.trim() || null,
+      description_ar: form.description_ar.trim() || null,
       value_kind: form.value_kind,
       unit: form.unit.trim() || null,
+      unit_ar: form.unit_ar.trim() || null,
       categorical_values:
-        form.value_kind === "categorical"
-          ? form.categorical_values
-              .split(",")
-              .map((v) => v.trim())
-              .filter(Boolean)
+        form.value_kind === "categorical" ? splitValues(form.categorical_values) : null,
+      // Sent only when the counts match. The API rejects a mismatched pair
+      // with a 400, and a half-filled Arabic list is a typo, not an intent.
+      categorical_values_ar:
+        form.value_kind === "categorical" &&
+        splitValues(form.categorical_values_ar).length ===
+          splitValues(form.categorical_values).length
+          ? splitValues(form.categorical_values_ar)
           : null,
       value_min: form.value_min ? form.value_min : null,
       value_max: form.value_max ? form.value_max : null,
@@ -202,6 +226,18 @@ export function SignalsConfigPage(): ReactNode {
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   placeholder={t("config.form.namePlaceholder")}
+                  className={inputCls}
+                />
+              )}
+            </Field>
+            <Field label={t("config.form.nameAr")} help={t("config.form.nameArHelp")}>
+              {(props) => (
+                <input
+                  {...props}
+                  dir="rtl"
+                  lang="ar"
+                  value={form.name_ar}
+                  onChange={(e) => setForm({ ...form, name_ar: e.target.value })}
                   className={inputCls}
                 />
               )}
@@ -296,18 +332,36 @@ export function SignalsConfigPage(): ReactNode {
               </>
             ) : null}
             {form.value_kind === "categorical" ? (
-              <Field label={t("config.form.categoricalValues")} className="sm:col-span-2">
-                {(props) => (
-                  <input
-                    {...props}
-                    required
-                    value={form.categorical_values}
-                    onChange={(e) => setForm({ ...form, categorical_values: e.target.value })}
-                    placeholder={t("config.form.categoricalPlaceholder")}
-                    className={inputCls}
-                  />
-                )}
-              </Field>
+              <>
+                <Field label={t("config.form.categoricalValues")} className="sm:col-span-2">
+                  {(props) => (
+                    <input
+                      {...props}
+                      required
+                      value={form.categorical_values}
+                      onChange={(e) => setForm({ ...form, categorical_values: e.target.value })}
+                      placeholder={t("config.form.categoricalPlaceholder")}
+                      className={inputCls}
+                    />
+                  )}
+                </Field>
+                <Field
+                  label={t("config.form.categoricalValuesAr")}
+                  help={t("config.form.categoricalValuesArHelp")}
+                  className="sm:col-span-2"
+                >
+                  {(props) => (
+                    <input
+                      {...props}
+                      dir="rtl"
+                      lang="ar"
+                      value={form.categorical_values_ar}
+                      onChange={(e) => setForm({ ...form, categorical_values_ar: e.target.value })}
+                      className={inputCls}
+                    />
+                  )}
+                </Field>
+              </>
             ) : null}
             <Field label={t("config.form.description")} className="sm:col-span-2">
               {(props) => (
@@ -315,6 +369,18 @@ export function SignalsConfigPage(): ReactNode {
                   {...props}
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  className={inputCls}
+                />
+              )}
+            </Field>
+            <Field label={t("config.form.descriptionAr")} className="sm:col-span-2">
+              {(props) => (
+                <input
+                  {...props}
+                  dir="rtl"
+                  lang="ar"
+                  value={form.description_ar}
+                  onChange={(e) => setForm({ ...form, description_ar: e.target.value })}
                   className={inputCls}
                 />
               )}
@@ -459,7 +525,7 @@ function DefinitionRow({
   onShowReferences: (references: SignalReferences) => void;
   onToggleActive: () => void;
 }): ReactNode {
-  const { t } = useTranslation("signals");
+  const { t, i18n } = useTranslation("signals");
   const { data: references } = useSignalDefinitionReferences(defn.id);
   const valueRange = useMemo(() => {
     if (defn.value_kind !== "numeric") return null;
@@ -476,7 +542,7 @@ function DefinitionRow({
     <li className="flex items-start gap-3 p-4">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-ap-ink">{defn.name}</span>
+          <span className="text-sm font-medium text-ap-ink">{signalName(i18n.language, defn)}</span>
           <span className="font-mono text-[11px] text-ap-muted">{defn.code}</span>
           <Pill kind={defn.is_active ? "ok" : "neutral"}>
             {defn.is_active ? t("config.row.active") : t("config.row.inactive")}
@@ -527,14 +593,18 @@ function DefinitionRow({
 interface TemplateFormState {
   code: string;
   name: string;
+  name_ar: string;
   description: string;
+  description_ar: string;
   members: SignalTemplateMember[];
 }
 
 const EMPTY_TEMPLATE_FORM: TemplateFormState = {
   code: "",
   name: "",
+  name_ar: "",
   description: "",
+  description_ar: "",
   members: [],
 };
 
@@ -619,7 +689,9 @@ function TemplatesCard({
               onCreate({
                 code: s.code.trim(),
                 name: s.name.trim(),
+                name_ar: s.name_ar.trim() || null,
                 description: s.description.trim() || null,
+                description_ar: s.description_ar.trim() || null,
                 members: s.members,
               })
             }
@@ -649,13 +721,17 @@ function TemplatesCard({
                   fallback={{
                     code: tpl.code,
                     name: tpl.name,
+                    name_ar: tpl.name_ar ?? "",
                     description: tpl.description ?? "",
+                    description_ar: tpl.description_ar ?? "",
                     members: [],
                   }}
                   onSubmit={(s) =>
                     onUpdate(tpl.id, {
                       name: s.name.trim(),
+                      name_ar: s.name_ar.trim() || null,
                       description: s.description.trim() || null,
+                      description_ar: s.description_ar.trim() || null,
                       members: s.members,
                     })
                   }
@@ -800,7 +876,9 @@ function TemplateEditor({
       setState({
         code: detail.template.code,
         name: detail.template.name,
+        name_ar: detail.template.name_ar ?? "",
         description: detail.template.description ?? "",
+        description_ar: detail.template.description_ar ?? "",
         members: detail.members
           .slice()
           .sort((a, b) => a.position - b.position)
@@ -894,12 +972,36 @@ function TemplateEditor({
             />
           )}
         </Field>
+        <Field label={t("config.form.nameAr")} help={t("config.form.nameArHelp")}>
+          {(props) => (
+            <input
+              {...props}
+              dir="rtl"
+              lang="ar"
+              value={state.name_ar}
+              onChange={(e) => setState({ ...state, name_ar: e.target.value })}
+              className={inputCls}
+            />
+          )}
+        </Field>
         <Field label={t("config.form.description")} className="sm:col-span-2">
           {(props) => (
             <input
               {...props}
               value={state.description}
               onChange={(e) => setState({ ...state, description: e.target.value })}
+              className={inputCls}
+            />
+          )}
+        </Field>
+        <Field label={t("config.form.descriptionAr")} className="sm:col-span-2">
+          {(props) => (
+            <input
+              {...props}
+              dir="rtl"
+              lang="ar"
+              value={state.description_ar}
+              onChange={(e) => setState({ ...state, description_ar: e.target.value })}
               className={inputCls}
             />
           )}

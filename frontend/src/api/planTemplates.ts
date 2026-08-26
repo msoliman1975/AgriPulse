@@ -41,6 +41,7 @@ export interface PlanTemplateMilestone {
   id: string;
   code: string;
   name: string;
+  name_ar: string | null;
   day_from_start: number;
   sort_order: number;
 }
@@ -64,11 +65,14 @@ export interface PlanTemplateSummary {
   id: string;
   code: string;
   name: string;
+  /** Arabic display name. Null when nobody wrote one — fall back to `name`. */
+  name_ar: string | null;
   crop_path: string;
   crop_id: string | null;
   country: string | null;
   region: string | null;
   description: string | null;
+  description_ar: string | null;
   status: TemplateStatus;
   created_at: string;
   updated_at: string;
@@ -84,6 +88,7 @@ export interface PlanTemplateDetail extends PlanTemplateSummary {
 export interface MilestoneInput {
   code: string;
   name: string;
+  name_ar?: string | null;
   day_from_start: number;
   sort_order: number;
 }
@@ -105,10 +110,12 @@ export interface ActivityInput {
 export interface PlanTemplateWriteRequest {
   code: string;
   name: string;
+  name_ar?: string | null;
   crop_path: string;
   country?: string | null;
   region?: string | null;
   description?: string | null;
+  description_ar?: string | null;
   milestones: MilestoneInput[];
   activities: ActivityInput[];
 }

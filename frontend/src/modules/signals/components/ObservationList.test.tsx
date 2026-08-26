@@ -39,10 +39,14 @@ function defn(id: string, name: string): SignalDefinition {
     id,
     code: name.toLowerCase(),
     name,
+    name_ar: null,
     description: null,
+    description_ar: null,
     value_kind: "numeric",
     unit: null,
+    unit_ar: null,
     categorical_values: null,
+    categorical_values_ar: null,
     value_min: null,
     value_max: null,
     attachment_allowed: false,
@@ -54,7 +58,9 @@ function defn(id: string, name: string): SignalDefinition {
   };
 }
 
-function obs(p: Partial<SignalObservation> & Pick<SignalObservation, "id" | "time">): SignalObservation {
+function obs(
+  p: Partial<SignalObservation> & Pick<SignalObservation, "id" | "time">,
+): SignalObservation {
   return {
     signal_definition_id: DEF1,
     signal_code: "soilmoisture",
@@ -79,7 +85,12 @@ function obs(p: Partial<SignalObservation> & Pick<SignalObservation, "id" | "tim
 
 const ROWS: SignalObservation[] = [
   obs({ id: "o1", time: "2026-06-03T10:00:00Z", value_numeric: "55" }),
-  obs({ id: "g1", time: "2026-06-02T10:00:00Z", template_observation_id: "grp", value_numeric: "70" }),
+  obs({
+    id: "g1",
+    time: "2026-06-02T10:00:00Z",
+    template_observation_id: "grp",
+    value_numeric: "70",
+  }),
   obs({
     id: "g2",
     time: "2026-06-02T10:00:00Z",

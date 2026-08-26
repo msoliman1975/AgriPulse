@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import type { ActivityType, BoardActivity } from "@/api/plans";
 import { useDateLocale } from "@/hooks/useDateLocale";
+import { localizedName } from "@/lib/localizedField";
 
 /** Color hint per activity type, using the design system's ap activity tokens
  *  (soft wash + token text + soft border). Keep keys aligned with backend
@@ -48,7 +49,7 @@ interface ActivityChipProps {
 }
 
 export function ActivityChip({ activity, onClick }: ActivityChipProps): ReactNode {
-  const { t } = useTranslation("board");
+  const { t, i18n } = useTranslation("board");
   const dateLocale = useDateLocale();
   const tint = TYPE_TINT[activity.activity_type] ?? "bg-ap-bg text-ap-ink border-ap-line";
   const icon = TYPE_ICON[activity.activity_type] ?? "•";
@@ -92,7 +93,10 @@ export function ActivityChip({ activity, onClick }: ActivityChipProps): ReactNod
         <span className="truncate text-[11px] text-ap-muted">
           {activity.resources
             .slice(0, 2)
-            .map((r) => `${r.kind === "worker" ? "👤" : "🔧"} ${r.name}`)
+            .map(
+              (r) =>
+                `${r.kind === "worker" ? "👤" : "🔧"} ${localizedName(i18n.language, r.name, r.name_ar)}`,
+            )
             .join(" · ")}
           {activity.resources.length > 2 ? ` +${activity.resources.length - 2}` : ""}
         </span>

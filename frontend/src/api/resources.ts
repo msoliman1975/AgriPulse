@@ -26,6 +26,8 @@ export interface Resource {
   farm_ids?: string[];
   kind: ResourceKind;
   name: string;
+  /** Arabic display name. Null when nobody wrote one — fall back to `name`. */
+  name_ar: string | null;
   role: WorkerRole | null;
   equipment_type: EquipmentType | null;
   phone: string | null;
@@ -39,6 +41,7 @@ export interface Resource {
 export interface ResourceCreatePayload {
   kind: ResourceKind;
   name: string;
+  name_ar?: string | null;
   role?: WorkerRole | null;
   equipment_type?: EquipmentType | null;
   phone?: string | null;
@@ -47,6 +50,7 @@ export interface ResourceCreatePayload {
 
 export interface ResourceUpdatePayload {
   name?: string;
+  name_ar?: string | null;
   role?: WorkerRole | null;
   equipment_type?: EquipmentType | null;
   phone?: string | null;

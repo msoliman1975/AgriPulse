@@ -10,7 +10,7 @@ import type { Feature, FeatureCollection, Polygon } from "geojson";
 import i18n from "@/i18n";
 import { getBlock, listBlocks, type Block, type BlockDetail } from "@/api/blocks";
 import { getBlocksSummary } from "@/api/blocksSummary";
-import { localizedField } from "@/lib/localizedField";
+import { localizedField, localizedName } from "@/lib/localizedField";
 import { listBlockCrops, type BlockCropAssignment } from "@/api/cropAssignments";
 import {
   listCrops,
@@ -73,7 +73,10 @@ function isoNDays(n: number): { from: string; to: string } {
 }
 
 function blockShortName(b: Block): string {
-  return b.name?.trim() || b.code;
+  // Falls back to the code when the block has no name at all, which is the
+  // common case: `name` is optional on a block, `code` never is.
+  const en = b.name?.trim() || b.code;
+  return localizedName(i18n.language, en, b.name_ar);
 }
 
 function specUnitType(b: Block): "block" | "pivot" | "pivot_section" {

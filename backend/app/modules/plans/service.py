@@ -46,6 +46,8 @@ class PlansService(Protocol):
         season_label: str,
         season_year: int,
         name: str | None,
+        # Arabic display name (tenant migration 0087). Optional.
+        name_ar: str | None = None,
         notes: str | None,
         actor_user_id: UUID | None,
         tenant_schema: str,
@@ -176,6 +178,8 @@ class PlansServiceImpl:
         season_label: str,
         season_year: int,
         name: str | None,
+        # Arabic display name (tenant migration 0087). Optional.
+        name_ar: str | None = None,
         notes: str | None,
         actor_user_id: UUID | None,
         tenant_schema: str,
@@ -187,6 +191,7 @@ class PlansServiceImpl:
             season_label=season_label,
             season_year=season_year,
             name=name,
+            name_ar=name_ar,
             notes=notes,
             actor_user_id=actor_user_id,
         )

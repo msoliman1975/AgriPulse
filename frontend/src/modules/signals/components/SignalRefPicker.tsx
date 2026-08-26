@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SignalDefinition } from "@/api/signals";
+import { signalName } from "../lib/signalLabels";
 
 import { buildSignalRef, refToJson, refToYaml, valueKeyForKind } from "./signalRef";
 
@@ -31,7 +32,7 @@ interface Props {
  * again?" + "what's the JSON shape?" friction.
  */
 export function SignalRefPicker({ definitions, isLoading, isError, format }: Props) {
-  const { t } = useTranslation("signals");
+  const { t, i18n } = useTranslation("signals");
   const [selectedId, setSelectedId] = useState<string>("");
   const [copied, setCopied] = useState(false);
 
@@ -79,7 +80,7 @@ export function SignalRefPicker({ definitions, isLoading, isError, format }: Pro
             </option>
             {definitions.map((d) => (
               <option key={d.id} value={d.id}>
-                {d.code} — {d.name}
+                {d.code} — {signalName(i18n.language, d)}
               </option>
             ))}
           </select>

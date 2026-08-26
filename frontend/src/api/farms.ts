@@ -20,7 +20,10 @@ export interface Farm {
   id: string;
   code: string;
   name: string;
+  /** Arabic display name. Null when nobody wrote one — fall back to `name`. */
+  name_ar: string | null;
   description: string | null;
+  description_ar: string | null;
   centroid: GeoJSON.Point;
   area_m2: number;
   area_value: number;
@@ -52,7 +55,9 @@ export interface FarmDetail extends Farm {
 export interface FarmCreatePayload {
   code: string;
   name: string;
+  name_ar?: string | null;
   description?: string | null;
+  description_ar?: string | null;
   boundary: MultiPolygon;
   elevation_m?: number | null;
   country_code?: string | null;
@@ -70,7 +75,9 @@ export interface FarmCreatePayload {
 
 export interface FarmUpdatePayload {
   name?: string;
+  name_ar?: string | null;
   description?: string | null;
+  description_ar?: string | null;
   boundary?: MultiPolygon;
   elevation_m?: number | null;
   country_code?: string | null;

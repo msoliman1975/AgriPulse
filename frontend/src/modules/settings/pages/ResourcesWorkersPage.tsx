@@ -6,6 +6,7 @@ import { listFarms } from "@/api/farms";
 import type { WorkerRole } from "@/api/resources";
 import { listTenantUsers, type TenantUser } from "@/api/users";
 import { AsyncBoundary } from "@/components/AsyncBoundary";
+import { localizedName } from "@/lib/localizedField";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
@@ -227,9 +228,10 @@ interface WorkerRowProps {
 }
 
 function WorkerRow({ row, farmId, canManage, members, canLink }: WorkerRowProps): ReactNode {
-  const { t } = useTranslation("resources");
+  const { t, i18n } = useTranslation("resources");
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(row.name);
+  const [nameAr, setNameAr] = useState(row.name_ar ?? "");
   const [role, setRole] = useState<WorkerRole>(row.role ?? "FieldWorker");
   const [phone, setPhone] = useState(row.phone ?? "");
   const [membershipId, setMembershipId] = useState<string | null>(row.membership_id);
@@ -239,10 +241,22 @@ function WorkerRow({ row, farmId, canManage, members, canLink }: WorkerRowProps)
     return (
       <Tr className="border-t border-ap-line">
         <Td>
+          {/* Both names in one cell: a separate Arabic column would push the
+              row past the width the table already fills on a laptop. */}
           <input
             className="w-full rounded border border-ap-line px-2 py-1"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            aria-label={t("col.name")}
+          />
+          <input
+            className="mt-1 w-full rounded border border-ap-line px-2 py-1"
+            dir="rtl"
+            lang="ar"
+            placeholder={t("col.nameAr")}
+            aria-label={t("col.nameAr")}
+            value={nameAr}
+            onChange={(e) => setNameAr(e.target.value)}
           />
         </Td>
         <Td>
@@ -282,7 +296,13 @@ function WorkerRow({ row, farmId, canManage, members, canLink }: WorkerRowProps)
               update.mutate(
                 {
                   resourceId: row.id,
-                  payload: { name, role, phone: phone || null, membership_id: membershipId },
+                  payload: {
+                    name,
+                    name_ar: nameAr.trim() || null,
+                    role,
+                    phone: phone || null,
+                    membership_id: membershipId,
+                  },
                 },
                 { onSuccess: () => setEditing(false) },
               )
@@ -304,7 +324,7 @@ function WorkerRow({ row, farmId, canManage, members, canLink }: WorkerRowProps)
 
   return (
     <Tr className="border-t border-ap-line">
-      <Td>{row.name}</Td>
+      <Td>{localizedName(i18n.language, row.name, row.name_ar)}</Td>
       <Td className="text-ap-muted">{t(`role.${row.role}`)}</Td>
       {canLink ? (
         <Td className="text-ap-muted">{memberName(members, row.membership_id) ?? "—"}</Td>
@@ -351,6 +371,7 @@ interface AddWorkerRowProps {
 function AddWorkerRow({ farmId, members, canLink, onDone }: AddWorkerRowProps): ReactNode {
   const { t } = useTranslation("resources");
   const [name, setName] = useState("");
+  const [nameAr, setNameAr] = useState("");
   const [role, setRole] = useState<WorkerRole>("FieldWorker");
   const [phone, setPhone] = useState("");
   const [membershipId, setMembershipId] = useState<string | null>(null);
@@ -364,6 +385,15 @@ function AddWorkerRow({ farmId, members, canLink, onDone }: AddWorkerRowProps): 
           placeholder={t("workers.namePlaceholder")}
           value={name}
           onChange={(e) => setName(e.target.value)}
+        />
+        <input
+          className="mt-1 w-full rounded border border-ap-line px-2 py-1"
+          dir="rtl"
+          lang="ar"
+          placeholder={t("col.nameAr")}
+          aria-label={t("col.nameAr")}
+          value={nameAr}
+          onChange={(e) => setNameAr(e.target.value)}
         />
       </Td>
       <Td>
@@ -403,6 +433,7 @@ function AddWorkerRow({ farmId, members, canLink, onDone }: AddWorkerRowProps): 
               {
                 kind: "worker",
                 name: name.trim(),
+                name_ar: nameAr.trim() || null,
                 role,
                 phone: phone.trim() || null,
                 membership_id: membershipId,

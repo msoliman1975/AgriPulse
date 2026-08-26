@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useMe } from "@/hooks/useMe";
+import { localizedField } from "@/lib/localizedField";
 
 /**
  * Static tenant-name label, rendered between the AgriPulse wordmark
@@ -14,7 +16,11 @@ import { useMe } from "@/hooks/useMe";
  */
 export function TenantBadge(): ReactNode {
   const { data: me } = useMe();
-  const tenantName = me?.tenant_memberships[0]?.tenant_name;
+  const { i18n } = useTranslation();
+  const membership = me?.tenant_memberships[0];
+  const tenantName = membership
+    ? localizedField(i18n.language, membership.tenant_name, membership.tenant_name_ar)
+    : null;
   if (!tenantName) return null;
   return (
     <>

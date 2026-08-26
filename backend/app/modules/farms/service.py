@@ -198,6 +198,8 @@ class FarmService(Protocol):
         preferred_unit: str,
         active_from: _date | None = None,
         correlation_id: UUID | None = None,
+        name_ar: str | None = None,
+        description_ar: str | None = None,
     ) -> dict[str, Any]: ...
 
     async def list_farms(
@@ -276,6 +278,7 @@ class FarmService(Protocol):
         irrigation_geometry: dict[str, Any] | None = None,
         active_from: _date | None = None,
         correlation_id: UUID | None = None,
+        name_ar: str | None = None,
     ) -> dict[str, Any]: ...
 
     async def reconcile_blocks_bulk(
@@ -753,6 +756,10 @@ class FarmServiceImpl:
         preferred_unit: str,
         active_from: _date | None = None,
         correlation_id: UUID | None = None,
+        # Keyword-only with a default: the bulk / pivot callers do not
+        # collect an Arabic name, and the read path falls back to `name`.
+        name_ar: str | None = None,
+        description_ar: str | None = None,
     ) -> dict[str, Any]:
         _geometry.validate_multipolygon_geojson(boundary)
         ewkt = _geometry.geojson_to_ewkt_multipolygon(boundary)
@@ -763,7 +770,9 @@ class FarmServiceImpl:
             farm_id=farm_id,
             code=code,
             name=name,
+            name_ar=name_ar,
             description=description,
+            description_ar=description_ar,
             boundary_ewkt=ewkt,
             elevation_m=elevation_m,
             country_code=country_code,
@@ -1056,6 +1065,8 @@ class FarmServiceImpl:
         irrigation_geometry: dict[str, Any] | None = None,
         active_from: _date | None = None,
         correlation_id: UUID | None = None,
+        # See create_farm: bulk block create and pivot create pass nothing.
+        name_ar: str | None = None,
     ) -> dict[str, Any]:
         _geometry.validate_polygon_geojson(boundary)
         ewkt = _geometry.geojson_to_ewkt_polygon(boundary)
@@ -1071,6 +1082,7 @@ class FarmServiceImpl:
             farm_id=farm_id,
             code=code,
             name=name,
+            name_ar=name_ar,
             boundary_ewkt=ewkt,
             elevation_m=elevation_m,
             irrigation_system=irrigation_system,

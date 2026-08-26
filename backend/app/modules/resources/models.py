@@ -30,6 +30,9 @@ class Resource(Base, TimestampedMixin):
     # because one person can work several farms and a column cannot say that.
     kind: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    # Arabic display name (tenant migration 0087). Nullable; readers fall
+    # back with COALESCE(NULLIF(name_ar, ''), name).
+    name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     role: Mapped[str | None] = mapped_column(Text, nullable=True)
     equipment_type: Mapped[str | None] = mapped_column(Text, nullable=True)
     phone: Mapped[str | None] = mapped_column(Text, nullable=True)

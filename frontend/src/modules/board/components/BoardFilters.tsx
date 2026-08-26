@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ActivityType, BoardBlock, BoardResourceChip } from "@/api/plans";
+import { localizedName } from "@/lib/localizedField";
 
 const ALL_TYPES: ActivityType[] = [
   "irrigation",
@@ -40,7 +41,7 @@ export function BoardFilters({
   setResourceIds,
   onClear,
 }: BoardFiltersProps): ReactNode {
-  const { t } = useTranslation("board");
+  const { t, i18n } = useTranslation("board");
   const isFiltered = blockIds.size + types.size + resourceIds.size > 0;
 
   return (
@@ -61,7 +62,7 @@ export function BoardFilters({
         label={t("filters.assignees")}
         all={knownResources.map((r) => ({
           id: r.id,
-          label: `${r.kind === "worker" ? "👤" : "🔧"} ${r.name}`,
+          label: `${r.kind === "worker" ? "👤" : "🔧"} ${localizedName(i18n.language, r.name, r.name_ar)}`,
         }))}
         selected={resourceIds}
         onChange={setResourceIds}
@@ -86,12 +87,7 @@ interface MultiSelectProps {
   onChange: (next: Set<string>) => void;
 }
 
-function MultiSelect({
-  label,
-  all,
-  selected,
-  onChange,
-}: MultiSelectProps): ReactNode {
+function MultiSelect({ label, all, selected, onChange }: MultiSelectProps): ReactNode {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const summary = selected.size === 0 ? label : `${label} (${selected.size})`;

@@ -19,6 +19,7 @@ import { SubscriptionsTab } from "@/modules/imagery/components/SubscriptionsTab"
 import { IndexTrendChart } from "@/modules/indices/components/IndexTrendChart";
 import { WeatherForecastPanel } from "@/modules/weather/components/WeatherForecastPanel";
 import { WeatherSubscriptionsTab } from "@/modules/weather/components/WeatherSubscriptionsTab";
+import { localizedName } from "@/lib/localizedField";
 import { useCapability } from "@/rbac/useCapability";
 import { AreaDisplay } from "../components/AreaDisplay";
 import { ArchiveButton } from "../components/ArchiveButton";
@@ -28,7 +29,7 @@ import { MapPreview } from "../components/MapPreview";
 
 export function BlockDetailPage(): JSX.Element {
   const { farmId = "", blockId = "" } = useParams<{ farmId: string; blockId: string }>();
-  const { t } = useTranslation("farms");
+  const { t, i18n } = useTranslation("farms");
   const navigate = useNavigate();
   const canEdit = useCapability("block.update_metadata", { farmId });
   const canArchive = useCapability("block.delete", { farmId });
@@ -38,7 +39,7 @@ export function BlockDetailPage(): JSX.Element {
   const canReadWeather = useCapability("weather.read", { farmId });
 
   const [block, setBlock] = useState<BlockDetail | null>(null);
-  const [farmName, setFarmName] = useState<string | null>(null);
+  const [farmNames, setFarmNames] = useState<{ name: string; name_ar: string | null } | null>(null);
   const [history, setHistory] = useState<BlockCropAssignment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -59,7 +60,7 @@ export function BlockDetailPage(): JSX.Element {
         if (cancelled) return;
         setBlock(b);
         setHistory(h);
-        setFarmName(f.name);
+        setFarmNames({ name: f.name, name_ar: f.name_ar });
       })
       .catch((err) => {
         if (cancelled) return;
@@ -123,7 +124,12 @@ export function BlockDetailPage(): JSX.Element {
           <Breadcrumb
             items={[
               { label: t("list.heading"), to: "/farms" },
-              { label: farmName ?? "…", to: `/farms/${farmId}` },
+              {
+                label: farmNames
+                  ? localizedName(i18n.language, farmNames.name, farmNames.name_ar)
+                  : "…",
+                to: `/farms/${farmId}`,
+              },
               { label: `${t("block.detailHeading")} ${block.code}` },
             ]}
           />

@@ -13,6 +13,8 @@ import clsx from "clsx";
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { localizedName } from "@/lib/localizedField";
+
 import type { Block } from "@/api/blocks";
 import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import type { UnitSummary } from "../map/types";
@@ -173,8 +175,8 @@ function Row({
   onSelect: (id: string) => void;
   activeIndex: ApiIndexCode;
 }): ReactNode {
-  const { t } = useTranslation("farmConsole");
-  const name = block.name?.trim() || block.code;
+  const { t, i18n } = useTranslation("farmConsole");
+  const name = localizedName(i18n.language, block.name?.trim() || block.code, block.name_ar);
   const value = unitValue(summary, activeIndex);
   const gridOnly = value === null;
 

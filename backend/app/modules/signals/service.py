@@ -78,6 +78,24 @@ from app.shared.storage.client import (
 )
 
 
+def _assert_categorical_ar_matches(values: list[str] | None, values_ar: list[str] | None) -> None:
+    """Reject a mismatched Arabic value list before Postgres does.
+
+    Migration 0074 has a CHECK on the equal length. Hitting it raises an
+    IntegrityError, which surfaces as a 500 with no useful message, so
+    check here and return a 400 that names the problem.
+    """
+    if values_ar is None:
+        return
+    if values is None or len(values_ar) != len(values):
+        raise InvalidSignalValueError(
+            detail=(
+                "categorical_values_ar must have the same number of entries as "
+                "categorical_values, in the same order."
+            )
+        )
+
+
 class SignalsService(Protocol):
     async def list_definitions(
         self, *, include_inactive: bool = False
@@ -90,10 +108,16 @@ class SignalsService(Protocol):
         *,
         code: str,
         name: str,
+        # Arabic labels (public migration 0074). All optional; the read
+        # path falls back to the English field.
+        name_ar: str | None = None,
         description: str | None,
+        description_ar: str | None = None,
         value_kind: str,
         unit: str | None,
+        unit_ar: str | None = None,
         categorical_values: list[str] | None,
+        categorical_values_ar: list[str] | None = None,
         value_min: Decimal | None,
         value_max: Decimal | None,
         attachment_allowed: bool,
@@ -127,7 +151,9 @@ class SignalsService(Protocol):
         *,
         code: str,
         name: str,
+        name_ar: str | None = None,
         description: str | None,
+        description_ar: str | None = None,
         members: tuple[SignalTemplateDefinitionMember, ...],
         actor_user_id: UUID | None,
         tenant_schema: str | None,
@@ -297,10 +323,16 @@ class SignalsServiceImpl:
         *,
         code: str,
         name: str,
+        # Arabic labels (public migration 0074). All optional; the read
+        # path falls back to the English field.
+        name_ar: str | None = None,
         description: str | None,
+        description_ar: str | None = None,
         value_kind: str,
         unit: str | None,
+        unit_ar: str | None = None,
         categorical_values: list[str] | None,
+        categorical_values_ar: list[str] | None = None,
         value_min: Decimal | None,
         value_max: Decimal | None,
         attachment_allowed: bool,
@@ -319,6 +351,7 @@ class SignalsServiceImpl:
             )
         if value_min is not None and value_max is not None and value_min > value_max:
             raise InvalidSignalValueError(detail="value_min must be ≤ value_max.")
+        _assert_categorical_ar_matches(categorical_values, categorical_values_ar)
         # CS-1 D3 — non-numeric value_kinds always use `latest`. The
         # schema-layer coercion runs here (not in the Pydantic model)
         # because the relevant value_kind comes from the request body
@@ -335,10 +368,14 @@ class SignalsServiceImpl:
             definition_id=definition_id,
             code=code,
             name=name,
+            name_ar=name_ar,
             description=description,
+            description_ar=description_ar,
             value_kind=value_kind,
             unit=unit,
+            unit_ar=unit_ar,
             categorical_values=categorical_values,
+            categorical_values_ar=categorical_values_ar,
             value_min=value_min,
             value_max=value_max,
             attachment_allowed=attachment_allowed,
@@ -374,6 +411,14 @@ class SignalsServiceImpl:
             and updates["value_min"] > updates["value_max"]
         ):
             raise InvalidSignalValueError(detail="value_min must be ≤ value_max.")
+        # The Arabic value list must match whatever the row will hold after
+        # this patch, which is the incoming list when the caller sends one
+        # and the stored list otherwise.
+        if "categorical_values_ar" in updates:
+            _assert_categorical_ar_matches(
+                updates.get("categorical_values", existing["categorical_values"]),
+                updates["categorical_values_ar"],
+            )
         # CS-1 D3 — if the caller is changing aggregation, coerce
         # against the existing value_kind (kind itself isn't updatable
         # per SignalDefinitionUpdateRequest). Window-day cleanup mirrors
@@ -820,7 +865,9 @@ class SignalsServiceImpl:
         *,
         code: str,
         name: str,
+        name_ar: str | None = None,
         description: str | None,
+        description_ar: str | None = None,
         members: tuple[SignalTemplateDefinitionMember, ...],
         actor_user_id: UUID | None,
         tenant_schema: str | None,
@@ -834,7 +881,9 @@ class SignalsServiceImpl:
             template_id=template_id,
             code=code,
             name=name,
+            name_ar=name_ar,
             description=description,
+            description_ar=description_ar,
             members=repo_members,
             actor_user_id=actor_user_id,
         )

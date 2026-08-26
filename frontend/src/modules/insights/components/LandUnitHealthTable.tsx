@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 
 import { listBlocks, type Block } from "@/api/blocks";
 import { Card } from "@/components/Card";
+import { localizedName } from "@/lib/localizedField";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
@@ -75,14 +76,16 @@ export function LandUnitHealthTable({ farmId }: Props): ReactNode {
 }
 
 function Row({ block: b, farmId }: { block: Block; farmId: string }): ReactNode {
-  const { t } = useTranslation("insights");
+  const { t, i18n } = useTranslation("insights");
   const navigate = useNavigate();
   const status: "ok" | "neutral" = b.is_active ? "ok" : "neutral";
   const statusLabel = b.is_active ? t("landUnits.status.active") : t("landUnits.status.inactive");
   return (
     <Tr className="hover:bg-ap-line/20">
       <Td>
-        <div className="text-ap-ink">{b.name ?? b.code}</div>
+        <div className="text-ap-ink">
+          {localizedName(i18n.language, b.name ?? b.code, b.name_ar)}
+        </div>
         <div className="text-[11px] text-ap-muted">
           {b.code}
           {b.irrigation_system ? ` · ${b.irrigation_system}` : ""}

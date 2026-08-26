@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import type { ActivityType, BoardActivity } from "@/api/plans";
 import type { Resource } from "@/api/resources";
 import { Modal } from "@/components/Modal";
+import { localizedName } from "@/lib/localizedField";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
 import { useDeleteActivity, useUpdateActivity } from "@/queries/plans";
@@ -50,10 +51,7 @@ export function ActivityDetailDialog({
   const [mode, setMode] = useState<"view" | "edit" | "confirm-delete">("view");
 
   function runAction(state: "start" | "complete" | "skip") {
-    update.mutate(
-      { activityId: activity.id, payload: { state } },
-      { onSuccess: onClose },
-    );
+    update.mutate({ activityId: activity.id, payload: { state } }, { onSuccess: onClose });
   }
 
   function confirmDelete() {
@@ -124,8 +122,7 @@ export function ActivityDetailDialog({
               {t("detail.start")}
             </button>
           ) : null}
-          {canComplete &&
-          (activity.status === "scheduled" || activity.status === "in_progress") ? (
+          {canComplete && (activity.status === "scheduled" || activity.status === "in_progress") ? (
             <>
               <button
                 type="button"
@@ -169,15 +166,13 @@ export function ActivityDetailDialog({
         </div>
       ) : null}
 
-      {del.isError ? (
-        <p className="mt-2 text-xs text-ap-crit">{t("detail.deleteFailed")}</p>
-      ) : null}
+      {del.isError ? <p className="mt-2 text-xs text-ap-crit">{t("detail.deleteFailed")}</p> : null}
     </Modal>
   );
 }
 
 function ViewBody({ activity }: { activity: BoardActivity }): ReactNode {
-  const { t } = useTranslation("board");
+  const { t, i18n } = useTranslation("board");
   const dateLocale = useDateLocale();
   return (
     <dl className="mt-3 space-y-2 text-sm">
@@ -188,21 +183,15 @@ function ViewBody({ activity }: { activity: BoardActivity }): ReactNode {
       {activity.product_name ? (
         <Row label={t("detail.product")}>{activity.product_name}</Row>
       ) : null}
-      {activity.dosage ? (
-        <Row label={t("detail.dosage")}>{activity.dosage}</Row>
-      ) : null}
-      {activity.notes ? (
-        <Row label={t("detail.notes")}>{activity.notes}</Row>
-      ) : null}
+      {activity.dosage ? <Row label={t("detail.dosage")}>{activity.dosage}</Row> : null}
+      {activity.notes ? <Row label={t("detail.notes")}>{activity.notes}</Row> : null}
       {activity.resources.length > 0 ? (
         <Row label={t("detail.assigned")}>
           <div className="flex flex-wrap gap-1">
             {activity.resources.map((r) => (
-              <span
-                key={r.id}
-                className="rounded bg-ap-bg/50 px-2 py-0.5 text-xs"
-              >
-                {r.kind === "worker" ? "👤" : "🔧"} {r.name}
+              <span key={r.id} className="rounded bg-ap-bg/50 px-2 py-0.5 text-xs">
+                {r.kind === "worker" ? "👤" : "🔧"}{" "}
+                {localizedName(i18n.language, r.name, r.name_ar)}
               </span>
             ))}
           </div>
@@ -227,9 +216,7 @@ function EditBody({
   const update = useUpdateActivity();
   const attach = useAttachResource(farmId);
   const detach = useDetachResource(farmId);
-  const [activityType, setActivityType] = useState<ActivityType>(
-    activity.activity_type,
-  );
+  const [activityType, setActivityType] = useState<ActivityType>(activity.activity_type);
   const [scheduledDate, setScheduledDate] = useState(activity.scheduled_date);
   const [notes, setNotes] = useState(activity.notes ?? "");
   const [productName, setProductName] = useState(activity.product_name ?? "");
@@ -285,11 +272,7 @@ function EditBody({
     const toAttach = Array.from(resourceIds).filter((id) => !currentIds.has(id));
     const toDetach = Array.from(currentIds).filter((id) => !resourceIds.has(id));
 
-    if (
-      Object.keys(payload).length === 0 &&
-      toAttach.length === 0 &&
-      toDetach.length === 0
-    ) {
+    if (Object.keys(payload).length === 0 && toAttach.length === 0 && toDetach.length === 0) {
       onCancel();
       return;
     }
@@ -300,12 +283,8 @@ function EditBody({
     // Resources: ignore individual failures so a partial save still
     // produces a usable activity (mirrors QuickAddDialog policy).
     await Promise.allSettled([
-      ...toAttach.map((rid) =>
-        attach.mutateAsync({ activityId: activity.id, resourceId: rid }),
-      ),
-      ...toDetach.map((rid) =>
-        detach.mutateAsync({ activityId: activity.id, resourceId: rid }),
-      ),
+      ...toAttach.map((rid) => attach.mutateAsync({ activityId: activity.id, resourceId: rid })),
+      ...toDetach.map((rid) => detach.mutateAsync({ activityId: activity.id, resourceId: rid })),
     ]);
     onClose();
   }
@@ -397,9 +376,7 @@ function EditBody({
         )}
       </div>
 
-      {update.isError ? (
-        <p className="text-xs text-ap-crit">{t("detail.editFailed")}</p>
-      ) : null}
+      {update.isError ? <p className="text-xs text-ap-crit">{t("detail.editFailed")}</p> : null}
 
       <div className="mt-1 flex justify-end gap-2">
         <button
@@ -429,36 +406,23 @@ interface ResourceGroupProps {
   onToggle: (id: string) => void;
 }
 
-function ResourceGroup({
-  label,
-  items,
-  selected,
-  onToggle,
-}: ResourceGroupProps): ReactNode {
+function ResourceGroup({ label, items, selected, onToggle }: ResourceGroupProps): ReactNode {
+  const { i18n } = useTranslation("board");
   if (items.length === 0) return null;
   return (
     <div>
-      <div className="px-1 text-[11px] uppercase tracking-wider text-ap-muted">
-        {label}
-      </div>
+      <div className="px-1 text-[11px] uppercase tracking-wider text-ap-muted">{label}</div>
       <ul className="flex flex-col">
         {items.map((r) => (
           <li key={r.id}>
             <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-ap-bg/50">
-              <input
-                type="checkbox"
-                checked={selected.has(r.id)}
-                onChange={() => onToggle(r.id)}
-              />
+              <input type="checkbox" checked={selected.has(r.id)} onChange={() => onToggle(r.id)} />
               <span className="text-sm">
-                {r.kind === "worker" ? "👤" : "🔧"} {r.name}
-                {r.role ? (
-                  <span className="ms-1 text-xs text-ap-muted">({r.role})</span>
-                ) : null}
+                {r.kind === "worker" ? "👤" : "🔧"}{" "}
+                {localizedName(i18n.language, r.name, r.name_ar)}
+                {r.role ? <span className="ms-1 text-xs text-ap-muted">({r.role})</span> : null}
                 {r.equipment_type ? (
-                  <span className="ms-1 text-xs text-ap-muted">
-                    ({r.equipment_type})
-                  </span>
+                  <span className="ms-1 text-xs text-ap-muted">({r.equipment_type})</span>
                 ) : null}
               </span>
             </label>
@@ -469,11 +433,7 @@ function ResourceGroup({
   );
 }
 
-function ConfirmDeleteBody({
-  activity,
-}: {
-  activity: BoardActivity;
-}): ReactNode {
+function ConfirmDeleteBody({ activity }: { activity: BoardActivity }): ReactNode {
   const { t } = useTranslation("board");
   const dateLocale = useDateLocale();
   return (
@@ -489,13 +449,7 @@ function ConfirmDeleteBody({
   );
 }
 
-function Row({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}): ReactNode {
+function Row({ label, children }: { label: string; children: ReactNode }): ReactNode {
   return (
     <div className="flex gap-2">
       <dt className="w-24 flex-shrink-0 text-ap-muted">{label}</dt>

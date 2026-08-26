@@ -25,6 +25,8 @@ class ResourcesService(Protocol):
         farm_id: UUID,
         kind: str,
         name: str,
+        # Arabic display name (tenant migration 0087). Optional.
+        name_ar: str | None = None,
         role: str | None,
         equipment_type: str | None,
         phone: str | None,
@@ -74,6 +76,8 @@ class ResourcesServiceImpl:
         farm_id: UUID,
         kind: str,
         name: str,
+        # Arabic display name (tenant migration 0087). Optional.
+        name_ar: str | None = None,
         role: str | None,
         equipment_type: str | None,
         phone: str | None,
@@ -85,6 +89,7 @@ class ResourcesServiceImpl:
             resource_id=resource_id,
             kind=kind,
             name=name.strip(),
+            name_ar=(name_ar or "").strip() or None,
             role=role,
             equipment_type=equipment_type,
             phone=phone,

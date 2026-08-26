@@ -9,6 +9,7 @@ import {
   type PreviewResponse,
 } from "@/api/planTemplates";
 import { Modal } from "@/components/Modal";
+import { localizedName } from "@/lib/localizedField";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useAppliableTemplates, useApplyTemplate } from "@/queries/planTemplates";
@@ -34,7 +35,7 @@ type Step = 1 | 2 | 3 | 4;
  *   4. Preview the resolved schedule (stage-anchored dates + skipped) → apply.
  */
 export function ApplyTemplateDialog({ farmId, onClose }: Props): ReactNode {
-  const { t } = useTranslation("planTemplates");
+  const { t, i18n } = useTranslation("planTemplates");
   const today = format(new Date(), "yyyy-MM-dd");
 
   const appliableQ = useAppliableTemplates(farmId);
@@ -147,7 +148,9 @@ export function ApplyTemplateDialog({ farmId, onClose }: Props): ReactNode {
                     className="flex w-full items-center justify-between rounded-lg border border-ap-line bg-white p-3 text-start hover:border-ap-primary"
                   >
                     <div>
-                      <div className="font-medium text-ap-ink">{tpl.name}</div>
+                      <div className="font-medium text-ap-ink">
+                        {localizedName(i18n.language, tpl.name, tpl.name_ar)}
+                      </div>
                       <code className="font-mono text-[11px] text-ap-primary">{tpl.crop_path}</code>
                       {tpl.region ? (
                         <span className="ms-2 text-[11px] text-ap-muted">· {tpl.region}</span>

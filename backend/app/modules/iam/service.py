@@ -89,6 +89,7 @@ class UserServiceImpl:
                     tenant_id=tenant.id,
                     tenant_slug=tenant.slug,
                     tenant_name=tenant.name,
+                    tenant_name_ar=tenant.name_ar,
                     status=membership.status,
                     joined_at=membership.joined_at,
                     tenant_roles=[

@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { fetchMe, type Me } from "@/api/me";
 import { isApiError } from "@/api/errors";
+import { localizedField } from "@/lib/localizedField";
 import { Drawer } from "./Drawer";
 import { LanguageToggle } from "./LanguageToggle";
 import { UnitToggle } from "./UnitToggle";
@@ -146,7 +147,8 @@ function ProfileBody({ me, lang }: { me: Me; lang: string | undefined }): ReactN
             {me.tenant_memberships.map((m) => (
               <li key={m.tenant_id} className="rounded-md border border-ap-line p-2">
                 <p className="font-medium text-ap-ink">
-                  {m.tenant_name} <span className="text-xs text-ap-muted">({m.tenant_slug})</span>
+                  {localizedField(lang, m.tenant_name, m.tenant_name_ar)}{" "}
+                  <span className="text-xs text-ap-muted">({m.tenant_slug})</span>
                 </p>
                 <p className="text-xs text-ap-muted">
                   {t("me.status")}: {m.status}

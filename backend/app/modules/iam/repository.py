@@ -28,6 +28,8 @@ class TenantSummary:
     id: UUID
     slug: str
     name: str
+    # Arabic display name (public migration 0074). Null falls back to `name`.
+    name_ar: str | None = None
 
 
 class UserRepository:
@@ -146,14 +148,15 @@ class UserRepository:
         tenants_rows = (
             await self._session.execute(
                 text(
-                    "SELECT id, slug, name FROM public.tenants "
+                    "SELECT id, slug, name, name_ar FROM public.tenants "
                     "WHERE id IN :ids AND deleted_at IS NULL"
                 ).bindparams(bindparam("ids", type_=PG_UUID(as_uuid=True), expanding=True)),
                 {"ids": list(tenant_ids)},
             )
         ).all()
         tenants_by_id = {
-            row.id: TenantSummary(id=row.id, slug=row.slug, name=row.name) for row in tenants_rows
+            row.id: TenantSummary(id=row.id, slug=row.slug, name=row.name, name_ar=row.name_ar)
+            for row in tenants_rows
         }
 
         out: list[tuple[TenantMembership, TenantSummary, list[TenantRoleAssignment]]] = []

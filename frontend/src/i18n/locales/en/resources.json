@@ -26,6 +26,7 @@
   "col": {
     "name": "Name",
     "role": "Role",
+    "nameAr": "Arabic name",
     "member": "Linked member",
     "phone": "Phone",
     "type": "Type",

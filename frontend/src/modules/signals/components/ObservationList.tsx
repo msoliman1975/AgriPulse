@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { listBlocks } from "@/api/blocks";
+import { localizedName } from "@/lib/localizedField";
+import { signalName } from "../lib/signalLabels";
 import { Card } from "@/components/Card";
 import { Modal } from "@/components/Modal";
 import {
@@ -90,7 +92,7 @@ export function ObservationList({
   canDelete,
   lockedBlockId = null,
 }: Props): ReactNode {
-  const { t } = useTranslation("signals");
+  const { t, i18n } = useTranslation("signals");
   const dateLocale = useDateLocale();
 
   const [filters, setFilters] = useState<Filters>({
@@ -110,9 +112,9 @@ export function ObservationList({
 
   const defName = useMemo(() => {
     const m = new Map<string, string>();
-    for (const d of definitions) m.set(d.id, d.name);
+    for (const d of definitions) m.set(d.id, signalName(i18n.language, d));
     return m;
-  }, [definitions]);
+  }, [definitions, i18n.language]);
 
   const blocksQ = useQuery({
     queryKey: ["blocks", "list", farmId] as const,
@@ -199,7 +201,7 @@ export function ObservationList({
             <option value="">{t("log.list.filters.allDefinitions")}</option>
             {definitions.map((d) => (
               <option key={d.id} value={d.id}>
-                {d.name}
+                {signalName(i18n.language, d)}
               </option>
             ))}
           </select>
@@ -215,7 +217,7 @@ export function ObservationList({
               <option value="">{t("log.list.filters.anyBlock")}</option>
               {blocks.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.name}
+                  {localizedName(i18n.language, b.name ?? b.code, b.name_ar)}
                 </option>
               ))}
             </select>

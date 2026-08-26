@@ -12,6 +12,7 @@ import { LinkButton } from "@/components/LinkButton";
 import { Page } from "@/components/Page";
 import { Skeleton } from "@/components/Skeleton";
 import { PageHeader } from "@/components/PageHeader";
+import { localizedName } from "@/lib/localizedField";
 import { useCapability } from "@/rbac/useCapability";
 import { WeatherForecastPanel } from "@/modules/weather/components/WeatherForecastPanel";
 import { AreaDisplay } from "../components/AreaDisplay";
@@ -21,7 +22,7 @@ import { MapPreview } from "../components/MapPreview";
 
 export function FarmDetailPage(): JSX.Element {
   const { farmId = "" } = useParams<{ farmId: string }>();
-  const { t } = useTranslation("farms");
+  const { t, i18n } = useTranslation("farms");
   const navigate = useNavigate();
   const canEdit = useCapability("farm.update", { farmId });
   const canArchive = useCapability("farm.delete", { farmId });
@@ -70,13 +71,15 @@ export function FarmDetailPage(): JSX.Element {
     return <Skeleton className="h-64 w-full rounded-xl" />;
   }
 
+  const farmName = localizedName(i18n.language, farm.name, farm.name_ar);
+
   return (
     <Page>
       <PageHeader
         above={
-          <Breadcrumb items={[{ label: t("list.heading"), to: "/farms" }, { label: farm.name }]} />
+          <Breadcrumb items={[{ label: t("list.heading"), to: "/farms" }, { label: farmName }]} />
         }
-        title={farm.name}
+        title={farmName}
         subtitle={
           <>
             {farm.code} · {farm.governorate ?? "—"} · <AreaDisplay areaM2={Number(farm.area_m2)} />
@@ -101,7 +104,7 @@ export function FarmDetailPage(): JSX.Element {
       </Card>
 
       {canReadWeather && blocks.length > 0 ? (
-        <WeatherForecastPanel blockId={blocks[0].id} farmId={farm.id} farmName={farm.name} />
+        <WeatherForecastPanel blockId={blocks[0].id} farmId={farm.id} farmName={farmName} />
       ) : null}
 
       <Card>
@@ -123,7 +126,8 @@ export function FarmDetailPage(): JSX.Element {
             {blocks.map((b) => (
               <li key={b.id} className="flex items-center justify-between text-sm">
                 <Link to={`/farms/${farm.id}/blocks/${b.id}`} className="text-ap-primary underline">
-                  {b.code} {b.name ? `— ${b.name}` : null}
+                  {b.code}
+                  {b.name ? ` — ${localizedName(i18n.language, b.name, b.name_ar)}` : null}
                 </Link>
                 <AreaDisplay areaM2={Number(b.area_m2)} />
               </li>

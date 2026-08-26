@@ -88,6 +88,7 @@ async def create_resource(
         farm_id=farm_id,
         kind=payload.kind,
         name=payload.name,
+        name_ar=payload.name_ar,
         role=payload.role,
         equipment_type=payload.equipment_type,
         phone=payload.phone,

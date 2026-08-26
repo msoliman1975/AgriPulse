@@ -98,6 +98,7 @@ async def create_tenant(
         result = await service.create_tenant(
             slug=payload.slug,
             name=payload.name,
+            name_ar=payload.name_ar,
             contact_email=str(payload.contact_email),
             legal_name=payload.legal_name,
             tax_id=payload.tax_id,

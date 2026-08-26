@@ -58,7 +58,9 @@ export function FarmForm({
   const isAr = i18n.language === "ar";
   const [code, setCode] = useState(initial?.code ?? "");
   const [name, setName] = useState(initial?.name ?? "");
+  const [nameAr, setNameAr] = useState(initial?.name_ar ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
+  const [descriptionAr, setDescriptionAr] = useState(initial?.description_ar ?? "");
   const [country, setCountry] = useState(initial?.country_code ?? "");
   const [countries, setCountries] = useState<Country[]>([]);
   const [governorate, setGovernorate] = useState(initial?.governorate ?? "");
@@ -126,7 +128,11 @@ export function FarmForm({
     const payload: FarmFormValues = {
       code,
       name,
+      // Blank means "not written yet", not an empty name. The API stores
+      // NULL and every Arabic screen falls back to `name`.
+      name_ar: nameAr.trim() || null,
       description: description || null,
+      description_ar: descriptionAr.trim() || null,
       boundary,
       country_code: country || null,
       governorate: governorate || null,
@@ -192,6 +198,20 @@ export function FarmForm({
             />
           )}
         </Field>
+        <Field label={t("form.nameAr")} help={t("form.nameArHelp")}>
+          {(props) => (
+            <input
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              // The Arabic name is Arabic whatever the interface language is,
+              // so the control is always RTL rather than following the page.
+              dir="rtl"
+              lang="ar"
+              value={nameAr ?? ""}
+              onChange={(e) => setNameAr(e.target.value)}
+            />
+          )}
+        </Field>
         <Field label={t("form.description")} className="sm:col-span-2">
           {(props) => (
             <textarea
@@ -200,6 +220,19 @@ export function FarmForm({
               rows={2}
               value={description ?? ""}
               onChange={(e) => setDescription(e.target.value)}
+            />
+          )}
+        </Field>
+        <Field label={t("form.descriptionAr")} className="sm:col-span-2">
+          {(props) => (
+            <textarea
+              {...props}
+              className={FIELD_CONTROL_CLASS}
+              rows={2}
+              dir="rtl"
+              lang="ar"
+              value={descriptionAr ?? ""}
+              onChange={(e) => setDescriptionAr(e.target.value)}
             />
           )}
         </Field>

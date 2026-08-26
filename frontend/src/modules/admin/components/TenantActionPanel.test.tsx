@@ -39,6 +39,7 @@ function tenant(status: TenantStatus, overrides: Partial<AdminTenant> = {}): Adm
     id: TENANT_ID,
     slug: "acme",
     name: "Acme",
+    name_ar: null,
     legal_name: null,
     tax_id: null,
     contact_email: "ops@acme.test",

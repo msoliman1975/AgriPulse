@@ -20,6 +20,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 interface FormState {
   slug: string;
   name: string;
+  name_ar: string;
   legal_name: string;
   tax_id: string;
   contact_email: string;
@@ -34,6 +35,7 @@ interface FormState {
 const INITIAL: FormState = {
   slug: "",
   name: "",
+  name_ar: "",
   legal_name: "",
   tax_id: "",
   contact_email: "",
@@ -106,6 +108,7 @@ export function TenantCreatePage(): ReactNode {
     return {
       slug: form.slug,
       name: form.name.trim(),
+      name_ar: form.name_ar.trim() || null,
       contact_email: form.contact_email.trim(),
       legal_name: form.legal_name.trim() || null,
       tax_id: form.tax_id.trim() || null,
@@ -291,6 +294,19 @@ function ProfileStep({
           />
         )}
       </Field>
+      <Field label={t("tenants.create.fields.nameAr")}>
+        {(props) => (
+          <input
+            {...props}
+            type="text"
+            dir="rtl"
+            lang="ar"
+            value={form.name_ar}
+            onChange={(e) => onChange("name_ar", e.target.value)}
+            className="w-full rounded-md border border-ap-line bg-ap-panel px-3 py-2 text-sm shadow-sm"
+          />
+        )}
+      </Field>
       <div className="grid gap-4 md:grid-cols-2">
         <Field label={t("tenants.create.fields.legalName")}>
           {(props) => (
@@ -440,6 +456,7 @@ function ReviewStep({ form }: { form: FormState }): ReactNode {
     <div className="mt-6 space-y-3 rounded-md border border-ap-line bg-ap-panel p-4 text-sm">
       <ReviewRow label={t("tenants.create.fields.slug")} value={form.slug} mono />
       <ReviewRow label={t("tenants.create.fields.name")} value={form.name} />
+      <ReviewRow label={t("tenants.create.fields.nameAr")} value={form.name_ar || "—"} />
       <ReviewRow label={t("tenants.create.fields.contactEmail")} value={form.contact_email} />
       <ReviewRow label={t("tenants.create.fields.locale")} value={form.default_locale} />
       <ReviewRow label={t("tenants.create.fields.unitSystem")} value={form.default_unit_system} />

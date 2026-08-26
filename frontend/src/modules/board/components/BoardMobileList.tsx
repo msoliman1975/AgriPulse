@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import type { BoardActivity, BoardBlock } from "@/api/plans";
 import { useDateLocale } from "@/hooks/useDateLocale";
+import { localizedName } from "@/lib/localizedField";
 
 import { ActivityChip } from "./ActivityChip";
 import { Card } from "@/components/Card";
@@ -28,7 +29,7 @@ export function BoardMobileList({
   onBlockAddClick,
   canManage,
 }: BoardMobileListProps): ReactNode {
-  const { t } = useTranslation("board");
+  const { t, i18n } = useTranslation("board");
   const dateLocale = useDateLocale();
   const byBlock = new Map<string, BoardActivity[]>();
   for (const a of activities) {
@@ -49,7 +50,11 @@ export function BoardMobileList({
             <header className="flex items-center justify-between border-b border-ap-line p-3">
               <div>
                 <div className="font-medium text-ap-ink">{block.code}</div>
-                {block.name ? <div className="text-xs text-ap-muted">{block.name}</div> : null}
+                {block.name ? (
+                  <div className="text-xs text-ap-muted">
+                    {localizedName(i18n.language, block.name, block.name_ar)}
+                  </div>
+                ) : null}
               </div>
               {canManage && onBlockAddClick ? (
                 <button
