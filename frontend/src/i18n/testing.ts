@@ -18,6 +18,7 @@ import enDecisionTrees from "./locales/en/decisionTrees.json";
 import enBulkUpdates from "./locales/en/bulkUpdates.json";
 import enActionCenter from "./locales/en/actionCenter.json";
 import enUsers from "./locales/en/users.json";
+import enTimeline from "./locales/en/timeline.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
 import arAccount from "./locales/ar/account.json";
@@ -35,6 +36,7 @@ import arDecisionTrees from "./locales/ar/decisionTrees.json";
 import arBulkUpdates from "./locales/ar/bulkUpdates.json";
 import arActionCenter from "./locales/ar/actionCenter.json";
 import arUsers from "./locales/ar/users.json";
+import arTimeline from "./locales/ar/timeline.json";
 
 /**
  * Test-only i18n bootstrap. Identical resources to the production
@@ -65,6 +67,7 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           bulkUpdates: enBulkUpdates,
           actionCenter: enActionCenter,
           users: enUsers,
+          timeline: enTimeline,
         },
         ar: {
           common: arCommon,
@@ -84,6 +87,7 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           bulkUpdates: arBulkUpdates,
           actionCenter: arActionCenter,
           users: arUsers,
+          timeline: arTimeline,
         },
       },
       lng: language,
@@ -103,6 +107,7 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
         "bulkUpdates",
         "actionCenter",
         "users",
+        "timeline",
       ],
       interpolation: { escapeValue: false },
       react: { useSuspense: false },

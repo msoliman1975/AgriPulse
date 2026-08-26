@@ -1,0 +1,106 @@
+{
+  "title": "الخط الزمني",
+  "subtitle": "أعد تشغيل المزرعة يوماً بيوم: صور المؤشرات، وما سجّله الناس والنظام.",
+  "noAccess": "ليس لديك صلاحية على هذه المزرعة.",
+  "badge": {
+    "noImageYet": "لا توجد صورة في هذا التاريخ",
+    "carriedFrom": "صورة بتاريخ {{date}}"
+  },
+  "controls": {
+    "scope": "النطاق",
+    "wholeFarm": "المزرعة كلها",
+    "from": "من",
+    "to": "إلى",
+    "index": "المؤشر",
+    "optical": "بصري (سنتينل-2)",
+    "thermal": "حراري (لاندسات)",
+    "hintFarm": "عرض المزرعة كلها. اختر قطعة لإضافة مرحلة الخطة، فهي تخص قطعة واحدة في كل مرة.",
+    "hintBlock": "عرض القطعة. تغييرات مرحلة الخطة مضمّنة.",
+    "hintWindow": "المدة حتى {{days}} يوماً.",
+    "errorReversed": "يجب أن يكون تاريخ البداية قبل تاريخ النهاية أو مساوياً له.",
+    "errorTooWide": "اختر مدة {{days}} يوماً أو أقل."
+  },
+  "scrubber": {
+    "play": "تشغيل",
+    "pause": "إيقاف مؤقت",
+    "speed": "السرعة",
+    "dayAria": "اليوم في إعادة التشغيل",
+    "eventCount_zero": "لا توجد نقاط بيانات",
+    "eventCount_one": "نقطة بيانات واحدة",
+    "eventCount_two": "نقطتا بيانات",
+    "eventCount_few": "{{count}} نقاط بيانات",
+    "eventCount_many": "{{count}} نقطة بيانات",
+    "eventCount_other": "{{count}} نقطة بيانات",
+    "noEvents": "لا شيء مسجّل",
+    "noWindow": "اختر مدة زمنية لإعادة التشغيل."
+  },
+  "rail": {
+    "title": "{{date}}",
+    "titleNoDay": "نقاط البيانات",
+    "emptyWindow": "لم يُسجّل شيء في هذه المزرعة خلال هذه المدة. وسّع التواريخ أو اختر نطاقاً آخر.",
+    "empty": "لم يُسجّل شيء في هذا اليوم ولا في الأيام الثلاثة السابقة.",
+    "daysAgo_zero": "اليوم نفسه",
+    "daysAgo_one": "قبل يوم",
+    "daysAgo_two": "قبل يومين",
+    "daysAgo_few": "قبل {{count}} أيام",
+    "daysAgo_many": "قبل {{count}} يوماً",
+    "daysAgo_other": "قبل {{count}} يوماً",
+    "omitted": "غير معروضة لأن دورك لا يسمح بقراءتها: {{kinds}}.",
+    "truncated": "هذه المدة تحتوي على نقاط بيانات أكثر مما يعيده طلب واحد. قلّل المدة لرؤيتها كلها."
+  },
+  "kind": {
+    "stage": "مرحلة الخطة",
+    "signal": "إشارة",
+    "activity": "نشاط منفَّذ",
+    "visit": "زيارة كشف",
+    "flag": "علامة حقلية",
+    "alert": "تنبيه",
+    "recommendation": "توصية"
+  },
+  "code": {
+    "activity": {
+      "planting": "زراعة",
+      "fertilizing": "تسميد",
+      "spraying": "رش",
+      "pruning": "تقليم",
+      "harvesting": "حصاد",
+      "irrigation": "ري",
+      "soil_prep": "تجهيز التربة",
+      "observation": "ملاحظة",
+      "pollination": "تلقيح",
+      "growth_regulator": "منظم نمو",
+      "thinning": "خف الثمار",
+      "bagging": "تكييس",
+      "hilling": "ترديم"
+    },
+    "alert": {
+      "irrigate": "ري",
+      "fertilize": "تسميد",
+      "spray": "رش",
+      "scout": "كشف",
+      "inspect": "فحص",
+      "harvest_window": "موعد الحصاد",
+      "prune": "تقليم",
+      "no_action": "لا إجراء",
+      "other": "أخرى",
+      "unknown": "غير مصنّف"
+    },
+    "recommendation": {
+      "irrigate": "ري",
+      "fertilize": "تسميد",
+      "spray": "رش",
+      "scout": "كشف",
+      "inspect": "فحص",
+      "harvest_window": "موعد الحصاد",
+      "prune": "تقليم",
+      "no_action": "لا إجراء",
+      "other": "أخرى"
+    },
+    "visit": {
+      "ad_hoc": "زيارة عارضة",
+      "alert": "من تنبيه",
+      "recommendation": "من توصية",
+      "schedule": "زيارة مجدولة"
+    }
+  }
+}

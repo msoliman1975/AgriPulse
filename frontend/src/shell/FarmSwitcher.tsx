@@ -16,6 +16,7 @@ const NEW_FARM_PATH = "/labs/map-v2?create=farm";
 const PINNED_PREFIXES = [
   "/insights/",
   "/board/",
+  "/timeline/",
   "/plan/",
   "/alerts/",
   "/reports/",

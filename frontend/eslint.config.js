@@ -137,7 +137,16 @@ export default tseslint.config(
     // interaction and add noise without value — these are stable APIs
     // we exercise heavily in production. Keep typed rules on for the
     // rest of src/ where they catch real bugs.
-    files: ["src/modules/labs/map/**/*.{ts,tsx}", "src/modules/labs/mapnext/**/*.{ts,tsx}"],
+    files: [
+      "src/modules/labs/map/**/*.{ts,tsx}",
+      "src/modules/labs/mapnext/**/*.{ts,tsx}",
+      // The Farm Timeline's own canvas. Same reasoning as the two above:
+      // it is a MapLibre surface that talks to the same loose runtime
+      // mutators and passes raw colour strings to paint specs. Only the
+      // canvas is listed — the rest of src/modules/timeline/** keeps the
+      // full rule set.
+      "src/modules/timeline/components/TimelineMap.tsx",
+    ],
     rules: {
       "@typescript-eslint/no-unsafe-call": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",

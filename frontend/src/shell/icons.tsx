@@ -94,6 +94,17 @@ export function InsightsIcon(props: IconProps): ReactNode {
   );
 }
 
+// Farm Timeline. A play triangle inside a clock face — the two things the
+// screen is: a moment in time, and a replay running through it.
+export function TimelineIcon(props: IconProps): ReactNode {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M10 9l5 3-5 3z" />
+    </svg>
+  );
+}
+
 export function PlanIcon(props: IconProps): ReactNode {
   return (
     <svg {...base(props)}>

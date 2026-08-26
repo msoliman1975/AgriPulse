@@ -22,6 +22,7 @@ import { BlockDetailPage } from "@/modules/farms/pages/BlockDetailPage";
 import { BlockEditPage } from "@/modules/farms/pages/BlockEditPage";
 import { InsightsPage } from "@/modules/insights/pages/InsightsPage";
 import { BoardPage } from "@/modules/board/pages/BoardPage";
+import { FarmTimelinePage } from "@/modules/timeline/pages/FarmTimelinePage";
 import { ActionCenterPage } from "@/modules/actionCenter/pages/ActionCenterPage";
 import { AlertsPage } from "@/modules/alerts/pages/AlertsPage";
 import { RecommendationsPage } from "@/modules/recommendations/pages/RecommendationsPage";
@@ -191,6 +192,11 @@ export function App(): ReactNode {
                   redirect keeps old deep-links working. */}
                 <Route path="/plan/:farmId" element={<RedirectPlanToBoard />} />
                 <Route path="/board/:farmId" element={<BoardPage />} />
+                {/* Farm Timeline — the replay surface. Farm-scoped like the
+                  rest of the workspace; the block is a control on the page,
+                  not a route segment, because changing scope must not push
+                  history on every pick. */}
+                <Route path="/timeline/:farmId" element={<FarmTimelinePage />} />
                 {/* The unified queue. /alerts and /recommendations stay routed
                     until this screen is signed off. */}
                 <Route path="/action-center/:farmId" element={<ActionCenterPage />} />
