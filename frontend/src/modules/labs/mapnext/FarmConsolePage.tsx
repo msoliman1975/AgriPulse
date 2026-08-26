@@ -118,6 +118,11 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     flags: true,
     flagsOpenOnly: false,
     signals: true,
+    // The live console has no picker for this; it exists so both consoles
+    // share one LayerState shape.
+    labelField: "name",
+    alerts: true,
+    markLegend: false,
   });
   // Grid overlay. Defaults ON for a farm that has any sub-block grid
   // configured — someone who went to the trouble of zoning a block wants to
@@ -397,8 +402,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   // appears in the panel, it just stops drawing here.
   const flagsQ = useQuery({
     queryKey: ["labs/mapnext/fieldFlags", farmId, layers.flagsOpenOnly],
-    queryFn: () =>
-      listFieldFlags(farmId, { pinned_only: true, open_only: layers.flagsOpenOnly }),
+    queryFn: () => listFieldFlags(farmId, { pinned_only: true, open_only: layers.flagsOpenOnly }),
     enabled: Boolean(farmId && layers.flags),
     staleTime: 30_000,
   });

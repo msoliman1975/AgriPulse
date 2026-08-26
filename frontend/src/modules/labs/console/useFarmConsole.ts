@@ -19,6 +19,7 @@ import { useTranslation } from "react-i18next";
 import type { FeatureCollection, Polygon } from "geojson";
 
 import type { Block } from "@/api/blocks";
+import { listFarmCropAssignments } from "@/api/cropAssignments";
 import { listFieldFlags } from "@/api/fieldFlags";
 import { getFarmGridCells, getGridCells } from "@/api/grid";
 import { listFarmScenes, listSubscriptions } from "@/api/imagery";
@@ -49,6 +50,7 @@ import { classify } from "./indexClasses";
 import { useIndexPixels } from "./useIndexPixels";
 import { useOptionalConfig } from "@/config/ConfigContext";
 import type { LayerState } from "../mapnext/ViewBar";
+import type { FlagsMode } from "./MapDataControl";
 
 export function useFarmConsole(farmId: string) {
   const { i18n } = useTranslation("farmConsole");
@@ -125,8 +127,21 @@ export function useFarmConsole(farmId: string) {
     // draws. Wiring only one would leave a control here that does nothing —
     // the exact drift that let cell size go missing from a console before.
     flags: true,
-    flagsOpenOnly: false,
+    // "Current" — open flags only. The tri-state picker in the datapoint
+    // control makes the other two reachable in one click, and a map opening
+    // on every flag ever raised buries the ones somebody is waiting on.
+    flagsOpenOnly: true,
     signals: true,
+    // Block name, not crop: the name is what the rail, the dock and every
+    // link in the console call a block, so the map agrees with them until
+    // somebody asks it not to.
+    labelField: "name",
+    // Alert chips on by default — the map's job is to say where the trouble
+    // is before anyone asks.
+    alerts: true,
+    // The mark legend starts hidden. It is a reference, and it costs a row of
+    // the map every time it is open.
+    markLegend: false,
   });
   // Grid overlay defaults ON for a farm that has any sub-block grid
   // configured — someone who went to the trouble of zoning a block wants to
@@ -370,6 +385,10 @@ export function useFarmConsole(farmId: string) {
   const geojsonWithClasses = useMemo(() => {
     const base = summaryQ.data?.geojson;
     if (!base) return base;
+    // "None" in the index picker means the map draws no index at all — no
+    // pixels and no class fill. Colouring the blocks anyway would leave the
+    // reader looking at an index they had just switched off.
+    if (!showPixels) return base;
     return {
       ...base,
       features: base.features.map((f) => {
@@ -383,7 +402,7 @@ export function useFarmConsole(farmId: string) {
             f;
       }),
     };
-  }, [summaryQ.data, pixels.meanByBlockId, activeIndex]);
+  }, [summaryQ.data, pixels.meanByBlockId, activeIndex, showPixels]);
 
   const gridCellsFc: FeatureCollection<Polygon, GridCellProps> | null = useMemo(() => {
     if (!showGrid || !farmGridQ.data) return null;
@@ -541,6 +560,52 @@ export function useFarmConsole(farmId: string) {
     return buildFlagOverlay(rows, blockCentroids);
   }, [layers.flags, flagsQ.data, blockCentroids, asOf]);
 
+  // Crop labels, as of the scene date.
+  //
+  // Farm-wide in one request, and only while the reader asked for crop
+  // labels: a console on block names never issues it. The date matters —
+  // scrubbing back to a pass from a past season must name the crop that was
+  // in the ground then, not the one there today.
+  const cropLabelsQ = useQuery({
+    queryKey: CONSOLE_QK.cropLabels(farmId, sceneDate),
+    queryFn: () => listFarmCropAssignments(farmId, sceneDate),
+    enabled: Boolean(farmId && layers.labels && layers.labelField === "crop"),
+    staleTime: 5 * 60_000,
+    placeholderData: keepPreviousData,
+  });
+  const cropLabelByBlockId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const row of cropLabelsQ.data ?? []) {
+      m.set(row.block_id, isAr ? row.crop_name_ar : row.crop_name_en);
+    }
+    return m;
+  }, [cropLabelsQ.data, isAr]);
+
+  /**
+   * The collection the map actually draws.
+   *
+   * Crop labels are a feature property rather than a MapLibre expression over
+   * some other source, because the label layer is one `text-field` over the
+   * whole units source. Identity of the object matters: MapCanvas re-sets the
+   * source data whenever this changes, so it is only rebuilt when a crop label
+   * is genuinely in play.
+   */
+  const geojsonForMap = useMemo(() => {
+    const base = geojsonWithClasses;
+    if (!base) return base;
+    if (layers.labelField !== "crop" || cropLabelByBlockId.size === 0) return base;
+    return {
+      ...base,
+      features: base.features.map((f) => {
+        const crop = cropLabelByBlockId.get(f.properties.id);
+        // No property at all when this block had no crop on this date: the
+        // label expression coalesces to the block name, so the block stays
+        // identified instead of going blank.
+        return crop ? { ...f, properties: { ...f.properties, crop_label: crop } } : f;
+      }),
+    };
+  }, [geojsonWithClasses, layers.labelField, cropLabelByBlockId]);
+
   // Value kind per definition, so a mixed overlay labels each observation
   // against its OWN signal rather than against whichever one is picked.
   const valueKindByDefId = useMemo(
@@ -636,6 +701,45 @@ export function useFarmConsole(farmId: string) {
     setSearch(next, { replace: true });
     setSelectedCellId(null);
   };
+  /**
+   * The index picker, with "None" folded in.
+   *
+   * `activeIndex` stays set to the last real index even at "None", because
+   * the rail, the block dock and the scene timeline all read it and none of
+   * them is the map. What "None" turns off is the map's own drawing —
+   * `showPixels` gates both the raster and the block class fill.
+   */
+  const selectedIndex: ApiIndexCode | null = showPixels ? activeIndex : null;
+  const changeSelectedIndex = (code: ApiIndexCode | null): void => {
+    if (code == null) {
+      setShowPixels(false);
+      return;
+    }
+    setActiveIndex(code);
+    setShowPixels(true);
+  };
+
+  /**
+   * Flags as one tri-state.
+   *
+   * Stored as the two booleans both consoles already share rather than as a
+   * third field: "current" and "historical" are both ON, and a separate mode
+   * field would be a second source of truth for the same layer.
+   */
+  const flagsMode: FlagsMode = !layers.flags
+    ? "none"
+    : layers.flagsOpenOnly
+      ? "current"
+      : "historical";
+  const changeFlagsMode = (mode: FlagsMode): void => {
+    setLayers((l) => ({ ...l, flags: mode !== "none", flagsOpenOnly: mode === "current" }));
+  };
+
+  const changeSignals = ({ on, defId }: { on: boolean; defId: string | null }): void => {
+    setLayers((l) => ({ ...l, signals: on }));
+    changeSignalDef(defId);
+  };
+
   const changeSignalDef = (id: string | null): void => {
     setSignalDefId(id);
     const next = new URLSearchParams(search);
@@ -665,6 +769,11 @@ export function useFarmConsole(farmId: string) {
     setCellClickPoint,
     signalDefId,
     changeSignalDef,
+    changeSignals,
+    selectedIndex,
+    changeSelectedIndex,
+    flagsMode,
+    changeFlagsMode,
     obsClickPoint,
     obsStack,
     // scenes
@@ -697,6 +806,8 @@ export function useFarmConsole(farmId: string) {
     gridCellsFc,
     pixels,
     geojsonWithClasses,
+    geojsonForMap,
+    cropLabelsQ,
     cellMeta,
     highlightedCellIds,
     selectedCellBaseline,

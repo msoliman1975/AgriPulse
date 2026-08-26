@@ -21,6 +21,7 @@ required query parameters, which breaks OpenAPI generation and POST
 route validation.
 """
 
+from datetime import date
 from typing import Any
 from uuid import UUID
 
@@ -74,6 +75,7 @@ from app.modules.farms.schemas import (
     CropVarietyStrainResponse,
     CropVarietyUpdateRequest,
     FarmCreateRequest,
+    FarmCropAssignmentResponse,
     FarmDetailResponse,
     FarmInactivationPreviewResponse,
     FarmInactivationRequest,
@@ -847,6 +849,31 @@ async def list_block_crops(
         raise BlockNotFoundError(block_id)
 
     return await service.list_block_crops(block_id=block_id)
+
+
+@router.get(
+    "/farms/{farm_id}/crop-assignments",
+    response_model=list[FarmCropAssignmentResponse],
+    summary="The crop each block on a farm carried on a given date.",
+)
+async def list_farm_crop_assignments(
+    farm_id: UUID,
+    on: date | None = Query(
+        default=None,
+        description="Date to resolve against. Defaults to today.",
+    ),
+    context: RequestContext = Depends(requires_capability("block.read", farm_id_param="farm_id")),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    """Farm-wide, so the map can label every block in one request.
+
+    The per-block route exists and returns the same rows, but the map needs
+    forty answers at once and re-asks whenever the reader picks another scene
+    date — asking per block is the N+1 that exhausted the connection pool on
+    this same page before (#311).
+    """
+    _ensure_tenant(context)
+    return await service.list_farm_crop_assignments(farm_id=farm_id, on=on or date.today())
 
 
 # ---------- Bulk crop assignment -------------------------------------------

@@ -1429,6 +1429,22 @@ class FarmsRepository:
         )
         return list(rows)
 
+    async def crop_names_by_id(self, *, crop_ids: Sequence[UUID]) -> dict[UUID, tuple[str, str]]:
+        """`crop_id -> (name_en, name_ar)` for the ids asked for, in one query.
+
+        Deliberately not filtered on `is_active`: a block can still hold an
+        assignment for a crop the catalogue has since retired, and dropping the
+        row here would leave that block labelled with nothing at all.
+        """
+        if not crop_ids:
+            return {}
+        rows = (
+            await self._public.execute(
+                select(Crop.id, Crop.name_en, Crop.name_ar).where(Crop.id.in_(set(crop_ids)))
+            )
+        ).all()
+        return {row.id: (row.name_en, row.name_ar) for row in rows}
+
     async def list_block_crop_rows_for_farm(self, *, farm_id: UUID) -> dict[UUID, list[BlockCrop]]:
         """Every live assignment on a farm's blocks, in ONE query, keyed by block.
 

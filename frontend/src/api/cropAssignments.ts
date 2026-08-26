@@ -66,6 +66,38 @@ export async function assignBlockCrop(
   return data;
 }
 
+/** One block's crop on one date, as `GET /v1/farms/{id}/crop-assignments` returns it. */
+export interface FarmCropAssignment {
+  block_id: string;
+  block_crop_id: string;
+  crop_id: string;
+  crop_path: string;
+  crop_name_en: string;
+  crop_name_ar: string;
+  season_label: string;
+  effective_from: string;
+  effective_to: string | null;
+  status: BlockCropStatus;
+}
+
+/**
+ * The crop each block on a farm carried on `on` (YYYY-MM-DD; omit for today).
+ *
+ * Farm-wide in one request because the caller is the map label, which needs
+ * every block at once and re-asks whenever the reader picks another scene
+ * date. Blocks with no assignment covering that date are simply absent.
+ */
+export async function listFarmCropAssignments(
+  farmId: string,
+  on?: string | null,
+): Promise<FarmCropAssignment[]> {
+  const { data } = await apiClient.get<FarmCropAssignment[]>(
+    `/v1/farms/${farmId}/crop-assignments`,
+    { params: on ? { on } : undefined },
+  );
+  return data;
+}
+
 export async function listBlockCrops(blockId: string): Promise<BlockCropAssignment[]> {
   const { data } = await apiClient.get<BlockCropAssignment[]>(
     `/v1/blocks/${blockId}/crop-assignments`,

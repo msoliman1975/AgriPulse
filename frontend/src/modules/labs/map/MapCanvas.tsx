@@ -68,6 +68,21 @@ interface Props {
   showBlocks?: boolean;
   showBlockBorders?: boolean;
   showBlockLabels?: boolean;
+  /**
+   * Which feature property the block label reads. Defaults to `name`.
+   *
+   * A property name rather than the text, because the label is a MapLibre
+   * `text-field` over the whole source — one expression for every block, not
+   * a value per feature. The caller decides what the property holds; Farm
+   * Console v2 writes `crop_label` from the farm's crop assignments as of the
+   * scene being drawn.
+   */
+  blockLabelProperty?: string;
+  /**
+   * Alert chips — the count bubble on a block with open alerts. Defaults on,
+   * which is how it behaved before there was a switch.
+   */
+  showAlerts?: boolean;
   // 0..1 multiplier applied to AOI line opacity and block stroke opacity.
   borderOpacity?: number;
   // 0..1 multiplier applied to block fill opacity (on top of the
@@ -366,6 +381,8 @@ export function MapCanvas({
   showBlocks = true,
   showBlockBorders = true,
   showBlockLabels = true,
+  blockLabelProperty = "name",
+  showAlerts = true,
   borderOpacity = 0.9,
   blockFillOpacity = 1,
   signalOverlay = null,
@@ -1332,7 +1349,7 @@ export function MapCanvas({
       // hides so the operator sees only the base map + AOI border.
       setVis(FILL_LAYER, !!showBlocks);
       setVis(SELECTED_LAYER, !!showBlocks);
-      setVis(ALERT_BADGE_LAYER, !!showBlocks);
+      setVis(ALERT_BADGE_LAYER, !!showBlocks && !!showAlerts);
       setVis(STROKE_LAYER, !!showBlocks && !!showBlockBorders);
       setVis(STROKE_LAYER + "-future", !!showBlocks && !!showBlockBorders);
       setVis(LOGICAL_PIVOT_LAYER, !!showBlocks && !!showBlockBorders);
@@ -1355,7 +1372,29 @@ export function MapCanvas({
     };
     if (map.isStyleLoaded()) apply();
     else map.once("load", apply);
-  }, [showAoi, showBlocks, showBlockBorders, showBlockLabels, borderOpacity]);
+  }, [showAoi, showBlocks, showBlockBorders, showBlockLabels, showAlerts, borderOpacity]);
+
+  // What the block label says.
+  //
+  // Its own effect, and a `coalesce` rather than a bare `get`: a farm can be
+  // scrubbed back to a date on which some blocks had no crop, and a
+  // `text-field` reading an absent property renders nothing at all — a block
+  // that silently loses its name reads as a map bug, not as "no crop here".
+  // Falling back to the block name keeps every block identified.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const apply = () => {
+      if (!map.getLayer(LABEL_LAYER)) return;
+      map.setLayoutProperty(LABEL_LAYER, "text-field", [
+        "coalesce",
+        ["get", blockLabelProperty],
+        ["get", "name"],
+      ]);
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once("load", apply);
+  }, [blockLabelProperty]);
 
   // Index pixels: one raster source + layer per block that has a raster for
   // the selected scene.

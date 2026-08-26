@@ -90,21 +90,67 @@ describe.each(LOCALES)("farmConsole legend copy (%s)", (_lang, bundle) => {
     expect(missing).toEqual([]);
   });
 
-  it("has the map dock strings", () => {
+  it("has the datapoint control strings", () => {
     const required = [
-      "mapDock.pixels",
-      "mapDock.pixelsUnavailable",
-      "mapDock.grid",
-      "mapDock.gridUnavailable",
-      "mapDock.anomaly",
-      "mapDock.contrast",
-      "mapDock.compare",
-      "mapDock.comingSoon",
-      "mapDock.fullscreen",
-      "mapDock.exitFullscreen",
+      "dataControl.index",
+      "dataControl.indexTitle",
+      "dataControl.indexNone",
+      "dataControl.indexNoneHint",
+      "dataControl.indexUnavailable",
+      "dataControl.alerts",
+      "dataControl.flags",
+      "dataControl.flagsTitle",
+      "dataControl.signals",
+      "dataControl.signalsTitle",
+      "dataControl.signalsAll",
+      "dataControl.signalsNone",
+      "dataControl.markLegend",
+      "dataControl.on",
+      "dataControl.off",
+      "dataControl.shown",
+      "dataControl.hidden",
+      "dataControl.fullscreen",
+      "dataControl.exitFullscreen",
     ];
     const missing = required.filter((p) => typeof lookup(bundle, p) !== "string");
     expect(missing).toEqual([]);
+  });
+
+  // The tri-state is rendered from a literal array of three modes, and each
+  // mode needs both a name and the line under it. A missing one renders the
+  // key, which reads as a typo the eye slides over.
+  it("has a name and a hint for every flags mode", () => {
+    const missing: string[] = [];
+    for (const mode of ["current", "historical", "none"]) {
+      for (const path of [`dataControl.flagsMode.${mode}`, `dataControl.flagsHint.${mode}`]) {
+        if (typeof lookup(bundle, path) !== "string") missing.push(path);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it("has the top-bar layer strings", () => {
+    const required = [
+      "layerBar.farmBorders",
+      "layerBar.blockBorders",
+      "layerBar.cells",
+      "layerBar.cellsUnavailable",
+      "layerBar.cellsNotForThisIndex",
+      "layerBar.borderOpacity",
+      "layerBar.fillOpacity",
+      "layerBar.showLabels",
+      "layerBar.labelName",
+      "layerBar.labelCrop",
+    ];
+    const missing = required.filter((p) => typeof lookup(bundle, p) !== "string");
+    expect(missing).toEqual([]);
+  });
+
+  // Both controls were deleted; their copy must go with them. A namespace
+  // nothing renders is the copy that rots — see the header of this file.
+  it("has no copy left over from the deleted map dock and layer cards", () => {
+    expect(lookup(bundle, "mapDock")).toBeUndefined();
+    expect(lookup(bundle, "layerCards")).toBeUndefined();
   });
 });
 

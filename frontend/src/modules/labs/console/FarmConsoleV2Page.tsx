@@ -27,6 +27,7 @@ import { usePrefs } from "@/prefs/PrefsContext";
 import { useCapability } from "@/rbac/useCapability";
 
 import { MapCanvas } from "../map/MapCanvas";
+import { MarkerLegend } from "../map/MarkerLegend";
 import { InactivateConfirmModal } from "../map/InactivateConfirmModal";
 import { FieldFlagPanel } from "../map/FieldFlagPanel";
 import { SignalObservationPanel } from "../map/SignalObservationPanel";
@@ -45,8 +46,8 @@ import { CONSOLE_QK } from "./constants";
 import { ConsoleUnitsRail } from "./ConsoleUnitsRail";
 import { FarmIdentityStrip } from "./FarmIdentityStrip";
 import { IndexLegend } from "./IndexLegend";
-import { MapDock } from "./MapDock";
-import { MapLayersControl } from "./MapLayersControl";
+import { MapDataControl } from "./MapDataControl";
+import { MapLayerBar } from "./MapLayerBar";
 import { SceneTimeline } from "./SceneTimeline";
 import { SettingsDrawer } from "./SettingsDrawer";
 import { useMapFullscreen } from "./useMapFullscreen";
@@ -214,6 +215,12 @@ function Console({ farmId }: { farmId: string }): ReactNode {
         // still renders the chip — it has no cards — which is why this is a
         // prop rather than a deletion inside ViewBar.
         showLayersMenu={false}
+        // The index and the signal picker moved onto the map, into the one
+        // control that decides what data is drawn. Leaving a copy in the bar
+        // would be two front doors onto one piece of state, which is how the
+        // old cards and the old rail came to disagree about the mesh.
+        showIndexMenu={false}
+        showSignalsMenu={false}
         onOpenSettings={() => setSettingsOpen(true)}
         showGrid={c.showGrid}
         onToggleGrid={() => {
@@ -235,6 +242,23 @@ function Console({ farmId }: { farmId: string }): ReactNode {
             blocks={summary.blocks}
           />
         }
+        // The map's frame — what is outlined, how hard, and what a block is
+        // called. Spelled out on the bar rather than hidden behind a chip:
+        // these are checkboxes and sliders, and a checkbox behind two clicks
+        // is a checkbox nobody finds.
+        trailing={
+          <MapLayerBar
+            layers={c.layers}
+            onLayersChange={(patch) => c.setLayers((l) => ({ ...l, ...patch }))}
+            showGrid={c.showGrid}
+            onToggleGrid={() => {
+              c.setShowGrid((sh) => !sh);
+              c.setSelectedCellId(null);
+            }}
+            gridAvailable={c.gridded.length > 0}
+            gridUnavailableForIndex={c.gridUnavailableForIndex}
+          />
+        }
       />
 
       <div className="flex min-h-0 flex-1">
@@ -251,7 +275,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
         <div className="flex min-w-0 flex-1 flex-col">
           <main ref={fullscreen.ref} className="relative min-w-0 flex-1 bg-ap-bg">
             <MapCanvas
-              geojson={c.geojsonWithClasses ?? summary.geojson}
+              geojson={c.geojsonForMap ?? summary.geojson}
               farmBoundary={summary.farm.boundary}
               selectedId={c.selectedId}
               onSelect={c.select}
@@ -260,13 +284,19 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               showBlocks={c.layers.blocks}
               showBlockBorders={c.layers.borders}
               showBlockLabels={c.layers.labels}
+              blockLabelProperty={c.layers.labelField === "crop" ? "crop_label" : "name"}
+              showAlerts={c.layers.alerts}
               borderOpacity={c.layers.borderOpacity}
               blockFillOpacity={c.layers.fillOpacity}
               // The pixels ARE the reading; the cells are reference lines
               // drawn over them, so their fill goes whenever pixels are up.
               pixelLayers={c.showPixels ? c.pixels.layers : null}
               gridFillVisible={false}
-              blockFillColorProperty="class_color"
+              // Unset at "None": the property is absent from every feature
+              // then, and naming it would paint the whole farm the paint
+              // expression's no-reading colour rather than leaving the blocks
+              // as they look with no index at all.
+              blockFillColorProperty={c.showPixels ? "class_color" : undefined}
               gridCells={c.gridCellsFc}
               gridIndexCode={c.activeIndex}
               highlightedCellIds={c.highlightedCellIds}
@@ -302,65 +332,53 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               bulkPreview={m.bulkPreviewFc}
             />
 
-            {/* Zone 5 — how am I reading this: view modes, not visibility.
-                Trailing edge, clear of the legend above it and of the layer
-                cards in the opposite corner. */}
-            <MapDock
-              className="absolute end-3 top-1/2 z-10 -translate-y-1/2 bg-ap-panel/95 shadow-card"
-              showPixels={c.showPixels}
+            {/* Zone 5 — what data is on the map. One control: the index (its
+                "None" is the pixel off switch), alert chips, field flags,
+                signal readings, the mark legend, and full screen. The layer
+                cards that used to sit in the opposite corner are gone — they
+                shared two switches with this rail, and one piece of state with
+                two front doors is one that goes out of step. */}
+            <MapDataControl
+              className="absolute end-3 top-1/2 z-10 -translate-y-1/2"
+              activeIndex={c.selectedIndex}
+              indexOptions={MAP_INDEX_ORDER}
+              onIndexChange={c.changeSelectedIndex}
               pixelsAvailable={c.pixels.assetCount > 0}
-              onTogglePixels={() => c.setShowPixels((s) => !s)}
-              showGrid={c.showGrid}
-              gridAvailable={c.gridded.length > 0}
-              gridUnavailableForIndex={c.gridUnavailableForIndex}
-              onToggleGrid={() => {
-                c.setShowGrid((s) => !s);
-                c.setSelectedCellId(null);
-              }}
+              alerts={c.layers.alerts}
+              onAlertsChange={(on) => c.setLayers((l) => ({ ...l, alerts: on }))}
+              flagsMode={c.flagsMode}
+              onFlagsModeChange={c.changeFlagsMode}
+              signalDefs={(c.signalDefsQ.data ?? []).map((d) => ({ id: d.id, name: d.name }))}
+              signalsOn={c.layers.signals}
+              signalDefId={c.signalDefId}
+              onSignalsChange={c.changeSignals}
+              markLegend={c.layers.markLegend}
+              onMarkLegendChange={(on) => c.setLayers((l) => ({ ...l, markLegend: on }))}
               onFullscreen={fullscreen.toggle}
               isFullscreen={fullscreen.isFullscreen}
             />
 
-            {/* Zone 5b — layers, as cards on the map rather than a menu in
-                the bar. Bottom-leading corner: the one part of a farm map
-                that is reliably empty, and out of the way of the legend. */}
-            <MapLayersControl
-              // `bottom-8`, not `bottom-3`: MapLibre draws its attribution
-              // strip along the bottom edge, and at map width the compact
-              // control expands into a full line that the cards sat on top of.
-              className="absolute bottom-8 start-3 z-10"
-              layers={c.layers}
-              onLayersChange={(patch) => c.setLayers((l) => ({ ...l, ...patch }))}
-              activeIndex={c.activeIndex}
-              showPixels={c.showPixels}
-              onTogglePixels={() => c.setShowPixels((s) => !s)}
-              pixelsAvailable={c.pixels.assetCount > 0}
-              showGrid={c.showGrid}
-              onToggleGrid={() => {
-                c.setShowGrid((s) => !s);
-                c.setSelectedCellId(null);
-              }}
-              gridAvailable={c.gridded.length > 0}
-              gridUnavailableForIndex={c.gridUnavailableForIndex}
-            />
-
             {/* Zone 4 — index legend. Anchored to the map's trailing edge so
-                it reads against the pixels it describes. */}
-            <IndexLegend
-              className="absolute end-3 top-3 z-10 w-[268px] bg-ap-panel/95 shadow-card"
-              code={c.activeIndex}
-              areas={legendAreas}
-              scopeBlockId={legendScopeBlockId}
-              scopeBlockName={
-                legendScopeBlockId ? (c.blockNameById.get(legendScopeBlockId) ?? null) : null
-              }
-              showPixels={c.showPixels}
-              assetCount={c.pixels.assetCount}
-              indexUnit={c.activeIndexUnit}
-              imagerySubCount={c.imagerySubCount}
-              loading={c.pixels.assetsLoading || c.pixels.statsLoading}
-              onOpenImagerySettings={() => navigate(`/config/imagery/${farmId}`)}
-            />
+                it reads against the pixels it describes. Absent at "None": a
+                legend for an index the map is not drawing explains nothing
+                that is on screen. */}
+            {c.selectedIndex ? (
+              <IndexLegend
+                className="absolute end-3 top-3 z-10 w-[268px] bg-ap-panel/95 shadow-card"
+                code={c.selectedIndex}
+                areas={legendAreas}
+                scopeBlockId={legendScopeBlockId}
+                scopeBlockName={
+                  legendScopeBlockId ? (c.blockNameById.get(legendScopeBlockId) ?? null) : null
+                }
+                showPixels={c.showPixels}
+                assetCount={c.pixels.assetCount}
+                indexUnit={c.activeIndexUnit}
+                imagerySubCount={c.imagerySubCount}
+                loading={c.pixels.assetsLoading || c.pixels.statsLoading}
+                onOpenImagerySettings={() => navigate(`/config/imagery/${farmId}`)}
+              />
+            ) : null}
 
             {/* Draw-in-progress hint (before a shape is completed) */}
             {m.drawTarget && !m.pendingBlock && !m.pendingPivot ? (
@@ -543,6 +561,16 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               </div>
             ) : null}
           </main>
+
+          {/* What the marks mean — a strip between the map and the date bar,
+              off by default and switched from the datapoint control. Here and
+              not over the map: it is a reference somebody reads once, and a
+              panel floating over the farm costs map every second it is open. */}
+          {c.layers.markLegend ? (
+            <div className="flex-none border-t border-ap-line bg-ap-panel">
+              <MarkerLegend variant="bar" />
+            </div>
+          ) : null}
 
           {/* Zone 6 — the time spine. Belongs to the map, not the dock: it
               changes what the map shows, so it sits directly under it and

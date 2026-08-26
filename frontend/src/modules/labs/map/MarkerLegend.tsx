@@ -41,7 +41,21 @@ function Swatch({ src, alt }: { src: string | null; alt: string }) {
   return <img src={src} alt={alt} className="inline-block h-5 w-auto align-middle" />;
 }
 
-export function MarkerLegend(): React.ReactNode {
+interface Props {
+  /**
+   * `panel` is the tall column that sits inside a popover. `bar` is the same
+   * content laid out as one horizontal strip, for the row above the date bar
+   * in Farm Console v2 — a legend there has the map's full width and about
+   * three lines of height, which is the opposite budget.
+   *
+   * A variant rather than a second component: every swatch is a canvas
+   * round-trip through markerIcons, and a legend drawn twice is a legend that
+   * disagrees with itself the first time a colour changes.
+   */
+  variant?: "panel" | "bar";
+}
+
+export function MarkerLegend({ variant = "panel" }: Props = {}): React.ReactNode {
   const { t } = useTranslation("farmConsole");
 
   // Drawn once. Each preview is a canvas round-trip, and there are a dozen of
@@ -66,6 +80,35 @@ export function MarkerLegend(): React.ReactNode {
     }),
     [],
   );
+
+  if (variant === "bar") {
+    // The action glyphs are dropped here on purpose. There are nine of them,
+    // they are the least-asked half of the legend, and putting them on one
+    // line would push the three things a reader actually needs to tell apart
+    // — alert, flag, signal — off the end of the strip.
+    return (
+      <div className="flex items-center gap-x-5 gap-y-1 overflow-x-auto px-3 py-1.5 text-xs text-ap-fg">
+        <BarGroup title={t("markerLegend.alerts")}>
+          {art.alerts.map(({ severity, src }) => (
+            <BarItem key={severity} src={src} label={t(`markerLegend.severity.${severity}`)} />
+          ))}
+        </BarGroup>
+        <BarGroup title={t("markerLegend.flags")}>
+          {art.flags.map(({ severity, src }) => (
+            <BarItem key={severity} src={src} label={t(`markerLegend.severity.${severity}`)} />
+          ))}
+          <BarItem src={art.flagClosed} label={t("flags.closed")} />
+        </BarGroup>
+        <BarGroup title={t("markerLegend.signals")}>
+          {/* Short captions, not the panel's sentences: the strip is one line
+              across the map's width, and three full explanations pushed the
+              last group off the end of it. */}
+          <BarItem src={art.signal} label={t("markerLegend.signalsBar")} />
+          <BarItem src={art.signalStack} label={t("markerLegend.signalsStackBar")} />
+        </BarGroup>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-xs px-2.5 py-2 text-xs text-ap-fg">
@@ -117,5 +160,29 @@ export function MarkerLegend(): React.ReactNode {
         <span className="text-ap-muted">{t("markerLegend.signalsStackHint")}</span>
       </div>
     </div>
+  );
+}
+
+function BarGroup({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}): React.ReactNode {
+  return (
+    <div className="flex flex-none items-center gap-2.5">
+      <span className="whitespace-nowrap font-medium text-ap-ink">{title}</span>
+      {children}
+    </div>
+  );
+}
+
+function BarItem({ src, label }: { src: string | null; label: string }): React.ReactNode {
+  return (
+    <span className="flex flex-none items-center gap-1 whitespace-nowrap text-ap-muted">
+      <Swatch src={src} alt="" />
+      <span>{label}</span>
+    </span>
   );
 }
