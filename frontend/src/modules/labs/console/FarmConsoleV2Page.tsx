@@ -256,7 +256,6 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               c.setSelectedCellId(null);
             }}
             gridAvailable={c.gridded.length > 0}
-            gridUnavailableForIndex={c.gridUnavailableForIndex}
           />
         }
       />
@@ -332,53 +331,63 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               bulkPreview={m.bulkPreviewFc}
             />
 
-            {/* Zone 5 — what data is on the map. One control: the index (its
-                "None" is the pixel off switch), alert chips, field flags,
-                signal readings, the mark legend, and full screen. The layer
-                cards that used to sit in the opposite corner are gone — they
-                shared two switches with this rail, and one piece of state with
-                two front doors is one that goes out of step. */}
-            <MapDataControl
-              className="absolute end-3 top-1/2 z-10 -translate-y-1/2"
-              activeIndex={c.selectedIndex}
-              indexOptions={MAP_INDEX_ORDER}
-              onIndexChange={c.changeSelectedIndex}
-              pixelsAvailable={c.pixels.assetCount > 0}
-              alerts={c.layers.alerts}
-              onAlertsChange={(on) => c.setLayers((l) => ({ ...l, alerts: on }))}
-              flagsMode={c.flagsMode}
-              onFlagsModeChange={c.changeFlagsMode}
-              signalDefs={(c.signalDefsQ.data ?? []).map((d) => ({ id: d.id, name: d.name }))}
-              signalsOn={c.layers.signals}
-              signalDefId={c.signalDefId}
-              onSignalsChange={c.changeSignals}
-              markLegend={c.layers.markLegend}
-              onMarkLegendChange={(on) => c.setLayers((l) => ({ ...l, markLegend: on }))}
-              onFullscreen={fullscreen.toggle}
-              isFullscreen={fullscreen.isFullscreen}
-            />
+            {/* Zones 4 and 5 share ONE trailing column.
+                They used to be two independent absolute boxes both pinned to
+                `end-3`: the legend at the top, the datapoint rail at the
+                vertical middle. The legend grows with the index — thirteen
+                class rows plus areas — so on any short map it reached the
+                middle and sat on top of the rail. A column cannot overlap
+                itself: the legend takes the space it needs from the top and
+                scrolls when there is not enough, and the rail is pinned to
+                the bottom.
 
-            {/* Zone 4 — index legend. Anchored to the map's trailing edge so
-                it reads against the pixels it describes. Absent at "None": a
-                legend for an index the map is not drawing explains nothing
-                that is on screen. */}
-            {c.selectedIndex ? (
-              <IndexLegend
-                className="absolute end-3 top-3 z-10 w-[268px] bg-ap-panel/95 shadow-card"
-                code={c.selectedIndex}
-                areas={legendAreas}
-                scopeBlockId={legendScopeBlockId}
-                scopeBlockName={
-                  legendScopeBlockId ? (c.blockNameById.get(legendScopeBlockId) ?? null) : null
-                }
-                showPixels={c.showPixels}
-                assetCount={c.pixels.assetCount}
-                indexUnit={c.activeIndexUnit}
-                imagerySubCount={c.imagerySubCount}
-                loading={c.pixels.assetsLoading || c.pixels.statsLoading}
-                onOpenImagerySettings={() => navigate(`/config/imagery/${farmId}`)}
+                `bottom-8` clears the MapLibre attribution strip. The wrapper
+                ignores pointer events so the map is still draggable between
+                the two panels; each child takes them back. */}
+            <div className="pointer-events-none absolute bottom-8 end-3 top-3 z-10 flex flex-col items-end gap-2">
+              {c.selectedIndex ? (
+                <IndexLegend
+                  className="pointer-events-auto min-h-0 w-[268px] flex-shrink overflow-y-auto bg-ap-panel/95 shadow-card"
+                  code={c.selectedIndex}
+                  areas={legendAreas}
+                  scopeBlockId={legendScopeBlockId}
+                  scopeBlockName={
+                    legendScopeBlockId ? (c.blockNameById.get(legendScopeBlockId) ?? null) : null
+                  }
+                  showPixels={c.showPixels}
+                  assetCount={c.pixels.assetCount}
+                  indexUnit={c.activeIndexUnit}
+                  imagerySubCount={c.imagerySubCount}
+                  loading={c.pixels.assetsLoading || c.pixels.statsLoading}
+                  onOpenImagerySettings={() => navigate(`/config/imagery/${farmId}`)}
+                />
+              ) : null}
+
+              <div className="flex-1" />
+
+              {/* What data is on the map. One control: the index (its "None"
+                  is the pixel off switch), alert chips, field flags, signal
+                  readings, the mark legend, and full screen. */}
+              <MapDataControl
+                className="pointer-events-auto relative flex-none"
+                activeIndex={c.selectedIndex}
+                indexOptions={MAP_INDEX_ORDER}
+                onIndexChange={c.changeSelectedIndex}
+                pixelsAvailable={c.pixels.assetCount > 0}
+                alerts={c.layers.alerts}
+                onAlertsChange={(on) => c.setLayers((l) => ({ ...l, alerts: on }))}
+                flagsMode={c.flagsMode}
+                onFlagsModeChange={c.changeFlagsMode}
+                signalDefs={(c.signalDefsQ.data ?? []).map((d) => ({ id: d.id, name: d.name }))}
+                signalsOn={c.layers.signals}
+                signalDefId={c.signalDefId}
+                onSignalsChange={c.changeSignals}
+                markLegend={c.layers.markLegend}
+                onMarkLegendChange={(on) => c.setLayers((l) => ({ ...l, markLegend: on }))}
+                onFullscreen={fullscreen.toggle}
+                isFullscreen={fullscreen.isFullscreen}
               />
-            ) : null}
+            </div>
 
             {/* Draw-in-progress hint (before a shape is completed) */}
             {m.drawTarget && !m.pendingBlock && !m.pendingPivot ? (
@@ -489,7 +498,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
                 open
                 cellId={c.selectedCellId}
                 productId={c.cellMeta.get(c.selectedCellId)?.productId ?? null}
-                indexCode={c.activeIndex}
+                indexCode={c.gridIndex}
                 value={c.cellMeta.get(c.selectedCellId)?.value ?? null}
                 lat={c.cellMeta.get(c.selectedCellId)?.lat ?? null}
                 lon={c.cellMeta.get(c.selectedCellId)?.lon ?? null}

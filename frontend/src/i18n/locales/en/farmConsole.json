@@ -923,7 +923,7 @@
     "labelName": "Block name",
     "labelCrop": "Crop",
     "cellsUnavailable": "no block on this farm has a grid configured",
-    "cellsNotForThisIndex": "Sub-block zones are computed from the optical product. Thermal has none — read it across the farm instead."
+    "cellsUnavailableShort": "this farm has no cells configured"
   },
   "dataControl": {
     "title": "On the map",

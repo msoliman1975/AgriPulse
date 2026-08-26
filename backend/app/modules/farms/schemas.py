@@ -1076,6 +1076,13 @@ class FarmCropAssignmentResponse(BaseModel):
     crop_path: str
     crop_name_en: str
     crop_name_ar: str
+    # Variety and strain, so a caller can render the whole assignment the way
+    # the Block Dock already does ("Mango · Alphonso"). Null at a level the
+    # crop's `classification_depth` does not reach.
+    variety_name_en: str | None = None
+    variety_name_ar: str | None = None
+    strain_name_en: str | None = None
+    strain_name_ar: str | None = None
     season_label: str
     effective_from: date
     effective_to: date | None = None

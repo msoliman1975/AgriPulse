@@ -135,7 +135,7 @@ describe.each(LOCALES)("farmConsole legend copy (%s)", (_lang, bundle) => {
       "layerBar.blockBorders",
       "layerBar.cells",
       "layerBar.cellsUnavailable",
-      "layerBar.cellsNotForThisIndex",
+      "layerBar.cellsUnavailableShort",
       "layerBar.borderOpacity",
       "layerBar.fillOpacity",
       "layerBar.showLabels",

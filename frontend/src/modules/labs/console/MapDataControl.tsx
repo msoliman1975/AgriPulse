@@ -315,11 +315,11 @@ function Panel({ title, children }: { title: string; children: ReactNode }): Rea
   return (
     <Card
       noPadding
-      // Centred on the rail, not hung from its top. The rail itself sits at
-      // the map's vertical middle, so a panel anchored at `top-0` and 70vh
-      // tall runs off the bottom of the window — the thirteen-index list did
-      // exactly that, and gave the whole page a scroll bar.
-      className="absolute end-full top-1/2 me-2 max-h-[70vh] w-[212px] -translate-y-1/2 overflow-y-auto bg-ap-panel/98 p-1 shadow-card"
+      // Anchored to the rail's BOTTOM edge, because the rail itself now sits
+      // at the bottom of the trailing column. 60vh rather than 70vh so the
+      // thirteen-index list still clears the top of a short map instead of
+      // running under the legend above it.
+      className="absolute bottom-0 end-full me-2 max-h-[60vh] w-[212px] overflow-y-auto bg-ap-panel/98 p-1 shadow-card"
     >
       <Heading>{title}</Heading>
       {children}
