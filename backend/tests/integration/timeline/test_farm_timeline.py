@@ -218,7 +218,12 @@ async def test_titles_and_codes_carry_the_source_text(
 
     # The definition name and unit are joined in, not invented — an empty
     # title here means the public.signal_definitions join missed.
-    assert by_kind["signal"]["title_en"] == "Leaf wetness: 4.2500 hrs"
+    #
+    # "4.25", not "4.2500". This line originally asserted the padded form,
+    # which is what NUMERIC(14,4) casts to, and so it pinned the defect in
+    # place rather than catching it: the page read "fruit tss brix: 6.4000"
+    # on prod with this test green.
+    assert by_kind["signal"]["title_en"] == "Leaf wetness: 4.25 hrs"
     assert by_kind["alert"]["title_en"] == "NDVI fell 22% in seven days"
     assert by_kind["alert"]["code"] == "inspect"
     assert by_kind["alert"]["severity"] == "critical"
@@ -340,3 +345,33 @@ async def test_events_outside_the_window_are_left_out(
         **{"from": "2026-05-01", "to": DAY_FLAG.isoformat()},
     )
     assert [e["kind"] for e in resp.json()["events"]] == ["flag"]
+
+
+def test_numeric_signal_values_lose_their_trailing_zeros() -> None:
+    """A NUMERIC(14,4) reading must not reach the rail as "6.4000".
+
+    Unit-level on purpose. Every other test in this file asserts the shape
+    of the payload, and the shape was already correct when the page read
+    "fruit tss brix: 6.4000" on prod — the defect lived one layer up, in
+    the string a person reads.
+    """
+    from app.modules.timeline.service import _signal_title, _trim_number
+
+    assert _trim_number("6.4000") == "6.4"
+    assert _trim_number("0.1200") == "0.12"
+    # An integer reading has no decimal point and must be left alone.
+    assert _trim_number("28") == "28"
+    # And a trailing zero BEFORE the point is a digit, not padding.
+    assert _trim_number("120") == "120"
+    assert _trim_number("28.0000") == "28"
+    # A categorical value that happens to contain a dot is somebody's text.
+    assert _trim_number("stage 2.0 blight") == "stage 2.0 blight"
+
+    assert (
+        _signal_title({"definition_name": "fruit tss brix", "value_text": "6.4000", "unit": None})
+        == "fruit tss brix: 6.4"
+    )
+    assert (
+        _signal_title({"definition_name": "leaf wetness", "value_text": "4.2500", "unit": "hrs"})
+        == "leaf wetness: 4.25 hrs"
+    )

@@ -22,6 +22,7 @@ import type { FeatureCollection, MultiPolygon, Point, Polygon } from "geojson";
 import { registerMarkerImages } from "@/modules/labs/map/markerIcons";
 import { TILE_SIZE } from "@/modules/labs/console/pixelTiles";
 import type { MarkProps } from "../lib/marks";
+import { rasterSourceSpec } from "../lib/rasterSource";
 
 /** One raster to draw for the current pass. */
 export interface RasterLayer {
@@ -385,14 +386,19 @@ function applyRasters(
   for (const raster of rasters) {
     const layerId = `${RASTER_PREFIX}${gen}-${raster.id}`;
     if (map.getSource(layerId)) continue;
-    map.addSource(layerId, {
-      type: "raster",
-      tiles: [raster.tileUrl],
-      bounds: raster.bounds,
-      // 512 rather than 256: the cost is per REQUEST, not per pixel, and
-      // `pixelTiles` already asks TiTiler for that size via `scale`.
-      tileSize: TILE_SIZE,
-    });
+    // Built by `rasterSourceSpec` rather than inline, so the shape handed
+    // to MapLibre is testable. An explicit `bounds: undefined` throws here
+    // and takes the whole pixel layer with it; see that module for why.
+    // 512 rather than 256 on tileSize: the cost is per REQUEST, not per
+    // pixel, and `pixelTiles` already asks TiTiler for that size via `scale`.
+    map.addSource(
+      layerId,
+      rasterSourceSpec({
+        tileUrl: raster.tileUrl,
+        bounds: raster.bounds,
+        tileSize: TILE_SIZE,
+      }),
+    );
     map.addLayer(
       {
         id: layerId,
