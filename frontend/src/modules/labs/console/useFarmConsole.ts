@@ -14,7 +14,7 @@
 // (map/api.ts, api/grid.ts, gridOverlay.ts, signalOverlay.ts).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { FeatureCollection, Polygon } from "geojson";
 
@@ -159,6 +159,18 @@ export function useFarmConsole(farmId: string) {
     queryFn: () => loadMapSummary(farmId, asOf),
     staleTime: 30_000,
     refetchInterval: 60_000,
+    // Hold the previous answer while the next one loads.
+    //
+    // Load-bearing, not a nicety. The page renders a full-screen "loading
+    // this farm" branch whenever `summaryQ.data` is absent, and adding the
+    // as-of instant to this key means every click on the date bar is a new
+    // key with no cached data. Without this the whole console unmounts on
+    // each date — map included — and the map re-frames the farm when it comes
+    // back. The console's one rule is that the map never unmounts.
+    //
+    // The stale answer is also very nearly right: `at` changes the alert
+    // rollup only. The block roster and the geometry are the same farm.
+    placeholderData: keepPreviousData,
   });
 
   const blocksById = useMemo(() => {
@@ -264,6 +276,9 @@ export function useFarmConsole(farmId: string) {
     // than inapplicable; `gridUnavailableForIndex` is what says which it is.
     enabled: Boolean(showGrid && gridded.length > 0 && !isThermalIndex(activeIndex)),
     staleTime: 30_000,
+    // The mesh is drawn from this. Without it the cells vanish and come back
+    // on every date change, which reads as the map reloading.
+    placeholderData: keepPreviousData,
   });
 
   // The active index's display unit, for the legend and anything else that
@@ -495,6 +510,9 @@ export function useFarmConsole(farmId: string) {
       }),
     enabled: Boolean(farmId && layers.signals),
     staleTime: 30_000,
+    // Same reason as the summary: a date change is a new key, and without
+    // this the marks disappear and come back on every click.
+    placeholderData: keepPreviousData,
   });
   const pickedSignalDef = signalDefsQ.data?.find((d) => d.id === signalDefId) ?? null;
   const blockCentroids = useMemo(
@@ -509,6 +527,7 @@ export function useFarmConsole(farmId: string) {
     queryFn: () => listFieldFlags(farmId, { pinned_only: true, open_only: layers.flagsOpenOnly }),
     enabled: Boolean(farmId && layers.flags),
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
   const flagOverlayFc = useMemo(() => {
     if (!layers.flags) return null;

@@ -9,7 +9,7 @@
 // the same numbers the tiles are drawn from, so nothing on screen can disagree
 // with anything else on screen.
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { listFarmSceneAssets, type FarmRaster, type FarmSceneAsset } from "@/api/imagery";
 import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
@@ -133,6 +133,11 @@ export function useIndexPixels(input: {
     queryFn: () => listFarmSceneAssets(farmId, sceneAt ?? undefined, code),
     enabled: Boolean(farmId) && input.enabled,
     staleTime: 5 * 60_000,
+    // Keeps the LAYER IDS stable across a date change, which is what lets
+    // MapCanvas swap a raster source's tiles in place. Let this go empty and
+    // the layers are removed and re-added instead, and the base map flashes
+    // through on every click of the date bar.
+    placeholderData: keepPreviousData,
   });
   const assets = useMemo<FarmSceneAsset[]>(() => assetsQ.data?.items ?? [], [assetsQ.data]);
   /**
@@ -172,12 +177,7 @@ export function useIndexPixels(input: {
   // otherwise have nothing to say. Bounded concurrency for the same reason
   // the grid route exists — a 36-block farm must not open 36 sockets at once.
   const statsQ = useQuery({
-    queryKey: CONSOLE_QK.pixelStats(
-      farmId,
-      code,
-      sceneAt,
-      farmRaster ? -1 : assets.length,
-    ),
+    queryKey: CONSOLE_QK.pixelStats(farmId, code, sceneAt, farmRaster ? -1 : assets.length),
     queryFn: async (): Promise<PixelStats> => {
       if (!config) return { counts: [], failedBlockIds: [] };
       if (farmRaster) {
@@ -222,10 +222,7 @@ export function useIndexPixels(input: {
   // tiles do not need: they are drawn optimistically and the failures are
   // pruned when the probe lands. The scene strip greys out passes that were
   // never processed, so the optimistic path is nearly always right.
-  const failedBlockIds = useMemo(
-    () => new Set(statsQ.data?.failedBlockIds ?? []),
-    [statsQ.data],
-  );
+  const failedBlockIds = useMemo(() => new Set(statsQ.data?.failedBlockIds ?? []), [statsQ.data]);
 
   const layers = useMemo<PixelLayer[]>(() => {
     if (!config) return [];
