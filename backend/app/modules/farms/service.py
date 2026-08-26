@@ -2038,12 +2038,35 @@ class FarmServiceImpl:
             if assignment is not None:
                 picked[block_id] = assignment
 
+        # Three lookups for the whole farm, not three per block. The map labels
+        # every block with the full assignment — crop, variety, strain — the
+        # way the Block Dock already does.
         names = await self._repo.crop_names_by_id(
             crop_ids=[assignment.crop_id for assignment in picked.values()]
+        )
+        varieties = await self._repo.variety_names_by_id(
+            variety_ids=[
+                a.crop_variety_id for a in picked.values() if a.crop_variety_id is not None
+            ]
+        )
+        strains = await self._repo.strain_names_by_id(
+            strain_ids=[
+                a.crop_variety_strain_id
+                for a in picked.values()
+                if a.crop_variety_strain_id is not None
+            ]
         )
         out: list[dict[str, Any]] = []
         for block_id, assignment in picked.items():
             name_en, name_ar = names.get(assignment.crop_id, (assignment.crop_path, ""))
+            variety = (
+                varieties.get(assignment.crop_variety_id) if assignment.crop_variety_id else None
+            )
+            strain = (
+                strains.get(assignment.crop_variety_strain_id)
+                if assignment.crop_variety_strain_id
+                else None
+            )
             out.append(
                 {
                     "block_id": block_id,
@@ -2052,6 +2075,13 @@ class FarmServiceImpl:
                     "crop_path": assignment.crop_path,
                     "crop_name_en": name_en,
                     "crop_name_ar": name_ar or name_en,
+                    "variety_name_en": variety[0] if variety else None,
+                    # Arabic falls back to English rather than to null: the
+                    # caller renders one string, and a missing middle level
+                    # would drop the variety from an Arabic label only.
+                    "variety_name_ar": (variety[1] or variety[0]) if variety else None,
+                    "strain_name_en": strain[0] if strain else None,
+                    "strain_name_ar": (strain[1] or strain[0]) if strain else None,
                     "season_label": assignment.season_label,
                     "effective_from": assignment.effective_from,
                     "effective_to": assignment.effective_to,

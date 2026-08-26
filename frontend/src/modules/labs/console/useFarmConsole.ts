@@ -42,6 +42,7 @@ import {
 import type { GridCellProps } from "../map/MapCanvas";
 import { buildFlagOverlay } from "../map/flagOverlay";
 import { blockCentroidsFromGeojson, buildSignalOverlay } from "../map/signalOverlay";
+import { cropLabel } from "../mapnext/dockFormat";
 import { griddedBlocks } from "../mapnext/gridOverlay";
 import { isThermalIndex, LAST_FARM_KEY } from "../mapnext/constants";
 import { CONSOLE_QK } from "./constants";
@@ -264,10 +265,27 @@ export function useFarmConsole(farmId: string) {
   // because charts deploy independently, so a new frontend can meet an api
   // that has no farm route yet — bounded to 4 in flight so a degraded path
   // degrades rather than taking the connection pool down with it.
+  /**
+   * Which index the mesh is FETCHED with, which is not the one being drawn.
+   *
+   * The cells are geometry. Their outlines are identical whatever the map is
+   * painting, and this console never fills them (`gridFillVisible={false}`) —
+   * so the index here only decides which product's cell rows come back.
+   * Thermal has no grid config, so asking with a thermal code returns nothing
+   * and the mesh disappears; asking with "None" cannot ask at all. Both used
+   * to grey out the Cells box, which made a farm's zoning look absent because
+   * of what was being drawn over it.
+   *
+   * `ndvi` is the fallback because it is the optical product every gridded
+   * farm has. The cell VALUES that come back are that index's, so the popup
+   * is told this code rather than the one on the rail.
+   */
+  const gridIndex: ApiIndexCode = isThermalIndex(activeIndex) ? "ndvi" : activeIndex;
+
   const farmGridQ = useQuery({
-    queryKey: CONSOLE_QK.farmGrid(farmId, activeIndex, overlayKey, sceneAt),
+    queryKey: CONSOLE_QK.farmGrid(farmId, gridIndex, overlayKey, sceneAt),
     queryFn: async () => {
-      const farmWide = await getFarmGridCells(farmId, activeIndex, sceneAt ?? undefined);
+      const farmWide = await getFarmGridCells(farmId, gridIndex, sceneAt ?? undefined);
       if (farmWide) {
         return farmWide.blocks.map((b) => ({
           blockId: b.block_id,
@@ -278,18 +296,14 @@ export function useFarmConsole(farmId: string) {
       // The per-block fallback must honour the scene too, or an old API
       // would silently serve "latest" while the timeline says otherwise.
       return mapWithConcurrency(gridded, 4, async ({ blockId, productId }) => {
-        const res = await getGridCells(blockId, productId, activeIndex, sceneAt ?? undefined);
+        const res = await getGridCells(blockId, productId, gridIndex, sceneAt ?? undefined);
         return { blockId, productId, cells: res.cells };
       });
     },
-    // Never issued for a thermal index, because it could only ever come back
-    // empty: `grid_configs` are per-product, only the optical product has
-    // one, and `list_cells_for_scene` filters on `cfg.product_id` — so the
-    // write path never produces a thermal cell row and the read path could
-    // not return one if it did. Sending the request anyway would spend a
-    // round trip to draw nothing and leave the mesh looking broken rather
-    // than inapplicable; `gridUnavailableForIndex` is what says which it is.
-    enabled: Boolean(showGrid && gridded.length > 0 && !isThermalIndex(activeIndex)),
+    // Issued whenever the farm has zoning and the mesh is switched on. It is
+    // no longer gated on the index: `gridIndex` already resolves to a product
+    // that can answer, so a thermal or "None" reading keeps its outlines.
+    enabled: Boolean(showGrid && gridded.length > 0),
     staleTime: 30_000,
     // The mesh is drawn from this. Without it the cells vanish and come back
     // on every date change, which reads as the map reloading.
@@ -311,11 +325,6 @@ export function useFarmConsole(farmId: string) {
     () => catalogQ.data?.find((entry) => entry.code === activeIndex)?.unit ?? "",
     [catalogQ.data, activeIndex],
   );
-
-  // Sub-block zoning exists on this farm, but not for what is being drawn.
-  // A distinct state from "no grid configured": the toggle stays meaningful,
-  // it is this index that cannot honour it.
-  const gridUnavailableForIndex = isThermalIndex(activeIndex) && gridded.length > 0;
 
   // Index pixels + the statistics that feed the legend and the block fill.
   // Not gated on `showPixels`: the block fill and the legend read the same
@@ -576,7 +585,16 @@ export function useFarmConsole(farmId: string) {
   const cropLabelByBlockId = useMemo(() => {
     const m = new Map<string, string>();
     for (const row of cropLabelsQ.data ?? []) {
-      m.set(row.block_id, isAr ? row.crop_name_ar : row.crop_name_en);
+      // The whole assignment, not just the crop: a farm growing three mango
+      // varieties had every block labelled "Mango". Built with the same
+      // helper the Block Dock uses, so the map and the dock never disagree
+      // about what a block is planted with.
+      const label = cropLabel({
+        crop_name: isAr ? row.crop_name_ar : row.crop_name_en,
+        variety_name: (isAr ? row.variety_name_ar : row.variety_name_en) ?? null,
+        strain_name: (isAr ? row.strain_name_ar : row.strain_name_en) ?? null,
+      });
+      if (label) m.set(row.block_id, label);
     }
     return m;
   }, [cropLabelsQ.data, isAr]);
@@ -759,7 +777,6 @@ export function useFarmConsole(farmId: string) {
     setLayers,
     showGrid,
     setShowGrid,
-    gridUnavailableForIndex,
     activeIndexUnit,
     showPixels,
     setShowPixels,
@@ -803,6 +820,7 @@ export function useFarmConsole(farmId: string) {
     imagerySubCount,
     gridProductId,
     gridded,
+    gridIndex,
     gridCellsFc,
     pixels,
     geojsonWithClasses,

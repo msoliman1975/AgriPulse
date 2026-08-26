@@ -23,8 +23,6 @@ interface Props {
   onToggleGrid: () => void;
   /** No block on this farm has a sub-block grid configured. */
   gridAvailable: boolean;
-  /** The farm has zoning, but the index being drawn cannot use it (thermal). */
-  gridUnavailableForIndex?: boolean;
   className?: string;
 }
 
@@ -34,11 +32,9 @@ export function MapLayerBar({
   showGrid,
   onToggleGrid,
   gridAvailable,
-  gridUnavailableForIndex = false,
   className,
 }: Props): ReactNode {
   const { t } = useTranslation("farmConsole");
-  const gridDisabled = !gridAvailable || gridUnavailableForIndex;
 
   return (
     <div className={"flex min-w-0 items-center gap-3 " + (className ?? "")}>
@@ -52,19 +48,23 @@ export function MapLayerBar({
         checked={layers.borders}
         onChange={() => onLayersChange({ borders: !layers.borders })}
       />
+      {/* Cells no longer depend on what the map is drawing. The mesh is
+          geometry; only its numbers are per-index, and this console draws the
+          outlines without a fill. It greys out for ONE reason now — the farm
+          has no zoning — and says so on the bar rather than in a tooltip
+          nobody hovers. */}
       <Check
         label={t("layerBar.cells")}
-        checked={showGrid && !gridUnavailableForIndex}
-        disabled={gridDisabled}
-        title={
-          gridUnavailableForIndex
-            ? t("layerBar.cellsNotForThisIndex")
-            : gridAvailable
-              ? undefined
-              : t("layerBar.cellsUnavailable")
-        }
+        checked={showGrid}
+        disabled={!gridAvailable}
+        title={gridAvailable ? undefined : t("layerBar.cellsUnavailable")}
         onChange={onToggleGrid}
       />
+      {!gridAvailable ? (
+        <span className="flex-none whitespace-nowrap text-xs text-ap-muted">
+          {t("layerBar.cellsUnavailableShort")}
+        </span>
+      ) : null}
 
       <Rule />
 

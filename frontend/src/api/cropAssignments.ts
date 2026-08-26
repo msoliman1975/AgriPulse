@@ -74,6 +74,11 @@ export interface FarmCropAssignment {
   crop_path: string;
   crop_name_en: string;
   crop_name_ar: string;
+  /** Null at a level the crop's classification depth does not reach. */
+  variety_name_en: string | null;
+  variety_name_ar: string | null;
+  strain_name_en: string | null;
+  strain_name_ar: string | null;
   season_label: string;
   effective_from: string;
   effective_to: string | null;

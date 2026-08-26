@@ -76,18 +76,23 @@ describe("MapLayerBar", () => {
     expect(onLayersChange).not.toHaveBeenCalled();
   });
 
-  it("disables Cells when the farm has no zoning", () => {
+  it("disables Cells when the farm has no zoning, and says so on the bar", () => {
+    // The one reason it can be disabled. A tooltip on a disabled checkbox is
+    // not an explanation, so the reason is printed next to it.
     renderBar({}, { gridAvailable: false });
     expect(screen.getByRole("checkbox", { name: /Cells/ })).toBeDisabled();
+    expect(screen.getByText(/no cells configured/i)).toBeInTheDocument();
   });
 
-  it("shows Cells off, not merely disabled, when the index cannot use it", () => {
-    // Thermal. The mesh state is still ON underneath, and drawing the box
-    // ticked would claim a mesh the map is not painting.
-    renderBar({}, { gridUnavailableForIndex: true });
+  it("keeps Cells usable whatever the map is drawing", () => {
+    // The mesh is geometry. It used to grey out on a thermal index and on
+    // "None", which made a farm's zoning look absent because of what was
+    // being painted over it.
+    renderBar();
     const cells = screen.getByRole("checkbox", { name: /Cells/ });
-    expect(cells).toBeDisabled();
-    expect(cells).not.toBeChecked();
+    expect(cells).toBeEnabled();
+    expect(cells).toBeChecked();
+    expect(screen.queryByText(/no cells configured/i)).toBeNull();
   });
 
   it("carries both opacity sliders, labelled with their percentage", () => {

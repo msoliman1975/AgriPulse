@@ -92,6 +92,63 @@ async def test_returns_one_row_per_block_with_the_crop_name(
 
 
 @pytest.mark.asyncio
+async def test_carries_every_level_the_assignment_names(
+    admin_session: AsyncSession,
+) -> None:
+    """A farm growing three mango varieties had every block labelled "Mango".
+
+    Mango is classified to strain depth, so an assignment names crop, variety
+    and strain. The map joins all three the way the Block Dock does, so the
+    route has to return every level.
+    """
+    async with await _client(admin_session, f"fca-f-{uuid4().hex[:6]}") as c:
+        farm_id = await _farm(c)
+        block_id = await _block(c, farm_id)
+
+        crop_id = await _crop_id(c, "mango")
+        varieties = (await c.get(f"/api/v1/crops/{crop_id}/varieties")).json()
+        variety = varieties[0]
+        strains = (await c.get(f"/api/v1/crop-varieties/{variety['id']}/strains")).json()
+        strain = strains[0]
+
+        r = await c.post(
+            f"/api/v1/blocks/{block_id}/crop-assignments",
+            json={
+                "crop_id": crop_id,
+                "crop_variety_id": variety["id"],
+                "crop_variety_strain_id": strain["id"],
+                "season_label": "2026",
+                "planting_date": "2020-04-01",
+            },
+        )
+        assert r.status_code == 201, r.text
+
+        rows = (await c.get(f"/api/v1/farms/{farm_id}/crop-assignments")).json()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["variety_name_en"] == variety["name_en"]
+        assert row["strain_name_en"] == strain["name_en"]
+        # Arabic never falls back to null on a level that exists, or an Arabic
+        # label would silently lose the variety an English one shows.
+        assert row["variety_name_ar"]
+        assert row["strain_name_ar"]
+
+
+@pytest.mark.asyncio
+async def test_a_crop_with_no_variety_reports_null_levels(
+    admin_session: AsyncSession,
+) -> None:
+    async with await _client(admin_session, f"fca-g-{uuid4().hex[:6]}") as c:
+        farm_id = await _farm(c)
+        block_id = await _block(c, farm_id)
+        await _assign(c, block_id, "olive", planting_date="2019-03-04")
+
+        row = (await c.get(f"/api/v1/farms/{farm_id}/crop-assignments")).json()[0]
+        assert row["variety_name_en"] is None
+        assert row["strain_name_en"] is None
+
+
+@pytest.mark.asyncio
 async def test_a_block_with_no_assignment_is_omitted(admin_session: AsyncSession) -> None:
     async with await _client(admin_session, f"fca-b-{uuid4().hex[:6]}") as c:
         farm_id = await _farm(c)

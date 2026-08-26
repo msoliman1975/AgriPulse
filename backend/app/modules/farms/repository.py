@@ -1429,6 +1429,36 @@ class FarmsRepository:
         )
         return list(rows)
 
+    async def variety_names_by_id(
+        self, *, variety_ids: Sequence[UUID]
+    ) -> dict[UUID, tuple[str, str | None]]:
+        """`crop_variety_id -> (name_en, name_ar)`, in one query."""
+        if not variety_ids:
+            return {}
+        rows = (
+            await self._public.execute(
+                select(CropVariety.id, CropVariety.name_en, CropVariety.name_ar).where(
+                    CropVariety.id.in_(set(variety_ids))
+                )
+            )
+        ).all()
+        return {row.id: (row.name_en, row.name_ar) for row in rows}
+
+    async def strain_names_by_id(
+        self, *, strain_ids: Sequence[UUID]
+    ) -> dict[UUID, tuple[str, str | None]]:
+        """`crop_variety_strain_id -> (name_en, name_ar)`, in one query."""
+        if not strain_ids:
+            return {}
+        rows = (
+            await self._public.execute(
+                select(
+                    CropVarietyStrain.id, CropVarietyStrain.name_en, CropVarietyStrain.name_ar
+                ).where(CropVarietyStrain.id.in_(set(strain_ids)))
+            )
+        ).all()
+        return {row.id: (row.name_en, row.name_ar) for row in rows}
+
     async def crop_names_by_id(self, *, crop_ids: Sequence[UUID]) -> dict[UUID, tuple[str, str]]:
         """`crop_id -> (name_en, name_ar)` for the ids asked for, in one query.
 
