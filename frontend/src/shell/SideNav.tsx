@@ -16,6 +16,7 @@ import {
   ReportsIcon,
   RulesIcon,
   SignalsIcon,
+  TimelineIcon,
   TenantIcon,
   UsersIcon,
 } from "./icons";
@@ -315,6 +316,16 @@ export function SideNav(): ReactNode {
         icon={<PlanIcon className="h-4 w-4" />}
         disabled={!hasFarm}
         activePathPrefix="/board/"
+        collapsed={collapsed}
+      />
+      {/* The replay surface. Sits after Plan because it is read-only
+          history — you plan forward here and look backward there. */}
+      <SideNavItem
+        to={hasFarm ? `/timeline/${farmSegment}` : "#"}
+        label={t("common:workspaceNav.timeline")}
+        icon={<TimelineIcon className="h-4 w-4" />}
+        disabled={!hasFarm}
+        activePathPrefix="/timeline/"
         collapsed={collapsed}
       />
       <SideNavItem

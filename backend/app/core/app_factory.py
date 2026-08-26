@@ -199,6 +199,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     )
     from app.modules.signals.router import router as signals_router
     from app.modules.tenancy.router import router as tenancy_router
+    from app.modules.timeline.router import router as timeline_router
     from app.modules.weather.router import router as weather_router
     from app.shared.eventbus import get_default_bus
 
@@ -222,6 +223,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     app.include_router(notifications_router)
     app.include_router(recommendations_router)
     app.include_router(insights_router)
+    app.include_router(timeline_router)
     app.include_router(reports_router)
     app.include_router(signals_router)
     app.include_router(scouting_router)

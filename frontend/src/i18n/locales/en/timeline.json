@@ -1,0 +1,98 @@
+{
+  "title": "Timeline",
+  "subtitle": "Replay this farm day by day: index pixels, and what people and the system recorded.",
+  "noAccess": "You do not have access to this farm.",
+  "badge": {
+    "noImageYet": "No image yet on this date",
+    "carriedFrom": "Image from {{date}}"
+  },
+  "controls": {
+    "scope": "Scope",
+    "wholeFarm": "Whole farm",
+    "from": "From",
+    "to": "To",
+    "index": "Index",
+    "optical": "Optical (Sentinel-2)",
+    "thermal": "Thermal (Landsat)",
+    "hintFarm": "Whole-farm view. Pick a block to add its plan stage, which only applies to one block at a time.",
+    "hintBlock": "Block view. Plan stage changes are included.",
+    "hintWindow": "Windows up to {{days}} days.",
+    "errorReversed": "The start date must be on or before the end date.",
+    "errorTooWide": "Pick a window of {{days}} days or fewer."
+  },
+  "scrubber": {
+    "play": "Play",
+    "pause": "Pause",
+    "speed": "Speed",
+    "dayAria": "Day in the replay",
+    "eventCount_one": "{{count}} datapoint",
+    "eventCount_other": "{{count}} datapoints",
+    "noEvents": "Nothing recorded",
+    "noWindow": "Pick a date range to replay."
+  },
+  "rail": {
+    "title": "{{date}}",
+    "titleNoDay": "Datapoints",
+    "emptyWindow": "Nothing was recorded on this farm in this window. Widen the dates, or pick a different scope.",
+    "empty": "Nothing was recorded on this day or the three before it.",
+    "daysAgo_one": "{{count}} day earlier",
+    "daysAgo_other": "{{count}} days earlier",
+    "omitted": "Not shown, because your role cannot read them: {{kinds}}.",
+    "truncated": "This window holds more datapoints than one request returns. Narrow the dates to see them all."
+  },
+  "kind": {
+    "stage": "Plan stage",
+    "signal": "Signal",
+    "activity": "Activity done",
+    "visit": "Scout visit",
+    "flag": "Field flag",
+    "alert": "Alert",
+    "recommendation": "Recommendation"
+  },
+  "code": {
+    "activity": {
+      "planting": "Planting",
+      "fertilizing": "Fertilizing",
+      "spraying": "Spraying",
+      "pruning": "Pruning",
+      "harvesting": "Harvesting",
+      "irrigation": "Irrigation",
+      "soil_prep": "Soil preparation",
+      "observation": "Observation",
+      "pollination": "Pollination",
+      "growth_regulator": "Growth regulator",
+      "thinning": "Thinning",
+      "bagging": "Bagging",
+      "hilling": "Hilling"
+    },
+    "alert": {
+      "irrigate": "Irrigate",
+      "fertilize": "Fertilize",
+      "spray": "Spray",
+      "scout": "Scout",
+      "inspect": "Inspect",
+      "harvest_window": "Harvest window",
+      "prune": "Prune",
+      "no_action": "No action",
+      "other": "Other",
+      "unknown": "Unclassified"
+    },
+    "recommendation": {
+      "irrigate": "Irrigate",
+      "fertilize": "Fertilize",
+      "spray": "Spray",
+      "scout": "Scout",
+      "inspect": "Inspect",
+      "harvest_window": "Harvest window",
+      "prune": "Prune",
+      "no_action": "No action",
+      "other": "Other"
+    },
+    "visit": {
+      "ad_hoc": "Ad-hoc visit",
+      "alert": "From an alert",
+      "recommendation": "From a recommendation",
+      "schedule": "Scheduled visit"
+    }
+  }
+}
