@@ -13,7 +13,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.irrigation.errors import IrrigationScheduleNotFoundError
+from app.modules.irrigation.errors import (
+    IrrigationScheduleNotFoundError,
+    IrrigationTargetNotFoundError,
+)
 from app.modules.irrigation.schemas import (
     IrrigationApplyRequest,
     IrrigationGenerateRequest,
@@ -25,6 +28,7 @@ from app.modules.irrigation.service import (
     get_irrigation_service,
 )
 from app.shared.auth.context import RequestContext
+from app.shared.auth.middleware import get_current_context
 from app.shared.db.session import get_admin_db_session, get_db_session
 from app.shared.rbac.check import has_capability, requires_capability
 
@@ -77,6 +81,30 @@ async def list_for_farm(
     return list(rows)
 
 
+async def _require_on_farm(
+    context: RequestContext,
+    capability: str,
+    farm_id: UUID | None,
+    *,
+    kind: str,
+    target_id: UUID,
+) -> None:
+    """Check `capability` against the farm the addressed row lives in.
+
+    These three routes are keyed on a block or a schedule, not a farm, so
+    `requires_capability(farm_id_param=...)` has nothing to read and the
+    resolver never reaches the farm tier. That denied every farm-scoped
+    caller: an Agronomist could not generate an irrigation schedule for a
+    block on their own farm.
+
+    404 rather than 403 on failure, matching the block routes in
+    `farms/router`: the id is in the path, and answering "forbidden" tells a
+    caller which ids exist on farms they cannot see.
+    """
+    if farm_id is None or not has_capability(context, capability, farm_id=farm_id):
+        raise IrrigationTargetNotFoundError(kind, target_id)
+
+
 @router.get(
     "/blocks/{block_id}/water-balance",
     response_model=list[WaterBalanceDayResponse],
@@ -86,7 +114,7 @@ async def list_water_balance(
     block_id: UUID,
     from_date: date_type | None = Query(default=None, alias="from"),
     to_date: date_type | None = Query(default=None, alias="to"),
-    context: RequestContext = Depends(requires_capability("irrigation.schedule.read")),
+    context: RequestContext = Depends(get_current_context),
     service: IrrigationServiceImpl = Depends(_service),
 ) -> list[dict[str, Any]]:
     """Oldest first, so the caller charts it without re-sorting.
@@ -97,6 +125,13 @@ async def list_water_balance(
     irrigation data the schedule list already exposes, re-cut per day.
     """
     _ensure_tenant(context)
+    await _require_on_farm(
+        context,
+        "irrigation.schedule.read",
+        await service.farm_for_block(block_id=block_id),
+        kind="block",
+        target_id=block_id,
+    )
     end = to_date or date_type.today()
     start = from_date or end - timedelta(days=30)
     rows = await service.list_water_balance(block_id=block_id, from_date=start, to_date=end)
@@ -112,10 +147,17 @@ async def list_water_balance(
 async def generate_for_block(
     block_id: UUID,
     payload: IrrigationGenerateRequest,
-    context: RequestContext = Depends(requires_capability("irrigation.schedule.manage")),
+    context: RequestContext = Depends(get_current_context),
     service: IrrigationServiceImpl = Depends(_service),
 ) -> dict[str, Any] | None:
     schema = _ensure_tenant(context)
+    await _require_on_farm(
+        context,
+        "irrigation.schedule.manage",
+        await service.farm_for_block(block_id=block_id),
+        kind="block",
+        target_id=block_id,
+    )
     return await service.generate_for_block(
         block_id=block_id,
         scheduled_for=payload.scheduled_for,
@@ -132,10 +174,17 @@ async def generate_for_block(
 async def apply_or_skip(
     schedule_id: UUID,
     payload: IrrigationApplyRequest,
-    context: RequestContext = Depends(requires_capability("irrigation.schedule.manage")),
+    context: RequestContext = Depends(get_current_context),
     service: IrrigationServiceImpl = Depends(_service),
 ) -> dict[str, Any]:
     schema = _ensure_tenant(context)
+    await _require_on_farm(
+        context,
+        "irrigation.schedule.manage",
+        await service.farm_for_schedule(schedule_id=schedule_id),
+        kind="schedule",
+        target_id=schedule_id,
+    )
     if payload.action == "apply" and payload.applied_volume_mm is None:
         from app.core.errors import APIError
 

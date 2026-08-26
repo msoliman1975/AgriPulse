@@ -144,12 +144,24 @@ async def list_recommendations(
 )
 async def get_recommendation(
     recommendation_id: UUID,
-    context: RequestContext = Depends(requires_capability("recommendation.read")),
+    context: RequestContext = Depends(get_current_context),
     service: RecommendationsServiceImpl = Depends(_service),
 ) -> dict[str, Any]:
+    """Gated on the farm the recommendation is for, not on the tenant.
+
+    The route is keyed on a recommendation id, so there is no farm in the path
+    for `requires_capability` to read, and without one the resolver stops
+    before the farm tier — which denied every farm-scoped caller. The row
+    carries `farm_id`, so it is read first and the check runs against that.
+
+    A caller without the grant gets the same 404 as a caller naming an id that
+    does not exist. Answering 403 would confirm the recommendation is real.
+    """
     _ensure_tenant(context)
     rec = await service.get_recommendation(recommendation_id=recommendation_id)
     if rec is None:
+        raise RecommendationNotFoundError(recommendation_id)
+    if not has_capability(context, "recommendation.read", farm_id=rec["farm_id"]):
         raise RecommendationNotFoundError(recommendation_id)
     return rec
 
@@ -192,7 +204,13 @@ async def transition_recommendation(
     else:
         action = "defer"
 
-    if not has_capability(context, "recommendation.act"):
+    # Read the row first: `recommendation.act` is a farm-tier capability, and
+    # checking it without a farm never reaches the farm tier — so an
+    # Agronomist could not act on a recommendation for their own farm.
+    rec = await service.get_recommendation(recommendation_id=recommendation_id)
+    if rec is None:
+        raise RecommendationNotFoundError(recommendation_id)
+    if not has_capability(context, "recommendation.act", farm_id=rec["farm_id"]):
         # Mirrors alerts/router: a caller with read but not act sees a
         # 404 for the transition path, since they got the id from the
         # list and we don't want to leak existence beyond the read scope.

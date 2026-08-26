@@ -307,10 +307,21 @@ class CapabilityRegistry:
         capability: str,
         *,
         farm_id: UUID | None = None,
+        any_farm: bool = False,
     ) -> bool:
         """Resolve PlatformRole -> TenantRole -> FarmScope; first match wins.
 
         Unknown capabilities deny: a typo must never silently grant.
+
+        `any_farm` widens the last tier from "this farm" to "at least one farm
+        they hold". It is for tenant-level data that farm-scoped people
+        legitimately read — a signal definition, a template — where there is no
+        farm to check against because the row does not belong to one. Without
+        it those routes have to name a farm they do not have, and the only
+        remaining answer for a farm-scoped caller is 403.
+
+        Never combine it with a farm-scoped row: `any_farm` says the caller
+        holds the capability *somewhere*, not that they hold it *here*.
         """
         if not self.known(capability):
             return False
@@ -330,6 +341,11 @@ class CapabilityRegistry:
             if scope_role is not None and self.role_grants(scope_role.value, capability):
                 return True
 
+        if any_farm:
+            return any(
+                self.role_grants(scope.role.value, capability) for scope in context.farm_scopes
+            )
+
         return False
 
 
@@ -344,13 +360,42 @@ def has_capability(
     capability: str,
     *,
     farm_id: UUID | None = None,
+    any_farm: bool = False,
     registry: "CapabilityRegistry | None" = None,
 ) -> bool:
     """Module-level convenience over the default registry.
 
     Pass an explicit `registry` from tests; production code lets it default.
     """
-    return (registry or get_default_registry()).has_capability(context, capability, farm_id=farm_id)
+    return (registry or get_default_registry()).has_capability(
+        context, capability, farm_id=farm_id, any_farm=any_farm
+    )
+
+
+def has_tenant_wide_capability(
+    context: RequestContext,
+    capability: str,
+    *,
+    registry: "CapabilityRegistry | None" = None,
+) -> bool:
+    """Does this caller hold `capability` across the whole tenant?
+
+    Deliberately asks the *narrower* question than `has_capability`: it stops
+    before the farm tier, so it is true only for a platform or tenant role.
+
+    It exists so that intent is visible at the call site. A bare
+    `has_capability(ctx, cap)` with no farm is the shape of the bug this
+    codebase has shipped three times — a farm-tier capability checked where
+    the resolver can never reach the farm tier — and a reader cannot tell the
+    bug from the deliberate case. Anything that means "is this a tenant-level
+    caller" says so here, and the route-scoping guard test flags every bare
+    call that is left.
+
+    Use it to *widen* a response for tenant-level callers, never to gate a
+    farm-scoped one: "not tenant-wide" must fall through to a per-farm check,
+    not to a refusal.
+    """
+    return (registry or get_default_registry()).has_capability(context, capability)
 
 
 def effective_capabilities_for(
@@ -386,6 +431,7 @@ def requires_capability(
     capability: str,
     *,
     farm_id_param: str | None = None,
+    any_farm: bool = False,
 ) -> Callable[..., RequestContext]:
     """FastAPI dependency factory.
 
@@ -399,9 +445,20 @@ def requires_capability(
         ): ...
 
     `farm_id_param` is the path or query parameter to read the farm UUID
-    from. Omit it for tenant- or platform-scoped capabilities. The
-    dependency returns the RequestContext on success, so a single
+    from. The dependency returns the RequestContext on success, so a single
     `Depends(...)` covers both auth and authorization for the route.
+
+    **Omitting both `farm_id_param` and `any_farm` denies every farm-scoped
+    caller**, because the resolver never reaches the farm tier without a farm
+    to check. That is correct for a genuinely tenant-scoped capability and a
+    silent 403 for anything a Scout or a FarmManager is meant to reach. Which
+    one a route is is not guessable from here, so `tests/unit/test_route_
+    capability_scoping.py` walks the mounted routes and fails on any farm-tier
+    capability used with neither — see that test for how to satisfy it.
+
+    Use `any_farm=True` only for tenant-level data with no farm of its own: it
+    asks whether the caller holds the capability on *some* farm, which is not
+    the same question as whether they may see *this* row.
     """
 
     def _check(
@@ -417,8 +474,12 @@ def requires_capability(
                 except ValueError as exc:
                     raise PermissionDeniedError(capability) from exc
         registry = get_default_registry()
-        if not registry.has_capability(context, capability, farm_id=farm_id):
+        if not registry.has_capability(context, capability, farm_id=farm_id, any_farm=any_farm):
             raise PermissionDeniedError(capability, farm_id=farm_id)
         return context
 
+    # Read back by the route-scoping guard test, which cannot see the closure.
+    _check.__ap_capability__ = capability  # type: ignore[attr-defined]
+    _check.__ap_farm_id_param__ = farm_id_param  # type: ignore[attr-defined]
+    _check.__ap_any_farm__ = any_farm  # type: ignore[attr-defined]
     return _check

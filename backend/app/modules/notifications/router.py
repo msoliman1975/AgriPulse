@@ -38,6 +38,7 @@ from app.modules.notifications.service import (
     get_notifications_service,
 )
 from app.shared.auth.context import RequestContext
+from app.shared.auth.middleware import get_current_context
 from app.shared.db.session import get_admin_db_session, get_db_session
 from app.shared.rbac.check import requires_capability
 from app.shared.realtime import subscribe as realtime_subscribe
@@ -53,6 +54,23 @@ def _service(
 
 
 def _ensure_user(context: RequestContext) -> UUID:
+    """The caller's own id, which is the whole authorization for the inbox.
+
+    These four routes carry no capability gate, and that is the fix rather
+    than an oversight. Every row they touch is filtered to `user_id`, so the
+    question "may you read this" is already answered by whose token it is.
+
+    `notification.read_inbox` and `notification.write_inbox` are farm-tier
+    capabilities, and the resolver only reaches the farm tier when it is given
+    a farm. The inbox has no farm — it is one list per person, spanning every
+    farm they work — so there was nothing to pass, and the checks denied every
+    caller whose only grants are farm scopes. A Scout got 403 on their own
+    messages, and the bell on the web app was empty for a FarmManager.
+
+    The two capabilities stay in the matrix: the fan-out reads them to decide
+    who gets an in-app notification at all, which is a different question from
+    who may read their own inbox.
+    """
     if context.user_id is None or context.tenant_schema is None:
         raise APIError(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -71,7 +89,7 @@ def _ensure_user(context: RequestContext) -> UUID:
 async def list_inbox(
     include_archived: bool = Query(default=False),
     limit: int = Query(default=100, ge=1, le=500),
-    context: RequestContext = Depends(requires_capability("notification.read_inbox")),
+    context: RequestContext = Depends(get_current_context),
     service: NotificationsServiceImpl = Depends(_service),
 ) -> list[dict[str, Any]]:
     user_id = _ensure_user(context)
@@ -85,7 +103,7 @@ async def list_inbox(
     summary="Count of unread inbox items for the bell-icon badge.",
 )
 async def get_unread_count(
-    context: RequestContext = Depends(requires_capability("notification.read_inbox")),
+    context: RequestContext = Depends(get_current_context),
     service: NotificationsServiceImpl = Depends(_service),
 ) -> dict[str, int]:
     user_id = _ensure_user(context)
@@ -98,7 +116,7 @@ async def get_unread_count(
     summary="Server-Sent Events stream of new inbox items for the current user.",
 )
 async def stream_inbox(
-    context: RequestContext = Depends(requires_capability("notification.read_inbox")),
+    context: RequestContext = Depends(get_current_context),
 ) -> StreamingResponse:
     """Yields ``event: inbox\\ndata: <json>\\n\\n`` per push.
 
@@ -131,7 +149,7 @@ async def stream_inbox(
 async def transition_inbox_item(
     item_id: UUID,
     payload: InboxTransitionRequest,
-    context: RequestContext = Depends(requires_capability("notification.write_inbox")),
+    context: RequestContext = Depends(get_current_context),
     service: NotificationsServiceImpl = Depends(_service),
 ) -> dict[str, Any]:
     user_id = _ensure_user(context)

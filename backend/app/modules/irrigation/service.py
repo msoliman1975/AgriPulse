@@ -71,6 +71,10 @@ class IrrigationService(Protocol):
         tenant_schema: str,
     ) -> dict[str, Any]: ...
 
+    async def farm_for_block(self, *, block_id: UUID) -> UUID | None: ...
+
+    async def farm_for_schedule(self, *, schedule_id: UUID) -> UUID | None: ...
+
     async def compute_water_balance_for_day(self, *, target_date: date_type) -> dict[str, int]: ...
 
 
@@ -192,6 +196,14 @@ class IrrigationServiceImpl:
             to_date=to_date,
             status_filter=status_filter,
         )
+
+    async def farm_for_block(self, *, block_id: UUID) -> UUID | None:
+        """The farm a block belongs to, for the route's per-farm gate."""
+        return await self._repo.farm_for_block(block_id=block_id)
+
+    async def farm_for_schedule(self, *, schedule_id: UUID) -> UUID | None:
+        """The farm a schedule belongs to, for the route's per-farm gate."""
+        return await self._repo.farm_for_schedule(schedule_id=schedule_id)
 
     async def transition(
         self,
