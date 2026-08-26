@@ -208,3 +208,61 @@ describe("blockCentroidsFromGeojson", () => {
     expect(blockCentroidsFromGeojson(fc).size).toBe(0);
   });
 });
+
+describe("buildSignalOverlay stacking", () => {
+  const centroids = new Map<string, [number, number]>([["block-1", [31.0, 30.5]]]);
+
+  it("draws ONE feature for several observations on one block", () => {
+    // Entity-mode observations have no coordinate of their own, so every
+    // reading on a block lands on the same centroid. MapLibre places exactly
+    // one symbol per point, so four features here meant three invisible marks
+    // that `queryRenderedFeatures` would not return either — the bug that
+    // read as "the icons stopped being clickable".
+    const rows = ["a", "b", "c", "d"].map((id, i) =>
+      _obs({
+        id,
+        block_id: "block-1",
+        location_mode: "entity",
+        time: `2026-08-0${i + 1}T08:00:00+00:00`,
+      }),
+    );
+    const { features } = buildSignalOverlay(rows, centroids);
+    expect(features.features).toHaveLength(1);
+    expect(features.features[0].properties.stack_count).toBe(4);
+  });
+
+  it("opens the newest reading and lists the rest newest-first", () => {
+    const rows = [
+      _obs({ id: "old", block_id: "block-1", time: "2026-08-01T08:00:00+00:00" }),
+      _obs({ id: "new", block_id: "block-1", time: "2026-08-09T08:00:00+00:00" }),
+      _obs({ id: "mid", block_id: "block-1", time: "2026-08-05T08:00:00+00:00" }),
+    ];
+    const props = buildSignalOverlay(rows, centroids).features.features[0].properties;
+    expect(props.observation_id).toBe("new");
+    expect(JSON.parse(props.stack_ids)).toEqual(["new", "mid", "old"]);
+  });
+
+  it("reports a lone reading as a stack of one", () => {
+    const props = buildSignalOverlay([_obs({ id: "solo", block_id: "block-1" })], centroids)
+      .features.features[0].properties;
+    expect(props.stack_count).toBe(1);
+    expect(JSON.parse(props.stack_ids)).toEqual(["solo"]);
+  });
+
+  it("does NOT merge observations that carry their own distinct points", () => {
+    // A scout who walked two spots recorded two places, and collapsing them
+    // would move a reading to somewhere nobody stood.
+    const rows = [
+      _obs({ id: "p1", location_point: { latitude: 30.5, longitude: 31.0 } }),
+      _obs({ id: "p2", location_point: { latitude: 30.5009, longitude: 31.0009 } }),
+    ];
+    expect(buildSignalOverlay(rows, centroids).features.features).toHaveLength(2);
+  });
+
+  it("still counts the ones it cannot place", () => {
+    const rows = [_obs({ id: "nowhere", block_id: "unknown-block" })];
+    const { features, skippedCount } = buildSignalOverlay(rows, centroids);
+    expect(features.features).toHaveLength(0);
+    expect(skippedCount).toBe(1);
+  });
+});

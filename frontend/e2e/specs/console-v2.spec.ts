@@ -72,8 +72,23 @@ test("Farm Console v2 mounts its zones and explains an empty legend", async ({ a
   await authedPage.route(`**/api/v1/farms/${FARM_ID}`, async (route) => {
     await route.fulfill({ status: 200, body: JSON.stringify(farmDetail) });
   });
+  // A CURSOR PAGE, not a bare array: `listBlocks` reads `data.items`, so the
+  // array this used to return made the console throw before it drew anything
+  // and both assertions below failed for a reason that had nothing to do with
+  // what they test.
   await authedPage.route(`**/api/v1/farms/${FARM_ID}/blocks**`, async (route) => {
-    await route.fulfill({ status: 200, body: JSON.stringify([block]) });
+    await route.fulfill({
+      status: 200,
+      body: JSON.stringify({ items: [block], next_cursor: null }),
+    });
+  });
+  // AFTER the roster route, because Playwright matches the most recently
+  // registered handler first and `blocks**` also matches `blocks/summary`.
+  // Answering the summary with a cursor page is what made this spec fail:
+  // `summaryResp.units.map` threw, the console fell to its error state, and
+  // both assertions below missed for a reason unrelated to what they test.
+  await authedPage.route(`**/api/v1/farms/${FARM_ID}/blocks/summary**`, async (route) => {
+    await route.fulfill({ status: 200, body: JSON.stringify({ units: [] }) });
   });
 
   await authedPage.setViewportSize({ width: 1600, height: 900 });
@@ -88,8 +103,11 @@ test("Farm Console v2 mounts its zones and explains an empty legend", async ({ a
 
   // Zone 4 — with no imagery subscription there is nothing to measure, and
   // the legend has to say so rather than render an empty scale.
+  // Matches the legend's current empty-state copy. The old pattern here
+  // ("no imagery subscription") predates a rewording and had stopped matching
+  // anything, so this assertion had been silently red.
   await expect(
-    authedPage.getByText(/no imagery subscription|no zoned blocks/i).first(),
+    authedPage.getByText(/no imagery yet|active imagery subscription/i).first(),
   ).toBeVisible();
 
   // Zone 5 — controls Slice 3 will implement are present but disabled, so a
@@ -101,8 +119,23 @@ test("the v2 route does not bounce back to the live console", async ({ authedPag
   await authedPage.route(`**/api/v1/farms/${FARM_ID}`, async (route) => {
     await route.fulfill({ status: 200, body: JSON.stringify(farmDetail) });
   });
+  // A CURSOR PAGE, not a bare array: `listBlocks` reads `data.items`, so the
+  // array this used to return made the console throw before it drew anything
+  // and both assertions below failed for a reason that had nothing to do with
+  // what they test.
   await authedPage.route(`**/api/v1/farms/${FARM_ID}/blocks**`, async (route) => {
-    await route.fulfill({ status: 200, body: JSON.stringify([block]) });
+    await route.fulfill({
+      status: 200,
+      body: JSON.stringify({ items: [block], next_cursor: null }),
+    });
+  });
+  // AFTER the roster route, because Playwright matches the most recently
+  // registered handler first and `blocks**` also matches `blocks/summary`.
+  // Answering the summary with a cursor page is what made this spec fail:
+  // `summaryResp.units.map` threw, the console fell to its error state, and
+  // both assertions below missed for a reason unrelated to what they test.
+  await authedPage.route(`**/api/v1/farms/${FARM_ID}/blocks/summary**`, async (route) => {
+    await route.fulfill({ status: 200, body: JSON.stringify({ units: [] }) });
   });
 
   await authedPage.goto(`/labs/map-v2/${FARM_ID}`);

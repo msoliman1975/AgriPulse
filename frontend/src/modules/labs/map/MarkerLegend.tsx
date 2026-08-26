@@ -61,7 +61,8 @@ export function MarkerLegend(): React.ReactNode {
       })),
       flags: SEVERITIES.map((s) => ({ severity: s, src: flagPreview(s, true) })),
       flagClosed: flagPreview("critical", false),
-      signal: signalPreview(),
+      signal: signalPreview(false),
+      signalStack: signalPreview(true),
     }),
     [],
   );
@@ -108,6 +109,12 @@ export function MarkerLegend(): React.ReactNode {
       <div className="flex items-center gap-1.5">
         <Swatch src={art.signal} alt="" />
         <span className="text-ap-muted">{t("markerLegend.signalsHint")}</span>
+      </div>
+      {/* A doubled outline, not a number: the mark must stay drawable when the
+          style's glyph endpoint does not answer. */}
+      <div className="flex items-center gap-1.5 pt-1">
+        <Swatch src={art.signalStack} alt="" />
+        <span className="text-ap-muted">{t("markerLegend.signalsStackHint")}</span>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { formatDistanceToNow, parseISO } from "date-fns";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SignalDefinition, SignalObservation } from "@/api/signals";
@@ -12,6 +12,18 @@ interface Props {
   observation: SignalObservation | null;
   definition: SignalDefinition | null;
   isLoading: boolean;
+  /**
+   * Every reading on the clicked spot, newest first, when the mark stands for
+   * more than one. Entity-mode observations have no coordinate of their own,
+   * so a block that a scout visited four times produces four readings on one
+   * point — the map can draw a single mark for them, and this is what makes
+   * the other three reachable instead of buried under it.
+   *
+   * Empty or single means there is nothing to switch between and no row is
+   * drawn.
+   */
+  stack?: readonly SignalObservation[];
+  onSelectFromStack?: (observationId: string) => void;
   // Click pixel coords (relative to the map container) — anchor the card
   // next to the clicked observation dot. Null falls back to the fixed
   // top-right corner. Mirrors GridCellPopup so the two read as siblings.
@@ -32,12 +44,20 @@ export function SignalObservationPanel({
   observation,
   definition,
   isLoading,
+  stack = [],
+  onSelectFromStack,
   x,
   y,
   onClose,
 }: Props): ReactNode {
-  const { t } = useTranslation("signals");
+  const { t, i18n } = useTranslation("signals");
   const dateLocale = useDateLocale();
+  // The stack row is a list of DAYS, not relative ages: four readings from
+  // the same week all render as "5 days ago" and become indistinguishable.
+  const stackDayFmt = useMemo(
+    () => new Intl.DateTimeFormat(i18n.language, { day: "2-digit", month: "short" }),
+    [i18n.language],
+  );
 
   if (isLoading) {
     return (
@@ -70,6 +90,38 @@ export function SignalObservationPanel({
       onClose={onClose}
     >
       <p className="mb-2 font-mono text-[10px] text-ap-muted">{observation.signal_code}</p>
+
+      {/* Other readings on this exact spot. A row of dates rather than a
+          count, because "4 readings here" tells a reader there is something
+          they cannot reach; the dates are the thing they came for. */}
+      {stack.length > 1 && onSelectFromStack ? (
+        <div className="mb-2 border-b border-ap-line pb-2">
+          <p className="mb-1 text-[10px] uppercase tracking-wide text-ap-muted">
+            {t("observationPanel.stack", { count: stack.length })}
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {stack.map((o) => {
+              const active = o.id === observation.id;
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => onSelectFromStack(o.id)}
+                  title={o.signal_code}
+                  className={
+                    "rounded-md border px-1.5 py-0.5 text-[10px] tabular-nums " +
+                    (active
+                      ? "border-ap-primary bg-ap-primary-soft text-ap-primary"
+                      : "border-ap-line text-ap-ink hover:bg-ap-bg")
+                  }
+                >
+                  {stackDayFmt.format(parseISO(o.time))}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-[11px]">
         <dt className="text-ap-muted">{t("observationPanel.value")}</dt>

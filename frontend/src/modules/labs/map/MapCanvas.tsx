@@ -12,7 +12,7 @@ import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 
 import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
 import { buildAlertBadgePoints } from "./alertBadges";
-import { registerMarkerImages, SIGNAL_IMAGE_ID } from "./markerIcons";
+import { registerMarkerImages, SIGNAL_IMAGE_ID, SIGNAL_STACK_IMAGE_ID } from "./markerIcons";
 import { gridRampExpression } from "./gridRamp";
 import { HEALTH_FILL, HEALTH_FILL_OPACITY, HEALTH_STROKE } from "./health";
 import { approxPolygonAreaM2, haversineMeters, polygonPerimeterM } from "./geo";
@@ -81,7 +81,17 @@ interface Props {
   // as the signal overlay above, so the layer toggle is one boolean.
   flagOverlay?: FeatureCollection<Point, FlagOverlayProps> | null;
   onFlagClick?: (flagId: string, point: { x: number; y: number }) => void;
-  onSignalClick?: (observationId: string, point: { x: number; y: number }) => void;
+  /**
+   * `stackIds` lists every observation sitting on the clicked coordinate,
+   * newest first, with `observationId` as its head. Entity-mode observations
+   * all land on their block's centroid, so one mark commonly stands for
+   * several readings; without the list the other readings are unreachable.
+   */
+  onSignalClick?: (
+    observationId: string,
+    point: { x: number; y: number },
+    stackIds: string[],
+  ) => void;
   // Sub-block grid overlay (PR-grid). `null` hides; an FC shows.
   // Each feature must carry { cell_id: string, value: number | null }
   // in its properties; the heatmap color ramp reads `value`, the click
@@ -434,6 +444,13 @@ export function MapCanvas({
     // not animate a second fit over an already-correct view.
     if (initialBounds) lastFitKeyRef.current = initial.fitBoundsKey;
     mapRef.current = map;
+    // Dev-only handle for browser tests. The marks are symbol layers and the
+    // click path is MapLibre's own hit-testing, so an e2e spec has to be able
+    // to turn a lon/lat into a screen pixel. Stripped from the production
+    // bundle by the `import.meta.env.DEV` branch.
+    if (import.meta.env.DEV) {
+      (window as unknown as { __apMap?: maplibregl.Map }).__apMap = map;
+    }
     map.dragRotate.disable();
     map.touchZoomRotate.disableRotation();
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
@@ -656,15 +673,7 @@ export function MapCanvas({
           // Lower sorts first, and first placed wins. So on a crowded map the
           // chip that survives is the worst one, not whichever block happened
           // to come back first from the summary endpoint.
-          "symbol-sort-key": [
-            "match",
-            ["get", "alert_severity"],
-            "critical",
-            0,
-            "watch",
-            1,
-            2,
-          ],
+          "symbol-sort-key": ["match", ["get", "alert_severity"], "critical", 0, "watch", 1, 2],
           // Up and to the right of the block's anchor point, so the chip
           // does not start on top of the block's name label. Ems, because the
           // offset moves the text and the fitted icon follows it.
@@ -687,10 +696,47 @@ export function MapCanvas({
         type: "symbol",
         source: SIGNAL_SOURCE_ID,
         layout: {
-          "icon-image": SIGNAL_IMAGE_ID,
+          // Two images, not one image plus a count label. A symbol layer that
+          // carries text cannot draw at all until the style's glyph endpoint
+          // answers, and a diamond that vanishes when fonts are slow is the
+          // very failure this layer is being fixed for. The doubled outline
+          // says "more than one here"; the panel says how many.
+          "icon-image": [
+            "case",
+            [">", ["get", "stack_count"], 1],
+            SIGNAL_STACK_IMAGE_ID,
+            SIGNAL_IMAGE_ID,
+          ],
           "icon-allow-overlap": false,
           "icon-ignore-placement": false,
           "icon-padding": 4,
+          // Down and left of the block's anchor point, but ONLY for a mark
+          // that has no coordinate of its own.
+          //
+          // Three marks used to contend for one pixel. The alert chip is
+          // placed first and offset up-and-right; the block's name label
+          // tries `center` first; and the diamond, lowest priority of the
+          // four, is placed last. On Bashier Elkhier every one of 36 blocks
+          // carries an open alert, so every diamond lost its contest and the
+          // layer drew NOTHING — 145 observations, no marks, and no error.
+          // A symbol MapLibre did not place is also not returned by
+          // `queryRenderedFeatures`, which is why the icons read as "there
+          // but not clickable".
+          //
+          // An entity-mode observation is already sitting on an approximation
+          // (the block's centroid), so moving it a few pixels costs no
+          // accuracy. One with a real fix is left exactly where the scout
+          // stood — moving that one WOULD be a lie, and `source` is what
+          // tells the two apart.
+          "icon-offset": [
+            "case",
+            ["==", ["get", "source"], "block_centroid"],
+            ["literal", [-14, 22]],
+            ["literal", [0, 0]],
+          ],
+          // A busier spot outranks a quieter one, so where two stacks cannot
+          // both fit, the one carrying more readings is the one that draws.
+          "symbol-sort-key": ["-", 0, ["get", "stack_count"]],
         },
       });
 
@@ -726,6 +772,17 @@ export function MapCanvas({
           "icon-allow-overlap": false,
           "icon-ignore-placement": false,
           "icon-padding": 4,
+          // Same rule as the signal diamond: a flag with no GPS fix falls
+          // back to the block centroid, where the alert chip and the name
+          // label already are, and collision then drops it entirely. Move
+          // the approximate ones left of the anchor — the chip goes right —
+          // and leave a flag planted on a real coordinate alone.
+          "icon-offset": [
+            "case",
+            ["==", ["get", "source"], "block_centroid"],
+            ["literal", [-22, 0]],
+            ["literal", [0, 0]],
+          ],
           // Open before closed, and worse before milder. A flag still waiting
           // on somebody is the one worth the space; a closed pin riding out
           // the rest of its lifetime is the one that can wait for a zoom.
@@ -913,6 +970,15 @@ export function MapCanvas({
         if (map.queryRenderedFeatures(ev.point, { layers: [SIGNAL_LAYER] }).length > 0) {
           return;
         }
+        // Same for a flag pennant. This guard was missing, so on a farm with
+        // the sub-block grid on, clicking a pin opened the cell popup over
+        // the flag thread that had just opened underneath it.
+        if (
+          map.getLayer(FLAG_LAYER) &&
+          map.queryRenderedFeatures(ev.point, { layers: [FLAG_LAYER] }).length > 0
+        ) {
+          return;
+        }
         const f = ev.features?.[0];
         if (!f) return;
         const props = f.properties as { cell_id?: string };
@@ -937,10 +1003,19 @@ export function MapCanvas({
       map.on("click", SIGNAL_LAYER, (ev) => {
         const f = ev.features?.[0];
         if (!f) return;
-        const props = f.properties as { observation_id?: string };
-        if (props.observation_id) {
-          onSignalClickRef.current?.(props.observation_id, { x: ev.point.x, y: ev.point.y });
+        const props = f.properties as { observation_id?: string; stack_ids?: string };
+        if (!props.observation_id) return;
+        // Properties come back through MapLibre's worker as scalars, so the
+        // id list travels as JSON. A malformed one degrades to the single
+        // observation rather than losing the click.
+        let stack: string[] = [props.observation_id];
+        try {
+          const parsed = JSON.parse(props.stack_ids ?? "[]");
+          if (Array.isArray(parsed) && parsed.length > 0) stack = parsed as string[];
+        } catch {
+          /* keep the single-id fallback */
         }
+        onSignalClickRef.current?.(props.observation_id, { x: ev.point.x, y: ev.point.y }, stack);
       });
     });
 

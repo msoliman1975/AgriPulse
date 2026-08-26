@@ -7,7 +7,11 @@
 // the live console stale or wrong-date cells out of a warm cache.
 export const CONSOLE_QK = {
   farmsList: () => ["labs/console/farmsList"] as const,
-  summary: (farmId: string) => ["labs/console/summary", farmId] as const,
+  // `at` is in the key because the alert rollup the summary carries is
+  // answered as-of that instant — the map's alert chips have to agree with the
+  // date the timeline is parked on.
+  summary: (farmId: string, at: string | null = null) =>
+    ["labs/console/summary", farmId, at] as const,
   detail: (farmId: string, unitId: string | null, lang: string) =>
     ["labs/console/detail", farmId, unitId, lang] as const,
   blockHealth: (farmId: string) => ["labs/console/blockHealth", farmId] as const,
@@ -38,7 +42,18 @@ export const CONSOLE_QK = {
   // Not keyed on the signal definition: the console fetches the farm's whole
   // observation set once and filters client-side, so keying on the picker
   // would split one cache entry into one per signal type.
-  signalObs: (farmId: string) => ["labs/console/signalObs", farmId] as const,
+  //
+  // It IS keyed on the as-of instant. The console reads the whole map "as of"
+  // the pass the timeline is parked on, so a reader looking at a scene from
+  // ten days ago must not be shown an observation somebody recorded
+  // yesterday; `until` is a request parameter, and a key that omitted it
+  // would answer a past date out of the live cache entry.
+  signalObs: (farmId: string, until: string | null) =>
+    ["labs/console/signalObs", farmId, until] as const,
+  // Field flags. Same as-of rule; `open_only` is a layer filter the reader
+  // sets, and both change what comes back.
+  fieldFlags: (farmId: string, openOnly: boolean, until: string | null) =>
+    ["labs/console/fieldFlags", farmId, openOnly, until] as const,
   farm: (farmId: string) => ["labs/console/farm", farmId] as const,
   block: (blockId: string) => ["labs/console/block", blockId] as const,
   inactivatePreview: (blockId: string | null) =>

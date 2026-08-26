@@ -113,6 +113,18 @@ export function flagImageId(severity: MarkerSeverity, open: boolean): string {
 }
 
 export const SIGNAL_IMAGE_ID = "ap-signal-diamond";
+/**
+ * The same diamond with a second outline behind it, for a spot carrying more
+ * than one reading.
+ *
+ * "More than one" is drawn into the ARTWORK rather than written beside the
+ * mark as a `text-field`. A symbol layer with text cannot draw at all until
+ * the style's glyph endpoint answers, so a count label would make the diamond
+ * disappear whenever fonts are slow or blocked — which is the exact failure
+ * this whole change exists to remove. The panel says how many; the shape only
+ * has to say "there is more here".
+ */
+export const SIGNAL_STACK_IMAGE_ID = "ap-signal-diamond-stack";
 
 // ---------------------------------------------------------------------------
 // Glyph artwork. Stroke paths in a 24x24 box, drawn the way Lucide draws:
@@ -351,27 +363,46 @@ function drawFlag(severity: MarkerSeverity, open: boolean): Ctx | null {
  * somebody took, not a problem somebody found, and the map should not make
  * it compete with an alert for attention.
  */
-function drawSignalDiamond(): Ctx | null {
-  const ctx = canvas2d(PIN_W, PIN_H);
+function drawSignalDiamond(stacked = false): Ctx | null {
+  // A stacked mark needs room for the offset copy behind it.
+  const w = stacked ? PIN_W + 10 : PIN_W;
+  const h = stacked ? PIN_H + 10 : PIN_H;
+  const ctx = canvas2d(w, h);
   if (!ctx) return null;
-  const c = PIN_W / 2;
-  const r = c - 6;
+  const r = PIN_W / 2 - 6;
 
-  ctx.beginPath();
-  ctx.moveTo(c, c - r);
-  ctx.lineTo(c + r, c);
-  ctx.lineTo(c, c + r);
-  ctx.lineTo(c - r, c);
-  ctx.closePath();
+  const diamond = (cx: number, cy: number): void => {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx + r, cy);
+    ctx.lineTo(cx, cy + r);
+    ctx.lineTo(cx - r, cy);
+    ctx.closePath();
+  };
 
-  ctx.strokeStyle = "#ffffff";
-  ctx.lineWidth = 6;
-  ctx.stroke();
-  ctx.fillStyle = "#ffffff";
-  ctx.fill();
-  ctx.strokeStyle = SIGNAL_MARKER_COLOR;
-  ctx.lineWidth = 3.5;
-  ctx.stroke();
+  const draw = (cx: number, cy: number, faded: boolean): void => {
+    diamond(cx, cy);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.strokeStyle = SIGNAL_MARKER_COLOR;
+    ctx.lineWidth = faded ? 2.5 : 3.5;
+    ctx.globalAlpha = faded ? 0.55 : 1;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  };
+
+  if (stacked) {
+    // The one behind is drawn first, up and to the right, so the front
+    // diamond's white keyline cuts it and the two read as two cards rather
+    // than as one thick outline.
+    draw(w / 2 + 5, h / 2 - 5, true);
+    draw(w / 2 - 5, h / 2 + 5, false);
+  } else {
+    draw(w / 2, h / 2, false);
+  }
   return ctx;
 }
 
@@ -404,7 +435,8 @@ export function registerMarkerImages(map: MlMap): void {
       add(flagImageId(severity, open), drawFlag(severity, open), { pixelRatio: RATIO });
     }
   }
-  add(SIGNAL_IMAGE_ID, drawSignalDiamond(), { pixelRatio: RATIO });
+  add(SIGNAL_IMAGE_ID, drawSignalDiamond(false), { pixelRatio: RATIO });
+  add(SIGNAL_STACK_IMAGE_ID, drawSignalDiamond(true), { pixelRatio: RATIO });
 }
 
 // ---------------------------------------------------------------------------
@@ -435,6 +467,6 @@ export function flagPreview(severity: MarkerSeverity, open: boolean): string | n
   return dataUrl(drawFlag(severity, open));
 }
 
-export function signalPreview(): string | null {
-  return dataUrl(drawSignalDiamond());
+export function signalPreview(stacked = false): string | null {
+  return dataUrl(drawSignalDiamond(stacked));
 }

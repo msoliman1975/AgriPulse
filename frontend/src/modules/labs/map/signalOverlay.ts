@@ -30,6 +30,28 @@ export interface SignalOverlayProps {
   location_mode: LocationMode;
   block_id: string | null;
   source: "location_point" | "value_geopoint" | "block_centroid";
+  /**
+   * How many observations resolved to THIS coordinate, this one included.
+   *
+   * Entity-mode observations have no coordinate of their own, so every one
+   * recorded against a block lands on that block's centroid — 145
+   * observations across 36 blocks on Bashier Elkhier, all stacked four deep.
+   * MapLibre can place exactly one symbol per point, so the other three were
+   * silently dropped and unreachable: invisible, and not returned by
+   * `queryRenderedFeatures` either, which is what "the icons stopped being
+   * clickable" turned out to mean.
+   *
+   * One feature per coordinate, carrying the count, is the honest shape. The
+   * map says how many readings are here and the panel walks them.
+   */
+  stack_count: number;
+  /**
+   * Every observation id at this coordinate, newest first, as a JSON array
+   * string. MapLibre flattens feature properties through its worker, so an
+   * array does not survive the round trip — it arrives as "[object Object]".
+   * Serialised here and parsed by the click handler's consumer.
+   */
+  stack_ids: string;
 }
 
 export interface BuildOverlayResult {
@@ -60,8 +82,16 @@ export function buildSignalOverlay(
     valueKind?: ValueKind | null;
   } = {},
 ): BuildOverlayResult {
-  const features: Feature<Point, SignalOverlayProps>[] = [];
   let skippedCount = 0;
+
+  // Coordinate -> the observations sitting on it, in the order they arrived.
+  // Keyed on the coordinate rounded to ~1 cm: two entity-mode observations on
+  // one block produce bit-identical centroids, but a float key that depends on
+  // exact equality is the kind that works until it does not.
+  const stacks = new Map<
+    string,
+    { coord: [number, number]; placed: PlacedCoord; rows: SignalObservation[] }
+  >();
 
   for (const obs of observations) {
     const placed = _resolveCoord(obs, blockCentroids);
@@ -69,21 +99,35 @@ export function buildSignalOverlay(
       skippedCount += 1;
       continue;
     }
+    const key = `${placed.coord[0].toFixed(7)},${placed.coord[1].toFixed(7)}`;
+    const bucket = stacks.get(key);
+    if (bucket) bucket.rows.push(obs);
+    else stacks.set(key, { coord: placed.coord, placed, rows: [obs] });
+  }
+
+  const features: Feature<Point, SignalOverlayProps>[] = [];
+  for (const { coord, placed, rows } of stacks.values()) {
+    // Newest first: the mark opens the most recent reading, which is the one
+    // an operator asking "what did the scout find here" means.
+    const ordered = [...rows].sort((a, b) => (a.time < b.time ? 1 : a.time > b.time ? -1 : 0));
+    const top = ordered[0];
     features.push({
       type: "Feature",
-      geometry: { type: "Point", coordinates: [placed.coord[0], placed.coord[1]] },
+      geometry: { type: "Point", coordinates: [coord[0], coord[1]] },
       properties: {
-        observation_id: obs.id,
-        signal_code: obs.signal_code,
+        observation_id: top.id,
+        signal_code: top.signal_code,
         value_kind:
-          options.valueKindByDefinitionId?.get(obs.signal_definition_id) ??
+          options.valueKindByDefinitionId?.get(top.signal_definition_id) ??
           options.valueKind ??
           null,
-        value_display: formatObservationValue(obs),
-        observed_at: obs.time,
-        location_mode: obs.location_mode ?? "entity",
-        block_id: obs.block_id,
+        value_display: formatObservationValue(top),
+        observed_at: top.time,
+        location_mode: top.location_mode ?? "entity",
+        block_id: top.block_id,
         source: placed.source,
+        stack_count: ordered.length,
+        stack_ids: JSON.stringify(ordered.map((o) => o.id)),
       },
     });
   }

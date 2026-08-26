@@ -33,12 +33,12 @@ grows past a single tester.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Text, bindparam, text
+from sqlalchemy import DateTime, Text, bindparam, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -210,6 +210,84 @@ async def _latest_indices(
     return out
 
 
+# Open-alert rollup per block, in two shapes.
+#
+# The two differ only in what "open" means. `_ALERT_ROLLUP_NOW` reads the
+# stored `status`, which is what the map has always done. `_ALERT_ROLLUP_AS_OF`
+# reconstructs it for a past instant: raised by then, and not resolved until
+# after then.
+#
+# Reconstructing rather than trusting `status` is the whole point. An alert
+# raised three weeks ago and closed last Tuesday IS part of the picture of a
+# pass from a month ago, and `status = 'open'` would drop it — so scrubbing
+# further back would show fewer and fewer alerts, which reads as "the farm was
+# fine then" when the opposite is true.
+#
+# `acknowledged` and `snoozed` rows are counted the same way `status = 'open'`
+# never did: an alert is either raised-and-unresolved or it is not. That
+# widens the as-of count slightly against the live one, and the alternative —
+# replaying an acknowledgement timeline the table does not keep — is not
+# available.
+def _alert_rollup_sql(*, as_of: bool) -> str:
+    when = (
+        """
+                      AND a.created_at <= :at
+                      AND (a.resolved_at IS NULL OR a.resolved_at > :at)
+        """
+        if as_of
+        else """
+                      AND a.status = 'open'
+        """
+    )
+    return f"""
+        SELECT a.block_id,
+               count(*) FILTER (
+                   WHERE a.severity IN ('warning', 'critical')
+               ) AS alert_count,
+               bool_or(a.severity = 'critical') AS has_critical,
+               bool_or(a.severity = 'warning')  AS has_warning,
+               -- The verb of the WORST, then NEWEST, open alert.
+               -- The map draws one glyph per block, so it has to
+               -- pick one of a mixed bag; picking the worst one
+               -- matches what the badge's colour already says,
+               -- and the count beside it says there are others.
+               -- NULLs are filtered rather than ordered last so
+               -- a block whose worst alert names no verb still
+               -- shows the verb of the next one down instead of
+               -- falling back to the neutral glyph.
+               (array_agg(a.action_type ORDER BY
+                   CASE a.severity
+                       WHEN 'critical' THEN 0
+                       WHEN 'warning' THEN 1
+                       ELSE 2
+                   END,
+                   a.created_at DESC
+               ) FILTER (WHERE a.action_type IS NOT NULL))[1]
+                   AS alert_action_type
+        FROM alerts a
+        JOIN blocks b ON b.id = a.block_id
+        WHERE b.farm_id = :farm_id
+          {when}
+          -- Findings, not rows. A grouped alert is one finding
+          -- stored as a parent plus one child per cell; counting
+          -- both would badge a 12-cell outbreak as 13 alerts.
+          AND a.group_parent_id IS NULL
+        GROUP BY a.block_id
+    """
+
+
+_ALERT_ROLLUP_NOW = text(_alert_rollup_sql(as_of=False)).bindparams(
+    bindparam("farm_id", type_=PG_UUID(as_uuid=True))
+)
+# `at` is bound as a real datetime, never a string: asyncpg infers nothing
+# from a bare text() placeholder, and a string reaching a timestamptz
+# comparison is the shape that has raised DataError in prod before.
+_ALERT_ROLLUP_AS_OF = text(_alert_rollup_sql(as_of=True)).bindparams(
+    bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
+    bindparam("at", type_=DateTime(timezone=True)),
+)
+
+
 @router.get(
     "/farms/{farm_id}/blocks/summary",
     response_model=BlocksSummaryResponse,
@@ -217,53 +295,44 @@ async def _latest_indices(
 )
 async def get_blocks_summary(
     farm_id: UUID,
+    # `Annotated`, not `at: ... = Query(None)`. With the old form the default
+    # IS the `Query` sentinel object, so calling this function directly — which
+    # every unit test in tests/unit/modules/farms does — hands `at` a truthy
+    # non-datetime and takes the as-of branch by accident. Annotated keeps the
+    # default a real `None`.
+    at: Annotated[
+        datetime | None,
+        Query(
+            description=(
+                "Answer the alert rollup as of this instant instead of now. "
+                "Only alerts raised on or before it, and still unresolved "
+                "then, are counted. Omitted means now."
+            ),
+        ),
+    ] = None,
     context: RequestContext = Depends(requires_capability("block.read", farm_id_param="farm_id")),
     tenant_session: AsyncSession = Depends(get_db_session),
 ) -> BlocksSummaryResponse:
     del context  # capability check side-effect is the only consumer
 
+    # The map is a picture of one day. When the console's date bar is parked
+    # on a past pass it sends that day, and the chips have to describe the
+    # farm as it stood then — an alert that opened this morning did not exist
+    # on a scene from last week, and drawing it there makes the map disagree
+    # with its own date.
+    #
+    # "Open as of T" is two conditions, not one: raised by T, and not resolved
+    # until after T. Reading `status = 'open'` alone would drop every alert
+    # that has since been closed, so scrubbing back would show FEWER alerts
+    # the further back you went — the opposite of the truth.
+    as_of_alerts = _ALERT_ROLLUP_AS_OF if at is not None else _ALERT_ROLLUP_NOW
+
     # 2. Open-alert count + worst severity per block in this farm.
     alert_rows = (
         (
             await tenant_session.execute(
-                text(
-                    """
-                    SELECT a.block_id,
-                           count(*) FILTER (
-                               WHERE a.severity IN ('warning', 'critical')
-                           ) AS alert_count,
-                           bool_or(a.severity = 'critical') AS has_critical,
-                           bool_or(a.severity = 'warning')  AS has_warning,
-                           -- The verb of the WORST, then NEWEST, open alert.
-                           -- The map draws one glyph per block, so it has to
-                           -- pick one of a mixed bag; picking the worst one
-                           -- matches what the badge's colour already says,
-                           -- and the count beside it says there are others.
-                           -- NULLs are filtered rather than ordered last so
-                           -- a block whose worst alert names no verb still
-                           -- shows the verb of the next one down instead of
-                           -- falling back to the neutral glyph.
-                           (array_agg(a.action_type ORDER BY
-                               CASE a.severity
-                                   WHEN 'critical' THEN 0
-                                   WHEN 'warning' THEN 1
-                                   ELSE 2
-                               END,
-                               a.created_at DESC
-                           ) FILTER (WHERE a.action_type IS NOT NULL))[1]
-                               AS alert_action_type
-                    FROM alerts a
-                    JOIN blocks b ON b.id = a.block_id
-                    WHERE b.farm_id = :farm_id
-                      AND a.status = 'open'
-                      -- Findings, not rows. A grouped alert is one finding
-                      -- stored as a parent plus one child per cell; counting
-                      -- both would badge a 12-cell outbreak as 13 alerts.
-                      AND a.group_parent_id IS NULL
-                    GROUP BY a.block_id
-                    """
-                ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
-                {"farm_id": farm_id},
+                as_of_alerts,
+                {"farm_id": farm_id, "at": at} if at is not None else {"farm_id": farm_id},
             )
         )
         .mappings()
@@ -375,7 +444,9 @@ async def get_blocks_summary(
 
     return BlocksSummaryResponse(
         farm_id=farm_id,
-        as_of=datetime.now(UTC),
+        # Echoes the instant the answer describes, so a caller can tell an
+        # as-of response from a live one without re-reading its own request.
+        as_of=at or datetime.now(UTC),
         units=units,
     )
 

@@ -45,6 +45,15 @@ interface Props {
   indexOptions: ApiIndexCode[];
   layers: LayerState;
   onLayersChange: (patch: Partial<LayerState>) => void;
+  /**
+   * Whether to draw the `Layers ▾` chip and its popover.
+   *
+   * Farm Console v2 sets it false: it puts the same switches on the map as
+   * picture cards, and two front doors onto one piece of state is how a
+   * control ends up on only one of them. The live console has no cards, so it
+   * keeps the chip and this defaults to true.
+   */
+  showLayersMenu?: boolean;
   onOpenSettings: () => void;
   showGrid: boolean;
   onToggleGrid: () => void;
@@ -109,6 +118,7 @@ export function ViewBar({
   indexOptions,
   layers,
   onLayersChange,
+  showLayersMenu = true,
   onOpenSettings,
   showGrid,
   onToggleGrid,
@@ -143,13 +153,15 @@ export function ViewBar({
       <Chip innerRef={indexRef} onClick={() => setOpen(open === "index" ? null : "index")}>
         🎨 {t("viewbar.index")}: <b>{INDEX_META[activeIndex].label}</b> ▾
       </Chip>
-      <Chip
-        innerRef={layersRef}
-        onClick={() => setOpen(open === "layers" ? null : "layers")}
-        active={showGrid}
-      >
-        ▥ {t("viewbar.layers")} ▾
-      </Chip>
+      {showLayersMenu ? (
+        <Chip
+          innerRef={layersRef}
+          onClick={() => setOpen(open === "layers" ? null : "layers")}
+          active={showGrid}
+        >
+          ▥ {t("viewbar.layers")} ▾
+        </Chip>
+      ) : null}
       <Chip
         innerRef={signalsRef}
         onClick={() => setOpen(open === "signals" ? null : "signals")}
@@ -203,7 +215,7 @@ export function ViewBar({
       </Popover>
 
       {/* Layers popover — visibility, opacity + sub-block grid toggle */}
-      <Popover open={open === "layers"} onClose={close} anchorRef={layersRef}>
+      <Popover open={showLayersMenu && open === "layers"} onClose={close} anchorRef={layersRef}>
         <PopHeading>{t("viewbar.mapLayers")}</PopHeading>
         <Toggle
           label={`🟦 ${t("layers.aoi")}`}
