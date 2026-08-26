@@ -14,7 +14,8 @@ import type {
   ValueKind,
 } from "@/api/signals";
 import { Button } from "@/components/Button";
-import { signalName } from "../lib/signalLabels";
+import { localizedField, localizedName } from "@/lib/localizedField";
+import { categoricalLabel, signalName } from "../lib/signalLabels";
 import { Card } from "@/components/Card";
 import { Field } from "@/components/Field";
 import { Page } from "@/components/Page";
@@ -527,6 +528,7 @@ function DefinitionRow({
 }): ReactNode {
   const { t, i18n } = useTranslation("signals");
   const { data: references } = useSignalDefinitionReferences(defn.id);
+  const description = localizedField(i18n.language, defn.description, defn.description_ar);
   const valueRange = useMemo(() => {
     if (defn.value_kind !== "numeric") return null;
     if (defn.value_min === null && defn.value_max === null) return null;
@@ -555,14 +557,27 @@ function DefinitionRow({
             onClick={() => references && onShowReferences(references)}
           />
         </div>
-        {defn.description ? <p className="mt-1 text-sm text-ap-muted">{defn.description}</p> : null}
+        {description ? <p className="mt-1 text-sm text-ap-muted">{description}</p> : null}
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-ap-muted">
           {defn.value_kind === "numeric" && defn.unit ? (
-            <span>{t("config.row.unit", { unit: defn.unit })}</span>
+            <span>
+              {t("config.row.unit", {
+                unit: localizedField(i18n.language, defn.unit, defn.unit_ar) ?? defn.unit,
+              })}
+            </span>
           ) : null}
           {valueRange ? <span>{t("config.row.range", { range: valueRange })}</span> : null}
           {defn.categorical_values ? (
-            <span>{t("config.row.values", { values: defn.categorical_values.join(", ") })}</span>
+            <span>
+              {t("config.row.values", {
+                // Each value through the same positional lookup the capture
+                // form uses, so an untranslated one shows its code rather
+                // than shifting the whole list.
+                values: defn.categorical_values
+                  .map((v) => categoricalLabel(i18n.language, defn, v))
+                  .join(", "),
+              })}
+            </span>
           ) : null}
         </div>
       </div>
@@ -794,15 +809,22 @@ function TemplateRow({
   onArchive: () => void;
   onShowReferences: (references: SignalReferences) => void;
 }): ReactNode {
-  const { t } = useTranslation("signals");
+  const { t, i18n } = useTranslation("signals");
   const { data: detail } = useSignalTemplate(template.id);
   const { data: references } = useSignalTemplateReferences(template.id);
   const memberCount = detail?.members.length ?? null;
+  const templateDescription = localizedField(
+    i18n.language,
+    template.description,
+    template.description_ar,
+  );
   return (
     <li className="flex items-start gap-3 p-4">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-ap-ink">{template.name}</span>
+          <span className="text-sm font-medium text-ap-ink">
+            {localizedName(i18n.language, template.name, template.name_ar)}
+          </span>
           <span className="font-mono text-[11px] text-ap-muted">{template.code}</span>
           <Pill kind={template.is_active ? "ok" : "neutral"}>
             {template.is_active ? t("config.row.active") : t("config.row.inactive")}
@@ -815,8 +837,8 @@ function TemplateRow({
             onClick={() => references && onShowReferences(references)}
           />
         </div>
-        {template.description ? (
-          <p className="mt-1 text-sm text-ap-muted">{template.description}</p>
+        {templateDescription ? (
+          <p className="mt-1 text-sm text-ap-muted">{templateDescription}</p>
         ) : null}
       </div>
       {canEdit ? (
