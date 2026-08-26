@@ -3056,11 +3056,40 @@ global:
   #   Images CONFIRMED by pulling both on the node before the bump:
   #   api @ b9e03bf, frontend @ b9e03bf.
   #   Rollback is api, workers and frontend all back to e8ec32c.
+  # 2026-08-26 - ccbb935 carries THREE merged changes, not one. Prod sat on
+  #   b9e03bf while #595, #598 and #597 all landed, so this promote is a
+  #   catch-up and the rollback story is not the usual one.
+  #   #598 fix(iam): one person belongs to one tenant. public 0074, a partial
+  #     unique index on `tenant_memberships (user_id) WHERE deleted_at IS
+  #     NULL`. Its commit says two people in production hold two live
+  #     memberships today, so this migration is the one that can fail the
+  #     pre-sync job. If it does, NOTHING deploys - that is the job doing its
+  #     work, not a broken promote.
+  #   #595 feat(timeline): replay a farm or block day by day. api + frontend,
+  #     no migration. New route `GET /farms/{id}/timeline`, one new nav row.
+  #     Additive: it modifies no existing screen or endpoint.
+  #   #597 feat(i18n): the named entities get an Arabic name. tenant 0087 and
+  #     public 0075. Farm, block, worker, equipment, plan, tenant, signal
+  #     definition, signal template and plan template each named a thing with
+  #     one free-text column, so the Arabic interface showed English names on
+  #     every screen and a scout picking a value read `emitter_blocked`.
+  #     Backend + frontend, so api, workers and frontend all move together.
+  #   Tile-server stays 676746a and keycloak stays 677c7dc.
+  #   THREE MIGRATIONS: public 0074, public 0075, tenant 0087. Every column
+  #   0075 and 0087 add is nullable and readers fall back with
+  #   COALESCE(NULLIF(x_ar, ''), x), so a rolling deploy is safe in both
+  #   directions and rows written by the older image read fine.
+  #   Images CONFIRMED by pulling both on the node before the bump:
+  #   api @ ccbb935, frontend @ ccbb935.
+  #   ROLLBACK IS NOT SYMMETRIC. Tags go back to b9e03bf and take all three
+  #   code changes with them; the three migrations STAY APPLIED. 0075 and
+  #   0087 are additive columns and are harmless left behind. 0074's unique
+  #   index is not - dropping it needs its own migration, not a tag revert.
   images:
     api:
-      tag: "b9e03bf"
+      tag: "ccbb935"
     workers:
-      tag: "b9e03bf"
+      tag: "ccbb935"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3167,7 +3196,11 @@ global:
       # b9e03bf = #594. See the note above `global.images` - this tag moves
       # with api and workers, because the crop label now names every level of
       # the assignment and the route gained the fields to say so.
-      tag: "b9e03bf"
+      # ccbb935 = #595 + #597. Timeline adds a screen and a nav row; the
+      # Arabic-names change reads name_ar on the farm switcher, farm and
+      # block screens, the console rail, the board, insights and the signals
+      # catalog. Moves with api and workers.
+      tag: "ccbb935"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
