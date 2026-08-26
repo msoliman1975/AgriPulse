@@ -210,10 +210,13 @@ export function useFarmTimeline(input: TimelineInput) {
     // one.
     const items = blockId ? data.items.filter((a) => a.block_id === blockId) : data.items;
 
-    // A farm raster is only correct when it is the SAME pass the blocks
-    // resolved to; `farmRasterForPass` is where that is judged. In block
-    // scope it is never right — it covers the whole farm.
-    const farmRaster = blockId ? null : farmRasterForPass(data.farm, data.items);
+    // The farm raster must be the surface for the pass this frame is parked
+    // on; `farmRasterForPass` is where that is judged. It used to be judged
+    // against the blocks' day, which threw the surface away on every farm
+    // that had cut over to farm-level fetching — those farms stop writing
+    // block jobs, so their block rows freeze while the surfaces carry on. In
+    // block scope a farm raster is never right: it covers the whole farm.
+    const farmRaster = blockId ? null : farmRasterForPass(data.farm, currentPass?.at ?? null);
     if (farmRaster) {
       return [
         {
@@ -237,7 +240,7 @@ export function useFarmTimeline(input: TimelineInput) {
       }),
       bounds: boundsByBlockId.get(asset.block_id),
     }));
-  }, [assetsQ.data, config, index, blockId, boundsByBlockId]);
+  }, [assetsQ.data, config, index, blockId, boundsByBlockId, currentPass?.at]);
 
   // ---- events on this frame ---------------------------------------------
 

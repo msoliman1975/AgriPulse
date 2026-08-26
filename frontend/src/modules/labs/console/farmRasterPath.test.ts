@@ -72,52 +72,67 @@ describe("farm raster and block asset are interchangeable", () => {
   });
 });
 
-describe("the surface must be the pass the blocks resolved to", () => {
-  it("draws the farm raster when it is the same pass", () => {
-    expect(farmRasterForPass(FARM, [BLOCK])).toBe(FARM);
+describe("the surface must be the surface for the date asked for", () => {
+  const ASKED = "2026-08-10T08:41:47Z";
+
+  it("draws the farm raster for the requested day", () => {
+    expect(farmRasterForPass(FARM, ASKED)).toBe(FARM);
   });
 
-  it("refuses a farm raster from a different pass", () => {
-    // Reproduces what prod returns for a historical date: the requested
-    // pass's blocks alongside the LATEST farm surface. Drawing it would put
-    // today's pixels under a timeline reading two years ago.
-    const oldPass = { ...BLOCK, scene_datetime: "2024-05-17T08:41:48.000Z" };
-    expect(farmRasterForPass(FARM, [oldPass])).toBeNull();
+  it("draws the latest farm raster when no date is asked for", () => {
+    // "Latest" is what an empty timeline selection means, and the latest
+    // surface is the answer to it.
+    expect(farmRasterForPass(FARM, null)).toBe(FARM);
+    expect(farmRasterForPass(FARM, undefined)).toBe(FARM);
   });
 
-  it("accepts a farm raster when there are no blocks to disagree with", () => {
-    expect(farmRasterForPass(FARM, [])).toBe(FARM);
+  it("refuses a surface from a different day than the one asked for", () => {
+    // Drawing it would put one day's pixels under a date bar reading another.
+    expect(farmRasterForPass(FARM, "2024-05-17T08:41:48.000Z")).toBeNull();
+  });
+
+  it("keeps the surface when the blocks froze on an older pass", () => {
+    // The regression this replaced. A farm on farm-level fetching stops
+    // writing block ingestion jobs, so its block rows freeze on the cut-over
+    // day while the surfaces carry on daily. Judging the surface against the
+    // blocks rejected every pass after the cut-over: on prod, agrosina's
+    // Bashier Elkhier had a 2026-08-25 surface and a newest block job from
+    // 2026-08-10, so the console drew 36 stale block rasters instead of one
+    // current surface. The blocks are not the reference any more, so a farm
+    // in that shape is unaffected by how old they are.
+    const surface = { ...FARM, scene_datetime: "2026-08-25T08:41:46.290Z" };
+    expect(farmRasterForPass(surface, "2026-08-25T08:41:46.290Z")).toBe(surface);
   });
 
   it("stays on the per-block path when there is no farm raster", () => {
-    expect(farmRasterForPass(null, [BLOCK])).toBeNull();
-    expect(farmRasterForPass(undefined, [BLOCK])).toBeNull();
+    expect(farmRasterForPass(null, ASKED)).toBeNull();
+    expect(farmRasterForPass(undefined, ASKED)).toBeNull();
   });
 
   it("compares instants, not strings", () => {
-    // The same moment written two ways is the same pass.
-    const sameMoment = { ...BLOCK, scene_datetime: "2026-08-10T09:41:47.000+01:00" };
-    const farm = { ...FARM, scene_datetime: "2026-08-10T08:41:47.000Z" };
-    expect(farmRasterForPass(farm, [sameMoment])).toBe(farm);
+    // The same moment written two ways is the same day.
+    expect(farmRasterForPass(FARM, "2026-08-10T09:41:47.000+01:00")).toBe(FARM);
   });
 
-  it("tolerates blocks sensed minutes apart within one pass", () => {
-    // Two Sentinel tiles, one grower's pass. `items` is ordered by block id,
-    // so which of the two instants lands first is arbitrary — requiring them
-    // to be identical threw the surface away on a coin flip.
-    const laterTile = { ...BLOCK, scene_datetime: "2026-08-10T08:44:12.000Z" };
-    expect(farmRasterForPass(FARM, [laterTile])).toBe(FARM);
+  it("tolerates a surface sensed minutes from the instant asked for", () => {
+    // The strip offers days; the instant behind a day is whichever pass it
+    // resolved to, and a surface is stitched from tiles sensed minutes apart.
+    const laterTile = { ...FARM, scene_datetime: "2026-08-10T08:44:12.000Z" };
+    expect(farmRasterForPass(laterTile, ASKED)).toBe(laterTile);
   });
 
-  it("still refuses a surface from the day before", () => {
-    // The cut-over failure this guard exists for: block rows stop being
-    // written, so an unbounded "latest at or before" resolves them to the
-    // last pre-cutover pass. A day apart is not one pass.
-    const yesterday = { ...BLOCK, scene_datetime: "2026-08-09T23:59:59.000Z" };
-    expect(farmRasterForPass(FARM, [yesterday])).toBeNull();
+  it("refuses a surface from the day before the one asked for", () => {
+    const yesterday = { ...FARM, scene_datetime: "2026-08-09T23:59:59.000Z" };
+    expect(farmRasterForPass(yesterday, ASKED)).toBeNull();
   });
 
-  it("refuses an unparseable instant rather than guessing", () => {
-    expect(farmRasterForPass({ ...FARM, scene_datetime: "not a date" }, [BLOCK])).toBeNull();
+  it("refuses an unparseable surface instant rather than guessing", () => {
+    expect(farmRasterForPass({ ...FARM, scene_datetime: "not a date" }, ASKED)).toBeNull();
+  });
+
+  it("draws the surface rather than nothing when the asked-for instant is junk", () => {
+    // A date the console could not parse is its own bug; falling back to the
+    // seamed per-block path would hide it behind a merely uglier map.
+    expect(farmRasterForPass(FARM, "not a date")).toBe(FARM);
   });
 });

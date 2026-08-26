@@ -147,16 +147,15 @@ export function useIndexPixels(input: {
    * stacked two translucent copies of it). Null keeps the per-block path,
    * which is how the cutover runs one farm at a time.
    *
-   * The surface is only accepted when it is the SAME pass the blocks resolved
-   * to. On prod, asking for a 2024 pass returns that pass's block rasters
-   * alongside the LATEST farm raster, which paints today's pixels under a
-   * timeline reading two years ago — a wrong answer that looks like a right
-   * one. A pass the farm has no surface for falls back to the per-block path,
-   * which is merely seamed rather than untrue.
+   * The surface is accepted when it is the surface for the DATE ASKED FOR.
+   * It used to be accepted only when it matched the blocks' day, which threw
+   * it away on every farm that had moved to farm-level fetching — those farms
+   * stop writing block jobs, so their block rows freeze while the surfaces
+   * carry on. See `farmRasterForPass`.
    */
   const farmRaster = useMemo<FarmRaster | null>(
-    () => farmRasterForPass(assetsQ.data?.farm, assetsQ.data?.items ?? []),
-    [assetsQ.data],
+    () => farmRasterForPass(assetsQ.data?.farm, sceneAt),
+    [assetsQ.data, sceneAt],
   );
 
   /**

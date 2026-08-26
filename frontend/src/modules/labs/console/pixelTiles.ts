@@ -15,18 +15,11 @@ import { histogramBins, titilerColormap } from "./indexClasses";
  * bands under the scene's AOI-hashed prefix (`build_asset_key` in
  * `app/modules/imagery/storage.py`), and registers them on the pgstac item.
  */
-export function indexAssetKey(
-  asset: { stac_item_id: string },
-  code: ApiIndexCode,
-): string {
+export function indexAssetKey(asset: { stac_item_id: string }, code: ApiIndexCode): string {
   return `${asset.stac_item_id}/${code}.tif`;
 }
 
-function assetUri(
-  bucket: string,
-  asset: { stac_item_id: string },
-  code: ApiIndexCode,
-): string {
+function assetUri(bucket: string, asset: { stac_item_id: string }, code: ApiIndexCode): string {
   return `s3://${bucket}/${indexAssetKey(asset, code)}`;
 }
 
@@ -237,28 +230,40 @@ function utcDay(iso: string): number {
 /**
  * The farm surface to draw for a pass, or null to fall back to per-block.
  *
- * A farm raster is only the right thing to draw when it is the SAME pass the
- * blocks resolved to. An api that hands back the LATEST farm raster next to a
- * historical pass's block rasters would paint today's pixels under a timeline
- * reading two years ago — a wrong answer wearing the shape of a right one, and
- * the seamed per-block path is the better failure: ugly rather than untrue.
+ * Judged against the DATE THE READER ASKED FOR, not against the blocks.
  *
- * Agreement is judged on the acquisition DAY, not the instant. Blocks in
- * different Sentinel tiles are sensed minutes apart for what a grower calls
- * one pass, and the strip offers days; requiring identical instants threw away
- * a correct surface whenever the first block by id happened to be the one
- * sensed a minute later. Days are the unit both ends of this already speak.
+ * It used to compare the farm raster's day with the first block asset's day,
+ * on the reasoning that an api handing back the latest farm raster beside a
+ * historical pass's block rasters would paint today's pixels under a timeline
+ * reading two years ago. The api stopped doing that: `get_farm_scene_raster`
+ * bounds the surface to the acquisition day of `at` and returns None for a
+ * pass that has no surface of its own.
+ *
+ * Comparing against the blocks was then not just redundant but wrong, because
+ * the two are no longer the same clock. A farm that moved to farm-level
+ * fetching stops writing block ingestion jobs, so its block rows freeze on the
+ * day of the cut-over while the farm surfaces carry on daily. On prod,
+ * agrosina's Bashier Elkhier had a farm raster for 2026-08-25 and a newest
+ * block job from 2026-08-10: fifteen days apart, so every pass was rejected
+ * and the console drew 36 stale block rasters — 36 tile sources and 36
+ * statistics calls — under a date bar saying 2026-08-25. Slow AND untrue.
+ *
+ * So: no requested date means "latest", and the latest surface is what that
+ * means. A requested date accepts the surface for that day. Days, not
+ * instants, because blocks in different Sentinel tiles are sensed minutes
+ * apart for what a grower calls one pass.
  */
 export function farmRasterForPass<T extends { scene_datetime: string }>(
   farm: T | null | undefined,
-  items: readonly { scene_datetime: string }[],
+  /** The instant the console is reading as of, or null for "latest". */
+  at: string | null | undefined,
 ): T | null {
   if (!farm) return null;
-  // With no blocks there is no pass to disagree with — which is the normal
-  // shape for a cut-over farm, whose block table stopped gaining rows.
-  if (items.length === 0) return farm;
-  const day = utcDay(farm.scene_datetime);
-  return Number.isNaN(day) || day !== utcDay(items[0].scene_datetime) ? null : farm;
+  if (!at) return farm;
+  const requested = utcDay(at);
+  const surface = utcDay(farm.scene_datetime);
+  if (Number.isNaN(requested)) return farm;
+  return Number.isNaN(surface) || surface !== requested ? null : farm;
 }
 
 export interface ClassAreaSummary {
