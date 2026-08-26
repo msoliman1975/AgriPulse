@@ -95,7 +95,9 @@
       "other": "غير ذلك",
       "unknown": "غير محدد"
     },
-    "signalsStackHint": "عدة قراءات في موضع واحد — افتحها لتصفحها"
+    "signalsStackHint": "عدة قراءات في موضع واحد — افتحها لتصفحها",
+    "signalsBar": "قراءة",
+    "signalsStackBar": "عدة قراءات في نقطة واحدة"
   },
   "add": {
     "block": "رسم قطعة",

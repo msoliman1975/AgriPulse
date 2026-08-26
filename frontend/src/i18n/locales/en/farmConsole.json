@@ -95,7 +95,9 @@
       "other": "Other",
       "unknown": "Not stated"
     },
-    "signalsStackHint": "Several readings on one spot — open it to walk them"
+    "signalsStackHint": "Several readings on one spot — open it to walk them",
+    "signalsBar": "A reading",
+    "signalsStackBar": "Several on one spot"
   },
   "add": {
     "block": "Draw block",

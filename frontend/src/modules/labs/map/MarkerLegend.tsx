@@ -100,8 +100,11 @@ export function MarkerLegend({ variant = "panel" }: Props = {}): React.ReactNode
           <BarItem src={art.flagClosed} label={t("flags.closed")} />
         </BarGroup>
         <BarGroup title={t("markerLegend.signals")}>
-          <BarItem src={art.signal} label={t("markerLegend.signalsHint")} />
-          <BarItem src={art.signalStack} label={t("markerLegend.signalsStackHint")} />
+          {/* Short captions, not the panel's sentences: the strip is one line
+              across the map's width, and three full explanations pushed the
+              last group off the end of it. */}
+          <BarItem src={art.signal} label={t("markerLegend.signalsBar")} />
+          <BarItem src={art.signalStack} label={t("markerLegend.signalsStackBar")} />
         </BarGroup>
       </div>
     );
