@@ -170,6 +170,16 @@ class UserRepository:
         return out
 
     async def get_farm_scopes(self, user_id: UUID) -> list[FarmScope]:
+        """Live farm grants on the caller's active membership.
+
+        The membership filter is not tidiness. `/me` is what the mobile app
+        reads to learn which farms to load, and it used to return the scopes
+        of every membership the user held, including archived ones. A scout
+        offboarded from one farm business kept seeing its farms in the list;
+        each one then failed, because the token names one tenant and the
+        request resolved the wrong schema. Filtering here is what makes the
+        list match what the API will actually serve.
+        """
         stmt = (
             select(FarmScope)
             .join(
@@ -178,6 +188,8 @@ class UserRepository:
             )
             .where(
                 TenantMembership.user_id == user_id,
+                TenantMembership.deleted_at.is_(None),
+                TenantMembership.status == "active",
                 FarmScope.revoked_at.is_(None),
             )
         )

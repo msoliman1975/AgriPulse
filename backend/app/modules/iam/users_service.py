@@ -72,6 +72,31 @@ class FarmsNotInTenantError(LookupError):
         self.farm_ids = farm_ids
 
 
+class AlreadyInAnotherTenantError(Exception):
+    """This person already belongs to a different tenant.
+
+    A person belongs to exactly one tenant. The reason is one attribute:
+    Keycloak's `tenant_id` is single-valued and the JWT carries one value, so
+    a request resolves exactly one tenant schema, while `farm_scopes` is
+    multi-valued and spans every membership. A second membership therefore
+    produces a token that names farms in a tenant it cannot reach — the API
+    authorizes the farm and then looks for it in the wrong schema, with no
+    error anywhere.
+
+    Raised before anything is written, so a refused invite leaves neither a
+    Keycloak group membership nor a half-provisioned row behind.
+    """
+
+    def __init__(self, email: str, tenant_slug: str) -> None:
+        super().__init__(
+            f"{email} already belongs to the tenant {tenant_slug!r}. "
+            "A person can belong to only one tenant. Remove them from that "
+            "tenant first, or invite them under a different address."
+        )
+        self.email = email
+        self.tenant_slug = tenant_slug
+
+
 class LastTenantOwnerError(Exception):
     """The change would leave the tenant with no active TenantOwner."""
 
@@ -259,6 +284,35 @@ class TenantUsersService:
         if missing:
             raise FarmsNotInTenantError(missing)
 
+    async def _assert_free_of_other_tenants(self, *, email: str, tenant_id: UUID) -> None:
+        """Refuse an invite for somebody who is live in a different tenant.
+
+        Matched on the email rather than a user id because that is all an
+        invite carries, and it is the same key `public.users` is unique on.
+        Archived memberships (`deleted_at IS NOT NULL`) do not count: a person
+        who left one tenant is free to be invited by another.
+        """
+        row = (
+            await self._public.execute(
+                text(
+                    """
+                    SELECT t.slug AS slug
+                      FROM public.users u
+                      JOIN public.tenant_memberships m ON m.user_id = u.id
+                      JOIN public.tenants t ON t.id = m.tenant_id
+                     WHERE u.email = :email
+                       AND m.tenant_id <> :tid
+                       AND m.deleted_at IS NULL
+                       AND u.deleted_at IS NULL
+                     LIMIT 1
+                    """
+                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                {"email": email, "tid": tenant_id},
+            )
+        ).first()
+        if row is not None:
+            raise AlreadyInAnotherTenantError(email, str(row.slug))
+
     async def _sync_farm_scopes_to_kc(self, *, membership_id: UUID) -> None:
         """Re-project a membership's active farm scopes into Keycloak.
 
@@ -282,6 +336,8 @@ class TenantUsersService:
                                      ON fs.membership_id = m2.id
                                     AND fs.revoked_at IS NULL
                                   WHERE m2.user_id = u.id
+                                    AND m2.deleted_at IS NULL
+                                    AND m2.status = 'active'
                                ),
                                '[]'::jsonb
                            ) AS scopes
@@ -294,8 +350,11 @@ class TenantUsersService:
             )
         ).first()
         # The attribute is per Keycloak user, not per membership, so the
-        # aggregation spans every membership the user has. Writing only this
-        # tenant's scopes would revoke their access in another tenant.
+        # aggregation walks out to the user rather than reading this
+        # membership's rows. Since a person belongs to one tenant that is now
+        # the same set, but the shape is kept deliberately: it also drops the
+        # scopes of an archived membership, which reading one membership's
+        # rows would leave in the token after an offboarding.
         if row is None or not row.kc or row.kc.startswith("pending::"):
             return
         try:
@@ -718,14 +777,38 @@ class TenantUsersService:
         if existing is not None:
             raise TenantUserAlreadyExistsError(email)
 
-        # Reuse a global user row if email already exists — they may be a
-        # member of another tenant. Otherwise insert.
+        # A person belongs to one tenant. Checked before Keycloak is touched,
+        # because `_provision_in_keycloak` writes `tenant_id` on the attach
+        # path and that attribute holds a single value — provisioning first
+        # and refusing afterwards would leave the person pointing at this
+        # tenant while their real one still holds their rows.
+        await self._assert_free_of_other_tenants(email=email, tenant_id=tenant_id)
+
+        # Reuse the global user row when the email already exists. After the
+        # check above the only way to get here is a person whose memberships
+        # are all archived — someone who left another tenant and is being
+        # taken on by this one. Their Keycloak account is reused rather than
+        # duplicated, because the email is the username.
         global_user_row = (
             await self._public.execute(
-                text("SELECT id, keycloak_subject FROM public.users WHERE email = :e"),
+                text("SELECT id, keycloak_subject, deleted_at FROM public.users WHERE email = :e"),
                 {"e": email},
             )
         ).first()
+
+        # An archived row is a person who was offboarded from their last
+        # tenant: `delete_user` soft-deletes `public.users` and deletes their
+        # Keycloak account once no membership survives. Reusing that row as-is
+        # would hand them a membership and no way to sign in — `get_me` raises
+        # on a deleted user, and the account it points at no longer exists.
+        #
+        # This path used to be a rarity, because somebody could simply be
+        # invited into a second tenant. Now that a person belongs to one
+        # tenant, offboard-then-reinvite is the only way to move between them,
+        # so it is the path the refusal message sends people down and it has
+        # to work. Local id kept — their audit trail and any logical reference
+        # to it survive — while Keycloak is provisioned fresh.
+        revived = global_user_row is not None and global_user_row.deleted_at is not None
 
         (
             keycloak_subject,
@@ -738,8 +821,12 @@ class TenantUsersService:
             slug=slug,
             tenant_id=tenant_id,
             kc_roles=kc_roles,
-            existing_subject=(global_user_row.keycloak_subject if global_user_row else None),
-            is_new_global_user=global_user_row is None,
+            existing_subject=(
+                None if revived else (global_user_row.keycloak_subject if global_user_row else None)
+            ),
+            # A revived person needs a Keycloak account created, not attached
+            # to: theirs was deleted when they were offboarded.
+            is_new_global_user=global_user_row is None or revived,
         )
 
         if global_user_row is None:
@@ -768,6 +855,36 @@ class TenantUsersService:
             )
         else:
             user_id = global_user_row.id
+            if revived:
+                # Bring the row back and repoint it at the new Keycloak
+                # account. Without the `keycloak_subject` update they would
+                # keep the id of an account that was deleted, and every token
+                # check would resolve to nobody.
+                await self._public.execute(
+                    text(
+                        """
+                        UPDATE public.users
+                           SET deleted_at = NULL,
+                               status = 'active',
+                               keycloak_subject = :kc_sub,
+                               full_name = :name,
+                               phone = COALESCE(:phone, phone),
+                               updated_by = :actor,
+                               updated_at = now()
+                         WHERE id = :uid
+                        """
+                    ).bindparams(
+                        bindparam("uid", type_=PG_UUID(as_uuid=True)),
+                        bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {
+                        "uid": user_id,
+                        "kc_sub": keycloak_subject or f"pending::{email}",
+                        "name": full_name,
+                        "phone": phone,
+                        "actor": actor_user_id,
+                    },
+                )
 
         membership_id = uuid4()
         # `invited_by` has a FK to public.users but is nullable. Wrap the
@@ -1037,9 +1154,11 @@ class TenantUsersService:
     async def _sync_scopes_and_end_sessions(self, *, user_id: UUID) -> None:
         """Push the user's surviving farm scopes to Keycloak, then log them out.
 
-        Surviving means *across every tenant they still belong to*, not just
-        this one — the claim is a property of the person, so rebuilding it from
-        a single tenant's rows would silently strip their access elsewhere.
+        Surviving means every scope on an active, undeleted membership. The
+        claim is a property of the person, not of one membership, so the query
+        starts at the user: reading the membership being archived would leave
+        its revoked farms in the token, and reading only the caller's tenant
+        would strip a scope this offboarding did not touch.
         """
         kc_subject = await self._user_keycloak_subject(user_id=user_id)
         if not kc_subject or kc_subject.startswith("pending::"):

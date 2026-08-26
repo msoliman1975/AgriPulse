@@ -15,6 +15,7 @@ at all.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
@@ -68,20 +69,39 @@ async def _add_user(
 
 
 async def _add_membership(
-    session: AsyncSession, *, user_id: UUID, tenant_id: UUID, invited_by: UUID | None = None
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    tenant_id: UUID,
+    invited_by: UUID | None = None,
+    archived: bool = False,
 ) -> UUID:
+    """One membership row. `archived` is the only way to give one person two.
+
+    Migration 0074 permits a single live membership per person, so a test that
+    needs somebody attached to two tenants has to archive one of them — which
+    is the real shape anyway: a person who left one tenant and joined another.
+    """
     membership_id = uuid4()
     await session.execute(
         text(
-            "INSERT INTO public.tenant_memberships (id, user_id, tenant_id, status, invited_by) "
-            "VALUES (:mid, :uid, :tid, 'active', :inv)"
+            "INSERT INTO public.tenant_memberships "
+            "  (id, user_id, tenant_id, status, invited_by, deleted_at) "
+            "VALUES (:mid, :uid, :tid, :st, :inv, :del)"
         ).bindparams(
             bindparam("mid", type_=PG_UUID(as_uuid=True)),
             _UID,
             _TID,
             bindparam("inv", type_=PG_UUID(as_uuid=True)),
         ),
-        {"mid": membership_id, "uid": user_id, "tid": tenant_id, "inv": invited_by},
+        {
+            "mid": membership_id,
+            "uid": user_id,
+            "tid": tenant_id,
+            "inv": invited_by,
+            "st": "archived" if archived else "active",
+            "del": datetime.now(UTC) if archived else None,
+        },
     )
     return membership_id
 
@@ -116,11 +136,20 @@ async def test_purge_removes_users_left_with_no_membership(admin_session: AsyncS
 async def test_purge_keeps_user_with_membership_in_another_tenant(
     admin_session: AsyncSession,
 ) -> None:
-    """The reason this cannot be a blanket delete of the tenant's members."""
+    """The reason this cannot be a blanket delete of the tenant's members.
+
+    The surviving membership is archived, because a person holds one live
+    membership since migration 0074. That is not a weaker case — it is the
+    real one: somebody who left the tenant being purged and was taken on
+    elsewhere, or the reverse. The predicate counts membership rows without
+    looking at `deleted_at`, which is what keeps their user row alive.
+    """
     doomed = await _create(admin_session)
     survivor = await _create(admin_session)
     user_id = await _add_user(admin_session, tenant_id=doomed.tenant_id)
-    await _add_membership(admin_session, user_id=user_id, tenant_id=survivor.tenant_id)
+    await _add_membership(
+        admin_session, user_id=user_id, tenant_id=survivor.tenant_id, archived=True
+    )
     await admin_session.commit()
 
     await _purge(admin_session, doomed.tenant_id, doomed.slug)
