@@ -1,6 +1,6 @@
 """Arabic labels on a signal definition, including the categorical list.
 
-Public migration 0074 added `name_ar`, `description_ar`, `unit_ar` and
+Public migration 0075 added `name_ar`, `description_ar`, `unit_ar` and
 `categorical_values_ar`. The last one is a parallel array — same length, same
 order, one Arabic label per English code — and the table has a CHECK on the
 equal length.
@@ -119,7 +119,7 @@ async def test_mismatched_arabic_value_list_is_rejected_on_patch(
 
 @pytest.mark.asyncio
 async def test_platform_scouting_catalog_has_arabic(admin_session: AsyncSession) -> None:
-    """Migration 0074 pass 2 translated the nine platform definitions.
+    """Migration 0075 pass 2 translated the nine platform definitions.
 
     The scouting form is the whole reason `categorical_values_ar` exists: a
     scout picking a value in the Arabic app was reading `emitter_blocked`.

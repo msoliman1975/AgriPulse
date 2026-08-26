@@ -28,7 +28,7 @@ class TenantSummary:
     id: UUID
     slug: str
     name: str
-    # Arabic display name (public migration 0074). Null falls back to `name`.
+    # Arabic display name (public migration 0075). Null falls back to `name`.
     name_ar: str | None = None
 
 

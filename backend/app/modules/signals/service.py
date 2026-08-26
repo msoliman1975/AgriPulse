@@ -81,7 +81,7 @@ from app.shared.storage.client import (
 def _assert_categorical_ar_matches(values: list[str] | None, values_ar: list[str] | None) -> None:
     """Reject a mismatched Arabic value list before Postgres does.
 
-    Migration 0074 has a CHECK on the equal length. Hitting it raises an
+    Migration 0075 has a CHECK on the equal length. Hitting it raises an
     IntegrityError, which surfaces as a 500 with no useful message, so
     check here and return a 400 that names the problem.
     """
@@ -108,7 +108,7 @@ class SignalsService(Protocol):
         *,
         code: str,
         name: str,
-        # Arabic labels (public migration 0074). All optional; the read
+        # Arabic labels (public migration 0075). All optional; the read
         # path falls back to the English field.
         name_ar: str | None = None,
         description: str | None,
@@ -323,7 +323,7 @@ class SignalsServiceImpl:
         *,
         code: str,
         name: str,
-        # Arabic labels (public migration 0074). All optional; the read
+        # Arabic labels (public migration 0075). All optional; the read
         # path falls back to the English field.
         name_ar: str | None = None,
         description: str | None,

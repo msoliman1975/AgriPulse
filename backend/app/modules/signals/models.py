@@ -84,7 +84,7 @@ class SignalDefinition(Base, TimestampedMixin):
     tenant_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     code: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    # Arabic display name (public migration 0074). Nullable; readers fall
+    # Arabic display name (public migration 0075). Nullable; readers fall
     # back with COALESCE(NULLIF(name_ar, ''), name).
     name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -94,7 +94,7 @@ class SignalDefinition(Base, TimestampedMixin):
     unit_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     categorical_values: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
     # Parallel to `categorical_values`: same length, same order, one Arabic
-    # label per code. A CHECK in migration 0074 enforces the equal length,
+    # label per code. A CHECK in migration 0075 enforces the equal length,
     # because a shorter array would render a blank option, not an error.
     categorical_values_ar: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
     value_min: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
@@ -247,7 +247,7 @@ class SignalTemplate(Base, TimestampedMixin):
     tenant_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     code: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    # See SignalDefinition.name_ar (public migration 0074).
+    # See SignalDefinition.name_ar (public migration 0075).
     name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     description_ar: Mapped[str | None] = mapped_column(Text, nullable=True)

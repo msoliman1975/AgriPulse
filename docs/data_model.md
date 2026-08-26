@@ -890,7 +890,7 @@ What kind of signal exists. Defined by the tenant, scoped to their data. Example
 | `id` | UUID | PK | |
 | `code` | TEXT | NOT NULL | Unique within tenant; stable identifier |
 | `name` | TEXT | NOT NULL | Display name |
-| `name_ar` | TEXT | | Arabic display name (public 0074) |
+| `name_ar` | TEXT | | Arabic display name (public 0075) |
 | `description` | TEXT | | |
 | `description_ar` | TEXT | | |
 | `value_kind` | TEXT | NOT NULL, CHECK (`value_kind IN ('numeric','categorical','event','boolean','geopoint')`) | |

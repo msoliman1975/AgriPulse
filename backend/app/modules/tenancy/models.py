@@ -38,7 +38,7 @@ class Tenant(Base, TimestampedMixin):
     )
     slug: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    # Arabic display name (public migration 0074). Nullable; readers fall
+    # Arabic display name (public migration 0075). Nullable; readers fall
     # back with COALESCE(NULLIF(name_ar, ''), name).
     name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     legal_name: Mapped[str | None] = mapped_column(Text, nullable=True)

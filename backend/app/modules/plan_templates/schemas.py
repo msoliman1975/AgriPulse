@@ -54,7 +54,7 @@ class PlanTemplateSummary(BaseModel):
     id: UUID
     code: str
     name: str
-    # Arabic display name (public migration 0074). Null when nobody has
+    # Arabic display name (public migration 0075). Null when nobody has
     # written one; the client falls back to `name`.
     name_ar: str | None = None
     crop_path: str

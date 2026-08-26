@@ -41,7 +41,7 @@ class SignalDefinitionResponse(BaseModel):
     id: UUID
     code: str
     name: str
-    # Arabic labels (public migration 0074). Nullable on every one: a row
+    # Arabic labels (public migration 0075). Nullable on every one: a row
     # written by an older API image has none, and the client falls back to
     # the English field.
     name_ar: str | None = None

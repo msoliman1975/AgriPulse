@@ -1,7 +1,7 @@
 // Display labels for a signal definition and its categorical values.
 //
 // A signal definition carries parallel English and Arabic columns since
-// public migration 0074. `categorical_values_ar` is a parallel array: same
+// public migration 0075. `categorical_values_ar` is a parallel array: same
 // length, same order, one Arabic label per code, and a CHECK in the DB keeps
 // the lengths equal. These helpers are the only place that pairing is read,
 // so a mismatched or missing Arabic array degrades to the stored code in one

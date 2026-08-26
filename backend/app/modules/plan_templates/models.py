@@ -46,7 +46,7 @@ class PlanTemplate(Base, TimestampedMixin):
     )
     code: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    # Arabic display name (public migration 0074). Nullable; readers fall
+    # Arabic display name (public migration 0075). Nullable; readers fall
     # back with COALESCE(NULLIF(name_ar, ''), name).
     name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Crop-taxonomy targeting key, prefix-matched against block_crops.crop_path
@@ -81,7 +81,7 @@ class PlanTemplateMilestone(Base, TimestampedMixin):
     )
     code: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    # See PlanTemplate.name_ar (public migration 0074).
+    # See PlanTemplate.name_ar (public migration 0075).
     name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     day_from_start: Mapped[int] = mapped_column(Integer, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))

@@ -74,7 +74,7 @@ class TenantMembershipResponse(BaseModel):
     tenant_id: UUID
     tenant_slug: str
     tenant_name: str
-    # Arabic display name (public migration 0074). Null when nobody has
+    # Arabic display name (public migration 0075). Null when nobody has
     # written one; the shell falls back to `tenant_name`.
     tenant_name_ar: str | None = None
     status: str
