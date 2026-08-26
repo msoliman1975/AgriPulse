@@ -2988,6 +2988,24 @@ global:
   #   Images CONFIRMED by pulling both on the node before the bump:
   #   api @ e6735c0, frontend @ e6735c0.
   #   Rollback is api, workers and frontend all back to 25d01a6.
+  # 2026-08-26 - f40c68e = #590, two things the production check of #588 found.
+  #   Two readings recorded on one block on one day drew two chips both
+  #   reading "18 Aug", which names neither; the time is added only where the
+  #   day does not separate them. And scrubbing the date bar left the open
+  #   observation popup saying "pick the matching signal in the overlay
+  #   control", which sends the reader to a control that cannot help - the
+  #   reading is absent because it was recorded after the day being drawn.
+  #   Also fixes a regression #588 introduced: adding the as-of instant to the
+  #   farm summary query key made every date click a new key with no cached
+  #   data, so the page hit its full-screen loading branch and the map
+  #   unmounted and re-framed on each click. Five queries now hold their
+  #   previous answer while the next loads.
+  #   FRONTEND ONLY. No backend file changed, so api and workers stay e6735c0,
+  #   tile-server stays 676746a and keycloak stays 677c7dc.
+  #   NO MIGRATION.
+  #   Image CONFIRMED by pulling it on the node before the bump:
+  #   frontend @ f40c68e.
+  #   Rollback is the frontend tag back to e6735c0.
   images:
     api:
       tag: "e6735c0"
@@ -3096,7 +3114,7 @@ global:
       #   FRONTEND ONLY. No backend file changed, so api stays 698e8f6,
       #   workers 1363ebe and tile-server 676746a; none of them restart.
       #   Rollback is this tag back to 698e8f6. No migration.
-      tag: "e6735c0"
+      tag: "f40c68e"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
