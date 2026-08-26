@@ -2929,11 +2929,50 @@ global:
   #   since 1d0ed72, so frontend stays there; workers stay 1363ebe and
   #   tile-server 676746a.
   #   Rollback is this tag back to 698e8f6. No migration.
+  #
+  # 25d01a6 = #586, the daily imagery poll ran before the scene was published,
+  #   and the ingest watermark was empty on a farm with 216 succeeded jobs.
+  #   Found on Mango Republic (tenant green-valley) on 25 August, reported as
+  #   "the latest index on the map and in reports is 20 August".
+  #   The discovery anchor was 14:00 UTC, picked against Sentinel-2's
+  #   documented 3-6h L2A publication latency. That farm's pass was sensed at
+  #   08:41 UTC and processed at 13:51 UTC, and the 14:32 UTC poll still did
+  #   not find it in the Copernicus catalogue. The same search run from the
+  #   light worker pod at 22:21 UTC returned it. The anchor moves to 20:00
+  #   UTC, which leaves 11.5h after sensing and 6h after the latest processing
+  #   time measured on this farm.
+  #   `last_successful_ingest_at` was a wall-clock stamp written only by a
+  #   poll that queued a job. The backfill tasks pass bump_watermark=False and
+  #   a caught-up poll queues nothing, so a farm loaded entirely by a backfill
+  #   kept NULL for ever. NULL sends the discovery window to the 90-day
+  #   cold-start floor, so that subscription asked the catalogue for 90 days
+  #   every day and read back 27 scenes it already held. The column is now
+  #   derived: the sensing time of the newest scene the subscription has
+  #   successfully ingested, written in the same transaction that marks a job
+  #   succeeded and rebuilt on every live poll. Migration 0086 backfills it.
+  #   WATCH FOR THIS on the first evening after the promote: every daily
+  #   subscription last polled before 20:00 UTC becomes due at once, so expect
+  #   one catch-up round of discovery across both tenants, then one poll a day
+  #   at 20:00 UTC. This is the same catch-up 127406f caused when the anchor
+  #   was introduced.
+  #   API + WORKERS + FRONTEND. Workers run the discovery tasks; the api reads
+  #   the column into its subscription responses; the frontend change is two
+  #   translated strings, "Last successful" -> "Newest scene", because the
+  #   value is now a scene time and not a poll time. Tile-server stays 676746a
+  #   and keycloak stays 677c7dc.
+  #   MIGRATION 0086, tenant. It only rewrites `last_successful_ingest_at`
+  #   from the job rows. Its downgrade is a deliberate no-op: the old value
+  #   was a poll timestamp recorded nowhere else, so it cannot be restored.
+  #   Rolling the tag back therefore leaves the derived values in place, which
+  #   the old code reads as a valid watermark.
+  #   Images CONFIRMED by pulling both on the node before the bump:
+  #   api @ 25d01a6, frontend @ 25d01a6.
+  #   Rollback is api to d286e3c, workers to 1363ebe, frontend to 1d0ed72.
   images:
     api:
-      tag: "d286e3c"
+      tag: "25d01a6"
     workers:
-      tag: "1363ebe"
+      tag: "25d01a6"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3037,7 +3076,7 @@ global:
       #   FRONTEND ONLY. No backend file changed, so api stays 698e8f6,
       #   workers 1363ebe and tile-server 676746a; none of them restart.
       #   Rollback is this tag back to 698e8f6. No migration.
-      tag: "1d0ed72"
+      tag: "25d01a6"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
