@@ -29,7 +29,20 @@ export interface BlocksSummaryResponse {
   units: BlockSummary[];
 }
 
-export async function getBlocksSummary(farmId: string): Promise<BlocksSummaryResponse> {
-  const { data } = await apiClient.get<BlocksSummaryResponse>(`/v1/farms/${farmId}/blocks/summary`);
+/**
+ * @param at Answer the alert rollup AS OF this instant instead of now: only
+ *   alerts raised on or before it, and still unresolved then, are counted.
+ *   The map's date bar sends it when the reader has scrubbed to a past pass,
+ *   so the chips agree with the scene being drawn. Omitted means "now", which
+ *   is what every caller before this did.
+ */
+export async function getBlocksSummary(
+  farmId: string,
+  at?: string | null,
+): Promise<BlocksSummaryResponse> {
+  const { data } = await apiClient.get<BlocksSummaryResponse>(
+    `/v1/farms/${farmId}/blocks/summary`,
+    { params: { at: at ?? undefined } },
+  );
   return data;
 }

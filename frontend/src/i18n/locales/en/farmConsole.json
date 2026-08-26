@@ -94,7 +94,8 @@
       "no_action": "Nothing to do",
       "other": "Other",
       "unknown": "Not stated"
-    }
+    },
+    "signalsStackHint": "Several readings on one spot — open it to walk them"
   },
   "add": {
     "block": "Draw block",
@@ -723,7 +724,13 @@
     "partlyCloudyOn": "{{date}} — {{count}} block(s) imaged. {{pct}}% of the farm has no reading: cloud, shadow and haze are removed before the map is drawn.",
     "empty": "No satellite passes recorded for this farm yet.",
     "unavailable": "Scene history is not available from this API version.",
-    "unprocessedOn": "{{date}} — ingested but never processed, so there is nothing to draw"
+    "unprocessedOn": "{{date}} — ingested but never processed, so there is nothing to draw",
+    "rangeDays": "{{days}}d",
+    "rangeAll": "All",
+    "rangeHint": "Show the last {{days}} days of passes",
+    "rangeAllHint": "Show every pass held ({{count}})",
+    "moreHidden": "+{{count}} older",
+    "emptyInRange": "No pass in this window — widen it to see older ones."
   },
   "railTools": {
     "filterPlaceholder": "Filter…",
@@ -916,5 +923,14 @@
       "close": "closed it",
       "reopen": "re-opened it"
     }
+  },
+  "layerCards": {
+    "satellite": "Satellite",
+    "satelliteHint": "The base map. Always drawn.",
+    "pixelsHint": "Colour every pixel by the selected index",
+    "gridHint": "Draw the sub-block mesh over the index",
+    "more": "More",
+    "moreHint": "Outlines, labels, marks and opacity",
+    "grid": "Cells"
   }
 }

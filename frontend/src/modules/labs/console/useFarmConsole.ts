@@ -23,7 +23,11 @@ import { listFieldFlags } from "@/api/fieldFlags";
 import { getFarmGridCells, getGridCells } from "@/api/grid";
 import { listFarmScenes, listSubscriptions } from "@/api/imagery";
 import { getIndexCatalog, type AnyIndexCode as ApiIndexCode } from "@/api/indices";
-import { listSignalDefinitions, listSignalObservations } from "@/api/signals";
+import {
+  listSignalDefinitions,
+  listSignalObservations,
+  type SignalObservation,
+} from "@/api/signals";
 import { useAlerts } from "@/queries/alerts";
 import { useRecommendations } from "@/queries/recommendations";
 import type { CellItem } from "@/modules/grid/GridCellPopup";
@@ -40,6 +44,7 @@ import { blockCentroidsFromGeojson, buildSignalOverlay } from "../map/signalOver
 import { griddedBlocks } from "../mapnext/gridOverlay";
 import { isThermalIndex, LAST_FARM_KEY } from "../mapnext/constants";
 import { CONSOLE_QK } from "./constants";
+import { asOfInstant, scenesWithin, TIMELINE_DEFAULT_DAYS } from "./timelineWindow";
 import { classify } from "./indexClasses";
 import { useIndexPixels } from "./useIndexPixels";
 import { useOptionalConfig } from "@/config/ConfigContext";
@@ -83,6 +88,32 @@ export function useFarmConsole(farmId: string) {
   // does when `at` is omitted — so send nothing rather than pinning to today.
   const sceneAt = selectedScene?.at ?? null;
 
+  // The instant the whole console reads the farm "as of".
+  //
+  // The map is a picture of one day. Scrubbing back to a pass from ten days
+  // ago and still seeing a flag a scout raised yesterday, or an alert that
+  // opened this morning, makes the map disagree with its own date bar — the
+  // reader cannot tell which marks belong to the scene they are looking at.
+  //
+  // The END of the selected day, not `scene.at`: the satellite passes in the
+  // morning, and cutting at the overpass instant would hide everything
+  // recorded later the same day, which nobody means by "on the 12th".
+  // Null while the timeline is on "latest", which reads as "now".
+  const asOf = asOfInstant(sceneDate);
+
+  // How far back the date bar opens. 30 days rather than the whole history:
+  // a farm with two years of Sentinel-2 has ~180 passes, and a strip that
+  // long opens scrolled to one end with no sense of where the reader is.
+  // `null` means every pass the api returned.
+  const [timelineDays, setTimelineDays] = useState<number | null>(TIMELINE_DEFAULT_DAYS);
+
+  // The window the strip actually draws. See timelineWindow.ts for the two
+  // rules that decide it.
+  const visibleScenes = useMemo(
+    () => scenesWithin(scenes, timelineDays, sceneDate),
+    [scenes, timelineDays, sceneDate],
+  );
+
   const [layers, setLayers] = useState<LayerState>({
     aoi: true,
     blocks: true,
@@ -113,14 +144,19 @@ export function useFarmConsole(farmId: string) {
   const [cellClickPoint, setCellClickPoint] = useState<{ x: number; y: number } | null>(null);
   const [signalDefId, setSignalDefId] = useState<string | null>(null);
   const [obsClickPoint, setObsClickPoint] = useState<{ x: number; y: number } | null>(null);
+  // Every observation on the coordinate that was last clicked, newest first.
+  // One mark can stand for several readings — entity-mode observations all
+  // resolve to their block's centroid — so the panel needs the list to let a
+  // reader walk them instead of seeing only the newest.
+  const [obsStack, setObsStack] = useState<string[]>([]);
 
   useEffect(() => {
     if (typeof window !== "undefined") window.localStorage.setItem(LAST_FARM_KEY, farmId);
   }, [farmId]);
 
   const summaryQ = useQuery({
-    queryKey: CONSOLE_QK.summary(farmId),
-    queryFn: () => loadMapSummary(farmId),
+    queryKey: CONSOLE_QK.summary(farmId, asOf),
+    queryFn: () => loadMapSummary(farmId, asOf),
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
@@ -412,8 +448,13 @@ export function useFarmConsole(farmId: string) {
   const cellAlertsQ = useAlerts({ farm_id: farmId, status: "open", limit: 500 });
   const cellItemsByCell = useMemo(() => {
     const map = new Map<string, CellItem[]>();
+    // Both lists are filtered on `created_at` rather than fetched as-of: the
+    // recommendation and alert routes have no time parameter, and the console
+    // already holds the farm's open set. What the cell popup must not do is
+    // attribute a card that opened this morning to a pass from last week.
     for (const r of cellRecsQ.data ?? []) {
       if (!r.cell_id) continue;
+      if (asOf && r.created_at > asOf) continue;
       const text = (isAr && r.text_ar) || r.text_en;
       map.set(r.cell_id, [
         ...(map.get(r.cell_id) ?? []),
@@ -422,6 +463,7 @@ export function useFarmConsole(farmId: string) {
     }
     for (const a of cellAlertsQ.data ?? []) {
       if (!a.cell_id) continue;
+      if (asOf && a.created_at > asOf) continue;
       const text = ((isAr && a.diagnosis_ar) || a.diagnosis_en) ?? a.rule_code;
       map.set(a.cell_id, [
         ...(map.get(a.cell_id) ?? []),
@@ -429,7 +471,7 @@ export function useFarmConsole(farmId: string) {
       ]);
     }
     return map;
-  }, [cellRecsQ.data, cellAlertsQ.data, isAr]);
+  }, [cellRecsQ.data, cellAlertsQ.data, isAr, asOf]);
 
   // Signal overlay: definitions for the picker + observations for the active one.
   const signalDefsQ = useQuery({
@@ -441,12 +483,20 @@ export function useFarmConsole(farmId: string) {
   // shows every signal type at once, and re-fetching on every pick would
   // spend a round trip to narrow a list the client already holds.
   const signalObsQ = useQuery({
-    queryKey: CONSOLE_QK.signalObs(farmId),
-    queryFn: () => listSignalObservations({ farm_id: farmId, limit: 500 }),
+    queryKey: CONSOLE_QK.signalObs(farmId, asOf),
+    queryFn: () =>
+      listSignalObservations({
+        farm_id: farmId,
+        limit: 500,
+        // Server-side, because `until` is a real parameter on this route and
+        // the 500-row cap would otherwise be spent on readings the map is
+        // about to throw away.
+        ...(asOf ? { until: asOf } : {}),
+      }),
     enabled: Boolean(farmId && layers.signals),
     staleTime: 30_000,
   });
-  const selectedSignalDef = signalDefsQ.data?.find((d) => d.id === signalDefId) ?? null;
+  const pickedSignalDef = signalDefsQ.data?.find((d) => d.id === signalDefId) ?? null;
   const blockCentroids = useMemo(
     () =>
       summaryQ.data
@@ -455,7 +505,7 @@ export function useFarmConsole(farmId: string) {
     [summaryQ.data],
   );
   const flagsQ = useQuery({
-    queryKey: ["labs/console/fieldFlags", farmId, layers.flagsOpenOnly],
+    queryKey: CONSOLE_QK.fieldFlags(farmId, layers.flagsOpenOnly, asOf),
     queryFn: () => listFieldFlags(farmId, { pinned_only: true, open_only: layers.flagsOpenOnly }),
     enabled: Boolean(farmId && layers.flags),
     staleTime: 30_000,
@@ -463,8 +513,14 @@ export function useFarmConsole(farmId: string) {
   const flagOverlayFc = useMemo(() => {
     if (!layers.flags) return null;
     if (!flagsQ.data) return { type: "FeatureCollection" as const, features: [] };
-    return buildFlagOverlay(flagsQ.data, blockCentroids);
-  }, [layers.flags, flagsQ.data, blockCentroids]);
+    // Filtered here, not in the request: `GET /farms/{id}/field-flags` takes
+    // `open_only` and `pinned_only` and nothing about time. Client-side is
+    // honest for this route — a farm's pinned flags are tens of rows, not
+    // thousands — and the alternative is a map that shows a pin for work
+    // nobody had reported yet on the day being drawn.
+    const rows = asOf ? flagsQ.data.filter((f) => f.created_at <= asOf) : flagsQ.data;
+    return buildFlagOverlay(rows, blockCentroids);
+  }, [layers.flags, flagsQ.data, blockCentroids, asOf]);
 
   // Value kind per definition, so a mixed overlay labels each observation
   // against its OWN signal rather than against whichever one is picked.
@@ -495,6 +551,27 @@ export function useFarmConsole(farmId: string) {
     [selectedObsId, signalObsQ.data],
   );
 
+  // The definition of the observation being SHOWN, not of the one the picker
+  // happens to be narrowed to. The layer draws every signal type at once, so
+  // the picker is usually on "all" and reading the definition off it left the
+  // popup titled with a raw `signal_code` and no unit beside the value.
+  const selectedSignalDef = useMemo(() => {
+    if (selectedObs) {
+      return signalDefsQ.data?.find((d) => d.id === selectedObs.signal_definition_id) ?? null;
+    }
+    return pickedSignalDef;
+  }, [selectedObs, signalDefsQ.data, pickedSignalDef]);
+
+  // The readings the clicked mark stands for, in the order the overlay stacked
+  // them. Resolved against the same list the overlay was built from, so an id
+  // that has since been filtered out simply drops rather than rendering a
+  // blank chip.
+  const selectedObsStack = useMemo(() => {
+    if (obsStack.length < 2 || !signalObsQ.data) return [];
+    const byId = new Map(signalObsQ.data.map((o) => [o.id, o]));
+    return obsStack.map((id) => byId.get(id)).filter((o): o is SignalObservation => Boolean(o));
+  }, [obsStack, signalObsQ.data]);
+
   // ---- selection -----------------------------------------------------------
   const select = (id: string): void => {
     const next = new URLSearchParams(search);
@@ -508,18 +585,30 @@ export function useFarmConsole(farmId: string) {
     next.delete("unit");
     setSearch(next, { replace: false });
   };
-  const selectObservation = (observationId: string, point: { x: number; y: number }): void => {
+  const selectObservation = (
+    observationId: string,
+    point: { x: number; y: number },
+    stackIds: string[] = [observationId],
+  ): void => {
     const next = new URLSearchParams(search);
     next.set("signal_obs", observationId);
     setSearch(next, { replace: true });
     setObsClickPoint(point);
+    setObsStack(stackIds);
     setSelectedCellId(null);
+  };
+  /** Move to another reading on the same spot, without moving the popup. */
+  const showObservation = (observationId: string): void => {
+    const next = new URLSearchParams(search);
+    next.set("signal_obs", observationId);
+    setSearch(next, { replace: true });
   };
   const clearObservation = (): void => {
     const next = new URLSearchParams(search);
     next.delete("signal_obs");
     setSearch(next, { replace: true });
     setObsClickPoint(null);
+    setObsStack([]);
   };
   const selectScene = (scene_date: string | null): void => {
     const next = new URLSearchParams(search);
@@ -558,11 +647,16 @@ export function useFarmConsole(farmId: string) {
     signalDefId,
     changeSignalDef,
     obsClickPoint,
+    obsStack,
     // scenes
     scenesQ,
     scenes,
     sceneDate,
     sceneAt,
+    asOf,
+    visibleScenes,
+    timelineDays,
+    setTimelineDays,
     selectedScene,
     selectScene,
     medianGapDays: scenesQ.data?.median_gap_days ?? null,
@@ -592,10 +686,12 @@ export function useFarmConsole(farmId: string) {
     signalOverlayFc,
     flagOverlayFc,
     selectedObs,
+    selectedObsStack,
     // actions
     select,
     deselect,
     selectObservation,
+    showObservation,
     clearObservation,
   };
 }

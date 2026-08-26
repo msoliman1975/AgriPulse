@@ -73,7 +73,8 @@
       "entity": "Block-level (no precise point)",
       "point_in_entity": "Pinned inside the block",
       "free_point": "Free-floating point"
-    }
+    },
+    "stack": "{{count}} readings on this spot"
   },
   "refPicker": {
     "title": "Signal reference",

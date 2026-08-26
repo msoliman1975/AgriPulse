@@ -92,7 +92,7 @@ export interface MapSummary {
   activePlan: Plan | null;
 }
 
-export async function loadMapSummary(farmId: string): Promise<MapSummary> {
+export async function loadMapSummary(farmId: string, at?: string | null): Promise<MapSummary> {
   // Parallel summary fan-out. Farm + blocks + summary + (best-effort)
   // active plan.
   //
@@ -106,7 +106,11 @@ export async function loadMapSummary(farmId: string): Promise<MapSummary> {
   const [farm, blocksPage, summaryResp, plans] = await Promise.all([
     getFarm(farmId),
     listBlocks(farmId, { limit: 200, include_boundary: true }),
-    getBlocksSummary(farmId),
+    // `at` reaches the alert rollup only. The block roster and the index
+    // values are not as-of: a block that exists today existed on the pass
+    // being drawn, and the console reads index values through the scene
+    // routes, not through here.
+    getBlocksSummary(farmId, at),
     safePlans(farmId),
   ]);
   const blocks = blocksPage.items;

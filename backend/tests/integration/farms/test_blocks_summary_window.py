@@ -165,13 +165,16 @@ async def _insert_alert(
     severity: str,
     action_type: str | None,
     created_at: datetime,
+    status: str = "open",
+    resolved_at: datetime | None = None,
 ) -> None:
     await session.execute(text(f'SET LOCAL search_path TO "{schema}", public'))
     await session.execute(
         text(
             "INSERT INTO alerts "
-            "(id, block_id, rule_code, severity, action_type, status, created_at, updated_at) "
-            "VALUES (:id, :b, :rule, :sev, :action, 'open', :at, :at)"
+            "(id, block_id, rule_code, severity, action_type, status, "
+            " created_at, updated_at, resolved_at) "
+            "VALUES (:id, :b, :rule, :sev, :action, :status, :at, :at, :resolved)"
         ).bindparams(
             bindparam("id", type_=PG_UUID(as_uuid=True)),
             bindparam("b", type_=PG_UUID(as_uuid=True)),
@@ -185,6 +188,8 @@ async def _insert_alert(
             "sev": severity,
             "action": action_type,
             "at": created_at,
+            "status": status,
+            "resolved": resolved_at,
         },
     )
     await session.commit()
@@ -410,3 +415,149 @@ async def test_block_with_no_alerts_reports_no_verb(admin_session: AsyncSession)
     unit = next(u for u in resp.json()["units"] if u["id"] == block_id)
     assert unit["alert_action_type"] is None
     assert unit["alert_count"] == 0
+
+
+# ---------------------------------------------------------------------------
+# `at` — the alert rollup answered as of a past instant.
+#
+# The console's date bar sends it when a reader has scrubbed back to an older
+# pass. The map is a picture of one day, and an alert that opened this morning
+# did not exist on a scene from last week.
+#
+# Against the database on purpose. The rollup is raw SQL, and a fake session
+# would assert the shape of a query rather than what Postgres does with it —
+# which is how both SQL bugs in the platform-alerts work reached production.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_as_of_excludes_an_alert_raised_after_it(admin_session: AsyncSession) -> None:
+    """An alert opened yesterday is absent from a picture of last week."""
+    tenant, context = await _bootstrap(admin_session, "bsw-asof-future")
+    app = _build_app(context)
+    now = datetime.now(UTC)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        farm_id, block_id = await _make_farm_with_block(c)
+        await _insert_alert(
+            admin_session,
+            schema=tenant.schema_name,
+            block_id=UUID(block_id),
+            severity="critical",
+            action_type="inspect",
+            created_at=now - timedelta(days=1),
+        )
+
+        live = await c.get(f"/api/v1/farms/{farm_id}/blocks/summary")
+        past = await c.get(
+            f"/api/v1/farms/{farm_id}/blocks/summary",
+            params={"at": (now - timedelta(days=7)).isoformat()},
+        )
+
+    assert live.status_code == 200, live.text
+    assert past.status_code == 200, past.text
+    assert next(u for u in live.json()["units"] if u["id"] == block_id)["alert_count"] == 1
+    unit = next(u for u in past.json()["units"] if u["id"] == block_id)
+    assert unit["alert_count"] == 0
+    assert unit["alert_severity"] is None
+    assert unit["alert_action_type"] is None
+
+
+@pytest.mark.asyncio
+async def test_as_of_includes_an_alert_that_has_since_been_resolved(
+    admin_session: AsyncSession,
+) -> None:
+    """The rule that makes this worth writing.
+
+    Reading `status = 'open'` for a past instant would drop every alert closed
+    since — so the further back a reader scrubbed, the FEWER alerts the map
+    would show, which reads as "the farm was fine then". It was not; the alert
+    was open on that day and was closed later.
+    """
+    tenant, context = await _bootstrap(admin_session, "bsw-asof-closed")
+    app = _build_app(context)
+    now = datetime.now(UTC)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        farm_id, block_id = await _make_farm_with_block(c)
+        await _insert_alert(
+            admin_session,
+            schema=tenant.schema_name,
+            block_id=UUID(block_id),
+            severity="warning",
+            action_type="spray",
+            created_at=now - timedelta(days=20),
+            status="resolved",
+            resolved_at=now - timedelta(days=2),
+        )
+
+        live = await c.get(f"/api/v1/farms/{farm_id}/blocks/summary")
+        past = await c.get(
+            f"/api/v1/farms/{farm_id}/blocks/summary",
+            params={"at": (now - timedelta(days=10)).isoformat()},
+        )
+
+    assert live.status_code == 200, live.text
+    assert past.status_code == 200, past.text
+    # Closed today, so the live map says nothing is wrong.
+    assert next(u for u in live.json()["units"] if u["id"] == block_id)["alert_count"] == 0
+    # Ten days ago it was open, and the map for that day has to say so.
+    unit = next(u for u in past.json()["units"] if u["id"] == block_id)
+    assert unit["alert_count"] == 1
+    assert unit["alert_severity"] == "watch"
+    assert unit["alert_action_type"] == "spray"
+
+
+@pytest.mark.asyncio
+async def test_as_of_drops_one_resolved_before_it(admin_session: AsyncSession) -> None:
+    """Resolved BEFORE the instant asked about: gone, on that day too."""
+    tenant, context = await _bootstrap(admin_session, "bsw-asof-earlier")
+    app = _build_app(context)
+    now = datetime.now(UTC)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        farm_id, block_id = await _make_farm_with_block(c)
+        await _insert_alert(
+            admin_session,
+            schema=tenant.schema_name,
+            block_id=UUID(block_id),
+            severity="critical",
+            action_type="irrigate",
+            created_at=now - timedelta(days=40),
+            status="resolved",
+            resolved_at=now - timedelta(days=30),
+        )
+
+        past = await c.get(
+            f"/api/v1/farms/{farm_id}/blocks/summary",
+            params={"at": (now - timedelta(days=10)).isoformat()},
+        )
+
+    assert past.status_code == 200, past.text
+    assert next(u for u in past.json()["units"] if u["id"] == block_id)["alert_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_omitting_at_answers_now(admin_session: AsyncSession) -> None:
+    """No `at` is the behaviour every caller before this had — `status = 'open'`."""
+    tenant, context = await _bootstrap(admin_session, "bsw-asof-omitted")
+    app = _build_app(context)
+    now = datetime.now(UTC)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        farm_id, block_id = await _make_farm_with_block(c)
+        await _insert_alert(
+            admin_session,
+            schema=tenant.schema_name,
+            block_id=UUID(block_id),
+            severity="critical",
+            action_type="inspect",
+            created_at=now - timedelta(days=3),
+        )
+
+        resp = await c.get(f"/api/v1/farms/{farm_id}/blocks/summary")
+
+    assert resp.status_code == 200, resp.text
+    unit = next(u for u in resp.json()["units"] if u["id"] == block_id)
+    assert unit["alert_count"] == 1
+    assert unit["alert_severity"] == "critical"

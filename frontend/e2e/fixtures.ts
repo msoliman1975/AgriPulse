@@ -183,9 +183,44 @@ async function installApiMocks(page: Page): Promise<void> {
   });
 }
 
+/**
+ * Glyph cache, per worker process.
+ *
+ * MapLibre fetches a PBF per fontstack range, and a symbol layer carrying
+ * text draws NOTHING until they arrive. Six parallel browsers all pulling
+ * them from demotiles.maplibre.org over a corporate proxy is slow enough to
+ * time out the map specs, which then look like map bugs.
+ *
+ * Fetched once and replayed, so the suite makes one round trip instead of
+ * dozens and the marks appear at the same moment in every test.
+ */
+const glyphCache = new Map<string, Buffer>();
+
+async function installGlyphCache(page: Page): Promise<void> {
+  await page.route("https://demotiles.maplibre.org/font/**", async (route, request) => {
+    const url = request.url();
+    const hit = glyphCache.get(url);
+    if (hit) {
+      await route.fulfill({ status: 200, contentType: "application/x-protobuf", body: hit });
+      return;
+    }
+    try {
+      const resp = await route.fetch();
+      const body = await resp.body();
+      glyphCache.set(url, body);
+      await route.fulfill({ response: resp, body });
+    } catch {
+      // Offline: let the layer draw its icons and skip its text rather than
+      // failing the navigation.
+      await route.fulfill({ status: 404, body: "" });
+    }
+  });
+}
+
 export const test = base.extend<{ authedPage: Page }>({
   authedPage: async ({ page }, use) => {
     await installAuth(page);
+    await installGlyphCache(page);
     await installApiMocks(page);
     await use(page);
   },

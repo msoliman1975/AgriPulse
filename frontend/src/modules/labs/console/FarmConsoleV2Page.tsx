@@ -46,10 +46,12 @@ import { ConsoleUnitsRail } from "./ConsoleUnitsRail";
 import { FarmIdentityStrip } from "./FarmIdentityStrip";
 import { IndexLegend } from "./IndexLegend";
 import { MapDock } from "./MapDock";
+import { MapLayersControl } from "./MapLayersControl";
 import { SceneTimeline } from "./SceneTimeline";
 import { SettingsDrawer } from "./SettingsDrawer";
 import { useMapFullscreen } from "./useMapFullscreen";
 import { useConsoleMutations } from "./useConsoleMutations";
+import { TIMELINE_RANGES } from "./timelineWindow";
 import { useFarmConsole } from "./useFarmConsole";
 
 /** Every in-console link must build off this, never a literal. */
@@ -206,6 +208,12 @@ function Console({ farmId }: { farmId: string }): ReactNode {
         indexOptions={MAP_INDEX_ORDER}
         layers={c.layers}
         onLayersChange={(patch) => c.setLayers((l) => ({ ...l, ...patch }))}
+        // The `Layers ▾` chip is gone from THIS console: the same switches are
+        // picture cards on the map itself (MapLayersControl), and keeping both
+        // would give one piece of state two front doors. The live console
+        // still renders the chip — it has no cards — which is why this is a
+        // prop rather than a deletion inside ViewBar.
+        showLayersMenu={false}
         onOpenSettings={() => setSettingsOpen(true)}
         showGrid={c.showGrid}
         onToggleGrid={() => {
@@ -294,9 +302,11 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               bulkPreview={m.bulkPreviewFc}
             />
 
-            {/* Zone 5 — how am I reading this: view modes, not visibility. */}
+            {/* Zone 5 — how am I reading this: view modes, not visibility.
+                Trailing edge, clear of the legend above it and of the layer
+                cards in the opposite corner. */}
             <MapDock
-              className="absolute bottom-3 end-3 z-10 bg-ap-panel/95 shadow-card"
+              className="absolute end-3 top-1/2 z-10 -translate-y-1/2 bg-ap-panel/95 shadow-card"
               showPixels={c.showPixels}
               pixelsAvailable={c.pixels.assetCount > 0}
               onTogglePixels={() => c.setShowPixels((s) => !s)}
@@ -309,6 +319,29 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               }}
               onFullscreen={fullscreen.toggle}
               isFullscreen={fullscreen.isFullscreen}
+            />
+
+            {/* Zone 5b — layers, as cards on the map rather than a menu in
+                the bar. Bottom-leading corner: the one part of a farm map
+                that is reliably empty, and out of the way of the legend. */}
+            <MapLayersControl
+              // `bottom-8`, not `bottom-3`: MapLibre draws its attribution
+              // strip along the bottom edge, and at map width the compact
+              // control expands into a full line that the cards sat on top of.
+              className="absolute bottom-8 start-3 z-10"
+              layers={c.layers}
+              onLayersChange={(patch) => c.setLayers((l) => ({ ...l, ...patch }))}
+              activeIndex={c.activeIndex}
+              showPixels={c.showPixels}
+              onTogglePixels={() => c.setShowPixels((s) => !s)}
+              pixelsAvailable={c.pixels.assetCount > 0}
+              showGrid={c.showGrid}
+              onToggleGrid={() => {
+                c.setShowGrid((s) => !s);
+                c.setSelectedCellId(null);
+              }}
+              gridAvailable={c.gridded.length > 0}
+              gridUnavailableForIndex={c.gridUnavailableForIndex}
             />
 
             {/* Zone 4 — index legend. Anchored to the map's trailing edge so
@@ -461,6 +494,8 @@ function Console({ farmId }: { farmId: string }): ReactNode {
                 observation={c.selectedObs}
                 definition={c.selectedSignalDef}
                 isLoading={c.signalObsQ.isLoading}
+                stack={c.selectedObsStack}
+                onSelectFromStack={c.showObservation}
                 x={c.obsClickPoint?.x ?? null}
                 y={c.obsClickPoint?.y ?? null}
                 onClose={c.clearObservation}
@@ -512,12 +547,16 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               changes what the map shows, so it sits directly under it and
               spans the map column only. */}
           <SceneTimeline
-            scenes={c.scenes}
+            scenes={c.visibleScenes}
+            allScenes={c.scenes}
             selectedDate={c.sceneDate}
             onSelect={c.selectScene}
             medianGapDays={c.medianGapDays}
             loading={c.scenesQ.isLoading}
             available={c.scenesQ.data !== null}
+            rangeDays={c.timelineDays}
+            onRangeChange={c.setTimelineDays}
+            ranges={TIMELINE_RANGES}
           />
 
           {c.selectedId ? (

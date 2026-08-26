@@ -20,13 +20,31 @@ import { useTranslation } from "react-i18next";
 import type { FarmScene } from "@/api/imagery";
 
 interface Props {
+  /** The passes to draw — already narrowed to `rangeDays`. */
   scenes: readonly FarmScene[];
+  /**
+   * Every pass the api returned, before the window. Only used to say how many
+   * more there are behind the current range; a reader who cannot see that a
+   * wider window would show something has no reason to widen it.
+   */
+  allScenes?: readonly FarmScene[];
   selectedDate: string | null;
   onSelect: (sceneDate: string | null) => void;
   medianGapDays: number | null;
   loading: boolean;
   /** False when the API predates the farm-scenes route. */
   available: boolean;
+  /**
+   * Days of history the strip is showing; `null` is everything held.
+   *
+   * The three window props are optional together: a caller that does not
+   * window its own list gets the strip it always got, with no range control
+   * and nothing claiming there is more behind it.
+   */
+  rangeDays?: number | null;
+  onRangeChange?: (days: number | null) => void;
+  /** The windows to offer, in the order they are drawn. */
+  ranges?: readonly (number | null)[];
 }
 
 /** A pass is "cloudy" when every block that tried was skipped for cloud. */
@@ -69,11 +87,15 @@ function cloudPct(s: FarmScene): number | null {
 
 export function SceneTimeline({
   scenes,
+  allScenes = scenes,
   selectedDate,
   onSelect,
   medianGapDays,
   loading,
   available,
+  rangeDays = null,
+  onRangeChange,
+  ranges,
 }: Props): ReactNode {
   const { t, i18n } = useTranslation("farmConsole");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -129,7 +151,9 @@ export function SceneTimeline({
   }, [medianGapDays, ordered]);
 
   // Nothing to show is not the same as nothing to say.
-  if (!available || (!loading && ordered.length === 0)) {
+  const hidden = allScenes.length - scenes.length;
+
+  if (!available || (!loading && allScenes.length === 0)) {
     return (
       <div className="flex h-[46px] flex-none items-center gap-2 border-t border-ap-line bg-ap-panel px-3">
         <span className="text-meta text-ap-muted">
@@ -141,12 +165,49 @@ export function SceneTimeline({
 
   return (
     <div className="flex flex-none items-stretch border-t border-ap-line bg-ap-panel">
+      {/* The window, on the leading edge — the reader meets it before the
+          dates, so a strip that starts 30 days back is explained rather than
+          looking like the farm has no history. */}
+      {ranges && onRangeChange ? (
+        <div className="flex flex-none items-center gap-1 border-e border-ap-line px-2">
+          {ranges.map((d) => (
+            <button
+              key={String(d)}
+              type="button"
+              onClick={() => onRangeChange(d)}
+              aria-pressed={d === rangeDays}
+              title={
+                d === null
+                  ? t("timeline.rangeAllHint", { count: allScenes.length })
+                  : t("timeline.rangeHint", { days: d })
+              }
+              className={
+                "rounded-md px-1.5 py-0.5 text-[10px] font-bold tabular-nums transition-colors " +
+                (d === rangeDays
+                  ? "bg-ap-primary-soft text-ap-primary"
+                  : "text-ap-muted hover:bg-ap-bg")
+              }
+            >
+              {d === null ? t("timeline.rangeAll") : t("timeline.rangeDays", { days: d })}
+            </button>
+          ))}
+          {/* What widening would buy, in passes. Silent when nothing is hidden. */}
+          {hidden > 0 ? (
+            <span className="ms-0.5 whitespace-nowrap text-[10px] text-ap-muted">
+              {t("timeline.moreHidden", { count: hidden })}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       <div
         ref={scrollRef}
         role="listbox"
         aria-label={t("timeline.label")}
         className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-2 py-1.5"
       >
+        {!loading && ordered.length === 0 ? (
+          <span className="ps-1 text-meta text-ap-muted">{t("timeline.emptyInRange")}</span>
+        ) : null}
         {loading && ordered.length === 0
           ? Array.from({ length: 10 }, (_, i) => (
               <div

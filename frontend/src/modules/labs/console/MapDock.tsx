@@ -1,10 +1,17 @@
-// The map's own control cluster — "how am I reading this", as opposed to the
-// view bar's "what am I looking at".
+// The map's own tool rail — "how am I reading this", as opposed to the view
+// bar's "what am I looking at".
 //
-// The sub-block grid toggle moves here from the Layers popover on purpose: it
-// is a view MODE, not a visibility flag. It changes what the colours mean,
-// not merely whether something is drawn, which puts it with anomaly and
-// contrast rather than with "show borders".
+// Vertical, on the map's trailing edge. Tools sit apart from layers, which
+// are picture cards in the opposite corner (MapLayersControl): a tool changes
+// how the map is READ — anomaly, contrast, two dates side by side — where a
+// layer only decides what is drawn. Mixing the two in one menu is what the
+// old `Layers ▾` popover did, and it is why the mesh toggle was buried nine
+// rows down among visibility switches it has nothing to do with.
+//
+// Pixels and the mesh appear in BOTH places on purpose. They are the two
+// controls an operator reaches for constantly, they are legitimately layers
+// AND view modes, and one shared piece of state drives both — so the rail and
+// the cards can never disagree about which is on.
 //
 // Controls that Slice 3 will implement are rendered DISABLED with a reason
 // rather than hidden. A greyed control with an explanation tells the reader
@@ -99,7 +106,7 @@ export function MapDock({
 
   return (
     <Card className={className} noPadding>
-      <div className="flex items-center gap-1 p-1">
+      <div className="flex flex-col items-center gap-1 p-1">
         {buttons.map((b) => {
           const label = t(`mapDock.${b.labelKey}`);
           const hint = b.hintKey ? t(`mapDock.${b.hintKey}`) : null;
