@@ -9,6 +9,15 @@ import { INDEX_META, isThermalIndex } from "./constants";
 import { MarkerLegend } from "../map/MarkerLegend";
 import { Popover, PopHeading, PopItem, PopDivider } from "./ui";
 
+/**
+ * What a block label reads.
+ *
+ * `crop` is resolved against the SCENE DATE, not against today: a console
+ * scrubbed back to a pass from a past season must name the crop that was in
+ * the ground then. See `useFarmCropLabels`.
+ */
+export type BlockLabelField = "name" | "crop";
+
 export interface LayerState {
   aoi: boolean;
   blocks: boolean;
@@ -28,6 +37,17 @@ export interface LayerState {
   // turns it off. Without it, "no signal picked" was the only off switch and
   // that made the layer invisible until somebody guessed the right type.
   signals: boolean;
+  // What the block label says. Only read while `labels` is on. The live
+  // console has no picker for it and stays on "name"; both consoles carry the
+  // field so one shared LayerState cannot go missing a key.
+  labelField: BlockLabelField;
+  // Alert chips — the count bubble on a block with open alerts. A layer like
+  // any other; it simply never had a switch, so a farm with 29 open alerts
+  // had no way to see the map underneath them.
+  alerts: boolean;
+  // The "what the marks mean" strip above the date bar. Off by default: it is
+  // a reference, and a reference that is always open is chrome.
+  markLegend: boolean;
 }
 
 interface Props {
@@ -54,6 +74,19 @@ interface Props {
    * keeps the chip and this defaults to true.
    */
   showLayersMenu?: boolean;
+  /**
+   * Whether to draw the index chip and its popover.
+   *
+   * Farm Console v2 sets it false: the index selector moved into the map's
+   * datapoint control, where "None" turns the pixels off. Two front doors
+   * onto one index is how the two disagree about what "None" means.
+   */
+  showIndexMenu?: boolean;
+  /**
+   * Whether to draw the signals chip and its popover. False in v2 for the
+   * same reason as the index: the picker lives in the datapoint control.
+   */
+  showSignalsMenu?: boolean;
   onOpenSettings: () => void;
   showGrid: boolean;
   onToggleGrid: () => void;
@@ -119,6 +152,8 @@ export function ViewBar({
   layers,
   onLayersChange,
   showLayersMenu = true,
+  showIndexMenu = true,
+  showSignalsMenu = true,
   onOpenSettings,
   showGrid,
   onToggleGrid,
@@ -150,9 +185,11 @@ export function ViewBar({
   return (
     <header className="relative z-30 flex h-12 flex-none items-center gap-2.5 border-b border-ap-line bg-ap-panel px-3.5">
       {leading}
-      <Chip innerRef={indexRef} onClick={() => setOpen(open === "index" ? null : "index")}>
-        🎨 {t("viewbar.index")}: <b>{INDEX_META[activeIndex].label}</b> ▾
-      </Chip>
+      {showIndexMenu ? (
+        <Chip innerRef={indexRef} onClick={() => setOpen(open === "index" ? null : "index")}>
+          🎨 {t("viewbar.index")}: <b>{INDEX_META[activeIndex].label}</b> ▾
+        </Chip>
+      ) : null}
       {showLayersMenu ? (
         <Chip
           innerRef={layersRef}
@@ -162,13 +199,15 @@ export function ViewBar({
           ▥ {t("viewbar.layers")} ▾
         </Chip>
       ) : null}
-      <Chip
-        innerRef={signalsRef}
-        onClick={() => setOpen(open === "signals" ? null : "signals")}
-        active={layers.signals}
-      >
-        ◇ {activeSignalName ?? t("layers.signals")} ▾
-      </Chip>
+      {showSignalsMenu ? (
+        <Chip
+          innerRef={signalsRef}
+          onClick={() => setOpen(open === "signals" ? null : "signals")}
+          active={layers.signals}
+        >
+          ◇ {activeSignalName ?? t("layers.signals")} ▾
+        </Chip>
+      ) : null}
 
       {trailing}
 
@@ -190,7 +229,7 @@ export function ViewBar({
           NDVI changes only which number is drawn. The heading is the cheapest
           place to say "different sensor" once, instead of on every row or —
           the alternative that was live until now — nowhere at all. */}
-      <Popover open={open === "index"} onClose={close} anchorRef={indexRef}>
+      <Popover open={showIndexMenu && open === "index"} onClose={close} anchorRef={indexRef}>
         <PopHeading>{t("viewbar.vegIndex")}</PopHeading>
         {indexOptions.map((code, i) => (
           <span key={code} className="contents">
@@ -282,7 +321,7 @@ export function ViewBar({
       </Popover>
 
       {/* Signals popover — pick a signal to overlay its observations */}
-      <Popover open={open === "signals"} onClose={close} anchorRef={signalsRef}>
+      <Popover open={showSignalsMenu && open === "signals"} onClose={close} anchorRef={signalsRef}>
         <PopHeading>{t("layers.signals")}</PopHeading>
         {/* Top item shows everything. It used to hide everything, which is
             why nobody saw an observation without first guessing which signal

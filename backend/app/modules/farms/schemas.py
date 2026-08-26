@@ -1057,6 +1057,31 @@ BulkPreviewOutcome = Literal["assign", "replace", "skip"]
 BulkApplyOutcome = Literal["assigned", "replaced", "skipped", "failed"]
 
 
+class FarmCropAssignmentResponse(BaseModel):
+    """The crop one block carried on one date.
+
+    Serves the Farm Console map label, which can be scrubbed back to a scene
+    from a past season. Reading `is_active_now` off the per-block history would
+    label every historical scene with today's crop, so the date is a parameter
+    and the answer is the assignment whose validity range contains it.
+
+    The crop name ships in both languages rather than resolved server-side:
+    the caller already localizes every other catalogue name at read time, and
+    a locale switch must not need a refetch.
+    """
+
+    block_id: UUID
+    block_crop_id: UUID
+    crop_id: UUID
+    crop_path: str
+    crop_name_en: str
+    crop_name_ar: str
+    season_label: str
+    effective_from: date
+    effective_to: date | None = None
+    status: BlockCropStatus
+
+
 class BulkCropCandidateCurrent(BaseModel):
     """The assignment a candidate block carries today, if any."""
 

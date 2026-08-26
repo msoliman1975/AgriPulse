@@ -152,4 +152,14 @@ export interface UnitFeatureProps {
   // when the block has no scored risk. Read by the map fill expression when
   // the risk overlay is toggled on.
   risk_level: "low" | "moderate" | "high" | "none";
+  /**
+   * The crop this block carried on the date being drawn, already localized.
+   *
+   * Absent unless the caller asked for crop labels, and absent per block when
+   * that block had no assignment covering the date — the label expression
+   * falls back to `name`, so an unplanted block still says which block it is.
+   */
+  crop_label?: string;
+  /** Injected by Farm Console v2: the block's index class colour. */
+  class_color?: string;
 }

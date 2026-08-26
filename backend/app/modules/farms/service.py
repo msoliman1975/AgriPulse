@@ -409,6 +409,10 @@ class FarmService(Protocol):
 
     async def list_block_crops(self, *, block_id: UUID) -> list[dict[str, Any]]: ...
 
+    async def list_farm_crop_assignments(
+        self, *, farm_id: UUID, on: _date
+    ) -> list[dict[str, Any]]: ...
+
     async def list_bulk_crop_candidates(
         self, *, farm_id: UUID, preferred_unit: str
     ) -> list[dict[str, Any]]: ...
@@ -2013,6 +2017,48 @@ class FarmServiceImpl:
 
     async def list_block_crops(self, *, block_id: UUID) -> list[dict[str, Any]]:
         return await self._repo.list_block_crops(block_id=block_id)
+
+    async def list_farm_crop_assignments(self, *, farm_id: UUID, on: _date) -> list[dict[str, Any]]:
+        """The crop each block on the farm carried on `on`.
+
+        One query for the assignments and one for the crop names, because the
+        caller is the map: it asks for the whole farm at once and re-asks on
+        every date the reader clicks. Blocks with no assignment covering that
+        date are omitted rather than returned with nulls — the map draws a
+        label per row, and a row that names no crop is a label that says
+        nothing.
+        """
+        if (await self._repo.get_farm_by_id(farm_id, with_boundary=False)) is None:
+            raise FarmNotFoundError(farm_id)
+
+        by_block = await self._repo.list_block_crop_rows_for_farm(farm_id=farm_id)
+        picked: dict[UUID, Any] = {}
+        for block_id, rows in by_block.items():
+            assignment = current_assignment(rows, on)
+            if assignment is not None:
+                picked[block_id] = assignment
+
+        names = await self._repo.crop_names_by_id(
+            crop_ids=[assignment.crop_id for assignment in picked.values()]
+        )
+        out: list[dict[str, Any]] = []
+        for block_id, assignment in picked.items():
+            name_en, name_ar = names.get(assignment.crop_id, (assignment.crop_path, ""))
+            out.append(
+                {
+                    "block_id": block_id,
+                    "block_crop_id": assignment.id,
+                    "crop_id": assignment.crop_id,
+                    "crop_path": assignment.crop_path,
+                    "crop_name_en": name_en,
+                    "crop_name_ar": name_ar or name_en,
+                    "season_label": assignment.season_label,
+                    "effective_from": assignment.effective_from,
+                    "effective_to": assignment.effective_to,
+                    "status": assignment.status,
+                }
+            )
+        return out
 
     # ---- Bulk crop assignment ---------------------------------------------
     #

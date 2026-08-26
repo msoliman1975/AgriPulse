@@ -54,6 +54,11 @@ export const CONSOLE_QK = {
   // sets, and both change what comes back.
   fieldFlags: (farmId: string, openOnly: boolean, until: string | null) =>
     ["labs/console/fieldFlags", farmId, openOnly, until] as const,
+  // Crop labels for the map. Keyed on the SCENE DATE, not the as-of instant:
+  // a crop assignment is valid over whole days, so two passes on the same day
+  // are one answer. Null means "today", which is what the route defaults to.
+  cropLabels: (farmId: string, on: string | null) =>
+    ["labs/console/cropLabels", farmId, on] as const,
   farm: (farmId: string) => ["labs/console/farm", farmId] as const,
   block: (blockId: string) => ["labs/console/block", blockId] as const,
   inactivatePreview: (blockId: string | null) =>

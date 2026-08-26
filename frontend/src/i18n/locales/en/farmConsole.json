@@ -746,19 +746,6 @@
       "value": "Value"
     }
   },
-  "mapDock": {
-    "grid": "Grid lines",
-    "gridUnavailable": "no block on this farm has a grid configured",
-    "anomaly": "Anomaly vs baseline",
-    "contrast": "Contrast view",
-    "compare": "Compare two dates",
-    "comingSoon": "not built yet",
-    "fullscreen": "Full screen",
-    "exitFullscreen": "Exit full screen",
-    "pixels": "Index pixels",
-    "pixelsUnavailable": "no block has an image for this date",
-    "gridNotForThisIndex": "Sub-block zones are computed from the optical product. Thermal has none — read it across the farm instead."
-  },
   "legend": {
     "title": "Index legend",
     "scopeFarm": "Whole farm",
@@ -924,13 +911,48 @@
       "reopen": "re-opened it"
     }
   },
-  "layerCards": {
-    "satellite": "Satellite",
-    "satelliteHint": "The base map. Always drawn.",
-    "pixelsHint": "Colour every pixel by the selected index",
-    "gridHint": "Draw the sub-block mesh over the index",
-    "more": "More",
-    "moreHint": "Outlines, labels, marks and opacity",
-    "grid": "Cells"
+  "layerBar": {
+    "farmBorders": "Farm borders",
+    "blockBorders": "Block/pivot borders",
+    "cells": "Cells",
+    "borderOpacity": "Border",
+    "fillOpacity": "Fill",
+    "showLabels": "Labels",
+    "labelName": "Block name",
+    "labelCrop": "Crop",
+    "cellsUnavailable": "no block on this farm has a grid configured",
+    "cellsNotForThisIndex": "Sub-block zones are computed from the optical product. Thermal has none — read it across the farm instead."
+  },
+  "dataControl": {
+    "title": "On the map",
+    "index": "Index",
+    "indexTitle": "Index to draw",
+    "indexNone": "None",
+    "indexNoneHint": "Draw no index — satellite only",
+    "alerts": "Alerts & recs",
+    "flags": "Field flags",
+    "flagsTitle": "Field flags",
+    "flagsMode": {
+      "current": "Current",
+      "historical": "Historical",
+      "none": "None"
+    },
+    "flagsHint": {
+      "current": "Open flags only",
+      "historical": "Every flag, open and closed",
+      "none": "Hide the layer"
+    },
+    "signals": "Signals",
+    "signalsTitle": "Signal readings",
+    "signalsAll": "All signals",
+    "signalsNone": "None",
+    "markLegend": "What marks mean",
+    "on": "On",
+    "off": "Off",
+    "shown": "Shown",
+    "hidden": "Hidden",
+    "indexUnavailable": "no block has an image for this date",
+    "fullscreen": "Full screen",
+    "exitFullscreen": "Exit full screen"
   }
 }
