@@ -24,6 +24,15 @@ interface Props {
    */
   stack?: readonly SignalObservation[];
   onSelectFromStack?: (observationId: string) => void;
+  /**
+   * The day the console is reading the farm as of, or null for "now".
+   *
+   * Only used to explain an observation that is no longer in the list. With a
+   * date selected the reason is almost always that the reading was recorded
+   * after that day, and the old copy — "pick the matching signal in the
+   * overlay control" — sent the reader to a control that cannot help.
+   */
+  asOfDate?: string | null;
   // Click pixel coords (relative to the map container) — anchor the card
   // next to the clicked observation dot. Null falls back to the fixed
   // top-right corner. Mirrors GridCellPopup so the two read as siblings.
@@ -46,6 +55,7 @@ export function SignalObservationPanel({
   isLoading,
   stack = [],
   onSelectFromStack,
+  asOfDate = null,
   x,
   y,
   onClose,
@@ -58,6 +68,28 @@ export function SignalObservationPanel({
     () => new Intl.DateTimeFormat(i18n.language, { day: "2-digit", month: "short" }),
     [i18n.language],
   );
+  // A scout who visits a block twice in one morning produces two readings on
+  // one day, and two chips both reading "18 Aug" name neither. The time is
+  // added only where the day does not already separate them, so the common
+  // case stays short.
+  const stackTimeFmt = useMemo(
+    () =>
+      new Intl.DateTimeFormat(i18n.language, {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    [i18n.language],
+  );
+  const dayIsAmbiguous = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const o of stack) {
+      const key = o.time.slice(0, 10);
+      seen.set(key, (seen.get(key) ?? 0) + 1);
+    }
+    return seen;
+  }, [stack]);
 
   if (isLoading) {
     return (
@@ -70,7 +102,11 @@ export function SignalObservationPanel({
   if (!observation) {
     return (
       <AnchoredPopup x={x} y={y} title={t("observationPanel.title")} onClose={onClose}>
-        <p className="text-ap-crit">{t("observationPanel.notFound")}</p>
+        <p className="text-ap-crit">
+          {asOfDate
+            ? t("observationPanel.notInScene", { date: asOfDate })
+            : t("observationPanel.notFound")}
+        </p>
       </AnchoredPopup>
     );
   }
@@ -115,7 +151,9 @@ export function SignalObservationPanel({
                       : "border-ap-line text-ap-ink hover:bg-ap-bg")
                   }
                 >
-                  {stackDayFmt.format(parseISO(o.time))}
+                  {(dayIsAmbiguous.get(o.time.slice(0, 10)) ?? 0) > 1
+                    ? stackTimeFmt.format(parseISO(o.time))
+                    : stackDayFmt.format(parseISO(o.time))}
                 </button>
               );
             })}

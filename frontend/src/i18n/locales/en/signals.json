@@ -74,7 +74,8 @@
       "point_in_entity": "Pinned inside the block",
       "free_point": "Free-floating point"
     },
-    "stack": "{{count}} readings on this spot"
+    "stack": "{{count}} readings on this spot",
+    "notInScene": "This reading is not part of the pass on {{date}}. It was recorded on another day."
   },
   "refPicker": {
     "title": "Signal reference",
