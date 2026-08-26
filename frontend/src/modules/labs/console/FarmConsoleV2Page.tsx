@@ -496,6 +496,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
                 isLoading={c.signalObsQ.isLoading}
                 stack={c.selectedObsStack}
                 onSelectFromStack={c.showObservation}
+                asOfDate={c.sceneDate}
                 x={c.obsClickPoint?.x ?? null}
                 y={c.obsClickPoint?.y ?? null}
                 onClose={c.clearObservation}
