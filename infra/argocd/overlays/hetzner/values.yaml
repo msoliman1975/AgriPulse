@@ -2968,11 +2968,31 @@ global:
   #   Images CONFIRMED by pulling both on the node before the bump:
   #   api @ 25d01a6, frontend @ 25d01a6.
   #   Rollback is api to d286e3c, workers to 1363ebe, frontend to 1d0ed72.
+  # 2026-08-26 - e6735c0 = #588, the farm map draws its marks again, the date
+  #   bar opens on 30 days, and layers move onto the map.
+  #   The signal diamonds were not being drawn at all. #581 put every marker
+  #   layer into collision and placed the diamond last, and on Bashier Elkhier
+  #   all 145 observations are `entity` mode, so each falls back to its block
+  #   centroid - the same anchor the alert chip and the name label use. Every
+  #   diamond lost its contest. MapLibre does not hit-test a symbol it did not
+  #   place, so the mark read as "there but not clickable". Marks that fall
+  #   back to a centroid are now offset off that anchor, and observations on
+  #   one coordinate become one mark carrying the list.
+  #   The date bar opens on the last 30 days with 30d/90d/365d/All.
+  #   Every overlay now reads as of the selected pass. That is why api moves
+  #   too: `GET /farms/{id}/blocks/summary` gains an `at` parameter that
+  #   rebuilds the alert rollup for a past instant.
+  #   Backend + frontend, so api, workers and frontend all move together.
+  #   Tile-server stays 676746a and keycloak stays 677c7dc.
+  #   NO MIGRATION. The `at` parameter is optional and reads existing columns.
+  #   Images CONFIRMED by pulling both on the node before the bump:
+  #   api @ e6735c0, frontend @ e6735c0.
+  #   Rollback is api, workers and frontend all back to 25d01a6.
   images:
     api:
-      tag: "25d01a6"
+      tag: "e6735c0"
     workers:
-      tag: "25d01a6"
+      tag: "e6735c0"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3076,7 +3096,7 @@ global:
       #   FRONTEND ONLY. No backend file changed, so api stays 698e8f6,
       #   workers 1363ebe and tile-server 676746a; none of them restart.
       #   Rollback is this tag back to 698e8f6. No migration.
-      tag: "25d01a6"
+      tag: "e6735c0"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
