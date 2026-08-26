@@ -41,7 +41,13 @@ def postgres_container() -> Iterator[object]:
         pytest.skip("testcontainers not installed")
     # `driver="psycopg"` matches our psycopg[binary] dep â€” without it
     # testcontainers falls back to psycopg2 for its readiness probe.
-    container = PostgresContainer(_TIMESCALE_IMAGE, driver="psycopg")
+    # PROBE, NOT A FIX TO KEEP: Docker gives every container 64 MB of
+    # /dev/shm, and Postgres allocates parallel-query segments there. This
+    # branch exists only to answer whether that ceiling is what fails the
+    # weather suite in CI.
+    container = PostgresContainer(_TIMESCALE_IMAGE, driver="psycopg").with_kwargs(
+        shm_size="1g"
+    )
     container.with_env("POSTGRES_DB", "agripulse_test")
     container.start()
     try:
