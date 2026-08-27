@@ -92,6 +92,13 @@ export interface Visit {
   instruction: string | null;
   /** Why the engine raised this. Free-shaped JSON — render defensively. */
   reason_snapshot: Record<string, unknown> | null;
+  /** The exact spot a supervisor tapped. Set on ad-hoc dispatch and NOTHING
+   *  else — a CHECK on the table enforces that — so it is null on every visit
+   *  the decision engine raises. */
+  pin_point: GeoJsonPoint | null;
+  /** The centre of `cell_id`, filled in by the API from the live grid. Null
+   *  when the visit is scoped to the whole block. */
+  cell_point: GeoJsonPoint | null;
   severity: "info" | "warning" | "critical";
   priority: "low" | "medium" | "high";
   due_by: string | null;
@@ -336,6 +343,20 @@ export interface Geopoint {
 }
 
 /**
+ * A position as PostGIS renders it: GeoJSON, so **longitude first**.
+ *
+ * Deliberately a different type from `Geopoint` above, which the app *writes*
+ * and which names its fields. Every position the API *reads back* off a
+ * geometry column arrives in this shape, and the two orderings are silently
+ * interchangeable at a call site — a swap puts a scout in the wrong hemisphere
+ * with no error anywhere. Read it through `pointOf` in `work/where.ts`.
+ */
+export interface GeoJsonPoint {
+  type: "Point";
+  coordinates: [number, number];
+}
+
+/**
  * Record one observation.
  *
  * `location_mode` is `entity` when there is no fix and **`free_point`** when
@@ -494,6 +515,10 @@ export interface Block {
   code: string;
   name: string | null;
   is_active: boolean;
+  /** Its middle. The list endpoint has always sent this; the app simply never
+   *  declared it, so the coarsest position a job can have was sitting unread
+   *  in a payload the Tasks screen already fetches for every farm. */
+  centroid: GeoJsonPoint;
 }
 
 /**

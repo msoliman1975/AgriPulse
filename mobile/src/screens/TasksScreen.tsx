@@ -4,6 +4,7 @@ import { claimVisit, type WorkItem } from "@/api/client";
 import type { FarmScope } from "@/api/me";
 import { ALL_FARMS, FarmRail, type FarmCount } from "@/components/FarmRail";
 import { HomeHeader } from "@/components/HomeHeader";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { dueIn, t, tCount, type Lang, type MessageKey } from "@/i18n";
 import { WorkDetailScreen } from "@/screens/WorkDetailScreen";
 import {
@@ -300,6 +301,14 @@ export function TasksScreen({
         lang={lang}
         farmId={open.farm_id}
         item={open}
+        // The block list is already in hand for every farm — it is what names
+        // the rows — and it carries the centroid the detail screen needs to
+        // offer directions. Looked up from the item's OWN farm, not the rail:
+        // under "All farms" the two differ, and the wrong farm's list would
+        // send a scout to a block of the same name somewhere else.
+        block={
+          (loaded.blocksByFarm[open.farm_id] ?? []).find((b) => b.id === open.block_id) ?? null
+        }
         onClose={() => {
           setOpen(null);
           void load();
@@ -316,7 +325,7 @@ export function TasksScreen({
   const overview = current === ALL_FARMS && farms.length > 1;
 
   return (
-    <div className="screen tasks">
+    <PullToRefresh lang={lang} className="screen tasks" onRefresh={load}>
       <HomeHeader
         lang={lang}
         onLangChange={onLangChange}
@@ -438,7 +447,7 @@ export function TasksScreen({
           ))}
         </ul>
       )}
-    </div>
+    </PullToRefresh>
   );
 }
 

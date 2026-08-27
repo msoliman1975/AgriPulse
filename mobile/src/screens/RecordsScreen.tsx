@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import {
   listBlocks,
@@ -11,6 +11,7 @@ import {
 import type { FarmScope } from "@/api/me";
 import { ALL_FARMS, FarmRail, type FarmCount } from "@/components/FarmRail";
 import { HomeHeader } from "@/components/HomeHeader";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { t, type Lang } from "@/i18n";
 import { FlagDetailScreen } from "@/screens/FlagDetailScreen";
 
@@ -64,17 +65,34 @@ export function RecordsScreen({
   const [openFlagId, setOpenFlagId] = useState<string | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Mounted, and which fetch is the current one. Both are refs: neither is
+  // rendered, and putting either in state would re-render the list to record
+  // a fact about the fetch rather than about the data.
+  const alive = useRef(true);
+  const seq = useRef(0);
 
   const single = farms.length === 1 ? farms[0].farm_id : null;
   const current = single ?? farm;
   const farmIds = farms.map((f) => f.farm_id).join(",");
 
-  useEffect(() => {
-    let live = true;
+  /**
+   * Fetch everything, once per farm.
+   *
+   * A named function rather than a body inside the effect, because the pull
+   * gesture needs to run the same fetch and must be able to await it — the
+   * spinner has to stop when the data lands, not on a timer.
+   *
+   * `seq` is what makes a stale response harmless. Two fetches can be in
+   * flight at once now (a pull, and a farm gained mid-session), and the older
+   * one finishing last would otherwise paint yesterday's rows over today's.
+   */
+  const load = useCallback(async (): Promise<void> => {
+    const mine = ++seq.current;
+    const fresh = (): boolean => alive.current && seq.current === mine;
     // 30 days: long enough to cover a pay period, short enough that the
     // request stays small on a field connection.
     const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
-    void Promise.all(
+    await Promise.all(
       farms.map((f) =>
         Promise.all([
           // Tagged here because the response does not carry it — see the
@@ -92,7 +110,7 @@ export function RecordsScreen({
       ),
     )
       .then((perFarm) => {
-        if (!live) return;
+        if (!fresh()) return;
         const ok = perFarm.filter((p): p is { farmId: string; r: NonNullable<typeof p.r> } => p.r !== null);
         setFailed(perFarm.filter((p) => p.r === null).map((p) => p.farmId));
         if (ok.length === 0) {
@@ -100,6 +118,9 @@ export function RecordsScreen({
           setRows([]);
           return;
         }
+        // A pull that succeeds has to clear the last failure's message, or
+        // the screen shows fresh rows under "could not load your records".
+        setError(null);
         const obs = ok.flatMap(({ r }) => r[0]);
         const blockList = ok.flatMap(({ r }) => r[1]);
         const flagList = ok.flatMap(({ r }) => r[2]);
@@ -114,13 +135,18 @@ export function RecordsScreen({
         setFlags(userId ? flagList.filter((f) => f.raised_by === userId) : flagList);
       })
       .catch(() => {
-        if (live) setError(t(lang, "records.loadFailed"));
+        if (fresh()) setError(t(lang, "records.loadFailed"));
       });
-    return () => {
-      live = false;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [farmIds, lang, userId]);
+
+  useEffect(() => {
+    alive.current = true;
+    void load();
+    return () => {
+      alive.current = false;
+    };
+  }, [load]);
 
   const nameOf = useMemo(() => {
     const byId = new Map(blocks.map((b) => [b.id, b.name || b.code]));
@@ -172,7 +198,7 @@ export function RecordsScreen({
   }
 
   return (
-    <div className="screen records">
+    <PullToRefresh lang={lang} className="screen records" onRefresh={load}>
       {/* The same header as Tasks, so the name is the door to the account
           sheet in the same place on every screen. The old "My records" title
           said what the tab bar already said. */}
@@ -280,7 +306,7 @@ export function RecordsScreen({
           </li>
         ))}
       </ul>
-    </div>
+    </PullToRefresh>
   );
 }
 

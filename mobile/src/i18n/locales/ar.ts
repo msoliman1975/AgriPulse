@@ -35,6 +35,10 @@ export const ar: Messages = {
   "work.alreadyClosed": "هذه المهمة مغلقة.",
   "work.markDone": "تم الإنجاز",
   "work.markSkipped": "لم يكن مطلوبًا",
+  "work.takeMeThere": "خذني إلى هناك",
+  "work.noLocation": "لا يوجد موقع محفوظ لهذه المهمة",
+  "work.atCellCentre": "يشير هذا إلى مركز المنطقة.",
+  "work.atBlockCentre": "يشير هذا إلى مركز القطعة.",
   "work.actionFailed": "لم تتم العملية. حاول مرة أخرى.",
   "work.recordFailed": "تعذّر حفظ القراءة.",
   "work.loadDefsFailed": "تعذّر تحميل ما يمكن تسجيله.",
@@ -179,4 +183,8 @@ export const ar: Messages = {
   "health.authDown": "تعذّر الوصول إلى خدمة الدخول",
   "health.bothDown": "لا يوجد اتصال",
   "health.retry": "إعادة المحاولة",
+
+  "refresh.pull": "اسحب للأسفل للتحديث",
+  "refresh.release": "أفلت للتحديث",
+  "refresh.working": "جارٍ التحديث…",
 };

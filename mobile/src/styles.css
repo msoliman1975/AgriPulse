@@ -610,3 +610,42 @@ h1 { line-height: 1.35; font-weight: 700; }
    real, resting state — the farm is genuinely unanswered — so a scout can now
    sit looking at a full-strength green button that does nothing. */
 .sheet > button:disabled { opacity: .5; }
+
+/* --- Take me there ------------------------------------------------------- */
+/* Sits between the job's facts and the buttons that change its state: it is
+   the thing a scout acts on FIRST — before accepting, before starting — and
+   putting it down among the lifecycle controls would bury the one control
+   that is used while still walking. Outlined rather than filled, because the
+   filled treatment in this app means "this changes the job", and opening a
+   map does not. */
+.goto { margin: 16px 0 4px; }
+.goto .go { display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 650;
+  border: 1px solid var(--ap-action); background: transparent; color: var(--ap-action);
+  text-decoration: none; }
+.goto .go::before { content: "➤"; font-size: 15px; }
+/* Disabled is a <button>, enabled is an <a> — an anchor has no disabled state,
+   and a dead <a href> that still looks live is worse than a grey button. */
+.goto button.go:disabled { border-color: var(--ap-line); color: var(--ap-muted); opacity: 1; }
+.goto .hint { margin-top: 8px; font-size: 13px; color: var(--ap-muted); }
+
+/* --- Pull to refresh ----------------------------------------------------- */
+/* The header is in normal flow and starts at zero height, so the list sits
+   where it always did until a finger moves it. `overflow: hidden` keeps the
+   mark and the label clipped while the height is still small, rather than
+   letting them spill over the first row. */
+.ptr-head { display: flex; align-items: center; justify-content: center; gap: 8px;
+  overflow: hidden; color: var(--ap-muted); font-size: 13px; }
+.ptr-head .mark { font-size: 15px; }
+/* Only the release is animated. Following the finger down through a transition
+   makes the gesture feel detached from it — measured at 14px into an 82px
+   pull — while springing back when it lifts is the part that should be smooth.
+   So the transition is off for as long as a finger is on it. */
+.ptr-head:not(.dragging) { transition: height .18s ease-out; }
+.ptr-head.busy .mark { animation: ptr-spin 1s linear infinite; }
+@keyframes ptr-spin { to { transform: rotate(360deg); } }
+/* Stop the WebView answering the same downward drag with its own overscroll
+   glow and, on a long list, with the browser's own pull-to-reload. Without
+   this the gesture fires twice: once here and once as a page reload, which on
+   a signed-in app throws away the loaded state to fetch what we just fetched. */
+html, body { overscroll-behavior-y: contain; }

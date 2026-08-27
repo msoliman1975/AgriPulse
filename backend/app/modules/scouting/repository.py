@@ -33,6 +33,15 @@ _VISIT_COLUMNS = """
     v.title, v.instruction, v.reason_snapshot,
     CASE WHEN v.pin_point IS NULL THEN NULL
          ELSE ST_AsGeoJSON(v.pin_point)::jsonb END AS pin_point,
+    -- The centre of the grid cell this visit names, when it names one. The
+    -- phone turns a position into walking directions, and a cell-scoped visit
+    -- is the only kind that can say something more exact than "the block":
+    -- `pin_point` is set on ad-hoc dispatch alone (a CHECK on the table
+    -- enforces that), and every engine-raised visit leaves it NULL. Without
+    -- this a scout sent to one zone out of nine was routed to the middle of
+    -- the whole block.
+    CASE WHEN gc.centroid IS NULL THEN NULL
+         ELSE ST_AsGeoJSON(gc.centroid)::jsonb END AS cell_point,
     v.severity, v.priority, v.due_by, v.status, v.outcome,
     v.assigned_to, v.assigned_by, v.assigned_at, v.accepted_at, v.started_at,
     v.completed_at, v.completed_by, v.decline_reason,
@@ -54,12 +63,14 @@ _VISIT_COLUMNS = """
 """
 
 # A visit points at a recommendation OR an alert OR neither (routine, ad-hoc,
-# self-initiated). Both joins are LEFT and both sides are keyed on a primary
-# key, so the two extra lookups per row cost an index probe each.
+# self-initiated), and at a grid cell or no cell. Every join is LEFT and every
+# right-hand side is keyed on a primary key, so the extra lookups per row cost
+# an index probe each.
 _VISIT_FROM = """
     FROM scouting_visits v
     LEFT JOIN recommendations r ON r.id = v.recommendation_id
     LEFT JOIN alerts a ON a.id = v.alert_id
+    LEFT JOIN grid_cells gc ON gc.id = v.cell_id
 """
 
 

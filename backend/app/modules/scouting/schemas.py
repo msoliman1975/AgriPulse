@@ -73,6 +73,15 @@ class ScoutingVisitResponse(BaseModel):
     reason_snapshot: dict[str, Any] | None = None
     # GeoJSON Point, rendered by the repository (the column is PostGIS).
     pin_point: dict[str, Any] | None = None
+    # The centre of `cell_id`, when the visit names a cell. Read from the grid
+    # rather than stored, so a regenerated grid moves the point with it.
+    #
+    # It is here so the field app can offer directions. A scout is told to walk
+    # somewhere, and the three sources of a position are not equal: `pin_point`
+    # is the exact spot a supervisor tapped, this is the centre of one zone,
+    # and the block centroid (which the block list already carries) is the
+    # coarsest. The app reads them in that order.
+    cell_point: dict[str, Any] | None = None
     severity: Severity
     priority: Priority
     due_by: datetime | None = None

@@ -132,7 +132,16 @@ export function RecordSheet({
   // and waiting in the Tasks list, which is the truth.
   if (mode === "round" && visit) {
     return (
-      <WorkDetailScreen lang={lang} farmId={farmId} item={visit} onClose={onClose} onChanged={() => undefined} />
+      <WorkDetailScreen
+        lang={lang}
+        farmId={farmId}
+        item={visit}
+        // The block the scout just picked, already loaded above. A self-started
+        // round is walked to like any other job.
+        block={(blocks ?? []).find((b) => b.id === blockId) ?? null}
+        onClose={onClose}
+        onChanged={() => undefined}
+      />
     );
   }
 
