@@ -167,8 +167,19 @@ export function FarmTimelinePage(): ReactNode {
         <TimelineLayerBar layers={layers} onChange={setLayers} omittedKinds={tl.omittedKinds} />
       </div>
 
-      <div className="flex min-h-0 flex-1 gap-3 p-3">
-        <div className="relative min-w-0 flex-1 overflow-hidden rounded-card border border-ap-line">
+      {/* Column below `lg`, row at and above it.
+          The rail used to be `hidden lg:block`, so on a narrow window there
+          was a map and a scrubber and no datapoint list at all — a reader
+          could see THAT something happened on a block, from the marks and
+          the lit outlines, and never WHAT. Half the feature was absent on a
+          phone. Stacking keeps both: the map takes a fixed share of the
+          height and the rail takes the rest, each scrolling inside itself,
+          so the scrubber stays on screen at every width. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 lg:flex-row">
+        {/* `basis-1/2` below `lg` so the map cannot squeeze the rail to
+            nothing on a short window; `flex-1` from `lg` up, where the rail
+            is beside it and takes its width instead. */}
+        <div className="relative min-h-0 min-w-0 flex-1 basis-1/2 overflow-hidden rounded-card border border-ap-line lg:basis-auto">
           <TimelineMap
             blocks={blockGeojson}
             farmBoundary={tl.farmQ.data?.boundary ?? null}
@@ -190,7 +201,7 @@ export function FarmTimelinePage(): ReactNode {
           <ImageDateCaption imageDay={tl.imageDay} formatDay={formatDay} />
         </div>
 
-        <div className="hidden min-h-0 w-96 shrink-0 lg:block">
+        <div className="flex min-h-0 flex-1 basis-1/2 flex-col lg:w-96 lg:flex-none lg:basis-auto">
           <AsyncBoundary
             state={state}
             skeleton="lines"

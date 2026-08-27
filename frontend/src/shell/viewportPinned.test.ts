@@ -64,3 +64,42 @@ describe("viewport pinning", () => {
     expect(missing).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The datapoint rail must exist at every width
+// ---------------------------------------------------------------------------
+
+const TIMELINE_PAGE = readFileSync(
+  resolve(root, "src/modules/timeline/pages/FarmTimelinePage.tsx"),
+  "utf8",
+);
+
+describe("timeline rail at narrow widths", () => {
+  it("never hides the rail behind a breakpoint", () => {
+    // It shipped as `hidden lg:block`. On a 900px window that left a map
+    // and a scrubber and no datapoint list: the reader could see THAT
+    // something happened on a block, from the marks and the lit outlines,
+    // and never WHAT. Half the feature was absent on a phone.
+    //
+    // Source-level because the defect is a class on an element, and jsdom
+    // reports no layout at all — `hidden` and `block` measure identically
+    // there, both zero. A render test cannot tell them apart.
+    const railBlock = /\{\/\* [^*]*\*\/\}\s*<div className="([^"]*)">\s*<AsyncBoundary/.exec(
+      TIMELINE_PAGE,
+    );
+    const railClasses =
+      railBlock?.[1] ?? /<div className="([^"]*)">\s*<AsyncBoundary/.exec(TIMELINE_PAGE)?.[1] ?? "";
+    expect(railClasses, "could not find the rail wrapper").toBeTruthy();
+    expect(
+      railClasses.split(/\s+/),
+      `the rail is hidden by default: "${railClasses}"`,
+    ).not.toContain("hidden");
+  });
+
+  it("stacks rather than sitting beside the map below lg", () => {
+    // The two have to change direction together. A column that keeps a
+    // fixed-width rail, or a row that stacks, both produce a rail with no
+    // usable width.
+    expect(TIMELINE_PAGE).toMatch(/flex-col[^"]*lg:flex-row/);
+  });
+});
