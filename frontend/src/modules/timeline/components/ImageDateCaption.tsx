@@ -35,20 +35,27 @@ export function ImageDateCaption({ imageDay, formatDay }: Props): ReactNode {
   return (
     <Card
       noPadding
-      // `start-3`, so the caption mirrors with the script — and `bottom-10`,
-      // because MapLibre's attribution control sits at the bottom of the
-      // canvas and does NOT mirror: its positions are physical. Under Arabic
-      // the caption moves to the bottom-right, which is where the
-      // attribution already is, so it has to be cleared vertically to work
-      // in both directions.
+      // Physically top-right, and deliberately NOT a logical `start`/`end`.
       //
-      // 10 rather than 8, from MapLibre's own stylesheet rather than by eye:
-      // `.maplibregl-ctrl-bottom-right .maplibregl-ctrl` has `margin: 0 10px
-      // 10px 0` and the attribution button is 24px tall, so it occupies 10px
-      // to 34px above the canvas edge. `bottom-8` is 32px and overlaps by 2.
-      // `bottom-10` is 40px and clears by 6, which also leaves a little room
-      // for the expanded attribution bar, which is taller than the button.
-      className="pointer-events-none absolute bottom-10 start-3 z-10 bg-ap-panel/90 px-3 py-1.5"
+      // The map's own furniture does not mirror — MapLibre's control
+      // positions are physical — so a caption that mirrors will collide
+      // with one of them in one of the two directions. The zoom buttons are
+      // top-left and the attribution is along the bottom, which leaves
+      // top-right free in both directions and at every width.
+      //
+      // The bottom is not an option at any offset. The attribution's height
+      // depends on the viewport: at desktop widths the Esri string is one
+      // line and the control occupies 10-34px above the canvas edge, but it
+      // wraps to two lines on a narrow map and occupies about 44px. Below
+      // `lg` the event rail is hidden and the map takes the full width, so a
+      // phone hits the wrapped case. Any fixed `bottom-*` is right on one
+      // side of that and wrong on the other.
+      //
+      // Nor is bottom-LEFT, which looks free: the attribution bar is
+      // floated right inside a full-width container, so once it wraps it
+      // spans most of a narrow map's bottom edge rather than staying in its
+      // corner.
+      className="pointer-events-none absolute right-3 top-3 z-10 bg-ap-panel/90 px-3 py-1.5"
       // The value changes under playback without the element being
       // focused, so it is announced politely rather than not at all.
       aria-live="polite"
