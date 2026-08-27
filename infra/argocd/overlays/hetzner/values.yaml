@@ -3125,10 +3125,34 @@ global:
     #   CI on the merge commit: unit 1367 passed, integration 1130 passed /
     #   4 skipped / 0 failed. 1126 was main's baseline before this branch
     #   added 4 tests.
+    # c0df195 = api + workers only; the frontend is already here, promoted by
+    #   #619 while this promote was being prepared. What this actually ships
+    #   is two backend changes that have been sitting merged:
+    #
+    #   #607 — 16 routes gated a farm-tier capability without giving the
+    #     resolver a farm, so every farm-scoped caller got 403. GET /inbox
+    #     was one: a scout could not read their own messages. The note on
+    #     the frontend block below flagged this as merged and undeployed.
+    #   #616 — the tenant check on POST /users/{id}/farm-access. Its UI half
+    #     is already live inside c0df195.
+    #
+    #   THE TAG IS c0df195, NOT 5f21e84, and the difference is nothing:
+    #   `git rev-parse 5f21e846:backend` and `c0df1952:backend` are the same
+    #   tree, because #617 in between is frontend-only. Naming the tag the
+    #   frontend already runs keeps all three charts on one tag.
+    #
+    #   NO MIGRATION in 0d25fa8..c0df195, so nothing is applied and the
+    #   rollback is symmetric: these two tags straight back to 0d25fa8.
+    #
+    #   0d25fa8 is an ancestor of c0df195, checked with
+    #   `git merge-base --is-ancestor 0d25fa8 c0df1952`.
+    #
+    #   Image pulled on the node before this edit:
+    #   api:c0df195 -> sha256:200cfded….
     api:
-      tag: "0d25fa8"
+      tag: "c0df195"
     workers:
-      tag: "0d25fa8"
+      tag: "c0df195"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
