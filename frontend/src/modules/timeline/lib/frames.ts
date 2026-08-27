@@ -107,6 +107,30 @@ export function passForFrames(
 }
 
 /**
+ * The passes a window actually draws, in the order the replay reaches them.
+ *
+ * Distinct, because carry-forward means five consecutive frames usually
+ * resolve to one pass, and the caller wants "what will be drawn next",
+ * not "what is drawn tomorrow". This is the list the prefetch walks when
+ * the reader presses play, and the list the preload window slides along.
+ */
+export function passSequence(
+  frames: readonly string[],
+  passByFrame: ReadonlyMap<string, PassDay | null>,
+): PassDay[] {
+  const out: PassDay[] = [];
+  let last: string | null = null;
+  for (const frame of frames) {
+    const pass = passByFrame.get(frame) ?? null;
+    if (pass && pass.at !== last) {
+      out.push(pass);
+      last = pass.at;
+    }
+  }
+  return out;
+}
+
+/**
  * How strongly a datapoint draws on a given frame.
  *
  * 1 on its own day, stepping down to 0 once it is more than `fadeDays`

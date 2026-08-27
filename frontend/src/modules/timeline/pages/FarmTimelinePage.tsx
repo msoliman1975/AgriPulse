@@ -14,17 +14,24 @@ import { AsyncBoundary } from "@/components/AsyncBoundary";
 import { EmptyState } from "@/components/EmptyState";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
-import { Pill } from "@/components/Pill";
 import { queryState } from "@/components/asyncState";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { localizedName } from "@/lib/localizedField";
 import { useCapability } from "@/rbac/useCapability";
 import { EventRail } from "../components/EventRail";
+import { ImageDateCaption } from "../components/ImageDateCaption";
 import { Scrubber } from "../components/Scrubber";
 import { TimelineControls } from "../components/TimelineControls";
+import { TimelineLayerBar } from "../components/TimelineLayerBar";
 import { TimelineMap, type BlockFeatureProps } from "../components/TimelineMap";
-import { DEFAULT_TIMELINE_INDEX, DEFAULT_WINDOW_DAYS, MAX_WINDOW_DAYS } from "../constants";
+import {
+  BASE_FPS,
+  DEFAULT_TIMELINE_INDEX,
+  DEFAULT_WINDOW_DAYS,
+  MAX_WINDOW_DAYS,
+} from "../constants";
 import { daysBetween, toDayKey } from "../lib/frames";
+import { defaultLayerState, LAYER_KINDS, type TimelineLayerState } from "../lib/layerState";
 import { useFarmTimeline } from "../useFarmTimeline";
 
 function defaultWindow(): { from: string; to: string } {
@@ -48,6 +55,15 @@ export function FarmTimelinePage(): ReactNode {
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
   const [index, setIndex] = useState<AnyIndexCode>(DEFAULT_TIMELINE_INDEX);
+  const [layers, setLayers] = useState<TimelineLayerState>(defaultLayerState);
+
+  // The set the hook filters on. Derived from the checkboxes rather than
+  // held beside them, so there is one source of truth for "is this kind
+  // on" and the map, the rail and the bar cannot drift apart.
+  const visibleKinds = useMemo(
+    () => new Set(LAYER_KINDS.filter((k) => layers.kinds[k])),
+    [layers.kinds],
+  );
 
   const span = daysBetween(from, to) + 1;
   const windowError =
@@ -66,6 +82,7 @@ export function FarmTimelinePage(): ReactNode {
     from: windowError ? initial.from : from,
     to: windowError ? initial.to : to,
     index,
+    visibleKinds,
   });
 
   const formatDay = useMemo(() => {
@@ -129,22 +146,10 @@ export function FarmTimelinePage(): ReactNode {
   return (
     <Page width="bleed" className="h-full gap-0">
       <div className="flex flex-col gap-3 border-b border-ap-line bg-ap-panel px-4 py-3">
-        <PageHeader
-          title={t("title")}
-          subtitle={t("subtitle")}
-          badge={
-            tl.noImageYet ? (
-              <Pill kind="warn">{t("badge.noImageYet")}</Pill>
-            ) : tl.currentPass && tl.frameDay && tl.currentPass.day !== tl.frameDay ? (
-              // Says out loud that the picture is older than the date on the
-              // scrubber. Without it a reader takes a carried-forward pass
-              // for an image of the day they are looking at.
-              <Pill kind="neutral">
-                {t("badge.carriedFrom", { date: formatDay(tl.currentPass.day) })}
-              </Pill>
-            ) : null
-          }
-        />
+        {/* No badge. The picture's date lives on the map itself, in
+            `ImageDateCaption`, where it sits next to the pixels it
+            describes and where it can be read without leaving the map. */}
+        <PageHeader title={t("title")} subtitle={t("subtitle")} />
         <TimelineControls
           blocks={blockOptions}
           blockId={blockId}
@@ -159,18 +164,30 @@ export function FarmTimelinePage(): ReactNode {
           onIndexChange={setIndex}
           windowError={windowError}
         />
+        <TimelineLayerBar layers={layers} onChange={setLayers} omittedKinds={tl.omittedKinds} />
       </div>
 
       <div className="flex min-h-0 flex-1 gap-3 p-3">
-        <div className="min-w-0 flex-1 overflow-hidden rounded-card border border-ap-line">
+        <div className="relative min-w-0 flex-1 overflow-hidden rounded-card border border-ap-line">
           <TimelineMap
             blocks={blockGeojson}
             farmBoundary={tl.farmQ.data?.boundary ?? null}
-            rasters={tl.rasters}
+            rasterFrames={tl.rasterFrames}
+            activeRasterKey={tl.activeRasterKey}
             marks={tl.marks}
+            showBlocks={layers.blocks}
+            showFarmBoundary={layers.farmBoundary}
+            showPixels={layers.pixels}
+            // Half a frame, capped at 250 ms. At 1x a frame lasts 500 ms
+            // and can afford the full 250; at the 4x top speed it lasts
+            // 125, and a 250 ms fade would still be running a frame later,
+            // which reads as the map lagging the scrubber — the thing this
+            // whole change is here to remove.
+            fadeMs={Math.round(Math.min(250, 1000 / (BASE_FPS * tl.speed) / 2))}
             fitKey={`${farmId}:${blockId ?? "farm"}`}
             onMarkClick={tl.setFocusedEventId}
           />
+          <ImageDateCaption imageDay={tl.imageDay} formatDay={formatDay} />
         </div>
 
         <div className="hidden min-h-0 w-96 shrink-0 lg:block">
@@ -210,6 +227,7 @@ export function FarmTimelinePage(): ReactNode {
           passDays={tl.passDays}
           trend={tl.trend}
           playing={tl.playing}
+          preparing={tl.preparing}
           onTogglePlay={tl.togglePlay}
           speed={tl.speed}
           onSpeedChange={tl.setSpeed}

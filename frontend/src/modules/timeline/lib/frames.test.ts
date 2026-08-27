@@ -10,6 +10,7 @@ import {
   FADE_DAYS,
   frameIndexOf,
   passForFrames,
+  passSequence,
   visibleEvents,
 } from "./frames";
 
@@ -194,5 +195,40 @@ describe("frameIndexOf", () => {
   it("reports -1 for a day the new window does not hold", () => {
     expect(frameIndexOf(frames, "2026-07-03")).toBe(-1);
     expect(frameIndexOf(frames, null)).toBe(-1);
+  });
+});
+
+describe("passSequence", () => {
+  it("names each pass once, in the order the replay reaches it", () => {
+    const frames = buildFrames("2026-06-01", "2026-06-10");
+    const passes = drawablePasses([
+      scene({ scene_date: "2026-06-03", at: "2026-06-03T08:30:00Z" }),
+      scene({ scene_date: "2026-06-08", at: "2026-06-08T08:30:00Z" }),
+    ]);
+    const byFrame = passForFrames(frames, passes);
+
+    // Ten frames, two passes. Carry-forward means five consecutive frames
+    // resolve to one pass, and what the prefetch and the preload window
+    // both want is "what will be drawn next", not "what is drawn tomorrow".
+    expect(passSequence(frames, byFrame).map((p) => p.day)).toEqual(["2026-06-03", "2026-06-08"]);
+  });
+
+  it("leaves out a pass the window never reaches", () => {
+    const frames = buildFrames("2026-06-01", "2026-06-05");
+    const passes = drawablePasses([
+      scene({ scene_date: "2026-06-02", at: "2026-06-02T08:30:00Z" }),
+      scene({ scene_date: "2026-06-20", at: "2026-06-20T08:30:00Z" }),
+    ]);
+
+    // Prefetching a pass outside the window would spend a request on a
+    // frame that cannot be scrubbed to.
+    expect(passSequence(frames, passForFrames(frames, passes)).map((p) => p.day)).toEqual([
+      "2026-06-02",
+    ]);
+  });
+
+  it("is empty when no frame has an image", () => {
+    const frames = buildFrames("2026-06-01", "2026-06-05");
+    expect(passSequence(frames, passForFrames(frames, []))).toEqual([]);
   });
 });

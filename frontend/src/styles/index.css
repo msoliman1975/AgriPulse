@@ -94,3 +94,36 @@
     display: none !important;
   }
 }
+
+/*
+ * Farm Timeline — the image-date caption.
+ *
+ * The caption names the day the pixels on screen were sensed, and that day
+ * only changes when the replay crosses an acquisition, which is roughly
+ * once every five frames. Swapping the text with no transition reads as a
+ * flicker at playback speed, so the new value fades up in place.
+ *
+ * A keyframe rather than a Tailwind transition because the element is
+ * REPLACED on change (it is keyed on the day), and a transition has nothing
+ * to interpolate from when the node it is on has just been mounted.
+ */
+@keyframes tl-date-fade {
+  from {
+    opacity: 0;
+    transform: translateY(0.2rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.tl-date-fade {
+  animation: tl-date-fade 320ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-date-fade {
+    animation: none;
+  }
+}

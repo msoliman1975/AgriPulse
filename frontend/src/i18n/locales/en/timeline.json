@@ -2,9 +2,17 @@
   "title": "Timeline",
   "subtitle": "Replay this farm day by day: index pixels, and what people and the system recorded.",
   "noAccess": "You do not have access to this farm.",
-  "badge": {
-    "noImageYet": "No image yet on this date",
-    "carriedFrom": "Image from {{date}}"
+  "caption": {
+    "noImageYet": "No image yet"
+  },
+  "layers": {
+    "regionLabel": "What the replay draws",
+    "map": "Map",
+    "datapoints": "Datapoints",
+    "pixels": "Index pixels",
+    "farmBoundary": "Farm border",
+    "blocks": "Block borders",
+    "omitted": "Your role cannot read this kind."
   },
   "controls": {
     "scope": "Scope",
@@ -23,6 +31,7 @@
   "scrubber": {
     "play": "Play",
     "pause": "Pause",
+    "preparing": "Preparing…",
     "speed": "Speed",
     "dayAria": "Day in the replay",
     "eventCount_one": "{{count}} datapoint",
