@@ -27,6 +27,14 @@ interface Props {
   /** Farm or block mean of the drawn index, one point per day that has one. */
   trend: readonly TrendPoint[];
   playing: boolean;
+  /**
+   * True while play is loading the window's passes before it starts.
+   *
+   * Named on the button rather than hidden, because on a wide window it
+   * takes a second or two, and a play button that does nothing for two
+   * seconds reads as broken. Pressing again during it cancels.
+   */
+  preparing: boolean;
   onTogglePlay: () => void;
   speed: number;
   onSpeedChange: (speed: number) => void;
@@ -74,6 +82,7 @@ export function Scrubber({
   passDays,
   trend,
   playing,
+  preparing,
   onTogglePlay,
   speed,
   onSpeedChange,
@@ -118,14 +127,27 @@ export function Scrubber({
   return (
     <Card className="px-3 py-2" noPadding>
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={onTogglePlay}
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ap-line text-ap-ink hover:bg-ap-bg"
-          aria-label={playing ? t("scrubber.pause") : t("scrubber.play")}
-        >
-          {playing ? <PauseGlyph /> : <PlayGlyph />}
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onTogglePlay}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ap-line text-ap-ink hover:bg-ap-bg"
+            aria-label={
+              preparing
+                ? t("scrubber.preparing")
+                : playing
+                  ? t("scrubber.pause")
+                  : t("scrubber.play")
+            }
+          >
+            {preparing ? <SpinnerGlyph /> : playing ? <PauseGlyph /> : <PlayGlyph />}
+          </button>
+          {preparing ? (
+            <span className="whitespace-nowrap text-xs text-ap-muted" aria-live="polite">
+              {t("scrubber.preparing")}
+            </span>
+          ) : null}
+        </div>
 
         <div className="relative min-w-0 flex-1" style={{ height: TRACK_HEIGHT }}>
           <svg
@@ -244,6 +266,30 @@ function PlayGlyph(): ReactNode {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+/**
+ * The prepare step's own glyph.
+ *
+ * A spinner rather than a greyed play button: the button is still live —
+ * pressing it cancels — so it must not look disabled.
+ */
+function SpinnerGlyph(): ReactNode {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      className="animate-spin"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" opacity="0.25" />
+      <path d="M21 12a9 9 0 0 0-9-9" strokeLinecap="round" />
     </svg>
   );
 }

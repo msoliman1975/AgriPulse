@@ -11,10 +11,11 @@
 /* eslint-disable @typescript-eslint/require-await */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { listFarmSceneAssets } from "@/api/imagery";
 import { setupTestI18n } from "@/i18n/testing";
 import { PrefsProvider } from "@/prefs/PrefsContext";
 import { FarmTimelinePage } from "./FarmTimelinePage";
@@ -35,6 +36,16 @@ vi.mock("../components/TimelineMap", () => ({
 
 const WINDOW_FROM = "2026-06-01";
 const WINDOW_TO = "2026-06-10";
+
+/** Acquisition days in the fixture window, oldest first. */
+const SCENE_DAYS = vi.hoisted(() => [
+  "2026-06-02",
+  "2026-06-03",
+  "2026-06-04",
+  "2026-06-05",
+  "2026-06-06",
+  "2026-06-07",
+]);
 
 const fixtures = vi.hoisted(() => ({
   farm: {
@@ -104,29 +115,44 @@ vi.mock("@/api/blocks", () => ({
 vi.mock("@/api/imagery", () => ({
   listFarmScenes: vi.fn(async () => ({
     farm_id: "f1",
-    median_gap_days: 5,
-    items: [
-      {
-        scene_date: "2026-06-02",
-        at: "2026-06-02T08:30:00Z",
-        block_count: 1,
-        succeeded_count: 1,
-        skipped_cloud_count: 0,
-        computed_count: 1,
-        cloud_cover_pct: "1.0",
-      },
-    ],
+    median_gap_days: 2,
+    // Six passes, deliberately more than the map preloads at once. Four
+    // are enough to prove the preload window; the two past it are what
+    // give the prepare step real work to do, and a fixture with one pass
+    // cannot tell a warm cache from a prepare that never ran.
+    items: SCENE_DAYS.map((day) => ({
+      scene_date: day,
+      at: `${day}T08:30:00Z`,
+      block_count: 1,
+      succeeded_count: 1,
+      skipped_cloud_count: 0,
+      computed_count: 1,
+      cloud_cover_pct: "1.0",
+    })),
   })),
-  listFarmSceneAssets: vi.fn(async () => ({
+  // Answers for the pass it was ASKED for. A stub that returned one fixed
+  // date whatever `at` said would hide the bug this fixture exists to
+  // catch: a preloaded pass judged against the current frame's date
+  // instead of its own fails `farmRasterForPass` and falls back to the
+  // per-block path, which looks identical on the active frame.
+  listFarmSceneAssets: vi.fn(async (_farmId: string, at?: string) => ({
     farm_id: "f1",
-    at: "2026-06-02T08:30:00Z",
-    farm: null,
+    at: at ?? null,
+    farm: at
+      ? {
+          stac_item_id: `sentinel_hub/s2l2a/${at.slice(0, 10)}/aoihash`,
+          scene_datetime: at,
+          resolution_m: "10",
+          blocks_merged: null,
+          source: "fetched" as const,
+        }
+      : null,
     items: [
       {
         block_id: "b1",
         product_id: "prod",
         stac_item_id: "sentinel_hub/s2l2a/SCENE/aoihash",
-        scene_datetime: "2026-06-02T08:30:00Z",
+        scene_datetime: at ?? "2026-06-02T08:30:00Z",
         resolution_m: "10",
       },
     ],
@@ -207,6 +233,11 @@ async function renderAtFixtureWindow(): Promise<void> {
   await waitFor(() => expect(scrubber().max).toBe("9"));
 }
 
+/** The map's own date caption, which is not the rail's heading. */
+function imageDate(): Promise<HTMLElement> {
+  return screen.findByTestId("timeline-image-date");
+}
+
 /** The scrubber's range input — the one control that moves the replay. */
 function scrubber(): HTMLInputElement {
   return screen.getByRole("slider");
@@ -283,19 +314,171 @@ describe("FarmTimelinePage", () => {
     });
   });
 
-  it("says the picture is older than the date being read", async () => {
+  it("captions the map with the day the picture was taken, not the day being read", async () => {
     await renderAtFixtureWindow();
-    // The only pass in the fixture is 2 June, so every later frame is
-    // carrying it forward. Saying so is what stops a reader taking it for
-    // an image of the day on the scrubber.
+    // The last pass in the fixture is 7 June, so 9 June is carrying it
+    // forward. The caption is what stops a reader taking it for an image
+    // of the day on the scrubber.
     seekTo("2026-06-09");
-    expect(await screen.findByText(/Image from/)).toBeInTheDocument();
+    expect(await imageDate()).toHaveTextContent("Jun 7, 2026");
+  });
+
+  it("keeps the caption on screen on the day the picture was actually taken", async () => {
+    await renderAtFixtureWindow();
+    // The regression this pins: the old header badge only appeared when
+    // the pass was OLDER than the frame, so on an acquisition day — the
+    // one a reader most wants confirmed — the caption blinked out. At
+    // playback speed that is a flicker every five frames.
+    seekTo("2026-06-07");
+    expect(await imageDate()).toHaveTextContent("Jun 7, 2026");
+
+    // And it does not change on a carried-forward day, because the
+    // picture has not changed. That is the whole signal the caption
+    // carries: when this number does not move, neither did the image.
+    seekTo("2026-06-08");
+    await waitFor(() =>
+      expect(screen.getByTestId("timeline-image-date")).toHaveTextContent("Jun 7, 2026"),
+    );
+  });
+
+  it("hides a datapoint kind from BOTH the map and the rail when its box is off", async () => {
+    await renderAtFixtureWindow();
+    seekTo("2026-06-03");
+    expect(await screen.findByText("NDVI fell 22% in seven days")).toBeInTheDocument();
+    await waitFor(() => {
+      const marks = mapProps.current?.marks as { features: unknown[] };
+      expect(marks.features).toHaveLength(1);
+    });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Alert" }));
+
+    // One switch, both halves. The replay's rule is that the map and the
+    // rail read the same frame, so a kind that is off must be off in both
+    // — a rail listing an alert the map does not draw is the disagreement
+    // the whole screen is built to avoid.
+    await waitFor(() => {
+      const marks = mapProps.current?.marks as { features: unknown[] };
+      expect(marks.features).toHaveLength(0);
+    });
+    expect(screen.queryByText("NDVI fell 22% in seven days")).not.toBeInTheDocument();
+  });
+
+  it("leaves the scrubber's ticks alone when a kind is switched off", async () => {
+    await renderAtFixtureWindow();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Alert" }));
+
+    // Deliberate. The ticks say WHERE in the window something happened,
+    // and a reader who has hidden alerts still needs to find the day one
+    // was raised in order to switch them back on.
+    seekTo("2026-06-03");
+    expect(await screen.findByText("1 datapoint")).toBeInTheDocument();
+  });
+
+  it("stops drawing pixels without discarding them when the box is off", async () => {
+    await renderAtFixtureWindow();
+    seekTo("2026-06-03");
+    await waitFor(() => expect(mapProps.current?.activeRasterKey).toBeTruthy());
+    const frames = mapProps.current?.rasterFrames as unknown[];
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Index pixels" }));
+
+    await waitFor(() => {
+      // The frames stay on the map; only the active key goes. Dropping
+      // them would make switching pixels back on a re-fetch of every tile
+      // the reader has already paid for.
+      expect(mapProps.current?.showPixels).toBe(false);
+      expect(mapProps.current?.rasterFrames).toHaveLength(frames.length);
+    });
+  });
+
+  it("holds the next passes on the map, each judged against its own date", async () => {
+    await renderAtFixtureWindow();
+    seekTo("2026-06-02");
+
+    await waitFor(() => {
+      const frames = mapProps.current?.rasterFrames as {
+        key: string;
+        layers: { id: string; tileUrl: string }[];
+      }[];
+      // The current pass and three ahead of it. Bounded: the window has
+      // six passes and the map must not end up holding all of them, nor
+      // 36 block sources apiece on a per-block farm.
+      expect(frames).toHaveLength(4);
+
+      frames.forEach((f, n) => {
+        const day = SCENE_DAYS[n];
+        // One farm surface per pass, not a fallback to the per-block path.
+        // `farmRasterForPass` returns the surface only when its UTC day
+        // equals the day of the `at` it is given, so judging a preloaded
+        // pass against the CURRENT frame's date returns null for every one
+        // of them and quietly drops the replay onto per-block rasters —
+        // invisible on screen, because the active frame is still right.
+        expect(f.layers).toHaveLength(1);
+        expect(f.layers[0].id).toBe("__farm__");
+        expect(f.layers[0].tileUrl).toContain(day);
+        expect(f.key).toContain(day);
+      });
+
+      // And exactly one of them is painted.
+      expect(mapProps.current?.activeRasterKey).toBe(frames[0].key);
+    });
+  });
+
+  it("loads the window's passes before it starts playing", async () => {
+    const assets = vi.mocked(listFarmSceneAssets);
+    await renderAtFixtureWindow();
+    await waitFor(() => expect(assets).toHaveBeenCalled());
+
+    // Hold the prepare open so the state it puts the button in can be
+    // read. Without this the fixture's single pass resolves from cache
+    // within one tick and the step is invisible to the test — which is
+    // also why it was worth naming on the button in the first place.
+    let release = (): void => {};
+    assets.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve(null);
+        }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    expect(await screen.findByRole("button", { name: "Preparing…" })).toBeInTheDocument();
+    // Not running yet. Starting against an empty cache is what made the
+    // map trail the scrubber by seconds.
+    expect(scrubber().value).toBe("9");
+
+    release();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument());
+  });
+
+  it("a second press during the prepare cancels it rather than queueing a run", async () => {
+    const assets = vi.mocked(listFarmSceneAssets);
+    await renderAtFixtureWindow();
+    await waitFor(() => expect(assets).toHaveBeenCalled());
+
+    let release = (): void => {};
+    assets.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve(null);
+        }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    await screen.findByRole("button", { name: "Preparing…" });
+    fireEvent.click(screen.getByRole("button", { name: "Preparing…" }));
+
+    expect(await screen.findByRole("button", { name: "Play" })).toBeInTheDocument();
+    release();
+    // The abandoned prepare must not start the replay behind the reader's
+    // back once its requests land.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument());
   });
 
   it("says a frame before the first pass has no picture at all", async () => {
     await renderAtFixtureWindow();
     seekTo("2026-06-01");
-    expect(await screen.findByText(/No image yet/)).toBeInTheDocument();
+    expect(await imageDate()).toHaveTextContent("No image yet");
   });
 
   it("names the kinds this reader cannot see instead of hiding them", async () => {

@@ -42,3 +42,27 @@ export const MAX_WINDOW_DAYS = 366;
 
 /** Frames per second at 1x. Eight is roughly a week a second at 8x. */
 export const BASE_FPS = 2;
+
+/**
+ * Passes kept on the map ahead of the play head, at zero opacity.
+ *
+ * A raster layer at zero opacity still loads its tiles, so this is how far
+ * in advance TiTiler is asked for the picture the replay is about to need.
+ * Sentinel-2 flies every ~5 days, so three passes is roughly a fortnight
+ * of replay — about eight seconds at 1x, and still a second at 8x.
+ *
+ * Three rather than more because each preloaded pass is a live set of tile
+ * requests. Ten would put the whole window in flight at once and make the
+ * frame the reader is actually looking at queue behind the rest.
+ */
+export const PRELOAD_PASSES = 3;
+
+/**
+ * Parallel scene-asset requests during the prepare step.
+ *
+ * The prepare step is JSON only — which raster each block draws for a
+ * pass — so it is cheap per request but there is one per pass, and a year
+ * of Sentinel-2 is ~70 of them. Six at a time keeps the browser's
+ * per-host connection budget free for the tiles that follow.
+ */
+export const PREFETCH_CONCURRENCY = 6;

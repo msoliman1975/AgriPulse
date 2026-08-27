@@ -19,24 +19,14 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { FeatureCollection, MultiPolygon, Point, Polygon } from "geojson";
 
 import { registerMarkerImages } from "@/modules/labs/map/markerIcons";
-import { TILE_SIZE } from "@/modules/labs/console/pixelTiles";
 import type { MarkProps } from "../lib/marks";
 import { boundsOf } from "../lib/mapBounds";
-import { rasterSourceSpec } from "../lib/rasterSource";
+import { syncRasters, type RasterCache, type RasterFrame } from "../lib/rasterCache";
 
-/** One raster to draw for the current pass. */
-export interface RasterLayer {
-  /** Stable within a pass — the block id, or `__farm__` for a farm raster. */
-  id: string;
-  /** XYZ template with `{z}/{x}/{y}` intact. */
-  tileUrl: string;
-  /**
-   * `[west, south, east, north]`. Bounding each block's source is what
-   * stops 35 sources from each requesting tiles across the whole farm —
-   * without it a farm-wide view costs 35x the tiles it needs.
-   */
-  bounds?: [number, number, number, number];
-}
+// Re-exported so callers keep importing the map's own vocabulary from the
+// map. `rasterCache` is where they are DEFINED, because that module is the
+// one a fake-map test can import.
+export type { RasterFrame, RasterLayer } from "../lib/rasterCache";
 
 export interface BlockFeatureProps {
   block_id: string;
@@ -48,8 +38,19 @@ export interface BlockFeatureProps {
 interface Props {
   blocks: FeatureCollection<Polygon, BlockFeatureProps>;
   farmBoundary: MultiPolygon | null;
-  rasters: readonly RasterLayer[];
+  /** The active pass first is NOT assumed; `activeRasterKey` names it. */
+  rasterFrames: readonly RasterFrame[];
+  /** Which frame is painted. Null while no pass covers the current day. */
+  activeRasterKey: string | null;
   marks: FeatureCollection<Point, MarkProps>;
+  /** Off hides the block outlines and their event highlight. */
+  showBlocks: boolean;
+  /** Off hides the farm boundary. */
+  showFarmBoundary: boolean;
+  /** Off hides every index raster without discarding the preloaded tiles. */
+  showPixels: boolean;
+  /** Cross-fade length in ms. Shorter at high playback speeds. */
+  fadeMs: number;
   /** Bump to refit the view. Pass the farm id (plus the block, in block scope). */
   fitKey: string;
   onMarkClick?: (eventId: string) => void;
@@ -62,9 +63,6 @@ const BLOCK_LINE = "tl-blocks-line";
 const BLOCK_HIGHLIGHT = "tl-blocks-highlight";
 const MARK_SOURCE = "tl-marks";
 const MARK_LAYER = "tl-marks-symbols";
-
-/** Prefix for every raster layer/source this component owns. */
-const RASTER_PREFIX = "tl-raster-";
 
 const EMPTY: FeatureCollection<Point, MarkProps> = { type: "FeatureCollection", features: [] };
 
@@ -102,8 +100,13 @@ function buildStyle(): StyleSpecification {
 export function TimelineMap({
   blocks,
   farmBoundary,
-  rasters,
+  rasterFrames,
+  activeRasterKey,
   marks,
+  showBlocks,
+  showFarmBoundary,
+  showPixels,
+  fadeMs,
   fitKey,
   onMarkClick,
 }: Props): React.ReactElement {
@@ -114,15 +117,39 @@ export function TimelineMap({
   const onMarkClickRef = useRef(onMarkClick);
   onMarkClickRef.current = onMarkClick;
 
-  // The raster set currently on the map, and the generation it belongs to.
-  // Swapping passes replaces every layer at once; see the effect below.
-  const rasterGenRef = useRef(0);
-  const liveRasterIdsRef = useRef<string[]>([]);
+  // The raster frames on the map, keyed by pass, with the layer ids each
+  // one owns. Insertion order is the eviction order.
+  const frameCacheRef = useRef<RasterCache>(new Map());
+  // Bumped on every sync, so a fade that was waiting for tiles can tell it
+  // has been overtaken and must not paint a pass the reader has left.
+  const syncGenRef = useRef(0);
 
   // Latest props, read by the `load` handler. The map mounts once, so
   // without these the first paint would use whatever the first render saw.
-  const latestRef = useRef({ blocks, farmBoundary, marks, rasters, fitKey });
-  latestRef.current = { blocks, farmBoundary, marks, rasters, fitKey };
+  const latestRef = useRef({
+    blocks,
+    farmBoundary,
+    marks,
+    rasterFrames,
+    activeRasterKey,
+    showBlocks,
+    showFarmBoundary,
+    showPixels,
+    fadeMs,
+    fitKey,
+  });
+  latestRef.current = {
+    blocks,
+    farmBoundary,
+    marks,
+    rasterFrames,
+    activeRasterKey,
+    showBlocks,
+    showFarmBoundary,
+    showPixels,
+    fadeMs,
+    fitKey,
+  };
 
   // ---- mount ------------------------------------------------------------
   useEffect(() => {
@@ -151,6 +178,11 @@ export function TimelineMap({
     // keep its old size and the map would appear to jump.
     const ro = new ResizeObserver(() => mapRef.current?.resize());
     ro.observe(containerRef.current);
+
+    // Read once, here, rather than in the cleanup: the lint rule is right
+    // that a ref can change before a cleanup runs, and this one is the
+    // cache of layers belonging to the map created in THIS effect.
+    const frameCache = frameCacheRef.current;
 
     map.on("load", () => {
       // Artwork first. MapLibre resolves `icon-image` at draw time and a
@@ -249,7 +281,15 @@ export function TimelineMap({
       applyAoi(map, now.farmBoundary);
       applyBlocks(map, now.blocks);
       applyMarks(map, now.marks);
-      applyRasters(map, now.rasters, rasterGenRef, liveRasterIdsRef);
+      applyVisibility(map, now.showBlocks, now.showFarmBoundary);
+      syncRasters(map, {
+        frames: now.rasterFrames,
+        activeKey: now.showPixels ? now.activeRasterKey : null,
+        fadeMs: now.fadeMs,
+        cache: frameCacheRef,
+        genRef: syncGenRef,
+        beforeLayerId: BLOCK_HIGHLIGHT,
+      });
 
       // And FRAME it. This is the whole of the auto-focus fix.
       //
@@ -276,6 +316,9 @@ export function TimelineMap({
       readyRef.current = false;
       map.remove();
       mapRef.current = null;
+      // The cache indexes layers of a map that no longer exists. Leaving it
+      // populated would make a remount believe every frame is already on.
+      frameCache.clear();
     };
     // Mount once. Every prop is applied by its own effect below.
   }, []);
@@ -303,8 +346,23 @@ export function TimelineMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
-    applyRasters(map, rasters, rasterGenRef, liveRasterIdsRef);
-  }, [rasters]);
+    syncRasters(map, {
+      frames: rasterFrames,
+      // Turning pixels off paints nothing but keeps the cached frames, so
+      // turning them back on is instant rather than a re-fetch.
+      activeKey: showPixels ? activeRasterKey : null,
+      fadeMs,
+      cache: frameCacheRef,
+      genRef: syncGenRef,
+      beforeLayerId: BLOCK_HIGHLIGHT,
+    });
+  }, [rasterFrames, activeRasterKey, showPixels, fadeMs]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+    applyVisibility(map, showBlocks, showFarmBoundary);
+  }, [showBlocks, showFarmBoundary]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -354,74 +412,18 @@ function applyMarks(map: MlMap, marks: FeatureCollection<Point, MarkProps>): voi
 }
 
 /**
- * Swap the pixel layers for a new pass without a gap.
+ * Show or hide the frame layers — the farm outline and the block outlines.
  *
- * The naive remove-then-add shows bare satellite for as long as the new
- * tiles take, and at four frames a second that flash lands every time the
- * play head crosses an acquisition. So the new generation is added FIRST,
- * under the block outlines, and the previous one is removed only once the
- * map goes idle — which is after the new tiles have painted.
- *
- * Generations are numbered rather than diffed by block id, because a
- * per-block farm and a farm-raster farm produce different id sets for the
- * same ground and a diff between them would leave one of each on screen.
+ * `visibility` rather than opacity, because these are cheap vector layers
+ * with nothing to preload; hiding them should also stop them being drawn.
  */
-function applyRasters(
-  map: MlMap,
-  rasters: readonly RasterLayer[],
-  genRef: { current: number },
-  liveRef: { current: string[] },
-): void {
-  const previous = liveRef.current;
-  genRef.current += 1;
-  const gen = genRef.current;
-
-  const added: string[] = [];
-  for (const raster of rasters) {
-    const layerId = `${RASTER_PREFIX}${gen}-${raster.id}`;
-    if (map.getSource(layerId)) continue;
-    // Built by `rasterSourceSpec` rather than inline, so the shape handed
-    // to MapLibre is testable. An explicit `bounds: undefined` throws here
-    // and takes the whole pixel layer with it; see that module for why.
-    // 512 rather than 256 on tileSize: the cost is per REQUEST, not per
-    // pixel, and `pixelTiles` already asks TiTiler for that size via `scale`.
-    map.addSource(
-      layerId,
-      rasterSourceSpec({
-        tileUrl: raster.tileUrl,
-        bounds: raster.bounds,
-        tileSize: TILE_SIZE,
-      }),
-    );
-    map.addLayer(
-      {
-        id: layerId,
-        type: "raster",
-        source: layerId,
-        paint: { "raster-opacity": 0.85, "raster-resampling": "linear" },
-      },
-      // Under the outlines and the marks, above the satellite.
-      map.getLayer(BLOCK_HIGHLIGHT) ? BLOCK_HIGHLIGHT : undefined,
-    );
-    added.push(layerId);
-  }
-  liveRef.current = added;
-
-  if (previous.length === 0) return;
-  const drop = (): void => {
-    for (const id of previous) {
-      if (map.getLayer(id)) map.removeLayer(id);
-      if (map.getSource(id)) map.removeSource(id);
+function applyVisibility(map: MlMap, showBlocks: boolean, showFarmBoundary: boolean): void {
+  const set = (layerId: string, on: boolean): void => {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, "visibility", on ? "visible" : "none");
     }
   };
-  if (added.length === 0) {
-    // Nothing to fade into — a frame before the first pass. Drop at once
-    // rather than leaving the previous pass under a scrubber that says
-    // there is no image yet.
-    drop();
-    return;
-  }
-  // `once` with a listener returns the map, but its overload set also
-  // covers a promise form, so the call reads as floating without this.
-  void map.once("idle", drop);
+  set(AOI_LINE, showFarmBoundary);
+  set(BLOCK_LINE, showBlocks);
+  set(BLOCK_HIGHLIGHT, showBlocks);
 }

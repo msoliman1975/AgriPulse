@@ -5,7 +5,7 @@
 // that must not run per render (marks, rasters, frames) sit in one place
 // with their dependencies visible.
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { listBlocks } from "@/api/blocks";
@@ -13,19 +13,21 @@ import { getFarm } from "@/api/farms";
 import { listFarmScenes, listFarmSceneAssets } from "@/api/imagery";
 import { getFarmIndexTimeseries } from "@/api/insights";
 import type { AnyIndexCode } from "@/api/indices";
-import { getFarmTimeline, type TimelineEvent } from "@/api/timeline";
+import { getFarmTimeline, type TimelineEvent, type TimelineEventKind } from "@/api/timeline";
 import { blockTileUrl, farmRasterForPass } from "@/modules/labs/console/pixelTiles";
 import { useOptionalConfig } from "@/config/ConfigContext";
 import type { TrendPoint } from "./components/Scrubber";
-import type { RasterLayer } from "./components/TimelineMap";
-import { BASE_FPS, TIMELINE_QK } from "./constants";
+import type { RasterFrame, RasterLayer } from "./components/TimelineMap";
+import { BASE_FPS, PREFETCH_CONCURRENCY, PRELOAD_PASSES, TIMELINE_QK } from "./constants";
 import {
   buildFrames,
   dayIndex,
   drawablePasses,
   frameIndexOf,
   passForFrames,
+  passSequence,
   visibleEvents,
+  type PassDay,
 } from "./lib/frames";
 import { boundsOfMultiPolygon, padBounds, unionBounds, type SourceBounds } from "./lib/mapBounds";
 import { buildBlockAnchors, buildBlockHighlights, buildMarks } from "./lib/marks";
@@ -39,11 +41,20 @@ export interface TimelineInput {
   from: string;
   to: string;
   index: AnyIndexCode;
+  /**
+   * Datapoint kinds the reader has switched on.
+   *
+   * Applied to the map AND the rail from one place, because the screen's
+   * rule is that the two halves read the same frame. Filtering only the
+   * map would let the rail list a flag that is not drawn.
+   */
+  visibleKinds: ReadonlySet<TimelineEventKind>;
 }
 
 export function useFarmTimeline(input: TimelineInput) {
-  const { farmId, blockId, from, to, index } = input;
+  const { farmId, blockId, from, to, index, visibleKinds } = input;
   const config = useOptionalConfig().config;
+  const queryClient = useQueryClient();
 
   // ---- reads ------------------------------------------------------------
 
@@ -99,6 +110,8 @@ export function useFarmTimeline(input: TimelineInput) {
   const passes = useMemo(() => drawablePasses(scenesQ.data?.items ?? []), [scenesQ.data]);
   const passByFrame = useMemo(() => passForFrames(frames, passes), [frames, passes]);
   const passDays = useMemo(() => new Set(passes.map((p) => p.day)), [passes]);
+  /** The passes this window draws, in the order the replay reaches them. */
+  const sequence = useMemo(() => passSequence(frames, passByFrame), [frames, passByFrame]);
 
   const [frameIndex, setFrameIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -149,14 +162,91 @@ export function useFarmTimeline(input: TimelineInput) {
     return () => window.clearInterval(id);
   }, [playing, speed, frames.length]);
 
-  // Pressing play at the end restarts from the beginning; otherwise the
-  // button would look broken on the last frame.
+  // ---- prepare ----------------------------------------------------------
+  //
+  // Pressing play used to start the replay against an empty cache. Every
+  // pass then cost a scene-assets request the moment the play head reached
+  // it, and the tiles behind it a second more, so the map ran seconds
+  // behind the scrubber and kept catching up after the run had ended.
+  //
+  // So play now PREPARES first: it fetches, for every pass in the window,
+  // the answer to "which raster does each block draw here". That is the
+  // whole of the per-frame network work removed from playback. The tiles
+  // themselves are handled by the map's preload window, which can only
+  // start once these answers exist.
+  //
+  // Preparing is visible — the button says so and the run starts when it
+  // finishes — rather than silent, because it takes a second or two on a
+  // wide window and a play button that does nothing for two seconds reads
+  // as broken.
+
+  const [preparing, setPreparing] = useState(false);
+  /** The window/scope/index the cache was prepared for, so it runs once. */
+  const preparedKeyRef = useRef<string | null>(null);
+  /** Bumped to abandon a prepare the reader cancelled by pressing again. */
+  const prepareTokenRef = useRef(0);
+
+  const prepareKey = `${farmId}|${blockId ?? ""}|${index}|${from}|${to}`;
+
+  const prepare = useCallback(async (): Promise<void> => {
+    const queue = [...sequence];
+    let cursor = 0;
+    const worker = async (): Promise<void> => {
+      while (cursor < queue.length) {
+        const pass = queue[cursor];
+        cursor += 1;
+        await queryClient.prefetchQuery({
+          queryKey: TIMELINE_QK.sceneAssets(farmId, pass.at, index),
+          queryFn: () => listFarmSceneAssets(farmId, pass.at, index),
+          staleTime: 5 * 60_000,
+        });
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(PREFETCH_CONCURRENCY, queue.length) }, worker));
+  }, [queryClient, sequence, farmId, index]);
+
+  const startPlaying = useCallback(() => {
+    // Pressing play at the end restarts from the beginning; otherwise the
+    // button would look broken on the last frame.
+    setFrameIndex((i) => (i >= frames.length - 1 ? 0 : i));
+    setPlaying(true);
+  }, [frames.length]);
+
   const togglePlay = useCallback(() => {
-    setPlaying((was) => {
-      if (!was && frameIndex >= frames.length - 1) setFrameIndex(0);
-      return !was;
-    });
-  }, [frameIndex, frames.length]);
+    if (playing) {
+      setPlaying(false);
+      return;
+    }
+    if (preparing) {
+      // A second press during the prepare is a cancel, not a queue.
+      prepareTokenRef.current += 1;
+      setPreparing(false);
+      return;
+    }
+    if (preparedKeyRef.current === prepareKey || sequence.length === 0) {
+      startPlaying();
+      return;
+    }
+    prepareTokenRef.current += 1;
+    const token = prepareTokenRef.current;
+    setPreparing(true);
+    void prepare().then(
+      () => {
+        if (prepareTokenRef.current !== token) return;
+        preparedKeyRef.current = prepareKey;
+        setPreparing(false);
+        startPlaying();
+      },
+      () => {
+        // A failed prefetch is not a reason to refuse to play: the
+        // per-frame queries below still run, and the replay is merely as
+        // slow as it used to be rather than broken.
+        if (prepareTokenRef.current !== token) return;
+        setPreparing(false);
+        startPlaying();
+      },
+    );
+  }, [playing, preparing, prepareKey, prepare, sequence.length, startPlaying]);
 
   const seek = useCallback((next: number) => {
     setPlaying(false);
@@ -167,14 +257,47 @@ export function useFarmTimeline(input: TimelineInput) {
 
   const currentPass = frameDay ? (passByFrame.get(frameDay) ?? null) : null;
 
-  const assetsQ = useQuery({
-    queryKey: TIMELINE_QK.sceneAssets(farmId, currentPass?.at ?? null, index),
-    queryFn: () => listFarmSceneAssets(farmId, currentPass?.at, index),
-    enabled: Boolean(farmId) && currentPass !== null,
-    staleTime: 5 * 60_000,
-    // Holding the previous pass's assets while the next load is what keeps
-    // the map from blanking between two frames that share no cache entry.
-    placeholderData: keepPreviousData,
+  /**
+   * The passes to hold on the map: the current one and the next few.
+   *
+   * A window rather than a single pass, because a raster layer at zero
+   * opacity still loads its tiles — so the passes the replay is about to
+   * reach are already drawn-but-dark by the time it reaches them. This is
+   * the fix for the map trailing the scrubber; the pass swap becomes two
+   * paint writes instead of an asset request plus a tile fetch.
+   *
+   * When no pass covers the current day — the frames before the window's
+   * first acquisition — the window starts at the sequence's own head, so
+   * the first image is loading while the reader is still on bare ground.
+   */
+  const windowPasses = useMemo<PassDay[]>(() => {
+    if (sequence.length === 0) return [];
+    const at = currentPass
+      ? sequence.findIndex((p) => p.at === currentPass.at)
+      : /* before the first pass */ 0;
+    const start = at < 0 ? 0 : at;
+    return sequence.slice(start, start + 1 + PRELOAD_PASSES);
+  }, [sequence, currentPass]);
+
+  const assetData = useQueries({
+    queries: windowPasses.map((pass) => ({
+      queryKey: TIMELINE_QK.sceneAssets(farmId, pass.at, index),
+      queryFn: () => listFarmSceneAssets(farmId, pass.at, index),
+      enabled: Boolean(farmId),
+      staleTime: 5 * 60_000,
+      // Half an hour, against react-query's five-minute default. A replay
+      // scrubbed back and forth over one window must not re-fetch a pass it
+      // already answered for, and the answer cannot go stale within a
+      // sitting: which raster a block drew on 3 June is history.
+      gcTime: 30 * 60_000,
+    })),
+    // `combine`, not the raw results, and it matters. `useQueries` returns
+    // a NEW array every render; react-query structurally shares what
+    // `combine` returns, so this keeps its identity while the answers are
+    // the same. Without it `rasterFrames` is a new array on every frame
+    // tick — sixteen a second at 8x — and the map re-syncs its rasters
+    // each time, re-registering the listener that waits for tiles.
+    combine: (results) => results.map((r) => r.data ?? null),
   });
 
   const blocks = useMemo(() => blocksQ.data?.items ?? [], [blocksQ.data]);
@@ -221,59 +344,97 @@ export function useFarmTimeline(input: TimelineInput) {
     return padBounds(box);
   }, [farmQ.data, boundsByBlockId]);
 
-  const rasters = useMemo<RasterLayer[]>(() => {
-    if (!config) return [];
-    const data = assetsQ.data;
-    if (!data) return [];
-    // Only draw assets that belong to the pass this frame resolved to. The
-    // query is keyed on `at`, but `keepPreviousData` deliberately serves the
-    // previous pass during a load, and painting that under a scrubber
-    // parked elsewhere would be a wrong answer wearing the shape of a right
-    // one.
-    const items = blockId ? data.items.filter((a) => a.block_id === blockId) : data.items;
+  /** Identity of one pass's raster set, stable across renders. */
+  const rasterKey = useCallback(
+    (at: string): string => `${index}|${blockId ?? "farm"}|${at}`,
+    [index, blockId],
+  );
 
-    // The farm raster must be the surface for the pass this frame is parked
-    // on; `farmRasterForPass` is where that is judged. It used to be judged
-    // against the blocks' day, which threw the surface away on every farm
-    // that had cut over to farm-level fetching — those farms stop writing
-    // block jobs, so their block rows freeze while the surfaces carry on. In
-    // block scope a farm raster is never right: it covers the whole farm.
-    const farmRaster = blockId ? null : farmRasterForPass(data.farm, currentPass?.at ?? null);
-    if (farmRaster) {
-      return [
-        {
-          id: FARM_RASTER_ID,
-          tileUrl: blockTileUrl({
-            tileServerBaseUrl: config.tile_server_base_url,
-            s3Bucket: config.s3_bucket,
-            asset: farmRaster,
-            code: index,
-          }),
-          bounds: farmRasterBounds,
-        },
-      ];
-    }
-    return items.map((asset) => ({
-      id: asset.block_id,
-      tileUrl: blockTileUrl({
-        tileServerBaseUrl: config.tile_server_base_url,
-        s3Bucket: config.s3_bucket,
-        asset,
-        code: index,
-      }),
-      bounds: boundsByBlockId.get(asset.block_id),
-    }));
-  }, [assetsQ.data, config, index, blockId, boundsByBlockId, currentPass?.at]);
+  const rasterFrames = useMemo<RasterFrame[]>(() => {
+    if (!config) return [];
+    const out: RasterFrame[] = [];
+    windowPasses.forEach((pass, n) => {
+      const data = assetData[n];
+      if (!data) return;
+      // Only assets that belong to THIS pass. The query is keyed on `at`,
+      // so a frame can never be built from another pass's answer — which is
+      // what `keepPreviousData` used to allow, painting the previous pass
+      // under a scrubber parked elsewhere: a wrong answer wearing the shape
+      // of a right one. Holding the picture is now the map's job, and it
+      // holds the LAYER rather than reusing the data.
+      const items = blockId ? data.items.filter((a) => a.block_id === blockId) : data.items;
+
+      // The farm raster must be the surface for this pass; `farmRasterForPass`
+      // is where that is judged. It used to be judged against the blocks'
+      // day, which threw the surface away on every farm that had cut over to
+      // farm-level fetching — those farms stop writing block jobs, so their
+      // block rows freeze while the surfaces carry on. In block scope a farm
+      // raster is never right: it covers the whole farm.
+      const farmRaster = blockId ? null : farmRasterForPass(data.farm, pass.at);
+
+      const layers: RasterLayer[] = farmRaster
+        ? [
+            {
+              id: FARM_RASTER_ID,
+              tileUrl: blockTileUrl({
+                tileServerBaseUrl: config.tile_server_base_url,
+                s3Bucket: config.s3_bucket,
+                asset: farmRaster,
+                code: index,
+              }),
+              bounds: farmRasterBounds,
+            },
+          ]
+        : items.map((asset) => ({
+            id: asset.block_id,
+            tileUrl: blockTileUrl({
+              tileServerBaseUrl: config.tile_server_base_url,
+              s3Bucket: config.s3_bucket,
+              asset,
+              code: index,
+            }),
+            bounds: boundsByBlockId.get(asset.block_id),
+          }));
+
+      if (layers.length === 0) return;
+      out.push({ key: rasterKey(pass.at), layers });
+    });
+    return out;
+  }, [
+    assetData,
+    windowPasses,
+    config,
+    index,
+    blockId,
+    boundsByBlockId,
+    farmRasterBounds,
+    rasterKey,
+  ]);
+
+  /** Which of the held frames is painted; null while there is no image. */
+  const activeRasterKey = currentPass ? rasterKey(currentPass.at) : null;
+
+  /**
+   * The date of the pixels on screen, which is NOT the date on the
+   * scrubber. Sentinel-2 flies every ~5 days, so most frames carry an
+   * older pass forward, and the caption has to say which.
+   */
+  const imageDay = currentPass?.day ?? null;
 
   // ---- events on this frame ---------------------------------------------
 
   const events: TimelineEvent[] = useMemo(() => eventsQ.data?.events ?? [], [eventsQ.data]);
   const days = useMemo(() => dayIndex(eventsQ.data?.days ?? []), [eventsQ.data]);
 
-  const visible = useMemo(
-    () => (frameDay ? visibleEvents(events, frameDay) : []),
-    [events, frameDay],
-  );
+  const visible = useMemo(() => {
+    if (!frameDay) return [];
+    // Filtered ONCE, here, so the map and the rail cannot disagree about
+    // what is on screen. `days` — the scrubber's ticks — is deliberately
+    // NOT filtered: the ticks say where in the window something happened,
+    // and a reader who has hidden alerts still needs to find the day one
+    // was raised in order to switch them back on.
+    return visibleEvents(events, frameDay).filter((f) => visibleKinds.has(f.event.kind));
+  }, [events, frameDay, visibleKinds]);
 
   const anchors = useMemo(
     () => buildBlockAnchors(blocks.map((b) => ({ id: b.id, boundary: b.boundary ?? null }))),
@@ -316,12 +477,15 @@ export function useFarmTimeline(input: TimelineInput) {
     frameDay,
     seek,
     playing,
+    preparing,
     togglePlay,
     speed,
     setSpeed,
     passDays,
     currentPass,
-    rasters,
+    rasterFrames,
+    activeRasterKey,
+    imageDay,
     marks,
     highlights,
     visible,
