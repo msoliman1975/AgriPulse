@@ -152,10 +152,28 @@ async def _add_farm_scene(
 
 
 async def _seed(session: Any, env: dict[str, Any], count: int) -> None:
+    """Insert ``count`` farm scenes, leaving the session on the schema.
+
+    The search_path is set here and re-set after the commit. A commit ends
+    the transaction the `SET` was scoped to, so the next statement runs
+    against whatever schema the session had before — the failure mode this
+    repo has hit repeatedly, and one that shows up as "relation does not
+    exist" or, worse, as an empty result with no error at all.
+    """
+    await _use_schema(session, env)
     base = datetime.now(UTC)
     for i in range(count):
         await _add_farm_scene(session, env, scene_datetime=base - timedelta(days=i))
     await session.commit()
+    await _use_schema(session, env)
+
+
+async def _use_schema(session: Any, env: dict[str, Any]) -> None:
+    await session.execute(text(f'SET search_path TO "{env["schema"]}", public'))
+    # Asserted rather than assumed: a wrong search_path reads as missing
+    # data, and a test that cannot see its own rows is worse than one that
+    # fails outright.
+    assert (await session.execute(text("SELECT current_schema()"))).scalar_one() == env["schema"]
 
 
 @pytest.mark.asyncio
@@ -169,7 +187,7 @@ async def test_the_counts_see_farm_scenes_at_all(
     so the reading cannot be "the block query started matching".
     """
     await _seed(admin_session, cutover_farm, 5)
-    await admin_session.execute(text(f'SET search_path TO "{cutover_farm["schema"]}", public'))
+    await _use_schema(admin_session, cutover_farm)
 
     farm_jobs = await list_farm_scene_backfill_jobs(
         admin_session,
@@ -227,8 +245,7 @@ async def test_only_replayable_scenes_are_counted(
     # A failed scene is not history that went missing, so it counts nowhere.
     await _add_farm_scene(admin_session, cutover_farm, status="failed")
     await admin_session.commit()
-
-    await admin_session.execute(text(f'SET search_path TO "{cutover_farm["schema"]}", public'))
+    await _use_schema(admin_session, cutover_farm)
     assert (
         await count_farm_backfill_candidates(
             admin_session, farm_id=cutover_farm["farm_id"], since=None, per_pair_cap=1000
@@ -319,7 +336,7 @@ async def test_a_block_request_falls_back_to_the_farms_own_scenes(
     """
     await _seed(admin_session, cutover_farm, 3)
 
-    await admin_session.execute(text(f'SET search_path TO "{cutover_farm["schema"]}", public'))
+    await _use_schema(admin_session, cutover_farm)
     counted = await get_grid_service(tenant_session=admin_session).count_backfill_scenes(
         block_id=cutover_farm["block_a"],
         product_id=cutover_farm["product_id"],

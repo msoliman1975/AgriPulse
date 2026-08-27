@@ -231,6 +231,9 @@ async def test_a_farm_with_one_cell_reading_is_not_reported(admin_session: Any) 
     """
     env = await _env(admin_session, scenes=3)
     await admin_session.execute(text(f'SET search_path TO "{env["schema"]}", public'))
+    assert (await admin_session.execute(text("SELECT current_schema()"))).scalar_one() == env[
+        "schema"
+    ]
     cell_id = uuid4()
     config_id = (
         await admin_session.execute(
@@ -238,13 +241,15 @@ async def test_a_farm_with_one_cell_reading_is_not_reported(admin_session: Any) 
             {"b": str(env["block_id"])},
         )
     ).scalar_one()
+    # `geom` is the config's UTM zone; `centroid` is a 4326 column. Same
+    # split as the real writer in GridRepository.
     await admin_session.execute(
         text(
             "INSERT INTO grid_cells "
             "  (id, grid_config_id, row_idx, col_idx, geom, centroid, area_m2) "
             "VALUES (:id, :cfg, 0, 0, "
             "        ST_Transform(ST_GeomFromText(:wkt, 4326), 32636), "
-            "        ST_Transform(ST_Centroid(ST_GeomFromText(:wkt, 4326)), 32636), 900)"
+            "        ST_Centroid(ST_GeomFromText(:wkt, 4326)), 900)"
         ),
         {"id": str(cell_id), "cfg": str(config_id), "wkt": _BLOCK},
     )
