@@ -3258,7 +3258,31 @@ global:
       #   a3680d2 is an ancestor of c84b3e3, checked with
       #   `git merge-base --is-ancestor` before this edit.
       #   Rollback is the frontend tag back to a3680d2.
-      tag: "c84b3e3"
+      # a728e59 = #608, the two layout defects that made the Timeline screen
+      #   awkward on first open. Both were reported from using it, and
+      #   neither was catchable by a test: jsdom reports every height as 0
+      #   and has no WebGL.
+      #   (1) The right rail did not scroll, so the PAGE grew instead. A
+      #   <Card> WITH a title wraps its children in a plain <div>, which is a
+      #   flex child but not a flex container, so the rail's
+      #   `flex-1 min-h-0 overflow-y-auto` had nothing to resolve against and
+      #   its height became content height. Invisible on a quiet day - seven
+      #   rows fit. On 5 August this farm recorded 108 alerts, so the rail
+      #   rendered 108 full-height rows and pushed the scrubber and its play
+      #   button far below the fold.
+      #   (2) The map did not frame the farm. The fit effect returns early
+      #   while the map is not ready, and `readyRef` is a ref, so becoming
+      #   ready re-runs nothing. On a cold load the blocks always arrive
+      #   first - an API response beats MapLibre's style fetch plus WebGL
+      #   init - so the effect ran once against an unready map and never
+      #   fired again. The map sat on the constructor's fallback centre,
+      #   which is the middle of Egypt.
+      #   FRONTEND ONLY, and only four files, all under modules/timeline. No
+      #   backend/app change at all between c84b3e3 and a728e59 - the other
+      #   commit in that range, #606, is the /dev/shm fix and touches tests
+      #   only - so api, workers and tile-server stay put. No migration.
+      #   Rollback is this tag alone back to c84b3e3.
+      tag: "a728e59"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
