@@ -3350,7 +3350,18 @@ global:
       #   though - a missing field falls back to English.
       #   1d728ab is an ancestor of 0d25fa8. Rollback is these three tags
       #   back to 1d728ab / a3680d2 / a3680d2.
-      tag: "0d25fa8"
+      # 2026-08-27 - 63b29c8 = #613. FRONTEND ONLY, two files. Found by opening
+      #   the page on prod after 0d25fa8 went out, not by a test: setting an
+      #   Arabic name changed the Team & roles table and 145 rows of the signal
+      #   details report, and the top bar kept the Latin one. `UserMenu` reads
+      #   `auth.user.profile.name` - the OIDC token, which carries whatever
+      #   Keycloak holds - so it never touched public.users and 0d25fa8 could
+      #   not have reached it. It now prefers the cached /me and falls back to
+      #   the token exactly as before.
+      #   api, workers and tile-server stay put. No migration. 0d25fa8 is an
+      #   ancestor of 63b29c8, checked with `git merge-base --is-ancestor`.
+      #   Rollback is this tag alone back to 0d25fa8.
+      tag: "63b29c8"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
