@@ -36,6 +36,16 @@ export interface FieldEnrolmentAudit {
   ready_to_enrol: WorkerBrief[];
   blocked_by_role: WorkerBrief[];
   missing_phone: WorkerBrief[];
+  /**
+   * People available on this farm who hold no scope on it. The API has
+   * always computed this and the type omitted it, so the one bucket that
+   * catches the two stores disagreeing was never rendered.
+   *
+   * `resource_farms` says where somebody may be **scheduled**; `farm_scopes`
+   * says where they may **look**. Anyone in here can be given work on this
+   * farm and cannot open it.
+   */
+  scope_mismatch: WorkerBrief[];
 }
 
 export interface EnrolPayload {
@@ -97,6 +107,39 @@ export async function reissueFieldPin(args: {
     `/v1/users/${args.user_id}/field-pin:reissue`,
     null,
     { params: { farm_id: args.farm_id } },
+  );
+  return data;
+}
+
+/**
+ * Put someone who already has the app on one more farm.
+ *
+ * Not a re-enrolment: same person, same PIN, same account. Enrolling them
+ * again would 409, because one phone is one username — which is why this
+ * exists and why there was no way to do it from any screen until now.
+ *
+ * It writes both projections in one call. `farm_scopes` says where they may
+ * look and `resource_farms` says where they may be scheduled; a screen that
+ * wrote only the first would produce somebody who can open the farm and
+ * cannot be assigned anything on it.
+ */
+export interface FarmAccessGrant {
+  user_id: string;
+  membership_id: string;
+  farm_id: string;
+  role: string;
+  /** Null when the membership has no worker row to make available. */
+  worker_id: string | null;
+}
+
+export async function grantFarmAccess(args: {
+  user_id: string;
+  farm_id: string;
+  role?: "Scout" | "FieldOperator";
+}): Promise<FarmAccessGrant> {
+  const { data } = await apiClient.post<FarmAccessGrant>(
+    `/v1/users/${args.user_id}/farm-access`,
+    { farm_id: args.farm_id, role: args.role ?? "Scout" },
   );
   return data;
 }

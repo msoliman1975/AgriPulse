@@ -1,4 +1,4 @@
-﻿{
+{
   "title": "Field access",
   "subtitle": "Give the crew on this farm a phone-and-PIN sign-in for the Scout app.",
   "pickFarm": "Farm",
@@ -45,5 +45,16 @@
     "reissue": "New PIN",
     "working": "Issuing…",
     "noAccount": "This worker is linked to a member who did not get their sign-in here."
+  },
+  "addFarm": {
+    "col": "Also works on",
+    "pick": "Add a farm…",
+    "add": "Add",
+    "working": "Adding…",
+    "noOtherFarms": "No other farms"
+  },
+  "mismatch": {
+    "heading": "Can be given work here but cannot open it",
+    "hint": "These people are on this farm's roster and hold no access to it. Work assigned to them here will not reach their phone. Add the farm to fix it."
   }
 }
