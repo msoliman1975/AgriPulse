@@ -1040,7 +1040,15 @@ class HttpxKeycloakAdminClient:
         params: dict[str, str] = {}
         redirect = self._settings.keycloak_invite_redirect_url
         if redirect:
+            # Keycloak drops `redirect_uri` unless it is a registered
+            # redirect of the client the action token is minted for, and
+            # the default client is `account`. Send both, or the user
+            # ends on the Keycloak account console after setting the
+            # password instead of back in the app.
             params["redirect_uri"] = redirect
+            client_id = self._settings.keycloak_invite_client_id
+            if client_id:
+                params["client_id"] = client_id
         await self._request(
             "PUT",
             f"/users/{user_id}/execute-actions-email",
