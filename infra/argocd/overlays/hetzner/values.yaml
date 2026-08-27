@@ -3547,7 +3547,37 @@ global:
       #   FRONTEND HALF ONLY. It reads two new fields on the grid Apply
       #   response, so it wants the api on the same tag; both move here.
       #   Rollback is this tag alone back to c0df195.
-      tag: "df7dc1e"
+      # f785edf = #625, an Arabic name can be typed for a farm and a block.
+      #   The Arabic name columns went out in tenant migration 0087 and
+      #   every reader uses them. The input never shipped. `/farms/new`
+      #   redirects to `/labs/map-v2`, and the side nav has no `/farms`
+      #   link, so the two forms that ask for an Arabic name are reachable
+      #   only by typing the URL. In the Farm Console a farm or block could
+      #   be created and renamed, but never given an Arabic name.
+      #
+      #   Five console forms gain the field: create farm (Arabic name by
+      #   the name, Arabic description under More details), create block,
+      #   create pivot, the farm settings tab and the block Edit details
+      #   panel. The last two are the only rename path in either console,
+      #   so they are what lets an existing farm or block get an Arabic
+      #   name at all. Both consoles share these components, so the default
+      #   console and v2 get the field together. A blank box sends null,
+      #   not "".
+      #
+      #   FRONTEND ONLY here. The api half of #625 is one field on
+      #   PivotCreateRequest and it is ALREADY LIVE: it rode in on f785edf
+      #   with the promote directly above this one. Checked in the pod --
+      #   PivotCreateRequest.model_fields contains name_ar. So the api is
+      #   ahead of the frontend, which is the safe order; a frontend ahead
+      #   of the api would 422 on a drawn pivot.
+      #
+      #   #623 is also in this tag and changes no frontend file.
+      #
+      #   NO MIGRATION. Every column exists and is nullable. Rollback is
+      #   this tag alone back to df7dc1e, and an Arabic name already typed
+      #   stays in the column and still displays -- the readers shipped
+      #   two promotes ago.
+      tag: "f785edf"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
