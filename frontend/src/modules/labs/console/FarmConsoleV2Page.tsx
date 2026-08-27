@@ -292,11 +292,19 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               // drawn over them, so their fill goes whenever pixels are up.
               pixelLayers={c.showPixels ? c.pixels.layers : null}
               gridFillVisible={false}
-              // Unset at "None": the property is absent from every feature
-              // then, and naming it would paint the whole farm the paint
-              // expression's no-reading colour rather than leaving the blocks
-              // as they look with no index at all.
-              blockFillColorProperty={c.showPixels ? "class_color" : undefined}
+              // The flat per-block class colour STANDS IN for the raster; it
+              // must not sit on top of one. `units-fill` is a vector layer, so
+              // it draws above the pixels at 0.8 opacity — 36 flat rectangles
+              // over a single stitched farm surface, which is what "the map
+              // draws block by block" looked like on a farm-raster date.
+              //
+              // So: raster drawn -> no class fill, the pixels are the reading.
+              // No raster -> class fill, which is the only reading there is.
+              // At "None" the property is absent from every feature anyway, so
+              // the blocks come out unfilled and the satellite shows through.
+              blockFillColorProperty={
+                c.showPixels && c.pixels.assetCount > 0 ? undefined : "class_color"
+              }
               gridCells={c.gridCellsFc}
               gridIndexCode={c.activeIndex}
               highlightedCellIds={c.highlightedCellIds}
