@@ -3191,10 +3191,45 @@ global:
     #
     #   Images pulled on the node before this edit:
     #   api:df7dc1e -> sha256:7adc1a50..., frontend:df7dc1e -> sha256:473e42f8...
+    # 2026-08-27 - f785edf = #623, the scout app gets walking directions to a
+    #   job, and pull-to-refresh on its two lists.
+    #
+    #   The API half is ONE field and one join. The scouting visit read now
+    #   returns `cell_point`, the centre of the grid cell a visit names, taken
+    #   from `grid_cells` through a LEFT JOIN. LEFT matters: an inner join
+    #   would drop every block-scoped visit -- which is most of them -- out of
+    #   the visit list entirely. There is a test that fails if it is changed.
+    #
+    #   The field app reads three positions best-first: the exact pin a
+    #   supervisor tapped (`pin_point`, ad-hoc dispatch only), then this cell
+    #   centre, then the block centroid the block list already carried. The
+    #   rest of the PR is the phone app and does not deploy here -- it ships
+    #   as an APK.
+    #
+    #   NO MIGRATION. Rollback really is these two tags back to df7dc1e.
+    #
+    #   FRONTEND UNCHANGED and deliberately left on df7dc1e: the PR touches
+    #   backend/ and mobile/ only. Nothing in the web app reads `cell_point`.
+    #
+    #   Live before this edit: api + workers + frontend all df7dc1e, read off
+    #   the deployments, not off this file.
+    #   `git merge-base --is-ancestor df7dc1e f785edfa` passed.
+    #
+    #   CI on the merge: integration 1133 passed / 4 skipped, including the 2
+    #   new tests in tests/integration/scouting/test_visit_location.py. That
+    #   job is continue-on-error, so this is the summary line from its log,
+    #   not the green tick.
+    #
+    #   Image pulled on the node before this edit: `k3s crictl pull
+    #   ghcr.io/msoliman1975/agripulse/api:f785edf` succeeded.
+    #
+    #   After the sync, watch: the scout visit list keeps returning rows for
+    #   block-scoped visits. If the LEFT JOIN were wrong the list would go
+    #   empty for most scouts, with a 200 and no error.
     api:
-      tag: "df7dc1e"
+      tag: "f785edf"
     workers:
-      tag: "df7dc1e"
+      tag: "f785edf"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
