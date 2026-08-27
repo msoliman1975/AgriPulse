@@ -12,7 +12,19 @@
   still go through OUR template.ftl, so they inherit the brand chrome
   for free.
 -->
-<@layout.registrationLayout displayMessage=!messagesPerField.existsError('username','password') displayInfo=(realm.password && realm.resetPasswordAllowed && !usernameHidden??); section>
+<@layout.registrationLayout displayMessage=!messagesPerField.existsError('username','password') displayInfo=true; section>
+
+  <#if section = "header">
+    ${kcSanitize(msg("loginAccountTitle"))?no_esc}
+  </#if>
+
+  <#if section = "subhead">
+    <#if realm.displayName?has_content>
+      <p class="sub">${msg("doLogIn")} to ${realm.displayName}.</p>
+    <#else>
+      <p class="sub">${msg("doLogIn")} to AgriPulse.</p>
+    </#if>
+  </#if>
 
   <#if section = "form">
     <div id="kc-form">
@@ -86,12 +98,18 @@
   </#if>
 
   <#if section = "info">
-    <#-- Social providers, registration links etc. The default v2
-         theme renders a registration "noAccount + doRegister" link
-         here; we ALWAYS show our invitation-only line via
-         template.ftl, so we let realm.password+!realm.registrationAllowed
-         hide the default. -->
-    <#if realm.password && social.providers??>
+    <#-- Invitation-only help line. We never render Keycloak's own
+         "noAccount + doRegister" link — access is per-tenant via the
+         admin Invite flow. -->
+    <#if (realm.registrationAllowed!false) == false && (realm.password!false)>
+      <div class="divider">${msg("noAccount")}</div>
+      <p class="help">${msg("inviteOnly")}</p>
+    </#if>
+
+    <#-- `social.providers??` alone is true even when the realm has no
+         identity providers, which drew a bare rule and an "Or sign in
+         with" heading over the help line. -->
+    <#if realm.password && social.providers?? && social.providers?has_content>
       <div id="kc-social-providers" class="social-providers">
         <hr/>
         <h4>${msg("identity-provider-login-label")}</h4>

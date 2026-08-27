@@ -34,6 +34,13 @@
   </#if>
 
   <link rel="icon" type="image/svg+xml" href="${url.resourcesPath}/img/mark.svg" />
+
+  <#-- Password show/hide. The parent keycloak.v2 template loads its own
+       js/passwordVisibility.js; this file replaces that template, so
+       without this line every eye button on every login-area page is
+       inert. `type=module` defers execution until the DOM is parsed and
+       keeps us off inline JS (KC 26 CSP rejects inline scripts). -->
+  <script type="module" src="${url.resourcesPath}/js/passwordToggle.js"></script>
 </head>
 <body class="agripulse">
 
@@ -118,17 +125,14 @@
       <div class="form-wrap">
         <div class="form-card">
 
-          <#-- Page heading: section "header" from the calling .ftl. -->
-          <#if section??>
-            <#if section = "header">
-              <h2>${kcSanitize(msg("loginAccountTitle"))?no_esc}</h2>
-              <#if realm.displayName?has_content>
-                <p class="sub">${msg("doLogIn")} to ${realm.displayName}.</p>
-              <#else>
-                <p class="sub">${msg("doLogIn")} to AgriPulse.</p>
-              </#if>
-            </#if>
-          </#if>
+          <#-- Page heading. `section` is the nested loop variable of the
+               CALLING .ftl, not a variable of this macro, so the old
+               `<#if section??>` here was always false and no page ever
+               drew a title. Pull the text through the nested slots
+               instead: every keycloak.v2 login .ftl defines "header",
+               and ours add an optional "subhead" beneath it. -->
+          <h2 class="form-title"><#nested "header"></h2>
+          <#nested "subhead">
 
           <#-- Keycloak's standard message banner (errors, info). -->
           <#if displayMessage && message?has_content && (message.type != 'warning' || !isAppInitiatedAction??)>
@@ -147,13 +151,10 @@
             </div>
           </#if>
 
-          <#-- Always-visible help line: invitation-only copy. The
-               default Keycloak self-registration link is intentionally
-               not rendered — we run invitation-only. -->
-          <#if section?? && section = "form" && (realm.registrationAllowed!false) == false && (realm.password!false)>
-            <div class="divider">${msg("noAccount")}</div>
-            <p class="help">${msg("inviteOnly")}</p>
-          </#if>
+          <#-- The invitation-only help line used to live here behind the
+               same dead `section??` test, so it never rendered. It is
+               login-page copy, not chrome — it now sits in login.ftl's
+               own "info" slot. -->
 
           <p class="footnote">v2026.05 &middot; powered by Keycloak</p>
         </div>

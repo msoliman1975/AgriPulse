@@ -366,3 +366,78 @@ button[type="submit"]:active { transform: translateY(1px); }
   .hero h1 { font-size: 32px; }
   .hero p.lead { font-size: 15px; }
 }
+
+/* ------------------------------------------------ SHARED FORM CHROME
+ * Everything below is used by the non-login flows that go through the
+ * same template.ftl — login-update-password.ftl first of all. Before
+ * this block those pages fell back to the inherited PatternFly styles
+ * and looked like a different product.
+ */
+
+/* Page title, rendered from the calling .ftl's "header" slot. */
+.form-title {
+  font-size: 26px;
+  margin: 0 0 6px;
+  letter-spacing: -.3px;
+  color: var(--ink);
+  font-weight: 700;
+}
+/* Password field with a show/hide control docked on the trailing edge. */
+.field-password { position: relative; }
+.field-password input { padding-right: 46px; }
+
+.toggle-visibility {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.toggle-visibility:hover { background: var(--mint-50); color: var(--green-700); }
+.toggle-visibility:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(29,158,117,.25);
+}
+.toggle-visibility svg { width: 19px; height: 19px; display: block; }
+/* Default state: password hidden, so offer "show" (open eye). */
+.toggle-visibility .eye-shut { display: none; }
+.toggle-visibility.is-revealed .eye-open { display: none; }
+.toggle-visibility.is-revealed .eye-shut { display: block; }
+
+/* Secondary action (e.g. Cancel on an app-initiated password change).
+ * The `.form-card button[type="submit"]` rule above is specificity
+ * (0,2,1) and would otherwise repaint this button with the primary
+ * gradient, so match that weight here. */
+.btn-secondary,
+.form-card button.btn-secondary {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--ink-soft);
+  font: 600 15px/1 inherit;
+  cursor: pointer;
+  box-shadow: none;
+}
+.btn-secondary:hover,
+.form-card button.btn-secondary:hover { border-color: var(--green-500); background: var(--mint-50); }
+
+/* A link that has to sit in the button stack (e.g. "Back to sign in"). */
+.btn-link {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+}

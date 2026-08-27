@@ -87,10 +87,19 @@ class Settings(BaseSettings):
     keycloak_admin_client_id: str = "agripulse-tenancy"
     keycloak_admin_client_secret: str = ""
     keycloak_admin_request_timeout_seconds: float = 10.0
-    # Action URL the user is redirected to when accepting the welcome
-    # email (UPDATE_PASSWORD action). Empty string omits the param so KC
-    # uses the realm default.
+    # Where Keycloak sends the user after the welcome email's
+    # UPDATE_PASSWORD action succeeds. Empty string omits both params,
+    # and KC then falls back to the account console of whatever client
+    # the action token names -- which is why an invited owner used to
+    # land on a Keycloak page and had to open the app by hand.
+    #
+    # `redirect_uri` is only honoured when it matches a registered
+    # redirect URI of `keycloak_invite_client_id`, so the two settings
+    # move together. `agripulse-api` is the realm's public SPA client
+    # and already lists https://app.<envHost>/* (see
+    # infra/helm/keycloak/files/agripulse-realm.json).
     keycloak_invite_redirect_url: str = ""
+    keycloak_invite_client_id: str = "agripulse-api"
     # When False, the invite / welcome flow skips the SMTP-dependent
     # `execute-actions-email` step and instead sets a one-time temporary
     # password that is returned in the API response (the inviting admin
