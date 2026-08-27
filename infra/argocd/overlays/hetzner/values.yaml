@@ -3386,7 +3386,57 @@ global:
       #   is a frontend change and #607 deserves its own checks - but it
       #   should not be left sitting there.
       #   Rollback is this tag alone back to 63b29c8.
-      tag: "b782010"
+      # c0df195 = #617, the Timeline replay: preloading, layer switches and
+      #   the picture's date.
+      #   Three complaints, and the first three fixes are one problem. The
+      #   map trailed the scrubber and kept changing dates after the run had
+      #   ended, because rasters were built one pass at a time at the moment
+      #   the play head reached that pass - a scene-assets request and then
+      #   a round of tiles before anything could draw - and the outgoing
+      #   layers were removed on the map's next `idle`, which a map under
+      #   continuous playback rarely reaches, so the removals queued and
+      #   fired late.
+      #   Now: layers are cached per pass instead of added and removed per
+      #   swap; the next three passes sit on the map at zero opacity, which
+      #   still loads their tiles, so the picture is there before the play
+      #   head is; and the swap holds the old pass until the new one's tiles
+      #   land, then cross-fades. Pressing play loads the whole window's
+      #   passes first and says `Preparing...` while it does.
+      #   Each preloaded pass carries b782010's farm-AOI bounds, so the
+      #   preload costs the farm's tiles rather than three viewports of
+      #   desert 404s. The cache evicts past twelve frames.
+      #   Second: the image's date was a header badge that only appeared
+      #   when the picture was OLDER than the scrubber's day, so on an
+      #   acquisition day it showed nothing and the text blinked out every
+      #   time the replay crossed a pass. It is now a caption on the map
+      #   carrying only the picture's own date, fading between values.
+      #   Third: checkboxes for index pixels, farm border, block borders and
+      #   the seven datapoint kinds. The datapoint switches drive the map
+      #   and the rail together; they do not drive the scrubber's ticks, so
+      #   a reader who hides alerts can still find the day one was raised.
+      #   The 8x speed is gone. At two frames a second it drew 16 days a
+      #   second against a pass every ~5 days, so four frames in five redrew
+      #   a picture the reader had just seen. 1x, 2x and 4x remain.
+      #   The caption is physically top-right, NOT logical start/end.
+      #   MapLibre's control positions do not mirror, so a caption that
+      #   mirrors collides with the zoom buttons or the attribution in one
+      #   direction or the other. Bottom is unusable at any offset: the Esri
+      #   attribution is one line at desktop widths and two on a narrow map,
+      #   and below `lg` the rail hides and the map takes the full width.
+      #   Bottom-left is not safe either - the bar is floated right inside a
+      #   full-width container, so once it wraps it spans the bottom edge.
+      #   Known and NOT fixed: top-right is clear because `fitBounds`
+      #   letterboxes every farm we have - the widest in prod is 0.784
+      #   against a container near 1.5. A farm about twice as wide relative
+      #   to its height would reach the corner and the caption would cover
+      #   blocks. That arrives with such a farm, not with a code change.
+      #   FRONTEND ONLY. No migration - the screen is read-only. b782010
+      #   checked as an ancestor with `git merge-base --is-ancestor`.
+      #   NOTE api and workers still do NOT move, so #607 (16 routes 403-ing
+      #   every farm-scoped user) remains merged and undeployed. Still
+      #   deliberate, still should not be left sitting there.
+      #   Rollback is this tag alone back to b782010.
+      tag: "c0df195"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
