@@ -103,7 +103,12 @@ from app.shared.pagination import (
     decode_cursor,
     encode_cursor,
 )
-from app.shared.rbac.check import PermissionDeniedError, has_capability, requires_capability
+from app.shared.rbac.check import (
+    PermissionDeniedError,
+    has_capability,
+    has_tenant_wide_capability,
+    requires_capability,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["farms"])
 
@@ -209,7 +214,7 @@ async def list_farms(
     # they hold a scope on — so their farm switcher is populated instead of
     # 403-empty. No scope + no tenant capability = denied.
     farm_ids: list[UUID] | None = None
-    if not has_capability(context, "farm.read"):
+    if not has_tenant_wide_capability(context, "farm.read"):
         farm_ids = [scope.farm_id for scope in context.farm_scopes]
         if not farm_ids:
             raise PermissionDeniedError("farm.read")

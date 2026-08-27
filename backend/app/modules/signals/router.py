@@ -54,7 +54,11 @@ from app.modules.signals.service import SignalsServiceImpl, get_signals_service
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
 from app.shared.db.session import get_admin_db_session, get_db_session
-from app.shared.rbac.check import has_capability, requires_capability
+from app.shared.rbac.check import (
+    has_capability,
+    has_tenant_wide_capability,
+    requires_capability,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["signals"])
 
@@ -161,7 +165,7 @@ async def create_definition(
 )
 async def get_definition(
     definition_id: UUID,
-    context: RequestContext = Depends(requires_capability("signal.read")),
+    context: RequestContext = Depends(requires_capability("signal.read", any_farm=True)),
     service: SignalsServiceImpl = Depends(_service),
 ) -> dict[str, Any]:
     _ensure_tenant(context)
@@ -222,7 +226,7 @@ async def delete_definition(
 )
 async def get_definition_references(
     definition_id: UUID,
-    context: RequestContext = Depends(requires_capability("signal.read")),
+    context: RequestContext = Depends(requires_capability("signal.read", any_farm=True)),
     service: SignalsServiceImpl = Depends(_service),
     tenant_session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, list[dict[str, str]]]:
@@ -241,11 +245,31 @@ async def get_definition_references(
 )
 async def list_assignments(
     definition_id: UUID,
-    context: RequestContext = Depends(requires_capability("signal.read")),
+    context: RequestContext = Depends(requires_capability("signal.read", any_farm=True)),
     service: SignalsServiceImpl = Depends(_service),
 ) -> list[dict[str, Any]]:
+    """Where this definition applies, cut to what the caller may see.
+
+    Unlike the rest of the catalogue, an assignment names a farm or a block,
+    so `any_farm` alone would be too wide: a Scout on one farm would learn
+    which of the tenant's other farms record this signal. The rows are
+    therefore filtered to the farms the caller actually holds.
+
+    Tenant-wide rows (no farm, no block) survive the filter — they are a
+    property of the definition, not of a farm, and every member is subject to
+    them. A tenant- or platform-level caller skips the filter entirely.
+    """
     _ensure_tenant(context)
-    return list(await service.list_assignments(definition_id=definition_id))
+    rows = list(await service.list_assignments(definition_id=definition_id))
+
+    if not has_tenant_wide_capability(context, "signal.read"):
+        visible = {scope.farm_id for scope in context.farm_scopes}
+        rows = [
+            r for r in rows if r["effective_farm_id"] is None or r["effective_farm_id"] in visible
+        ]
+    # Internal only: it exists to run the filter, and publishing it would put
+    # a farm id on a row whose own `farm_id` is deliberately null.
+    return [{k: v for k, v in r.items() if k != "effective_farm_id"} for r in rows]
 
 
 @router.post(
@@ -314,7 +338,7 @@ class SignalTemplateWithMembersResponse(BaseModel):
 )
 async def list_templates(
     include_inactive: bool = Query(default=False),
-    context: RequestContext = Depends(requires_capability("signal.read")),
+    context: RequestContext = Depends(requires_capability("signal.read", any_farm=True)),
     service: SignalsServiceImpl = Depends(_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
@@ -353,7 +377,7 @@ async def create_template(
 )
 async def get_template(
     template_id: UUID,
-    context: RequestContext = Depends(requires_capability("signal.read")),
+    context: RequestContext = Depends(requires_capability("signal.read", any_farm=True)),
     service: SignalsServiceImpl = Depends(_service),
 ) -> dict[str, Any]:
     _ensure_tenant(context)
@@ -426,7 +450,7 @@ async def delete_template(
 )
 async def get_template_references(
     template_id: UUID,
-    context: RequestContext = Depends(requires_capability("signal.read")),
+    context: RequestContext = Depends(requires_capability("signal.read", any_farm=True)),
     service: SignalsServiceImpl = Depends(_service),
     tenant_session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, list[dict[str, str]]]:
@@ -610,7 +634,9 @@ async def import_observations_csv(
 )
 async def list_import_batches(
     farm_id: UUID = Query(..., description="Farm whose CSV upload history to list."),
-    context: RequestContext = Depends(requires_capability("signal.read")),
+    # The farm was always in the request; the gate simply never read it, so a
+    # farm-scoped caller was denied their own farm's upload history.
+    context: RequestContext = Depends(requires_capability("signal.read", farm_id_param="farm_id")),
     service: SignalsServiceImpl = Depends(_service),
 ) -> list[dict[str, Any]]:
     schema = _ensure_tenant(context)

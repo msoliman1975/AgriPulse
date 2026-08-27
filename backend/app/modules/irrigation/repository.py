@@ -239,6 +239,36 @@ class IrrigationRepository:
         await self._tenant.flush()
         return True
 
+    async def farm_for_block(self, *, block_id: UUID) -> UUID | None:
+        """Which farm this block belongs to, for the per-farm capability check.
+
+        Deliberately not `get_block_context`, which returns None for a block
+        with no current crop assignment. Authorization must not depend on
+        whether a crop happens to be planted: a block with no crop would come
+        back unauthorized rather than empty.
+        """
+        return (
+            await self._tenant.execute(
+                text("SELECT farm_id FROM blocks WHERE id = :b AND deleted_at IS NULL").bindparams(
+                    bindparam("b", type_=PG_UUID(as_uuid=True))
+                ),
+                {"b": block_id},
+            )
+        ).scalar_one_or_none()
+
+    async def farm_for_schedule(self, *, schedule_id: UUID) -> UUID | None:
+        """The farm behind a schedule id. Schedules are keyed on a block only."""
+        return (
+            await self._tenant.execute(
+                text(
+                    "SELECT b.farm_id FROM irrigation_schedules i "
+                    "  JOIN blocks b ON b.id = i.block_id "
+                    " WHERE i.id = :s AND i.deleted_at IS NULL AND b.deleted_at IS NULL"
+                ).bindparams(bindparam("s", type_=PG_UUID(as_uuid=True))),
+                {"s": schedule_id},
+            )
+        ).scalar_one_or_none()
+
     async def get_schedule(self, *, schedule_id: UUID) -> dict[str, Any] | None:
         stmt = select(IrrigationSchedule).where(
             IrrigationSchedule.id == schedule_id,

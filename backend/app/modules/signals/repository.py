@@ -285,16 +285,37 @@ class SignalsRepository:
     # ---- Assignments --------------------------------------------------
 
     async def list_assignments(self, *, definition_id: UUID) -> tuple[dict[str, Any], ...]:
+        """Assignments for a definition, each carrying the farm it lands on.
+
+        `effective_farm_id` is the assignment's own `farm_id`, or the farm of
+        the block it names when the row is block-scoped, or None for a
+        tenant-wide row. It exists so the route can drop the rows a
+        farm-scoped caller may not see; the response model does not carry it.
+        A row is farm-revealing, so "which farm" cannot be left to the caller
+        to work out from a block id.
+        """
+        # A correlated subquery rather than a join to `farms.models.Block`:
+        # no other module reaches into that module's ORM, and `blocks` is
+        # already read here as SQL for the location checks.
+        block_farm = text(
+            "(SELECT farm_id FROM blocks WHERE id = signal_assignments.block_id)"
+        ).columns()
         stmt = (
-            select(SignalAssignment)
+            select(SignalAssignment, block_farm.label("block_farm_id"))
             .where(
                 SignalAssignment.signal_definition_id == definition_id,
                 SignalAssignment.deleted_at.is_(None),
             )
             .order_by(SignalAssignment.created_at.asc())
         )
-        rows = (await self._session.execute(stmt)).scalars().all()
-        return tuple(_assignment_to_dict(r) for r in rows)
+        rows = (await self._session.execute(stmt)).all()
+        return tuple(
+            {
+                **_assignment_to_dict(assignment),
+                "effective_farm_id": assignment.farm_id or block_farm_id,
+            }
+            for assignment, block_farm_id in rows
+        )
 
     async def insert_assignment(
         self,
