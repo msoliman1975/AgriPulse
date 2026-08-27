@@ -412,7 +412,9 @@
       "normal": "Normal",
       "low": "Low",
       "high": "High"
-    }
+    },
+    "noFarmReadings": "No cell readings for this farm yet",
+    "noFarmReadingsHint": "The zones are drawn, but no scene has been measured on them. Re-run the index backfill for this farm."
   },
   "sparkline": {
     "notEnough": "Not enough data for a trend."
@@ -881,7 +883,11 @@
     "backfillBudget": "Backfill budget (scenes)",
     "backfillBudgetAll": "All affected",
     "resetToInherited": "Reset blocks to the inherited default",
-    "inheritApplied": "{{touched}} of {{total}} block(s) now inherit the default again."
+    "inheritApplied": "{{touched}} of {{total}} block(s) now inherit the default again.",
+    "backfillQueued": "Queued {{scenes}} scene(s) to recompute.",
+    "backfillQueuedFarm": "{{farmScenes}} of them cover the whole farm at once.",
+    "backfillNothingQueued": "No scene was queued. The farm has stored scenes, so its cells will stay empty until this is looked at.",
+    "backfillUnreplayable": "{{scenes}} stored scene(s) kept no raw bands and can never be recomputed."
   },
   "flags": {
     "title": "Field flag",

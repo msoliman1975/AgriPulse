@@ -31,6 +31,15 @@ invisible to everything else we had on 2026-08-21:
     signal handler in ``tasks.py``, because a task that dies before it
     writes its attempt row leaves the sweep nothing to find.
 
+``grid_unbackfilled``
+    A farm whose sub-block grid holds no readings at all, while the farm
+    does have stored scenes. Added after a 36-block production farm was
+    gridded on 2026-08-27 and every cell stayed empty: the apply fired the
+    backfill, the backfill read only per-block ingestion jobs, and that
+    farm had been cut over to the farm-wide path and had none. Nothing
+    failed, so nothing else could see it. The map still drew the mesh,
+    because the mesh is geometry - the values were what was missing.
+
 Every detector returns ``Finding`` objects rather than writing. The sweep
 owns all writes, so it can collect the keys it saw across every tenant and
 auto-resolve what it did not see in a single pass at the end.
@@ -114,6 +123,11 @@ class Thresholds:
     # and waiting twelve days to report a thermal feed that was never
     # provisioned is not monitoring.
     new_subscription_grace_hours: int
+
+    # How long after a grid is created its cells may still be empty
+    # without that counting as a fault. The apply fires a backfill, and a
+    # farm-sized replay does not land in a minute.
+    grid_backfill_grace_hours: int
 
     def for_stream(self, stream: str) -> tuple[int, int]:
         if stream == STREAM_WEATHER:
@@ -692,13 +706,143 @@ async def detect_stuck_jobs(
     return out
 
 
+# --- D6: grid_unbackfilled -------------------------------------------------
+
+# One row per farm that has live grid geometry, no cell readings anywhere,
+# and stored scenes that should have produced some.
+#
+# Both scene tables are counted. A farm on the farm-wide imagery path has
+# zero rows in `imagery_ingestion_jobs`, so a block-only read would call it
+# "no scenes yet" - the healthy reading - which is the exact blindness this
+# detector exists to catch.
+#
+# `age_hours` is measured from the NEWEST live grid config, not the oldest.
+# A farm rezoned an hour ago is inside its grace period even if its first
+# grid dates from last year, because it is the newest geometry whose cells
+# are being filled.
+_GRID_UNBACKFILLED_SQL = """
+WITH gridded AS (
+    SELECT b.farm_id,
+           count(*)              AS live_grids,
+           max(cfg.created_at)   AS newest_grid_at
+    FROM grid_configs cfg
+    JOIN blocks b
+      ON b.id = cfg.block_id
+     AND b.deleted_at IS NULL
+    WHERE cfg.retired_at IS NULL
+      AND cfg.deleted_at IS NULL
+    GROUP BY b.farm_id
+),
+scenes AS (
+    SELECT g.farm_id,
+           (
+               SELECT count(*)
+               FROM imagery_ingestion_jobs j
+               JOIN blocks b2 ON b2.id = j.block_id AND b2.farm_id = g.farm_id
+               WHERE j.status = 'succeeded'
+           ) AS block_scenes,
+           (
+               SELECT count(*)
+               FROM imagery_farm_ingestion_jobs fj
+               WHERE fj.farm_id = g.farm_id
+                 AND fj.status = 'succeeded'
+           ) AS farm_scenes
+    FROM gridded g
+)
+SELECT g.farm_id,
+       f.name AS farm_name,
+       g.live_grids,
+       g.newest_grid_at,
+       EXTRACT(EPOCH FROM (now() - g.newest_grid_at)) / 3600.0 AS age_hours,
+       s.block_scenes,
+       s.farm_scenes
+FROM gridded g
+JOIN scenes s ON s.farm_id = g.farm_id
+JOIN farms f ON f.id = g.farm_id AND f.deleted_at IS NULL
+WHERE (s.block_scenes + s.farm_scenes) > 0
+  AND g.newest_grid_at < now() - make_interval(hours => :grace_hours)
+  AND NOT EXISTS (
+      SELECT 1
+      FROM block_grid_aggregates o
+      JOIN blocks b3 ON b3.id = o.block_id AND b3.farm_id = g.farm_id
+  )
+ORDER BY f.name
+"""
+
+
+async def detect_grid_unbackfilled(
+    session: AsyncSession, *, tenant_key: str, th: Thresholds
+) -> list[Finding]:
+    """Farms whose grid cells are empty when they should not be.
+
+    Warning, never critical. Nothing is lost and nothing is wrong with the
+    data the rest of the product reads - the block-level numbers, the
+    alerts and the recommendations all still work. What is missing is the
+    sub-block detail, so this is a gap in a feature rather than an outage.
+    """
+    rows = (
+        (
+            await session.execute(
+                text(_GRID_UNBACKFILLED_SQL),
+                {"grace_hours": th.grid_backfill_grace_hours},
+            )
+        )
+        .mappings()
+        .all()
+    )
+    out: list[Finding] = []
+    for r in rows:
+        block_scenes = int(r["block_scenes"])
+        farm_scenes = int(r["farm_scenes"])
+        age = float(r["age_hours"])
+        # Which shape the farm's history is in decides which repair works,
+        # so it goes in the alert rather than in whoever reads it next.
+        path = "farm-wide" if farm_scenes and not block_scenes else "per-block"
+        out.append(
+            Finding(
+                alert_key=f"grid_unbackfilled:{tenant_key}:{r['farm_id']}",
+                category="index_calc",
+                kind="grid_unbackfilled",
+                severity="warning",
+                title=f"Grid cells are empty on {r['farm_name'] or 'unknown farm'}",
+                detail=(
+                    f"{r['live_grids']} live grid(s), created {_age_phrase(age)} ago, "
+                    f"hold no cell readings, while the farm has "
+                    f"{block_scenes + farm_scenes} stored scene(s) on the {path} "
+                    f"path. The map draws the mesh and every cell reads empty. "
+                    f"Re-run the farm index backfill for this farm."
+                ),
+                context={
+                    "live_grids": int(r["live_grids"]),
+                    "newest_grid_at": (
+                        r["newest_grid_at"].isoformat() if r["newest_grid_at"] else None
+                    ),
+                    "grid_age_hours": round(age, 2),
+                    "block_scenes": block_scenes,
+                    "farm_scenes": farm_scenes,
+                    "imagery_path": path,
+                },
+                farm_id=r["farm_id"],
+                farm_name=r["farm_name"],
+            )
+        )
+    return out
+
+
 # Kinds the sweep recomputes in full every run, and may therefore
 # auto-resolve by absence. `task_error` is excluded - see the repository.
-SWEEP_KINDS = ["stream_silent", "peer_lag", "failure_streak", "stuck_job"]
+SWEEP_KINDS = [
+    "stream_silent",
+    "peer_lag",
+    "failure_streak",
+    "stuck_job",
+    "grid_unbackfilled",
+]
 
 DETECTORS = (
     detect_stream_silent,
     detect_peer_lag,
     detect_failure_streaks,
     detect_stuck_jobs,
+    detect_grid_unbackfilled,
 )

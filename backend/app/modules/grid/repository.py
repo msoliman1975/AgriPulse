@@ -60,6 +60,21 @@ class GridRepository:
 
     # ---- block context ------------------------------------------------
 
+    async def get_block_farm_id(self, *, block_id: UUID) -> UUID | None:
+        """Which farm owns a block, or ``None`` if it is missing or deleted.
+
+        Needed by the backfill count, which has to ask the farm-level scene
+        table a question it can only answer with a farm id.
+        """
+        return (
+            await self._session.execute(
+                text(
+                    "SELECT farm_id FROM blocks WHERE id = :block AND deleted_at IS NULL"
+                ).bindparams(bindparam("block", type_=PG_UUID(as_uuid=True))),
+                {"block": block_id},
+            )
+        ).scalar_one_or_none()
+
     async def get_block_geometry(self, *, block_id: UUID) -> dict[str, Any] | None:
         """Return ``boundary_utm`` (WKT), ``area_m2``, ``utm_srid`` for a block.
 

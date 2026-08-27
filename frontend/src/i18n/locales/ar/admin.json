@@ -1193,7 +1193,8 @@
       "peer_lag": "متأخر عن بقية المزارع",
       "failure_streak": "أعطال متكررة",
       "task_error": "خطأ في المهمة",
-      "stuck_job": "مهام متوقفة"
+      "stuck_job": "مهام متوقفة",
+      "grid_unbackfilled": "خلايا الشبكة فارغة"
     },
     "resolvedReason": {
       "auto": "أُغلق تلقائياً",

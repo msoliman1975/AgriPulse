@@ -1193,7 +1193,8 @@
       "peer_lag": "Behind other farms",
       "failure_streak": "Repeated failures",
       "task_error": "Task error",
-      "stuck_job": "Stuck jobs"
+      "stuck_job": "Stuck jobs",
+      "grid_unbackfilled": "Grid cells empty"
     },
     "resolvedReason": {
       "auto": "Cleared automatically",

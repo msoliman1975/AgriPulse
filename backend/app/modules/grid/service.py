@@ -30,7 +30,7 @@ from app.modules.grid.anomaly import (
     detect_low_outliers,
     effective_k,
 )
-from app.modules.grid.backfill import list_backfill_jobs
+from app.modules.grid.backfill import list_backfill_jobs, list_farm_scene_backfill_jobs
 from app.modules.grid.errors import (
     CellSizeInvalidError,
     GridConfigNotFoundError,
@@ -771,6 +771,11 @@ class GridServiceImpl:
 
         Lets the UI show "Backfill N scenes" before the user commits. The
         actual fan-out runs in the ``grid.backfill_block`` task.
+
+        Mirrors that task's fallback exactly, including the order the two
+        sources are tried in. A farm on the farm-wide imagery path has no
+        per-block ingestion jobs, so a count that read only those told the
+        reader "0 scenes" about a request that is about to replay hundreds.
         """
         jobs = await list_backfill_jobs(
             self._session,
@@ -779,7 +784,19 @@ class GridServiceImpl:
             since=since,
             limit=limit,
         )
-        return len(jobs)
+        if jobs:
+            return len(jobs)
+        farm_id = await self._repo.get_block_farm_id(block_id=block_id)
+        if farm_id is None:
+            return 0
+        farm_jobs = await list_farm_scene_backfill_jobs(
+            self._session,
+            farm_id=farm_id,
+            product_id=product_id,
+            since=since,
+            limit=limit,
+        )
+        return len(farm_jobs)
 
     # ---- farm-wide (bulk) config -------------------------------------
 

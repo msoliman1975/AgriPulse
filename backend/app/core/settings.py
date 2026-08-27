@@ -362,6 +362,13 @@ class Settings(BaseSettings):
     # also never fails.
     platform_alert_stuck_job_hours: int = 6
 
+    # A farm gridded this recently is left alone, because the backfill the
+    # apply fired is still running and its cells are legitimately empty.
+    # Past it, empty cells mean the backfill found nothing to replay. Six
+    # hours is well beyond the queue latency and well short of a working
+    # day, so an operator hears about it the same morning.
+    platform_alert_grid_backfill_grace_hours: int = 6
+
     # A `task_error` alert has no sweep to re-detect it -- it is written by
     # a Celery failure signal, so absence of news is the only recovery
     # signal available. Auto-resolve after this long with no new failure.

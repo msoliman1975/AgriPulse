@@ -240,3 +240,12 @@ class GridApplyResponse(BaseModel):
     # the budget did not reach, which stay on the older geometry.
     scenes_queued: int = 0
     scenes_stranded: int = 0
+    # How many of `scenes_queued` are farm-AOI scenes rather than per-block
+    # ones. Reported separately because a farm cut over to the farm-wide
+    # imagery path has only the second kind, and a single total could not
+    # say whether such a farm was covered at all.
+    farm_scenes_queued: int = 0
+    # Succeeded scenes under the farm's live grids that no recompute can
+    # replay, because they kept no raw-bands asset. Without this number a
+    # partial queue reads as a budget truncation, which it is not.
+    scenes_unreplayable: int = 0

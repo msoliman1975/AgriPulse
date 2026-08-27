@@ -30,6 +30,11 @@ interface Props {
   // Open cell-scoped recommendations/alerts attributed to this cell (per-cell
   // P2). Empty/omitted when the cell has none.
   cellItems?: CellItem[];
+  // False when NO cell anywhere on this farm carries a reading. A single
+  // empty cell is ordinary — cloud, or a corner outside the pass. A whole
+  // farm of empty cells is a broken backfill, and printing the same "—"
+  // for both let one hide inside the other for as long as it liked.
+  farmHasCellReadings?: boolean;
   onClose: () => void;
 }
 
@@ -76,6 +81,7 @@ export function GridCellPopup({
   baselineMean,
   z,
   cellItems,
+  farmHasCellReadings = true,
   onClose,
 }: Props): ReactNode {
   const { t } = useTranslation("farmConsole");
@@ -92,9 +98,13 @@ export function GridCellPopup({
 
   // Latest non-null point drives the min/mean/max readout — same logic
   // as the old GridCellDrawer's CellSummary (newest scene first).
-  const latest = data ? [...data.points].reverse().find((p) => p.mean !== null) ?? null : null;
+  const latest = data ? ([...data.points].reverse().find((p) => p.mean !== null) ?? null) : null;
   const headline =
     value != null ? value.toFixed(3) : latest?.mean != null ? Number(latest.mean).toFixed(3) : "—";
+  // Only when the farm has nothing anywhere, and this cell is empty too.
+  // A farm that does have readings keeps the plain "—", because there the
+  // gap really is about this cell on this date.
+  const farmIsEmpty = !farmHasCellReadings && value == null && latest?.mean == null;
 
   // Baseline status copy + token. Positive z = below the block average
   // (the anomaly-flagged direction); >= 1.5σ-below is what the backend
@@ -139,6 +149,13 @@ export function GridCellPopup({
           </p>
         ) : null}
       </div>
+
+      {farmIsEmpty ? (
+        <div className="mb-2 rounded border border-ap-warn/40 bg-ap-warn-soft p-1.5">
+          <p className="text-[11px] font-medium text-ap-warn">{t("gridPopup.noFarmReadings")}</p>
+          <p className="mt-0.5 text-[10px] text-ap-muted">{t("gridPopup.noFarmReadingsHint")}</p>
+        </div>
+      ) : null}
 
       <dl className="mb-2 grid grid-cols-3 gap-1.5">
         <Stat label={t("gridPopup.min")} value={latest?.min ?? null} />

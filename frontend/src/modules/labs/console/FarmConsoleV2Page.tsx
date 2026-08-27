@@ -518,6 +518,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
                 baselineMean={c.selectedCellBaseline?.blockMean ?? null}
                 z={c.selectedCellBaseline?.z ?? null}
                 cellItems={c.cellItemsByCell.get(c.selectedCellId) ?? []}
+                farmHasCellReadings={c.farmHasCellReadings}
                 onClose={() => {
                   c.setSelectedCellId(null);
                   c.setCellClickPoint(null);

@@ -28,7 +28,8 @@ from typing import Any, cast
 from uuid import UUID
 
 from celery import shared_task
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from app.core.logging import get_logger
 from app.modules.grid.anomaly import DEFAULT_K, AnomalyResult, effective_k
@@ -526,8 +527,16 @@ def backfill_block(
 
     Walks succeeded ingestion jobs and re-enqueues ``compute_indices`` for
     each, which repopulates ``block_grid_aggregates`` on the freshly
-    regenerated cells. Idempotent: scenes already computed on the new grid
-    collide on the UNIQUE and DO NOTHING.
+    regenerated cells. Safe to run more than once: scenes already computed
+    on the new grid collide on the UNIQUE and DO NOTHING.
+
+    On a farm cut over to the farm-wide imagery path there are no per-block
+    ingestion jobs to walk, so this falls back to that farm's own scenes.
+    Note the widening: one farm scene is replayed for the WHOLE farm, so a
+    block-scoped request there recomputes every block. There is no
+    narrower unit — the farm raster is measured block by block in a single
+    pass — and the alternative is what this replaces, which was to queue
+    nothing and report success.
     """
     return _run_task(_backfill_block_async(tenant_schema, block_id, product_id, limit, since_iso))
 
@@ -539,7 +548,8 @@ async def _backfill_block_async(
     limit: int,
     since_iso: str | None,
 ) -> dict[str, int]:
-    from app.modules.imagery.tasks import compute_indices
+    from app.modules.grid.backfill import list_farm_scene_backfill_jobs
+    from app.modules.imagery.tasks import compute_indices, recompute_farm_scene_indices
 
     since = datetime.fromisoformat(since_iso) if since_iso else None
     factory = AsyncSessionLocal()
@@ -552,18 +562,52 @@ async def _backfill_block_async(
             since=since,
             limit=limit,
         )
+        farm_jobs: list[dict[str, str]] = []
+        if not jobs:
+            farm_id = await _farm_id_of_block(session, block_id=UUID(block_id))
+            if farm_id is not None:
+                farm_jobs = await list_farm_scene_backfill_jobs(
+                    session,
+                    farm_id=farm_id,
+                    product_id=UUID(product_id),
+                    since=since,
+                    limit=limit,
+                )
 
     for j in jobs:
         compute_indices.delay(j["job_id"], tenant_schema, j["raw_bands_key"])
+    for j in farm_jobs:
+        recompute_farm_scene_indices.delay(j["job_id"], tenant_schema)
 
     _log.info(
         "grid_backfill_queued",
         tenant_schema=tenant_schema,
         block_id=block_id,
         product_id=product_id,
-        scenes_queued=len(jobs),
+        scenes_queued=len(jobs) + len(farm_jobs),
+        farm_scenes_queued=len(farm_jobs),
     )
-    return {"scenes_queued": len(jobs)}
+    return {
+        "scenes_queued": len(jobs) + len(farm_jobs),
+        "farm_scenes_queued": len(farm_jobs),
+    }
+
+
+async def _farm_id_of_block(session: Any, *, block_id: UUID) -> UUID | None:
+    """Which farm a block belongs to, or None if it is gone.
+
+    Only needed on the fallback path, so it is a query rather than a
+    parameter: widening the task signature would make every caller carry a
+    farm id for the case that does not use one.
+    """
+    return (
+        await session.execute(
+            text("SELECT farm_id FROM blocks WHERE id = :b AND deleted_at IS NULL").bindparams(
+                bindparam("b", type_=PG_UUID(as_uuid=True))
+            ),
+            {"b": block_id},
+        )
+    ).scalar_one_or_none()
 
 
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
@@ -741,20 +785,26 @@ async def _backfill_farm_async(
         DEFAULT_PER_PAIR_CAP,
         allocate_budget,
         list_farm_grid_pairs,
+        list_farm_scene_backfill_jobs,
     )
-    from app.modules.imagery.tasks import compute_indices
+    from app.modules.imagery.tasks import compute_indices, recompute_farm_scene_indices
 
     since = datetime.fromisoformat(since_iso) if since_iso else None
-    # Per-pair fetch cap. With a farm budget set we can never enqueue more
-    # than the budget in total, so fetching beyond it is pure waste; with
-    # no budget we still bound the query rather than reading a decade of
-    # jobs into memory.
-    per_pair_cap = budget_scenes if budget_scenes is not None else DEFAULT_PER_PAIR_CAP
+    farm_uuid = UUID(farm_id)
+    # Per-pair fetch cap, the same with or without a budget.
+    #
+    # It used to narrow to the budget, on the reasoning that fetching past
+    # what can be enqueued is waste. It is, but `scenes_stranded` is
+    # counted from what was fetched, so a budget of 2 against 9 scenes
+    # reported 0 stranded — the number whose whole job is to say what the
+    # budget did not reach. The read is bounded either way, and reporting
+    # a truncated backfill as complete is the more expensive mistake.
+    per_pair_cap = DEFAULT_PER_PAIR_CAP
 
     factory = AsyncSessionLocal()
     async with factory() as session, session.begin():
         await _set_tenant_context(session, tenant_schema)
-        pairs = await list_farm_grid_pairs(session, farm_id=UUID(farm_id))
+        pairs = await list_farm_grid_pairs(session, farm_id=farm_uuid)
         jobs_by_pair: dict[tuple[UUID, UUID], list[dict[str, str]]] = {}
         for p in pairs:
             jobs_by_pair[(p["block_id"], p["product_id"])] = await list_backfill_jobs(
@@ -765,12 +815,43 @@ async def _backfill_farm_async(
                 limit=per_pair_cap,
             )
 
+        # The farm-AOI half. A farm cut over to the farm-wide imagery path
+        # has ZERO rows in `imagery_ingestion_jobs`, so everything above
+        # returns empty for it and this task used to enqueue nothing while
+        # reporting success. Its scenes live in `imagery_farm_ingestion_jobs`
+        # and are replayed by a different task.
+        #
+        # Keyed on (farm_id, product_id), not (block_id, product_id): one
+        # farm scene writes cells for every block, so it must appear in the
+        # allocation once, not once per block. A farm id can never collide
+        # with a block id, so the two pools share one dict and one budget.
+        farm_products = sorted({p["product_id"] for p in pairs})
+        for product_id in farm_products:
+            farm_jobs = await list_farm_scene_backfill_jobs(
+                session,
+                farm_id=farm_uuid,
+                product_id=product_id,
+                since=since,
+                limit=per_pair_cap,
+            )
+            if farm_jobs:
+                jobs_by_pair[(farm_uuid, product_id)] = farm_jobs
+
     allocated, stranded = allocate_budget(jobs_by_pair, budget=budget_scenes)
 
     queued = 0
+    farm_queued = 0
     for jobs in allocated.values():
         for j in jobs:
-            compute_indices.delay(j["job_id"], tenant_schema, j["raw_bands_key"])
+            # Dispatched on the job's own `kind`, never on the key. A block
+            # scene carries a stored raw-bands key; a farm scene derives its
+            # own, and sending one to the other's task fails at the first
+            # lookup.
+            if j["kind"] == "farm":
+                recompute_farm_scene_indices.delay(j["job_id"], tenant_schema)
+                farm_queued += 1
+            else:
+                compute_indices.delay(j["job_id"], tenant_schema, j["raw_bands_key"])
             queued += 1
 
     _log.info(
@@ -779,12 +860,17 @@ async def _backfill_farm_async(
         farm_id=farm_id,
         grids=len(jobs_by_pair),
         scenes_queued=queued,
+        # Reported separately, not folded into `scenes_queued`. A cut-over
+        # farm holds both shapes, and one number could not say which half a
+        # run actually touched.
+        farm_scenes_queued=farm_queued,
         scenes_stranded=stranded,
         budget=budget_scenes,
     )
     return {
         "grids": len(jobs_by_pair),
         "scenes_queued": queued,
+        "farm_scenes_queued": farm_queued,
         "scenes_stranded": stranded,
     }
 

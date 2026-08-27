@@ -1,7 +1,7 @@
 // Mirrors backend/app/modules/platform_alerts/schemas.py.
 //
 // Keep the unions below in lock-step with the CHECK constraints in public
-// migration 0069. A mirrored constant that drifts does not throw here - it
+// migrations 0069 and 0077. A mirrored constant that drifts does not throw here - it
 // silently degrades the UI into rendering a raw enum string where a label
 // belongs, which is the failure mode this codebase has hit before.
 
@@ -13,7 +13,8 @@ export type AlertKind =
   | "peer_lag"
   | "failure_streak"
   | "task_error"
-  | "stuck_job";
+  | "stuck_job"
+  | "grid_unbackfilled";
 export type AlertSeverity = "critical" | "warning";
 export type AlertStatus = "open" | "acknowledged" | "resolved";
 
