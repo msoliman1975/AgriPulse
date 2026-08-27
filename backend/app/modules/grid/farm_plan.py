@@ -47,7 +47,6 @@ class GridRowState:
     block_id: UUID
     block_code: str
     block_name: str | None
-    block_name_ar: str | None
     product_id: UUID | None
     product_code: str | None
     product_name: str | None
@@ -62,6 +61,10 @@ class GridRowState:
     # Rows already recorded against this block+product, used to state the
     # cost of a rezone honestly. Populated by the service, not planned.
     scenes_affected: int = 0
+    # Arabic block name (tenant 0087). Last and defaulted so the positional
+    # constructor keeps working; every existing caller passes the rest by
+    # position.
+    block_name_ar: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
