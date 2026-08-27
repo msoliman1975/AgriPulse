@@ -3361,7 +3361,32 @@ global:
       #   api, workers and tile-server stay put. No migration. 0d25fa8 is an
       #   ancestor of 63b29c8, checked with `git merge-base --is-ancestor`.
       #   Rollback is this tag alone back to 0d25fa8.
-      tag: "63b29c8"
+      # b782010 = #615, bound the whole-farm raster's tile requests.
+      #   A raster source with no `bounds` is requested across the ENTIRE
+      #   viewport. Per-block sources never showed this because each carries
+      #   its block's extent; the whole-farm surface had none to carry, so
+      #   the key was omitted and MapLibre asked TiTiler for tiles over
+      #   whatever was on screen. On this farm the viewport is mostly
+      #   desert: 24 tile 404s on one frame, none of which could ever have
+      #   returned an image. Harmless - MapLibre draws nothing there - but
+      #   every one is a round trip for a certain 404.
+      #   The box is the farm AOI, widened by the blocks, then padded ~220m.
+      #   Widened because the two do not always agree and a block outside
+      #   the stored boundary would otherwise stop being requested. Padded
+      #   because `bounds` suppresses REQUESTS, not just rendering, so a box
+      #   that is too small does not save traffic - it silently drops the
+      #   edge of the image. The COG keeps whole any pixel whose centre is
+      #   inside the AOI, so colour runs ~5m past the boundary and 15m on
+      #   the 30m thermal product; the pad is two orders of magnitude clear.
+      #   FRONTEND ONLY: three files, all under modules/timeline. 63b29c8
+      #   checked as an ancestor first. No migration.
+      #   NOTE the api and workers tags below are NOT moved by this promote,
+      #   and #607 (16 routes 403-ing every farm-scoped user) is merged into
+      #   main and still undeployed as a result. That is deliberate - this
+      #   is a frontend change and #607 deserves its own checks - but it
+      #   should not be left sitting there.
+      #   Rollback is this tag alone back to 63b29c8.
+      tag: "b782010"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
