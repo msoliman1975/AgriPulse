@@ -34,6 +34,10 @@ export const en = {
   "work.alreadyClosed": "This job is closed.",
   "work.markDone": "Mark done",
   "work.markSkipped": "Not needed",
+  "work.takeMeThere": "Take me there",
+  "work.noLocation": "No location saved for this job",
+  "work.atCellCentre": "This points at the centre of the zone.",
+  "work.atBlockCentre": "This points at the centre of the block.",
   "work.actionFailed": "That did not go through. Try again.",
   "work.recordFailed": "Could not save that reading.",
   "work.loadDefsFailed": "Could not load what can be recorded.",
@@ -204,4 +208,8 @@ export const en = {
   "health.authDown": "Cannot reach sign-in",
   "health.bothDown": "No connection",
   "health.retry": "Retry",
+
+  "refresh.pull": "Pull down to update",
+  "refresh.release": "Let go to update",
+  "refresh.working": "Updating…",
 } as const;

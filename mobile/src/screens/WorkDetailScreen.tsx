@@ -7,11 +7,14 @@ import {
   getVisit,
   startVisit,
   submitVisit,
+  type Block,
+  type Visit,
   type VisitOutcome,
   type WorkItem,
 } from "@/api/client";
 import { CaptureForm } from "@/components/CaptureForm";
-import { dueIn, t, type Lang } from "@/i18n";
+import { dueIn, t, type Lang, type MessageKey } from "@/i18n";
+import { destinationOf, directionsUrl, type Destination } from "@/work/where";
 
 /**
  * One job, and everything a scout can do about it.
@@ -30,12 +33,17 @@ export function WorkDetailScreen({
   lang,
   farmId,
   item,
+  block,
   onClose,
   onChanged,
 }: {
   lang: Lang;
   farmId: string;
   item: WorkItem;
+  /** The item's block, from the list the caller already holds. Carries the
+   *  centroid, which is the coarsest — and for board work the only — position
+   *  a job has. Null when the block list failed or the job has no block. */
+  block: Block | null;
   onClose: () => void;
   onChanged: () => void;
 }): ReactNode {
@@ -44,6 +52,11 @@ export function WorkDetailScreen({
   const [error, setError] = useState<string | null>(null);
 
   const isVisit = item.kind === "scouting_visit";
+  // One fetch, two readers: the reason text and the position. It used to sit
+  // inside WhyBlock, and adding a second consumer there would have meant a
+  // second request for a row the screen already had.
+  const visit = useVisit(isVisit ? item.id : null, farmId);
+  const destination = destinationOf(item, visit, block);
 
   async function act(fn: () => Promise<{ status: string }>): Promise<void> {
     setBusy(true);
@@ -80,7 +93,9 @@ export function WorkDetailScreen({
         {item.category ? <span className="origin">{item.category}</span> : null}
       </p>
 
-      {isVisit ? <WhyBlock lang={lang} farmId={farmId} visitId={item.id} /> : null}
+      <TakeMeThere lang={lang} destination={destination} />
+
+      {isVisit ? <WhyBlock lang={lang} reason={visit?.reason_snapshot ?? null} /> : null}
 
       {error ? <p className="error">{error}</p> : null}
 
@@ -321,35 +336,18 @@ function BoardActions({
  * A scout who is told *why* records something useful; one who is only told
  * "go and look" records what they happen to notice.
  *
- * Fetched here rather than carried on the work item because `/me/work` is a
- * merged list across two kinds and does not send it. One extra request on a
- * screen the scout opened deliberately is a fair price.
+ * The reason is fetched by the parent rather than here, because the same row
+ * also carries the two positions the directions control reads. A missing
+ * reason is normal — ad-hoc visits carry a human instruction instead — so this
+ * renders nothing rather than an error.
  */
 function WhyBlock({
   lang,
-  farmId,
-  visitId,
+  reason,
 }: {
   lang: Lang;
-  farmId: string;
-  visitId: string;
+  reason: Record<string, unknown> | null;
 }): ReactNode {
-  const [reason, setReason] = useState<Record<string, unknown> | null>(null);
-
-  useEffect(() => {
-    let live = true;
-    // A missing reason is normal — ad-hoc visits carry a human instruction
-    // instead — so a failure here shows nothing rather than an error.
-    void getVisit(visitId, farmId)
-      .then((v) => {
-        if (live) setReason(v.reason_snapshot);
-      })
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [farmId, visitId]);
-
   const lines = readableReason(reason);
   if (lines.length === 0) return null;
 
@@ -361,6 +359,100 @@ function WhyBlock({
           <span className="k">{label}</span> <span className="v">{value}</span>
         </p>
       ))}
+    </div>
+  );
+}
+
+/**
+ * The visit behind this row, or null.
+ *
+ * `/me/work` merges two kinds of work into one shape and sends neither the
+ * reason nor the position, so the detail screen asks for the visit itself. One
+ * extra request on a screen the scout opened deliberately is a fair price; a
+ * failure costs the "why" block and the exact pin, and the block centroid
+ * still answers the directions control.
+ */
+function useVisit(visitId: string | null, farmId: string): Visit | null {
+  const [visit, setVisit] = useState<Visit | null>(null);
+
+  useEffect(() => {
+    if (!visitId) {
+      setVisit(null);
+      return;
+    }
+    let live = true;
+    void getVisit(visitId, farmId)
+      .then((v) => {
+        if (live) setVisit(v);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [farmId, visitId]);
+
+  return visit;
+}
+
+/**
+ * "Take me there."
+ *
+ * Always rendered, and disabled rather than hidden when there is nowhere to
+ * go. A control that comes and goes between two jobs teaches a scout to hunt
+ * for it; one that is visibly greyed out, with a line saying why, teaches them
+ * that this particular job has no position — which is a fact about the job and
+ * worth knowing before they set off.
+ *
+ * The note under it is the honest half. Two of the three positions are the
+ * middle of an area rather than a place: the maps app will still draw a
+ * confident pin on the centre of a 12-hectare block, and the scout has to be
+ * told that is what it is or they will walk to it and find nothing.
+ */
+function TakeMeThere({
+  lang,
+  destination,
+}: {
+  lang: Lang;
+  destination: Destination | null;
+}): ReactNode {
+  if (!destination) {
+    return (
+      <div className="goto">
+        <button type="button" className="go" disabled>
+          {t(lang, "work.takeMeThere")}
+        </button>
+        <p className="hint">{t(lang, "work.noLocation")}</p>
+      </div>
+    );
+  }
+
+  const NOTE: Record<Destination["precision"], MessageKey | null> = {
+    // The one case with nothing to apologise for: somebody stood on the map
+    // and put the pin where they meant it.
+    exact: null,
+    cell: "work.atCellCentre",
+    block: "work.atBlockCentre",
+  };
+  const note = NOTE[destination.precision];
+
+  return (
+    <div className="goto">
+      {/* An anchor, not a button with a handler. Capacitor hands an external
+          https URL to the system, which is what opens Google Maps on the
+          directions screen; a `window.open` inside the WebView is the path
+          that ends with a map rendered inside the app with no way back. */}
+      <a
+        className="go"
+        href={directionsUrl(destination)}
+        target="_blank"
+        rel="noreferrer"
+        // The coordinates are a number, not prose: they must read
+        // left-to-right on an Arabic screen like every other number here.
+        dir="ltr"
+      >
+        {t(lang, "work.takeMeThere")}
+      </a>
+      {note ? <p className="hint">{t(lang, note)}</p> : null}
     </div>
   );
 }
