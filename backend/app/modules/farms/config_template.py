@@ -1146,12 +1146,16 @@ async def apply_grid_cell_size(
 
     scenes_queued = 0
     scenes_stranded = 0
+    farm_scenes_queued = 0
+    scenes_unreplayable = 0
     if written and tenant_schema:
         # Queued, never inline: recomputing a farm's history is heavy-worker
         # work measured in thousands of scene jobs.
         from app.modules.grid.backfill import (
             DEFAULT_PER_PAIR_CAP,
             count_farm_backfill_candidates,
+            count_farm_scene_candidates,
+            count_unreplayable_scenes,
             split_budget,
         )
         from app.modules.grid.tasks import backfill_farm
@@ -1176,12 +1180,34 @@ async def apply_grid_cell_size(
             ),
         )
         scenes_queued, scenes_stranded = split_budget(planned_scenes, budget=backfill_budget_scenes)
+        # The farm-AOI share of what was queued, and the scenes nothing can
+        # replay. Both exist so a small number is readable: "queued 40 of
+        # 340" means one thing under a budget and a different thing when
+        # 300 scenes kept no bands, and the caller cannot tell them apart
+        # from a single total.
+        farm_candidates = await count_farm_scene_candidates(
+            session,
+            farm_id=farm_id,
+            since=None,
+            per_product_cap=(
+                backfill_budget_scenes
+                if backfill_budget_scenes is not None
+                else DEFAULT_PER_PAIR_CAP
+            ),
+        )
+        # The budget is spread round-robin across pools, so the farm share
+        # of a truncated run cannot be derived here exactly. Reported as
+        # "at most", clamped to what was queued.
+        farm_scenes_queued = min(farm_candidates, scenes_queued)
+        scenes_unreplayable = await count_unreplayable_scenes(session, farm_id=farm_id, since=None)
 
     return {
         "blocks_touched": written,
         "total_blocks": len(applied),
         "scenes_queued": scenes_queued,
         "scenes_stranded": scenes_stranded,
+        "farm_scenes_queued": farm_scenes_queued,
+        "scenes_unreplayable": scenes_unreplayable,
     }
 
 

@@ -60,7 +60,14 @@ describe("FarmZonesPanel", () => {
     h.putTpl.mockResolvedValue({ ...TPL });
     h.preview.mockResolvedValue(preview());
     h.applyGrid.mockResolvedValue({ blocks_touched: 2, total_blocks: 2 });
-    h.applyCell.mockResolvedValue({ blocks_touched: 1, total_blocks: 2 });
+    h.applyCell.mockResolvedValue({
+      blocks_touched: 1,
+      total_blocks: 2,
+      scenes_queued: 12,
+      scenes_stranded: 0,
+      farm_scenes_queued: 0,
+      scenes_unreplayable: 0,
+    });
   });
 
   async function open() {
@@ -151,6 +158,69 @@ describe("FarmZonesPanel", () => {
     await user.click(screen.getByRole("button", { name: /Apply to blocks/i }));
 
     await waitFor(() => expect(h.applyCell).toHaveBeenCalledWith("f1", null, "Bashier Elkhier", 5));
+  });
+
+  // --- what the apply actually queued ------------------------------------
+  //
+  // A production apply on 2026-08-27 rezoned 36 blocks and queued zero
+  // scenes, because the backfill could not see that farm's scenes. The
+  // panel reported the blocks and said nothing about the recompute, so the
+  // run read exactly like a healthy one. These pin the difference.
+
+  async function rezone(): Promise<void> {
+    const user = userEvent.setup();
+    await open();
+    await user.click(screen.getByRole("button", { name: /Preview changes/i }));
+    await waitFor(() => expect(screen.getByText(/Type Bashier Elkhier/i)).toBeTruthy());
+    await user.type(screen.getByRole("textbox"), "Bashier Elkhier");
+    await user.click(screen.getByRole("button", { name: /Apply to blocks/i }));
+  }
+
+  it("says how many scenes it queued", async () => {
+    await rezone();
+    await waitFor(() => expect(screen.getByText(/Queued 12 scene/i)).toBeTruthy());
+  });
+
+  it("names the farm-wide share of what it queued", async () => {
+    h.applyCell.mockResolvedValue({
+      blocks_touched: 1,
+      total_blocks: 2,
+      scenes_queued: 12,
+      scenes_stranded: 0,
+      farm_scenes_queued: 12,
+      scenes_unreplayable: 0,
+    });
+    await rezone();
+    await waitFor(() => expect(screen.getByText(/12 of them cover the whole farm/i)).toBeTruthy());
+  });
+
+  it("warns when it queued nothing at all", async () => {
+    h.applyCell.mockResolvedValue({
+      blocks_touched: 36,
+      total_blocks: 36,
+      scenes_queued: 0,
+      scenes_stranded: 0,
+      farm_scenes_queued: 0,
+      scenes_unreplayable: 0,
+    });
+    await rezone();
+    await waitFor(() => expect(screen.getByText(/No scene was queued/i)).toBeTruthy());
+  });
+
+  it("separates scenes that can never be recomputed from a short budget", async () => {
+    h.applyCell.mockResolvedValue({
+      blocks_touched: 1,
+      total_blocks: 2,
+      scenes_queued: 2,
+      scenes_stranded: 0,
+      farm_scenes_queued: 0,
+      scenes_unreplayable: 40,
+    });
+    await rezone();
+    await waitFor(() => expect(screen.getByText(/40 stored scene/i)).toBeTruthy());
+    // Still a success, so no warning line: nothing is broken, those dates
+    // simply have no bands left to read.
+    expect(screen.queryByText(/No scene was queued/i)).toBeNull();
   });
 
   it("hands blocks back to the inherited default", async () => {

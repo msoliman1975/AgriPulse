@@ -12,6 +12,25 @@ bands COG), so it runs as the ``grid.backfill_block`` Celery task, never
 inline in a request. Both the task and the standalone
 ``scripts/grid_backfill`` CLI share :func:`extract_raw_bands_key` so the
 two asset-manifest shapes stay decoded the same way.
+
+**A farm's scenes live in one of two tables, and this module reads both.**
+``imagery_ingestion_jobs`` holds a scene fetched for a single block;
+``imagery_farm_ingestion_jobs`` holds one fetched for the whole farm AOI.
+A farm cut over to the farm-wide path has zero rows in the first table, so
+every query here that reads only it returns zero for such a farm — no
+error, no warning, and an apply that reports success having recomputed
+nothing. That is not hypothetical: a 36-block production farm was gridded
+on 2026-08-27, the apply fired the backfill, the backfill found no block
+jobs among its 303 farm scenes, and every grid cell stayed empty.
+
+The two shapes are recomputed by different tasks and are therefore kept in
+separate pools rather than merged. A block scene is replayed by
+``imagery.compute_indices`` and needs the stored raw-bands key. A farm
+scene is replayed by ``imagery.recompute_farm_scene_indices``, which
+derives its own key from (provider, product, scene, aoi_hash) and writes
+cells for *every* block under the farm in one pass. Each job dict carries
+a ``kind`` of ``"block"`` or ``"farm"`` so a caller can never dispatch one
+to the other's task.
 """
 
 from __future__ import annotations
@@ -222,9 +241,73 @@ async def list_backfill_jobs(
                 "job_id": r["job_id"],
                 "scene_datetime": str(r["scene_datetime"]),
                 "raw_bands_key": raw_key,
+                "kind": "block",
             }
         )
     return out
+
+
+async def list_farm_scene_backfill_jobs(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    product_id: UUID,
+    since: datetime | None,
+    limit: int,
+) -> list[dict[str, str]]:
+    """Succeeded farm-AOI scenes for (farm, product), newest-first.
+
+    The farm-path counterpart of :func:`list_backfill_jobs`. Returns
+    ``[{job_id, scene_datetime, kind}]`` with ``kind`` fixed at ``"farm"``.
+
+    No ``raw_bands_key``: ``imagery.recompute_farm_scene_indices`` rebuilds
+    the object key from the product and the farm's ``aoi_hash`` rather than
+    reading it back from the manifest, so passing one would be a second
+    source of truth for the same path.
+
+    The raw-bands test is still applied, for two reasons. It keeps the
+    count honest — a scene with no stored bands cannot be replayed however
+    the key is derived — and it keeps this predicate identical to the block
+    path's, so the two cannot drift into disagreeing about what is
+    replayable. Every one of the 303 succeeded farm scenes on the
+    production farm that motivated this passes it.
+
+    Caller must have set the tenant search_path on ``session``.
+    """
+    since_clause = "AND j.scene_datetime >= :since" if since is not None else ""
+    stmt = text(
+        f"""
+        SELECT j.id::text AS job_id, j.scene_datetime
+        FROM imagery_farm_ingestion_jobs j
+        WHERE j.farm_id    = :farm
+          AND j.product_id = :product
+          AND j.status     = 'succeeded'
+          AND j.stac_item_id IS NOT NULL
+          AND {_has_raw_bands_sql("j.assets_written")}
+          {since_clause}
+        ORDER BY j.scene_datetime DESC
+        LIMIT :limit
+        """  # noqa: S608 - both interpolations are fixed literals, not user input
+    ).bindparams(
+        bindparam("farm", type_=PG_UUID(as_uuid=True)),
+        bindparam("product", type_=PG_UUID(as_uuid=True)),
+    )
+    params: dict[str, object] = {
+        "farm": farm_id,
+        "product": product_id,
+        "limit": limit,
+    }
+    if since is not None:
+        params["since"] = since
+    rows = (await session.execute(stmt, params)).mappings().all()
+    return [
+        {
+            "job_id": r["job_id"],
+            "scene_datetime": str(r["scene_datetime"]),
+            "kind": "farm",
+        }
+        for r in rows
+    ]
 
 
 async def count_farm_backfill_candidates(
@@ -248,17 +331,154 @@ async def count_farm_backfill_candidates(
     that adds one grid to a farm that already has 35 really does queue all
     36 grids' worth of work, and saying otherwise would understate it.
 
+    Both scene tables are counted, because the task now walks both. The
+    farm half is capped per product rather than per (block, product): one
+    farm scene is replayed once and writes cells for every block under the
+    farm, so counting it 36 times on a 36-block farm would report 36 times
+    the work that will actually run.
+
     Caller must have set the tenant search_path on ``session``.
     """
-    since_clause = "AND j.scene_datetime >= :since" if since is not None else ""
+    block_since = "AND j.scene_datetime >= :since" if since is not None else ""
+    farm_since = "AND fj.scene_datetime >= :since" if since is not None else ""
+    stmt = text(
+        f"""
+        SELECT (
+            SELECT count(*)
+            FROM (
+                SELECT row_number() OVER (
+                           PARTITION BY j.block_id, j.product_id
+                           ORDER BY j.scene_datetime DESC
+                       ) AS rn
+                FROM imagery_ingestion_jobs j
+                JOIN grid_configs cfg
+                  ON cfg.block_id   = j.block_id
+                 AND cfg.product_id = j.product_id
+                 AND cfg.retired_at IS NULL
+                 AND cfg.deleted_at IS NULL
+                JOIN blocks b
+                  ON b.id = cfg.block_id
+                 AND b.deleted_at IS NULL
+                 AND b.farm_id = :farm
+                WHERE j.status = 'succeeded'
+                  AND j.stac_item_id IS NOT NULL
+                  AND {_has_raw_bands_sql("j.assets_written")}
+                  {block_since}
+            ) ranked
+            WHERE rn <= :cap
+        ) + (
+            SELECT count(*)
+            FROM (
+                SELECT row_number() OVER (
+                           PARTITION BY fj.product_id
+                           ORDER BY fj.scene_datetime DESC
+                       ) AS rn
+                FROM imagery_farm_ingestion_jobs fj
+                WHERE fj.farm_id = :farm
+                  AND fj.status = 'succeeded'
+                  AND fj.stac_item_id IS NOT NULL
+                  AND {_has_raw_bands_sql("fj.assets_written")}
+                  {farm_since}
+                  AND EXISTS (
+                      SELECT 1
+                      FROM grid_configs cfg
+                      JOIN blocks b
+                        ON b.id = cfg.block_id
+                       AND b.deleted_at IS NULL
+                       AND b.farm_id = :farm
+                      WHERE cfg.product_id = fj.product_id
+                        AND cfg.retired_at IS NULL
+                        AND cfg.deleted_at IS NULL
+                  )
+            ) ranked
+            WHERE rn <= :cap
+        ) AS scenes
+        """  # noqa: S608 - every interpolation is a fixed literal, not user input
+    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True)))
+    params: dict[str, object] = {"farm": farm_id, "cap": per_pair_cap}
+    if since is not None:
+        params["since"] = since
+    return int((await session.execute(stmt, params)).scalar_one() or 0)
+
+
+async def count_farm_scene_candidates(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    since: datetime | None,
+    per_product_cap: int,
+) -> int:
+    """The farm-AOI half of :func:`count_farm_backfill_candidates`.
+
+    Same rows, same cap, counted on their own so a caller can report how
+    much of a queued backfill is farm-wide scenes. A farm still on the
+    per-block path returns 0 here, which is the correct reading rather than
+    a missing one.
+
+    Caller must have set the tenant search_path on ``session``.
+    """
+    farm_since = "AND fj.scene_datetime >= :since" if since is not None else ""
     stmt = text(
         f"""
         SELECT count(*) AS scenes
         FROM (
             SELECT row_number() OVER (
-                       PARTITION BY j.block_id, j.product_id
-                       ORDER BY j.scene_datetime DESC
+                       PARTITION BY fj.product_id
+                       ORDER BY fj.scene_datetime DESC
                    ) AS rn
+            FROM imagery_farm_ingestion_jobs fj
+            WHERE fj.farm_id = :farm
+              AND fj.status = 'succeeded'
+              AND fj.stac_item_id IS NOT NULL
+              AND {_has_raw_bands_sql("fj.assets_written")}
+              {farm_since}
+              AND EXISTS (
+                  SELECT 1
+                  FROM grid_configs cfg
+                  JOIN blocks b
+                    ON b.id = cfg.block_id
+                   AND b.deleted_at IS NULL
+                   AND b.farm_id = :farm
+                  WHERE cfg.product_id = fj.product_id
+                    AND cfg.retired_at IS NULL
+                    AND cfg.deleted_at IS NULL
+              )
+        ) ranked
+        WHERE rn <= :cap
+        """  # noqa: S608 - every interpolation is a fixed literal, not user input
+    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True)))
+    params: dict[str, object] = {"farm": farm_id, "cap": per_product_cap}
+    if since is not None:
+        params["since"] = since
+    return int((await session.execute(stmt, params)).scalar_one() or 0)
+
+
+async def count_unreplayable_scenes(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    since: datetime | None,
+) -> int:
+    """Succeeded scenes under the farm's live grids that cannot be replayed.
+
+    A scene is replayable only if it kept a raw-bands asset. Older rows, and
+    rows written by tools that never stored one, did not: the bands they
+    were computed from are gone, so no recompute can put values on a new
+    grid for that date.
+
+    This number exists so an Apply that queues fewer scenes than the farm
+    holds can say why. Without it, "queued 40 of 340" reads as truncation by
+    the budget, which is a different problem with a different fix.
+
+    Counted uncapped, across both scene tables. Caller must have set the
+    tenant search_path on ``session``.
+    """
+    block_since = "AND j.scene_datetime >= :since" if since is not None else ""
+    farm_since = "AND fj.scene_datetime >= :since" if since is not None else ""
+    stmt = text(
+        f"""
+        SELECT (
+            SELECT count(*)
             FROM imagery_ingestion_jobs j
             JOIN grid_configs cfg
               ON cfg.block_id   = j.block_id
@@ -270,14 +490,36 @@ async def count_farm_backfill_candidates(
              AND b.deleted_at IS NULL
              AND b.farm_id = :farm
             WHERE j.status = 'succeeded'
-              AND j.stac_item_id IS NOT NULL
-              AND {_has_raw_bands_sql("j.assets_written")}
-              {since_clause}
-        ) ranked
-        WHERE rn <= :cap
-        """  # noqa: S608 - both interpolations are fixed literals, not user input
+              AND NOT (
+                  j.stac_item_id IS NOT NULL
+                  AND {_has_raw_bands_sql("j.assets_written")}
+              )
+              {block_since}
+        ) + (
+            SELECT count(*)
+            FROM imagery_farm_ingestion_jobs fj
+            WHERE fj.farm_id = :farm
+              AND fj.status = 'succeeded'
+              AND NOT (
+                  fj.stac_item_id IS NOT NULL
+                  AND {_has_raw_bands_sql("fj.assets_written")}
+              )
+              {farm_since}
+              AND EXISTS (
+                  SELECT 1
+                  FROM grid_configs cfg
+                  JOIN blocks b
+                    ON b.id = cfg.block_id
+                   AND b.deleted_at IS NULL
+                   AND b.farm_id = :farm
+                  WHERE cfg.product_id = fj.product_id
+                    AND cfg.retired_at IS NULL
+                    AND cfg.deleted_at IS NULL
+              )
+        ) AS scenes
+        """  # noqa: S608 - every interpolation is a fixed literal, not user input
     ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True)))
-    params: dict[str, object] = {"farm": farm_id, "cap": per_pair_cap}
+    params: dict[str, object] = {"farm": farm_id}
     if since is not None:
         params["since"] = since
     return int((await session.execute(stmt, params)).scalar_one() or 0)

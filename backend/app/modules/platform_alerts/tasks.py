@@ -80,6 +80,7 @@ def _thresholds() -> Thresholds:
         stuck_job_hours=s.platform_alert_stuck_job_hours,
         streak_threshold=s.integration_failure_streak_threshold,
         new_subscription_grace_hours=s.platform_alert_new_subscription_grace_hours,
+        grid_backfill_grace_hours=s.platform_alert_grid_backfill_grace_hours,
     )
 
 

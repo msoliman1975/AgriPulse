@@ -279,6 +279,15 @@ export interface GridApplyCounts extends SimpleApplyCounts {
   /** Scenes the budget did not reach. They stay readable on the older
    *  geometry — the farm genuinely has two geometries until they land. */
   scenes_stranded: number;
+  /** How many of `scenes_queued` are farm-wide scenes rather than
+   *  per-block ones. A farm cut over to the farm-wide imagery path has
+   *  only these, so a total on its own could not say whether such a farm
+   *  was covered at all. */
+  farm_scenes_queued: number;
+  /** Stored scenes that no recompute can replay, because they kept no
+   *  raw-bands asset. Separates "the budget stopped early" from "these
+   *  dates can never be filled". */
+  scenes_unreplayable: number;
 }
 
 export async function getGridTemplate(farmId: string): Promise<GridTemplate> {

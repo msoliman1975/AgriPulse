@@ -460,6 +460,23 @@ export function useFarmConsole(farmId: string) {
     return m;
   }, [farmGridQ.data, blockNameById]);
 
+  /**
+   * Does ANY cell on this farm carry a reading?
+   *
+   * The popup needs it to tell two different empties apart. One cell with
+   * no mean is ordinary: cloud over it, or a corner the pass did not
+   * cover. Every cell on the farm with no mean is a backfill that never
+   * ran, and both used to print the same "—".
+   *
+   * Derived from the mesh already in hand rather than asked for
+   * separately: the answer is a property of the rows the map is drawing
+   * from, and a second request could disagree with what is on screen.
+   */
+  const farmHasCellReadings = useMemo(
+    () => (farmGridQ.data ?? []).some((g) => g.cells.some((c) => c.mean !== null)),
+    [farmGridQ.data],
+  );
+
   // Worst-N (lowest mean) cells → outline on the map.
   const highlightedCellIds = useMemo<string[]>(() => {
     if (!showGrid) return [];
@@ -830,6 +847,7 @@ export function useFarmConsole(farmId: string) {
     geojsonForMap,
     cropLabelsQ,
     cellMeta,
+    farmHasCellReadings,
     highlightedCellIds,
     selectedCellBaseline,
     cellItemsByCell,

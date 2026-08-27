@@ -52,6 +52,10 @@ export function FarmZonesPanel({ farmId, farmName }: Props): ReactNode {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  // Kept apart from `note`. A queued-nothing apply is a success and a
+  // problem at the same time, and folding it into the green line would
+  // dress the problem up as the success.
+  const [warning, setWarning] = useState<string | null>(null);
 
   // Cell-size rezone flow: draft → preview → typed confirmation.
   const [cellDraft, setCellDraft] = useState("");
@@ -158,6 +162,7 @@ export function FarmZonesPanel({ farmId, farmName }: Props): ReactNode {
   async function confirmRezone(): Promise<void> {
     setBusy(true);
     setError(null);
+    setWarning(null);
     try {
       const counts = await applyGridCellSize(
         farmId,
@@ -165,12 +170,28 @@ export function FarmZonesPanel({ farmId, farmName }: Props): ReactNode {
         farmName,
         budget.trim() === "" ? null : Number(budget),
       );
-      setNote(
+      // What was queued, said out loud. Before this the panel reported the
+      // blocks it touched and nothing about the recompute, so a run that
+      // queued zero scenes — the whole failure this release fixes — read
+      // exactly like a run that queued three hundred.
+      const lines = [
         t("farmZones.rezoneApplied", {
           touched: counts.blocks_touched,
           total: counts.total_blocks,
         }),
-      );
+      ];
+      if (counts.scenes_queued > 0) {
+        lines.push(t("farmZones.backfillQueued", { scenes: counts.scenes_queued }));
+        if (counts.farm_scenes_queued > 0) {
+          lines.push(t("farmZones.backfillQueuedFarm", { farmScenes: counts.farm_scenes_queued }));
+        }
+      } else if (counts.blocks_touched > 0) {
+        setWarning(t("farmZones.backfillNothingQueued"));
+      }
+      if (counts.scenes_unreplayable > 0) {
+        lines.push(t("farmZones.backfillUnreplayable", { scenes: counts.scenes_unreplayable }));
+      }
+      setNote(lines.join(" "));
       setPreview(null);
       setTyped("");
     } catch (err: unknown) {
@@ -190,6 +211,7 @@ export function FarmZonesPanel({ farmId, farmName }: Props): ReactNode {
 
       {error ? <p className="mb-2 text-xs text-ap-crit">{error}</p> : null}
       {note ? <p className="mb-2 text-xs text-ap-good">{note}</p> : null}
+      {warning ? <p className="mb-2 text-xs text-ap-warn">{warning}</p> : null}
 
       <label className="mb-3 flex flex-wrap items-center gap-2 text-xs text-ap-muted">
         {t("farmZones.sensitivity")}

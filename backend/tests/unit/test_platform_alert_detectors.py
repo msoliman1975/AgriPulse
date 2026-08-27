@@ -29,6 +29,7 @@ TH = Thresholds(
     stuck_job_hours=6,
     streak_threshold=3,
     new_subscription_grace_hours=26,
+    grid_backfill_grace_hours=6,
 )
 
 
@@ -83,9 +84,15 @@ def test_sweep_kinds_cover_every_detector() -> None:
     """Conversely, every kind the sweep *does* recompute must be listed, or
     its alerts would never close on their own and the list would only ever
     grow."""
-    assert set(SWEEP_KINDS) == {"stream_silent", "peer_lag", "failure_streak", "stuck_job"}
-    # Four sweep detectors, four sweep-resolvable kinds.
-    assert len(DETECTORS) == 4
+    assert set(SWEEP_KINDS) == {
+        "stream_silent",
+        "peer_lag",
+        "failure_streak",
+        "stuck_job",
+        "grid_unbackfilled",
+    }
+    # Five sweep detectors, five sweep-resolvable kinds.
+    assert len(DETECTORS) == 5
 
 
 def test_age_phrase_switches_unit_at_readable_boundaries() -> None:
