@@ -178,11 +178,11 @@ export function FarmTimelinePage(): ReactNode {
             showBlocks={layers.blocks}
             showFarmBoundary={layers.farmBoundary}
             showPixels={layers.pixels}
-            // One frame's worth of fade, capped. At 1x a frame lasts 500 ms
-            // and the cross-fade can afford 250; at 8x it lasts 62 and a
-            // 250 ms fade would still be running two passes later, which
-            // reads as the map lagging the scrubber — the thing this whole
-            // change is here to remove.
+            // Half a frame, capped at 250 ms. At 1x a frame lasts 500 ms
+            // and can afford the full 250; at the 4x top speed it lasts
+            // 125, and a 250 ms fade would still be running a frame later,
+            // which reads as the map lagging the scrubber — the thing this
+            // whole change is here to remove.
             fadeMs={Math.round(Math.min(250, 1000 / (BASE_FPS * tl.speed) / 2))}
             fitKey={`${farmId}:${blockId ?? "farm"}`}
             onMarkClick={tl.setFocusedEventId}

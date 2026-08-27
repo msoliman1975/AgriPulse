@@ -47,7 +47,21 @@ const TREND_TOP = 6;
 const TREND_HEIGHT = 26;
 const TICK_TOP = TREND_TOP + TREND_HEIGHT + 4;
 
-const SPEEDS: readonly number[] = [1, 2, 4, 8];
+/**
+ * Playback speeds.
+ *
+ * 8x was here and is gone. At `BASE_FPS` 2 it drew 16 days a second, and
+ * Sentinel-2 flies about every 5 days, so four frames in five redrew a
+ * picture the reader had just seen — the date moved and the image did not.
+ * It also gave the preload under a second of cover, which no depth fixes,
+ * because covering 8x needs the whole window loaded in advance.
+ *
+ * Showing one frame per IMAGE rather than per day is the answer to
+ * watching a long window quickly, and it is a mode of its own rather than
+ * a fifth entry here. Not built; the day-by-day replay is the whole screen
+ * for now.
+ */
+const SPEEDS: readonly number[] = [1, 2, 4];
 
 /** Tick colour per kind. One dot per day, coloured by its worst kind. */
 const KIND_TONE: Record<string, string> = {

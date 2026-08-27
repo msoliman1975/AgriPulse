@@ -295,8 +295,8 @@ export function useFarmTimeline(input: TimelineInput) {
     // a NEW array every render; react-query structurally shares what
     // `combine` returns, so this keeps its identity while the answers are
     // the same. Without it `rasterFrames` is a new array on every frame
-    // tick — sixteen a second at 8x — and the map re-syncs its rasters
-    // each time, re-registering the listener that waits for tiles.
+    // tick — eight a second at the 4x top speed — and the map re-syncs its
+    // rasters each time, re-registering the listener that waits for tiles.
     combine: (results) => results.map((r) => r.data ?? null),
   });
 

@@ -40,7 +40,7 @@ export const DEFAULT_WINDOW_DAYS = 90;
  */
 export const MAX_WINDOW_DAYS = 366;
 
-/** Frames per second at 1x. Eight is roughly a week a second at 8x. */
+/** Frames per second at 1x. The top speed, 4x, is 8 days a second. */
 export const BASE_FPS = 2;
 
 /**
@@ -49,7 +49,8 @@ export const BASE_FPS = 2;
  * A raster layer at zero opacity still loads its tiles, so this is how far
  * in advance TiTiler is asked for the picture the replay is about to need.
  * Sentinel-2 flies every ~5 days, so three passes is roughly a fortnight
- * of replay — about eight seconds at 1x, and still a second at 8x.
+ * of replay — about eight seconds at 1x, and about two at the 4x top
+ * speed. 8x was dropped partly because no depth here covers it.
  *
  * Three rather than more because each preloaded pass is a live set of tile
  * requests. Ten would put the whole window in flight at once and make the
