@@ -35,7 +35,13 @@ export function ImageDateCaption({ imageDay, formatDay }: Props): ReactNode {
   return (
     <Card
       noPadding
-      className="pointer-events-none absolute bottom-3 start-3 z-10 bg-ap-panel/90 px-3 py-1.5"
+      // `start-3`, so the caption mirrors with the script — and `bottom-8`
+      // rather than `bottom-3`, because MapLibre's attribution control sits
+      // at the bottom of the canvas and does NOT mirror: its positions are
+      // physical. Under Arabic the caption moves to the bottom-right, which
+      // is where the attribution already is. Clearing it vertically works in
+      // both directions, and is what the Farm Console's map overlays do.
+      className="pointer-events-none absolute bottom-8 start-3 z-10 bg-ap-panel/90 px-3 py-1.5"
       // The value changes under playback without the element being
       // focused, so it is announced politely rather than not at all.
       aria-live="polite"
