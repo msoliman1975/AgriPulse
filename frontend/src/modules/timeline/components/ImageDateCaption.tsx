@@ -35,13 +35,20 @@ export function ImageDateCaption({ imageDay, formatDay }: Props): ReactNode {
   return (
     <Card
       noPadding
-      // `start-3`, so the caption mirrors with the script — and `bottom-8`
-      // rather than `bottom-3`, because MapLibre's attribution control sits
-      // at the bottom of the canvas and does NOT mirror: its positions are
-      // physical. Under Arabic the caption moves to the bottom-right, which
-      // is where the attribution already is. Clearing it vertically works in
-      // both directions, and is what the Farm Console's map overlays do.
-      className="pointer-events-none absolute bottom-8 start-3 z-10 bg-ap-panel/90 px-3 py-1.5"
+      // `start-3`, so the caption mirrors with the script — and `bottom-10`,
+      // because MapLibre's attribution control sits at the bottom of the
+      // canvas and does NOT mirror: its positions are physical. Under Arabic
+      // the caption moves to the bottom-right, which is where the
+      // attribution already is, so it has to be cleared vertically to work
+      // in both directions.
+      //
+      // 10 rather than 8, from MapLibre's own stylesheet rather than by eye:
+      // `.maplibregl-ctrl-bottom-right .maplibregl-ctrl` has `margin: 0 10px
+      // 10px 0` and the attribution button is 24px tall, so it occupies 10px
+      // to 34px above the canvas edge. `bottom-8` is 32px and overlaps by 2.
+      // `bottom-10` is 40px and clears by 6, which also leaves a little room
+      // for the expanded attribution bar, which is taller than the button.
+      className="pointer-events-none absolute bottom-10 start-3 z-10 bg-ap-panel/90 px-3 py-1.5"
       // The value changes under playback without the element being
       // focused, so it is announced politely rather than not at all.
       aria-live="polite"
