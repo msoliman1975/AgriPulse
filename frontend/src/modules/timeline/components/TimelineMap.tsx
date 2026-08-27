@@ -12,7 +12,6 @@
 import { useEffect, useRef } from "react";
 import maplibregl, {
   type GeoJSONSource,
-  type LngLatBoundsLike,
   type Map as MlMap,
   type StyleSpecification,
 } from "maplibre-gl";
@@ -22,6 +21,7 @@ import type { FeatureCollection, MultiPolygon, Point, Polygon } from "geojson";
 import { registerMarkerImages } from "@/modules/labs/map/markerIcons";
 import { TILE_SIZE } from "@/modules/labs/console/pixelTiles";
 import type { MarkProps } from "../lib/marks";
+import { boundsOf } from "../lib/mapBounds";
 import { rasterSourceSpec } from "../lib/rasterSource";
 
 /** One raster to draw for the current pass. */
@@ -97,31 +97,6 @@ function buildStyle(): StyleSpecification {
       },
     ],
   };
-}
-
-function boundsOf(
-  blocks: FeatureCollection<Polygon, BlockFeatureProps>,
-  farmBoundary: MultiPolygon | null,
-): LngLatBoundsLike | null {
-  let west = Infinity;
-  let south = Infinity;
-  let east = -Infinity;
-  let north = -Infinity;
-  const visit = (ring: number[][]): void => {
-    for (const [lon, lat] of ring) {
-      if (lon < west) west = lon;
-      if (lon > east) east = lon;
-      if (lat < south) south = lat;
-      if (lat > north) north = lat;
-    }
-  };
-  for (const f of blocks.features) for (const ring of f.geometry.coordinates) visit(ring);
-  if (farmBoundary) for (const poly of farmBoundary.coordinates) for (const r of poly) visit(r);
-  if (!Number.isFinite(west) || !Number.isFinite(south)) return null;
-  return [
-    [west, south],
-    [east, north],
-  ];
 }
 
 export function TimelineMap({
@@ -275,6 +250,25 @@ export function TimelineMap({
       applyBlocks(map, now.blocks);
       applyMarks(map, now.marks);
       applyRasters(map, now.rasters, rasterGenRef, liveRasterIdsRef);
+
+      // And FRAME it. This is the whole of the auto-focus fix.
+      //
+      // The fit effect below returns early while `readyRef` is false, and
+      // `readyRef` is a ref, so becoming ready re-runs nothing. On a cold
+      // load the blocks almost always arrive first — an API response beats
+      // MapLibre's style fetch plus WebGL init — so the effect ran once
+      // against an unready map, returned, and never fired again because
+      // `blocks` did not change a second time. The map then sat on the
+      // constructor's fallback centre, which is the middle of Egypt, and
+      // the farm was somewhere off screen.
+      //
+      // `duration: 0`, not an animation: this is the first paint, so there
+      // is no previous view worth flying from.
+      const initialFit = boundsOf(now.blocks, now.farmBoundary);
+      if (initialFit && lastFitRef.current !== now.fitKey) {
+        lastFitRef.current = now.fitKey;
+        map.fitBounds(initialFit, { padding: 48, duration: 0 });
+      }
     });
 
     return () => {
