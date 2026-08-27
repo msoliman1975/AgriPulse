@@ -75,6 +75,7 @@ class TimelineEvent(BaseModel):
 
     block_id: UUID | None = None
     block_name: str | None = None
+    block_name_ar: str | None = None
     block_code: str | None = None
 
     # The enum-ish value the frontend translates: activity_type, rule_code,

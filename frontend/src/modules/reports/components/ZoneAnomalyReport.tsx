@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { CustomFieldDef, ZoneAnomalyBlockRow, ZoneAnomalyStatus } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
+import { localizedName } from "@/lib/localizedField";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useZoneAnomalyReport } from "@/queries/reports";
 
@@ -57,7 +58,7 @@ export function ZoneAnomalyReport({ farmId, since, until }: ReportProps): ReactN
       ...customCsvHeaders(customFields, i18n.language),
     ];
     const rows: CsvCell[][] = data.blocks.map((b) => [
-      b.block_name,
+      localizedName(i18n.language, b.block_name, b.block_name_ar),
       t(`zoneAnomaly.status.${b.status}`),
       b.scene_time?.slice(0, 10) ?? "",
       b.cell_count,
@@ -78,7 +79,7 @@ export function ZoneAnomalyReport({ farmId, since, until }: ReportProps): ReactN
   return (
     <ReportShell
       title={t("catalog.zone-anomaly.title")}
-      farmName={data?.farm_name}
+      farmName={data ? localizedName(i18n.language, data.farm_name, data.farm_name_ar) : undefined}
       period={{ since, until }}
       onExportCsv={data ? handleExport : undefined}
     >
@@ -142,7 +143,7 @@ function ZoneAnomalyTable({
   rows: ZoneAnomalyBlockRow[];
   customFields: CustomFieldDef[];
 }): ReactNode {
-  const { t } = useTranslation("reports");
+  const { t, i18n } = useTranslation("reports");
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -174,7 +175,9 @@ function ZoneAnomalyTable({
         <Tbody>
           {rows.map((b) => (
             <Tr key={b.block_id} className="hover:bg-ap-bg/40">
-              <Td className="font-medium text-ap-ink">{b.block_name}</Td>
+              <Td className="font-medium text-ap-ink">
+                {localizedName(i18n.language, b.block_name, b.block_name_ar)}
+              </Td>
               <Td>
                 <span
                   className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_CHIP[b.status]}`}

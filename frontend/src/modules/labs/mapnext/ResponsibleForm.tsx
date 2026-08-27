@@ -35,7 +35,7 @@ interface Props {
  * replacing is how a block quietly loses its owner.
  */
 export function ResponsibleForm({ blockId, farmId, current, onSaved }: Props): ReactNode {
-  const { t } = useTranslation("farmConsole");
+  const { t, i18n } = useTranslation("farmConsole");
   const dateLocale = useDateLocale();
   const qc = useQueryClient();
   const canEdit = useCapability("block.update_metadata", { farmId });
@@ -67,7 +67,7 @@ export function ResponsibleForm({ blockId, farmId, current, onSaved }: Props): R
   const nameOf = (membership: string | null): string => {
     if (membership === null) return t("responsible.none");
     const u = (users.data ?? []).find((x) => x.membership_id === membership);
-    return u ? displayUser(u, membership) : membership.slice(0, 8);
+    return u ? displayUser(u, membership, i18n.language) : membership.slice(0, 8);
   };
 
   const when = (iso: string): string =>
@@ -98,7 +98,7 @@ export function ResponsibleForm({ blockId, farmId, current, onSaved }: Props): R
           <option value="">{t("responsible.none")}</option>
           {(users.data ?? []).map((u) => (
             <option key={u.membership_id} value={u.membership_id}>
-              {displayUser(u, u.membership_id)}
+              {displayUser(u, u.membership_id, i18n.language)}
             </option>
           ))}
         </select>

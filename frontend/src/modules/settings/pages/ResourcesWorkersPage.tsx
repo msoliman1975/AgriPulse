@@ -37,7 +37,7 @@ function MemberSelect({
   value: string | null;
   onChange: (id: string | null) => void;
 }): ReactNode {
-  const { t } = useTranslation("resources");
+  const { t, i18n } = useTranslation("resources");
   return (
     <select
       className="rounded border border-ap-line px-2 py-1"
@@ -47,7 +47,7 @@ function MemberSelect({
       <option value="">{t("link.none")}</option>
       {members.map((m) => (
         <option key={m.membership_id} value={m.membership_id}>
-          {displayUser(m, m.membership_id)}
+          {displayUser(m, m.membership_id, i18n.language)}
         </option>
       ))}
     </select>

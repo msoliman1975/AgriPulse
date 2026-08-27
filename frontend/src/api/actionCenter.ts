@@ -171,6 +171,7 @@ export interface ActionItem {
   block_id: string;
   block_code: string;
   block_name: string | null;
+  block_name_ar: string | null;
   cell: CellLocation | null;
 
   /** NULL only for alerts raised before migration 0063 — shown as

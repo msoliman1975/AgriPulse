@@ -25,8 +25,33 @@ because three things are missing and only you can supply them:
    lived, so production mints it at deploy rather than storing it). Until
    `FCM_ENABLED` is true every send records `status='skipped'` — by design, so a
    dev environment without Firebase does not look like an outage.
-3. **A build toolchain and a device.** Capacitor 8 needs **JDK 17+** (this
-   machine has 1.8) and the Android SDK on `ANDROID_HOME`.
+3. **A device, and a signing key.** The toolchain itself works — see
+   "Building an APK" below. What is missing is a keystore, so nothing built
+   here can be installed as a release.
+
+## Building an APK
+
+The build works on this machine, checked 2026-08-26. `java -version` on PATH
+reports 1.8, which is too old, but Android Studio ships its own JDK 25 and
+Gradle takes it from `JAVA_HOME`:
+
+```bash
+pnpm install && pnpm build
+npx cap sync android
+cd android
+JAVA_HOME="C:/Program Files/Android/Android Studio/jbr" ./gradlew assembleDebug
+# -> app/build/outputs/apk/debug/app-debug.apk, about 6.2 MB
+```
+
+A **debug** APK is signed with Gradle's generated debug key. It installs on a
+handset for testing and is not something to hand to a farm: the debug key is
+not stable across machines, so the next build cannot upgrade it in place.
+
+A **release** APK needs a keystore, and there is no `signingConfig` in
+`app/build.gradle`. Until one exists, `assembleRelease` produces an unsigned
+APK that Android refuses to install. The keystore has to be created once and
+kept — losing it means the app can never be updated, only reinstalled under a
+new identity.
 
 ## Proving it, once those exist
 

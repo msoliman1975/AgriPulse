@@ -800,6 +800,7 @@ class GridServiceImpl:
                 block_id=r["block_id"],
                 block_code=r["block_code"],
                 block_name=r["block_name"],
+                block_name_ar=r.get("block_name_ar"),
                 product_id=r["product_id"],
                 product_code=r["product_code"],
                 product_name=r["product_name"],

@@ -127,10 +127,14 @@ async def select_signal_details(
         f"""
         SELECT o.id, o.time AS observed_at, o.inserted_at AS recorded_at,
                d.code AS signal_code, d.name AS signal_name,
-               d.value_kind, d.unit,
+               d.name_ar AS signal_name_ar,
+               d.value_kind, d.unit, d.unit_ar,
+               d.categorical_values, d.categorical_values_ar,
                o.value_numeric, o.value_categorical, o.value_event, o.value_boolean,
-               o.block_id, b.name AS block_name, bc.crop_path,
+               o.block_id, b.name AS block_name, b.name_ar AS block_name_ar,
+               bc.crop_path,
                o.notes, o.recorded_by, u.full_name AS recorded_by_name,
+               u.full_name_ar AS recorded_by_name_ar,
                o.location_mode, o.attachment_s3_key,
                o.template_observation_id, o.import_batch_id
         FROM signal_observations o
@@ -193,6 +197,7 @@ def signal_detail_stats(rows: list[SignalDetailRow]) -> list[SignalDetailStat]:
             SignalDetailStat(
                 signal_code=code,
                 signal_name=head.signal_name,
+                signal_name_ar=head.signal_name_ar,
                 value_kind=head.value_kind,
                 unit=head.unit,
                 observation_count=len(group),

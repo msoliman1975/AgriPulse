@@ -148,6 +148,7 @@ class FieldEnrolmentService:
         farm_id: UUID,
         phone: str,
         full_name: str,
+        full_name_ar: str | None = None,
         role: str = "Scout",
         worker_id: UUID | None = None,
         language: str = "ar",
@@ -230,9 +231,10 @@ class FieldEnrolmentService:
                 text(
                     """
                     INSERT INTO public.users
-                        (id, keycloak_subject, email, full_name, phone, status,
-                         created_by, updated_by)
-                    VALUES (:id, :kc, :email, :name, :phone, 'active', :actor, :actor)
+                        (id, keycloak_subject, email, full_name, full_name_ar,
+                         phone, status, created_by, updated_by)
+                    VALUES (:id, :kc, :email, :name, :name_ar, :phone, 'active',
+                            :actor, :actor)
                     """
                 ).bindparams(
                     bindparam("id", type_=PG_UUID(as_uuid=True)),
@@ -243,6 +245,7 @@ class FieldEnrolmentService:
                     "kc": kc_subject,
                     "email": email,
                     "name": full_name,
+                    "name_ar": full_name_ar,
                     # The real identity, stored alongside the synthetic address
                     # so support can find someone by the number they know.
                     "phone": phone_e164,
@@ -309,6 +312,7 @@ class FieldEnrolmentService:
             worker_id=worker_id,
             membership_id=membership_id,
             full_name=full_name,
+            full_name_ar=full_name_ar,
             phone=phone_e164,
             role=role,
             farm_id=farm_id,
@@ -722,6 +726,7 @@ class FieldEnrolmentService:
         worker_id: UUID | None,
         membership_id: UUID,
         full_name: str,
+        full_name_ar: str | None,
         phone: str,
         role: str,
         farm_id: UUID,
@@ -765,8 +770,9 @@ class FieldEnrolmentService:
         await self._tenant.execute(
             text(
                 """
-                INSERT INTO resources (id, kind, name, role, phone, membership_id)
-                VALUES (:id, 'worker', :name, :role, :phone, :mid)
+                INSERT INTO resources
+                    (id, kind, name, name_ar, role, phone, membership_id)
+                VALUES (:id, 'worker', :name, :name_ar, :role, :phone, :mid)
                 """
             ).bindparams(
                 bindparam("id", type_=PG_UUID(as_uuid=True)),
@@ -775,6 +781,7 @@ class FieldEnrolmentService:
             {
                 "id": new_id,
                 "name": full_name,
+                "name_ar": full_name_ar,
                 "role": role,
                 "phone": phone,
                 "mid": membership_id,

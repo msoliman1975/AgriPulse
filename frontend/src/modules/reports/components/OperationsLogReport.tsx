@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { OperationsLogReportResponse, OpsLogEntry, OpsLogKind } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
+import { localizedField, localizedName } from "@/lib/localizedField";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useOperationsLogReport } from "@/queries/reports";
 
@@ -21,7 +22,7 @@ function day(iso: string): string {
 }
 
 export function OperationsLogReport({ farmId, since, until }: ReportProps): ReactNode {
-  const { t } = useTranslation("reports");
+  const { t, i18n } = useTranslation("reports");
   const { data, isLoading, isError } = useOperationsLogReport(farmId, { since, until });
 
   const handleExport = (): void => {
@@ -38,7 +39,7 @@ export function OperationsLogReport({ farmId, since, until }: ReportProps): Reac
     const rows: CsvCell[][] = data.entries.map((e) => [
       day(e.time),
       t(`opsLog.kind.${e.kind}`),
-      e.block_name ?? "",
+      localizedField(i18n.language, e.block_name, e.block_name_ar) ?? "",
       e.title,
       e.status ?? "",
       e.severity ?? "",
@@ -50,7 +51,7 @@ export function OperationsLogReport({ farmId, since, until }: ReportProps): Reac
   return (
     <ReportShell
       title={t("catalog.operations-log.title")}
-      farmName={data?.farm_name}
+      farmName={data ? localizedName(i18n.language, data.farm_name, data.farm_name_ar) : undefined}
       period={{ since, until }}
       onExportCsv={data ? handleExport : undefined}
     >
@@ -112,7 +113,7 @@ function Summary({ data }: { data: OperationsLogReportResponse }): ReactNode {
 }
 
 function LogTable({ entries }: { entries: OpsLogEntry[] }): ReactNode {
-  const { t } = useTranslation("reports");
+  const { t, i18n } = useTranslation("reports");
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -136,7 +137,9 @@ function LogTable({ entries }: { entries: OpsLogEntry[] }): ReactNode {
                   {t(`opsLog.kind.${e.kind}`)}
                 </span>
               </Td>
-              <Td className="whitespace-nowrap">{e.block_name ?? "—"}</Td>
+              <Td className="whitespace-nowrap">
+                {localizedField(i18n.language, e.block_name, e.block_name_ar) ?? "—"}
+              </Td>
               <Td className="text-ap-ink">
                 <div>{e.title}</div>
                 {e.detail ? <div className="text-[11px] text-ap-muted">{e.detail}</div> : null}

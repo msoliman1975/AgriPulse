@@ -78,6 +78,7 @@ class InsightsService:
         for block in blocks:
             block_id = block["id"]
             block_name = block.get("name") or block.get("code") or str(block_id)
+            block_name_ar = block.get("name_ar") or None
             rows = await self._indices.get_timeseries(
                 block_id=block_id,
                 index_code=index_code,
@@ -96,6 +97,7 @@ class InsightsService:
                         time=r["bucket_time"],
                         block_id=block_id,
                         block_name=block_name,
+                        block_name_ar=block_name_ar,
                         value=Decimal(str(mean)),
                     )
                 )
@@ -133,6 +135,7 @@ class InsightsService:
         for block in blocks:
             block_id = block["id"]
             block_name = block.get("name") or block.get("code") or str(block_id)
+            block_name_ar = block.get("name_ar") or None
 
             current, current_at = await self._latest_observation(block_id=block_id, until=now)
             anchor, _ = await self._latest_observation(
@@ -149,6 +152,7 @@ class InsightsService:
                 BlockHealthRow(
                     block_id=block_id,
                     block_name=block_name,
+                    block_name_ar=block_name_ar,
                     current_health=health,
                     current_value=current,
                     trend_30d_pct=trend_pct,

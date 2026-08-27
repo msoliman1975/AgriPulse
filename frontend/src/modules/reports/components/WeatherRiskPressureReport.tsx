@@ -8,6 +8,7 @@ import type {
 } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
+import { localizedName } from "@/lib/localizedField";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useWeatherRiskPressureReport } from "@/queries/reports";
 
@@ -57,7 +58,7 @@ export function WeatherRiskPressureReport({ farmId, since, until }: ReportProps)
       ...customCsvHeaders(customFields, i18n.language),
     ];
     const rows: CsvCell[][] = data.rows.map((r) => [
-      r.block_name,
+      localizedName(i18n.language, r.block_name, r.block_name_ar),
       pathogenName(r.risk_code),
       r.peak_score,
       r.days_high,
@@ -75,7 +76,7 @@ export function WeatherRiskPressureReport({ farmId, since, until }: ReportProps)
   return (
     <ReportShell
       title={t("catalog.weather-risk-pressure.title")}
-      farmName={data?.farm_name}
+      farmName={data ? localizedName(i18n.language, data.farm_name, data.farm_name_ar) : undefined}
       period={{ since, until }}
       onExportCsv={data && data.rows.length > 0 ? handleExport : undefined}
     >
@@ -135,7 +136,7 @@ function PressureTable({
   levelName: (level: string) => string;
   customFields: CustomFieldDef[];
 }): ReactNode {
-  const { t } = useTranslation("reports");
+  const { t, i18n } = useTranslation("reports");
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -158,7 +159,9 @@ function PressureTable({
         <Tbody>
           {rows.map((r) => (
             <Tr key={`${r.block_id}:${r.risk_code}`} className="hover:bg-ap-bg/40">
-              <Td className="font-medium text-ap-ink">{r.block_name}</Td>
+              <Td className="font-medium text-ap-ink">
+                {localizedName(i18n.language, r.block_name, r.block_name_ar)}
+              </Td>
               <Td className="text-ap-ink">{pathogenName(r.risk_code)}</Td>
               <Td className="text-end tabular-nums text-ap-ink">{r.peak_score}</Td>
               <Td className="text-end tabular-nums">{r.days_high || "—"}</Td>

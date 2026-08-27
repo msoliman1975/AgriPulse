@@ -65,8 +65,15 @@ class FieldFlagService:
         for r in rows:
             item = dict(r)
             item["block_name"] = r["block_name"] or r["block_code"]
-            item["raised_by_name"] = names.get(r["raised_by"])
-            item["closed_by_name"] = names.get(r["closed_by"]) if r["closed_by"] else None
+            item["block_name_ar"] = r["block_name_ar"]
+            raised, raised_ar = names.get(r["raised_by"], (None, None))
+            item["raised_by_name"] = raised
+            item["raised_by_name_ar"] = raised_ar
+            closed, closed_ar = (
+                names.get(r["closed_by"], (None, None)) if r["closed_by"] else (None, None)
+            )
+            item["closed_by_name"] = closed
+            item["closed_by_name_ar"] = closed_ar
             out.append(item)
         return out
 
@@ -76,11 +83,18 @@ class FieldFlagService:
             raise _not_found(flag_id)
         item = dict(row)
         item["block_name"] = row["block_name"] or row["block_code"]
+        item["block_name_ar"] = row["block_name_ar"]
         names = await self._repo.resolve_names(
             user_ids=[row["raised_by"]] + ([row["closed_by"]] if row["closed_by"] else [])
         )
-        item["raised_by_name"] = names.get(row["raised_by"])
-        item["closed_by_name"] = names.get(row["closed_by"]) if row["closed_by"] else None
+        raised, raised_ar = names.get(row["raised_by"], (None, None))
+        item["raised_by_name"] = raised
+        item["raised_by_name_ar"] = raised_ar
+        closed, closed_ar = (
+            names.get(row["closed_by"], (None, None)) if row["closed_by"] else (None, None)
+        )
+        item["closed_by_name"] = closed
+        item["closed_by_name_ar"] = closed_ar
         if with_thread:
             item["comments"] = [dict(c) for c in await self._repo.list_comments(flag_id=flag_id)]
             item["photos"] = [

@@ -47,7 +47,7 @@ function today(): string {
  * to a smaller list plus an explanation rather than to no control at all.
  */
 export function DispatchDialog({ farmId, items, onClose, onDispatched }: Props): ReactNode {
-  const { t } = useTranslation("actionCenter");
+  const { t, i18n } = useTranslation("actionCenter");
   const canReadMembers = useCapability("farm.member.read", { farmId });
   const canReadUsers = useCapability("user.read");
   // Roles are a nice-to-have annotation; names are the thing that matters.
@@ -59,8 +59,14 @@ export function DispatchDialog({ farmId, items, onClose, onDispatched }: Props):
   const cellCount = items.filter((i) => i.cell !== null).length;
 
   const options = useMemo(
-    () => buildAssigneeOptions(users.data ?? [], members.data ?? [], defaultAssignee(items)),
-    [members.data, users.data, items],
+    () =>
+      buildAssigneeOptions(
+        users.data ?? [],
+        members.data ?? [],
+        defaultAssignee(items),
+        i18n.language,
+      ),
+    [members.data, users.data, items, i18n.language],
   );
 
   // The batch's default: the block owner, but only when every item agrees on

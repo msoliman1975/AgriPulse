@@ -9,6 +9,7 @@ import type {
 } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
+import { localizedName } from "@/lib/localizedField";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useWaterBalanceReport } from "@/queries/reports";
 
@@ -50,7 +51,7 @@ export function WaterBalanceReport({ farmId, since, until }: ReportProps): React
       ...customCsvHeaders(customFields, i18n.language),
     ];
     const rows: CsvCell[][] = data.blocks.map((b) => [
-      b.block_name,
+      localizedName(i18n.language, b.block_name, b.block_name_ar),
       b.scheduled_count,
       b.applied_count,
       b.skipped_count,
@@ -67,7 +68,7 @@ export function WaterBalanceReport({ farmId, since, until }: ReportProps): React
   return (
     <ReportShell
       title={t("catalog.water-balance.title")}
-      farmName={data?.farm_name}
+      farmName={data ? localizedName(i18n.language, data.farm_name, data.farm_name_ar) : undefined}
       period={{ since, until }}
       onExportCsv={data ? handleExport : undefined}
     >
@@ -128,7 +129,7 @@ function WaterBalanceTable({
   rows: WaterBalanceBlockRow[];
   customFields: CustomFieldDef[];
 }): ReactNode {
-  const { t } = useTranslation("reports");
+  const { t, i18n } = useTranslation("reports");
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -159,7 +160,9 @@ function WaterBalanceTable({
         <Tbody>
           {rows.map((b) => (
             <Tr key={b.block_id} className="hover:bg-ap-bg/40">
-              <Td className="font-medium text-ap-ink">{b.block_name}</Td>
+              <Td className="font-medium text-ap-ink">
+                {localizedName(i18n.language, b.block_name, b.block_name_ar)}
+              </Td>
               <Td className="text-end tabular-nums">{b.scheduled_count || "—"}</Td>
               <Td className="text-end tabular-nums text-ap-ink">
                 {b.scheduled_count ? b.applied_count : "—"}

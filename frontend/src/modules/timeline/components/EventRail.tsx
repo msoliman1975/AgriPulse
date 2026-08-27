@@ -12,6 +12,7 @@ import type { TimelineEvent, TimelineEventKind } from "@/api/timeline";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { Pill } from "@/components/Pill";
+import { localizedField } from "@/lib/localizedField";
 import { markerSeverity } from "@/modules/labs/map/markerIcons";
 import { daysBetween, type FadedEvent } from "../lib/frames";
 
@@ -125,7 +126,8 @@ export function EventRail({
                       <Pill kind={pillKind(event)}>{t(`kind.${event.kind}`)}</Pill>
                       {event.block_code ? (
                         <span className="text-meta text-ap-muted">
-                          {event.block_name ?? event.block_code}
+                          {localizedField(i18n.language, event.block_name, event.block_name_ar) ??
+                            event.block_code}
                         </span>
                       ) : null}
                       <span className="ms-auto text-meta text-ap-muted">

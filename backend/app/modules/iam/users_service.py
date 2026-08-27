@@ -155,6 +155,7 @@ class TenantUsersService:
                     SELECT u.id AS user_id,
                            u.email::text AS email,
                            u.full_name,
+                           u.full_name_ar,
                            u.phone,
                            u.avatar_url,
                            u.status AS user_status,
@@ -226,6 +227,7 @@ class TenantUsersService:
                     "email": row["email"],
                     "identity_kind": "phone" if synthetic else "email",
                     "full_name": row["full_name"],
+                    "full_name_ar": row["full_name_ar"],
                     "phone": row["phone"],
                     "avatar_url": row["avatar_url"],
                     "status": row["user_status"],
@@ -733,6 +735,7 @@ class TenantUsersService:
         *,
         email: str,
         full_name: str,
+        full_name_ar: str | None = None,
         phone: str | None,
         tenant_role: str,
         tenant_schema: str,
@@ -835,10 +838,10 @@ class TenantUsersService:
                 text(
                     """
                     INSERT INTO public.users
-                        (id, keycloak_subject, email, full_name, phone, status,
-                         created_by, updated_by)
-                    VALUES (:id, :kc_sub, :email, :name, :phone, 'active',
-                            :actor, :actor)
+                        (id, keycloak_subject, email, full_name, full_name_ar,
+                         phone, status, created_by, updated_by)
+                    VALUES (:id, :kc_sub, :email, :name, :name_ar, :phone,
+                            'active', :actor, :actor)
                     """
                 ).bindparams(
                     bindparam("id", type_=PG_UUID(as_uuid=True)),
@@ -849,6 +852,7 @@ class TenantUsersService:
                     "kc_sub": keycloak_subject or f"pending::{email}",
                     "email": email,
                     "name": full_name,
+                    "name_ar": full_name_ar,
                     "phone": phone,
                     "actor": actor_user_id,
                 },
@@ -868,6 +872,7 @@ class TenantUsersService:
                                status = 'active',
                                keycloak_subject = :kc_sub,
                                full_name = :name,
+                               full_name_ar = :name_ar,
                                phone = COALESCE(:phone, phone),
                                updated_by = :actor,
                                updated_at = now()
@@ -881,6 +886,7 @@ class TenantUsersService:
                         "uid": user_id,
                         "kc_sub": keycloak_subject or f"pending::{email}",
                         "name": full_name,
+                        "name_ar": full_name_ar,
                         "phone": phone,
                         "actor": actor_user_id,
                     },
@@ -1035,7 +1041,7 @@ class TenantUsersService:
         await self._require_membership(user_id=user_id, tenant_id=tenant_id)
         if updates:
             # Static allow-list of editable user columns.
-            allowed = {"full_name", "phone", "avatar_url"}
+            allowed = {"full_name", "full_name_ar", "phone", "avatar_url"}
             sets: list[str] = []
             params: dict[str, Any] = {"id": user_id, "actor": actor_user_id}
             for col, value in updates.items():

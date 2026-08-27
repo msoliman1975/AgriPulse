@@ -8,7 +8,13 @@ import { setupTestI18n } from "@/i18n/testing";
 import { CanvasTreeRunPanel } from "./CanvasTreeRunPanel";
 
 const FARMS: TreeRunCandidateFarm[] = [
-  { farm_id: "farm-1", name: "Bashier Elkhier", blocks_total: 12, blocks_targeted: 4 },
+  {
+    farm_id: "farm-1",
+    name: "Bashier Elkhier",
+    name_ar: null,
+    blocks_total: 12,
+    blocks_targeted: 4,
+  },
 ];
 
 function renderPanel(overrides: Partial<Parameters<typeof CanvasTreeRunPanel>[0]> = {}) {

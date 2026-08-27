@@ -24,6 +24,7 @@ export interface TenantUser {
   email: string;
   identity_kind: IdentityKind;
   full_name: string;
+  full_name_ar?: string | null;
   phone: string | null;
   avatar_url: string | null;
   status: string;
@@ -52,6 +53,7 @@ export interface FarmRoleGrant {
 export interface UserInvitePayload {
   email: string;
   full_name: string;
+  full_name_ar?: string | null;
   phone?: string | null;
   /** Any role in `ASSIGNABLE_ROLES`. Platform roles are refused with a 422. */
   role: string;
@@ -97,6 +99,7 @@ export interface UserResendInviteResponse {
 
 export interface UserUpdatePayload {
   full_name?: string;
+  full_name_ar?: string | null;
   phone?: string | null;
   avatar_url?: string | null;
   preferences?: Partial<UserPreferences>;

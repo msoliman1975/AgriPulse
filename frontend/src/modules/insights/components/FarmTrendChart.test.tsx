@@ -9,8 +9,9 @@ function _p(
   block_id: string,
   block_name: string,
   value: string,
+  block_name_ar: string | null = null,
 ): FarmIndexTimeseriesPoint {
-  return { time, block_id, block_name, value };
+  return { time, block_id, block_name, block_name_ar, value };
 }
 
 describe("_reshapeForRecharts", () => {

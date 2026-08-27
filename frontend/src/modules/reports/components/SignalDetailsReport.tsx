@@ -6,6 +6,8 @@ import { listBlocks } from "@/api/blocks";
 import type { CustomFieldDef, SignalDetailRow, SignalDetailStat } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
+import { localizedField, localizedName } from "@/lib/localizedField";
+import { categoricalLabel } from "@/modules/signals/lib/signalLabels";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useReportCustomFields, useSignalDetailsReport } from "@/queries/reports";
 
@@ -18,25 +20,31 @@ import { ReportShell } from "./ReportShell";
  * Branches on `value_kind` rather than on which column happens to be non-null:
  * `false` and `0` are real readings, and a "first non-null wins" render turns
  * both into an em dash. */
-function renderValue(row: SignalDetailRow, noValue: string): string {
+// `lang` is threaded in rather than read from the i18n singleton so the cell
+// re-renders when the language changes, and so the CSV export can ask for the
+// same string the table shows.
+function renderValue(row: SignalDetailRow, noValue: string, lang?: string): string {
+  const unit = localizedField(lang, row.unit, row.unit_ar);
+  const categorical =
+    row.value_categorical === null ? null : categoricalLabel(lang, row, row.value_categorical);
   switch (row.value_kind) {
     case "numeric":
       return row.value_numeric === null
         ? noValue
-        : row.unit
-          ? `${row.value_numeric} ${row.unit}`
+        : unit
+          ? `${row.value_numeric} ${unit}`
           : row.value_numeric;
     case "boolean":
       return row.value_boolean === null ? noValue : row.value_boolean ? "✓" : "✗";
     case "categorical":
-      return row.value_categorical ?? noValue;
+      return categorical ?? noValue;
     case "event":
       return row.value_event ?? noValue;
     default:
       // geopoint and anything added later: the coordinates live in a column
       // this table does not carry, so say the reading exists rather than
       // printing an em dash that reads as "nothing was recorded".
-      return row.value_categorical ?? row.value_event ?? noValue;
+      return categorical ?? row.value_event ?? noValue;
   }
 }
 
@@ -123,14 +131,14 @@ export function SignalDetailsReport({ farmId, since, until }: ReportProps): Reac
     ];
     const rows: CsvCell[][] = data.rows.map((r) => [
       r.observed_at,
-      r.signal_name,
+      localizedName(i18n.language, r.signal_name, r.signal_name_ar),
       // The raw stored value, not the rendered one: a CSV column of
       // "12 count" does not sum in a spreadsheet.
       r.value_numeric ?? r.value_categorical ?? r.value_event ?? boolText(r.value_boolean),
-      r.unit ?? "",
-      r.block_name ?? "",
+      localizedField(i18n.language, r.unit, r.unit_ar) ?? "",
+      localizedField(i18n.language, r.block_name, r.block_name_ar) ?? "",
       r.crop_path ?? "",
-      r.recorded_by_name ?? "",
+      localizedField(i18n.language, r.recorded_by_name, r.recorded_by_name_ar) ?? "",
       r.notes ?? "",
       r.location_mode,
       r.has_attachment ? "1" : "0",
@@ -160,7 +168,7 @@ export function SignalDetailsReport({ farmId, since, until }: ReportProps): Reac
   return (
     <ReportShell
       title={t("catalog.signal-details.title")}
-      farmName={data?.farm_name}
+      farmName={data ? localizedName(i18n.language, data.farm_name, data.farm_name_ar) : undefined}
       period={{ since, until }}
       onExportCsv={data && data.rows.length > 0 ? handleExport : undefined}
     >
@@ -306,7 +314,7 @@ function SummaryRow({
 }
 
 function StatsTable({ stats }: { stats: SignalDetailStat[] }): ReactNode {
-  const { t } = useTranslation("reports");
+  const { t, i18n } = useTranslation("reports");
   if (stats.length === 0) return null;
   return (
     <div className="mb-5">
@@ -336,7 +344,9 @@ function StatsTable({ stats }: { stats: SignalDetailStat[] }): ReactNode {
           {stats.map((s) => (
             <Tr key={s.signal_code}>
               <Td className="text-ap-ink" dir="auto">
-                <div className="font-medium">{s.signal_name}</div>
+                <div className="font-medium">
+                  {localizedName(i18n.language, s.signal_name, s.signal_name_ar)}
+                </div>
                 <div className="text-[11px] text-ap-muted">
                   {s.last_observed_at.slice(0, 10)}
                   {s.unit ? ` · ${s.unit}` : ""}
@@ -382,7 +392,7 @@ function ObservationsTable({
   rows: SignalDetailRow[];
   noValue: string;
 }): ReactNode {
-  const { t } = useTranslation("reports");
+  const { t, i18n } = useTranslation("reports");
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -405,20 +415,21 @@ function ObservationsTable({
                 {r.observed_at.slice(0, 16).replace("T", " ")}
               </Td>
               <Td className="text-ap-ink" dir="auto">
-                {r.signal_name}
+                {localizedName(i18n.language, r.signal_name, r.signal_name_ar)}
               </Td>
               <Td className="text-end tabular-nums font-medium text-ap-ink" dir="auto">
-                {renderValue(r, noValue)}
+                {renderValue(r, noValue, i18n.language)}
               </Td>
               <Td className="text-ap-ink" dir="auto">
                 {/* No block means a farm-level reading, which is a real shape
                     here — not missing data. */}
-                {r.block_name ?? (
+                {localizedField(i18n.language, r.block_name, r.block_name_ar) ?? (
                   <span className="text-ap-muted">{t("signalDetails.farmLevel")}</span>
                 )}
               </Td>
               <Td className="text-[11px] text-ap-muted" dir="auto">
-                {r.recorded_by_name ?? noValue}
+                {localizedField(i18n.language, r.recorded_by_name, r.recorded_by_name_ar) ??
+                  noValue}
               </Td>
               <Td className="max-w-xs text-[11px] text-ap-muted" dir="auto">
                 {r.notes ? <span className="line-clamp-2">{r.notes}</span> : noValue}

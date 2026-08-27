@@ -60,12 +60,7 @@ export interface TreeEvidence {
   citations: TreeCitation[];
 }
 
-export type TransferabilityGrade =
-  | "very_high"
-  | "high"
-  | "medium"
-  | "low"
-  | "not_applicable";
+export type TransferabilityGrade = "very_high" | "high" | "medium" | "low" | "not_applicable";
 
 export interface TreeTransferability {
   egypt: TransferabilityGrade | null;
@@ -76,16 +71,15 @@ export interface TreeTransferability {
 // Pull the provenance blocks out of an untyped compiled tree. Tolerant
 // of the legacy shape (keys absent) — returns nulls so callers render
 // nothing rather than crashing on an older version's compiled JSON.
-export function readTreeProvenance(
-  compiled: Record<string, unknown> | null | undefined,
-): { evidence: TreeEvidence | null; transferability: TreeTransferability | null } {
+export function readTreeProvenance(compiled: Record<string, unknown> | null | undefined): {
+  evidence: TreeEvidence | null;
+  transferability: TreeTransferability | null;
+} {
   const ev = compiled?.evidence;
   const tr = compiled?.transferability;
   return {
-    evidence:
-      ev && typeof ev === "object" ? (ev as TreeEvidence) : null,
-    transferability:
-      tr && typeof tr === "object" ? (tr as TreeTransferability) : null,
+    evidence: ev && typeof ev === "object" ? (ev as TreeEvidence) : null,
+    transferability: tr && typeof tr === "object" ? (tr as TreeTransferability) : null,
   };
 }
 
@@ -114,6 +108,9 @@ export interface DecisionTreeDetail extends DecisionTree {
 export interface DryRunCandidateBlock {
   block_id: string;
   label: string;
+  /** The same "Farm / Block" label from the Arabic columns. Null when
+   *  neither half has an Arabic name; the reader falls back to `label`. */
+  label_ar: string | null;
 }
 
 export interface DecisionTreeCreatePayload {
@@ -222,6 +219,7 @@ export interface DryRunResponse {
 export interface TreeRunCandidateFarm {
   farm_id: string;
   name: string;
+  name_ar: string | null;
   blocks_total: number;
   blocks_targeted: number;
 }
@@ -234,6 +232,7 @@ export interface TreeRunPayload {
 export interface TreeRunBlockResult {
   block_id: string;
   label: string;
+  label_ar: string | null;
   /** 0 when this block's crop / country / soil excluded the tree. */
   trees_evaluated: number;
   skipped_targeting: boolean;
@@ -290,6 +289,7 @@ export interface EvalTrace {
   farm_id: string;
   block_id: string;
   block_name: string | null;
+  block_name_ar: string | null;
   cell_id: string | null;
   cell_row: number | null;
   cell_col: number | null;
@@ -364,10 +364,7 @@ export async function updateDecisionTree(
   code: string,
   payload: DecisionTreeUpdatePayload,
 ): Promise<DecisionTreeDetail> {
-  const { data } = await apiClient.patch<DecisionTreeDetail>(
-    `/v1/decision-trees/${code}`,
-    payload,
-  );
+  const { data } = await apiClient.patch<DecisionTreeDetail>(`/v1/decision-trees/${code}`, payload);
   return data;
 }
 
@@ -376,9 +373,7 @@ export async function archiveDecisionTree(code: string): Promise<void> {
 }
 
 export async function restoreDecisionTree(code: string): Promise<DecisionTreeDetail> {
-  const { data } = await apiClient.post<DecisionTreeDetail>(
-    `/v1/decision-trees/${code}:restore`,
-  );
+  const { data } = await apiClient.post<DecisionTreeDetail>(`/v1/decision-trees/${code}:restore`);
   return data;
 }
 
@@ -440,9 +435,7 @@ export async function listEvalTraces(filters: EvalTraceFilters = {}): Promise<Ev
 // The drill-down. Separate from the list because the node walk and the
 // resolved values are megabytes per page and only ever read one row at a time.
 export async function getEvalTrace(traceId: string): Promise<EvalTraceDetail> {
-  const { data } = await apiClient.get<EvalTraceDetail>(
-    `/v1/decision-tree-traces/${traceId}`,
-  );
+  const { data } = await apiClient.get<EvalTraceDetail>(`/v1/decision-tree-traces/${traceId}`);
   return data;
 }
 

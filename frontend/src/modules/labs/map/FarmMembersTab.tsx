@@ -15,6 +15,7 @@ import {
   type FarmMemberRole,
 } from "@/api/farmMembers";
 import { isApiError } from "@/api/errors";
+import { localizedName } from "@/lib/localizedField";
 import { useCapability } from "@/rbac/useCapability";
 import { useTenantUsers } from "@/queries/users";
 import { MembersList } from "@/modules/farms/components/MembersList";
@@ -26,7 +27,7 @@ interface Props {
 }
 
 export function FarmMembersTab({ farmId }: Props): JSX.Element {
-  const { t } = useTranslation("farms");
+  const { t, i18n } = useTranslation("farms");
   const canAssign = useCapability("role.assign_farm", { farmId });
   const canReadUsers = useCapability("user.read");
   const tenantUsers = useTenantUsers();
@@ -109,7 +110,7 @@ export function FarmMembersTab({ farmId }: Props): JSX.Element {
                   .filter((u) => !members.some((m) => m.membership_id === u.membership_id))
                   .map((u) => (
                     <option key={u.membership_id} value={u.membership_id}>
-                      {u.full_name} — {u.email}
+                      {localizedName(i18n.language, u.full_name, u.full_name_ar)} — {u.email}
                     </option>
                   ))}
               </select>

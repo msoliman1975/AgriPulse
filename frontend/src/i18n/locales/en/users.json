@@ -59,7 +59,8 @@
     "farmsLoading": "Loading farms…",
     "farmsFailed": "Could not load the farm list.",
     "farmsEmpty": "This tenant has no farms yet. Create a farm first, or pick a tenant-wide role.",
-    "farmsTruncated": "Only the first 100 farms are listed. Use the farm's Members page for the rest."
+    "farmsTruncated": "Only the first 100 farms are listed. Use the farm's Members page for the rest.",
+    "fullNameAr": "Full name (Arabic)"
   },
   "edit": {
     "title": "Edit user",
@@ -69,7 +70,8 @@
     "save": "Save",
     "saving": "Saving…",
     "saveFailed": "Save failed",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "fullNameAr": "Full name (Arabic)"
   },
   "roles": {
     "TenantOwner": "Tenant Owner",

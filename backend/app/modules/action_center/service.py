@@ -298,6 +298,7 @@ def to_item(row: dict[str, Any], *, now: datetime) -> ActionItem:
         block_id=row["block_id"],
         block_code=row["block_code"],
         block_name=row.get("block_name"),
+        block_name_ar=row.get("block_name_ar"),
         cell=cell,
         action_type=row.get("action_type"),
         severity=row["severity"],

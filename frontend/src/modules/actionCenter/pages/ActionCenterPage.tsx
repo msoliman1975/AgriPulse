@@ -20,6 +20,7 @@ import { Pill } from "@/components/Pill";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
+import { localizedField } from "@/lib/localizedField";
 import { DispatchDialog } from "@/modules/actionCenter/components/DispatchDialog";
 import { ItemRow } from "@/modules/actionCenter/components/ItemRow";
 import { isApiError } from "@/api/errors";
@@ -168,7 +169,14 @@ export function ActionCenterPage(): ReactNode {
       allItems.map((i) => i.assigned_membership_id).filter((id): id is string => id !== null),
     ),
   ]
-    .map((id) => ({ id, name: userByMembership.get(id)?.full_name ?? id.slice(0, 8) }))
+    .map((id) => {
+      const u = userByMembership.get(id);
+      return {
+        id,
+        name:
+          localizedField(i18n.language, u?.full_name ?? null, u?.full_name_ar) ?? id.slice(0, 8),
+      };
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const anyFilterActive =

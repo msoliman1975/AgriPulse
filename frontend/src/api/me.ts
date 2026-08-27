@@ -45,6 +45,7 @@ export interface Me {
   id: string;
   email: string;
   full_name: string;
+  full_name_ar: string | null;
   phone: string | null;
   avatar_url: string | null;
   status: string;

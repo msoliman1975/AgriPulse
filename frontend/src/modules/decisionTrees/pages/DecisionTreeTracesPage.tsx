@@ -23,6 +23,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Toolbar, type FilterValues } from "@/components/Toolbar";
 import { queryState } from "@/components/asyncState";
+import { localizedField } from "@/lib/localizedField";
 import { useEvalRuns, useEvalTrace, useEvalTraces } from "@/queries/decisionTrees";
 import { useCapability } from "@/rbac/useCapability";
 
@@ -70,7 +71,9 @@ export function DecisionTreeTracesPage(): ReactNode {
     const q = search.trim().toLowerCase();
     if (!q) return tracesQ.data ?? [];
     return (tracesQ.data ?? []).filter((row) =>
-      `${row.tree_code} ${row.block_name ?? ""}`.toLowerCase().includes(q),
+      `${row.tree_code} ${row.block_name ?? ""} ${row.block_name_ar ?? ""}`
+        .toLowerCase()
+        .includes(q),
     );
   }, [tracesQ.data, search]);
 
@@ -156,7 +159,8 @@ export function DecisionTreeTracesPage(): ReactNode {
                 className: "text-xs",
                 cell: (row) => (
                   <span className="flex items-center gap-1.5">
-                    {row.block_name ?? row.block_id.slice(0, 8)}
+                    {localizedField(i18n.language, row.block_name, row.block_name_ar) ??
+                      row.block_id.slice(0, 8)}
                     {cellLabel(row.cell_row, row.cell_col) ? (
                       <Pill kind="neutral">
                         {t("traces.table.zone", {
@@ -312,7 +316,7 @@ function TraceDetailModal({
   traceId: string | null;
   onClose: () => void;
 }): ReactNode {
-  const { t } = useTranslation("decisionTrees");
+  const { t, i18n } = useTranslation("decisionTrees");
   const traceQ = useEvalTrace(traceId ?? undefined);
   const trace = traceQ.data;
 
@@ -336,7 +340,13 @@ function TraceDetailModal({
                 value={`${trace.tree_code} v${trace.tree_version}`}
                 mono
               />
-              <Row label={t("traces.detail.block")} value={trace.block_name ?? trace.block_id} />
+              <Row
+                label={t("traces.detail.block")}
+                value={
+                  localizedField(i18n.language, trace.block_name, trace.block_name_ar) ??
+                  trace.block_id
+                }
+              />
               {cellLabel(trace.cell_row, trace.cell_col) ? (
                 <Row
                   label={t("traces.detail.zone")}

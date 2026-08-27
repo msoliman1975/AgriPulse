@@ -2003,7 +2003,8 @@ class FarmsRepository:
         ]
 
     async def farm_managers_for(self, *, farm_ids: list[UUID]) -> dict[UUID, dict[str, Any]]:
-        """Map farm_id -> {membership_id, full_name} for the primary manager.
+        """Map farm_id -> {membership_id, full_name, full_name_ar} for the
+        primary manager.
 
         "Primary" = the active ``FarmManager`` farm-scope with the earliest
         grant. Farms with no FarmManager scope are absent from the map.
@@ -2019,7 +2020,7 @@ class FarmsRepository:
             text(
                 """
                 SELECT DISTINCT ON (fs.farm_id)
-                       fs.farm_id, fs.membership_id, u.full_name
+                       fs.farm_id, fs.membership_id, u.full_name, u.full_name_ar
                 FROM public.farm_scopes fs
                 JOIN public.tenant_memberships tm ON tm.id = fs.membership_id
                 JOIN public.users u ON u.id = tm.user_id
@@ -2032,7 +2033,11 @@ class FarmsRepository:
             {"fids": farm_ids},
         )
         return {
-            r.farm_id: {"membership_id": r.membership_id, "full_name": r.full_name}
+            r.farm_id: {
+                "membership_id": r.membership_id,
+                "full_name": r.full_name,
+                "full_name_ar": r.full_name_ar,
+            }
             for r in result.all()
         }
 
