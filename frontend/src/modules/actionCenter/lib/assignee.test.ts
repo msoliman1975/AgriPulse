@@ -11,6 +11,7 @@ const item = (over: Partial<ActionItem> = {}): ActionItem => ({
   farm_id: "f1",
   block_id: "b1",
   block_code: "B-01",
+  block_name_ar: null,
   block_name: null,
   cell: null,
   action_type: "scout",

@@ -16,6 +16,7 @@ import {
 import type { WeatherCropContext, WeatherSummaryStats } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
 import { makeDateLabelFmt, makeDateTickFmt } from "@/lib/chartFormat";
+import { localizedName } from "@/lib/localizedField";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { useWeatherSummaryReport } from "@/queries/reports";
 
@@ -44,7 +45,7 @@ interface ChartPoint {
 }
 
 export function WeatherSummaryReport({ farmId, since, until }: ReportProps): ReactNode {
-  const { t } = useTranslation("reports");
+  const { t, i18n } = useTranslation("reports");
   const [cropPath, setCropPath] = useState<string | null>(null);
   const { data, isLoading, isError } = useWeatherSummaryReport(farmId, {
     since,
@@ -101,7 +102,7 @@ export function WeatherSummaryReport({ farmId, since, until }: ReportProps): Rea
   return (
     <ReportShell
       title={t("catalog.weather-summary.title")}
-      farmName={data?.farm_name}
+      farmName={data ? localizedName(i18n.language, data.farm_name, data.farm_name_ar) : undefined}
       period={{ since, until }}
       onExportCsv={data ? handleExport : undefined}
     >
@@ -209,7 +210,6 @@ function CropContext({ crops }: { crops: WeatherCropContext[] }): ReactNode {
     </div>
   );
 }
-
 
 function TempPrecipChart({ data }: { data: ChartPoint[] }): ReactNode {
   const { t, i18n } = useTranslation("reports");

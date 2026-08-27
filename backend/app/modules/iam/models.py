@@ -34,6 +34,9 @@ class User(Base, TimestampedMixin):
         Boolean, nullable=False, server_default=text("FALSE")
     )
     full_name: Mapped[str] = mapped_column(Text, nullable=False)
+    # Arabic display name (0076). Nullable and never written by the login
+    # upsert, which copies `full_name` out of the Keycloak token each sign-in.
+    full_name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     phone: Mapped[str | None] = mapped_column(Text, nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'active'"))

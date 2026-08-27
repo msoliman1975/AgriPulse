@@ -125,7 +125,8 @@ def _load_block_and_farm(
     row = (
         session.execute(
             text(
-                "SELECT b.code AS block_code, f.code AS farm_code, f.name AS farm_name "
+                "SELECT b.code AS block_code, f.code AS farm_code, "
+                "       f.name AS farm_name, f.name_ar AS farm_name_ar "
                 "FROM blocks b JOIN farms f ON f.id = b.farm_id "
                 "WHERE b.id = :bid AND f.id = :fid AND b.deleted_at IS NULL"
             ),
@@ -291,7 +292,10 @@ def _build_render_ctx(
         "block_id": str(alert["block_id"]),
         "block_code": alert.get("block_code"),
         "farm_id": str(alert["farm_id"]),
-        "farm_name": alert.get("farm_name"),
+        # The email is already rendered per recipient locale, so the name is
+        # resolved here rather than shipped as a pair the template would have
+        # to choose between.
+        "farm_name": ((alert.get("farm_name_ar") if is_ar else None) or alert.get("farm_name")),
         "rule_code": alert["rule_code"],
         "rule_name": rule_name,
         "severity": severity,
@@ -992,6 +996,7 @@ def _on_alert_opened(event: AlertOpenedV1) -> None:
             "block_code": names.get("block_code"),
             "farm_code": names.get("farm_code"),
             "farm_name": names.get("farm_name"),
+            "farm_name_ar": names.get("farm_name_ar"),
         }
 
         rule = _load_default_rule(session, event.rule_code)
@@ -1113,7 +1118,7 @@ def _build_render_ctx_for_recommendation(
         "block_id": str(rec["block_id"]),
         "block_code": rec.get("block_code"),
         "farm_id": str(rec["farm_id"]),
-        "farm_name": rec.get("farm_name"),
+        "farm_name": ((rec.get("farm_name_ar") if is_ar else None) or rec.get("farm_name")),
         "tree_code": rec["tree_code"],
         "tree_name": tree_name,
         "action_type": rec["action_type"],
@@ -1545,6 +1550,7 @@ def _on_recommendation_opened(event: RecommendationOpenedV1) -> None:
             "block_code": names.get("block_code"),
             "farm_code": names.get("farm_code"),
             "farm_name": names.get("farm_name"),
+            "farm_name_ar": names.get("farm_name_ar"),
         }
 
         tree = _load_decision_tree(session, event.tree_code, tenant_id=tenant_id)

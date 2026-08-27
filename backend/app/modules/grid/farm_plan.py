@@ -47,6 +47,7 @@ class GridRowState:
     block_id: UUID
     block_code: str
     block_name: str | None
+    block_name_ar: str | None
     product_id: UUID | None
     product_code: str | None
     product_name: str | None

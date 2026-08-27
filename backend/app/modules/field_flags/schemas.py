@@ -37,6 +37,7 @@ class FlagCommentResponse(BaseModel):
     body: str
     author_id: UUID
     author_name: str | None = None
+    author_name_ar: str | None = None
     kind: CommentKind
     created_at: datetime
 
@@ -50,6 +51,7 @@ class FieldFlagResponse(BaseModel):
     farm_id: UUID
     block_id: UUID
     block_name: str | None = None
+    block_name_ar: str | None = None
     note: str
     severity: Severity
     status: Status
@@ -64,9 +66,11 @@ class FieldFlagResponse(BaseModel):
     is_pinned: bool
     raised_by: UUID
     raised_by_name: str | None = None
+    raised_by_name_ar: str | None = None
     closed_at: datetime | None = None
     closed_by: UUID | None = None
     closed_by_name: str | None = None
+    closed_by_name_ar: str | None = None
     close_reason: CloseReason | None = None
     comment_count: int = 0
     photos: list[FlagPhotoResponse] = Field(default_factory=list)

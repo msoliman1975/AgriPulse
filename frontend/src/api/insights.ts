@@ -10,6 +10,7 @@ export interface FarmIndexTimeseriesPoint {
   time: string; // ISO timestamp
   block_id: string;
   block_name: string;
+  block_name_ar: string | null;
   // Pydantic Decimal serialises as string.
   value: string;
 }
@@ -24,6 +25,7 @@ export interface FarmIndexTimeseriesResponse {
 export interface BlockHealthRow {
   block_id: string;
   block_name: string;
+  block_name_ar: string | null;
   current_health: Health;
   current_value: string | null;
   trend_30d_pct: string | null;

@@ -309,6 +309,7 @@ async def invite_tenant_user(
         return await service.invite_user(
             email=str(payload.email),
             full_name=payload.full_name,
+            full_name_ar=payload.full_name_ar,
             phone=payload.phone,
             tenant_role=payload.role,
             farm_ids=tuple(payload.farm_ids),
@@ -535,6 +536,9 @@ class FieldEnrolmentRequest(BaseModel):
 
     phone: str = Field(min_length=6, max_length=32)
     full_name: str = Field(min_length=1, max_length=200)
+    # Arabic name for the crew list. Field workers are the people most often
+    # named in Arabic, so this is the one invite path where it is expected.
+    full_name_ar: str | None = Field(default=None, max_length=200)
     farm_id: UUID
     role: Literal["Scout", "FieldOperator"] = "Scout"
     # Link an existing `resources` worker rather than creating a second row for
@@ -591,6 +595,7 @@ async def enrol_field_worker(
         farm_id=payload.farm_id,
         phone=payload.phone,
         full_name=payload.full_name,
+        full_name_ar=payload.full_name_ar,
         role=payload.role,
         worker_id=payload.worker_id,
         language=payload.language,

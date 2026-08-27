@@ -232,6 +232,7 @@ class ReportsService:
         for block in blocks:
             block_id = block["id"]
             block_name = block.get("name") or block.get("code") or str(block_id)
+            block_name_ar = block.get("name_ar") or None
             s = stats.get(block_id)
             crop = crops.get(block_id)
 
@@ -242,6 +243,7 @@ class ReportsService:
                     CropHealthBlockRow(
                         block_id=block_id,
                         block_name=block_name,
+                        block_name_ar=block_name_ar,
                         crop_name_en=crop[0] if crop else None,
                         crop_name_ar=crop[1] if crop else None,
                         crop_path=(crop[2] or None) if crop else None,
@@ -276,6 +278,7 @@ class ReportsService:
                 CropHealthBlockRow(
                     block_id=block_id,
                     block_name=block_name,
+                    block_name_ar=block_name_ar,
                     crop_name_en=crop[0] if crop else None,
                     crop_name_ar=crop[1] if crop else None,
                     crop_path=(crop[2] or None) if crop else None,
@@ -313,6 +316,7 @@ class ReportsService:
         return CropHealthReportResponse(
             farm_id=farm_id,
             farm_name=farm["name"],
+            farm_name_ar=farm.get("name_ar"),
             index_code=index_code,
             period=period,
             crop_path=crop_path,
@@ -362,6 +366,7 @@ class ReportsService:
         for block in blocks:
             block_id = block["id"]
             block_name = block.get("name") or block.get("code") or str(block_id)
+            block_name_ar = block.get("name_ar") or None
             s = stats.get(block_id)
 
             if s is None:
@@ -370,6 +375,7 @@ class ReportsService:
                     ZoneAnomalyBlockRow(
                         block_id=block_id,
                         block_name=block_name,
+                        block_name_ar=block_name_ar,
                         status=status,
                         scene_time=None,
                         cell_count=0,
@@ -411,6 +417,7 @@ class ReportsService:
                 ZoneAnomalyBlockRow(
                     block_id=block_id,
                     block_name=block_name,
+                    block_name_ar=block_name_ar,
                     status=status,
                     scene_time=s["scene_time"],
                     cell_count=cell_count,
@@ -439,6 +446,7 @@ class ReportsService:
         return ZoneAnomalyReportResponse(
             farm_id=farm_id,
             farm_name=farm["name"],
+            farm_name_ar=farm.get("name_ar"),
             index_code=index_code,
             period=period,
             blocks=rows,
@@ -493,12 +501,14 @@ class ReportsService:
         for block in blocks:
             block_id = block["id"]
             block_name = block.get("name") or block.get("code") or str(block_id)
+            block_name_ar = block.get("name_ar") or None
             s = sched.get(block_id)
             if s is None:
                 rows.append(
                     WaterBalanceBlockRow(
                         block_id=block_id,
                         block_name=block_name,
+                        block_name_ar=block_name_ar,
                         scheduled_count=0,
                         applied_count=0,
                         skipped_count=0,
@@ -525,6 +535,7 @@ class ReportsService:
                 WaterBalanceBlockRow(
                     block_id=block_id,
                     block_name=block_name,
+                    block_name_ar=block_name_ar,
                     scheduled_count=s["scheduled_count"],
                     applied_count=s["applied_count"],
                     skipped_count=s["skipped_count"],
@@ -554,6 +565,7 @@ class ReportsService:
         return WaterBalanceReportResponse(
             farm_id=farm_id,
             farm_name=farm["name"],
+            farm_name_ar=farm.get("name_ar"),
             period=period,
             weather=weather,
             blocks=rows,
@@ -581,7 +593,13 @@ class ReportsService:
         farm = await self._load_farm(farm_id)
         period = resolve_period(since, until)
         blocks = await self._list_active_blocks(farm_id)
-        name_by_id = {b["id"]: (b.get("name") or b.get("code") or str(b["id"])) for b in blocks}
+        name_by_id = {
+            b["id"]: (
+                b.get("name") or b.get("code") or str(b["id"]),
+                b.get("name_ar") or None,
+            )
+            for b in blocks
+        }
 
         data = await _select_weather_risk_pressure(
             self._session,
@@ -605,7 +623,8 @@ class ReportsService:
             rows.append(
                 WeatherRiskPressureRow(
                     block_id=block_id,
-                    block_name=name_by_id.get(block_id, str(block_id)),
+                    block_name=name_by_id.get(block_id, (str(block_id), None))[0],
+                    block_name_ar=name_by_id.get(block_id, (str(block_id), None))[1],
                     risk_code=d["risk_code"],
                     days_observed=d["days_observed"],
                     peak_score=d["peak_score"],
@@ -638,6 +657,7 @@ class ReportsService:
         return WeatherRiskPressureReportResponse(
             farm_id=farm_id,
             farm_name=farm["name"],
+            farm_name_ar=farm.get("name_ar"),
             period=period,
             rows=rows,
             summary=summary,
@@ -703,6 +723,7 @@ class ReportsService:
         return WeatherSummaryReportResponse(
             farm_id=farm_id,
             farm_name=farm["name"],
+            farm_name_ar=farm.get("name_ar"),
             period=period,
             crop_path=crop_path,
             stats=stats,
@@ -745,6 +766,7 @@ class ReportsService:
                     time=datetime.combine(a["scheduled_date"], dt_time.min, tzinfo=UTC),
                     kind="activity",
                     block_name=a.get("block_name"),
+                    block_name_ar=a.get("block_name_ar"),
                     title=a["activity_type"],
                     status=a.get("status"),
                     detail=" · ".join(detail_bits) if detail_bits else None,
@@ -761,6 +783,7 @@ class ReportsService:
                     time=al["created_at"],
                     kind="alert",
                     block_name=al.get("block_name"),
+                    block_name_ar=al.get("block_name_ar"),
                     title=al.get("diagnosis_en") or al["rule_code"],
                     status=al.get("status"),
                     severity=al.get("severity"),
@@ -773,6 +796,7 @@ class ReportsService:
                     time=rc["created_at"],
                     kind="recommendation",
                     block_name=rc.get("block_name"),
+                    block_name_ar=rc.get("block_name_ar"),
                     title=_truncate(rc["text_en"], 140) or rc["action_type"],
                     status=rc.get("state"),
                     severity=rc.get("severity"),
@@ -800,6 +824,7 @@ class ReportsService:
         return OperationsLogReportResponse(
             farm_id=farm_id,
             farm_name=farm["name"],
+            farm_name_ar=farm.get("name_ar"),
             period=period,
             entries=entries,
             summary=summary,
@@ -873,18 +898,24 @@ class ReportsService:
                 recorded_at=r["recorded_at"],
                 signal_code=r["signal_code"],
                 signal_name=r["signal_name"],
+                signal_name_ar=r["signal_name_ar"],
                 value_kind=r["value_kind"],
                 unit=r["unit"],
+                unit_ar=r["unit_ar"],
+                categorical_values=r["categorical_values"],
+                categorical_values_ar=r["categorical_values_ar"],
                 value_numeric=r["value_numeric"],
                 value_categorical=r["value_categorical"],
                 value_event=r["value_event"],
                 value_boolean=r["value_boolean"],
                 block_id=r["block_id"],
                 block_name=r["block_name"],
+                block_name_ar=r["block_name_ar"],
                 crop_path=r["crop_path"] or None,
                 notes=r["notes"],
                 recorded_by=r["recorded_by"],
                 recorded_by_name=r["recorded_by_name"],
+                recorded_by_name_ar=r["recorded_by_name_ar"],
                 location_mode=r["location_mode"],
                 has_attachment=r["attachment_s3_key"] is not None,
                 template_observation_id=r["template_observation_id"],
@@ -904,6 +935,7 @@ class ReportsService:
         return SignalDetailsReportResponse(
             farm_id=farm_id,
             farm_name=farm["name"],
+            farm_name_ar=farm.get("name_ar"),
             period=period,
             filters=SignalDetailFilters(
                 signal_codes=list(signal_codes or []),
@@ -1459,7 +1491,8 @@ async def _select_ops_activities(
         """
         SELECT a.scheduled_date, a.activity_type, a.status,
                a.product_name, a.dosage,
-               COALESCE(b.name, b.code) AS block_name
+               COALESCE(b.name, b.code) AS block_name,
+               NULLIF(b.name_ar, '') AS block_name_ar
         FROM plan_activities a
         JOIN blocks b ON b.id = a.block_id AND b.deleted_at IS NULL
         WHERE a.farm_id = :farm_id
@@ -1484,7 +1517,8 @@ async def _select_ops_alerts(
         """
         SELECT a.created_at, a.resolved_at, a.rule_code, a.severity,
                a.status, a.diagnosis_en,
-               COALESCE(b.name, b.code) AS block_name
+               COALESCE(b.name, b.code) AS block_name,
+               NULLIF(b.name_ar, '') AS block_name_ar
         FROM alerts a
         JOIN blocks b ON b.id = a.block_id AND b.deleted_at IS NULL
         WHERE b.farm_id = :farm_id
@@ -1514,7 +1548,8 @@ async def _select_ops_recommendations(
         """
         SELECT r.created_at, r.action_type, r.severity, r.state,
                r.text_en, r.dismissal_reason,
-               COALESCE(b.name, b.code) AS block_name
+               COALESCE(b.name, b.code) AS block_name,
+               NULLIF(b.name_ar, '') AS block_name_ar
         FROM recommendations r
         JOIN blocks b ON b.id = r.block_id AND b.deleted_at IS NULL
         WHERE r.farm_id = :farm_id

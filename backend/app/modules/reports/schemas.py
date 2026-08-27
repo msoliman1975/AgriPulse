@@ -144,6 +144,7 @@ class CropHealthBlockRow(BaseModel):
 
     block_id: UUID
     block_name: str
+    block_name_ar: str | None = None
     crop_name_en: str | None = None
     crop_name_ar: str | None = None
     # Hierarchical taxonomy path of the block's current crop, e.g.
@@ -185,6 +186,7 @@ class CropHealthReportResponse(BaseModel):
 
     farm_id: UUID
     farm_name: str
+    farm_name_ar: str | None = None
     index_code: str
     period: ReportPeriod
     # Echoes the crop-taxonomy path prefix the report was filtered to
@@ -223,6 +225,7 @@ class ZoneAnomalyBlockRow(BaseModel):
 
     block_id: UUID
     block_name: str
+    block_name_ar: str | None = None
     status: ZoneAnomalyStatus
     scene_time: datetime | None
     cell_count: int
@@ -253,6 +256,7 @@ class ZoneAnomalyReportResponse(BaseModel):
 
     farm_id: UUID
     farm_name: str
+    farm_name_ar: str | None = None
     index_code: str
     period: ReportPeriod
     blocks: list[ZoneAnomalyBlockRow]
@@ -289,6 +293,7 @@ class WaterBalanceBlockRow(BaseModel):
 
     block_id: UUID
     block_name: str
+    block_name_ar: str | None = None
     scheduled_count: int
     applied_count: int
     skipped_count: int
@@ -320,6 +325,7 @@ class WaterBalanceReportResponse(BaseModel):
 
     farm_id: UUID
     farm_name: str
+    farm_name_ar: str | None = None
     period: ReportPeriod
     weather: WaterBalanceWeather
     blocks: list[WaterBalanceBlockRow]
@@ -401,6 +407,7 @@ class WeatherSummaryReportResponse(BaseModel):
 
     farm_id: UUID
     farm_name: str
+    farm_name_ar: str | None = None
     period: ReportPeriod
     # Echoes the crop-taxonomy path prefix the crop context was filtered to
     # (None = every current crop on the farm).
@@ -425,6 +432,7 @@ class OpsLogEntry(BaseModel):
     time: datetime
     kind: OpsLogKind
     block_name: str | None
+    block_name_ar: str | None = None
     title: str
     status: str | None = None
     severity: str | None = None
@@ -449,6 +457,7 @@ class OperationsLogReportResponse(BaseModel):
 
     farm_id: UUID
     farm_name: str
+    farm_name_ar: str | None = None
     period: ReportPeriod
     entries: list[OpsLogEntry]
     summary: OpsLogSummary
@@ -470,6 +479,7 @@ class WeatherRiskPressureRow(BaseModel):
 
     block_id: UUID
     block_name: str
+    block_name_ar: str | None = None
     risk_code: str
     days_observed: int
     peak_score: int
@@ -498,6 +508,7 @@ class WeatherRiskPressureSummary(BaseModel):
 class WeatherRiskPressureReportResponse(BaseModel):
     farm_id: UUID
     farm_name: str
+    farm_name_ar: str | None = None
     period: ReportPeriod
     rows: list[WeatherRiskPressureRow]
     summary: WeatherRiskPressureSummary
@@ -553,8 +564,15 @@ class SignalDetailRow(BaseModel):
     recorded_at: datetime
     signal_code: str
     signal_name: str
+    signal_name_ar: str | None = None
     value_kind: str
     unit: str | None = None
+    unit_ar: str | None = None
+    # The definition's value list and its Arabic labels, matched by position.
+    # Carried on the row because the stored reading is always the English
+    # code, so the reader needs the pair to show an Arabic label for it.
+    categorical_values: list[str] | None = None
+    categorical_values_ar: list[str] | None = None
     value_numeric: Decimal | None = None
     value_categorical: str | None = None
     value_event: str | None = None
@@ -563,10 +581,12 @@ class SignalDetailRow(BaseModel):
     # None for a farm-level observation (`block_id IS NULL`), which is a real
     # shape here — unlike in a custom column, where it would be broadcast.
     block_name: str | None = None
+    block_name_ar: str | None = None
     crop_path: str | None = None
     notes: str | None = None
     recorded_by: UUID
     recorded_by_name: str | None = None
+    recorded_by_name_ar: str | None = None
     location_mode: str
     has_attachment: bool
     # Set when the row came in as part of a grouped template submission, so
@@ -597,6 +617,7 @@ class SignalDetailStat(BaseModel):
 
     signal_code: str
     signal_name: str
+    signal_name_ar: str | None = None
     value_kind: str
     unit: str | None = None
     observation_count: int
@@ -630,6 +651,7 @@ class SignalDetailsReportResponse(BaseModel):
 
     farm_id: UUID
     farm_name: str
+    farm_name_ar: str | None = None
     period: ReportPeriod
     filters: SignalDetailFilters
     rows: list[SignalDetailRow]

@@ -1,5 +1,6 @@
 import type { FarmMember } from "@/api/farmMembers";
 import type { TenantUser } from "@/api/users";
+import { localizedField } from "@/lib/localizedField";
 
 export interface AssigneeOption {
   membershipId: string;
@@ -29,6 +30,7 @@ export function buildAssigneeOptions(
   users: readonly TenantUser[],
   members: readonly FarmMember[],
   ensureId: string,
+  lang?: string,
 ): AssigneeOption[] {
   const roleByMembership = new Map(
     members.filter((m) => m.revoked_at === null).map((m) => [m.membership_id, m.role as string]),
@@ -39,7 +41,8 @@ export function buildAssigneeOptions(
     role: roleByMembership.get(u.membership_id) ?? null,
     // name → email → short id. A blank option cannot be told from its
     // neighbours and reads as a broken list.
-    name: u.full_name || u.email || u.membership_id.slice(0, 8),
+    name:
+      localizedField(lang, u.full_name, u.full_name_ar) || u.email || u.membership_id.slice(0, 8),
   }));
 
   if (ensureId !== "" && !list.some((o) => o.membershipId === ensureId)) {

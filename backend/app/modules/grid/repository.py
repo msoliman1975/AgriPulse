@@ -300,6 +300,7 @@ class GridRepository:
                             b.id            AS block_id,
                             b.code          AS block_code,
                             b.name          AS block_name,
+                            b.name_ar       AS block_name_ar,
                             b.area_m2       AS block_area_m2,
                             s.product_id    AS product_id,
                             p.code          AS product_code,

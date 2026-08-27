@@ -12,6 +12,7 @@ import {
 } from "@/api/fieldFlags";
 import { AnchoredPopup } from "@/components/AnchoredPopup";
 import { useDateLocale } from "@/hooks/useDateLocale";
+import { localizedField } from "@/lib/localizedField";
 
 const CLOSE_REASONS: FlagCloseReason[] = ["actioned", "no_action_needed", "duplicate"];
 
@@ -40,7 +41,7 @@ export function FieldFlagPanel({
   onClose: () => void;
   onChanged?: () => void;
 }): ReactNode {
-  const { t } = useTranslation("farmConsole");
+  const { t, i18n } = useTranslation("farmConsole");
   const dateLocale = useDateLocale();
   const qc = useQueryClient();
 
@@ -109,8 +110,14 @@ export function FieldFlagPanel({
 
           <p className="whitespace-pre-wrap text-[13px] text-ap-ink">{flag.note}</p>
           <p className="text-[11px] text-ap-muted">
-            {flag.block_name} · {flag.raised_by_name ?? t("flags.someone")} ·{" "}
-            {formatDistanceToNow(parseISO(flag.created_at), { addSuffix: true, locale: dateLocale })}
+            {localizedField(i18n.language, flag.block_name, flag.block_name_ar)} ·{" "}
+            {localizedField(i18n.language, flag.raised_by_name, flag.raised_by_name_ar) ??
+              t("flags.someone")}{" "}
+            ·{" "}
+            {formatDistanceToNow(parseISO(flag.created_at), {
+              addSuffix: true,
+              locale: dateLocale,
+            })}
             {flag.point ? null : ` · ${t("flags.noPosition")}`}
           </p>
 
@@ -132,7 +139,8 @@ export function FieldFlagPanel({
 
           {flag.status === "closed" && flag.close_reason ? (
             <p className="rounded bg-ap-primary-soft px-2 py-1 text-[11px] text-ap-ink">
-              {t(`flags.reason.${flag.close_reason}`)} — {flag.closed_by_name ?? ""}
+              {t(`flags.reason.${flag.close_reason}`)} —{" "}
+              {localizedField(i18n.language, flag.closed_by_name, flag.closed_by_name_ar) ?? ""}
             </p>
           ) : null}
 
@@ -140,7 +148,9 @@ export function FieldFlagPanel({
             {flag.comments.map((c) => (
               <div key={c.id} className="text-[12px]">
                 <span className="text-[10px] text-ap-muted">
-                  {c.author_name ?? t("flags.someone")} ·{" "}
+                  {localizedField(i18n.language, c.author_name, c.author_name_ar) ??
+                    t("flags.someone")}{" "}
+                  ·{" "}
                   {formatDistanceToNow(parseISO(c.created_at), {
                     addSuffix: true,
                     locale: dateLocale,

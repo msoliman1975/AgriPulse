@@ -305,13 +305,15 @@ function UserRow({
   onDelete: () => void;
   onResend: () => void;
 }): ReactNode {
-  const { t } = useTranslation("users");
+  const { t, i18n } = useTranslation("users");
   const dateLocale = useDateLocale();
   const isPending = user.keycloak_subject?.startsWith("pending::") ?? false;
   const memberStatus = user.membership_status;
   return (
     <Tr>
-      <Td className="text-ap-ink">{user.full_name}</Td>
+      <Td className="text-ap-ink" dir="auto">
+        {localizedName(i18n.language, user.full_name, user.full_name_ar)}
+      </Td>
       <Td className="font-mono text-xs text-ap-muted">{user.email}</Td>
       <Td>
         <div className="flex flex-wrap gap-1">
@@ -423,6 +425,7 @@ function InviteForm({
   const invite = useInviteTenantUser();
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
+  const [fullNameAr, setFullNameAr] = useState("");
   const [phone, setPhone] = useState("");
   // TenantAdmin, not Viewer. The old default put every invite on the tier
   // that grants the least, and a tenant-wide Viewer granted nothing at all.
@@ -442,6 +445,7 @@ function InviteForm({
       {
         email: invitedEmail,
         full_name: fullName.trim(),
+        full_name_ar: fullNameAr.trim() || null,
         phone: phone.trim() || null,
         role,
         farm_ids: needsFarms(role) ? farmIds : [],
@@ -499,6 +503,15 @@ function InviteForm({
             required
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
+            className={inputCls}
+          />
+        </FormField>
+        <FormField label={t("invite.fullNameAr")}>
+          <input
+            dir="rtl"
+            lang="ar"
+            value={fullNameAr}
+            onChange={(e) => setFullNameAr(e.target.value)}
             className={inputCls}
           />
         </FormField>
@@ -621,6 +634,7 @@ function EditForm({ user, onClose }: { user: TenantUser; onClose: () => void }):
   const { t } = useTranslation("users");
   const update = useUpdateTenantUser();
   const [fullName, setFullName] = useState(user.full_name);
+  const [fullNameAr, setFullNameAr] = useState(user.full_name_ar ?? "");
   const [phone, setPhone] = useState(user.phone ?? "");
   const [language, setLanguage] = useState(user.preferences?.language ?? "en");
 
@@ -628,6 +642,7 @@ function EditForm({ user, onClose }: { user: TenantUser; onClose: () => void }):
     event.preventDefault();
     const payload: UserUpdatePayload = {
       full_name: fullName,
+      full_name_ar: fullNameAr.trim() || null,
       phone: phone || null,
       preferences: { language },
     };
@@ -655,6 +670,15 @@ function EditForm({ user, onClose }: { user: TenantUser; onClose: () => void }):
             required
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
+            className={inputCls}
+          />
+        </FormField>
+        <FormField label={t("edit.fullNameAr")}>
+          <input
+            dir="rtl"
+            lang="ar"
+            value={fullNameAr}
+            onChange={(e) => setFullNameAr(e.target.value)}
             className={inputCls}
           />
         </FormField>

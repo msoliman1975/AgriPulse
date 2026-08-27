@@ -14,9 +14,13 @@
  */
 
 import type { IdentityKind } from "@/api/users";
+import { localizedField } from "./localizedField";
 
 export interface DisplayablePerson {
   full_name?: string | null;
+  /** Set by whoever invited or edited the person. Never written by the login
+   *  path, which copies `full_name` out of the Keycloak token each sign-in. */
+  full_name_ar?: string | null;
   email?: string | null;
   phone?: string | null;
   identity_kind?: IdentityKind;
@@ -27,8 +31,8 @@ export interface DisplayablePerson {
  * to the email only for people who genuinely have one, then to a short id so
  * a row is never blank.
  */
-export function displayUser(person: DisplayablePerson, fallbackId?: string): string {
-  const name = person.full_name?.trim();
+export function displayUser(person: DisplayablePerson, fallbackId?: string, lang?: string): string {
+  const name = localizedField(lang, person.full_name ?? null, person.full_name_ar)?.trim();
   if (name) return name;
   if (person.identity_kind === "phone") {
     return person.phone?.trim() || fallbackId?.slice(0, 8) || "";

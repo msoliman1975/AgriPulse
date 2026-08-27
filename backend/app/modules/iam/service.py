@@ -76,6 +76,7 @@ class UserServiceImpl:
             id=user.id,
             email=str(user.email),
             full_name=user.full_name,
+            full_name_ar=user.full_name_ar,
             phone=user.phone,
             avatar_url=user.avatar_url,
             status=user.status,

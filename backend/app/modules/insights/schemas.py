@@ -31,6 +31,7 @@ class FarmIndexTimeseriesPoint(BaseModel):
     time: datetime
     block_id: UUID
     block_name: str
+    block_name_ar: str | None = None
     value: Decimal | None
 
 
@@ -59,6 +60,7 @@ class BlockHealthRow(BaseModel):
 
     block_id: UUID
     block_name: str
+    block_name_ar: str | None = None
     current_health: Health
     current_value: Decimal | None
     trend_30d_pct: Decimal | None

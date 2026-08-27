@@ -173,6 +173,7 @@ SELECT
     i.*,
     bl.code                AS block_code,
     bl.name                AS block_name,
+    bl.name_ar             AS block_name_ar,
     bl.agronomist_membership_id AS responsible_membership_id,
     cg.row_idx, cg.col_idx, cg.lat, cg.lon, cg.area_m2,
     cg.ordinal, cg.total,

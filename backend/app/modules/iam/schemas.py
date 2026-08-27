@@ -99,6 +99,9 @@ class MeResponse(BaseModel):
     id: UUID
     email: str
     full_name: str
+    # Arabic display name (public migration 0076). Never written by the login
+    # upsert, so it stays NULL until somebody sets it; readers fall back.
+    full_name_ar: str | None = None
     phone: str | None
     avatar_url: str | None
     status: str
@@ -153,6 +156,7 @@ class TenantUserResponse(BaseModel):
     # name belongs — and implies somewhere you could write to.
     identity_kind: Literal["email", "phone"] = "email"
     full_name: str
+    full_name_ar: str | None = None
     phone: str | None
     avatar_url: str | None
     status: str  # users.status
@@ -241,6 +245,7 @@ class UserInviteRequest(RoleAssignmentMixin):
 
     email: EmailStr
     full_name: str = Field(min_length=1, max_length=200)
+    full_name_ar: str | None = Field(default=None, max_length=200)
     phone: str | None = Field(default=None, max_length=32)
 
 
@@ -301,6 +306,7 @@ class UserUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     full_name: str | None = Field(default=None, min_length=1, max_length=200)
+    full_name_ar: str | None = Field(default=None, max_length=200)
     phone: str | None = Field(default=None, max_length=32)
     avatar_url: str | None = Field(default=None, max_length=500)
     preferences: dict[str, Any] | None = None  # partial preferences patch

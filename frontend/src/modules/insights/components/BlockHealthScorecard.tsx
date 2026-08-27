@@ -9,6 +9,7 @@ import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { useDateLocale } from "@/hooks/useDateLocale";
+import { localizedName } from "@/lib/localizedField";
 
 interface Props {
   farmId: string;
@@ -26,7 +27,7 @@ interface Props {
  * read-only summary and the action surface elsewhere.
  */
 export function BlockHealthScorecard({ farmId, blockIds = null }: Props): ReactNode {
-  const { t } = useTranslation("insights");
+  const { t, i18n } = useTranslation("insights");
   const dateLocale = useDateLocale();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["insights", "health-summary", farmId] as const,
@@ -88,8 +89,11 @@ export function BlockHealthScorecard({ farmId, blockIds = null }: Props): ReactN
               {rows.map((b) => (
                 <Tr key={b.block_id} className="hover:bg-ap-bg/40">
                   <Td className="text-ap-ink">
-                    <Link to={`/labs/map-v2/${farmId}?unit=${b.block_id}`} className="hover:underline">
-                      {b.block_name}
+                    <Link
+                      to={`/labs/map-v2/${farmId}?unit=${b.block_id}`}
+                      className="hover:underline"
+                    >
+                      {localizedName(i18n.language, b.block_name, b.block_name_ar)}
                     </Link>
                   </Td>
                   <Td>

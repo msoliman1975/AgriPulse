@@ -509,7 +509,8 @@ class RecommendationsServiceImpl:
             blocks.append(
                 {
                     "block_id": block_id,
-                    "label": labels.get(block_id, str(block_id)),
+                    "label": labels.get(block_id, (str(block_id), None))[0],
+                    "label_ar": labels.get(block_id, (str(block_id), None))[1],
                     # Zero when targeting excluded the tree from this block —
                     # the block was visited, the tree never walked.
                     "trees_evaluated": summary["trees_evaluated"],
@@ -2834,10 +2835,16 @@ class DecisionTreesAuthorService:
                 continue
             farm = b["farm_name"] or ""
             block_label = b["block_name"] or b["block_code"]
+            # Arabic falls back per part, not per label: a farm named in
+            # Arabic beside a block that is not still reads better than
+            # dropping the whole label back to English.
+            farm_ar = b["farm_name_ar"] or farm
+            block_label_ar = b["block_name_ar"] or block_label
             out.append(
                 {
                     "block_id": b["block_id"],
                     "label": f"{farm} / {block_label}" if farm else block_label,
+                    "label_ar": (f"{farm_ar} / {block_label_ar}" if farm_ar else block_label_ar),
                 }
             )
         return out
@@ -2870,6 +2877,7 @@ class DecisionTreesAuthorService:
                 {
                     "farm_id": farm_id,
                     "name": b["farm_name"] or str(farm_id),
+                    "name_ar": b["farm_name_ar"],
                     "blocks_total": 0,
                     "blocks_targeted": 0,
                 },

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+
 import {
   CartesianGrid,
   Line,
@@ -23,6 +24,7 @@ import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { makeDateLabelFmt, makeDateTickFmt } from "@/lib/chartFormat";
 import { formatIndexTick, formatIndexValue } from "@/lib/indexFormat";
+import { localizedName } from "@/lib/localizedField";
 import { isThermalIndex } from "@/lib/thermalResolution";
 
 import { toIsoRange, type TimeRange } from "../lib/timeRange";
@@ -161,7 +163,10 @@ export function FarmTrendChart({
     return all.filter((p) => keep.has(p.block_id));
   }, [data?.points, blockIds]);
 
-  const { chartData, blockNames } = useMemo(() => _reshapeForRecharts(points), [points]);
+  const { chartData, blockNames } = useMemo(
+    () => _reshapeForRecharts(points, i18n.language),
+    [points, i18n.language],
+  );
 
   const visibleCount = blockNames.filter((n) => !hidden.has(n)).length;
   // Muting every block used to be blocked, because an empty plot under a full
@@ -372,20 +377,27 @@ interface ReshapedRow {
   [blockName: string]: string | number;
 }
 
-export function _reshapeForRecharts(points: readonly FarmIndexTimeseriesPoint[]): {
+export function _reshapeForRecharts(
+  points: readonly FarmIndexTimeseriesPoint[],
+  lang?: string,
+): {
   chartData: ReshapedRow[];
   blockNames: string[];
 } {
   const byTime = new Map<string, ReshapedRow>();
   const names = new Set<string>();
   for (const p of points) {
-    names.add(p.block_name);
+    // The series key is the displayed name, so it has to be resolved here.
+    // A key that changed language mid-render would split one block into two
+    // legend entries.
+    const name = localizedName(lang, p.block_name, p.block_name_ar);
+    names.add(name);
     const existing = byTime.get(p.time);
     const value = Number(p.value);
     if (existing) {
-      existing[p.block_name] = value;
+      existing[name] = value;
     } else {
-      byTime.set(p.time, { time: p.time, [p.block_name]: value });
+      byTime.set(p.time, { time: p.time, [name]: value });
     }
   }
   const chartData = Array.from(byTime.values()).sort((a, b) =>

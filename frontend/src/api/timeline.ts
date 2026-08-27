@@ -37,6 +37,7 @@ export interface TimelineEvent {
   day: string;
   block_id: string | null;
   block_name: string | null;
+  block_name_ar: string | null;
   block_code: string | null;
   /**
    * The enum-ish value to translate: activity type, alert action, stage

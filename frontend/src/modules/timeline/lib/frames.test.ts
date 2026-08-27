@@ -34,6 +34,7 @@ function event(day: string, over: Partial<TimelineEvent> = {}): TimelineEvent {
     day,
     block_id: "b1",
     block_name: "Block 1",
+    block_name_ar: null,
     block_code: "B1",
     code: null,
     title_en: "note",

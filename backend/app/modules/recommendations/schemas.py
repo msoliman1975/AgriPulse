@@ -367,6 +367,9 @@ class DryRunCandidateBlock(BaseModel):
     block_id: UUID
     # "Farm / Block" display label (block name, or code when unnamed).
     label: str
+    # The same label from the Arabic columns, each part falling back on its
+    # own. NULL only when neither part has an Arabic name.
+    label_ar: str | None = None
 
 
 class DryRunCell(BaseModel):
@@ -434,6 +437,7 @@ class TreeRunCandidateFarm(BaseModel):
 
     farm_id: UUID
     name: str
+    name_ar: str | None = None
     blocks_total: int
     blocks_targeted: int
 
@@ -457,6 +461,7 @@ class TreeRunBlockResult(BaseModel):
 
     block_id: UUID
     label: str
+    label_ar: str | None = None
     # 0 when this block's crop / country / soil excluded the tree.
     trees_evaluated: int
     skipped_targeting: bool
@@ -540,6 +545,7 @@ class EvalTraceResponse(BaseModel):
     farm_id: UUID
     block_id: UUID
     block_name: str | None = None
+    block_name_ar: str | None = None
     cell_id: UUID | None = None
     cell_row: int | None = None
     cell_col: int | None = None

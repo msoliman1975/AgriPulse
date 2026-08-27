@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import type { DryRunCandidateBlock, DryRunResponse } from "@/api/decisionTrees";
 import { Card } from "@/components/Card";
 import { Pill } from "@/components/Pill";
+import { localizedName } from "@/lib/localizedField";
 
 interface CanvasDryRunPanelProps {
   blockId: string;
@@ -41,7 +42,7 @@ export function CanvasDryRunPanel({
   onRun,
   onClear,
 }: CanvasDryRunPanelProps): ReactNode {
-  const { t } = useTranslation("decisionTrees");
+  const { t, i18n } = useTranslation("decisionTrees");
   const matched = result?.matched ?? false;
   const noCandidates = !candidatesLoading && candidateBlocks.length === 0;
   return (
@@ -65,7 +66,7 @@ export function CanvasDryRunPanel({
               </option>
               {candidateBlocks.map((b) => (
                 <option key={b.block_id} value={b.block_id}>
-                  {b.label}
+                  {localizedName(i18n.language, b.label, b.label_ar)}
                 </option>
               ))}
             </select>

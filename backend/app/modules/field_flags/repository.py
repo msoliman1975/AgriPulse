@@ -24,7 +24,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # `is_pinned` is derived here rather than stored: it is a comparison against
 # now(), and a stored copy would be wrong the moment the clock moved.
 _FLAG_COLUMNS = """
-    f.id, f.farm_id, f.block_id, b.name AS block_name, b.code AS block_code,
+    f.id, f.farm_id, f.block_id, b.name AS block_name,
+    b.name_ar AS block_name_ar, b.code AS block_code,
     f.note, f.severity, f.status,
     CASE WHEN f.point IS NULL THEN NULL
          ELSE ST_AsGeoJSON(f.point)::jsonb END AS point,
@@ -110,6 +111,7 @@ class FieldFlagRepository:
             await self._session.execute(
                 text(
                     "SELECT c.id, c.body, c.author_id, u.full_name AS author_name, "
+                    "u.full_name_ar AS author_name_ar, "
                     "       c.kind, c.created_at "
                     "  FROM field_flag_comments c "
                     "  LEFT JOIN public.users u ON u.id = c.author_id "
@@ -120,12 +122,20 @@ class FieldFlagRepository:
         ).mappings()
         return tuple(dict(r) for r in rows)
 
-    async def resolve_names(self, *, user_ids: list[UUID]) -> dict[UUID, str]:
+    async def resolve_names(self, *, user_ids: list[UUID]) -> dict[UUID, tuple[str, str | None]]:
+        """`user_id -> (full_name, full_name_ar)`.
+
+        Both are returned rather than one resolved name, because the caller
+        renders in whichever language the reader chose and the API is not
+        language-aware.
+        """
         if not user_ids:
             return {}
         rows = (
             await self._session.execute(
-                text("SELECT id, full_name FROM public.users WHERE id = ANY(:ids)").bindparams(
+                text(
+                    "SELECT id, full_name, full_name_ar FROM public.users WHERE id = ANY(:ids)"
+                ).bindparams(
                     # ARRAY(...) around the element type, not the element type
                     # alone: with a bare PG_UUID this renders `ANY($1::UUID)`,
                     # which asks Postgres to treat one uuid as a list.
@@ -134,7 +144,7 @@ class FieldFlagRepository:
                 {"ids": user_ids},
             )
         ).mappings()
-        return {r["id"]: r["full_name"] for r in rows}
+        return {r["id"]: (r["full_name"], r["full_name_ar"]) for r in rows}
 
     async def pin_days_for_farm(self, *, farm_id: UUID) -> int:
         """The farm's flag lifetime, in days.

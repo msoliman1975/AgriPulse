@@ -47,9 +47,7 @@ export interface ApplyCounts {
   weather_deactivated: number;
 }
 
-export async function getSubscriptionsTemplate(
-  farmId: string,
-): Promise<SubscriptionsTemplate> {
+export async function getSubscriptionsTemplate(farmId: string): Promise<SubscriptionsTemplate> {
   const { data } = await apiClient.get<SubscriptionsTemplate>(
     `/v1/farms/${farmId}/config/subscriptions/template`,
   );
@@ -78,10 +76,7 @@ export async function previewApplySubscriptions(
   return data;
 }
 
-export async function applySubscriptions(
-  farmId: string,
-  blockIds: string[],
-): Promise<ApplyCounts> {
+export async function applySubscriptions(farmId: string, blockIds: string[]): Promise<ApplyCounts> {
   const { data } = await apiClient.post<ApplyCounts>(
     `/v1/farms/${farmId}/config/subscriptions/apply`,
     { block_ids: blockIds },
@@ -117,10 +112,7 @@ export async function lockCategory(
   return data;
 }
 
-export async function unlockCategory(
-  farmId: string,
-  category: LockCategory,
-): Promise<void> {
+export async function unlockCategory(farmId: string, category: LockCategory): Promise<void> {
   await apiClient.post(`/v1/farms/${farmId}/config/${category}/unlock`);
 }
 
@@ -150,9 +142,7 @@ export interface SimpleApplyCounts {
   total_blocks: number;
 }
 
-export async function getIrrigationTemplate(
-  farmId: string,
-): Promise<IrrigationTemplate> {
+export async function getIrrigationTemplate(farmId: string): Promise<IrrigationTemplate> {
   const { data } = await apiClient.get<IrrigationTemplate>(
     `/v1/farms/${farmId}/config/irrigation/template`,
   );
@@ -199,16 +189,11 @@ export interface OrgTemplate {
 }
 
 export async function getOrgTemplate(farmId: string): Promise<OrgTemplate> {
-  const { data } = await apiClient.get<OrgTemplate>(
-    `/v1/farms/${farmId}/config/org/template`,
-  );
+  const { data } = await apiClient.get<OrgTemplate>(`/v1/farms/${farmId}/config/org/template`);
   return data;
 }
 
-export async function putOrgTemplate(
-  farmId: string,
-  body: OrgTemplate,
-): Promise<OrgTemplate> {
+export async function putOrgTemplate(farmId: string, body: OrgTemplate): Promise<OrgTemplate> {
   const { data } = await apiClient.put<OrgTemplate>(
     `/v1/farms/${farmId}/config/org/template`,
     body,
@@ -231,10 +216,9 @@ export async function applyOrg(
   farmId: string,
   blockIds: string[] | null,
 ): Promise<SimpleApplyCounts> {
-  const { data } = await apiClient.post<SimpleApplyCounts>(
-    `/v1/farms/${farmId}/config/org/apply`,
-    { block_ids: blockIds },
-  );
+  const { data } = await apiClient.post<SimpleApplyCounts>(`/v1/farms/${farmId}/config/org/apply`, {
+    block_ids: blockIds,
+  });
   return data;
 }
 
@@ -256,6 +240,7 @@ export interface GridPlanRow {
   block_id: string;
   block_code: string;
   block_name: string | null;
+  block_name_ar: string | null;
   product_id: string | null;
   product_code: string | null;
   product_name: string | null;
@@ -297,16 +282,11 @@ export interface GridApplyCounts extends SimpleApplyCounts {
 }
 
 export async function getGridTemplate(farmId: string): Promise<GridTemplate> {
-  const { data } = await apiClient.get<GridTemplate>(
-    `/v1/farms/${farmId}/config/grid/template`,
-  );
+  const { data } = await apiClient.get<GridTemplate>(`/v1/farms/${farmId}/config/grid/template`);
   return data;
 }
 
-export async function putGridTemplate(
-  farmId: string,
-  body: GridTemplate,
-): Promise<GridTemplate> {
+export async function putGridTemplate(farmId: string, body: GridTemplate): Promise<GridTemplate> {
   const { data } = await apiClient.put<GridTemplate>(
     `/v1/farms/${farmId}/config/grid/template`,
     body,
@@ -332,10 +312,11 @@ export async function applyGrid(
   blockIds: string[] | null,
   clearOverride = false,
 ): Promise<GridApplyCounts> {
-  const { data } = await apiClient.post<GridApplyCounts>(
-    `/v1/farms/${farmId}/config/grid/apply`,
-    { block_ids: blockIds, clear_override: clearOverride, scope: "threshold" },
-  );
+  const { data } = await apiClient.post<GridApplyCounts>(`/v1/farms/${farmId}/config/grid/apply`, {
+    block_ids: blockIds,
+    clear_override: clearOverride,
+    scope: "threshold",
+  });
   return data;
 }
 
@@ -350,14 +331,11 @@ export async function applyGridCellSize(
   confirmFarmName: string | null,
   backfillBudgetScenes: number | null,
 ): Promise<GridApplyCounts> {
-  const { data } = await apiClient.post<GridApplyCounts>(
-    `/v1/farms/${farmId}/config/grid/apply`,
-    {
-      block_ids: blockIds,
-      scope: "cell_size",
-      confirm_farm_name: confirmFarmName,
-      backfill_budget_scenes: backfillBudgetScenes,
-    },
-  );
+  const { data } = await apiClient.post<GridApplyCounts>(`/v1/farms/${farmId}/config/grid/apply`, {
+    block_ids: blockIds,
+    scope: "cell_size",
+    confirm_farm_name: confirmFarmName,
+    backfill_budget_scenes: backfillBudgetScenes,
+  });
   return data;
 }

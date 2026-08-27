@@ -191,6 +191,7 @@ class ActionItem(BaseModel):
     block_id: UUID
     block_code: str
     block_name: str | None
+    block_name_ar: str | None = None
     # NULL for a block-scoped item; the whole block is the unit there.
     cell: CellLocation | None = None
 

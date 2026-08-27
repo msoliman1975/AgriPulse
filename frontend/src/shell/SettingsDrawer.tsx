@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { fetchMe, type Me } from "@/api/me";
 import { isApiError } from "@/api/errors";
-import { localizedField } from "@/lib/localizedField";
+import { localizedField, localizedName } from "@/lib/localizedField";
 import { Drawer } from "./Drawer";
 import { LanguageToggle } from "./LanguageToggle";
 import { UnitToggle } from "./UnitToggle";
@@ -103,7 +103,7 @@ function ProfileBody({ me, lang }: { me: Me; lang: string | undefined }): ReactN
   return (
     <div className="space-y-4 text-sm">
       <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <Row label={t("me.fullName")} value={me.full_name} />
+        <Row label={t("me.fullName")} value={localizedName(lang, me.full_name, me.full_name_ar)} />
         <Row label={t("me.email")} value={me.email} />
         <Row label={t("me.phone")} value={me.phone ?? "—"} />
         <Row label={t("me.status")} value={me.status} />

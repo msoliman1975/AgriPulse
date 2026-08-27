@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { CropHealthBlockRow, CropHealthStatus, CustomFieldDef } from "@/api/reports";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
+import { localizedField, localizedName } from "@/lib/localizedField";
 import { downloadCsv, toCsv, type CsvCell } from "@/lib/csv";
 import { formatIndexValue } from "@/lib/indexFormat";
 import { useCropHealthReport } from "@/queries/reports";
@@ -71,8 +72,8 @@ export function CropHealthReport({ farmId, since, until }: ReportProps): ReactNo
       ...customCsvHeaders(customFields, i18n.language),
     ];
     const rows: CsvCell[][] = data.blocks.map((b) => [
-      b.block_name,
-      b.crop_name_en ?? "",
+      localizedName(i18n.language, b.block_name, b.block_name_ar),
+      localizedField(i18n.language, b.crop_name_en, b.crop_name_ar) ?? "",
       b.crop_path ?? "",
       t(`cropHealth.status.${b.status}`),
       b.last_value ?? "",
@@ -98,7 +99,7 @@ export function CropHealthReport({ farmId, since, until }: ReportProps): ReactNo
   return (
     <ReportShell
       title={t("catalog.crop-health.title")}
-      farmName={data?.farm_name}
+      farmName={data ? localizedName(i18n.language, data.farm_name, data.farm_name_ar) : undefined}
       period={{ since, until }}
       onExportCsv={data ? handleExport : undefined}
     >
@@ -166,7 +167,7 @@ function CropHealthTable({
   unit: string;
   customFields: CustomFieldDef[];
 }): ReactNode {
-  const { t } = useTranslation("reports");
+  const { t, i18n } = useTranslation("reports");
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -199,10 +200,12 @@ function CropHealthTable({
           {rows.map((b) => (
             <Tr key={b.block_id} className="hover:bg-ap-bg/40">
               <Td className="text-ap-ink">
-                <div className="font-medium">{b.block_name}</div>
+                <div className="font-medium">
+                  {localizedName(i18n.language, b.block_name, b.block_name_ar)}
+                </div>
                 {b.crop_name_en ? (
                   <div className="text-[11px] text-ap-muted">
-                    {b.crop_name_en}
+                    {localizedField(i18n.language, b.crop_name_en, b.crop_name_ar)}
                     {b.crop_path ? (
                       <span className="ms-1 font-mono text-ap-primary">{b.crop_path}</span>
                     ) : null}

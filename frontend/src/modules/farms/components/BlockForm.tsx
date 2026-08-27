@@ -67,7 +67,7 @@ export function BlockForm({
   busy,
   error,
 }: Props): ReactNode {
-  const { t } = useTranslation("farms");
+  const { t, i18n } = useTranslation("farms");
   const [code, setCode] = useState(initial?.code ?? "");
   const [name, setName] = useState(initial?.name ?? "");
   const [nameAr, setNameAr] = useState(initial?.name_ar ?? "");
@@ -296,7 +296,7 @@ export function BlockForm({
               <option value="">{t("form.agronomistNone")}</option>
               {members.map((m) => (
                 <option key={m.membership_id} value={m.membership_id}>
-                  {displayUser(m, m.membership_id)}
+                  {displayUser(m, m.membership_id, i18n.language)}
                 </option>
               ))}
             </select>

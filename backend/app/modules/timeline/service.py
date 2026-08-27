@@ -220,6 +220,7 @@ class TimelineService:
             day=row["day"],
             block_id=row.get("block_id"),
             block_name=_text(row.get("block_name")),
+            block_name_ar=_text(row.get("block_name_ar")),
             block_code=_text(row.get("block_code")),
             code=_text(row.get("code")),
             title_en=title_en,

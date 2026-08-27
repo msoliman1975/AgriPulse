@@ -1523,11 +1523,15 @@ class RecommendationsRepository:
         ).all()
         return tuple(r.id for r in rows)
 
-    async def get_block_labels(self, *, block_ids: tuple[UUID, ...]) -> dict[UUID, str]:
-        """``{block_id: "Block name"}`` for the run report.
+    async def get_block_labels(
+        self, *, block_ids: tuple[UUID, ...]
+    ) -> dict[UUID, tuple[str, str | None]]:
+        """``{block_id: ("Block name", "Arabic name")}`` for the run report.
 
         Returns the code when a block is unnamed, so every row in the report
-        carries something a human recognises rather than a bare UUID.
+        carries something a human recognises rather than a bare UUID. The
+        Arabic half is NULL when the block has no Arabic name; the reader
+        falls back rather than the query.
         """
         if not block_ids:
             return {}
@@ -1535,7 +1539,8 @@ class RecommendationsRepository:
             (
                 await self._tenant.execute(
                     text(
-                        "SELECT id, COALESCE(NULLIF(name, ''), code) AS label "
+                        "SELECT id, COALESCE(NULLIF(name, ''), code) AS label, "
+                        "       NULLIF(name_ar, '') AS label_ar "
                         "FROM blocks WHERE id = ANY(:ids)"
                     ).bindparams(bindparam("ids", type_=postgresql.ARRAY(PG_UUID(as_uuid=True)))),
                     {"ids": list(block_ids)},
@@ -1544,7 +1549,7 @@ class RecommendationsRepository:
             .mappings()
             .all()
         )
-        return {r["id"]: r["label"] for r in rows}
+        return {r["id"]: (r["label"], r["label_ar"]) for r in rows}
 
     async def farm_exists(self, *, farm_id: UUID) -> bool:
         """Whether the farm is live in this tenant. The run endpoint checks
@@ -1575,10 +1580,12 @@ class RecommendationsRepository:
                         """
                     SELECT b.id          AS block_id,
                            b.name        AS block_name,
+                           b.name_ar     AS block_name_ar,
                            b.code        AS block_code,
                            b.soil_texture,
                            f.id          AS farm_id,
                            f.name        AS farm_name,
+                           f.name_ar     AS farm_name_ar,
                            f.country_code,
                            bc.crop_id,
                            bc.crop_path
@@ -1841,6 +1848,7 @@ class RecommendationsRepository:
             "       t.outcome, t.recommendation_id, t.alert_id, "
             "       t.duration_ms, t.error, "
             "       COALESCE(b.name, b.code) AS block_name, "
+            "       COALESCE(NULLIF(b.name_ar, ''), b.name, b.code) AS block_name_ar, "
             "       c.row_idx AS cell_row, c.col_idx AS cell_col "
             "FROM decision_tree_eval_traces t "
             "LEFT JOIN blocks b ON b.id = t.block_id "
@@ -1861,6 +1869,8 @@ class RecommendationsRepository:
                         """
                     SELECT t.*,
                            COALESCE(b.name, b.code) AS block_name,
+                           COALESCE(NULLIF(b.name_ar, ''), b.name, b.code)
+                               AS block_name_ar,
                            c.row_idx AS cell_row, c.col_idx AS cell_col
                     FROM decision_tree_eval_traces t
                     LEFT JOIN blocks b ON b.id = t.block_id

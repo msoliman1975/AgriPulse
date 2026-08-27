@@ -68,7 +68,8 @@ class TimelineRepository:
     async def flags(self, **p: Any) -> tuple[dict[str, Any], ...]:
         sql = f"""
             SELECT f.id::text AS id, f.created_at AS at, {_day("f.created_at")},
-                   f.block_id, b.name AS block_name, b.code AS block_code,
+                   f.block_id, b.name AS block_name, b.name_ar AS block_name_ar,
+                   b.code AS block_code,
                    f.severity, f.note, f.status,
                    CASE WHEN f.point IS NULL THEN NULL
                         ELSE ST_AsGeoJSON(f.point)::jsonb END AS point
@@ -94,7 +95,8 @@ class TimelineRepository:
         # rather than only "an observation happened".
         sql = f"""
             SELECT o.id::text AS id, o.time AS at, {_day("o.time")},
-                   o.block_id, b.name AS block_name, b.code AS block_code,
+                   o.block_id, b.name AS block_name, b.name_ar AS block_name_ar,
+                   b.code AS block_code,
                    d.code AS code, d.name AS definition_name, d.unit AS unit,
                    COALESCE(
                        o.value_categorical,
@@ -127,7 +129,8 @@ class TimelineRepository:
         # those have no day to sit on.
         sql = f"""
             SELECT a.id::text AS id, a.completed_at AS at, {_day("a.completed_at")},
-                   a.block_id, b.name AS block_name, b.code AS block_code,
+                   a.block_id, b.name AS block_name, b.name_ar AS block_name_ar,
+                   b.code AS block_code,
                    a.activity_type AS code, a.product_name, a.dosage, a.notes,
                    a.anchored_stage_code
             FROM plan_activities a
@@ -147,7 +150,8 @@ class TimelineRepository:
     async def visits(self, **p: Any) -> tuple[dict[str, Any], ...]:
         sql = f"""
             SELECT v.id::text AS id, v.completed_at AS at, {_day("v.completed_at")},
-                   v.block_id, b.name AS block_name, b.code AS block_code,
+                   v.block_id, b.name AS block_name, b.name_ar AS block_name_ar,
+                   b.code AS block_code,
                    v.title, v.summary_note, v.severity, v.outcome,
                    v.origin AS code,
                    CASE WHEN v.pin_point IS NULL THEN NULL
@@ -168,7 +172,8 @@ class TimelineRepository:
     async def alerts(self, **p: Any) -> tuple[dict[str, Any], ...]:
         sql = f"""
             SELECT a.id::text AS id, a.created_at AS at, {_day("a.created_at")},
-                   a.block_id, b.name AS block_name, b.code AS block_code,
+                   a.block_id, b.name AS block_name, b.name_ar AS block_name_ar,
+                   b.code AS block_code,
                    a.rule_code, a.action_type AS code, a.severity,
                    a.diagnosis_en, a.diagnosis_ar
             FROM alerts a
@@ -186,7 +191,8 @@ class TimelineRepository:
     async def recommendations(self, **p: Any) -> tuple[dict[str, Any], ...]:
         sql = f"""
             SELECT r.id::text AS id, r.created_at AS at, {_day("r.created_at")},
-                   r.block_id, b.name AS block_name, b.code AS block_code,
+                   r.block_id, b.name AS block_name, b.name_ar AS block_name_ar,
+                   b.code AS block_code,
                    r.action_type AS code, r.severity, r.text_en, r.text_ar,
                    r.tree_code
             FROM recommendations r
@@ -208,7 +214,8 @@ class TimelineRepository:
         sql = f"""
             SELECT g.id::text AS id, g.transition_date AS at,
                    {_day("g.transition_date")},
-                   g.block_id, b.name AS block_name, b.code AS block_code,
+                   g.block_id, b.name AS block_name, b.name_ar AS block_name_ar,
+                   b.code AS block_code,
                    g.stage AS code, g.source, g.notes
             FROM growth_stage_logs g
             JOIN blocks b ON b.id = g.block_id

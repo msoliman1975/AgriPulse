@@ -80,6 +80,7 @@ export type CropHealthStatus = "normal" | "watch" | "stressed" | "unknown";
 export interface CropHealthBlockRow {
   block_id: string;
   block_name: string;
+  block_name_ar: string | null;
   crop_name_en: string | null;
   crop_name_ar: string | null;
   crop_path: string | null;
@@ -112,6 +113,7 @@ export interface CropHealthSummary {
 export interface CropHealthReportResponse {
   farm_id: string;
   farm_name: string;
+  farm_name_ar: string | null;
   index_code: string;
   period: ReportPeriod;
   crop_path: string | null;
@@ -146,6 +148,7 @@ export type ZoneAnomalyStatus = "anomalies" | "clear" | "insufficient" | "no_dat
 export interface ZoneAnomalyBlockRow {
   block_id: string;
   block_name: string;
+  block_name_ar: string | null;
   status: ZoneAnomalyStatus;
   scene_time: string | null;
   cell_count: number;
@@ -169,6 +172,7 @@ export interface ZoneAnomalySummary {
 export interface ZoneAnomalyReportResponse {
   farm_id: string;
   farm_name: string;
+  farm_name_ar: string | null;
   index_code: string;
   period: ReportPeriod;
   blocks: ZoneAnomalyBlockRow[];
@@ -208,6 +212,7 @@ export interface WaterBalanceWeather {
 export interface WaterBalanceBlockRow {
   block_id: string;
   block_name: string;
+  block_name_ar: string | null;
   scheduled_count: number;
   applied_count: number;
   skipped_count: number;
@@ -232,6 +237,7 @@ export interface WaterBalanceSummary {
 export interface WaterBalanceReportResponse {
   farm_id: string;
   farm_name: string;
+  farm_name_ar: string | null;
   period: ReportPeriod;
   weather: WaterBalanceWeather;
   blocks: WaterBalanceBlockRow[];
@@ -296,6 +302,7 @@ export interface WeatherCropContext {
 export interface WeatherSummaryReportResponse {
   farm_id: string;
   farm_name: string;
+  farm_name_ar: string | null;
   period: ReportPeriod;
   crop_path: string | null;
   stats: WeatherSummaryStats;
@@ -328,6 +335,7 @@ export interface OpsLogEntry {
   time: string;
   kind: OpsLogKind;
   block_name: string | null;
+  block_name_ar: string | null;
   title: string;
   status: string | null;
   severity: string | null;
@@ -348,6 +356,7 @@ export interface OpsLogSummary {
 export interface OperationsLogReportResponse {
   farm_id: string;
   farm_name: string;
+  farm_name_ar: string | null;
   period: ReportPeriod;
   entries: OpsLogEntry[];
   summary: OpsLogSummary;
@@ -369,6 +378,7 @@ export async function getOperationsLogReport(
 export interface WeatherRiskPressureRow {
   block_id: string;
   block_name: string;
+  block_name_ar: string | null;
   risk_code: string;
   days_observed: number;
   peak_score: number;
@@ -392,6 +402,7 @@ export interface WeatherRiskPressureSummary {
 export interface WeatherRiskPressureReportResponse {
   farm_id: string;
   farm_name: string;
+  farm_name_ar: string | null;
   period: ReportPeriod;
   rows: WeatherRiskPressureRow[];
   summary: WeatherRiskPressureSummary;
@@ -433,11 +444,18 @@ export interface SignalDetailRow {
   recorded_at: string;
   signal_code: string;
   signal_name: string;
+  signal_name_ar: string | null;
   /** numeric | categorical | event | boolean | geopoint. Pick the value
    * column from this rather than probing for the non-null one: `false` and
    * `0` are real values. */
   value_kind: string;
   unit: string | null;
+  unit_ar: string | null;
+  /** The definition's value list and its Arabic labels, matched by position.
+   * The stored reading is always the English code, so both are needed to
+   * show an Arabic label for it. */
+  categorical_values: string[] | null;
+  categorical_values_ar: string[] | null;
   value_numeric: string | null;
   value_categorical: string | null;
   value_event: string | null;
@@ -445,10 +463,12 @@ export interface SignalDetailRow {
   /** Null for a farm-level observation. */
   block_id: string | null;
   block_name: string | null;
+  block_name_ar: string | null;
   crop_path: string | null;
   notes: string | null;
   recorded_by: string;
   recorded_by_name: string | null;
+  recorded_by_name_ar: string | null;
   location_mode: string;
   has_attachment: boolean;
   /** Set when the row was part of a grouped template submission. */
@@ -465,6 +485,7 @@ export interface SignalDetailCategoryCount {
 export interface SignalDetailStat {
   signal_code: string;
   signal_name: string;
+  signal_name_ar: string | null;
   value_kind: string;
   unit: string | null;
   observation_count: number;
@@ -491,6 +512,7 @@ export interface SignalDetailSummary {
 export interface SignalDetailsReportResponse {
   farm_id: string;
   farm_name: string;
+  farm_name_ar: string | null;
   period: ReportPeriod;
   filters: SignalDetailFilters;
   rows: SignalDetailRow[];

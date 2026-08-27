@@ -22,6 +22,7 @@ export interface FlagComment {
   body: string;
   author_id: string;
   author_name: string | null;
+  author_name_ar: string | null;
   kind: FlagCommentKind;
   created_at: string;
 }
@@ -31,6 +32,7 @@ export interface FieldFlag {
   farm_id: string;
   block_id: string;
   block_name: string | null;
+  block_name_ar: string | null;
   note: string;
   severity: FlagSeverity;
   status: FlagStatus;
@@ -44,9 +46,11 @@ export interface FieldFlag {
   is_pinned: boolean;
   raised_by: string;
   raised_by_name: string | null;
+  raised_by_name_ar: string | null;
   closed_at: string | null;
   closed_by: string | null;
   closed_by_name: string | null;
+  closed_by_name_ar: string | null;
   close_reason: FlagCloseReason | null;
   comment_count: number;
   photos: FlagPhoto[];

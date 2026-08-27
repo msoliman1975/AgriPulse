@@ -27,6 +27,7 @@ function event(over: Partial<TimelineEvent>): TimelineEvent {
     day: "2026-06-03",
     block_id: "b1",
     block_name: "Block 1",
+    block_name_ar: null,
     block_code: "B1",
     code: null,
     title_en: "",

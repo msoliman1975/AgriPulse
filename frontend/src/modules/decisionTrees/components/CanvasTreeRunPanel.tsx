@@ -22,6 +22,7 @@ import { useTranslation } from "react-i18next";
 import type { TreeRunCandidateFarm, TreeRunResponse } from "@/api/decisionTrees";
 import { Card } from "@/components/Card";
 import { Pill } from "@/components/Pill";
+import { localizedName } from "@/lib/localizedField";
 
 interface CanvasTreeRunPanelProps {
   farmId: string;
@@ -52,7 +53,7 @@ export function CanvasTreeRunPanel({
   onRun,
   onClear,
 }: CanvasTreeRunPanelProps): ReactNode {
-  const { t } = useTranslation("decisionTrees");
+  const { t, i18n } = useTranslation("decisionTrees");
   const [confirming, setConfirming] = useState(false);
   const selected = candidateFarms.find((f) => f.farm_id === farmId);
   const noCandidates = !candidatesLoading && candidateFarms.length === 0;
@@ -86,7 +87,7 @@ export function CanvasTreeRunPanel({
               {candidateFarms.map((f) => (
                 <option key={f.farm_id} value={f.farm_id}>
                   {t("editor.run.farmOption", {
-                    name: f.name,
+                    name: localizedName(i18n.language, f.name, f.name_ar),
                     targeted: f.blocks_targeted,
                     total: f.blocks_total,
                   })}
@@ -199,7 +200,9 @@ export function CanvasTreeRunPanel({
             <ul className="mt-1 flex flex-col gap-0.5">
               {result.blocks.map((b) => (
                 <li key={b.block_id} className="flex flex-wrap items-center gap-2 text-[11px]">
-                  <span className="font-medium text-ap-ink">{b.label}</span>
+                  <span className="font-medium text-ap-ink">
+                    {localizedName(i18n.language, b.label, b.label_ar)}
+                  </span>
                   {b.skipped_targeting ? (
                     <Pill kind="neutral">{t("editor.run.blockSkipped")}</Pill>
                   ) : b.recommendations_opened > 0 ? (

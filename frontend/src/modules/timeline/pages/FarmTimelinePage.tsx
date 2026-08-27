@@ -17,6 +17,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { queryState } from "@/components/asyncState";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
+import { localizedName } from "@/lib/localizedField";
 import { useCapability } from "@/rbac/useCapability";
 import { EventRail } from "../components/EventRail";
 import { Scrubber } from "../components/Scrubber";
@@ -106,12 +107,12 @@ export function FarmTimelinePage(): ReactNode {
           geometry: b.boundary as Polygon,
           properties: {
             block_id: b.id,
-            block_name: b.name?.trim() || b.code,
+            block_name: localizedName(i18n.language, b.name?.trim() || b.code, b.name_ar),
             highlight: tl.highlights.get(b.id) ?? 0,
           },
         })),
     };
-  }, [tl.blocks, tl.highlights, blockId]);
+  }, [tl.blocks, tl.highlights, blockId, i18n.language]);
 
   if (!farmId) return <Navigate to="/farms" replace />;
   if (!canRead) {

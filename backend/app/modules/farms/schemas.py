@@ -582,6 +582,7 @@ class FarmManagerRef(BaseModel):
 
     membership_id: UUID
     full_name: str | None = None
+    full_name_ar: str | None = None
 
 
 class FarmResponse(BaseModel):
