@@ -222,7 +222,8 @@ The identity record. Authoritative source for `email`/`name`/`phone`; Keycloak h
 | `keycloak_subject` | TEXT | NOT NULL, UNIQUE | The `sub` claim from Keycloak JWTs |
 | `email` | CITEXT | NOT NULL, UNIQUE | Case-insensitive |
 | `email_verified` | BOOLEAN | NOT NULL, DEFAULT FALSE | Synced from Keycloak |
-| `full_name` | TEXT | NOT NULL | |
+| `full_name` | TEXT | NOT NULL | Written from the Keycloak token on every sign-in |
+| `full_name_ar` | TEXT | | Arabic display name (public 0076). Never written by the login upsert, so it survives a sign-in. Readers use `COALESCE(NULLIF(full_name_ar, ''), full_name)` |
 | `phone` | TEXT | | E.164 |
 | `avatar_url` | TEXT | | S3 URL |
 | `status` | TEXT | NOT NULL, DEFAULT `'active'`, CHECK (`status IN ('active','suspended','archived')`) | |
