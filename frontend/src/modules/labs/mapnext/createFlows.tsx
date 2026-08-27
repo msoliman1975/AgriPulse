@@ -2,7 +2,8 @@
 // that float over the console map, replacing the old deep-linked screens
 // (/blocks/new, /blocks/auto-grid, legacy map pivot). They reuse the
 // MapCanvas draw primitives wired up in FarmConsolePage; this file is just
-// the capture UI: code+name for a drawn block, code+name+sectors for a
+// the capture UI: code+name (+ Arabic name) for a drawn block, the same
+// plus sectors for a
 // drawn pivot, and a cell-size → compute → pick → create panel for
 // auto-blocking (with a live candidate preview painted on the map).
 import { useState, type ReactNode } from "react";
@@ -93,12 +94,14 @@ export function CreateBlockPanel({
   areaM2: number;
   submitting: boolean;
   error: string | null;
-  onSubmit: (v: { code: string; name: string }) => void;
+  onSubmit: (v: { code: string; name: string; name_ar: string | null }) => void;
   onCancel: () => void;
 }): ReactNode {
   const { t } = useTranslation("farmConsole");
+  const { t: tf } = useTranslation("farms");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const [nameAr, setNameAr] = useState("");
   const codeError = code.trim().length === 0 ? t("create.codeRequired") : null;
   return (
     <FloatingCard>
@@ -111,7 +114,7 @@ export function CreateBlockPanel({
         onSubmit={(e) => {
           e.preventDefault();
           if (codeError) return;
-          onSubmit({ code: code.trim(), name: name.trim() });
+          onSubmit({ code: code.trim(), name: name.trim(), name_ar: nameAr.trim() || null });
         }}
       >
         <label className="block">
@@ -133,6 +136,18 @@ export function CreateBlockPanel({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={t("create.blockNamePlaceholder")}
+            disabled={submitting}
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-ap-muted">
+            {tf("form.blockNameAr")}
+          </span>
+          <input
+            className={inputCls}
+            dir="rtl"
+            value={nameAr}
+            onChange={(e) => setNameAr(e.target.value)}
             disabled={submitting}
           />
         </label>
@@ -170,12 +185,19 @@ export function CreatePivotPanel({
   radiusM: number;
   submitting: boolean;
   error: string | null;
-  onSubmit: (v: { code: string; name: string; sector_count: number }) => void;
+  onSubmit: (v: {
+    code: string;
+    name: string;
+    name_ar: string | null;
+    sector_count: number;
+  }) => void;
   onCancel: () => void;
 }): ReactNode {
   const { t } = useTranslation("farmConsole");
+  const { t: tf } = useTranslation("farms");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const [nameAr, setNameAr] = useState("");
   const [sectorCount, setSectorCount] = useState(4);
   const areaM2 = Math.PI * radiusM * radiusM;
   const codeError = code.trim().length === 0 ? t("create.codeRequired") : null;
@@ -191,7 +213,12 @@ export function CreatePivotPanel({
         onSubmit={(e) => {
           e.preventDefault();
           if (codeError) return;
-          onSubmit({ code: code.trim(), name: name.trim(), sector_count: sectorCount });
+          onSubmit({
+            code: code.trim(),
+            name: name.trim(),
+            name_ar: nameAr.trim() || null,
+            sector_count: sectorCount,
+          });
         }}
       >
         <label className="block">
@@ -213,6 +240,18 @@ export function CreatePivotPanel({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={t("create.pivotNamePlaceholder")}
+            disabled={submitting}
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-ap-muted">
+            {tf("form.blockNameAr")}
+          </span>
+          <input
+            className={inputCls}
+            dir="rtl"
+            value={nameAr}
+            onChange={(e) => setNameAr(e.target.value)}
             disabled={submitting}
           />
         </label>
@@ -370,8 +409,11 @@ export function FarmBoundaryBar({
 export interface FarmDraft {
   code: string;
   name: string;
+  /** Arabic display name. Null when left blank — the reader falls back to `name`. */
+  name_ar: string | null;
   country_code: string | null;
   description: string | null;
+  description_ar: string | null;
   governorate: string | null;
   district: string | null;
   nearest_city: string | null;
@@ -409,9 +451,11 @@ export function CreateFarmPanel({
   const isAr = i18n.language === "ar";
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const [nameAr, setNameAr] = useState("");
   const [country, setCountry] = useState("");
   const [more, setMore] = useState(false);
   const [description, setDescription] = useState("");
+  const [descriptionAr, setDescriptionAr] = useState("");
   const [governorate, setGovernorate] = useState("");
   const [district, setDistrict] = useState("");
   const [nearestCity, setNearestCity] = useState("");
@@ -460,8 +504,10 @@ export function CreateFarmPanel({
           onSubmit({
             code: code.trim(),
             name: name.trim(),
+            name_ar: nameAr.trim() || null,
             country_code: country || null,
             description: description.trim() || null,
+            description_ar: descriptionAr.trim() || null,
             governorate: governorate.trim() || null,
             district: district.trim() || null,
             nearest_city: nearestCity.trim() || null,
@@ -504,6 +550,19 @@ export function CreateFarmPanel({
             disabled={submitting}
           />
         </label>
+        <div>
+          <label className="block">
+            <span className={fieldLabel}>{tf("form.nameAr")}</span>
+            <input
+              className={inputCls}
+              dir="rtl"
+              value={nameAr}
+              onChange={(e) => setNameAr(e.target.value)}
+              disabled={submitting}
+            />
+          </label>
+          <p className="mt-1 text-xs text-ap-muted">{tf("form.nameArHelp")}</p>
+        </div>
         <label className="block">
           <span className={fieldLabel}>{tf("form.country")}</span>
           <select
@@ -539,6 +598,17 @@ export function CreateFarmPanel({
                 rows={2}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                disabled={submitting}
+              />
+            </label>
+            <label className="block">
+              <span className={fieldLabel}>{tf("form.descriptionAr")}</span>
+              <textarea
+                className={inputCls}
+                dir="rtl"
+                rows={2}
+                value={descriptionAr}
+                onChange={(e) => setDescriptionAr(e.target.value)}
                 disabled={submitting}
               />
             </label>

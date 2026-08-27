@@ -929,6 +929,8 @@ class PivotCreateRequest(BaseModel):
 
     code: str
     name: str | None = Field(default=None, max_length=255)
+    # See BlockCreateRequest.name_ar — the rig is a block row like any other.
+    name_ar: str | None = Field(default=None, max_length=255)
     center: PivotCenter
     radius_m: float = Field(gt=0, le=5000)
     # 1..16 keeps the UI cohort sane; equal-angle slicing.

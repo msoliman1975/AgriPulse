@@ -77,6 +77,8 @@ export function FarmSettingsTab({
   onSaved,
 }: FarmSettingsTabProps): ReactNode {
   const { t } = useTranslation("farmConsole");
+  // Label wording reused from the farm edit form so the two agree.
+  const { t: tf } = useTranslation("farms");
   const navigate = useNavigate();
   const qc = useQueryClient();
   const farmQ = useQuery({
@@ -91,6 +93,8 @@ export function FarmSettingsTab({
     (f
       ? {
           name: f.name,
+          name_ar: f.name_ar,
+          description_ar: f.description_ar,
           governorate: f.governorate,
           district: f.district,
           nearest_city: f.nearest_city,
@@ -132,6 +136,30 @@ export function FarmSettingsTab({
               className={inputCls}
               value={state.name ?? ""}
               onChange={(e) => set({ name: e.target.value })}
+            />
+          </label>
+          <label className="mb-1 block">
+            <span className="mb-1 block text-xs font-semibold text-ap-muted">
+              {tf("form.nameAr")}
+            </span>
+            <input
+              className={inputCls}
+              dir="rtl"
+              value={state.name_ar ?? ""}
+              onChange={(e) => set({ name_ar: e.target.value || null })}
+            />
+          </label>
+          <p className="mb-3 text-xs text-ap-muted">{tf("form.nameArHelp")}</p>
+          <label className="mb-3 block">
+            <span className="mb-1 block text-xs font-semibold text-ap-muted">
+              {tf("form.descriptionAr")}
+            </span>
+            <textarea
+              className={inputCls}
+              dir="rtl"
+              rows={2}
+              value={state.description_ar ?? ""}
+              onChange={(e) => set({ description_ar: e.target.value || null })}
             />
           </label>
           <div className="grid grid-cols-2 gap-3">

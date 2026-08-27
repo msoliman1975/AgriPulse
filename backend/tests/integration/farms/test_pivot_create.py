@@ -162,3 +162,51 @@ async def test_create_pivot_rejects_bad_radius(admin_session: AsyncSession) -> N
             },
         )
     assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_pivot_stores_the_arabic_name(admin_session: AsyncSession) -> None:
+    """The rig row is a block, so it carries `name_ar` like any other block.
+
+    ``PivotCreateRequest`` forbids extra fields, so before the field existed
+    this body was a 422 — an Arabic tenant could name a drawn block but not a
+    drawn pivot. Sectors get no Arabic name because they get no name at all;
+    their codes are derived.
+    """
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug="pivot-ar",
+        name="Pivot",
+        contact_email="ops@pivot-ar.test",
+    )
+    user_id = uuid4()
+    await _create_user_in_tenant(admin_session, tenant_id=tenant.tenant_id, user_id=user_id)
+    context = make_context(
+        user_id=user_id,
+        tenant_id=tenant.tenant_id,
+        tenant_role=TenantRole.TENANT_ADMIN,
+    )
+    app = build_app(context)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        farm = await c.post(
+            "/api/v1/farms",
+            json={"code": "F", "name": "F", "boundary": _square(31.2, 30.0)},
+        )
+        farm_id = farm.json()["id"]
+        resp = await c.post(
+            f"/api/v1/farms/{farm_id}/pivots",
+            json={
+                "code": "P1",
+                "name": "Pivot 1",
+                "name_ar": "المحور 1",
+                "center": {"lat": 30.005, "lon": 31.205},
+                "radius_m": 300,
+                "sector_count": 2,
+            },
+        )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["pivot"]["name"] == "Pivot 1"
+    assert body["pivot"]["name_ar"] == "المحور 1"
+    assert all(s["name_ar"] is None for s in body["sectors"])

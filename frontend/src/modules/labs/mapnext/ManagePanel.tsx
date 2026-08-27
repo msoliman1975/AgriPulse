@@ -113,6 +113,7 @@ const inputCls =
 
 function EditForm({ blockId, onDone }: { blockId: string; onDone: () => void }): ReactNode {
   const { t } = useTranslation("farmConsole");
+  const { t: tf } = useTranslation("farms");
   const qc = useQueryClient();
   const blockQ = useQuery({
     queryKey: ["labs/mapnext/block", blockId],
@@ -128,6 +129,7 @@ function EditForm({ blockId, onDone }: { blockId: string; onDone: () => void }):
     (b
       ? {
           name: b.name ?? null,
+          name_ar: b.name_ar ?? null,
           irrigation_system: b.irrigation_system ?? null,
           irrigation_source: b.irrigation_source ?? null,
           soil_texture: b.soil_texture ?? null,
@@ -166,6 +168,14 @@ function EditForm({ blockId, onDone }: { blockId: string; onDone: () => void }):
           className={inputCls}
           value={state.name ?? ""}
           onChange={(e) => set({ name: e.target.value || null })}
+        />
+      </Field>
+      <Field label={tf("form.blockNameAr")}>
+        <input
+          className={inputCls}
+          dir="rtl"
+          value={state.name_ar ?? ""}
+          onChange={(e) => set({ name_ar: e.target.value || null })}
         />
       </Field>
       <div className="grid grid-cols-2 gap-3">

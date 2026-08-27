@@ -754,6 +754,7 @@ async def create_pivot(
         farm_id=farm_id,
         code=payload.code,
         name=payload.name,
+        name_ar=payload.name_ar,
         center_lat=payload.center.lat,
         center_lon=payload.center.lon,
         radius_m=payload.radius_m,
