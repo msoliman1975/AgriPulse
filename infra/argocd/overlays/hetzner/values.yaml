@@ -3282,7 +3282,33 @@ global:
       #   commit in that range, #606, is the /dev/shm fix and touches tests
       #   only - so api, workers and tile-server stay put. No migration.
       #   Rollback is this tag alone back to c84b3e3.
-      tag: "a728e59"
+      # 2026-08-26 - 1d728ab = #609, the flat block colours stop covering the
+      #   index raster. `units-fill` is a VECTOR layer, so it draws above the
+      #   pixels, and the per-block class colour is painted at 0.8 opacity.
+      #   That fill exists to STAND IN for the raster when there is none; over
+      #   an actual one it only hides it, and it shows worst on a farm-raster
+      #   date because the surface underneath is one clean image rather than
+      #   36 tiles that line up with the block edges. Read on screen as "the
+      #   map draws block by block, then draws the whole farm on top".
+      #   e8ec32c (#592) had made it worse, not better: it changed the property
+      #   from unconditional to `showPixels ? "class_color" : undefined`, which
+      #   applies the fill exactly when the pixels are drawn and drops it
+      #   exactly when they are not. Now: raster drawn -> no class fill; no
+      #   raster -> class fill, the only reading there is.
+      #   Found by mounting MapCanvas in a harness and reading the style back -
+      #   index-pixels-__farm__ at layer 2, units-fill at layer 5. The same
+      #   harness cleared the other suspect: switching three block layers to
+      #   one farm layer leaves only index-pixels-__farm__, so the double image
+      #   was never a stale raster source.
+      #   FRONTEND ONLY. No backend file changed, so api and workers stay
+      #   a3680d2, tile-server stays 676746a and keycloak stays 677c7dc.
+      #   NO MIGRATION.
+      #   Image CONFIRMED by pulling it on the node before the bump:
+      #   frontend @ 1d728ab -> sha256:bffc3953.
+      #   a728e59 is an ancestor of 1d728ab, checked with
+      #   `git merge-base --is-ancestor` before this edit.
+      #   Rollback is this tag alone back to a728e59.
+      tag: "1d728ab"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
