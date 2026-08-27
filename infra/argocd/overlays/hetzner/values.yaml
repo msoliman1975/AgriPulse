@@ -3095,10 +3095,40 @@ global:
     #   The other two fixes are frontend and are described on that tag below.
     #   NO MIGRATION between ccbb935 and a3680d2 - rollback really is just
     #   these tags back to ccbb935.
+    # 2026-08-27 - 0d25fa8 = #611, Arabic names in the payloads that still
+    #   carried English only. Migrations 0087 and 0075 gave every named
+    #   entity an Arabic column, but eight modules embed a farm, block or
+    #   person name in their OWN read payload, and every one of those
+    #   projections selected the English column alone. So an Arabic page read
+    #   Arabic in the farm switcher and English in the report under it.
+    #
+    #   PUBLIC MIGRATION 0076 - users.full_name_ar. Additive, nullable, no
+    #   backfill. It exists as a separate column because upsert_from_jwt
+    #   copies full_name out of the Keycloak token on EVERY sign-in, so a
+    #   translation written into full_name is erased at the next login.
+    #
+    #   Every new column is nullable and every reader falls back with
+    #   COALESCE(NULLIF(x_ar, ''), x), so the order api/workers/frontend roll
+    #   does not matter. An older api sends no Arabic field and the page shows
+    #   English.
+    #
+    #   ROLLBACK IS ASYMMETRIC. These tags go back to a3680d2 safely - the old
+    #   api simply never selects the new column. The migration does not: 0076's
+    #   downgrade drops users.full_name_ar, so rolling the SCHEMA back loses
+    #   any Arabic name typed in the meantime. Roll the tags, leave the column.
+    #
+    #   a3680d2 is an ancestor of 0d25fa8, checked with
+    #   `git merge-base --is-ancestor a3680d2 0d25fa83`. Carries #599
+    #   (c84b3e3) and the /dev/shm CI fix (a08fd509) forward; the latter
+    #   touches tests only.
+    #
+    #   CI on the merge commit: unit 1367 passed, integration 1130 passed /
+    #   4 skipped / 0 failed. 1126 was main's baseline before this branch
+    #   added 4 tests.
     api:
-      tag: "a3680d2"
+      tag: "0d25fa8"
     workers:
-      tag: "a3680d2"
+      tag: "0d25fa8"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3308,7 +3338,19 @@ global:
       #   a728e59 is an ancestor of 1d728ab, checked with
       #   `git merge-base --is-ancestor` before this edit.
       #   Rollback is this tag alone back to a728e59.
-      tag: "1d728ab"
+      # 2026-08-27 - 0d25fa8 = #611. The frontend half of the Arabic names:
+      #   the report, timeline, insights, field-flag, decision-tree and user
+      #   screens now read the Arabic column the API started sending. The
+      #   signal details report is the one that mattered - it listed every
+      #   scouting observation by its STORED reading, and the stored reading
+      #   is always the English code, so a season of Arabic scouting read
+      #   `emitter_blocked`.
+      #   Deploys with api and workers, not alone: the Arabic fields it reads
+      #   do not exist on a3680d2's payloads. Harmless in the other order
+      #   though - a missing field falls back to English.
+      #   1d728ab is an ancestor of 0d25fa8. Rollback is these three tags
+      #   back to 1d728ab / a3680d2 / a3680d2.
+      tag: "0d25fa8"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
