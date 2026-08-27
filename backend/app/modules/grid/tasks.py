@@ -791,11 +791,15 @@ async def _backfill_farm_async(
 
     since = datetime.fromisoformat(since_iso) if since_iso else None
     farm_uuid = UUID(farm_id)
-    # Per-pair fetch cap. With a farm budget set we can never enqueue more
-    # than the budget in total, so fetching beyond it is pure waste; with
-    # no budget we still bound the query rather than reading a decade of
-    # jobs into memory.
-    per_pair_cap = budget_scenes if budget_scenes is not None else DEFAULT_PER_PAIR_CAP
+    # Per-pair fetch cap, the same with or without a budget.
+    #
+    # It used to narrow to the budget, on the reasoning that fetching past
+    # what can be enqueued is waste. It is, but `scenes_stranded` is
+    # counted from what was fetched, so a budget of 2 against 9 scenes
+    # reported 0 stranded — the number whose whole job is to say what the
+    # budget did not reach. The read is bounded either way, and reporting
+    # a truncated backfill as complete is the more expensive mistake.
+    per_pair_cap = DEFAULT_PER_PAIR_CAP
 
     factory = AsyncSessionLocal()
     async with factory() as session, session.begin():

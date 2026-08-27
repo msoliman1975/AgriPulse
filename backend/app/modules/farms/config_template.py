@@ -1169,15 +1169,15 @@ async def apply_grid_cell_size(
         # meant a farm gridded for the first time reported "0 scenes
         # queued" while the task it had just fired recomputed its entire
         # imagery history.
+        # Capped exactly as the task caps its own fetch — see the note on
+        # `per_pair_cap` in `grid.tasks._backfill_farm_async`. Narrowing
+        # this to the budget would make `scenes_stranded` count only what
+        # the budget already excluded, which is always zero.
         planned_scenes = await count_farm_backfill_candidates(
             session,
             farm_id=farm_id,
             since=None,
-            per_pair_cap=(
-                backfill_budget_scenes
-                if backfill_budget_scenes is not None
-                else DEFAULT_PER_PAIR_CAP
-            ),
+            per_pair_cap=DEFAULT_PER_PAIR_CAP,
         )
         scenes_queued, scenes_stranded = split_budget(planned_scenes, budget=backfill_budget_scenes)
         # The farm-AOI share of what was queued, and the scenes nothing can
@@ -1189,11 +1189,7 @@ async def apply_grid_cell_size(
             session,
             farm_id=farm_id,
             since=None,
-            per_product_cap=(
-                backfill_budget_scenes
-                if backfill_budget_scenes is not None
-                else DEFAULT_PER_PAIR_CAP
-            ),
+            per_product_cap=DEFAULT_PER_PAIR_CAP,
         )
         # The budget is spread round-robin across pools, so the farm share
         # of a truncated run cannot be derived here exactly. Reported as

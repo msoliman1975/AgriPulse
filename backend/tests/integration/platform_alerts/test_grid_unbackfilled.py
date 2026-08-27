@@ -256,8 +256,9 @@ async def test_a_farm_with_one_cell_reading_is_not_reported(admin_session: Any) 
     await admin_session.execute(
         text(
             "INSERT INTO block_grid_aggregates "
-            "  (time, cell_id, block_id, index_code, product_id, mean) "
-            "VALUES (now(), :cell, :block, 'ndvi', :product, 0.42)"
+            "  (time, cell_id, block_id, index_code, product_id, mean, "
+            "   valid_pixel_count, total_pixel_count, stac_item_id) "
+            "VALUES (now(), :cell, :block, 'ndvi', :product, 0.42, 100, 100, 'item')"
         ),
         {
             "cell": str(cell_id),

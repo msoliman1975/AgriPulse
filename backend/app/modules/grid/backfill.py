@@ -490,20 +490,24 @@ async def count_unreplayable_scenes(
              AND b.deleted_at IS NULL
              AND b.farm_id = :farm
             WHERE j.status = 'succeeded'
-              AND NOT (
+              -- IS NOT TRUE, not NOT (...): `jsonb_typeof(NULL)` is NULL,
+              -- so a scene with no manifest makes the inner test NULL and
+              -- `NOT NULL` is NULL, which drops the row. A scene with no
+              -- manifest is the plainest unreplayable case there is.
+              AND (
                   j.stac_item_id IS NOT NULL
                   AND {_has_raw_bands_sql("j.assets_written")}
-              )
+              ) IS NOT TRUE
               {block_since}
         ) + (
             SELECT count(*)
             FROM imagery_farm_ingestion_jobs fj
             WHERE fj.farm_id = :farm
               AND fj.status = 'succeeded'
-              AND NOT (
+              AND (
                   fj.stac_item_id IS NOT NULL
                   AND {_has_raw_bands_sql("fj.assets_written")}
-              )
+              ) IS NOT TRUE
               {farm_since}
               AND EXISTS (
                   SELECT 1
