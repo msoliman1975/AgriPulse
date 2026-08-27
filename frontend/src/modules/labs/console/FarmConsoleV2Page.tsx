@@ -597,6 +597,24 @@ function Console({ farmId }: { farmId: string }): ReactNode {
             </div>
           ) : null}
 
+          {/* The cells are not on the day the strip says.
+              Directly above the strip because that is the control it
+              contradicts, and the reader is looking there when they change
+              the date. Suppressed while the mesh is refetching: the previous
+              day's cells are held on screen during a date change, so a notice
+              drawn then would name a gap that is about to close. */}
+          {c.cellDateGap && !c.farmGridQ.isFetching ? (
+            <div className="flex-none border-t border-ap-line bg-ap-warn-soft px-4 py-2 text-meta text-ap-ink">
+              {t("cellDate.gap", {
+                drawn: c.cellDateGap.drawn,
+                wanted: c.cellDateGap.wanted,
+              })}
+              {c.cellDateGap.dayCount > 1
+                ? ` ${t("cellDate.mixed", { count: c.cellDateGap.dayCount })}`
+                : null}
+            </div>
+          ) : null}
+
           {/* Zone 6 — the time spine. Belongs to the map, not the dock: it
               changes what the map shows, so it sits directly under it and
               spans the map column only. */}
