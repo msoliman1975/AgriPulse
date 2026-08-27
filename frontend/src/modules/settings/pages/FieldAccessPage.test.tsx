@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import * as React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { setupTestI18n } from "@/i18n/testing";
@@ -155,7 +154,9 @@ describe("FieldAccessPage — a second farm for someone who already has the app"
     );
   });
 
-  it("hides the mismatch card when the two stores agree", async () => {
+  // Worded to avoid the standalone word the DS-8 lint rule bans in string
+  // literals; it matches prose as readily as a className.
+  it("hides the mismatch section when the two stores agree", async () => {
     fetchFieldEnrolmentAudit.mockResolvedValue(emptyAudit({ enrolled: [TAREK] }));
     renderPage();
 
