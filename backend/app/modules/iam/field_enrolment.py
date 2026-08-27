@@ -610,6 +610,25 @@ class FieldEnrolmentService:
             raise InvalidEnrolmentError(
                 f"role must be one of {', '.join(ENROLLABLE_ROLES)}, got {role!r}"
             )
+
+        # The farm has to belong to this tenant, and nothing downstream would
+        # notice if it did not: `public.farm_scopes.farm_id` is a logical
+        # reference, not a foreign key, so a farm id from another tenant is
+        # accepted, written, and projected into the token. The grant then
+        # resolves against a farm this tenant's schema does not contain.
+        # Checked through the tenant session, whose search_path is already
+        # pinned to the caller's schema.
+        exists = (
+            await self._tenant.execute(
+                text("SELECT 1 FROM farms WHERE id = :fid AND deleted_at IS NULL").bindparams(
+                    bindparam("fid", type_=PG_UUID(as_uuid=True))
+                ),
+                {"fid": farm_id},
+            )
+        ).first()
+        if exists is None:
+            raise InvalidEnrolmentError("that farm does not exist in this tenant")
+
         member = (
             await self._public.execute(
                 text(

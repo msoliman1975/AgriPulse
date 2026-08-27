@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   enrolFieldWorker,
   fetchFieldEnrolmentAudit,
+  grantFarmAccess,
   reRoleFieldWorkers,
   reissueFieldPin,
   type EnrolPayload,
@@ -55,5 +56,25 @@ export function useReRoleFieldWorkers(farmId: string | null) {
 export function useReissueFieldPin(farmId: string | null) {
   return useMutation({
     mutationFn: (user_id: string) => reissueFieldPin({ user_id, farm_id: farmId as string }),
+  });
+}
+
+/**
+ * Adding a farm changes two lists, not one.
+ *
+ * The audit for the farm just granted gains the person, and the audit for the
+ * farm the operator is looking at may lose them from `scope_mismatch` — that
+ * bucket is exactly "available here, scoped nowhere", which this call fixes.
+ * Invalidating every audit is cheaper than reasoning about which.
+ */
+export function useGrantFarmAccess(farmId: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { user_id: string; farm_id: string; role?: "Scout" | "FieldOperator" }) =>
+      grantFarmAccess(args),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["field-access", "audit"] });
+      void qc.invalidateQueries({ queryKey: ["resources", farmId] });
+    },
   });
 }

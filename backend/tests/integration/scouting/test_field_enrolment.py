@@ -895,3 +895,42 @@ async def test_a_phone_already_working_in_another_tenant_is_refused(
         )
     ).scalar_one()
     assert count == 1
+
+
+@pytest.mark.asyncio
+async def test_farm_access_refuses_a_farm_from_another_tenant(
+    scouting_env: ScoutingFixture,
+) -> None:
+    """A farm id belonging to somebody else must not be granted.
+
+    `public.farm_scopes.farm_id` is a logical reference, not a foreign key —
+    a real FK from a tenant schema into `public` would make `DROP SCHEMA`
+    take an ACCESS EXCLUSIVE lock platform-wide. So nothing in the database
+    rejects a farm id from another tenant: the grant is written, projected
+    into the token, and then resolves against a farm this tenant's schema
+    does not contain. The check has to live in the service.
+
+    A random UUID stands in for another tenant's farm. The path is the same:
+    the id is simply not a live farm of this tenant.
+    """
+    env = scouting_env
+    enrolled = await _enrol(env, phone=_unique_phone(), full_name="Wandering Wael")
+    assert enrolled.status_code == 201, enrolled.text
+    user_id = enrolled.json()["user_id"]
+
+    async with _client(env.admin_context) as client:
+        refused = await client.post(
+            f"/api/v1/users/{user_id}/farm-access",
+            json={"farm_id": str(uuid4()), "role": "Scout"},
+        )
+
+    assert refused.status_code == 422, refused.text
+    assert "this tenant" in refused.json()["detail"]
+
+    # And nothing was written: the person still holds exactly their own farm.
+    async with _client(env.admin_context) as client:
+        audit = (
+            await client.get(f"/api/v1/users/field-enrolment/audit?farm_id={env.farm_id}")
+        ).json()
+    assert "Wandering Wael" in {w["name"] for w in audit["enrolled"]}
+    assert audit["scope_mismatch"] == []
