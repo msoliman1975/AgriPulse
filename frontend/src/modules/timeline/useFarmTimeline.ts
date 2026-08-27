@@ -27,6 +27,7 @@ import {
   passForFrames,
   visibleEvents,
 } from "./lib/frames";
+import { boundsOfMultiPolygon, padBounds, unionBounds, type SourceBounds } from "./lib/mapBounds";
 import { buildBlockAnchors, buildBlockHighlights, buildMarks } from "./lib/marks";
 
 /** Id the whole-farm raster is drawn under. Matches the console's scope id. */
@@ -199,6 +200,27 @@ export function useFarmTimeline(input: TimelineInput) {
     return out;
   }, [blocks]);
 
+  /**
+   * The ground the whole-farm raster covers, for its source `bounds`.
+   *
+   * Without it MapLibre requests tiles for the entire viewport, and the
+   * viewport is mostly desert: measured on prod that was 24 tile 404s from
+   * TiTiler on one frame, none of which could ever have returned an image.
+   * A per-block source already avoids this because it carries its block's
+   * extent; the farm surface had no per-block extent to carry, so the key
+   * was omitted entirely.
+   *
+   * Taken from the farm AOI and widened by the blocks, because the two do
+   * not always agree: a block drawn slightly outside the stored boundary
+   * would otherwise fall outside the box and stop being requested. Padded
+   * on top of that — see `padBounds`. Every step here only ever widens.
+   */
+  const farmRasterBounds = useMemo<SourceBounds | undefined>(() => {
+    let box = boundsOfMultiPolygon(farmQ.data?.boundary ?? null);
+    for (const b of boundsByBlockId.values()) box = unionBounds(box, b);
+    return padBounds(box);
+  }, [farmQ.data, boundsByBlockId]);
+
   const rasters = useMemo<RasterLayer[]>(() => {
     if (!config) return [];
     const data = assetsQ.data;
@@ -227,6 +249,7 @@ export function useFarmTimeline(input: TimelineInput) {
             asset: farmRaster,
             code: index,
           }),
+          bounds: farmRasterBounds,
         },
       ];
     }
