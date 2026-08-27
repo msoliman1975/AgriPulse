@@ -735,7 +735,7 @@ class TenantUsersService:
         *,
         email: str,
         full_name: str,
-        full_name_ar: str | None,
+        full_name_ar: str | None = None,
         phone: str | None,
         tenant_role: str,
         tenant_schema: str,

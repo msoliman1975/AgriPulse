@@ -34,6 +34,7 @@ function event(i: number): TimelineEvent {
     day: "2026-08-05",
     block_id: "b1",
     block_name: "North ridge",
+    block_name_ar: null,
     block_code: "B-01",
     code: "inspect",
     title_en: `Alert number ${i}`,
