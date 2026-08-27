@@ -3149,10 +3149,52 @@ global:
     #
     #   Image pulled on the node before this edit:
     #   api:c0df195 -> sha256:200cfded….
+    # df7dc1e = #622, a grid backfill that can see a farm's own scenes.
+    #
+    #   A farm gridded after its scenes arrived kept empty grid cells for
+    #   ever. Apply fires `grid.backfill_farm`, and every query that task
+    #   ran read `imagery_ingestion_jobs`, which is keyed per block. A farm
+    #   cut over to the farm-wide imagery path has no rows there, so the
+    #   backfill enumerated nothing, logged `scenes_queued=0` and returned
+    #   success. Nothing failed anywhere.
+    #
+    #   Live proof, Mango Republic (tenant 01a041ef...): 36 live grids, 0
+    #   succeeded rows in `imagery_ingestion_jobs`, 303 in
+    #   `imagery_farm_ingestion_jobs`, 0 rows in `block_grid_aggregates`.
+    #   The map drew the mesh and every number in the cell popup read "-".
+    #   The new count statement, run against that database read-only,
+    #   returns block_half=0 farm_half=217 where the old one returned 0.
+    #
+    #   Three parts: the backfill now reads both scene tables and replays
+    #   farm scenes with `imagery.recompute_farm_scene_indices`; a sixth
+    #   platform-alert detector `grid_unbackfilled` reports the state
+    #   itself; and Apply reports what it queued instead of reporting only
+    #   the blocks it touched.
+    #
+    #   MIGRATION: public 0077, and it is the only one. It rewrites the
+    #   `platform_alerts.kind` CHECK to admit `grid_unbackfilled`. No
+    #   tenant migration.
+    #
+    #   ROLLBACK IS NOT SYMMETRIC, but it is safe. These tags go straight
+    #   back to c0df195 on their own. 0077 stays applied and does not need
+    #   to be undone: the wider constraint accepts every row the narrower
+    #   one did, and only the new detector writes the new kind. Undoing it
+    #   would need a deliberate `alembic downgrade`, which deletes
+    #   `grid_unbackfilled` rows first so the narrower CHECK can build.
+    #
+    #   c0df195 is an ancestor of df7dc1e, checked with
+    #   `git merge-base --is-ancestor c0df195 df7dc1e4`.
+    #
+    #   CI on the merged PR: unit 1371 passed, integration 1141 passed / 4
+    #   skipped / 0 failed. 1132 was main's baseline before this branch
+    #   added 9 tests. Frontend 1390 passed.
+    #
+    #   Images pulled on the node before this edit:
+    #   api:df7dc1e -> sha256:7adc1a50..., frontend:df7dc1e -> sha256:473e42f8...
     api:
-      tag: "c0df195"
+      tag: "df7dc1e"
     workers:
-      tag: "c0df195"
+      tag: "df7dc1e"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3460,7 +3502,17 @@ global:
       #   every farm-scoped user) remains merged and undeployed. Still
       #   deliberate, still should not be left sitting there.
       #   Rollback is this tag alone back to b782010.
-      tag: "c0df195"
+      # df7dc1e = #622, the reporting half of the grid-backfill fix. The
+      #   Zones panel now says how many scenes an Apply queued, names the
+      #   farm-wide share, and warns when it touched blocks and queued
+      #   nothing -- which is exactly what the broken Apply did while
+      #   looking healthy. The cell popup separates "no cell readings for
+      #   this farm yet" from one empty cell; both printed "-", which is
+      #   how this hid for as long as it did.
+      #   FRONTEND HALF ONLY. It reads two new fields on the grid Apply
+      #   response, so it wants the api on the same tag; both move here.
+      #   Rollback is this tag alone back to c0df195.
+      tag: "df7dc1e"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
