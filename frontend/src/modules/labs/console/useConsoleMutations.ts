@@ -202,8 +202,24 @@ export function useConsoleMutations({ farmId, selectedId, onSelect, onDeselect, 
   }, [resetCreate, closeAuto]);
 
   const createBlockMut = useMutation({
-    mutationFn: ({ polygon, code, name }: { polygon: Polygon; code: string; name: string }) =>
-      createBlock(farmId, { code, name: name || null, boundary: polygon, unit_type: "block" }),
+    mutationFn: ({
+      polygon,
+      code,
+      name,
+      name_ar,
+    }: {
+      polygon: Polygon;
+      code: string;
+      name: string;
+      name_ar: string | null;
+    }) =>
+      createBlock(farmId, {
+        code,
+        name: name || null,
+        name_ar,
+        boundary: polygon,
+        unit_type: "block",
+      }),
     onSuccess: (newBlock) => {
       invalidateAll();
       resetCreate();
@@ -219,6 +235,7 @@ export function useConsoleMutations({ farmId, selectedId, onSelect, onDeselect, 
       radiusM,
       code,
       name,
+      name_ar,
       sectorCount,
     }: {
       lat: number;
@@ -226,11 +243,13 @@ export function useConsoleMutations({ farmId, selectedId, onSelect, onDeselect, 
       radiusM: number;
       code: string;
       name: string;
+      name_ar: string | null;
       sectorCount: number;
     }) =>
       createPivot(farmId, {
         code,
         name: name || null,
+        name_ar,
         center: { lat, lon },
         radius_m: radiusM,
         sector_count: sectorCount,

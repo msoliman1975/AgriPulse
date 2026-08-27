@@ -413,8 +413,13 @@ function Console({ farmId }: { farmId: string }): ReactNode {
                 areaM2={m.pendingBlock.areaM2}
                 submitting={m.createBlockMut.isPending}
                 error={m.createBlockMut.isError ? t("create.createFailed") : null}
-                onSubmit={({ code, name }) =>
-                  m.createBlockMut.mutate({ polygon: m.pendingBlock!.polygon, code, name })
+                onSubmit={({ code, name, name_ar }) =>
+                  m.createBlockMut.mutate({
+                    polygon: m.pendingBlock!.polygon,
+                    code,
+                    name,
+                    name_ar,
+                  })
                 }
                 onCancel={m.resetCreate}
               />
@@ -427,13 +432,14 @@ function Console({ farmId }: { farmId: string }): ReactNode {
                 radiusM={m.pendingPivot.radiusM}
                 submitting={m.createPivotMut.isPending}
                 error={m.createPivotMut.isError ? t("create.createFailed") : null}
-                onSubmit={({ code, name, sector_count }) =>
+                onSubmit={({ code, name, name_ar, sector_count }) =>
                   m.createPivotMut.mutate({
                     lat: m.pendingPivot!.lat,
                     lon: m.pendingPivot!.lon,
                     radiusM: m.pendingPivot!.radiusM,
                     code,
                     name,
+                    name_ar,
                     sectorCount: sector_count,
                   })
                 }

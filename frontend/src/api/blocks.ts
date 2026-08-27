@@ -259,6 +259,8 @@ export async function bulkCreateBlocks(
 export interface PivotCreatePayload {
   code: string;
   name?: string | null;
+  /** Arabic display name for the rig row. Null falls back to `name`. */
+  name_ar?: string | null;
   center: { lat: number; lon: number };
   radius_m: number;
   sector_count: number;
