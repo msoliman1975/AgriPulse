@@ -42,6 +42,10 @@ export function useUpdateTenantUser() {
     mutationFn: ({ userId, payload }) => updateTenantUser(userId, payload),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["tenant_users"] });
+      // An admin editing themselves changes the name in the top bar, which
+      // reads /me. Without this the table updates and the header does not,
+      // which reads as a half-saved edit.
+      void qc.invalidateQueries({ queryKey: ["me"] });
     },
   });
 }
