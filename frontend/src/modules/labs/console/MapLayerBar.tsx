@@ -74,12 +74,6 @@ export function MapLayerBar({
         value={layers.borderOpacity}
         onChange={(v) => onLayersChange({ borderOpacity: v })}
       />
-      <MiniSlider
-        label={t("layerBar.fillOpacity")}
-        title={t("layers.fillOpacity")}
-        value={layers.fillOpacity}
-        onChange={(v) => onLayersChange({ fillOpacity: v })}
-      />
 
       <Rule />
 

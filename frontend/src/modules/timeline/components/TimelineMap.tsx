@@ -60,7 +60,6 @@ const AOI_SOURCE = "tl-aoi";
 const AOI_LINE = "tl-aoi-line";
 const BLOCK_SOURCE = "tl-blocks";
 const BLOCK_LINE = "tl-blocks-line";
-const BLOCK_HIGHLIGHT = "tl-blocks-highlight";
 const MARK_SOURCE = "tl-marks";
 const MARK_LAYER = "tl-marks-symbols";
 
@@ -205,20 +204,10 @@ export function TimelineMap({
       });
 
       map.addSource(BLOCK_SOURCE, { type: "geojson", data: emptyPolygons() });
-      // The highlight sits UNDER the outline so a lit block reads as a
-      // glow inside its own border rather than as a thicker border.
-      map.addLayer({
-        id: BLOCK_HIGHLIGHT,
-        type: "fill",
-        source: BLOCK_SOURCE,
-        paint: {
-          "fill-color": "#facc15",
-          // Driven by the feature's own `highlight`, so one source update
-          // per frame moves every block. A style recompile per frame would
-          // stall playback.
-          "fill-opacity": ["*", ["get", "highlight"], 0.28],
-        },
-      });
+      // No block fill. A lit block used to carry a yellow glow as well as a
+      // yellow border; the glow sat on top of the index raster and gave the
+      // reader two colours for one block. The border and the line width say
+      // the same thing without covering the pixels.
       map.addLayer({
         id: BLOCK_LINE,
         type: "line",
@@ -288,7 +277,7 @@ export function TimelineMap({
         fadeMs: now.fadeMs,
         cache: frameCacheRef,
         genRef: syncGenRef,
-        beforeLayerId: BLOCK_HIGHLIGHT,
+        beforeLayerId: BLOCK_LINE,
       });
 
       // And FRAME it. This is the whole of the auto-focus fix.
@@ -354,7 +343,7 @@ export function TimelineMap({
       fadeMs,
       cache: frameCacheRef,
       genRef: syncGenRef,
-      beforeLayerId: BLOCK_HIGHLIGHT,
+      beforeLayerId: BLOCK_LINE,
     });
   }, [rasterFrames, activeRasterKey, showPixels, fadeMs]);
 
@@ -425,5 +414,4 @@ function applyVisibility(map: MlMap, showBlocks: boolean, showFarmBoundary: bool
   };
   set(AOI_LINE, showFarmBoundary);
   set(BLOCK_LINE, showBlocks);
-  set(BLOCK_HIGHLIGHT, showBlocks);
 }

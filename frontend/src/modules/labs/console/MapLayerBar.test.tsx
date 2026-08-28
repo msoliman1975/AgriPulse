@@ -17,7 +17,6 @@ const LAYERS: LayerState = {
   borders: true,
   labels: true,
   borderOpacity: 0.6,
-  fillOpacity: 1,
   flags: true,
   flagsOpenOnly: true,
   signals: true,
@@ -95,10 +94,17 @@ describe("MapLayerBar", () => {
     expect(screen.queryByText(/no cells configured/i)).toBeNull();
   });
 
-  it("carries both opacity sliders, labelled with their percentage", () => {
-    renderBar({ borderOpacity: 0.6, fillOpacity: 1 });
+  it("carries the border opacity slider, labelled with its percentage", () => {
+    renderBar({ borderOpacity: 0.6 });
     expect(screen.getByRole("slider", { name: /Border opacity — 60%/ })).toBeInTheDocument();
-    expect(screen.getByRole("slider", { name: /Block fill opacity — 100%/ })).toBeInTheDocument();
+  });
+
+  // Blocks draw no fill any more, so the slider that set its opacity is
+  // gone. It was the one control on this bar that could make the map look
+  // broken — a reader who dragged it to 0 saw the health colours vanish.
+  it("has no block fill opacity slider", () => {
+    renderBar();
+    expect(screen.queryByRole("slider", { name: /fill/i })).toBeNull();
   });
 
   it("reports an opacity change as a 0..1 fraction", () => {

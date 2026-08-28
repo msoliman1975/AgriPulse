@@ -287,7 +287,14 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               blockLabelProperty={c.layers.labelField === "crop" ? "crop_label" : "name"}
               showAlerts={c.layers.alerts}
               borderOpacity={c.layers.borderOpacity}
-              blockFillOpacity={c.layers.fillOpacity}
+              // Block fills are off. The health tint sat on top of the
+              // index raster and said something different from it, so the
+              // reader had two colours for one block and no way to tell
+              // which one to believe. The border and the label carry the
+              // block; the pixels carry the reading. The layer stays at
+              // zero opacity rather than being removed because it is the
+              // click target that opens a block.
+              blockFillOpacity={0}
               // The pixels ARE the reading; the cells are reference lines
               // drawn over them, so their fill goes whenever pixels are up.
               pixelLayers={c.showPixels ? c.pixels.layers : null}
