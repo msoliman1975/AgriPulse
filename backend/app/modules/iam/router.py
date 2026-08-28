@@ -5,14 +5,14 @@ from __future__ import annotations
 from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import APIError
 from app.modules.iam.field_enrolment import get_field_enrolment_service
-from app.modules.iam.my_work import list_my_work
+from app.modules.iam.my_work import WorkState, list_my_work
 from app.modules.iam.notification_prefs import (
     UnknownChannelError,
     read_preferences,
@@ -249,6 +249,14 @@ async def patch_my_notification_preferences(
 )
 async def get_my_work(
     farm_id: UUID | None = None,
+    # "open" or "closed", and not a free status list: the client asking this
+    # question is a Done tab, which wants "what did I finish", not "which of
+    # eight status strings is set". Cancelled and declined work is in neither
+    # answer — see `_CLOSED_VISIT_STATUSES`.
+    state: WorkState = Query(
+        default="open",
+        description="Open work (the default), or work this person has finished.",
+    ),
     # No capability gate: every row returned is one where the caller IS the
     # assignee. Requiring one would defeat the purpose — a Scout holds no
     # `plan_activity.complete`, so gating on it would hide from them exactly
@@ -272,6 +280,7 @@ async def get_my_work(
         user_id=context.user_id,
         tenant_id=tenant_id,
         farm_id=farm_id,
+        state=state,
     )
 
 

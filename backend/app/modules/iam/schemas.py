@@ -338,3 +338,10 @@ class WorkItemResponse(BaseModel):
     # named one. It is what turns "go and look" into "record these three
     # things". Null on board work, which carries no template.
     template_id: UUID | None = None
+    # When this was closed, for both kinds. Null on anything still open.
+    #
+    # It arrives on the open feed too, always null there, rather than only on
+    # the closed one. One response shape for one endpoint: a field that appears
+    # and disappears with a query parameter is the kind of thing a typed client
+    # marks optional and then reads as undefined for ever.
+    completed_at: str | None = None

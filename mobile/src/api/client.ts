@@ -133,7 +133,9 @@ export interface WorkItem {
    *  now holds work from every farm a scout is granted at once, so the farm is
    *  part of what a row *is*, not a global setting it was fetched under. */
   farm_name?: string | null;
-  /** Closure time, carried across from the visit. Board work has none. */
+  /** When it was closed, sent by the API for BOTH kinds, and null on
+   *  anything still open. This used to be client-filled and visit-only, which
+   *  is why finished board work had no date to group under. */
   completed_at?: string | null;
   /** Zone count, spread and streak. `/me/work` does not send these either, so
    *  the Tasks list joins them on from the visit list. Board work has none. */
@@ -148,8 +150,18 @@ export interface WorkItem {
  * was structurally invisible here: the scout saw an empty list while their
  * name sat on the activities.
  */
-export function listMyWork(farmId: string) {
-  return request<WorkItem[]>(`/me/work?farm_id=${encodeURIComponent(farmId)}`);
+/**
+ * Work this person has finished, as opposed to work they still owe.
+ *
+ * The same endpoint and the same shape, because it is the same question asked
+ * about the other end of the day. `open` is the default server-side, so an
+ * omitted state cannot silently mean "everything".
+ */
+export type WorkState = "open" | "closed";
+
+export function listMyWork(farmId: string, state: WorkState = "open") {
+  const q = new URLSearchParams({ farm_id: farmId, state });
+  return request<WorkItem[]>(`/me/work?${q}`);
 }
 
 export function listVisits(
