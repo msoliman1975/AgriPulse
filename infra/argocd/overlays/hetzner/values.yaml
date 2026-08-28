@@ -3577,7 +3577,34 @@ global:
       #   this tag alone back to df7dc1e, and an Arabic name already typed
       #   stays in the column and still displays -- the readers shipped
       #   two promotes ago.
-      tag: "f785edf"
+      # 636fd73 = #627, the Farm Console says when the cell mesh is not on
+      #   the day the date strip is parked on.
+      #
+      #   `GET /farms/{id}/grid-cells?at=` answers with the newest cell
+      #   reading AT OR BEFORE the selected instant. A day with no cell
+      #   rows comes back holding an OLDER day's numbers. They render
+      #   normally and nothing on the map said they belonged to another
+      #   day. Found on Mango Republic: every date the reader picked
+      #   showed the same value, "as of Jul 23" 2025, because the cell
+      #   backfill had only replayed that far while the strip offered days
+      #   into 2026-08. The rasters were current, the cells were 13 months
+      #   behind, and the only clue was the "as of" line inside the cell
+      #   popup.
+      #
+      #   A strip above the date bar now names both days, plus a second
+      #   sentence when blocks resolve to more than one day. It stays
+      #   quiet while the mesh is refetching -- the previous day's cells
+      #   are held on screen during a date change -- and on "latest" it
+      #   compares against the newest day with a computed raster, so a
+      #   cloudy last pass is not reported as a gap.
+      #
+      #   FRONTEND ONLY. It reads `time` and `computed_count`, both long
+      #   since served, so it asks nothing new of the api. The api and
+      #   workers stay on f785edf.
+      #
+      #   NO MIGRATION. Rollback is this tag alone back to f785edf and
+      #   leaves nothing behind.
+      tag: "636fd73"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
