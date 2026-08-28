@@ -23,7 +23,13 @@ pytestmark = [pytest.mark.integration, pytest.mark.usefixtures("_no_rate_limit")
 
 
 def _email(prefix: str) -> str:
-    return f"{prefix}@{prefix}-{uuid4().hex[:8]}.test"
+    """A unique address on a domain `email-validator` accepts.
+
+    Not `.test`: it is a reserved special-use TLD and EmailStr refuses it,
+    so every signup came back 422 before the endpoint ran. `.example.com`
+    is reserved for documentation and parses.
+    """
+    return f"{prefix}@{prefix}-{uuid4().hex[:8]}.example.com"
 
 
 def _payload(email: str, **overrides: object) -> dict[str, object]:
@@ -172,7 +178,7 @@ async def test_verify_routes_a_known_company_to_its_administrator(
     """The rule that stops a company ending up with two tenants."""
     from app.modules.tenancy import get_tenant_service
 
-    domain = f"already-{uuid4().hex[:8]}.test"
+    domain = f"already-{uuid4().hex[:8]}.example.com"
     service = get_tenant_service(admin_session)
     await service.create_tenant(
         slug=f"known-{uuid4().hex[:8]}",

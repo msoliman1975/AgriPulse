@@ -106,18 +106,28 @@ def upgrade() -> None:
         sa.Column("source_ip", sa.Text(), nullable=True),
         sa.Column("user_agent", sa.Text(), nullable=True),
         sa.Column("chase_email_sent_at", sa.DateTime(timezone=True), nullable=True),
+        # The five TimestampedMixin columns. The model inherits the mixin, so
+        # every SELECT it builds names all five — a table missing any of them
+        # fails at query time, not at migration time.
+        #
+        # `created_by` stays NULL for every trial signup: the row is written by
+        # an anonymous visitor, and the named actor appears on `reviewed_by`
+        # when a platform admin decides it.
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
             nullable=False,
             server_default=sa.text("now()"),
         ),
+        sa.Column("created_by", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
             nullable=False,
             server_default=sa.text("now()"),
         ),
+        sa.Column("updated_by", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint(
             "status IN (" + ", ".join(f"'{s}'" for s in _STATUSES) + ")",
             # Full name, matching every other migration in this tree.

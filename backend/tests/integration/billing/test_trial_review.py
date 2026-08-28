@@ -49,8 +49,8 @@ async def _queued_signup(session: AsyncSession, *, status: str = "awaiting_appro
         ),
         {
             "status": status,
-            "email": f"person@{suffix}.test",
-            "domain": f"{suffix}.test",
+            "email": f"person@{suffix}.example.com",
+            "domain": f"{suffix}.example.com",
             "org": f"Org {suffix}",
             "handle": f"h-{suffix}",
         },
