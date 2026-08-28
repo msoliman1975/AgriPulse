@@ -47,6 +47,7 @@ import { blockCentroidsFromGeojson, buildSignalOverlay } from "../map/signalOver
 import { cropLabel } from "../mapnext/dockFormat";
 import { griddedBlocks } from "../mapnext/gridOverlay";
 import { isThermalIndex, LAST_FARM_KEY } from "../mapnext/constants";
+import { cellDateGap } from "./cellDateGap";
 import { CONSOLE_QK } from "./constants";
 import { asOfInstant, scenesWithin, TIMELINE_DEFAULT_DAYS } from "./timelineWindow";
 import { classify } from "./indexClasses";
@@ -477,6 +478,24 @@ export function useFarmConsole(farmId: string) {
     [farmGridQ.data],
   );
 
+  /**
+   * The day the mesh is really drawn from, when that is not the day on the
+   * strip. Null when the two agree, which is the ordinary case.
+   *
+   * Read from the cells already in hand, so it cannot disagree with what is
+   * on screen. See cellDateGap.ts for why the two can differ at all.
+   */
+  const cellDateGapNow = useMemo(() => {
+    if (!showGrid) return null;
+    return cellDateGap({
+      cellTimes: (farmGridQ.data ?? []).flatMap((g) =>
+        g.cells.filter((c) => c.mean !== null).map((c) => c.time),
+      ),
+      sceneDate,
+      scenes,
+    });
+  }, [showGrid, farmGridQ.data, sceneDate, scenes]);
+
   // Worst-N (lowest mean) cells → outline on the map.
   const highlightedCellIds = useMemo<string[]>(() => {
     if (!showGrid) return [];
@@ -848,6 +867,7 @@ export function useFarmConsole(farmId: string) {
     cropLabelsQ,
     cellMeta,
     farmHasCellReadings,
+    cellDateGap: cellDateGapNow,
     highlightedCellIds,
     selectedCellBaseline,
     cellItemsByCell,

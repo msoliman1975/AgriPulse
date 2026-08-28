@@ -416,6 +416,10 @@
     "noFarmReadings": "No cell readings for this farm yet",
     "noFarmReadingsHint": "The zones are drawn, but no scene has been measured on them. Re-run the index backfill for this farm."
   },
+  "cellDate": {
+    "gap": "Sub-block cells are from {{drawn}}, not {{wanted}}. No cell readings are stored for {{wanted}} yet, so the map draws the most recent day that has them.",
+    "mixed": "Blocks are not all on the same day: {{count}} days are drawn."
+  },
   "sparkline": {
     "notEnough": "Not enough data for a trend."
   },
