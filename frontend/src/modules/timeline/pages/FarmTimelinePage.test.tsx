@@ -188,6 +188,20 @@ vi.mock("@/api/timeline", async (importOriginal) => {
     })),
   };
 });
+// The catalog is what tells the legend that `lst` reads in degrees. Real
+// here would be an XHR jsdom cannot serve, and the legend would silently
+// fall back to the dimensionless case — which is exactly the drift the
+// unit is read rather than hardcoded to avoid.
+vi.mock("@/api/indices", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/api/indices")>();
+  return {
+    ...actual,
+    getIndexCatalog: vi.fn(async () => [
+      { code: "ndvi", unit: "" },
+      { code: "lst", unit: "°C" },
+    ]),
+  };
+});
 vi.mock("@/config/ConfigContext", () => ({
   useOptionalConfig: () => ({
     config: { tile_server_base_url: "https://tiles.test", s3_bucket: "bucket" },
@@ -486,5 +500,40 @@ describe("FarmTimelinePage", () => {
     seekTo("2026-06-03");
     const omitted = await screen.findByText(/your role cannot read them/i);
     expect(within(omitted).getByText(/Recommendation/i)).toBeDefined();
+  });
+  // ---- the colour key ---------------------------------------------------
+  //
+  // The map paints classes from `indexClasses.ts` and the legend reads the
+  // same table, so what these assert is the wiring: that the panel is on
+  // the screen, that it follows the index picker, and that it goes away
+  // with the layer it describes.
+
+  it("names the colour classes of the index on the map", async () => {
+    await renderAtFixtureWindow();
+    const legend = await screen.findByTestId("timeline-legend");
+    expect(within(legend).getByText("NDVI")).toBeInTheDocument();
+    expect(within(legend).getByText("Dense canopy")).toBeInTheDocument();
+    expect(within(legend).getByText("Bare soil")).toBeInTheDocument();
+    // The boundary numbers, not just the words. NDVI's dense class runs
+    // 0.60 to 0.80, and the range must read low-to-high left to right.
+    expect(within(legend).getByText("0.60 – 0.80")).toBeInTheDocument();
+  });
+
+  it("switches the whole key when the index switches", async () => {
+    await renderAtFixtureWindow();
+    fireEvent.change(screen.getByLabelText("Index"), { target: { value: "lst" } });
+    const legend = await screen.findByTestId("timeline-legend");
+    await waitFor(() => expect(within(legend).getByText("LST")).toBeInTheDocument());
+    // A different vocabulary, a different scale, and the catalog's unit.
+    expect(within(legend).getByText(/Very hot/)).toBeInTheDocument();
+    expect(within(legend).getByText("°C")).toBeInTheDocument();
+    expect(within(legend).queryByText("Dense canopy")).not.toBeInTheDocument();
+  });
+
+  it("takes the key away with the pixels it describes", async () => {
+    await renderAtFixtureWindow();
+    expect(await screen.findByTestId("timeline-legend")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Index pixels"));
+    await waitFor(() => expect(screen.queryByTestId("timeline-legend")).not.toBeInTheDocument());
   });
 });

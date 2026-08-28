@@ -23,6 +23,7 @@ import { ImageDateCaption } from "../components/ImageDateCaption";
 import { Scrubber } from "../components/Scrubber";
 import { TimelineControls } from "../components/TimelineControls";
 import { TimelineLayerBar } from "../components/TimelineLayerBar";
+import { TimelineLegend } from "../components/TimelineLegend";
 import { TimelineMap, type BlockFeatureProps } from "../components/TimelineMap";
 import {
   BASE_FPS,
@@ -188,6 +189,25 @@ export function FarmTimelinePage(): ReactNode {
             onMarkClick={tl.setFocusedEventId}
           />
           <ImageDateCaption imageDay={tl.imageDay} formatDay={formatDay} />
+
+          {/* The colour key, under the date caption and sharing its
+              column so the two cannot overlap at any map height.
+
+              Physically end-side and top, matching the caption: MapLibre's
+              own furniture does not mirror, and top-left is the zoom
+              buttons in both directions.
+
+              Only when the pixels are on. The replay paints no block fill
+              by class, so with the layer off this panel would describe
+              nothing that is on the map. */}
+          {layers.pixels ? (
+            <div className="pointer-events-none absolute bottom-10 right-3 top-14 z-10 flex flex-col items-end">
+              <TimelineLegend
+                code={index}
+                className="pointer-events-auto min-h-0 w-[248px] flex-shrink overflow-y-auto bg-ap-panel/95"
+              />
+            </div>
+          ) : null}
         </div>
 
         <div className="hidden min-h-0 w-96 shrink-0 lg:block">

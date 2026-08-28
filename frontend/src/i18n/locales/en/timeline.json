@@ -14,6 +14,11 @@
     "blocks": "Block borders",
     "omitted": "Your role cannot read this kind."
   },
+  "legend": {
+    "title": "Colour key",
+    "expand": "Show the colour key",
+    "collapse": "Hide the colour key"
+  },
   "controls": {
     "scope": "Scope",
     "wholeFarm": "Whole farm",
