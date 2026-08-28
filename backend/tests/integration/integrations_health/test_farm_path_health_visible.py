@@ -305,8 +305,11 @@ async def test_the_later_of_the_two_paths_wins_the_last_sync(
 
     row = await _farm_health(admin_session, schema)
     assert abs((row["weather_last_sync_at"] - fresh).total_seconds()) < 1
-    # Both rows are real subscriptions and both are counted.
-    assert row["weather_active_subs"] == 2
+    # 0088: only the row that fetches is counted. The block row stopped
+    # being polled at the cut-over, so counting it read "37 active weather
+    # subscriptions" on a farm where one thing fetches. See
+    # test_block_health_sees_farm_path.py.
+    assert row["weather_active_subs"] == 1
     # 0085: the abandoned block row is NOT overdue. Nothing polls it any
     # more — `list_due_farm_provider_pairs` skips a block row once its farm
     # has an active farm row for the same provider — so its watermark can

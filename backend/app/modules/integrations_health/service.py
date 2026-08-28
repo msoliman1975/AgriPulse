@@ -1,7 +1,8 @@
 """Read-only integration health service.
 
 Queries the `v_farm_integration_health` / `v_block_integration_health`
-views (created by tenant migration 0019 + extended in 0022) and the
+views (created by tenant migration 0019, extended in 0022, and rebuilt in
+0088 so both of them read the farm acquisition path) and the
 `v_integration_recent_attempts` union view (added in 0022). All views
 run in the tenant schema — the caller is expected to set search_path
 before invocation, which is what `requires_capability` already arranges
@@ -10,7 +11,7 @@ via the auth middleware.
 
 from __future__ import annotations
 
-from datetime import UTC
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -159,8 +160,11 @@ class IntegrationsHealthService:
         the same row's most recent attempt) — that's fine; the UI groups
         by state and shows the row once per group.
 
-        Stuck-threshold is in minutes, defaulting to 30. Callers expose
-        this via `platform_defaults` in PR-IH4+; for now it's a kwarg.
+        Every threshold is a keyword argument with no policy of its own.
+        The routers pass `integration_health_stuck_minutes`,
+        `weather_default_cadence_hours` and `imagery_default_cadence_hours`
+        from settings. The defaults below match those settings and exist so
+        a test can call this method with one argument.
         """
         rows: list[dict[str, Any]] = []
         wants_weather = kind is None or kind == "weather"
@@ -269,19 +273,16 @@ class IntegrationsHealthService:
                 .mappings()
                 .all()
             )
-            stuck_cutoff_sql = "EXTRACT(EPOCH FROM (now() - wa.started_at)) / 60 >= :stuck_minutes"
             for x in r:
                 d = dict(x)
-                # Determine state per row in Python — re-running the query
-                # twice for stuck vs not-stuck is wasteful.
-                from datetime import datetime as _dt
-
-                age_min = (_dt.now(UTC) - d["since"]).total_seconds() / 60
+                # Determine state per row in Python. Running the query twice,
+                # once for stuck and once for not-stuck, would read the same
+                # rows twice to split them on a clock.
+                age_min = (datetime.now(UTC) - d["since"]).total_seconds() / 60
                 row_state = "stuck" if age_min >= stuck_minutes else "running"
                 if state is None or state == row_state:
                     d.update({"kind": "weather", "state": row_state})
                     rows.append(d)
-            _ = stuck_cutoff_sql  # silence unused-var warning
 
         # --- Imagery --------------------------------------------------
         if wants_imagery and (state is None or state == "overdue"):
@@ -438,9 +439,7 @@ class IntegrationsHealthService:
             )
             for x in r:
                 d = dict(x)
-                from datetime import datetime as _dt
-
-                age_min = (_dt.now(UTC) - d["since"]).total_seconds() / 60
+                age_min = (datetime.now(UTC) - d["since"]).total_seconds() / 60
                 row_state = "stuck" if age_min >= stuck_minutes else "running"
                 if state is None or state == row_state:
                     d.update({"kind": "imagery", "state": row_state})

@@ -6,7 +6,7 @@ import { Card } from "@/components/Card";
 import { Pill, type PillKind } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
-import { useIntegrationQueue } from "@/queries/integrationsHealth";
+import { useIntegrationQueue, useQueueConfig } from "@/queries/integrationsHealth";
 import type { QueueEntry, QueueState } from "@/api/integrationsHealth";
 
 export interface QueueTabProps {
@@ -20,6 +20,11 @@ export interface QueueTabProps {
  */
 export function QueueTab({ basePath }: QueueTabProps): ReactNode {
   const { t } = useTranslation("integrationsHealth");
+
+  // The caption under the Stuck column names a threshold, so it reads the
+  // one the scan actually used instead of repeating a number.
+  const configQ = useQueueConfig(basePath);
+  const stuckMinutes = configQ.data?.stuck_minutes ?? null;
 
   const runningQ = useIntegrationQueue(undefined, "running", basePath);
   const overdueQ = useIntegrationQueue(undefined, "overdue", basePath);
@@ -47,7 +52,9 @@ export function QueueTab({ basePath }: QueueTabProps): ReactNode {
         rows={stuckQ.data ?? []}
         isLoading={stuckQ.isLoading}
         isError={stuckQ.isError}
-        footer={t("queue.stuckThreshold", { minutes: 30 })}
+        footer={
+          stuckMinutes === null ? undefined : t("queue.stuckThreshold", { minutes: stuckMinutes })
+        }
       />
     </div>
   );

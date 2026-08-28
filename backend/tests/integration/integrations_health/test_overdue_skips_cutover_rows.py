@@ -127,8 +127,9 @@ async def test_a_block_weather_row_superseded_by_a_farm_row_is_not_overdue(
 
     row = await _health(admin_session, schema)
     assert int(row["weather_overdue_count"]) == 0
-    # The block row is still a subscription; only the overdue verdict changes.
-    assert int(row["weather_active_subs"]) == 2
+    # 0088: the abandoned block row is no longer counted either. Nothing
+    # polls it, so it is not one of the things fetching for this farm.
+    assert int(row["weather_active_subs"]) == 1
 
 
 @pytest.mark.asyncio

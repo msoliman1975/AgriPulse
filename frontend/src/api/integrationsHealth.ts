@@ -135,6 +135,26 @@ export interface QueueParams {
   stuck_minutes?: number;
 }
 
+/**
+ * The thresholds the queue scan ran with.
+ *
+ * Read rather than assumed. The stuck caption used to print a literal 30
+ * while the server used its own literal 30, so a settings change would have
+ * left the caption naming a threshold nothing used.
+ */
+export interface IntegrationHealthConfig {
+  stuck_minutes: number;
+  weather_default_cadence_hours: number;
+  imagery_default_cadence_hours: number;
+}
+
+export async function readQueueConfig(basePath: string = "/v1"): Promise<IntegrationHealthConfig> {
+  const { data } = await apiClient.get<IntegrationHealthConfig>(
+    `${basePath}/integrations/health/queue/config`,
+  );
+  return data;
+}
+
 export async function listQueue(
   params: QueueParams = {},
   basePath: string = "/v1",

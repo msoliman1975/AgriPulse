@@ -10,6 +10,7 @@ import {
   listQueue,
   listRecentAttempts,
   listRecentProbes,
+  readQueueConfig,
   type AttemptKind,
   type AttemptStatus,
   type QueueState,
@@ -75,6 +76,15 @@ export function useIntegrationQueue(
     queryFn: () => listQueue({ kind, state }, basePath),
     refetchInterval: REFETCH_MS,
     staleTime: REFETCH_MS / 2,
+  });
+}
+
+export function useQueueConfig(basePath: string = "/v1") {
+  return useQuery({
+    queryKey: ["integrations", "health", "queue", "config", basePath] as const,
+    queryFn: () => readQueueConfig(basePath),
+    // Settings change on a deploy, not while a tab is open.
+    staleTime: 10 * 60_000,
   });
 }
 
