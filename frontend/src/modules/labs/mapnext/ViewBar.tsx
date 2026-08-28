@@ -24,7 +24,6 @@ export interface LayerState {
   borders: boolean;
   labels: boolean;
   borderOpacity: number;
-  fillOpacity: number;
   // Field flags. ON by default: a layer nobody knows about is a layer nobody
   // uses, and the whole point of a flag is that somebody sees it.
   flags: boolean;
@@ -306,11 +305,6 @@ export function ViewBar({
           label={t("layers.borderOpacity")}
           value={layers.borderOpacity}
           onChange={(v) => onLayersChange({ borderOpacity: v })}
-        />
-        <Slider
-          label={t("layers.fillOpacity")}
-          value={layers.fillOpacity}
-          onChange={(v) => onLayersChange({ fillOpacity: v })}
         />
         {/* The legend lives here rather than behind its own chip: this is
             already the menu holding the switches for the very layers it

@@ -112,7 +112,6 @@ function Console({ farmId }: { farmId: string }): ReactNode {
     borders: true,
     labels: true,
     borderOpacity: 0.6,
-    fillOpacity: 1,
     // On by default — a flag exists to be seen. `flagsOpenOnly` starts off so
     // the first look shows everything the farm has, including what was
     // recently dealt with.
@@ -805,7 +804,14 @@ function Console({ farmId }: { farmId: string }): ReactNode {
               showBlockBorders={layers.borders}
               showBlockLabels={layers.labels}
               borderOpacity={layers.borderOpacity}
-              blockFillOpacity={layers.fillOpacity}
+              // Block fills are off. The health tint sat on top of the
+              // index raster and said something different from it, so the
+              // reader had two colours for one block and no way to tell
+              // which one to believe. The border and the label carry the
+              // block; the pixels carry the reading. The layer stays at
+              // zero opacity rather than being removed because it is the
+              // click target that opens a block.
+              blockFillOpacity={0}
               gridCells={gridCellsFc}
               gridIndexCode={activeIndex}
               highlightedCellIds={highlightedCellIds}

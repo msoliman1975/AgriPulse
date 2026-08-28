@@ -137,7 +137,6 @@ describe.each(LOCALES)("farmConsole legend copy (%s)", (_lang, bundle) => {
       "layerBar.cellsUnavailable",
       "layerBar.cellsUnavailableShort",
       "layerBar.borderOpacity",
-      "layerBar.fillOpacity",
       "layerBar.showLabels",
       "layerBar.labelName",
       "layerBar.labelCrop",
@@ -151,6 +150,13 @@ describe.each(LOCALES)("farmConsole legend copy (%s)", (_lang, bundle) => {
   it("has no copy left over from the deleted map dock and layer cards", () => {
     expect(lookup(bundle, "mapDock")).toBeUndefined();
     expect(lookup(bundle, "layerCards")).toBeUndefined();
+  });
+
+  // The block fill slider is gone and blocks draw no fill, so its label is
+  // copy for a control nobody can reach.
+  it("has no copy left over from the deleted fill opacity slider", () => {
+    expect(lookup(bundle, "layerBar.fillOpacity")).toBeUndefined();
+    expect(lookup(bundle, "layers.fillOpacity")).toBeUndefined();
   });
 });
 

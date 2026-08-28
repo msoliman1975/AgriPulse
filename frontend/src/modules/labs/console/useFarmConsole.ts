@@ -126,7 +126,6 @@ export function useFarmConsole(farmId: string) {
     borders: true,
     labels: true,
     borderOpacity: 0.6,
-    fillOpacity: 1,
     // Both consoles share ViewBar, so both must actually serve the toggle it
     // draws. Wiring only one would leave a control here that does nothing —
     // the exact drift that let cell size go missing from a console before.
