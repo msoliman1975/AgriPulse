@@ -138,6 +138,8 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     from app.modules.action_center.router import router as action_center_router
     from app.modules.alerts.router import router as alerts_router
     from app.modules.backfill.router import router as backfill_router
+    from app.modules.billing.public_router import router as public_trial_router
+    from app.modules.billing.trials_router import router as platform_trials_router
     from app.modules.farms.blocks_summary_router import router as farms_blocks_summary_router
     from app.modules.farms.config_router import router as farms_config_router
     from app.modules.farms.router import router as farms_router
@@ -203,6 +205,11 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     from app.modules.weather.router import router as weather_router
     from app.shared.eventbus import get_default_bus
 
+    # The one unauthenticated router. Its prefix is also registered in
+    # `app.shared.auth.middleware._PUBLIC_PREFIXES` — mounting it here
+    # without that entry would give every call a 401.
+    app.include_router(public_trial_router)
+    app.include_router(platform_trials_router)
     app.include_router(backfill_router)
     app.include_router(purge_router)
     app.include_router(iam_router)

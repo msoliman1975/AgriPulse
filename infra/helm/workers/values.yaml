@@ -68,6 +68,20 @@ env:
   SMTP_FROM: "AgriPulse <admin@agripulse.tech>"
   # Origin the SPA is served from. See api/values.yaml.
   APP_BASE_URL: "https://app.{{ .Values.global.envHost }}"
+  # --- Self-serve trial (PR #631) --------------------------------------
+  # Three origins the trial emails and the verify redirect are built from.
+  # They are separate on purpose: the verification link must point at the
+  # API, because `app.<envHost>/api/*` serves the SPA and a link built from
+  # the app origin would return HTML and verify nothing.
+  TRIAL_API_BASE_URL: "https://api.{{ .Values.global.envHost }}"
+  TRIAL_APP_BASE_URL: "https://app.{{ .Values.global.envHost }}"
+  # The marketing site, which hosts the form and the status page. Its own
+  # origin, not a subdomain of envHost — it is served by Cloudflare Workers.
+  TRIAL_MARKETING_BASE_URL: "https://{{ .Values.global.envHost }}"
+  # TURNSTILE_SECRET_KEY is deliberately absent. Empty means the anti-robot
+  # check passes and logs that it did, which is right until the marketing
+  # form exists — nothing can reach the endpoint from a browser yet. It must
+  # be set, via a secret, in the same change that ships the form.
   # Sentinel Hub OAuth client_id — see api/values.yaml for rationale.
   # Must be set in the per-env overlay alongside the SENTINEL_HUB_CLIENT_SECRET
   # crossRef; both halves are required or imagery.discover_scenes writes the

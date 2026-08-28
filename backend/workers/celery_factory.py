@@ -68,6 +68,9 @@ _TASK_PACKAGES: tuple[str, ...] = (
     # Platform-admin hard delete. Only large purges reach a worker; small
     # ones run inline in the request.
     "app.modules.purge.tasks",
+    # Self-serve trial provisioning, and the chase mail for a request that
+    # has waited a working day with no decision.
+    "app.modules.billing.tasks",
 )
 
 

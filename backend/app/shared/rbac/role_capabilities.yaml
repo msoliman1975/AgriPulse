@@ -44,6 +44,10 @@ roles:
       - analytics.read
       - tenant.read_integration_health
       - platform.observe_pipeline
+      # Support sees the trial queue so it can answer "where is my
+      # workspace". Acting on a row needs platform.trial.manage, which
+      # support does not have.
+      - platform.trial.read
 
   # ---- Tenant-scoped --------------------------------------------------
 

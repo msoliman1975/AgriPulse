@@ -409,6 +409,20 @@ TENANT_PUBLIC_OWNED: tuple[OwnedTable, ...] = (
         note="tenant-authored trees; decision_tree_versions cascades off this",
     ),
     OwnedTable("backfill_runs", owner_column="tenant_id", schema="public", order=10, fk=False),
+    # The trial signup that created this tenant (public migration 0078). It
+    # holds the person's name, work address and phone, so a purge that leaves
+    # it behind leaves their personal data behind. Rows with tenant_id NULL —
+    # rejected, expired, or routed to an existing tenant — never belonged to a
+    # tenant and are untouched, which the owner column expresses by
+    # construction.
+    OwnedTable(
+        "trial_signups",
+        owner_column="tenant_id",
+        schema="public",
+        order=10,
+        fk=False,
+        note="carries the requester's personal data; must not survive the tenant",
+    ),
     # The signals catalog gained a platform tier (public migration 0052 /
     # tenant 0063): definitions and templates moved out of the tenant schema
     # into `public`, discriminated by a nullable tenant_id. They are listed
