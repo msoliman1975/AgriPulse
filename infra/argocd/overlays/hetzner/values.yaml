@@ -3226,10 +3226,50 @@ global:
     #   After the sync, watch: the scout visit list keeps returning rows for
     #   block-scoped visits. If the LEFT JOIN were wrong the list would go
     #   empty for most scouts, with a 200 and no error.
+    # 2026-08-28 - 7017a97 = #632, the scout app's Done tab could not show
+    #   finished board work, and on a board-scheduled farm that means it was
+    #   empty every single time.
+    #
+    #   Three lists, and only two of them merged the two kinds of work:
+    #     My work   -> /me/work         both kinds, OPEN only
+    #     Available -> scouting visits
+    #     Done      -> scouting visits, status=completed
+    #   So an activity a scout finished left My work by being closed, and Done
+    #   never asked for it. It appeared on no screen. Nothing failed and
+    #   nothing logged; the rows were written correctly the whole time and no
+    #   read returned them.
+    #
+    #   Found on prod before the fix was written: the tenant the app signs in
+    #   to holds 0 scouting visits and 3 completed plan_activities, two of them
+    #   the Scout's own, one finished at 07:07 that morning.
+    #
+    #   The API half: `/me/work` gains `state=open|closed` (open is the
+    #   default, so every existing caller is unchanged) and now returns
+    #   `completed_at` for both kinds on BOTH feeds, null on open work.
+    #   "closed" means "I finished it", not "no longer open" - cancelled,
+    #   declined and expired are in neither feed.
+    #
+    #   NO MIGRATION, and the only backend code between f785edf and 7017a97 is
+    #   this PR's three files. #630 in the same range is a Helm values change,
+    #   not an image one. Rollback really is these two tags back to f785edf.
+    #
+    #   FRONTEND UNCHANGED, deliberately: the web app does not call /me/work.
+    #   It stays where the two frontend promotes in this range left it.
+    #
+    #   CI on the merge: integration 1147 passed / 4 skipped, and
+    #   tests/integration/scouting/test_my_work.py ran 8, the 3 new ones
+    #   included. Read from the job log - that job is continue-on-error.
+    #
+    #   Image pulled on the node before this edit: `k3s crictl pull
+    #   ghcr.io/msoliman1975/agripulse/api:7017a97` succeeded.
+    #
+    #   After the sync, watch: `/me/work` with no `state` still returns the
+    #   same open rows it did before. A regression there would empty the main
+    #   Tasks list, which is a far worse failure than the one being fixed.
     api:
-      tag: "f785edf"
+      tag: "7017a97"
     workers:
-      tag: "f785edf"
+      tag: "7017a97"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
