@@ -253,4 +253,13 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.weather_reap_stale_attempts_seconds),
         "options": {"queue": "light"},
     },
+    # The trial queue promises a decision within one working day. This is
+    # what keeps that promise visible: anyone still waiting after 24 hours
+    # gets a message saying so, once. Without it a quiet queue looks the
+    # same to the visitor as a lost request.
+    "billing.chase_unreviewed_trials": {
+        "task": "billing.chase_unreviewed_trials",
+        "schedule": float(_settings.trial_chase_sweep_seconds),
+        "options": {"queue": "light"},
+    },
 }

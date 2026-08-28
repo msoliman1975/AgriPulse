@@ -67,6 +67,8 @@ export type Capability =
   | "platform.purge_data"
   | "platform.read"
   | "platform.run_backfill"
+  | "platform.trial.manage"
+  | "platform.trial.read"
   | "platform.run_tasks"
   | "recommendation.act"
   | "recommendation.read"
@@ -131,6 +133,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan_template.read",
     "platform.observe_pipeline",
     "platform.read",
+    "platform.trial.read",
     "recommendation.read",
     "signal.read",
     "subscription.read",

@@ -555,6 +555,67 @@ class Settings(BaseSettings):
     # every environment that does not host simulation runs.
     notification_sink_tenant_prefix: str = ""
 
+    # --- Self-serve trial -------------------------------------------------
+    # Every number here is configuration on purpose. A price, a cap or a
+    # trial length compiled into the image cannot be changed without a
+    # release, and the roadmap gate says grepping the image for one must
+    # find nothing.
+    #
+    # Where the visitor is sent. The verification link and the status page
+    # live on the marketing site; the set-password link goes to the app.
+    trial_marketing_base_url: str = "http://localhost:4321"
+    trial_app_base_url: str = "http://localhost:5173"
+    #: The API's own public origin. The verification link points here, not
+    #: at the SPA host — `app.agripulse.cloud/api/*` serves the SPA, so a
+    #: link built from the app URL would return HTML and verify nothing.
+    trial_api_base_url: str = "http://localhost:8000"
+    #: Days from provisioning to read-only.
+    trial_length_days: int = 30
+    #: Hours a verification link stays usable.
+    trial_verification_ttl_hours: int = 48
+    #: Entitlement caps written onto the trial term at provisioning.
+    trial_max_area_feddan: int = 100
+    trial_max_farms: int = 2
+    trial_max_seats: int = 5
+    #: Approval caps. Approve is refused past these unless an admin
+    #: overrides with a reason, which is audited.
+    trial_approvals_per_day: int = 3
+    trial_approvals_per_week: int = 10
+    #: Public-endpoint rate limits. Signups, not tenants — these protect
+    #: the queue and the mail sender, not the database.
+    #: How often the chase sweep runs. Hourly: the mail it sends is keyed
+    #: on a 24-hour wait, so the sweep only needs to be finer than that.
+    trial_chase_sweep_seconds: int = 3600
+    trial_signups_per_ip_per_hour: int = 5
+    trial_signups_per_domain_per_day: int = 3
+    #: Cloudflare Turnstile. Empty secret disables the check, which is what
+    #: a dev stack and the test suite run with. A cluster env must set it.
+    turnstile_secret_key: str = ""
+    turnstile_verify_url: str = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+    turnstile_timeout_seconds: float = 5.0
+    #: Domains that never reach the queue. Comma-separated in the env var.
+    trial_disposable_domains: list[str] = Field(
+        default_factory=lambda: [
+            "mailinator.com",
+            "10minutemail.com",
+            "guerrillamail.com",
+            "yopmail.com",
+            "tempmail.com",
+            "trashmail.com",
+            "sharklasers.com",
+            "getnada.com",
+            "dispostable.com",
+            "maildrop.cc",
+        ]
+    )
+
+    @field_validator("trial_disposable_domains", mode="before")
+    @classmethod
+    def _split_domains(cls, value: object) -> list[str] | object:
+        if isinstance(value, str):
+            return [d.strip().lower() for d in value.split(",") if d.strip()]
+        return value
+
     # --- CORS -------------------------------------------------------------
     cors_allowed_origins: list[str] = Field(default_factory=list)
 

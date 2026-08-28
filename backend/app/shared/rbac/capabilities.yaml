@@ -124,6 +124,20 @@ capabilities:
     description: Add or remove platform admins (PlatformAdmin / PlatformSupport).
     scope: platform
     status: active
+  platform.trial.read:
+    # Reading the queue is safe: it holds a name, a work address and a
+    # company, nothing a support person cannot already see on a tenant.
+    description: View the self-serve trial signup queue and its capacity numbers.
+    scope: platform
+    status: active
+  platform.trial.manage:
+    # Deliberately split from platform.trial.read. Approving spends real
+    # capacity — a Postgres schema, a Keycloak group, and imagery for 30
+    # days — so seeing the queue must not imply the right to act on it.
+    # PlatformSupport reads it and cannot approve.
+    description: Approve, pause or reject a trial signup, including approving past a cap.
+    scope: platform
+    status: active
   platform.manage_rbac:
     # Deliberately NOT folded into platform.read, which gates *viewing* the
     # matrix. This one rewrites the authorization policy for every tenant at

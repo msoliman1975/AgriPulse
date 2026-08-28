@@ -40,7 +40,11 @@ if TYPE_CHECKING:
 _PUBLIC_PATHS: frozenset[str] = frozenset(
     {"/health", "/metrics", "/docs", "/redoc", "/openapi.json"}
 )
-_PUBLIC_PREFIXES: tuple[str, ...] = ("/docs/oauth2-redirect",)
+#: `/api/v1/public/` is the self-serve trial front door — the only routes in
+#: the service with no bearer token behind them. They carry their own rate
+#: limiting and a Turnstile check, and they never touch tenant data: at that
+#: point in the flow no tenant exists.
+_PUBLIC_PREFIXES: tuple[str, ...] = ("/docs/oauth2-redirect", "/api/v1/public/")
 
 
 def _is_public(path: str) -> bool:
