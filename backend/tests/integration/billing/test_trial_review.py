@@ -20,7 +20,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.settings import get_settings
 from app.shared.auth.context import PlatformRole
 
-pytestmark = [pytest.mark.integration]
+# The caps count every approval in the database for the day and the week,
+# which is the behaviour we want in production and a trap in a suite that
+# shares one database. Without this, whether a test passes depends on how
+# many approvals ran before it. Every test lifts the caps; the two that are
+# about caps set them from the live count.
+pytestmark = [pytest.mark.integration, pytest.mark.usefixtures("_lifted_caps")]
 
 
 async def _client(app: FastAPI) -> AsyncClient:
@@ -149,12 +154,16 @@ async def test_approve_is_refused_past_the_daily_cap(
     enqueued_tasks: list[str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _set_caps(monkeypatch, per_day=1, per_week=10)
     first = await _queued_signup(admin_session)
     second = await _queued_signup(admin_session)
     app = platform_app_factory(PlatformRole.PLATFORM_ADMIN)
 
     async with await _client(app) as client:
+        # Set the cap one above whatever this database has already approved
+        # today, so exactly one more approval fits and the next is refused.
+        cap = await _cap_leaving_room_for(client, approvals=1)
+        _set_caps(monkeypatch, per_day=cap, per_week=cap + 100)
+
         ok = await client.post(f"/api/v1/platform/trials/{first}/approve", json={})
         blocked = await client.post(f"/api/v1/platform/trials/{second}/approve", json={})
 
@@ -164,7 +173,8 @@ async def test_approve_is_refused_past_the_daily_cap(
     # The refusal must name the cap. "Not allowed" with no number leaves an
     # admin with nothing to act on.
     assert problem["scope"] == "daily"
-    assert problem["cap"] == 1
+    assert problem["cap"] == cap
+    assert problem["used"] == cap
     assert problem["resets_at"]
     # The blocked one never reached the worker.
     assert enqueued_tasks == [str(first)]
@@ -177,12 +187,14 @@ async def test_override_past_the_cap_is_allowed_and_recorded(
     enqueued_tasks: list[str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _set_caps(monkeypatch, per_day=1, per_week=10)
     first = await _queued_signup(admin_session)
     second = await _queued_signup(admin_session)
     app = platform_app_factory(PlatformRole.PLATFORM_ADMIN)
 
     async with await _client(app) as client:
+        cap = await _cap_leaving_room_for(client, approvals=1)
+        _set_caps(monkeypatch, per_day=cap, per_week=cap + 100)
+
         await client.post(f"/api/v1/platform/trials/{first}/approve", json={})
         override = await client.post(
             f"/api/v1/platform/trials/{second}/approve",
@@ -280,6 +292,17 @@ async def test_approving_twice_is_refused(
     assert enqueued_tasks == [str(signup_id)]
 
 
+async def _cap_leaving_room_for(client: AsyncClient, *, approvals: int) -> int:
+    """A daily cap that leaves room for exactly `approvals` more.
+
+    Read from the API rather than assumed, because other tests in the same
+    run have already approved trials today and the counter is database-wide.
+    """
+    response = await client.get("/api/v1/platform/trials")
+    assert response.status_code == 200
+    return int(response.json()["capacity"]["approved_today"]) + approvals
+
+
 def _set_caps(monkeypatch: pytest.MonkeyPatch, *, per_day: int, per_week: int) -> None:
     """Move the caps for one test.
 
@@ -289,6 +312,14 @@ def _set_caps(monkeypatch: pytest.MonkeyPatch, *, per_day: int, per_week: int) -
     """
     monkeypatch.setenv("TRIAL_APPROVALS_PER_DAY", str(per_day))
     monkeypatch.setenv("TRIAL_APPROVALS_PER_WEEK", str(per_week))
+    get_settings.cache_clear()
+
+
+@pytest.fixture
+def _lifted_caps(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Put the caps out of the way for tests that are not about caps."""
+    monkeypatch.setenv("TRIAL_APPROVALS_PER_DAY", "10000")
+    monkeypatch.setenv("TRIAL_APPROVALS_PER_WEEK", "10000")
     get_settings.cache_clear()
 
 
