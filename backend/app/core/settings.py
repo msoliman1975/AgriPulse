@@ -184,6 +184,17 @@ class Settings(BaseSettings):
     # Open-Meteo's free-tier 10k req/day cap even with hundreds of farms.
     weather_default_cadence_hours: int = 3
 
+    # Default cadence applied when `imagery_aoi_subscriptions.cadence_hours`
+    # or `imagery_farm_subscriptions.cadence_hours` is NULL. Sentinel-2
+    # revisits every 2 to 5 days, so polling once a day finds every pass
+    # without asking the provider for the same scene twice.
+    #
+    # The integration health views and the Queue tab's overdue scan both
+    # need this number. Until now the scan carried its own literal 24 and
+    # the weather half carried its own literal 3, so the Queue tab could
+    # not follow a change made here.
+    imagery_default_cadence_hours: int = 24
+
     # Hour counts the ingestion task asks the provider for per fetch.
     # 48h past covers two days of "observations" (Open-Meteo updates the
     # past hourly model output every cycle, so re-fetching past entries
@@ -296,6 +307,11 @@ class Settings(BaseSettings):
     # round-trip per provider, so the cost grows linearly with the
     # provider catalog rather than tenant count.
     provider_probe_seconds: int = 300
+
+    # How long a running ingestion attempt may sit before the Queue tab
+    # calls it stuck rather than running. 30 minutes is longer than any
+    # healthy fetch: the slowest imagery job on prod runs under 4 minutes.
+    integration_health_stuck_minutes: int = 30
 
     # PR-IH11. Beat cadence for the consecutive-failure-streak watcher.
     # 10 min strikes a balance: alerting within a beat or two of the

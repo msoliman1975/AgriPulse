@@ -499,6 +499,8 @@ EXEMPT_PAIRS: dict[tuple[str, str], str] = {
     # follow their source tables (CAGGs via BLOCK_CAGGS refresh).
     ("block_index_daily", "block_id"): "continuous aggregate over block_index_aggregates",
     ("block_index_weekly", "block_id"): "continuous aggregate over block_index_aggregates",
+    ("v_block_own_integration_health", "block_id"): "view",
+    ("v_block_own_integration_health", "farm_id"): "view",
     ("v_block_integration_health", "block_id"): "view",
     ("v_block_integration_health", "farm_id"): "view",
     ("v_farm_integration_health", "farm_id"): "view",

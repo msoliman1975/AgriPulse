@@ -175,3 +175,20 @@ class IntegrationAttemptRow(BaseModel):
     # 0 for non-failures or first-attempt successes. UI shows
     # "Attempt #N" badge when > 1.
     failed_streak_position: int = 0
+
+
+class IntegrationHealthConfig(BaseModel):
+    """The thresholds the Queue tab reads its numbers against.
+
+    The Queue tab prints "stuck after N minutes" under its stuck column.
+    That caption used to be the literal 30, written in the React file, while
+    the scan used its own literal 30 in the router. Two literals for one
+    number is a caption that can start lying after a settings change nobody
+    connects to it. Both now come from here.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    stuck_minutes: int
+    weather_default_cadence_hours: int
+    imagery_default_cadence_hours: int

@@ -26,11 +26,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.settings import get_settings
 from app.modules.integrations_health.providers_service import ProviderHealthService
 from app.modules.integrations_health.schemas import (
     BlockIntegrationHealthResponse,
     FarmIntegrationHealthResponse,
     IntegrationAttemptRow,
+    IntegrationHealthConfig,
     ProviderHealthRow,
     QueueEntry,
 )
@@ -153,14 +155,51 @@ async def drill_queue(
     tenant_id: UUID,
     kind: Literal["weather", "imagery"] | None = Query(default=None),
     state: Literal["overdue", "running", "stuck"] | None = Query(default=None),
-    stuck_minutes: int = Query(default=30, ge=1, le=24 * 60),
+    stuck_minutes: int | None = Query(default=None, ge=1, le=24 * 60),
     context: RequestContext = Depends(requires_capability("platform.manage_tenants")),
     session: AsyncSession = Depends(get_admin_db_session),
 ) -> list[dict[str, Any]]:
     del context
     await _resolve_and_scope(tenant_id, session)
     service = IntegrationsHealthService(tenant_session=session)
-    return await service.list_queue(kind=kind, state=state, stuck_minutes=stuck_minutes)
+    settings = get_settings()
+    return await service.list_queue(
+        kind=kind,
+        state=state,
+        stuck_minutes=(
+            stuck_minutes
+            if stuck_minutes is not None
+            else settings.integration_health_stuck_minutes
+        ),
+        default_weather_cadence_hours=settings.weather_default_cadence_hours,
+        default_imagery_cadence_hours=settings.imagery_default_cadence_hours,
+    )
+
+
+@router.get(
+    "/{tenant_id}/integrations/health/queue/config",
+    response_model=IntegrationHealthConfig,
+)
+async def drill_queue_config(
+    tenant_id: UUID,
+    context: RequestContext = Depends(requires_capability("platform.manage_tenants")),
+    session: AsyncSession = Depends(get_admin_db_session),
+) -> dict[str, Any]:
+    """The same thresholds the tenant route returns.
+
+    Mirrored so the drill-in page can read its caption from the same place
+    the tenant page does. The tenant still has to resolve, so a drill-in at
+    an archived tenant keeps returning 404 here as it does on every other
+    route in this file.
+    """
+    del context
+    await _resolve_and_scope(tenant_id, session)
+    settings = get_settings()
+    return {
+        "stuck_minutes": settings.integration_health_stuck_minutes,
+        "weather_default_cadence_hours": settings.weather_default_cadence_hours,
+        "imagery_default_cadence_hours": settings.imagery_default_cadence_hours,
+    }
 
 
 @router.get(

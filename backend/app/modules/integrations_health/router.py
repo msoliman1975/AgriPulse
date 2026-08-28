@@ -6,6 +6,8 @@ Mounted under /api/v1 by the app factory:
   GET /integrations/health/farms/{farm_id}/blocks      â€” per-Block detail
   GET /integrations/health/blocks/{block_id}/attempts  â€” per-Block run log (PR-IH3)
   GET /integrations/health/recent                      â€” tenant-wide recent runs (PR-IH3)
+  GET /integrations/health/queue                       â€” overdue / running / stuck (PR-IH4)
+  GET /integrations/health/queue/config                â€” the queue scan's thresholds
 
 All gated on `tenant.read_integration_health`. PlatformSupport gets
 this capability so support staff can diagnose tenant integration issues
@@ -20,6 +22,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.settings import get_settings
 from app.modules.integrations_health.providers_service import (
     ProviderHealthService,
 )
@@ -27,6 +30,7 @@ from app.modules.integrations_health.schemas import (
     BlockIntegrationHealthResponse,
     FarmIntegrationHealthResponse,
     IntegrationAttemptRow,
+    IntegrationHealthConfig,
     ProviderHealthRow,
     QueueEntry,
 )
@@ -142,12 +146,44 @@ async def list_tenant_providers(
 async def list_queue(
     kind: Literal["weather", "imagery"] | None = Query(default=None),
     state: Literal["overdue", "running", "stuck"] | None = Query(default=None),
-    stuck_minutes: int = Query(default=30, ge=1, le=24 * 60),
+    stuck_minutes: int | None = Query(default=None, ge=1, le=24 * 60),
     context: RequestContext = Depends(requires_capability("tenant.read_integration_health")),
     service: IntegrationsHealthService = Depends(_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
-    return await service.list_queue(kind=kind, state=state, stuck_minutes=stuck_minutes)
+    # The three thresholds come from settings, not from literals here and a
+    # second set of literals in the service. `GET .../queue/config` returns
+    # the same numbers, so the caption on the Queue tab cannot name a
+    # threshold different from the one the scan used.
+    settings = get_settings()
+    return await service.list_queue(
+        kind=kind,
+        state=state,
+        stuck_minutes=(
+            stuck_minutes
+            if stuck_minutes is not None
+            else settings.integration_health_stuck_minutes
+        ),
+        default_weather_cadence_hours=settings.weather_default_cadence_hours,
+        default_imagery_cadence_hours=settings.imagery_default_cadence_hours,
+    )
+
+
+@router.get(
+    "/integrations/health/queue/config",
+    response_model=IntegrationHealthConfig,
+    summary="The thresholds the queue scan uses.",
+)
+async def read_queue_config(
+    context: RequestContext = Depends(requires_capability("tenant.read_integration_health")),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    settings = get_settings()
+    return {
+        "stuck_minutes": settings.integration_health_stuck_minutes,
+        "weather_default_cadence_hours": settings.weather_default_cadence_hours,
+        "imagery_default_cadence_hours": settings.imagery_default_cadence_hours,
+    }
 
 
 @router.get(

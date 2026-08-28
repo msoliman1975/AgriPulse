@@ -82,7 +82,6 @@
     "errorMessage": "Error message"
   },
   "queue": {
-    "placeholder": "Queue view — coming soon.",
     "sections": {
       "running": "Running",
       "overdue": "Overdue",
@@ -139,7 +138,11 @@
     "farmLabel": "Farm:",
     "pickFarm": "Choose a farm…",
     "pickPrompt": "Choose a farm to see per-block sync status.",
-    "empty": "No blocks in this farm."
+    "empty": "No blocks in this farm.",
+    "viewRuns": "Runs",
+    "hideRuns": "Hide",
+    "runsTitle": "Recent runs covering this block",
+    "runsEmpty": "No runs recorded for this block."
   },
   "scope": {
     "block": "Block",
