@@ -3645,6 +3645,21 @@ env:
   # weather chart requests a 7-day horizon, so bump to 168h (7d) — within
   # Open-Meteo's free-tier forecast range — so "next week" isn't clipped.
   WEATHER_FORECAST_HOURS: "168"
+  # Cadence for `indices.recompute_baselines_sweep`. The settings.py default is
+  # 3600 (hourly) so a fresh dev tenant sees baselines within one Beat cycle;
+  # the field comment there says production is meant to run it weekly, but no
+  # overlay ever set the override, so production ran it hourly.
+  #
+  # Measured on the live node over 3 hours of light-worker logs on 2026-08-27:
+  # `indices.recompute_baselines_for_tenant` took 765s per run and accounted
+  # for 2295s of the 2621s of total light-queue task time — 88%. The light
+  # worker runs --concurrency=4 behind a 1 CPU limit, so that one task held
+  # 21% of its whole hourly budget continuously and capped block-scaling
+  # sweeps at roughly 600 blocks.
+  #
+  # 604800 = 7 days. Baselines need 3 same-day-of-year samples to become
+  # non-NULL, so a weekly refresh changes nothing a reader can observe.
+  INDICES_BASELINE_RECOMPUTE_SECONDS: "604800"
   # Push (AgriPulse Scout). Left unset, `fcm_enabled` defaults to false and
   # every send records `skipped` rather than `failed` — correct behaviour and
   # the quietest possible failure, which is how a pilot runs for a week
