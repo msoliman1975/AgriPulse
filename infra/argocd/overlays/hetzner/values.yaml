@@ -3324,10 +3324,46 @@ global:
     #   overdue counts. Its subscription counts DROP on purpose - Bashier
     #   Elkhier moves from 37 weather to 1 and from 38 imagery to 2, because
     #   the frozen block rows are no longer counted as things that fetch.
+    # 2026-08-28 - aaf133f = #631 + #634. Two unrelated PRs on one tag because
+    #   they are simply everything that merged after 84a80dc.
+    #
+    #   #631, the api half: the self-serve trial. Public migration 0078 adds
+    #   public.trial_signups with a CHECK on the state and two partial unique
+    #   indexes, so one address and one company domain hold one live request.
+    #   It runs on PreSync. New routes: POST /api/v1/public/trial/signups,
+    #   GET /verify and GET /status/{handle} - the api's FIRST unauthenticated
+    #   routes, rate limited by app/shared/ratelimit.py through Redis - plus
+    #   GET /api/v1/platform/trials and its approve, pause and reject actions
+    #   behind the new platform.trial.read and platform.trial.manage
+    #   capabilities. Approval is the only path that creates a tenant, so
+    #   nothing is provisioned until a platform admin acts.
+    #
+    #   Nothing on the marketing site calls the public routes yet, and no
+    #   platform admin holds the two new capabilities until they are granted,
+    #   so this reaches prod switched off in both directions.
+    #
+    #   #634 is frontend only (the Timeline colour key). See the frontend note.
+    #
+    #   Live before this edit: api, workers and frontend all 84a80dc, read off
+    #   .status.containerStatuses[0].image on the pods, not off this file.
+    #   `git merge-base --is-ancestor 84a80dc aaf133f0` passed.
+    #
+    #   CI on the merge of #634: all 11 jobs green, backend-integration
+    #   included. That job is continue-on-error, so its green was read off the
+    #   job list, not off the run conclusion.
+    #
+    #   Images pulled on the node before this edit: `k3s crictl pull` of
+    #   ghcr.io/msoliman1975/agripulse/api:aaf133f and .../frontend:aaf133f
+    #   both succeeded.
+    #
+    #   After the sync, watch: the public alembic head is 0078 and the api
+    #   pods come up. Then that no EXISTING route changed shape - the trial
+    #   work is additive, so a 500 anywhere else means the migration or the
+    #   new router import broke something that was working.
     api:
-      tag: "84a80dc"
+      tag: "aaf133f"
     workers:
-      tag: "84a80dc"
+      tag: "aaf133f"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3707,7 +3743,28 @@ global:
       #   Integration Health page and its views together, so the web app and
       #   the api move on one tag. #629 removes the block fill opacity slider
       #   and the block fill from Farm Management and the Timeline.
-      tag: "84a80dc"
+      #
+      # aaf133f = #634, the Timeline gains the index colour key. The replay
+      #   painted index pixels with no legend, so a reader saw a green or red
+      #   field with no table saying which value each colour stands for. The
+      #   panel sits on the map under the date caption, shows one row per
+      #   class with its swatch, value range and name, and follows the index
+      #   picker. It reads the same class table that builds the TiTiler
+      #   colormap the pixels are painted with, and the same class copy the
+      #   Farm Console legend reads, so the two screens cannot disagree.
+      #
+      #   FRONTEND ONLY, and no new endpoint: the only request it makes is the
+      #   platform index catalog, which the console already reads. The 3-line
+      #   capability mirror change from #631 rides along on this tag and is
+      #   inert.
+      #
+      #   NO MIGRATION on the frontend half. Rollback is this tag alone back
+      #   to 84a80dc.
+      #
+      #   After the sync, watch: /timeline/<farmId> draws the panel with the
+      #   pixel layer on, it swaps its wording and its numbers when the index
+      #   picker changes, and it leaves when "Index pixels" is unticked.
+      tag: "aaf133f"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
