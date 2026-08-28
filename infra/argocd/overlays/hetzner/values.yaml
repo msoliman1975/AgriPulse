@@ -3266,10 +3266,68 @@ global:
     #   After the sync, watch: `/me/work` with no `state` still returns the
     #   same open rows it did before. A regression there would empty the main
     #   Tasks list, which is a far worse failure than the one being fixed.
+    # 2026-08-28 - 84a80dc = #633 + #629, promoted together because #633
+    #   changes the api and the web app at once.
+    #
+    #   #633: the Integration Health Blocks tab reported the wrong thing about
+    #   every block on a farm that acquires as one AOI. Migration 0078 taught
+    #   the FARM health view about the farm acquisition path and left the
+    #   BLOCK view reading only the two block-keyed subscription tables, so
+    #   the tab was wrong in both directions at once. Read on prod the
+    #   morning of the fix:
+    #     Valley Farms / Mango Republic  36 blocks, 0 block subscriptions
+    #       -> every block said "Idle - No active subscription" while the farm
+    #          weather row had synced at 07:07 and the two farm imagery rows
+    #          had been attempted at 20:20 the evening before.
+    #     agrosina, both farms             72 blocks, watermarks frozen
+    #       -> every block said "Failing" because its block rows stopped being
+    #          polled on 2026-08-13, 15 days before the farms last synced.
+    #
+    #   MIGRATION 0088, tenant schemas. It drops and recreates
+    #   v_block_integration_health and v_farm_integration_health and adds a
+    #   third, internal v_block_own_integration_health. Views only: no table,
+    #   no column, no data is touched, and the downgrade restores 0056's block
+    #   view and 0085's farm view exactly. It runs in the PreSync hook job
+    #   (alembic upgrade head, then migrate_tenants over active tenants), so
+    #   the archived agrosina-Demo schema stays where it is.
+    #
+    #   Rollback is these three tags back to api/workers 7017a97 and frontend
+    #   636fd73, plus `alembic downgrade 0087` per tenant. Leaving 0088 in
+    #   place under the old image is also safe: the columns did not move.
+    #
+    #   Same PR, smaller: the Blocks table opens a per-block run log (the
+    #   endpoint has existed since PR-IH3 and nothing called it), and the
+    #   Queue tab's stuck threshold now comes from settings through
+    #   GET /integrations/health/queue/config instead of a literal 30 in the
+    #   React file and a second literal 30 in the router.
+    #
+    #   #629 is the frontend half of the same tag: the block fill opacity
+    #   slider is gone from Farm Management and blocks draw no fill on Farm
+    #   Management or the Timeline. NO MIGRATION in that one.
+    #
+    #   Live before this edit: api + workers 7017a97, frontend 636fd73, read
+    #   off .spec.template.spec.containers[0].image, not off this file.
+    #   `git merge-base --is-ancestor` passed for both against 84a80dc.
+    #
+    #   CI on the merge of #633: integration 1152 passed / 4 skipped, with
+    #   tests/integration/integrations_health/test_block_health_sees_farm_path.py
+    #   among them. Read from the job log - that job is continue-on-error.
+    #   The new views were also run against the prod database inside a
+    #   rolled-back transaction: Mango Republic's 36 blocks came back with 1
+    #   weather subscription synced 07:07 and 2 imagery subscriptions.
+    #
+    #   Images pulled on the node before this edit: `k3s crictl pull` of
+    #   ghcr.io/msoliman1975/agripulse/api:84a80dc and .../frontend:84a80dc
+    #   both succeeded.
+    #
+    #   After the sync, watch: the Farms tab keeps its timestamps and its 0
+    #   overdue counts. Its subscription counts DROP on purpose - Bashier
+    #   Elkhier moves from 37 weather to 1 and from 38 imagery to 2, because
+    #   the frozen block rows are no longer counted as things that fetch.
     api:
-      tag: "7017a97"
+      tag: "84a80dc"
     workers:
-      tag: "7017a97"
+      tag: "84a80dc"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3644,7 +3702,12 @@ global:
       #
       #   NO MIGRATION. Rollback is this tag alone back to f785edf and
       #   leaves nothing behind.
-      tag: "636fd73"
+      #
+      # 84a80dc = #633 + #629. See the api note above: #633 changes the
+      #   Integration Health page and its views together, so the web app and
+      #   the api move on one tag. #629 removes the block fill opacity slider
+      #   and the block fill from Farm Management and the Timeline.
+      tag: "84a80dc"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
