@@ -13,8 +13,8 @@ against tenant-to-public keys does not apply here.
 Nothing is provisioned without a platform admin approving the row. See
 `docs/proposals/self-serve-trial-flow.md`.
 
-Revision ID: 0056
-Revises: 0055
+Revision ID: 0078
+Revises: 0077
 Create Date: 2026-08-28
 """
 
@@ -26,8 +26,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0056"
-down_revision: str | Sequence[str] | None = "0055"
+revision: str = "0078"
+down_revision: str | Sequence[str] | None = "0077"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -55,7 +55,9 @@ def upgrade() -> None:
             primary_key=True,
             server_default=sa.text("uuid_generate_v7()"),
         ),
-        sa.Column("status", sa.Text(), nullable=False, server_default=sa.text("'pending_verification'")),
+        sa.Column(
+            "status", sa.Text(), nullable=False, server_default=sa.text("'pending_verification'")
+        ),
         # --- what they told us -------------------------------------------
         sa.Column("full_name", sa.Text(), nullable=False),
         sa.Column("email", sa.Text(), nullable=False),

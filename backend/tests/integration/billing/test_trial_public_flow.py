@@ -16,7 +16,10 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-pytestmark = [pytest.mark.integration]
+# Every test here posts the signup form, so every one needs the limiter
+# out of the way. Left live, the order of the tests in this file would
+# decide whether they pass.
+pytestmark = [pytest.mark.integration, pytest.mark.usefixtures("_no_rate_limit")]
 
 
 def _email(prefix: str) -> str:
@@ -56,7 +59,6 @@ async def test_signup_accepts_and_records_the_request(
     public_app: FastAPI,
     admin_session: AsyncSession,
     sent_emails: list[dict[str, str]],
-    no_rate_limit: None,
 ) -> None:
     email = _email("nadia")
     async with await _client(public_app) as client:
@@ -80,7 +82,6 @@ async def test_signup_answers_the_same_for_a_repeat_address(
     public_app: FastAPI,
     admin_session: AsyncSession,
     sent_emails: list[dict[str, str]],
-    no_rate_limit: None,
 ) -> None:
     """No enumeration oracle, and no mail-bombing either.
 
@@ -107,7 +108,6 @@ async def test_signup_answers_the_same_for_a_repeat_address(
 @pytest.mark.asyncio
 async def test_signup_without_accepting_terms_is_refused(
     public_app: FastAPI,
-    no_rate_limit: None,
 ) -> None:
     async with await _client(public_app) as client:
         response = await client.post(
@@ -122,7 +122,6 @@ async def test_verify_puts_a_company_address_in_the_queue(
     public_app: FastAPI,
     admin_session: AsyncSession,
     sent_emails: list[dict[str, str]],
-    no_rate_limit: None,
 ) -> None:
     email = _email("queued")
     async with await _client(public_app) as client:
@@ -150,7 +149,6 @@ async def test_verify_rejects_a_disposable_domain(
     public_app: FastAPI,
     admin_session: AsyncSession,
     sent_emails: list[dict[str, str]],
-    no_rate_limit: None,
 ) -> None:
     email = f"throwaway-{uuid4().hex[:6]}@mailinator.com"
     async with await _client(public_app) as client:
@@ -170,7 +168,6 @@ async def test_verify_routes_a_known_company_to_its_administrator(
     public_app: FastAPI,
     admin_session: AsyncSession,
     sent_emails: list[dict[str, str]],
-    no_rate_limit: None,
 ) -> None:
     """The rule that stops a company ending up with two tenants."""
     from app.modules.tenancy import get_tenant_service
@@ -203,7 +200,6 @@ async def test_an_expired_link_does_not_verify(
     public_app: FastAPI,
     admin_session: AsyncSession,
     sent_emails: list[dict[str, str]],
-    no_rate_limit: None,
 ) -> None:
     email = _email("stale")
     async with await _client(public_app) as client:
@@ -233,7 +229,6 @@ async def test_status_page_reads_the_handle(
     public_app: FastAPI,
     admin_session: AsyncSession,
     sent_emails: list[dict[str, str]],
-    no_rate_limit: None,
 ) -> None:
     email = _email("statuspage")
     async with await _client(public_app) as client:

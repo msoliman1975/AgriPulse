@@ -85,7 +85,7 @@ class TrialRepository:
         """A live request already holds the slot for this address or company.
 
         Checked before the insert so a duplicate reads as a quiet 202 rather
-        than a unique-violation traceback. The partial indexes in 0056 are
+        than a unique-violation traceback. The partial indexes in 0078 are
         still the authority — this is the friendly path, not the guard.
         """
         stmt = select(TrialSignup.id).where(
@@ -125,14 +125,20 @@ class TrialRepository:
         approval that later fails in Keycloak still spends a slot — otherwise
         a broken provisioner would silently lift the cap.
         """
-        stmt = select(func.count()).select_from(TrialSignup).where(
-            TrialSignup.reviewed_at.is_not(None),
-            TrialSignup.reviewed_at >= since,
-            TrialSignup.status.in_(("approved", "provisioning", "provisioned", "failed")),
+        stmt = (
+            select(func.count())
+            .select_from(TrialSignup)
+            .where(
+                TrialSignup.reviewed_at.is_not(None),
+                TrialSignup.reviewed_at >= since,
+                TrialSignup.status.in_(("approved", "provisioning", "provisioned", "failed")),
+            )
         )
         return int((await self._session.execute(stmt)).scalar_one())
 
-    async def capacity_snapshot(self, *, day_start: datetime, week_start: datetime) -> dict[str, Any]:
+    async def capacity_snapshot(
+        self, *, day_start: datetime, week_start: datetime
+    ) -> dict[str, Any]:
         """The numbers the approval screen shows above the queue.
 
         Live trials, and the farms and area they carry, come from a

@@ -97,9 +97,7 @@ async def test_support_can_read_the_queue_but_not_approve(
 
     async with await _client(app) as client:
         read = await client.get("/api/v1/platform/trials")
-        approve = await client.post(
-            f"/api/v1/platform/trials/{signup_id}/approve", json={}
-        )
+        approve = await client.post(f"/api/v1/platform/trials/{signup_id}/approve", json={})
 
     assert read.status_code == 200
     assert approve.status_code == 403
@@ -259,9 +257,7 @@ async def test_reject_sends_the_reason_to_the_person(
     assert response.status_code == 200
     assert response.json()["status"] == "rejected"
     assert enqueued_tasks == []
-    assert any(
-        "We do not operate in this region yet." in mail["body"] for mail in sent_emails
-    )
+    assert any("We do not operate in this region yet." in mail["body"] for mail in sent_emails)
 
 
 @pytest.mark.asyncio

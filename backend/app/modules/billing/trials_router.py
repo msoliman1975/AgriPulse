@@ -240,8 +240,7 @@ def _row(signup: Any) -> TrialSignupRow:
     row.is_free_mail = is_free_mail(signup.email_domain)
     if signup.created_at is not None and signup.status in ("awaiting_approval", "paused"):
         row.waiting_hours = round(
-            (datetime.now(signup.created_at.tzinfo) - signup.created_at).total_seconds()
-            / 3600.0,
+            (datetime.now(signup.created_at.tzinfo) - signup.created_at).total_seconds() / 3600.0,
             1,
         )
     return row

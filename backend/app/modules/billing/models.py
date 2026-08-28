@@ -15,7 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.shared.db.base import UUID_V7_DEFAULT, Base, TimestampedMixin
 
-#: Every state a signup can hold. Mirrors the CHECK in migration 0056 —
+#: Every state a signup can hold. Mirrors the CHECK in migration 0078 —
 #: change one and you must change the other.
 SIGNUP_STATUSES: tuple[str, ...] = (
     "pending_verification",
@@ -31,7 +31,7 @@ SIGNUP_STATUSES: tuple[str, ...] = (
 )
 
 #: The states that occupy a slot — one live request per address, one per
-#: company domain. Mirrors the two partial unique indexes in 0056.
+#: company domain. Mirrors the two partial unique indexes in 0078.
 LIVE_STATUSES: tuple[str, ...] = (
     "pending_verification",
     "awaiting_approval",

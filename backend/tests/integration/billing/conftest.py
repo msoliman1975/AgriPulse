@@ -100,7 +100,7 @@ def sent_emails(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[dict[str, str]
 
 
 @pytest.fixture
-def no_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:  # noqa: PT004 — named for the test signatures that request it
+def _no_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     """Let every request through the limiter.
 
     The limiter is tested on its own. Leaving it live here would make the
@@ -127,7 +127,5 @@ def enqueued_tasks(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[str]]:
     def _enqueue(signup_id: UUID) -> None:
         calls.append(str(signup_id))
 
-    monkeypatch.setattr(
-        "app.modules.billing.trials_router._enqueue_provisioning", _enqueue
-    )
+    monkeypatch.setattr("app.modules.billing.trials_router._enqueue_provisioning", _enqueue)
     return calls

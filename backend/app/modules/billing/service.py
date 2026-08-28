@@ -213,9 +213,7 @@ class TrialService:
         """Everything the approval screen shows above the queue."""
         settings = get_settings()
         day_start, week_start = day_and_week_start()
-        snapshot = await self._repo.capacity_snapshot(
-            day_start=day_start, week_start=week_start
-        )
+        snapshot = await self._repo.capacity_snapshot(day_start=day_start, week_start=week_start)
         usage = await self._repo.trial_usage()
         return {
             **snapshot,
@@ -262,16 +260,10 @@ class TrialService:
             scope = "daily" if over_day else "weekly"
             used = used_today if over_day else used_week
             cap = (
-                settings.trial_approvals_per_day
-                if over_day
-                else settings.trial_approvals_per_week
+                settings.trial_approvals_per_day if over_day else settings.trial_approvals_per_week
             )
-            resets = (
-                day_start + timedelta(days=1) if over_day else week_start + timedelta(days=7)
-            )
-            raise CapReachedError(
-                scope=scope, used=used, cap=cap, resets_at=resets.isoformat()
-            )
+            resets = day_start + timedelta(days=1) if over_day else week_start + timedelta(days=7)
+            raise CapReachedError(scope=scope, used=used, cap=cap, resets_at=resets.isoformat())
 
         signup.status = "approved"
         signup.reviewed_by = actor_user_id
