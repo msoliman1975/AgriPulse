@@ -91,7 +91,13 @@ async function loadFarm(farmId: string, farmName: string): Promise<FarmWork> {
     listMyWork(farmId),
     listVisits(farmId, { mine: true }),
     listVisits(farmId, { claimable: true }),
-    listVisits(farmId, { mine: true, status: ["completed"] }),
+    // Finished work, BOTH kinds. This used to ask the scouting API for
+    // completed visits, which meant a finished board activity appeared
+    // nowhere: it had already left "My work" by being closed. On a farm
+    // scheduled entirely from the board — the normal shape — the Done tab was
+    // empty every time. Measured on production: 0 visits, 3 completed
+    // activities, an empty Done tab.
+    listMyWork(farmId, "closed"),
     // A missing block list costs a row its place name, which is survivable.
     // A missing work list is the screen's whole reason to exist, which is not
     // — so only this one is allowed to fail quietly.
@@ -116,7 +122,16 @@ async function loadFarm(farmId: string, farmName: string): Promise<FarmWork> {
       source: sourceById.get(w.id) ?? null,
     })),
     available: claimable.map((v) => asWorkItem(v, blockName(v.block_id), farmName)),
-    done: closed.map((v) => asWorkItem(v, blockName(v.block_id), farmName)),
+    // Named and farm-tagged the same way as `mine`, because it comes from the
+    // same endpoint. It carries no `source`: the group counters are a property
+    // of a live finding, and re-reading them for closed work would tell a
+    // scout how far something has spread since they dealt with it.
+    done: closed.map((w) => ({
+      ...w,
+      farm_name: farmName,
+      block_name: blockName(w.block_id),
+      source: null,
+    })),
     blocks,
   };
 }

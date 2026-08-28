@@ -9,7 +9,7 @@ roster writes ``activity_resources.resource_id``. Same person, three ids.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 import pytest
@@ -57,6 +57,7 @@ async def _add_activity(
     when: date,
     status: str = "scheduled",
     membership_id: UUID | None = None,
+    completed_at: datetime | None = None,
 ) -> UUID:
     await session.execute(text(f"SET LOCAL search_path TO {schema}, public"))
     return (
@@ -64,8 +65,8 @@ async def _add_activity(
             text(
                 "INSERT INTO plan_activities "
                 "  (farm_id, block_id, activity_type, scheduled_date, status, "
-                "   assigned_membership_id) "
-                "VALUES (CAST(:f AS uuid), CAST(:b AS uuid), :t, :d, :s, :m) "
+                "   assigned_membership_id, completed_at) "
+                "VALUES (CAST(:f AS uuid), CAST(:b AS uuid), :t, :d, :s, :m, :c) "
                 "RETURNING id"
             ).bindparams(bindparam("m", type_=PG_UUID(as_uuid=True))),
             {
@@ -75,6 +76,7 @@ async def _add_activity(
                 "d": when,
                 "s": status,
                 "m": membership_id,
+                "c": completed_at,
             },
         )
     ).scalar()
@@ -258,3 +260,158 @@ async def test_visits_and_board_work_arrive_in_one_ordered_feed(
     assert "plan_activity" in kinds
     assert kinds[0] == "scouting_visit"
     assert [i["due_at"] for i in items] == sorted(i["due_at"] for i in items)
+
+
+# ---- Finished work -----------------------------------------------------------
+#
+# `state=closed` exists because the phone's Done tab could not answer for board
+# work. It asked the scouting API for completed VISITS, so an activity a scout
+# finished left "My work" by being closed and then appeared on no screen at
+# all. Measured on production before this was written: the tenant held 0
+# scouting visits and 3 completed activities, and Done was empty every time.
+
+
+@pytest.mark.asyncio
+async def test_finished_board_work_is_reachable(
+    scouting_env: ScoutingFixture, admin_session: AsyncSession
+) -> None:
+    """The regression. Both closures come back, and the open feed keeps neither."""
+    env = scouting_env
+    membership_id = await _membership_of(admin_session, env.scout_user_id)
+    common = {
+        "schema": env.schema,
+        "farm_id": env.farm_id,
+        "block_id": env.block_id,
+        "membership_id": membership_id,
+    }
+    older = datetime(2026, 8, 27, 21, 44, tzinfo=UTC)
+    newer = datetime(2026, 8, 28, 7, 7, tzinfo=UTC)
+
+    did = await _add_activity(
+        admin_session,
+        activity_type="observation",
+        when=date.today(),
+        status="completed",
+        completed_at=older,
+        **common,
+    )
+    # "Not needed" is a closure the scout performed and a fact the office wants.
+    # A Done list holding only "completed" hides half a real day.
+    skipped = await _add_activity(
+        admin_session,
+        activity_type="irrigation",
+        when=date.today(),
+        status="skipped",
+        completed_at=newer,
+        **common,
+    )
+    still_open = await _add_activity(
+        admin_session,
+        activity_type="observation",
+        when=date.today(),
+        status="scheduled",
+        **common,
+    )
+    await admin_session.commit()
+
+    async with _client(env.scout_context) as client:
+        closed = (await client.get(f"/api/v1/me/work?farm_id={env.farm_id}&state=closed")).json()
+        open_feed = (await client.get(f"/api/v1/me/work?farm_id={env.farm_id}")).json()
+
+    closed_ids = [UUID(i["id"]) for i in closed]
+    assert did in closed_ids
+    assert skipped in closed_ids
+    assert still_open not in closed_ids
+    # And the two feeds do not overlap: open work is not finished work.
+    open_ids = {UUID(i["id"]) for i in open_feed}
+    assert still_open in open_ids
+    assert did not in open_ids
+    assert skipped not in open_ids
+
+    # The closure time travels, because the phone buckets the Done list by the
+    # day it was closed. Null here would file every row under "date unknown".
+    by_id = {UUID(i["id"]): i for i in closed}
+    assert by_id[did]["completed_at"] is not None
+    assert by_id[did]["completed_at"].startswith("2026-08-27")
+    assert by_id[skipped]["completed_at"].startswith("2026-08-28")
+    # Newest first: a proof-of-work list is read from the top.
+    assert closed_ids.index(skipped) < closed_ids.index(did)
+
+
+@pytest.mark.asyncio
+async def test_open_feed_still_carries_a_null_closure_time(
+    scouting_env: ScoutingFixture, admin_session: AsyncSession
+) -> None:
+    """One response shape for one endpoint, whichever state was asked for.
+
+    A field that appears only on the closed feed is one a typed client marks
+    optional and then reads as undefined for ever.
+    """
+    env = scouting_env
+    membership_id = await _membership_of(admin_session, env.scout_user_id)
+    await _add_activity(
+        admin_session,
+        schema=env.schema,
+        farm_id=env.farm_id,
+        block_id=env.block_id,
+        activity_type="observation",
+        when=date.today(),
+        membership_id=membership_id,
+    )
+    await admin_session.commit()
+
+    async with _client(env.scout_context) as client:
+        items = (await client.get(f"/api/v1/me/work?farm_id={env.farm_id}")).json()
+
+    assert items, "the open feed should not be empty"
+    assert all("completed_at" in i for i in items)
+    assert all(i["completed_at"] is None for i in items)
+
+
+@pytest.mark.asyncio
+async def test_a_cancelled_visit_is_in_neither_feed(
+    scouting_env: ScoutingFixture, admin_session: AsyncSession
+) -> None:
+    """ "Closed" means "I finished it", not "it is no longer open".
+
+    Work called off by somebody else is not a day's work to show back to the
+    person it was called off for.
+    """
+    env = scouting_env
+    await admin_session.execute(text(f"SET search_path TO {env.schema}, public"))
+    ids = {}
+    # `ck_scouting_visits_outcome_iff_completed` makes the outcome and the
+    # status one fact: exactly the completed row may carry an outcome, and it
+    # must. Writing a completed visit with a null outcome is rejected.
+    for status_value, outcome in (("completed", "resolved"), ("cancelled", None)):
+        ids[status_value] = (
+            await admin_session.execute(
+                text(
+                    "INSERT INTO scouting_visits "
+                    "  (farm_id, block_id, origin, status, title, severity, priority, "
+                    "   assigned_to, outcome, completed_at) "
+                    "VALUES (CAST(:f AS uuid), CAST(:b AS uuid), 'ad_hoc', :s, :t, "
+                    "        'info', 'medium', :u, :o, now()) "
+                    "RETURNING id"
+                ).bindparams(bindparam("u", type_=PG_UUID(as_uuid=True))),
+                {
+                    "f": env.farm_id,
+                    "b": env.block_id,
+                    "s": status_value,
+                    "t": f"a {status_value} visit",
+                    "u": env.scout_user_id,
+                    "o": outcome,
+                },
+            )
+        ).scalar()
+    await admin_session.commit()
+
+    async with _client(env.scout_context) as client:
+        closed = (await client.get(f"/api/v1/me/work?farm_id={env.farm_id}&state=closed")).json()
+        open_feed = (await client.get(f"/api/v1/me/work?farm_id={env.farm_id}")).json()
+
+    closed_ids = {UUID(i["id"]) for i in closed}
+    open_ids = {UUID(i["id"]) for i in open_feed}
+    assert ids["completed"] in closed_ids
+    assert ids["cancelled"] not in closed_ids
+    assert ids["cancelled"] not in open_ids
