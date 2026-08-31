@@ -3360,10 +3360,41 @@ global:
     #   pods come up. Then that no EXISTING route changed shape - the trial
     #   work is additive, so a 500 anywhere else means the migration or the
     #   new router import broke something that was working.
+    # 2026-08-31 - 76a6411 = #638, the T_ mango decision tree catalogue.
+    #   API + WORKERS ONLY. The frontend stays on aaf133f: this change adds no
+    #   screen and no bundle string, only tree rows the API serves.
+    #
+    #   `git merge-base --is-ancestor aaf133f 76a64115` passed. Images pulled
+    #   on the node before this edit: `k3s crictl pull` of
+    #   ghcr.io/msoliman1975/agripulse/api:76a6411 and .../workers:76a6411 both
+    #   returned "Image is up to date".
+    #
+    #   Public migration 0079 runs on PreSync. It is small and reversible: it
+    #   inserts one crop attribute definition (`harvest_season_group` on the
+    #   `mango` path) and sets `is_active = FALSE` on eight platform decision
+    #   trees. Dry-run against this database inside BEGIN/ROLLBACK reported
+    #   `INSERT 0 1` and `UPDATE 8`. No table is altered, so rolling the tag
+    #   back leaves the definition and the retired flags in place; downgrade()
+    #   reverses both if that is wanted.
+    #
+    #   Twenty-two `t_*` trees ship as seed YAML. `sync_from_disk` runs at api
+    #   startup and inserts them, so they appear WITHOUT a migration. The eight
+    #   trees the catalogue replaces have their YAML deleted in the same
+    #   commit; sync only touches trees whose file is on disk, so the retired
+    #   rows stay retired across restarts.
+    #
+    #   After the sync, watch: `SELECT count(*) FROM public.decision_trees
+    #   WHERE tenant_id IS NULL AND code LIKE 't\_%'` reads 22, and the eight
+    #   superseded mango codes read is_active = f while mango_canopy_health_v1
+    #   and ndvi_baseline_alert_v1 stay t. Open recommendations from the
+    #   retired trees are deliberately left alone - they are real findings
+    #   somebody may be working through.
+    #
+    #   Rollback is this tag back to aaf133f on api + workers.
     api:
-      tag: "aaf133f"
+      tag: "76a6411"
     workers:
-      tag: "aaf133f"
+      tag: "76a6411"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
