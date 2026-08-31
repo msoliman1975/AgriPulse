@@ -43,6 +43,7 @@ import argparse
 import json
 import os
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -92,14 +93,36 @@ def _post_form(url: str, form: dict[str, str]) -> dict:
         return json.load(resp)
 
 
+class _ApiError(Exception):
+    """Carries the problem-detail body. A 422 from this API names the field
+    and the reason in `detail`; discarding it turns a precise complaint into
+    "Unprocessable Entity"."""
+
+    def __init__(self, status: int, detail: str) -> None:
+        super().__init__(f"{status}: {detail}")
+        self.status = status
+        self.detail = detail
+
+
+def _items(payload: dict | list) -> list:
+    """Collection endpoints are not consistent: some return a bare JSON list,
+    others wrap it in `{"items": [...]}`. Accept either rather than guessing."""
+    if isinstance(payload, list):
+        return payload
+    return payload.get("items", [])
+
+
 def _api(token: str, path: str, *, method: str = "GET", body: dict | None = None) -> dict:
     payload = None if body is None else json.dumps(body).encode()
     req = urllib.request.Request(f"{API_BASE}{path}", data=payload, method=method)
     req.add_header("Authorization", f"Bearer {token}")
     if payload is not None:
         req.add_header("Content-Type", "application/json")
-    with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310
-        return json.load(resp)
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310
+            return json.load(resp)
+    except urllib.error.HTTPError as exc:  # a 422 body names the field
+        raise _ApiError(exc.code, exc.read().decode("utf-8", "replace")) from exc
 
 
 def token() -> str:
@@ -136,30 +159,39 @@ def main() -> int:
 
     tok = token()
 
-    farms = _api(tok, "/farms")
-    farm = next((f for f in farms.get("items", farms) if f["name"] == FARM_NAME), None)
+    farm = next((f for f in _items(_api(tok, "/farms")) if f["name"] == FARM_NAME), None)
     if farm is None:
         sys.exit(f"No farm named {FARM_NAME!r} in this tenant.")
 
-    assignments = _api(tok, f"/farms/{farm['id']}/crop-assignments")
-    rows = assignments.get("items", assignments)
+    # The assignment rows carry no block code, so build the map once rather
+    # than fetching a block per assignment.
+    code_by_block = {
+        b["id"]: b.get("code") or b.get("name") or b["id"][:8]
+        for b in _items(_api(tok, f"/farms/{farm['id']}/blocks"))
+    }
+
+    rows = _items(_api(tok, f"/farms/{farm['id']}/crop-assignments"))
     print(f"{FARM_NAME}: {len(rows)} crop assignments")
 
     groups_used: set[str] = set()
+    rejected: list[str] = []
     changed = 0
 
     for row in rows:
-        block_code = row.get("block_code") or row.get("block", {}).get("code", "?")
+        block_crop_id = row["block_crop_id"]
+        block_code = code_by_block.get(row.get("block_id"), "?")
         crop_path = row.get("crop_path", "")
-        block_crop_id = row["id"]
 
         current = _api(tok, f"/crop-assignments/{block_crop_id}/attributes")
-        values: dict[str, object] = {
-            definition["code"]: definition.get("value")
-            for definition in current.get("definitions", [])
-            if definition.get("value") is not None
-        }
-        before = dict(values)
+
+        # Send back only codes the catalog still serves as active definitions.
+        # The stored values also carry retired codes (`003`, `004`,
+        # `implantation_date`) left over from hand-authored fields that
+        # migrations 0072 and 0079 turned off; echoing those into a whole-form
+        # PUT would either 422 or resurrect them.
+        live = {d["code"] for d in current.get("definitions", []) if d.get("is_active", True)}
+        before = {k: v for k, v in current.get("values", {}).items() if k in live}
+        values = dict(before)
 
         group = VARIETY_GROUP.get(variety_of(crop_path), "unconfirmed")
         values["harvest_season_group"] = group
@@ -180,17 +212,39 @@ def main() -> int:
             for k in set(before) | set(values)
             if before.get(k) != values.get(k)
         }
-        print(f"  {block_code:>4}  {crop_path:<16} {delta}")
-        changed += 1
-        if not args.dry_run:
+        if args.dry_run:
+            print(f"  {block_code:>4}  {crop_path:<16} {delta}")
+            changed += 1
+            continue
+
+        # The PUT is a WHOLE-FORM replace and it runs the `required_when`
+        # rules over everything submitted, not only over what changed. On this
+        # farm all 36 blocks carry `establishment_method`, and 8 of them carry
+        # `grafted_tree`, which makes transplant_date, age_at_transplant_months
+        # and rootstock_type required -- none of which was ever filled in. The
+        # values were written by tenant migration 0084's bulk copy, which does
+        # not run the validator, so those 8 blocks cannot be saved through the
+        # form at all until somebody supplies three horticultural facts. That
+        # is a real defect and not this script's to paper over: report the
+        # block and move on rather than inventing a transplant date.
+        try:
             _api(
                 tok,
                 f"/crop-assignments/{block_crop_id}/attributes",
                 method="PUT",
                 body={"attributes": values},
             )
+        except _ApiError as exc:
+            print(f"  {block_code:>4}  {crop_path:<16} REJECTED {exc.detail[:160]}")
+            rejected.append(block_code)
+            continue
+        print(f"  {block_code:>4}  {crop_path:<16} {delta}")
+        changed += 1
 
-    print(f"\n{'would change' if args.dry_run else 'changed'}: {changed} assignments")
+    print()
+    print(f"{'would change' if args.dry_run else 'changed'}: {changed} assignments")
+    if rejected:
+        print(f"rejected by the form validator: {len(rejected)} -> {sorted(rejected)}")
     print(f"harvest groups present on this farm: {sorted(groups_used)}")
     missing = {"early", "mid", "late", "unconfirmed"} - groups_used
     if missing:
