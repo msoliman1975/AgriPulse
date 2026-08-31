@@ -1,0 +1,321 @@
+# t_ndmi_leaf_water — NDMI against the mango index guide's band for the
+# block's recorded tree size.
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# 10 m column of the three stage value sheets.
+#
+# Size is the axis that matters. Of the workbook's 72 index x size x
+# productivity combinations, 64 hold the same range in all three stage
+# sheets, so this tree takes no stage input; only CWSI and SMI genuinely
+# move, and they move because irrigation is cut on purpose before harvest.
+#
+# Reads the platform's ndmi, not its ndwi.
+# The guide's NDWI row carries the formula (NIR-SWIR)/(NIR+SWIR), which is
+# NDMI.
+# The platform's ndwi is McFeeters (GREEN-NIR)/(GREEN+NIR), open surface
+# water, and a mango moisture rule written on it would be reading the wrong
+# thing.
+
+code: t_ndmi_leaf_water
+name_en: T_NDMI — leaf water content against the band for this tree size
+name_ar: T_NDMI — محتوى الماء في الأوراق مقابل نطاق حجم الشجرة
+description_en: >-
+  Checks how much water is inside the leaves. The guide lists this twice,
+  once as NDWI and once as NDMI, and says both rows carry the same formula
+  and the same numbers. Branches on the block's recorded Tree size and
+  compares NDMI against the band the guide gives for that size. Opens one
+  card when the reading is below the band. Needs the Tree size attribute
+  to be set on the crop assignment.
+description_ar: >-
+  يفحص كم من الماء داخل الأوراق. يدرجه الدليل مرتين، مرة باسم NDWI ومرة
+  باسم NDMI، ويقول إن الصفين يحملان المعادلة نفسها والأرقام نفسها. يتفرّع
+  على حجم الشجرة المسجّل للقطعة ويقارن NDMI بالنطاق الذي يعطيه الدليل لهذا
+  الحجم. يفتح بطاقة واحدة عندما تكون القراءة دون النطاق. يحتاج ضبط خاصية
+  حجم الشجرة على تخصيص المحصول.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    Thresholds are the actionable edge of each size's 10 m band in the
+    AgriPulse mango index guide. The guide states its own limit plainly:
+    no published study measures these indices for these nine mango
+    varieties, and field ground-truthing is recommended before the ranges
+    drive a decision. Every bound is therefore a tunable parameter, and
+    small-tree results carry lower confidence because the guide grades
+    every small-tree cell Low. Reads the platform's ndmi, not its ndwi.
+    The guide's NDWI row carries the formula (NIR-SWIR)/(NIR+SWIR), which
+    is NDMI. The platform's ndwi is McFeeters (GREEN-NIR)/(GREEN+NIR),
+    open surface water, and a mango moisture rule written on it would be
+    reading the wrong thing.
+  citations:
+    - source_type: remote_sensing
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), Index
+        Definitions + the three stage value sheets, 10 m column
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: medium
+  global: low
+
+parameters:
+  small_ndmi_floor:
+    type: number
+    default: -0.15
+    min: -2.0
+    max: 3.0
+    description: >-
+      NDMI value below which a small-tree mango block is outside the range
+      the index guide expects (guide band -0.15 to 0.0 at 10 m).
+  medium_ndmi_floor:
+    type: number
+    default: 0.0
+    min: -2.0
+    max: 3.0
+    description: >-
+      NDMI value below which a medium-tree mango block is outside the
+      range the index guide expects (guide band 0.0 to 0.12 at 10 m).
+  large_ndmi_floor:
+    type: number
+    default: 0.11
+    min: -2.0
+    max: 3.0
+    description: >-
+      NDMI value below which a large-tree mango block is outside the range
+      the index guide expects (guide band 0.11 to 0.27 at 10 m).
+
+root: size_small
+nodes:
+  size_small:
+    label_en: Are the trees in the small size class?
+    label_ar: هل الأشجار في فئة الحجم صغيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: small
+    on_match: small_check
+    on_miss: size_medium
+
+  size_medium:
+    label_en: Are the trees in the medium size class?
+    label_ar: هل الأشجار في فئة الحجم متوسطة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: medium
+    on_match: medium_check
+    on_miss: size_large
+
+  size_large:
+    label_en: Are the trees in the large size class?
+    label_ar: هل الأشجار في فئة الحجم كبيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: large
+    on_match: large_check
+    on_miss: leaf_size_unknown
+
+  small_check:
+    label_en: Is NDMI below the small-tree bound?
+    label_ar: هل NDMI دون حدّ الشجرة صغيرة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndmi
+          key: mean
+        right:
+          source: params
+          name: small_ndmi_floor
+    on_match: leaf_out_of_band_small
+    on_miss: leaf_in_band
+
+  medium_check:
+    label_en: Is NDMI below the medium-tree bound?
+    label_ar: هل NDMI دون حدّ الشجرة متوسطة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndmi
+          key: mean
+        right:
+          source: params
+          name: medium_ndmi_floor
+    on_match: leaf_out_of_band_medium
+    on_miss: leaf_in_band
+
+  large_check:
+    label_en: Is NDMI below the large-tree bound?
+    label_ar: هل NDMI دون حدّ الشجرة كبيرة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndmi
+          key: mean
+        right:
+          source: params
+          name: large_ndmi_floor
+    on_match: leaf_out_of_band_large
+    on_miss: leaf_in_band
+
+  leaf_out_of_band_small:
+    label_en: NDMI below the small-tree band
+    label_ar: NDMI دون نطاق الشجرة صغيرة
+    outcome:
+      action_type: irrigate
+      severity: info
+      confidence: 0.4
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        Leaf water is below the band the guide expects for this tree size.
+        The tree is drawing on its own reserves. The guide's small-tree
+        band for NDMI at 10 m is -0.15 to 0.0. The guide grades every
+        small-tree cell Low, so treat this as advisory and confirm on the
+        ground.
+      text_ar: >-
+        ماء الأوراق دون النطاق الذي يتوقعه الدليل لهذا الحجم. الشجرة تسحب
+        من مخزونها. نطاق الدليل للشجرة صغيرة في NDMI عند 10 م هو من -0.15
+        إلى 0.0. يصنّف الدليل كل خلايا الشجرة الصغيرة بثقة منخفضة،
+        فاعتبرها استرشادية وأكّدها في الأرض.
+      actions:
+        immediate:
+          - text_en: >-
+              Check the irrigation actually ran and reached this block.
+            text_ar: >-
+              تأكد أن الريّ عمل فعلًا ووصل إلى هذه القطعة.
+        short_term:
+          - text_en: >-
+              Check for a blocked line or a failed emitter row before
+              adding water everywhere.
+            text_ar: >-
+              افحص وجود خط مسدود أو صف نقاطات معطّل قبل زيادة الماء في كل
+              مكان.
+        monitoring:
+          - text_en: Re-read NDMI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة NDMI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_out_of_band_medium:
+    label_en: NDMI below the medium-tree band
+    label_ar: NDMI دون نطاق الشجرة متوسطة
+    outcome:
+      action_type: irrigate
+      severity: warning
+      confidence: 0.55
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        Leaf water is below the band the guide expects for this tree size.
+        The tree is drawing on its own reserves. The guide's medium-tree
+        band for NDMI at 10 m is 0.0 to 0.12.
+      text_ar: >-
+        ماء الأوراق دون النطاق الذي يتوقعه الدليل لهذا الحجم. الشجرة تسحب
+        من مخزونها. نطاق الدليل للشجرة متوسطة في NDMI عند 10 م هو من 0.0
+        إلى 0.12.
+      actions:
+        immediate:
+          - text_en: >-
+              Check the irrigation actually ran and reached this block.
+            text_ar: >-
+              تأكد أن الريّ عمل فعلًا ووصل إلى هذه القطعة.
+        short_term:
+          - text_en: >-
+              Check for a blocked line or a failed emitter row before
+              adding water everywhere.
+            text_ar: >-
+              افحص وجود خط مسدود أو صف نقاطات معطّل قبل زيادة الماء في كل
+              مكان.
+        monitoring:
+          - text_en: Re-read NDMI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة NDMI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_out_of_band_large:
+    label_en: NDMI below the large-tree band
+    label_ar: NDMI دون نطاق الشجرة كبيرة
+    outcome:
+      action_type: irrigate
+      severity: warning
+      confidence: 0.65
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        Leaf water is below the band the guide expects for this tree size.
+        The tree is drawing on its own reserves. The guide's large-tree
+        band for NDMI at 10 m is 0.11 to 0.27.
+      text_ar: >-
+        ماء الأوراق دون النطاق الذي يتوقعه الدليل لهذا الحجم. الشجرة تسحب
+        من مخزونها. نطاق الدليل للشجرة كبيرة في NDMI عند 10 م هو من 0.11
+        إلى 0.27.
+      actions:
+        immediate:
+          - text_en: >-
+              Check the irrigation actually ran and reached this block.
+            text_ar: >-
+              تأكد أن الريّ عمل فعلًا ووصل إلى هذه القطعة.
+        short_term:
+          - text_en: >-
+              Check for a blocked line or a failed emitter row before
+              adding water everywhere.
+            text_ar: >-
+              افحص وجود خط مسدود أو صف نقاطات معطّل قبل زيادة الماء في كل
+              مكان.
+        monitoring:
+          - text_en: Re-read NDMI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة NDMI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_in_band:
+    label_en: No action — NDMI inside the band for this tree size
+    label_ar: لا إجراء — NDMI داخل نطاق هذا الحجم
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        NDMI is inside the range the mango index guide expects for this
+        tree size.
+      text_ar: >-
+        NDMI داخل النطاق الذي يتوقعه دليل مؤشرات المانجو لهذا الحجم.
+
+  leaf_size_unknown:
+    label_en: No action — tree size not recorded, so there is no band to compare against
+    label_ar: لا إجراء — حجم الشجرة غير مسجّل فلا يوجد نطاق للمقارنة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        This rule needs the block's Tree size attribute. Open the block's
+        crop assignment, set Tree size, and the rule starts running on the
+        next sweep.
+      text_ar: >-
+        تحتاج هذه القاعدة خاصية حجم الشجرة للقطعة. افتح تخصيص المحصول
+        للقطعة واضبط حجم الشجرة لتبدأ القاعدة في العمل مع أول تمريرة.

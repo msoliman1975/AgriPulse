@@ -1,0 +1,351 @@
+# t_ndre_nitrogen — NDRE against the mango index guide's band for the
+# block's recorded tree size.
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# 10 m column of the three stage value sheets.
+#
+# Size is the axis that matters. Of the workbook's 72 index x size x
+# productivity combinations, 64 hold the same range in all three stage
+# sheets, so this tree takes no stage input; only CWSI and SMI genuinely
+# move, and they move because irrigation is cut on purpose before harvest.
+#
+# Suppressed on purpose during pre-flowering.
+# The plan sheets stop nitrogen about two months before flowering to push
+# the tree from vegetative growth into flowering, so a low NDRE in that
+# window is the plan working, not a fault.
+
+code: t_ndre_nitrogen
+name_en: T_NDRE — nitrogen sufficiency against the band for this tree size
+name_ar: T_NDRE — كفاية النيتروجين مقابل نطاق حجم الشجرة
+description_en: >-
+  Checks a fertilizer shortage, mainly nitrogen, early enough that no
+  yellowing is visible to the eye yet. Branches on the block's recorded
+  Tree size and compares NDRE against the band the guide gives for that
+  size. Opens one card when the reading is below the band. Needs the Tree
+  size attribute to be set on the crop assignment.
+description_ar: >-
+  يفحص نقص التسميد، وخاصة النيتروجين، مبكرًا قبل أن يظهر أي اصفرار للعين.
+  يتفرّع على حجم الشجرة المسجّل للقطعة ويقارن NDRE بالنطاق الذي يعطيه
+  الدليل لهذا الحجم. يفتح بطاقة واحدة عندما تكون القراءة دون النطاق. يحتاج
+  ضبط خاصية حجم الشجرة على تخصيص المحصول.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    Thresholds are the actionable edge of each size's 10 m band in the
+    AgriPulse mango index guide. The guide states its own limit plainly:
+    no published study measures these indices for these nine mango
+    varieties, and field ground-truthing is recommended before the ranges
+    drive a decision. Every bound is therefore a tunable parameter, and
+    small-tree results carry lower confidence because the guide grades
+    every small-tree cell Low. Suppressed on purpose during pre-flowering.
+    The plan sheets stop nitrogen about two months before flowering to
+    push the tree from vegetative growth into flowering, so a low NDRE in
+    that window is the plan working, not a fault.
+  citations:
+    - source_type: remote_sensing
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), Index
+        Definitions + the three stage value sheets, 10 m column
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: medium
+  global: low
+
+parameters:
+  small_ndre_floor:
+    type: number
+    default: 0.08
+    min: -2.0
+    max: 3.0
+    description: >-
+      NDRE value below which a small-tree mango block is outside the range
+      the index guide expects (guide band 0.08 to 0.18 at 10 m).
+  medium_ndre_floor:
+    type: number
+    default: 0.18
+    min: -2.0
+    max: 3.0
+    description: >-
+      NDRE value below which a medium-tree mango block is outside the
+      range the index guide expects (guide band 0.18 to 0.3 at 10 m).
+  large_ndre_floor:
+    type: number
+    default: 0.38
+    min: -2.0
+    max: 3.0
+    description: >-
+      NDRE value below which a large-tree mango block is outside the range
+      the index guide expects (guide band 0.38 to 0.52 at 10 m).
+
+root: stage_suppressed
+nodes:
+  stage_suppressed:
+    label_en: Is the block inside the deliberate nitrogen-stop window?
+    label_ar: هل القطعة داخل نافذة إيقاف النيتروجين المتعمد؟
+    condition:
+      tree:
+        op: in
+        left:
+          source: block
+          field: growth_stage
+        values: [pre_flowering, flowering]
+    on_match: leaf_stage_suppressed
+    on_miss: size_small
+
+  size_small:
+    label_en: Are the trees in the small size class?
+    label_ar: هل الأشجار في فئة الحجم صغيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: small
+    on_match: small_check
+    on_miss: size_medium
+
+  size_medium:
+    label_en: Are the trees in the medium size class?
+    label_ar: هل الأشجار في فئة الحجم متوسطة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: medium
+    on_match: medium_check
+    on_miss: size_large
+
+  size_large:
+    label_en: Are the trees in the large size class?
+    label_ar: هل الأشجار في فئة الحجم كبيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: large
+    on_match: large_check
+    on_miss: leaf_size_unknown
+
+  small_check:
+    label_en: Is NDRE below the small-tree bound?
+    label_ar: هل NDRE دون حدّ الشجرة صغيرة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndre
+          key: mean
+        right:
+          source: params
+          name: small_ndre_floor
+    on_match: leaf_out_of_band_small
+    on_miss: leaf_in_band
+
+  medium_check:
+    label_en: Is NDRE below the medium-tree bound?
+    label_ar: هل NDRE دون حدّ الشجرة متوسطة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndre
+          key: mean
+        right:
+          source: params
+          name: medium_ndre_floor
+    on_match: leaf_out_of_band_medium
+    on_miss: leaf_in_band
+
+  large_check:
+    label_en: Is NDRE below the large-tree bound?
+    label_ar: هل NDRE دون حدّ الشجرة كبيرة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndre
+          key: mean
+        right:
+          source: params
+          name: large_ndre_floor
+    on_match: leaf_out_of_band_large
+    on_miss: leaf_in_band
+
+  leaf_out_of_band_small:
+    label_en: NDRE below the small-tree band
+    label_ar: NDRE دون نطاق الشجرة صغيرة
+    outcome:
+      action_type: fertilize
+      severity: info
+      confidence: 0.4
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        NDRE is below the band the guide expects for this tree size, which
+        points at a nitrogen shortage before it becomes visible. The
+        guide's small-tree band for NDRE at 10 m is 0.08 to 0.18. The
+        guide grades every small-tree cell Low, so treat this as advisory
+        and confirm on the ground.
+      text_ar: >-
+        قيمة NDRE دون النطاق الذي يتوقعه الدليل لهذا الحجم، ما يشير إلى
+        نقص نيتروجين قبل أن يصبح مرئيًا. نطاق الدليل للشجرة صغيرة في NDRE
+        عند 10 م هو من 0.08 إلى 0.18. يصنّف الدليل كل خلايا الشجرة الصغيرة
+        بثقة منخفضة، فاعتبرها استرشادية وأكّدها في الأرض.
+      actions:
+        immediate:
+          - text_en: >-
+              Take a leaf sample before changing the program — NDRE points
+              at nitrogen but does not measure it.
+            text_ar: >-
+              خذ عينة أوراق قبل تغيير البرنامج — NDRE يشير إلى النيتروجين
+              ولا يقيسه.
+        short_term:
+          - text_en: >-
+              If the sample confirms it, correct the nitrogen rate.
+            text_ar: >-
+              إذا أكدت العينة النقص، صحّح معدل النيتروجين.
+        monitoring:
+          - text_en: Re-read NDRE on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة NDRE في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_out_of_band_medium:
+    label_en: NDRE below the medium-tree band
+    label_ar: NDRE دون نطاق الشجرة متوسطة
+    outcome:
+      action_type: fertilize
+      severity: warning
+      confidence: 0.55
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        NDRE is below the band the guide expects for this tree size, which
+        points at a nitrogen shortage before it becomes visible. The
+        guide's medium-tree band for NDRE at 10 m is 0.18 to 0.3.
+      text_ar: >-
+        قيمة NDRE دون النطاق الذي يتوقعه الدليل لهذا الحجم، ما يشير إلى
+        نقص نيتروجين قبل أن يصبح مرئيًا. نطاق الدليل للشجرة متوسطة في NDRE
+        عند 10 م هو من 0.18 إلى 0.3.
+      actions:
+        immediate:
+          - text_en: >-
+              Take a leaf sample before changing the program — NDRE points
+              at nitrogen but does not measure it.
+            text_ar: >-
+              خذ عينة أوراق قبل تغيير البرنامج — NDRE يشير إلى النيتروجين
+              ولا يقيسه.
+        short_term:
+          - text_en: >-
+              If the sample confirms it, correct the nitrogen rate.
+            text_ar: >-
+              إذا أكدت العينة النقص، صحّح معدل النيتروجين.
+        monitoring:
+          - text_en: Re-read NDRE on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة NDRE في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_out_of_band_large:
+    label_en: NDRE below the large-tree band
+    label_ar: NDRE دون نطاق الشجرة كبيرة
+    outcome:
+      action_type: fertilize
+      severity: warning
+      confidence: 0.65
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        NDRE is below the band the guide expects for this tree size, which
+        points at a nitrogen shortage before it becomes visible. The
+        guide's large-tree band for NDRE at 10 m is 0.38 to 0.52.
+      text_ar: >-
+        قيمة NDRE دون النطاق الذي يتوقعه الدليل لهذا الحجم، ما يشير إلى
+        نقص نيتروجين قبل أن يصبح مرئيًا. نطاق الدليل للشجرة كبيرة في NDRE
+        عند 10 م هو من 0.38 إلى 0.52.
+      actions:
+        immediate:
+          - text_en: >-
+              Take a leaf sample before changing the program — NDRE points
+              at nitrogen but does not measure it.
+            text_ar: >-
+              خذ عينة أوراق قبل تغيير البرنامج — NDRE يشير إلى النيتروجين
+              ولا يقيسه.
+        short_term:
+          - text_en: >-
+              If the sample confirms it, correct the nitrogen rate.
+            text_ar: >-
+              إذا أكدت العينة النقص، صحّح معدل النيتروجين.
+        monitoring:
+          - text_en: Re-read NDRE on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة NDRE في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_in_band:
+    label_en: No action — NDRE inside the band for this tree size
+    label_ar: لا إجراء — NDRE داخل نطاق هذا الحجم
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        NDRE is inside the range the mango index guide expects for this
+        tree size.
+      text_ar: >-
+        NDRE داخل النطاق الذي يتوقعه دليل مؤشرات المانجو لهذا الحجم.
+
+  leaf_size_unknown:
+    label_en: No action — tree size not recorded, so there is no band to compare against
+    label_ar: لا إجراء — حجم الشجرة غير مسجّل فلا يوجد نطاق للمقارنة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        This rule needs the block's Tree size attribute. Open the block's
+        crop assignment, set Tree size, and the rule starts running on the
+        next sweep.
+      text_ar: >-
+        تحتاج هذه القاعدة خاصية حجم الشجرة للقطعة. افتح تخصيص المحصول
+        للقطعة واضبط حجم الشجرة لتبدأ القاعدة في العمل مع أول تمريرة.
+
+  leaf_stage_suppressed:
+    label_en: No action — nitrogen is withheld on purpose at this stage
+    label_ar: لا إجراء — يُمنع النيتروجين عمدًا في هذه المرحلة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        Nitrogen is withheld on purpose in the run-up to flowering, so a
+        low NDRE here is the plan working. The agriculture plan stops
+        nitrogen about two months before flowering and switches to a
+        potassium-only feed, so the tree moves from vegetative growth into
+        flowering. A low NDRE reading here is that plan working. The rule
+        resumes at fruit set.
+      text_ar: >-
+        يُمنع النيتروجين عمدًا قبل التزهير، لذا فانخفاض NDRE هنا هو الخطة
+        تعمل لا خلل. توقف الخطة الزراعية النيتروجين نحو شهرين قبل التزهير
+        وتحوّل إلى تغذية بالبوتاسيوم وحده، لتنتقل الشجرة من النمو الخضري
+        إلى التزهير. انخفاض NDRE هنا هو تلك الخطة تعمل. تستأنف القاعدة عند
+        العقد.

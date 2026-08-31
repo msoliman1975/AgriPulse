@@ -1,0 +1,557 @@
+# t_smi_soil_moisture — SMI against the mango index guide's band for the
+# block's recorded tree size.
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# 10 m column of the three stage value sheets.
+#
+# Size is the axis that matters. Of the workbook's 72 index x size x
+# productivity combinations, 64 hold the same range in all three stage
+# sheets, so this tree takes no stage input; only CWSI and SMI genuinely
+# move, and they move because irrigation is cut on purpose before harvest.
+#
+# Every SMI cell in the guide is graded Medium-Low, and the guide states
+# there is no single standardized formula under this name.
+# This is the weakest tree in the catalogue.
+# Its card is advisory and T_WATER_CONFIRM is the place to act on it.
+
+code: t_smi_soil_moisture
+name_en: T_SMI — soil moisture below the band for this tree size
+name_ar: T_SMI — رطوبة التربة دون نطاق حجم الشجرة
+description_en: >-
+  Checks the water in the soil itself rather than in the plant, estimated
+  from land-surface temperature. Branches on the block's recorded Tree
+  size and compares SMI against the band the guide gives for that size.
+  Opens one card when the reading is below the band. Needs the Tree size
+  attribute to be set on the crop assignment.
+description_ar: >-
+  يفحص الماء في التربة نفسها لا في النبات، مُقدَّرًا من حرارة سطح الأرض.
+  يتفرّع على حجم الشجرة المسجّل للقطعة ويقارن SMI بالنطاق الذي يعطيه
+  الدليل لهذا الحجم. يفتح بطاقة واحدة عندما تكون القراءة دون النطاق. يحتاج
+  ضبط خاصية حجم الشجرة على تخصيص المحصول.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    Thresholds are the actionable edge of each size's 10 m band in the
+    AgriPulse mango index guide. The guide states its own limit plainly:
+    no published study measures these indices for these nine mango
+    varieties, and field ground-truthing is recommended before the ranges
+    drive a decision. Every bound is therefore a tunable parameter, and
+    small-tree results carry lower confidence because the guide grades
+    every small-tree cell Low. Every SMI cell in the guide is graded
+    Medium-Low, and the guide states there is no single standardized
+    formula under this name. This is the weakest tree in the catalogue.
+    Its card is advisory and T_WATER_CONFIRM is the place to act on it.
+  citations:
+    - source_type: remote_sensing
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), Index
+        Definitions + the three stage value sheets, 10 m column
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: medium
+  global: low
+
+parameters:
+  small_smi_floor:
+    type: number
+    default: 0.35
+    min: -2.0
+    max: 3.0
+    description: >-
+      SMI value below which a small-tree mango block is outside the range
+      the index guide expects (guide band 0.35 to 0.55 at 10 m).
+  medium_smi_floor:
+    type: number
+    default: 0.4
+    min: -2.0
+    max: 3.0
+    description: >-
+      SMI value below which a medium-tree mango block is outside the range
+      the index guide expects (guide band 0.4 to 0.6 at 10 m).
+  large_smi_floor:
+    type: number
+    default: 0.45
+    min: -2.0
+    max: 3.0
+    description: >-
+      SMI value below which a large-tree mango block is outside the range
+      the index guide expects (guide band 0.45 to 0.7 at 10 m).
+  small_smi_floor_deficit:
+    type: number
+    default: 0.27
+    min: -2.0
+    max: 3.0
+    description: >-
+      SMI value below which a small-tree bearing block is outside the
+      range the guide expects while pre-harvest deficit irrigation is
+      running (guide band 0.27 to 0.47 at 10 m).
+  medium_smi_floor_deficit:
+    type: number
+    default: 0.31
+    min: -2.0
+    max: 3.0
+    description: >-
+      SMI value below which a medium-tree bearing block is outside the
+      range the guide expects while pre-harvest deficit irrigation is
+      running (guide band 0.31 to 0.51 at 10 m).
+  large_smi_floor_deficit:
+    type: number
+    default: 0.35
+    min: -2.0
+    max: 3.0
+    description: >-
+      SMI value below which a large-tree bearing block is outside the
+      range the guide expects while pre-harvest deficit irrigation is
+      running (guide band 0.35 to 0.6 at 10 m).
+
+root: deficit_window
+nodes:
+  deficit_window:
+    label_en: >-
+      Is this a bearing block inside its pre-harvest deficit
+      irrigation window?
+    label_ar: هل هذه قطعة مثمرة داخل نافذة الريّ الناقص قبل الحصاد؟
+    condition:
+      tree:
+        all_of:
+          - op: eq
+            left:
+              source: crop_attribute
+              code: bearing_status
+              key: value
+            right: bearing
+          - op: in
+            left:
+              source: block
+              field: growth_stage
+            values: [maturation]
+    on_match: deficit_size_small
+    on_miss: size_small
+
+  size_small:
+    label_en: Are the trees in the small size class?
+    label_ar: هل الأشجار في فئة الحجم صغيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: small
+    on_match: small_check
+    on_miss: size_medium
+
+  size_medium:
+    label_en: Are the trees in the medium size class?
+    label_ar: هل الأشجار في فئة الحجم متوسطة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: medium
+    on_match: medium_check
+    on_miss: size_large
+
+  size_large:
+    label_en: Are the trees in the large size class?
+    label_ar: هل الأشجار في فئة الحجم كبيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: large
+    on_match: large_check
+    on_miss: leaf_size_unknown
+
+  small_check:
+    label_en: Is SMI below the small-tree bound?
+    label_ar: هل SMI دون حدّ الشجرة صغيرة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: smi
+          key: mean
+        right:
+          source: params
+          name: small_smi_floor
+    on_match: leaf_out_of_band_small
+    on_miss: leaf_in_band
+
+  medium_check:
+    label_en: Is SMI below the medium-tree bound?
+    label_ar: هل SMI دون حدّ الشجرة متوسطة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: smi
+          key: mean
+        right:
+          source: params
+          name: medium_smi_floor
+    on_match: leaf_out_of_band_medium
+    on_miss: leaf_in_band
+
+  large_check:
+    label_en: Is SMI below the large-tree bound?
+    label_ar: هل SMI دون حدّ الشجرة كبيرة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: smi
+          key: mean
+        right:
+          source: params
+          name: large_smi_floor
+    on_match: leaf_out_of_band_large
+    on_miss: leaf_in_band
+
+  deficit_size_small:
+    label_en: Are the trees in the small size class?
+    label_ar: هل الأشجار في فئة الحجم صغيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: small
+    on_match: deficit_small_check
+    on_miss: deficit_size_medium
+
+  deficit_size_medium:
+    label_en: Are the trees in the medium size class?
+    label_ar: هل الأشجار في فئة الحجم متوسطة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: medium
+    on_match: deficit_medium_check
+    on_miss: deficit_size_large
+
+  deficit_size_large:
+    label_en: Are the trees in the large size class?
+    label_ar: هل الأشجار في فئة الحجم كبيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: large
+    on_match: deficit_large_check
+    on_miss: leaf_size_unknown
+
+  deficit_small_check:
+    label_en: Is SMI below the small-tree bound for the deficit window?
+    label_ar: هل SMI دون حدّ الشجرة صغيرةضمن نافذة العجز؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: smi
+          key: mean
+        right:
+          source: params
+          name: small_smi_floor_deficit
+    on_match: leaf_deficit_out_of_band_small
+    on_miss: leaf_in_band
+
+  deficit_medium_check:
+    label_en: Is SMI below the medium-tree bound for the deficit window?
+    label_ar: هل SMI دون حدّ الشجرة متوسطةضمن نافذة العجز؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: smi
+          key: mean
+        right:
+          source: params
+          name: medium_smi_floor_deficit
+    on_match: leaf_deficit_out_of_band_medium
+    on_miss: leaf_in_band
+
+  deficit_large_check:
+    label_en: Is SMI below the large-tree bound for the deficit window?
+    label_ar: هل SMI دون حدّ الشجرة كبيرةضمن نافذة العجز؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: smi
+          key: mean
+        right:
+          source: params
+          name: large_smi_floor_deficit
+    on_match: leaf_deficit_out_of_band_large
+    on_miss: leaf_in_band
+
+  leaf_out_of_band_small:
+    label_en: SMI below the small-tree band
+    label_ar: SMI دون نطاق الشجرة صغيرة
+    outcome:
+      action_type: irrigate
+      severity: info
+      confidence: 0.4
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        Soil moisture is below the band the guide expects for this tree
+        size. The guide's small-tree band for SMI at 10 m is 0.35 to 0.55.
+        The guide grades every small-tree cell Low, so treat this as
+        advisory and confirm on the ground.
+      text_ar: >-
+        رطوبة التربة دون النطاق الذي يتوقعه الدليل لهذا الحجم. نطاق الدليل
+        للشجرة صغيرة في SMI عند 10 م هو من 0.35 إلى 0.55. يصنّف الدليل كل
+        خلايا الشجرة الصغيرة بثقة منخفضة، فاعتبرها استرشادية وأكّدها في
+        الأرض.
+      actions:
+        immediate:
+          - text_en: >-
+              Confirm with a soil probe before changing the irrigation
+              schedule — this index is the weakest in the guide.
+            text_ar: >-
+              أكّد بمسبار تربة قبل تغيير جدول الريّ — هذا أضعف مؤشرات
+              الدليل.
+        short_term:
+          - text_en: >-
+              Read it beside T_CWSI and T_NDMI rather than on its own.
+            text_ar: >-
+              اقرأه بجانب T_CWSI و T_NDMI لا وحده.
+        monitoring:
+          - text_en: Re-read SMI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة SMI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_out_of_band_medium:
+    label_en: SMI below the medium-tree band
+    label_ar: SMI دون نطاق الشجرة متوسطة
+    outcome:
+      action_type: irrigate
+      severity: warning
+      confidence: 0.55
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        Soil moisture is below the band the guide expects for this tree
+        size. The guide's medium-tree band for SMI at 10 m is 0.4 to 0.6.
+      text_ar: >-
+        رطوبة التربة دون النطاق الذي يتوقعه الدليل لهذا الحجم. نطاق الدليل
+        للشجرة متوسطة في SMI عند 10 م هو من 0.4 إلى 0.6.
+      actions:
+        immediate:
+          - text_en: >-
+              Confirm with a soil probe before changing the irrigation
+              schedule — this index is the weakest in the guide.
+            text_ar: >-
+              أكّد بمسبار تربة قبل تغيير جدول الريّ — هذا أضعف مؤشرات
+              الدليل.
+        short_term:
+          - text_en: >-
+              Read it beside T_CWSI and T_NDMI rather than on its own.
+            text_ar: >-
+              اقرأه بجانب T_CWSI و T_NDMI لا وحده.
+        monitoring:
+          - text_en: Re-read SMI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة SMI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_out_of_band_large:
+    label_en: SMI below the large-tree band
+    label_ar: SMI دون نطاق الشجرة كبيرة
+    outcome:
+      action_type: irrigate
+      severity: warning
+      confidence: 0.65
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        Soil moisture is below the band the guide expects for this tree
+        size. The guide's large-tree band for SMI at 10 m is 0.45 to 0.7.
+      text_ar: >-
+        رطوبة التربة دون النطاق الذي يتوقعه الدليل لهذا الحجم. نطاق الدليل
+        للشجرة كبيرة في SMI عند 10 م هو من 0.45 إلى 0.7.
+      actions:
+        immediate:
+          - text_en: >-
+              Confirm with a soil probe before changing the irrigation
+              schedule — this index is the weakest in the guide.
+            text_ar: >-
+              أكّد بمسبار تربة قبل تغيير جدول الريّ — هذا أضعف مؤشرات
+              الدليل.
+        short_term:
+          - text_en: >-
+              Read it beside T_CWSI and T_NDMI rather than on its own.
+            text_ar: >-
+              اقرأه بجانب T_CWSI و T_NDMI لا وحده.
+        monitoring:
+          - text_en: Re-read SMI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة SMI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_deficit_out_of_band_small:
+    label_en: SMI below the small-tree band (deficit window)
+    label_ar: SMI دون نطاق الشجرة صغيرة (نافذة العجز)
+    outcome:
+      action_type: irrigate
+      severity: info
+      confidence: 0.4
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        Soil moisture is below even the reduced band that the pre-harvest
+        deficit window allows. The guide's small-tree band for SMI at 10 m
+        is 0.27 to 0.47. The guide grades every small-tree cell Low, so
+        treat this as advisory and confirm on the ground.
+      text_ar: >-
+        رطوبة التربة دون النطاق المخفّض الذي تسمح به نافذة العجز قبل
+        الحصاد. نطاق الدليل للشجرة صغيرة في SMI عند 10 م هو من 0.27 إلى
+        0.47. يصنّف الدليل كل خلايا الشجرة الصغيرة بثقة منخفضة، فاعتبرها
+        استرشادية وأكّدها في الأرض.
+      actions:
+        immediate:
+          - text_en: >-
+              Confirm with a soil probe before changing the irrigation
+              schedule — this index is the weakest in the guide.
+            text_ar: >-
+              أكّد بمسبار تربة قبل تغيير جدول الريّ — هذا أضعف مؤشرات
+              الدليل.
+        short_term:
+          - text_en: >-
+              Read it beside T_CWSI and T_NDMI rather than on its own.
+            text_ar: >-
+              اقرأه بجانب T_CWSI و T_NDMI لا وحده.
+        monitoring:
+          - text_en: Re-read SMI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة SMI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_deficit_out_of_band_medium:
+    label_en: SMI below the medium-tree band (deficit window)
+    label_ar: SMI دون نطاق الشجرة متوسطة (نافذة العجز)
+    outcome:
+      action_type: irrigate
+      severity: warning
+      confidence: 0.55
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        Soil moisture is below even the reduced band that the pre-harvest
+        deficit window allows. The guide's medium-tree band for SMI at 10
+        m is 0.31 to 0.51.
+      text_ar: >-
+        رطوبة التربة دون النطاق المخفّض الذي تسمح به نافذة العجز قبل
+        الحصاد. نطاق الدليل للشجرة متوسطة في SMI عند 10 م هو من 0.31 إلى
+        0.51.
+      actions:
+        immediate:
+          - text_en: >-
+              Confirm with a soil probe before changing the irrigation
+              schedule — this index is the weakest in the guide.
+            text_ar: >-
+              أكّد بمسبار تربة قبل تغيير جدول الريّ — هذا أضعف مؤشرات
+              الدليل.
+        short_term:
+          - text_en: >-
+              Read it beside T_CWSI and T_NDMI rather than on its own.
+            text_ar: >-
+              اقرأه بجانب T_CWSI و T_NDMI لا وحده.
+        monitoring:
+          - text_en: Re-read SMI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة SMI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_deficit_out_of_band_large:
+    label_en: SMI below the large-tree band (deficit window)
+    label_ar: SMI دون نطاق الشجرة كبيرة (نافذة العجز)
+    outcome:
+      action_type: irrigate
+      severity: warning
+      confidence: 0.65
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        Soil moisture is below even the reduced band that the pre-harvest
+        deficit window allows. The guide's large-tree band for SMI at 10 m
+        is 0.35 to 0.6.
+      text_ar: >-
+        رطوبة التربة دون النطاق المخفّض الذي تسمح به نافذة العجز قبل
+        الحصاد. نطاق الدليل للشجرة كبيرة في SMI عند 10 م هو من 0.35 إلى
+        0.6.
+      actions:
+        immediate:
+          - text_en: >-
+              Confirm with a soil probe before changing the irrigation
+              schedule — this index is the weakest in the guide.
+            text_ar: >-
+              أكّد بمسبار تربة قبل تغيير جدول الريّ — هذا أضعف مؤشرات
+              الدليل.
+        short_term:
+          - text_en: >-
+              Read it beside T_CWSI and T_NDMI rather than on its own.
+            text_ar: >-
+              اقرأه بجانب T_CWSI و T_NDMI لا وحده.
+        monitoring:
+          - text_en: Re-read SMI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة SMI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_in_band:
+    label_en: No action — SMI inside the band for this tree size
+    label_ar: لا إجراء — SMI داخل نطاق هذا الحجم
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        SMI is inside the range the mango index guide expects for this
+        tree size.
+      text_ar: >-
+        SMI داخل النطاق الذي يتوقعه دليل مؤشرات المانجو لهذا الحجم.
+
+  leaf_size_unknown:
+    label_en: No action — tree size not recorded, so there is no band to compare against
+    label_ar: لا إجراء — حجم الشجرة غير مسجّل فلا يوجد نطاق للمقارنة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        This rule needs the block's Tree size attribute. Open the block's
+        crop assignment, set Tree size, and the rule starts running on the
+        next sweep.
+      text_ar: >-
+        تحتاج هذه القاعدة خاصية حجم الشجرة للقطعة. افتح تخصيص المحصول
+        للقطعة واضبط حجم الشجرة لتبدأ القاعدة في العمل مع أول تمريرة.

@@ -1,0 +1,433 @@
+# t_water_stress_confirm — do the water indices agree before anyone drives
+# to the block?
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# Index Definitions sheet (confidence column) and the three value sheets.
+#
+# The guide grades its four water indices very differently. CWSI is High
+# confidence and it says so in words: "the most reliable index for irrigation
+# decisions". SMI is Medium-Low and the guide admits there is no single
+# standardized formula under that name. NDMI is Medium-High. Acting on any one
+# of them alone spends a driver and a pump on the weakest evidence in the file,
+# so this tree is where a real irrigation decision belongs and the single-index
+# trees stay advisory.
+#
+# TWO INDICES IN THE GUIDE ARE ONE SIGNAL. The guide lists NDMI and MSI as
+# separate rows, but MSI is SWIR/NIR and NDMI is (NIR-SWIR)/(NIR+SWIR): they
+# are a monotone transform of each other, ndmi == (1 - msi) / (1 + msi). They
+# cannot disagree. Counting both would let one measurement cast two votes and
+# reach "confirmed" on its own, so MSI is not read here at all.
+#
+# Judged as z-scores, not absolute values. Every absolute band in the guide is
+# keyed on tree size; a confirmation tree that branched on size as well would
+# be nine nodes deep for no gain. baseline_deviation compares the block against
+# its own history for this day of year, which removes the size axis outright
+# and asks the better question: is this block drier than it usually is now?
+
+code: t_water_stress_confirm
+name_en: T_WATER_CONFIRM — water stress agreed by more than one index
+name_ar: T_WATER_CONFIRM — إجهاد مائي تتفق عليه أكثر من قراءة
+description_en: >-
+  Raises an irrigation decision only when more than one independent water
+  reading agrees. Reads leaf water (NDMI), soil moisture (SMI) and canopy
+  temperature (CWSI), each as a deviation from the block's own history for
+  this day of year. MSI is deliberately not read: it is the same measurement
+  as NDMI on an inverted scale and would let one signal vote twice. Skips
+  the thermal vote when CWSI is clipped at its ceiling.
+description_ar: >-
+  لا يرفع قرار ريّ إلا عندما تتفق أكثر من قراءة مائية مستقلة. يقرأ ماء
+  الأوراق (NDMI) ورطوبة التربة (SMI) وحرارة المجموع (CWSI)، كل واحدة
+  كانحراف عن تاريخ القطعة نفسها في اليوم نفسه من السنة. لا يقرأ MSI عمدًا:
+  فهو القياس نفسه الذي يقيسه NDMI على مقياس معكوس وكان سيمنح إشارة واحدة
+  صوتين. يتجاوز الصوت الحراري عندما يكون CWSI ملتصقًا بسقفه.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    The agreement rule is a design choice, not a published finding. What is
+    published, and what drives it, is the confidence spread in the mango index
+    guide itself: CWSI High, NDMI Medium-High, SMI Medium-Low with no agreed
+    formula. The collinearity of NDMI and MSI is arithmetic and not a matter
+    of confidence — the identity ndmi == (1 - msi) / (1 + msi) holds exactly.
+  citations:
+    - source_type: peer_reviewed
+      title: >-
+        Idso, S.B. et al. — Normalizing the stress-degree-day parameter for
+        environmental variability; Jackson, R.D. et al. — Canopy temperature
+        as a crop water stress indicator
+      url: https://agupubs.onlinelibrary.wiley.com/doi/10.1029/WR017i004p01133
+      year: 1981
+    - source_type: peer_reviewed
+      title: >-
+        Gao, B.C. — NDWI, a normalized difference water index for remote
+        sensing of vegetation liquid water from space, Remote Sensing of
+        Environment 58(3)
+      url: https://www.sciencedirect.com/science/article/abs/pii/S0034425796000673
+      year: 1996
+    - source_type: remote_sensing
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), Index
+        Definitions sheet, confidence column
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: high
+  global: medium
+
+parameters:
+  dry_z:
+    type: number
+    default: -1.0
+    min: -5.0
+    max: 0.0
+    description: >-
+      Deviation from the block's own day-of-year history at or below which a
+      moisture index counts as a dry vote. -1.0 is one standard deviation
+      below normal for this block at this time of year.
+  cwsi_hot_z:
+    type: number
+    default: 1.0
+    min: 0.0
+    max: 5.0
+    description: >-
+      Deviation at or above which canopy temperature counts as a stress vote.
+      CWSI runs the other way to the moisture indices, so its vote is a
+      positive deviation.
+  saturation_guard:
+    type: number
+    default: 0.99
+    min: 0.0
+    max: 1.0
+    description: >-
+      CWSI value at or above which the thermal reading is treated as clipped
+      at the index ceiling and dropped from the vote entirely.
+
+root: cwsi_usable
+nodes:
+  cwsi_usable:
+    label_en: Is the thermal reading usable, or is CWSI clipped at its ceiling?
+    label_ar: هل القراءة الحرارية صالحة أم أن CWSI ملتصق بسقفه؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: indices
+          index_code: cwsi
+          key: mean
+        right:
+          source: params
+          name: saturation_guard
+    on_match: two_votes_both
+    on_miss: three_votes_all
+
+  # ---- three usable votes -------------------------------------------
+  three_votes_all:
+    label_en: Do all three readings — leaf water, soil moisture and canopy temperature — say dry?
+    label_ar: هل تقول القراءات الثلاث كلها — ماء الأوراق ورطوبة التربة وحرارة المجموع — جفاف؟
+    condition:
+      tree:
+        all_of:
+          - op: le
+            left:
+              source: indices
+              index_code: ndmi
+              key: baseline_deviation
+            right:
+              source: params
+              name: dry_z
+          - op: le
+            left:
+              source: indices
+              index_code: smi
+              key: baseline_deviation
+            right:
+              source: params
+              name: dry_z
+          - op: ge
+            left:
+              source: indices
+              index_code: cwsi
+              key: baseline_deviation
+            right:
+              source: params
+              name: cwsi_hot_z
+    on_match: leaf_confirmed_strong
+    on_miss: three_votes_any_two
+
+  three_votes_any_two:
+    label_en: Do any two of the three readings agree?
+    label_ar: هل تتفق أي قراءتين من الثلاث؟
+    condition:
+      tree:
+        any_of:
+          - all_of:
+              - op: le
+                left:
+                  source: indices
+                  index_code: ndmi
+                  key: baseline_deviation
+                right:
+                  source: params
+                  name: dry_z
+              - op: le
+                left:
+                  source: indices
+                  index_code: smi
+                  key: baseline_deviation
+                right:
+                  source: params
+                  name: dry_z
+          - all_of:
+              - op: le
+                left:
+                  source: indices
+                  index_code: ndmi
+                  key: baseline_deviation
+                right:
+                  source: params
+                  name: dry_z
+              - op: ge
+                left:
+                  source: indices
+                  index_code: cwsi
+                  key: baseline_deviation
+                right:
+                  source: params
+                  name: cwsi_hot_z
+          - all_of:
+              - op: le
+                left:
+                  source: indices
+                  index_code: smi
+                  key: baseline_deviation
+                right:
+                  source: params
+                  name: dry_z
+              - op: ge
+                left:
+                  source: indices
+                  index_code: cwsi
+                  key: baseline_deviation
+                right:
+                  source: params
+                  name: cwsi_hot_z
+    on_match: leaf_confirmed
+    on_miss: three_votes_any_one
+
+  three_votes_any_one:
+    label_en: Does any single reading say dry?
+    label_ar: هل تقول أي قراءة منفردة جفافًا؟
+    condition:
+      tree:
+        any_of:
+          - op: le
+            left:
+              source: indices
+              index_code: ndmi
+              key: baseline_deviation
+            right:
+              source: params
+              name: dry_z
+          - op: le
+            left:
+              source: indices
+              index_code: smi
+              key: baseline_deviation
+            right:
+              source: params
+              name: dry_z
+          - op: ge
+            left:
+              source: indices
+              index_code: cwsi
+              key: baseline_deviation
+            right:
+              source: params
+              name: cwsi_hot_z
+    on_match: leaf_single_signal
+    on_miss: leaf_no_stress
+
+  # ---- thermal unusable, two votes left ------------------------------
+  two_votes_both:
+    label_en: With the thermal reading dropped, do leaf water and soil moisture both say dry?
+    label_ar: بعد إسقاط القراءة الحرارية، هل يقول ماء الأوراق ورطوبة التربة معًا جفافًا؟
+    condition:
+      tree:
+        all_of:
+          - op: le
+            left:
+              source: indices
+              index_code: ndmi
+              key: baseline_deviation
+            right:
+              source: params
+              name: dry_z
+          - op: le
+            left:
+              source: indices
+              index_code: smi
+              key: baseline_deviation
+            right:
+              source: params
+              name: dry_z
+    on_match: leaf_confirmed
+    on_miss: two_votes_any_one
+
+  two_votes_any_one:
+    label_en: Does either of the two remaining readings say dry?
+    label_ar: هل تقول إحدى القراءتين الباقيتين جفافًا؟
+    condition:
+      tree:
+        any_of:
+          - op: le
+            left:
+              source: indices
+              index_code: ndmi
+              key: baseline_deviation
+            right:
+              source: params
+              name: dry_z
+          - op: le
+            left:
+              source: indices
+              index_code: smi
+              key: baseline_deviation
+            right:
+              source: params
+              name: dry_z
+    on_match: leaf_single_signal
+    on_miss: leaf_no_stress
+
+  # ---- leaves --------------------------------------------------------
+  leaf_confirmed_strong:
+    label_en: Water stress confirmed by all three readings — irrigate
+    label_ar: إجهاد مائي تؤكده القراءات الثلاث — اروِ
+    outcome:
+      action_type: irrigate
+      severity: critical
+      confidence: 0.8
+      valid_for_hours: 72
+      parameters:
+        priority: high
+      text_en: >-
+        Leaf water, soil moisture and canopy temperature all read drier than
+        this block's own normal for this time of year. Three independent
+        measurements agreeing is the strongest water evidence the platform
+        can produce.
+      text_ar: >-
+        ماء الأوراق ورطوبة التربة وحرارة المجموع كلها أجف من المعتاد لهذه
+        القطعة في هذا الوقت من السنة. اتفاق ثلاث قياسات مستقلة هو أقوى دليل
+        مائي يمكن للمنصة إنتاجه.
+      actions:
+        immediate:
+          - text_en: Irrigate this block on the next cycle.
+            text_ar: اروِ هذه القطعة في الدورة القادمة.
+          - text_en: >-
+              Check the block actually received water on its last scheduled
+              run before adding an extra one.
+            text_ar: >-
+              تأكد أن القطعة تلقت ماءً فعلًا في تشغيلها المجدول الأخير قبل
+              إضافة تشغيل جديد.
+        short_term:
+          - text_en: >-
+              If the block was irrigated on schedule and still reads dry,
+              look for a blocked line, a failed valve, or a row of emitters
+              that stopped.
+            text_ar: >-
+              إن كانت القطعة رُويت في موعدها وما زالت تقرأ جفافًا، فابحث عن
+              خط مسدود أو محبس معطّل أو صف نقاطات توقّف.
+        monitoring:
+          - text_en: >-
+              Re-read all three indices on the next clear scene; expect the
+              deviations to move back toward zero.
+            text_ar: >-
+              أعد قراءة المؤشرات الثلاثة في أول مشهد صافٍ؛ يُتوقع أن تعود
+              الانحرافات نحو الصفر.
+
+  leaf_confirmed:
+    label_en: Water stress confirmed by two readings — irrigate
+    label_ar: إجهاد مائي تؤكده قراءتان — اروِ
+    outcome:
+      action_type: irrigate
+      severity: warning
+      confidence: 0.65
+      valid_for_hours: 96
+      parameters:
+        priority: medium
+      text_en: >-
+        Two independent water readings agree that this block is drier than
+        its own normal for this time of year. That is enough to act on.
+      text_ar: >-
+        تتفق قراءتان مائيتان مستقلتان على أن هذه القطعة أجف من المعتاد لها في
+        هذا الوقت من السنة. هذا يكفي للتصرف.
+      actions:
+        immediate:
+          - text_en: Irrigate this block on the next cycle.
+            text_ar: اروِ هذه القطعة في الدورة القادمة.
+        short_term:
+          - text_en: >-
+              Confirm the irrigation reached the block before increasing the
+              schedule for the whole farm.
+            text_ar: >-
+              تأكد أن الريّ وصل القطعة قبل زيادة الجدول للمزرعة كلها.
+        monitoring:
+          - text_en: Re-read the indices on the next clear scene.
+            text_ar: أعد قراءة المؤشرات في أول مشهد صافٍ.
+
+  leaf_single_signal:
+    label_en: One reading says dry and the others do not — check, do not act yet
+    label_ar: قراءة واحدة تقول جفافًا والبقية لا — تحقق ولا تتصرف بعد
+    outcome:
+      action_type: scout
+      severity: info
+      confidence: 0.35
+      valid_for_hours: 120
+      parameters:
+        priority: low
+      text_en: >-
+        One water reading is below this block's normal while the others are
+        not. That is as likely to be a cloud edge, a thermal gap, or a thin
+        baseline as it is real water stress. Check before spending water.
+      text_ar: >-
+        قراءة مائية واحدة دون المعتاد لهذه القطعة بينما البقية ليست كذلك. هذا
+        قد يكون حافة سحابة أو فجوة حرارية أو خط أساس ضعيف بقدر ما قد يكون
+        إجهادًا حقيقيًا. تحقق قبل صرف الماء.
+      actions:
+        immediate:
+          - text_en: >-
+              Check soil moisture in the block by hand or with a probe.
+            text_ar: افحص رطوبة التربة في القطعة يدويًا أو بمسبار.
+        short_term:
+          - text_en: >-
+              If the hand check agrees with the index, irrigate; if not,
+              leave the schedule alone and wait for the next scene.
+            text_ar: >-
+              إن اتفق الفحص اليدوي مع المؤشر فاروِ؛ وإن لم يتفق فاترك الجدول
+              وانتظر المشهد التالي.
+        monitoring:
+          - text_en: >-
+              Watch whether a second index joins on the next scene — that is
+              what turns this into a decision.
+            text_ar: >-
+              راقب انضمام مؤشر ثانٍ في المشهد التالي — فذلك ما يحوّلها إلى قرار.
+
+  leaf_no_stress:
+    label_en: No action — no water reading is below this block's normal
+    label_ar: لا إجراء — لا توجد قراءة مائية دون معتاد هذه القطعة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        Leaf water, soil moisture and canopy temperature are all within this
+        block's own normal range for this time of year.
+      text_ar: >-
+        ماء الأوراق ورطوبة التربة وحرارة المجموع كلها ضمن النطاق المعتاد لهذه
+        القطعة في هذا الوقت من السنة.

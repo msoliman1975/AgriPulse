@@ -1,0 +1,256 @@
+# t_fruit_development_program — the two sprays, the thinning, and the switch
+# away from nitrogen.
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# Stage B of the four Plan sheets.
+#
+# Stage B carries five instructions and they are not interchangeable:
+#
+#   ~42 days after flower induction   first KNO3 foliar spray, 1-2% — holds
+#                                     the set fruit on the tree
+#   mid stage                         thin at pea-to-marble size where the
+#                                     load is excessive
+#   ~65 days after flower induction   second KNO3 foliar spray, 1-2% — sizes
+#                                     the fruit that stayed
+#   through the stage                 raise irrigation for bulking, and shift
+#                                     the feed to low-nitrogen, high-potassium
+#
+# The two sprays are the same product at the same rate doing two different
+# jobs, and the gap between them is the point. This tree splits Stage B in
+# half so the early card carries the retention spray and the late card carries
+# the sizing spray, rather than emitting one card listing both and letting
+# whoever reads it guess which is due.
+#
+# The day counts are counted from flower induction, which the platform does
+# not record as a date. The split therefore falls on the stage boundary the
+# platform does have — fruit_set for the early half, fruit_development for the
+# late half — and the card names the day count so a grower who knows their own
+# induction date can place it exactly.
+
+code: t_fruit_development_program
+name_en: T_FRUIT_DEV — KNO3 sprays, fruit thinning and the shift off nitrogen
+name_ar: T_FRUIT_DEV — رشّات نترات البوتاسيوم وخفّ الثمار والتحول عن النيتروجين
+description_en: >-
+  Runs through fruit set and fruit development and gives the due half of the
+  plan's Stage B program: the first KNO3 foliar spray and thinning early, the
+  second KNO3 spray and the bulking irrigation later, with the shift to a
+  low-nitrogen potassium-rich feed across both. Calendar driven — the day
+  counts run from flower induction, which is on the card for growers who
+  recorded that date.
+description_ar: >-
+  يعمل خلال العقد وتطور الثمار ويعطي النصف المستحق من برنامج المرحلة B في
+  الخطة: رشّة نترات البوتاسيوم الأولى والخفّ مبكرًا، ثم الرشّة الثانية وريّ
+  التضخيم لاحقًا، مع التحول إلى تغذية منخفضة النيتروجين غنية بالبوتاسيوم في
+  النصفين. يعتمد على التقويم — وتُحسب الأيام من حثّ التزهير، وهي على البطاقة
+  لمن سجّل ذلك التاريخ.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    Every item is graded Medium in the plan sheets, which is the honest grade:
+    KNO3 foliar sprays for fruit retention and sizing are widely used in mango
+    and widely reported, but the workbook found no study placing them by week
+    for these nine varieties. The 1-2% rate is the plan's. Thinning is
+    conditional on an excessive load, which nothing here measures — the card
+    says "where the load is excessive" and leaves the judgement with the
+    grower, because a light crop thinned is a crop lost.
+  citations:
+    - source_type: extension
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), Stage B of the
+        Plan sheets: fruit development
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: high
+  global: medium
+
+root: bearing_block
+nodes:
+  bearing_block:
+    label_en: Is this block carrying a crop this season?
+    label_ar: هل تحمل هذه القطعة محصولًا هذا الموسم؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: bearing_status
+          key: value
+        right: bearing
+    on_match: early_half
+    on_miss: leaf_not_bearing
+
+  early_half:
+    label_en: Is the block in the early half of fruit development?
+    label_ar: هل القطعة في النصف الأول من تطور الثمار؟
+    condition:
+      tree:
+        op: in
+        left:
+          source: block
+          field: growth_stage
+        values: [fruit_set]
+    on_match: leaf_early_program
+    on_miss: late_half
+
+  late_half:
+    label_en: Is the block in the late half of fruit development?
+    label_ar: هل القطعة في النصف الثاني من تطور الثمار؟
+    condition:
+      tree:
+        op: in
+        left:
+          source: block
+          field: growth_stage
+        values: [fruit_development]
+    on_match: leaf_late_program
+    on_miss: leaf_not_due
+
+  leaf_early_program:
+    label_en: First KNO3 spray and thinning window
+    label_ar: نافذة رشّة نترات البوتاسيوم الأولى والخفّ
+    outcome:
+      action_type: spray
+      severity: warning
+      confidence: 0.6
+      valid_for_hours: 240
+      parameters:
+        priority: medium
+      text_en: >-
+        The fruit has set and the early half of the development program is
+        due. The first KNO3 spray goes on around 42 days after flower
+        induction and its job is retention — holding the set fruit on the tree
+        through the natural drop. Thinning follows while the fruit is still at
+        pea to marble size, and only where the load is genuinely heavy.
+      text_ar: >-
+        عقدت الثمار وحلّ النصف الأول من برنامج التطور. تُطبّق رشّة نترات
+        البوتاسيوم الأولى نحو 42 يومًا من حثّ التزهير ومهمتها التثبيت — إبقاء
+        الثمار العاقدة على الشجرة خلال التساقط الطبيعي. ويتبعها الخفّ والثمرة
+        ما زالت بحجم البازلاء إلى البلية، وحيث يكون الحمل ثقيلًا فعلًا فقط.
+      actions:
+        immediate:
+          - text_en: >-
+              Apply the first KNO3 foliar spray at 1 to 2%, about 42 days
+              after flower induction.
+            text_ar: >-
+              طبّق رشّة نترات البوتاسيوم الورقية الأولى بتركيز 1 إلى 2%، نحو
+              42 يومًا من حثّ التزهير.
+        short_term:
+          - text_en: >-
+              Thin where the load is excessive, at pea to marble size. Removing
+              surplus fruit now improves the size and quality of what stays.
+              Do not thin a light crop.
+            text_ar: >-
+              خفّف حيث يكون الحمل مفرطًا، بحجم البازلاء إلى البلية. إزالة
+              الفائض الآن تحسّن حجم وجودة ما يبقى. لا تخفّف محصولًا خفيفًا.
+          - text_en: >-
+              Some natural fruit drop is normal and needs no intervention
+              unless it is severe.
+            text_ar: >-
+              بعض تساقط الثمار الطبيعي معتاد ولا يحتاج تدخلًا إلا إذا اشتد.
+        monitoring:
+          - text_en: >-
+              Watch for anthracnose in humid conditions — dark sunken lesions
+              on leaves, flowers and young fruit.
+            text_ar: >-
+              راقب الأنثراكنوز في الأجواء الرطبة — بقع داكنة غائرة على الأوراق
+              والأزهار والثمار الصغيرة.
+
+  leaf_late_program:
+    label_en: Second KNO3 spray, bulking irrigation and the shift off nitrogen
+    label_ar: الرشّة الثانية وريّ التضخيم والتحول عن النيتروجين
+    outcome:
+      action_type: spray
+      severity: warning
+      confidence: 0.6
+      valid_for_hours: 240
+      parameters:
+        priority: medium
+      text_en: >-
+        The fruit is bulking and the late half of the program is due. The
+        second KNO3 spray goes on around 65 days after flower induction and
+        its job is size, not retention. Irrigation rises to support the
+        bulking, and the feed moves to low nitrogen and high potassium so the
+        tree puts its energy into fruit rather than into another flush.
+      text_ar: >-
+        الثمار في طور التضخيم وحلّ النصف الثاني من البرنامج. تُطبّق رشّة نترات
+        البوتاسيوم الثانية نحو 65 يومًا من حثّ التزهير ومهمتها الحجم لا
+        التثبيت. يرتفع الريّ لدعم التضخيم، وتتحول التغذية إلى نيتروجين منخفض
+        وبوتاسيوم مرتفع لتضع الشجرة طاقتها في الثمار لا في دفعة نمو جديدة.
+      actions:
+        immediate:
+          - text_en: >-
+              Apply the second KNO3 foliar spray at 1 to 2%, about 65 days
+              after flower induction.
+            text_ar: >-
+              طبّق رشّة نترات البوتاسيوم الورقية الثانية بتركيز 1 إلى 2%، نحو
+              65 يومًا من حثّ التزهير.
+          - text_en: >-
+              Increase irrigation to support active fruit bulking.
+            text_ar: >-
+              ارفع الريّ لدعم تضخيم الثمار النشط.
+        short_term:
+          - text_en: >-
+              Shift the fertilization program to low nitrogen and high
+              potassium so growth favours the fruit over another vegetative
+              flush.
+            text_ar: >-
+              حوّل برنامج التسميد إلى نيتروجين منخفض وبوتاسيوم مرتفع ليفضّل
+              النمو الثمار على دفعة خضرية جديدة.
+          - text_en: >-
+              Watch for mango mealybug: sap-sucking on shoots and leaves, with
+              honeydew leading to sooty mould. Organic options are a strong
+              water jet to dislodge the colonies, neem oil, or the
+              biopesticide Metarhizium anisopliae.
+            text_ar: >-
+              راقب البق الدقيقي للمانجو: امتصاص العصارة من الأفرع والأوراق مع
+              ندوة عسلية تؤدي إلى العفن الأسود. الخيارات العضوية نفث ماء قوي
+              لإزاحة المستعمرات، أو زيت النيم، أو المبيد الحيوي
+              Metarhizium anisopliae.
+        monitoring:
+          - text_en: >-
+              Keep watching for anthracnose through the humid weeks; it moves
+              from leaf to fruit and shows on the fruit only after picking.
+            text_ar: >-
+              واصل مراقبة الأنثراكنوز خلال الأسابيع الرطبة؛ فهو ينتقل من
+              الورقة إلى الثمرة ولا يظهر عليها إلا بعد الجني.
+
+  leaf_not_bearing:
+    label_en: No action — this block is not carrying a crop this season
+    label_ar: لا إجراء — هذه القطعة لا تحمل محصولًا هذا الموسم
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        The fruit development program only applies to a block that set a crop.
+        If this block is in fact carrying fruit, correct the Bearing this
+        season attribute — it does not update on its own.
+      text_ar: >-
+        لا ينطبق برنامج تطور الثمار إلا على قطعة عقدت محصولًا. إن كانت هذه
+        القطعة تحمل ثمارًا فعلًا فصحّح خاصية الإثمار هذا الموسم — فهي لا تتحدّث
+        تلقائيًا.
+
+  leaf_not_due:
+    label_en: No action — this block is not in the fruit development window
+    label_ar: لا إجراء — هذه القطعة ليست في نافذة تطور الثمار
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        The Stage B program runs between fruit set and the start of
+        maturation. The window opens on a different date per variety group,
+        which the block's stage calendar already carries.
+      text_ar: >-
+        يعمل برنامج المرحلة B بين العقد وبداية النضج. تفتح النافذة في تاريخ
+        مختلف لكل مجموعة أصناف، وهو ما يحمله تقويم مراحل القطعة أصلًا.

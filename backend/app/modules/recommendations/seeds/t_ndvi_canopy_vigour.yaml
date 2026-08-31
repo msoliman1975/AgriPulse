@@ -1,0 +1,340 @@
+# t_ndvi_canopy_vigour — NDVI against the mango index guide's band for the
+# block's recorded tree size.
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# 10 m column of the three stage value sheets.
+#
+# Size is the axis that matters. Of the workbook's 72 index x size x
+# productivity combinations, 64 hold the same range in all three stage
+# sheets, so this tree takes no stage input; only CWSI and SMI genuinely
+# move, and they move because irrigation is cut on purpose before harvest.
+#
+# NDVI saturates on a closed mango canopy, so a large-tree reading that sits
+# just inside the band is weaker evidence than the same position on a small
+# tree.
+# T_EVI answers the same question with an index that does not saturate.
+
+code: t_ndvi_canopy_vigour
+name_en: T_NDVI — canopy vigour against the band for this tree size
+name_ar: T_NDVI — حيوية المجموع مقابل نطاق حجم الشجرة
+description_en: >-
+  Checks how dense and green the leaves are, against the NDVI band the
+  mango index guide gives for a tree of this size. Branches on the block's
+  recorded Tree size and compares NDVI against the band the guide gives
+  for that size. Opens one card when the reading is below the band. Needs
+  the Tree size attribute to be set on the crop assignment.
+description_ar: >-
+  يفحص كثافة الأوراق واخضرارها، مقابل نطاق NDVI الذي يعطيه دليل مؤشرات
+  المانجو لشجرة بهذا الحجم. يتفرّع على حجم الشجرة المسجّل للقطعة ويقارن
+  NDVI بالنطاق الذي يعطيه الدليل لهذا الحجم. يفتح بطاقة واحدة عندما تكون
+  القراءة دون النطاق. يحتاج ضبط خاصية حجم الشجرة على تخصيص المحصول.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    Thresholds are the actionable edge of each size's 10 m band in the
+    AgriPulse mango index guide. The guide states its own limit plainly:
+    no published study measures these indices for these nine mango
+    varieties, and field ground-truthing is recommended before the ranges
+    drive a decision. Every bound is therefore a tunable parameter, and
+    small-tree results carry lower confidence because the guide grades
+    every small-tree cell Low. NDVI saturates on a closed mango canopy, so
+    a large-tree reading that sits just inside the band is weaker evidence
+    than the same position on a small tree. T_EVI answers the same
+    question with an index that does not saturate.
+  citations:
+    - source_type: remote_sensing
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), Index
+        Definitions + the three stage value sheets, 10 m column
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: medium
+  global: low
+
+parameters:
+  small_ndvi_floor:
+    type: number
+    default: 0.1
+    min: -2.0
+    max: 3.0
+    description: >-
+      NDVI value below which a small-tree mango block is outside the range
+      the index guide expects (guide band 0.1 to 0.22 at 10 m).
+  medium_ndvi_floor:
+    type: number
+    default: 0.25
+    min: -2.0
+    max: 3.0
+    description: >-
+      NDVI value below which a medium-tree mango block is outside the
+      range the index guide expects (guide band 0.25 to 0.4 at 10 m).
+  large_ndvi_floor:
+    type: number
+    default: 0.65
+    min: -2.0
+    max: 3.0
+    description: >-
+      NDVI value below which a large-tree mango block is outside the range
+      the index guide expects (guide band 0.65 to 0.81 at 10 m).
+
+root: size_small
+nodes:
+  size_small:
+    label_en: Are the trees in the small size class?
+    label_ar: هل الأشجار في فئة الحجم صغيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: small
+    on_match: small_check
+    on_miss: size_medium
+
+  size_medium:
+    label_en: Are the trees in the medium size class?
+    label_ar: هل الأشجار في فئة الحجم متوسطة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: medium
+    on_match: medium_check
+    on_miss: size_large
+
+  size_large:
+    label_en: Are the trees in the large size class?
+    label_ar: هل الأشجار في فئة الحجم كبيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: large
+    on_match: large_check
+    on_miss: leaf_size_unknown
+
+  small_check:
+    label_en: Is NDVI below the small-tree bound?
+    label_ar: هل NDVI دون حدّ الشجرة صغيرة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndvi
+          key: mean
+        right:
+          source: params
+          name: small_ndvi_floor
+    on_match: leaf_out_of_band_small
+    on_miss: leaf_in_band
+
+  medium_check:
+    label_en: Is NDVI below the medium-tree bound?
+    label_ar: هل NDVI دون حدّ الشجرة متوسطة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndvi
+          key: mean
+        right:
+          source: params
+          name: medium_ndvi_floor
+    on_match: leaf_out_of_band_medium
+    on_miss: leaf_in_band
+
+  large_check:
+    label_en: Is NDVI below the large-tree bound?
+    label_ar: هل NDVI دون حدّ الشجرة كبيرة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: ndvi
+          key: mean
+        right:
+          source: params
+          name: large_ndvi_floor
+    on_match: leaf_out_of_band_large
+    on_miss: leaf_in_band
+
+  leaf_out_of_band_small:
+    label_en: NDVI below the small-tree band
+    label_ar: NDVI دون نطاق الشجرة صغيرة
+    outcome:
+      action_type: scout
+      severity: info
+      confidence: 0.4
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        Canopy greenness is below the band the guide expects for this tree
+        size. On a large tree this is the single strongest sign of
+        decline. The guide's small-tree band for NDVI at 10 m is 0.1 to
+        0.22. The guide grades every small-tree cell Low, so treat this as
+        advisory and confirm on the ground.
+      text_ar: >-
+        اخضرار المجموع دون النطاق الذي يتوقعه الدليل لهذا الحجم. على
+        الشجرة الكبيرة هذه أقوى علامة منفردة على التدهور. نطاق الدليل
+        للشجرة صغيرة في NDVI عند 10 م هو من 0.1 إلى 0.22. يصنّف الدليل كل
+        خلايا الشجرة الصغيرة بثقة منخفضة، فاعتبرها استرشادية وأكّدها في
+        الأرض.
+      actions:
+        immediate:
+          - text_en: >-
+              Walk the block and compare the weak trees against healthy
+              ones.
+            text_ar: >-
+              تجوّل في القطعة وقارن الأشجار الضعيفة بالسليمة.
+        short_term:
+          - text_en: >-
+              Check the recorded tree size first — a wrong size makes the
+              comparison wrong.
+            text_ar: >-
+              تأكد أولًا من حجم الشجرة المسجّل — الحجم الخطأ يجعل المقارنة
+              خطأ.
+          - text_en: >-
+              Look for the cause: water shortage, root or trunk damage,
+              pest, disease, or nutrient shortage.
+            text_ar: >-
+              ابحث عن السبب: نقص ماء، أو ضرر بالجذور أو الساق، أو آفة، أو
+              مرض، أو نقص تغذية.
+        monitoring:
+          - text_en: Re-read NDVI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة NDVI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_out_of_band_medium:
+    label_en: NDVI below the medium-tree band
+    label_ar: NDVI دون نطاق الشجرة متوسطة
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.55
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        Canopy greenness is below the band the guide expects for this tree
+        size. On a large tree this is the single strongest sign of
+        decline. The guide's medium-tree band for NDVI at 10 m is 0.25 to
+        0.4.
+      text_ar: >-
+        اخضرار المجموع دون النطاق الذي يتوقعه الدليل لهذا الحجم. على
+        الشجرة الكبيرة هذه أقوى علامة منفردة على التدهور. نطاق الدليل
+        للشجرة متوسطة في NDVI عند 10 م هو من 0.25 إلى 0.4.
+      actions:
+        immediate:
+          - text_en: >-
+              Walk the block and compare the weak trees against healthy
+              ones.
+            text_ar: >-
+              تجوّل في القطعة وقارن الأشجار الضعيفة بالسليمة.
+        short_term:
+          - text_en: >-
+              Check the recorded tree size first — a wrong size makes the
+              comparison wrong.
+            text_ar: >-
+              تأكد أولًا من حجم الشجرة المسجّل — الحجم الخطأ يجعل المقارنة
+              خطأ.
+          - text_en: >-
+              Look for the cause: water shortage, root or trunk damage,
+              pest, disease, or nutrient shortage.
+            text_ar: >-
+              ابحث عن السبب: نقص ماء، أو ضرر بالجذور أو الساق، أو آفة، أو
+              مرض، أو نقص تغذية.
+        monitoring:
+          - text_en: Re-read NDVI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة NDVI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_out_of_band_large:
+    label_en: NDVI below the large-tree band
+    label_ar: NDVI دون نطاق الشجرة كبيرة
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.65
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        Canopy greenness is below the band the guide expects for this tree
+        size. On a large tree this is the single strongest sign of
+        decline. The guide's large-tree band for NDVI at 10 m is 0.65 to
+        0.81.
+      text_ar: >-
+        اخضرار المجموع دون النطاق الذي يتوقعه الدليل لهذا الحجم. على
+        الشجرة الكبيرة هذه أقوى علامة منفردة على التدهور. نطاق الدليل
+        للشجرة كبيرة في NDVI عند 10 م هو من 0.65 إلى 0.81.
+      actions:
+        immediate:
+          - text_en: >-
+              Walk the block and compare the weak trees against healthy
+              ones.
+            text_ar: >-
+              تجوّل في القطعة وقارن الأشجار الضعيفة بالسليمة.
+        short_term:
+          - text_en: >-
+              Check the recorded tree size first — a wrong size makes the
+              comparison wrong.
+            text_ar: >-
+              تأكد أولًا من حجم الشجرة المسجّل — الحجم الخطأ يجعل المقارنة
+              خطأ.
+          - text_en: >-
+              Look for the cause: water shortage, root or trunk damage,
+              pest, disease, or nutrient shortage.
+            text_ar: >-
+              ابحث عن السبب: نقص ماء، أو ضرر بالجذور أو الساق، أو آفة، أو
+              مرض، أو نقص تغذية.
+        monitoring:
+          - text_en: Re-read NDVI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة NDVI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_in_band:
+    label_en: No action — NDVI inside the band for this tree size
+    label_ar: لا إجراء — NDVI داخل نطاق هذا الحجم
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        NDVI is inside the range the mango index guide expects for this
+        tree size.
+      text_ar: >-
+        NDVI داخل النطاق الذي يتوقعه دليل مؤشرات المانجو لهذا الحجم.
+
+  leaf_size_unknown:
+    label_en: No action — tree size not recorded, so there is no band to compare against
+    label_ar: لا إجراء — حجم الشجرة غير مسجّل فلا يوجد نطاق للمقارنة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        This rule needs the block's Tree size attribute. Open the block's
+        crop assignment, set Tree size, and the rule starts running on the
+        next sweep.
+      text_ar: >-
+        تحتاج هذه القاعدة خاصية حجم الشجرة للقطعة. افتح تخصيص المحصول
+        للقطعة واضبط حجم الشجرة لتبدأ القاعدة في العمل مع أول تمريرة.

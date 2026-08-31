@@ -1,0 +1,232 @@
+# t_post_harvest_care — the first six weeks after picking decide next year's
+# crop.
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# Stage 0 of the four Plan sheets.
+#
+# The plan sheets put four activities in the window immediately after harvest,
+# and the order is not arbitrary. Pruning opens the canopy to light; sanitation
+# removes the anthracnose and mealybug that overwinter in the debris pruning
+# just created; fertilization rebuilds the reserves the crop drained; and
+# irrigation resumes so the tree can push the vegetative flush that must grow
+# AND MATURE before flower induction can begin. Skip the flush and there is
+# nothing for next season's flowers to form on.
+#
+# This is a calendar rule, not a measurement. It fires once per block per
+# post-harvest window and says what is due; nothing in the imagery can tell
+# whether someone pruned. It exists because the window is short, it opens the
+# week everyone is exhausted from picking, and the cost of missing it does not
+# appear until the following spring.
+#
+# The activity list is identical in all four Plan sheets. The workbook is
+# explicit about why: published sources document real differences in harvest
+# TIMING between the nine varieties, but no source was found documenting any
+# difference in the practices themselves. What shifts per variety is when this
+# window opens, and the platform already carries that in the block's growth
+# stage.
+
+code: t_post_harvest_care
+name_en: T_POST_HARVEST — post-harvest pruning, sanitation and recovery feeding due
+name_ar: T_POST_HARVEST — التقليم والنظافة والتسميد التعويضي بعد الحصاد
+description_en: >-
+  Fires on a bearing block once it enters the post-harvest flush stage and
+  lists the four activities the plan puts in that window: structural pruning,
+  orchard sanitation, a balanced recovery feed, and resuming irrigation so the
+  vegetative flush can grow and mature before flower induction. Calendar
+  driven, not measured — no index can see whether a block was pruned.
+description_ar: >-
+  ينطلق على القطعة المثمرة عند دخولها مرحلة النمو بعد الحصاد، ويسرد الأنشطة
+  الأربعة التي تضعها الخطة في هذه النافذة: التقليم الهيكلي، ونظافة البستان،
+  والتسميد المتوازن التعويضي، واستئناف الريّ لينمو النمو الخضري وينضج قبل
+  حثّ التزهير. يعتمد على التقويم لا على القياس — فلا مؤشر يرى هل قُلّمت
+  القطعة.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    The activities and their window come from the mango index guide's Plan
+    sheets, which grade them High for pruning and Medium-High for the recovery
+    feed and the irrigation restart. The workbook states its own limit for the
+    whole plan: no published weekly study exists for these nine varieties, and
+    field verification of local timing is recommended. The N:P:K ratios below
+    are the plan's, and they are ratios rather than rates — the rate depends
+    on tree age, planting density and the soil test, none of which this rule
+    reads.
+  citations:
+    - source_type: extension
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), Stage 0 of
+        the Plan sheets: post-harvest care and flower-induction preparation
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: high
+  global: medium
+
+root: post_harvest_stage
+nodes:
+  post_harvest_stage:
+    label_en: Has this block entered the post-harvest flush stage?
+    label_ar: هل دخلت هذه القطعة مرحلة النمو بعد الحصاد؟
+    condition:
+      tree:
+        op: in
+        left:
+          source: block
+          field: growth_stage
+        values: [post_harvest_flush]
+    on_match: was_bearing
+    on_miss: leaf_not_due
+
+  was_bearing:
+    label_en: Was this block carrying a crop this season?
+    label_ar: هل كانت هذه القطعة تحمل محصولًا هذا الموسم؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: bearing_status
+          key: value
+        right: bearing
+    on_match: leaf_due_bearing
+    on_miss: leaf_due_resting
+
+  leaf_due_bearing:
+    label_en: Post-harvest window open — prune, clean, feed, water
+    label_ar: نافذة ما بعد الحصاد مفتوحة — قلّم ونظّف وسمّد واروِ
+    outcome:
+      action_type: prune
+      severity: warning
+      confidence: 0.7
+      valid_for_hours: 336
+      parameters:
+        priority: high
+      text_en: >-
+        This block has finished carrying a crop and is now in the window the
+        plan reserves for post-harvest recovery. What happens in the next six
+        weeks sets next season's flowering: the tree has to rebuild its
+        reserves and push one vegetative flush that then matures, because
+        flowers form on mature wood and not on wood that is still growing.
+      text_ar: >-
+        انتهت هذه القطعة من حمل محصولها وهي الآن في النافذة التي تخصصها الخطة
+        للتعافي بعد الحصاد. ما يحدث في الأسابيع الستة القادمة يحدّد تزهير
+        الموسم القادم: على الشجرة أن تعيد بناء مخزونها وتدفع دفعة نمو خضري
+        واحدة تنضج بعدها، لأن الأزهار تتكوّن على خشب ناضج لا على خشب ما زال
+        ينمو.
+      actions:
+        immediate:
+          - text_en: >-
+              Prune the shoot tips about 10 cm above the last internode, and
+              remove dead, diseased or crossing wood to open the canopy to
+              light.
+            text_ar: >-
+              قلّم أطراف الأفرع نحو 10 سم فوق آخر سلامية، وأزل الخشب الميت أو
+              المصاب أو المتقاطع لفتح المجموع للضوء.
+          - text_en: >-
+              Remove and destroy the pruning debris and any fallen or
+              mummified fruit — that is where anthracnose and mealybug carry
+              over to next season.
+            text_ar: >-
+              أزل بقايا التقليم والثمار الساقطة أو المتحنّطة وأتلفها — فهي
+              مكان بقاء الأنثراكنوز والبق الدقيقي إلى الموسم القادم.
+        short_term:
+          - text_en: >-
+              Apply a balanced recovery feed in weeks 3 to 6: roughly 1:1:1
+              N:P:K on young trees, and a higher-potassium ratio around 8:3:9
+              on bearing mature trees.
+            text_ar: >-
+              طبّق تسميدًا تعويضيًا متوازنًا في الأسابيع 3 إلى 6: نحو 1:1:1
+              نيتروجين وفوسفور وبوتاسيوم للأشجار الصغيرة، ونسبة أعلى في
+              البوتاسيوم نحو 8:3:9 للأشجار الناضجة المثمرة.
+          - text_en: >-
+              Resume normal irrigation so the post-harvest vegetative flush
+              can grow.
+            text_ar: >-
+              استأنف الريّ المعتاد لتتمكن دفعة النمو الخضري بعد الحصاد من
+              النمو.
+        monitoring:
+          - text_en: >-
+              Watch for the flush to stop growing. Flowering cannot begin
+              while shoots are still pushing, and mango makes up to four
+              flushes a year — the growth has to stop first.
+            text_ar: >-
+              راقب توقف الدفعة عن النمو. لا يبدأ التزهير والأفرع ما زالت تدفع،
+              والمانجو تعطي حتى أربع دفعات في السنة — لا بد أن يتوقف النمو
+              أولًا.
+
+  leaf_due_resting:
+    label_en: Post-harvest window open on a resting block — sanitation and light pruning only
+    label_ar: نافذة ما بعد الحصاد على قطعة مرتاحة — نظافة وتقليم خفيف فقط
+    outcome:
+      action_type: prune
+      severity: info
+      confidence: 0.6
+      valid_for_hours: 336
+      parameters:
+        priority: low
+      text_en: >-
+        This block is recorded as not bearing this season, so it has no crop
+        drain to recover from and does not need the full recovery feed. The
+        sanitation half still matters: anthracnose and mealybug overwinter in
+        debris whether or not the block carried fruit, and a resting block
+        sitting beside a bearing one is where next season's infection comes
+        from.
+      text_ar: >-
+        هذه القطعة مسجّلة على أنها غير مثمرة هذا الموسم، فلا استنزاف محصول
+        تتعافى منه ولا تحتاج التسميد التعويضي الكامل. أما شقّ النظافة فيبقى
+        مهمًا: يبقى الأنثراكنوز والبق الدقيقي في البقايا سواء حملت القطعة
+        ثمارًا أم لا، والقطعة المرتاحة المجاورة لمثمرة هي مصدر إصابة الموسم
+        القادم.
+      actions:
+        immediate:
+          - text_en: >-
+              Remove dead and diseased wood and clear fallen fruit and debris
+              from the block.
+            text_ar: >-
+              أزل الخشب الميت والمصاب ونظّف الثمار الساقطة والبقايا من القطعة.
+        short_term:
+          - text_en: >-
+              Hold the heavy recovery feed. A resting tree fed as if it had
+              cropped puts the nitrogen into vegetative growth, which delays
+              the flowering you want next season.
+            text_ar: >-
+              أوقف التسميد التعويضي الثقيل. الشجرة المرتاحة إذا سُمّدت كأنها
+              أثمرت تحوّل النيتروجين إلى نمو خضري، وهذا يؤخّر التزهير المطلوب
+              الموسم القادم.
+          - text_en: >-
+              Confirm the Bearing this season attribute is still correct — it
+              does not update on its own and has to be edited each season.
+            text_ar: >-
+              تأكد أن خاصية الإثمار هذا الموسم ما زالت صحيحة — فهي لا تتحدّث
+              تلقائيًا ويجب تعديلها كل موسم.
+        monitoring:
+          - text_en: >-
+              Expect this block to bear next season if it is on a normal
+              alternate-bearing cycle, and plan the feed for that.
+            text_ar: >-
+              توقّع أن تثمر هذه القطعة الموسم القادم إن كانت على دورة معاومة
+              طبيعية، وخطّط التسميد على هذا الأساس.
+
+  leaf_not_due:
+    label_en: No action — this block is not in its post-harvest window
+    label_ar: لا إجراء — هذه القطعة ليست في نافذة ما بعد الحصاد
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        Post-harvest care is due once the block enters the post-harvest flush
+        stage. The stage calendar shifts by variety, so blocks of different
+        varieties on the same farm reach this window on different dates.
+      text_ar: >-
+        تحلّ رعاية ما بعد الحصاد عند دخول القطعة مرحلة النمو بعد الحصاد. يتغيّر
+        تقويم المراحل حسب الصنف، فتصل قطع الأصناف المختلفة في المزرعة نفسها
+        إلى هذه النافذة في تواريخ مختلفة.

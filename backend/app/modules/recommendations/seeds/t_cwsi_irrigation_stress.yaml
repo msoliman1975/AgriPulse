@@ -1,0 +1,622 @@
+# t_cwsi_irrigation_stress — CWSI against the mango index guide's band for the
+# block's recorded tree size.
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# 10 m column of the three stage value sheets.
+#
+# Size is the axis that matters. Of the workbook's 72 index x size x
+# productivity combinations, 64 hold the same range in all three stage
+# sheets, so this tree takes no stage input; only CWSI and SMI genuinely
+# move, and they move because irrigation is cut on purpose before harvest.
+#
+# Guarded against a saturated reading.
+# CWSI is computed against a fixed dry-canopy constant, and Egyptian summer
+# land-surface temperature over sparse canopy on sand pushes past it, so the
+# value clips to exactly 1.0 and stops carrying information.
+# On Mango Republic 2,959 thermal rows average 0.995.
+# Any reading at or above the saturation guard returns a data-quality leaf,
+# not an irrigation card.
+
+code: t_cwsi_irrigation_stress
+name_en: T_CWSI — irrigation stress above the band for this tree size (thermal)
+name_ar: T_CWSI — إجهاد الريّ فوق نطاق حجم الشجرة (حراري)
+description_en: >-
+  Checks the tree's own canopy temperature against the air, not its
+  colour. A well-watered tree cools itself; a thirsty one heats up. The
+  guide calls this the most reliable index for irrigation decisions.
+  Branches on the block's recorded Tree size and compares CWSI against the
+  band the guide gives for that size. Opens one card when the reading is
+  above the band. Needs the Tree size attribute to be set on the crop
+  assignment.
+description_ar: >-
+  يفحص حرارة مجموع الشجرة نفسها مقابل الهواء، لا لونها. الشجرة المروية
+  جيدًا تبرّد نفسها، والعطشى تسخن. يسميه الدليل أوثق مؤشر لقرارات الريّ.
+  يتفرّع على حجم الشجرة المسجّل للقطعة ويقارن CWSI بالنطاق الذي يعطيه
+  الدليل لهذا الحجم. يفتح بطاقة واحدة عندما تكون القراءة فوق النطاق. يحتاج
+  ضبط خاصية حجم الشجرة على تخصيص المحصول.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    Thresholds are the actionable edge of each size's 10 m band in the
+    AgriPulse mango index guide. The guide states its own limit plainly:
+    no published study measures these indices for these nine mango
+    varieties, and field ground-truthing is recommended before the ranges
+    drive a decision. Every bound is therefore a tunable parameter, and
+    small-tree results carry lower confidence because the guide grades
+    every small-tree cell Low. Guarded against a saturated reading. CWSI
+    is computed against a fixed dry-canopy constant, and Egyptian summer
+    land-surface temperature over sparse canopy on sand pushes past it, so
+    the value clips to exactly 1.0 and stops carrying information. On
+    Mango Republic 2,959 thermal rows average 0.995. Any reading at or
+    above the saturation guard returns a data-quality leaf, not an
+    irrigation card.
+  citations:
+    - source_type: remote_sensing
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), Index
+        Definitions + the three stage value sheets, 10 m column
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: medium
+  global: low
+
+parameters:
+  small_cwsi_ceiling:
+    type: number
+    default: 0.35
+    min: -2.0
+    max: 3.0
+    description: >-
+      CWSI value above which a small-tree mango block is outside the range
+      the index guide expects (guide band 0.15 to 0.35 at 10 m).
+  medium_cwsi_ceiling:
+    type: number
+    default: 0.3
+    min: -2.0
+    max: 3.0
+    description: >-
+      CWSI value above which a medium-tree mango block is outside the
+      range the index guide expects (guide band 0.1 to 0.3 at 10 m).
+  large_cwsi_ceiling:
+    type: number
+    default: 0.25
+    min: -2.0
+    max: 3.0
+    description: >-
+      CWSI value above which a large-tree mango block is outside the range
+      the index guide expects (guide band 0.1 to 0.25 at 10 m).
+  small_cwsi_ceiling_deficit:
+    type: number
+    default: 0.63
+    min: -2.0
+    max: 3.0
+    description: >-
+      CWSI value above which a small-tree bearing block is outside the
+      range the guide expects while pre-harvest deficit irrigation is
+      running (guide band 0.38 to 0.63 at 10 m).
+  medium_cwsi_ceiling_deficit:
+    type: number
+    default: 0.54
+    min: -2.0
+    max: 3.0
+    description: >-
+      CWSI value above which a medium-tree bearing block is outside the
+      range the guide expects while pre-harvest deficit irrigation is
+      running (guide band 0.25 to 0.54 at 10 m).
+  large_cwsi_ceiling_deficit:
+    type: number
+    default: 0.45
+    min: -2.0
+    max: 3.0
+    description: >-
+      CWSI value above which a large-tree bearing block is outside the
+      range the guide expects while pre-harvest deficit irrigation is
+      running (guide band 0.25 to 0.45 at 10 m).
+  saturation_guard:
+    type: number
+    default: 0.99
+    min: 0.0
+    max: 1.0
+    description: >-
+      CWSI value at or above which the reading is treated as clipped at
+      the index ceiling and carrying no information, rather than as a real
+      stress measurement.
+
+root: saturation
+nodes:
+  saturation:
+    label_en: Is CWSI clipped at the index ceiling?
+    label_ar: هل CWSI ملتصق بسقف المؤشر؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: indices
+          index_code: cwsi
+          key: mean
+        right:
+          source: params
+          name: saturation_guard
+    on_match: leaf_saturated
+    on_miss: deficit_window
+
+  deficit_window:
+    label_en: >-
+      Is this a bearing block inside its pre-harvest deficit
+      irrigation window?
+    label_ar: هل هذه قطعة مثمرة داخل نافذة الريّ الناقص قبل الحصاد؟
+    condition:
+      tree:
+        all_of:
+          - op: eq
+            left:
+              source: crop_attribute
+              code: bearing_status
+              key: value
+            right: bearing
+          - op: in
+            left:
+              source: block
+              field: growth_stage
+            values: [maturation]
+    on_match: deficit_size_small
+    on_miss: size_small
+
+  size_small:
+    label_en: Are the trees in the small size class?
+    label_ar: هل الأشجار في فئة الحجم صغيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: small
+    on_match: small_check
+    on_miss: size_medium
+
+  size_medium:
+    label_en: Are the trees in the medium size class?
+    label_ar: هل الأشجار في فئة الحجم متوسطة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: medium
+    on_match: medium_check
+    on_miss: size_large
+
+  size_large:
+    label_en: Are the trees in the large size class?
+    label_ar: هل الأشجار في فئة الحجم كبيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: large
+    on_match: large_check
+    on_miss: leaf_size_unknown
+
+  small_check:
+    label_en: Is CWSI above the small-tree bound?
+    label_ar: هل CWSI فوق حدّ الشجرة صغيرة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: cwsi
+          key: mean
+        right:
+          source: params
+          name: small_cwsi_ceiling
+    on_match: leaf_out_of_band_small
+    on_miss: leaf_in_band
+
+  medium_check:
+    label_en: Is CWSI above the medium-tree bound?
+    label_ar: هل CWSI فوق حدّ الشجرة متوسطة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: cwsi
+          key: mean
+        right:
+          source: params
+          name: medium_cwsi_ceiling
+    on_match: leaf_out_of_band_medium
+    on_miss: leaf_in_band
+
+  large_check:
+    label_en: Is CWSI above the large-tree bound?
+    label_ar: هل CWSI فوق حدّ الشجرة كبيرة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: cwsi
+          key: mean
+        right:
+          source: params
+          name: large_cwsi_ceiling
+    on_match: leaf_out_of_band_large
+    on_miss: leaf_in_band
+
+  deficit_size_small:
+    label_en: Are the trees in the small size class?
+    label_ar: هل الأشجار في فئة الحجم صغيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: small
+    on_match: deficit_small_check
+    on_miss: deficit_size_medium
+
+  deficit_size_medium:
+    label_en: Are the trees in the medium size class?
+    label_ar: هل الأشجار في فئة الحجم متوسطة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: medium
+    on_match: deficit_medium_check
+    on_miss: deficit_size_large
+
+  deficit_size_large:
+    label_en: Are the trees in the large size class?
+    label_ar: هل الأشجار في فئة الحجم كبيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: large
+    on_match: deficit_large_check
+    on_miss: leaf_size_unknown
+
+  deficit_small_check:
+    label_en: Is CWSI above the small-tree bound for the deficit window?
+    label_ar: هل CWSI فوق حدّ الشجرة صغيرةضمن نافذة العجز؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: cwsi
+          key: mean
+        right:
+          source: params
+          name: small_cwsi_ceiling_deficit
+    on_match: leaf_deficit_out_of_band_small
+    on_miss: leaf_in_band
+
+  deficit_medium_check:
+    label_en: Is CWSI above the medium-tree bound for the deficit window?
+    label_ar: هل CWSI فوق حدّ الشجرة متوسطةضمن نافذة العجز؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: cwsi
+          key: mean
+        right:
+          source: params
+          name: medium_cwsi_ceiling_deficit
+    on_match: leaf_deficit_out_of_band_medium
+    on_miss: leaf_in_band
+
+  deficit_large_check:
+    label_en: Is CWSI above the large-tree bound for the deficit window?
+    label_ar: هل CWSI فوق حدّ الشجرة كبيرةضمن نافذة العجز؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: cwsi
+          key: mean
+        right:
+          source: params
+          name: large_cwsi_ceiling_deficit
+    on_match: leaf_deficit_out_of_band_large
+    on_miss: leaf_in_band
+
+  leaf_out_of_band_small:
+    label_en: CWSI above the small-tree band
+    label_ar: CWSI فوق نطاق الشجرة صغيرة
+    outcome:
+      action_type: irrigate
+      severity: critical
+      confidence: 0.4
+      valid_for_hours: 168
+      parameters:
+        priority: high
+      text_en: >-
+        Canopy temperature says this block is under more water stress than
+        the guide expects for its tree size. The guide's small-tree band
+        for CWSI at 10 m is 0.15 to 0.35. The guide grades every
+        small-tree cell Low, so treat this as advisory and confirm on the
+        ground.
+      text_ar: >-
+        تقول حرارة المجموع إن هذه القطعة تحت إجهاد ماء أكبر مما يتوقعه
+        الدليل لحجم أشجارها. نطاق الدليل للشجرة صغيرة في CWSI عند 10 م هو
+        من 0.15 إلى 0.35. يصنّف الدليل كل خلايا الشجرة الصغيرة بثقة
+        منخفضة، فاعتبرها استرشادية وأكّدها في الأرض.
+      actions:
+        immediate:
+          - text_en: >-
+              Irrigate this block, then confirm the next thermal pass
+              comes back down.
+            text_ar: >-
+              اروِ هذه القطعة، ثم تأكد أن المرور الحراري التالي ينخفض.
+        short_term:
+          - text_en: >-
+              If it does not, look for a blocked line rather than a short
+              irrigation run.
+            text_ar: >-
+              إن لم ينخفض، فابحث عن خط مسدود لا عن ريّ قصير.
+        monitoring:
+          - text_en: Re-read CWSI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة CWSI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_out_of_band_medium:
+    label_en: CWSI above the medium-tree band
+    label_ar: CWSI فوق نطاق الشجرة متوسطة
+    outcome:
+      action_type: irrigate
+      severity: critical
+      confidence: 0.55
+      valid_for_hours: 168
+      parameters:
+        priority: high
+      text_en: >-
+        Canopy temperature says this block is under more water stress than
+        the guide expects for its tree size. The guide's medium-tree band
+        for CWSI at 10 m is 0.1 to 0.3.
+      text_ar: >-
+        تقول حرارة المجموع إن هذه القطعة تحت إجهاد ماء أكبر مما يتوقعه
+        الدليل لحجم أشجارها. نطاق الدليل للشجرة متوسطة في CWSI عند 10 م هو
+        من 0.1 إلى 0.3.
+      actions:
+        immediate:
+          - text_en: >-
+              Irrigate this block, then confirm the next thermal pass
+              comes back down.
+            text_ar: >-
+              اروِ هذه القطعة، ثم تأكد أن المرور الحراري التالي ينخفض.
+        short_term:
+          - text_en: >-
+              If it does not, look for a blocked line rather than a short
+              irrigation run.
+            text_ar: >-
+              إن لم ينخفض، فابحث عن خط مسدود لا عن ريّ قصير.
+        monitoring:
+          - text_en: Re-read CWSI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة CWSI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_out_of_band_large:
+    label_en: CWSI above the large-tree band
+    label_ar: CWSI فوق نطاق الشجرة كبيرة
+    outcome:
+      action_type: irrigate
+      severity: critical
+      confidence: 0.65
+      valid_for_hours: 168
+      parameters:
+        priority: high
+      text_en: >-
+        Canopy temperature says this block is under more water stress than
+        the guide expects for its tree size. The guide's large-tree band
+        for CWSI at 10 m is 0.1 to 0.25.
+      text_ar: >-
+        تقول حرارة المجموع إن هذه القطعة تحت إجهاد ماء أكبر مما يتوقعه
+        الدليل لحجم أشجارها. نطاق الدليل للشجرة كبيرة في CWSI عند 10 م هو
+        من 0.1 إلى 0.25.
+      actions:
+        immediate:
+          - text_en: >-
+              Irrigate this block, then confirm the next thermal pass
+              comes back down.
+            text_ar: >-
+              اروِ هذه القطعة، ثم تأكد أن المرور الحراري التالي ينخفض.
+        short_term:
+          - text_en: >-
+              If it does not, look for a blocked line rather than a short
+              irrigation run.
+            text_ar: >-
+              إن لم ينخفض، فابحث عن خط مسدود لا عن ريّ قصير.
+        monitoring:
+          - text_en: Re-read CWSI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة CWSI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_deficit_out_of_band_small:
+    label_en: CWSI above the small-tree band (deficit window)
+    label_ar: CWSI فوق نطاق الشجرة صغيرة (نافذة العجز)
+    outcome:
+      action_type: irrigate
+      severity: critical
+      confidence: 0.4
+      valid_for_hours: 168
+      parameters:
+        priority: high
+      text_en: >-
+        This block is inside its pre-harvest deficit window and its canopy
+        is hotter than even that window allows. Deficit irrigation is
+        meant to stress the tree, not damage the fruit. The guide's
+        small-tree band for CWSI at 10 m is 0.38 to 0.63. The guide grades
+        every small-tree cell Low, so treat this as advisory and confirm
+        on the ground.
+      text_ar: >-
+        هذه القطعة داخل نافذة العجز قبل الحصاد ومجموعها أسخن مما تسمح به
+        تلك النافذة. الهدف من الريّ الناقص إجهاد الشجرة لا إتلاف الثمار.
+        نطاق الدليل للشجرة صغيرة في CWSI عند 10 م هو من 0.38 إلى 0.63.
+        يصنّف الدليل كل خلايا الشجرة الصغيرة بثقة منخفضة، فاعتبرها
+        استرشادية وأكّدها في الأرض.
+      actions:
+        immediate:
+          - text_en: >-
+              Irrigate this block, then confirm the next thermal pass
+              comes back down.
+            text_ar: >-
+              اروِ هذه القطعة، ثم تأكد أن المرور الحراري التالي ينخفض.
+        short_term:
+          - text_en: >-
+              If it does not, look for a blocked line rather than a short
+              irrigation run.
+            text_ar: >-
+              إن لم ينخفض، فابحث عن خط مسدود لا عن ريّ قصير.
+        monitoring:
+          - text_en: Re-read CWSI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة CWSI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_deficit_out_of_band_medium:
+    label_en: CWSI above the medium-tree band (deficit window)
+    label_ar: CWSI فوق نطاق الشجرة متوسطة (نافذة العجز)
+    outcome:
+      action_type: irrigate
+      severity: critical
+      confidence: 0.55
+      valid_for_hours: 168
+      parameters:
+        priority: high
+      text_en: >-
+        This block is inside its pre-harvest deficit window and its canopy
+        is hotter than even that window allows. Deficit irrigation is
+        meant to stress the tree, not damage the fruit. The guide's
+        medium-tree band for CWSI at 10 m is 0.25 to 0.54.
+      text_ar: >-
+        هذه القطعة داخل نافذة العجز قبل الحصاد ومجموعها أسخن مما تسمح به
+        تلك النافذة. الهدف من الريّ الناقص إجهاد الشجرة لا إتلاف الثمار.
+        نطاق الدليل للشجرة متوسطة في CWSI عند 10 م هو من 0.25 إلى 0.54.
+      actions:
+        immediate:
+          - text_en: >-
+              Irrigate this block, then confirm the next thermal pass
+              comes back down.
+            text_ar: >-
+              اروِ هذه القطعة، ثم تأكد أن المرور الحراري التالي ينخفض.
+        short_term:
+          - text_en: >-
+              If it does not, look for a blocked line rather than a short
+              irrigation run.
+            text_ar: >-
+              إن لم ينخفض، فابحث عن خط مسدود لا عن ريّ قصير.
+        monitoring:
+          - text_en: Re-read CWSI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة CWSI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_deficit_out_of_band_large:
+    label_en: CWSI above the large-tree band (deficit window)
+    label_ar: CWSI فوق نطاق الشجرة كبيرة (نافذة العجز)
+    outcome:
+      action_type: irrigate
+      severity: critical
+      confidence: 0.65
+      valid_for_hours: 168
+      parameters:
+        priority: high
+      text_en: >-
+        This block is inside its pre-harvest deficit window and its canopy
+        is hotter than even that window allows. Deficit irrigation is
+        meant to stress the tree, not damage the fruit. The guide's
+        large-tree band for CWSI at 10 m is 0.25 to 0.45.
+      text_ar: >-
+        هذه القطعة داخل نافذة العجز قبل الحصاد ومجموعها أسخن مما تسمح به
+        تلك النافذة. الهدف من الريّ الناقص إجهاد الشجرة لا إتلاف الثمار.
+        نطاق الدليل للشجرة كبيرة في CWSI عند 10 م هو من 0.25 إلى 0.45.
+      actions:
+        immediate:
+          - text_en: >-
+              Irrigate this block, then confirm the next thermal pass
+              comes back down.
+            text_ar: >-
+              اروِ هذه القطعة، ثم تأكد أن المرور الحراري التالي ينخفض.
+        short_term:
+          - text_en: >-
+              If it does not, look for a blocked line rather than a short
+              irrigation run.
+            text_ar: >-
+              إن لم ينخفض، فابحث عن خط مسدود لا عن ريّ قصير.
+        monitoring:
+          - text_en: Re-read CWSI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة CWSI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_in_band:
+    label_en: No action — CWSI inside the band for this tree size
+    label_ar: لا إجراء — CWSI داخل نطاق هذا الحجم
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        CWSI is inside the range the mango index guide expects for this
+        tree size.
+      text_ar: >-
+        CWSI داخل النطاق الذي يتوقعه دليل مؤشرات المانجو لهذا الحجم.
+
+  leaf_size_unknown:
+    label_en: No action — tree size not recorded, so there is no band to compare against
+    label_ar: لا إجراء — حجم الشجرة غير مسجّل فلا يوجد نطاق للمقارنة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        This rule needs the block's Tree size attribute. Open the block's
+        crop assignment, set Tree size, and the rule starts running on the
+        next sweep.
+      text_ar: >-
+        تحتاج هذه القاعدة خاصية حجم الشجرة للقطعة. افتح تخصيص المحصول
+        للقطعة واضبط حجم الشجرة لتبدأ القاعدة في العمل مع أول تمريرة.
+
+  leaf_saturated:
+    label_en: No action — CWSI is clipped at its ceiling and carries no information
+    label_ar: لا إجراء — CWSI ملتصق بسقفه ولا يحمل معلومة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        The thermal reading for this block is sitting at the index
+        ceiling. CWSI is computed against a fixed dry-canopy constant, and
+        Egyptian summer surface temperature over sparse canopy on sand
+        runs past it, so the value clips to 1.0 for stressed and healthy
+        blocks alike. No irrigation decision can be read from it until
+        that constant is calibrated against local measurements.
+      text_ar: >-
+        القراءة الحرارية لهذه القطعة عند سقف المؤشر. يُحسب CWSI مقابل ثابت
+        جفاف مثبّت، وحرارة السطح في الصيف المصري فوق مجموع متفرق على رمل
+        تتجاوزه، فتلتصق القيمة عند 1.0 للقطع المجهدة والسليمة معًا. لا
+        يمكن قراءة قرار ريّ منها حتى يُعاير هذا الثابت محليًا.

@@ -1,6 +1,14 @@
-"""Evaluate the seeded mango decision trees (PR-D2) end-to-end against
-hand-built contexts. Compilation of every seed is covered in test_loader;
-this asserts the agronomy logic walks to the right leaves.
+"""Evaluate `mango_canopy_health_v1` end-to-end against hand-built contexts.
+
+The other mango seeds this file used to cover -- stress induction and
+post-harvest nitrogen -- were retired by public migration 0079 and replaced by
+`t_flower_induction_readiness` and `t_ndre_nitrogen`. All twenty-two `t_*`
+trees are covered in `tests/unit/recommendations/test_mango_catalogue_trees.py`.
+
+`mango_canopy_health_v1` stays because it asks a different question from any
+of them: it judges the block against its OWN day-of-year history rather than
+against the index guide's absolute band, so it catches a healthy block falling
+where an absolute rule sees a block still inside its range.
 """
 
 from __future__ import annotations
@@ -15,7 +23,7 @@ import yaml
 from app.modules.recommendations.engine import evaluate_tree
 from app.modules.recommendations.loader import compile_tree
 from app.shared.conditions import ConditionContext
-from app.shared.conditions.context import IndicesEntry, WeatherSnapshot
+from app.shared.conditions.context import IndicesEntry
 
 pytestmark = [pytest.mark.integration]
 
@@ -28,105 +36,10 @@ def _tree(name: str) -> dict:
     )
 
 
-def _idx(**means: float) -> dict[str, IndicesEntry]:
-    return {
-        code: IndicesEntry(time=datetime.now(UTC), mean=Decimal(str(v)), baseline_deviation=None)
-        for code, v in means.items()
-    }
-
-
 def _idx_dev(code: str, dev: float) -> dict[str, IndicesEntry]:
     return {
         code: IndicesEntry(time=datetime.now(UTC), mean=None, baseline_deviation=Decimal(str(dev)))
     }
-
-
-# ---- stress induction -----------------------------------------------------
-
-_STRESS = _tree("mango_stress_induction_v1.yaml")
-
-
-def _stress_ctx(*, stage: str, ndmi: float, tmin: float) -> ConditionContext:
-    return ConditionContext(
-        block_id="b1",
-        block_attributes={"growth_stage": stage},
-        indices=_idx(ndmi=ndmi),
-        weather=WeatherSnapshot(forecast_72h={"air_temp_c_min": Decimal(str(tmin))}),
-    )
-
-
-def test_stress_induction_fires_when_wet_and_cool_in_preflowering() -> None:
-    r = evaluate_tree(_STRESS, _stress_ctx(stage="pre_flowering", ndmi=0.45, tmin=12.0))
-    assert r.outcome is not None
-    assert r.outcome.action_type == "irrigate"
-    assert r.outcome.severity == "warning"
-
-
-def test_stress_induction_silent_when_warm() -> None:
-    r = evaluate_tree(_STRESS, _stress_ctx(stage="pre_flowering", ndmi=0.45, tmin=22.0))
-    assert r.outcome.action_type == "no_action"
-
-
-def test_stress_induction_silent_when_dry() -> None:
-    r = evaluate_tree(_STRESS, _stress_ctx(stage="pre_flowering", ndmi=0.10, tmin=12.0))
-    assert r.outcome.action_type == "no_action"
-
-
-def test_stress_induction_silent_outside_preflowering() -> None:
-    r = evaluate_tree(_STRESS, _stress_ctx(stage="fruit_development", ndmi=0.45, tmin=12.0))
-    assert r.outcome.action_type == "no_action"
-
-
-# ---- post-harvest nitrogen (NDRE) -----------------------------------------
-
-_NITRO = _tree("mango_post_harvest_nitrogen_v1.yaml")
-
-
-def test_post_harvest_low_ndre_warns() -> None:
-    # NDRE 0.2 is under the large-tree floor of 0.38 and inside the medium
-    # band, so the size the block records decides the verdict. The tree gained
-    # the per-size floors from the mango index guide; a single 0.30 floor used
-    # to condemn every young orchard and miss a large block sliding to 0.31.
-    ctx = ConditionContext(
-        block_id="b1",
-        block_attributes={"growth_stage": "post_harvest_flush"},
-        crop_attributes={"tree_size_class": "large"},
-        indices=_idx(ndre=0.2),
-    )
-    r = evaluate_tree(_NITRO, ctx)
-    assert r.outcome.action_type == "other"
-    assert r.outcome.severity == "warning"
-
-
-def test_post_harvest_same_ndre_is_fine_on_a_medium_tree() -> None:
-    ctx = ConditionContext(
-        block_id="b1",
-        block_attributes={"growth_stage": "post_harvest_flush"},
-        crop_attributes={"tree_size_class": "medium"},
-        indices=_idx(ndre=0.2),
-    )
-    assert evaluate_tree(_NITRO, ctx).outcome.action_type == "no_action"
-
-
-def test_post_harvest_without_a_recorded_size_never_guesses() -> None:
-    ctx = ConditionContext(
-        block_id="b1",
-        block_attributes={"growth_stage": "post_harvest_flush"},
-        indices=_idx(ndre=0.01),
-    )
-    r = evaluate_tree(_NITRO, ctx)
-    assert r.path[-1].node_id == "leaf_size_unknown"
-    assert r.outcome.action_type == "no_action"
-
-
-def test_post_harvest_healthy_ndre_silent() -> None:
-    ctx = ConditionContext(
-        block_id="b1",
-        block_attributes={"growth_stage": "post_harvest_flush"},
-        crop_attributes={"tree_size_class": "large"},
-        indices=_idx(ndre=0.5),
-    )
-    assert evaluate_tree(_NITRO, ctx).outcome.action_type == "no_action"
 
 
 # ---- canopy health: SAVI on sandy soil, else NDVI -------------------------

@@ -1,0 +1,395 @@
+# t_size_record_check — does the recorded tree size match what the imagery
+# shows?
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# NDVI and BSI rows of the 10 m value sheets.
+#
+# Every other tree in this catalogue branches on the block's recorded Tree
+# size before it looks at a single number. If that field is wrong, all eleven
+# index trees compare against the wrong band at the same time, in the same
+# direction, and nothing in the system says so — the cards look like an
+# agronomy emergency and the fix is a dropdown.
+#
+# This has already happened on this platform. A previous mango release found
+# 100 blocks carrying a size label that put them a whole class above what
+# their imagery and their recorded tree age both said. Mapping the label
+# through unchanged would have put those 100 blocks below their expected
+# range on the first sweep.
+#
+# The check itself is deliberately coarse. It does not fire when a block sits
+# near a class boundary; it fires when the reading lands squarely inside a
+# DIFFERENT size's band, which is a gap of at least one whole class. NDVI
+# carries the check because its three bands are the widest apart of any index
+# in the guide (0.10-0.22 small, 0.25-0.40 medium, 0.65-0.81 large), and BSI
+# confirms it from the ground side, where a real size difference must also
+# show up as a difference in exposed soil.
+
+code: t_size_record_check
+name_en: T_SIZE_CHECK — recorded tree size disagrees with the imagery
+name_ar: T_SIZE_CHECK — حجم الشجرة المسجّل يخالف الصورة
+description_en: >-
+  Checks the block's recorded Tree size against what NDVI and BSI actually
+  show, and opens a card when the reading sits squarely inside a different
+  size class. This is a data-quality rule, not an agronomy one: a wrong size
+  makes every other size-aware mango rule compare against the wrong band at
+  once, in the same direction, with no other warning.
+description_ar: >-
+  يقارن حجم الشجرة المسجّل للقطعة بما تُظهره قراءتا NDVI و BSI فعلًا، ويفتح
+  بطاقة عندما تقع القراءة داخل فئة حجم مختلفة تمامًا. هذه قاعدة جودة بيانات
+  لا قاعدة زراعية: الحجم الخطأ يجعل كل قواعد المانجو المعتمدة على الحجم
+  تقارن بالنطاق الخطأ دفعة واحدة وفي الاتجاه نفسه دون أي تحذير آخر.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    The bands are the mango index guide's own, so the comparison inherits the
+    guide's stated limits. The rule is written to be conservative: it needs
+    the reading to clear a whole size class, and it needs BSI to agree from
+    the ground side, because a block under severe stress can read a low NDVI
+    without being small. A large block that has genuinely collapsed will fire
+    both this and T_NDVI; the ground check tells the two apart in one visit.
+  citations:
+    - source_type: peer_reviewed
+      title: >-
+        Rouse, J.W. et al. — Monitoring vegetation systems in the Great
+        Plains with ERTS, NASA/GSFC
+      url: https://ntrs.nasa.gov/citations/19740022614
+      year: 1974
+    - source_type: remote_sensing
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), NDVI and BSI
+        rows of the 10 m value sheets
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: medium
+  global: low
+
+parameters:
+  small_ndvi_top:
+    type: number
+    default: 0.22
+    min: -1.0
+    max: 1.0
+    description: >-
+      Top of the guide's small-tree NDVI band. A block recorded as medium or
+      large reading at or below this is reading like a small tree.
+  medium_ndvi_top:
+    type: number
+    default: 0.40
+    min: -1.0
+    max: 1.0
+    description: >-
+      Top of the guide's medium-tree NDVI band. A block recorded as large
+      reading at or below this is reading like a medium tree at best.
+  medium_ndvi_floor:
+    type: number
+    default: 0.25
+    min: -1.0
+    max: 1.0
+    description: >-
+      Floor of the guide's medium-tree NDVI band. A block recorded as small
+      reading at or above this is reading like a larger tree.
+  large_ndvi_floor:
+    type: number
+    default: 0.65
+    min: -1.0
+    max: 1.0
+    description: >-
+      Floor of the guide's large-tree NDVI band. A block recorded as medium
+      reading at or above this is reading like a large tree.
+  small_bsi_floor:
+    type: number
+    default: 0.35
+    min: -1.0
+    max: 1.0
+    description: >-
+      Floor of the guide's small-tree BSI band. Confirms from the ground side
+      that a block reading small really is showing a small tree's worth of
+      exposed soil, rather than being a large block whose canopy collapsed.
+  large_bsi_top:
+    type: number
+    default: 0.14
+    min: -1.0
+    max: 1.0
+    description: >-
+      Top of the guide's large-tree BSI band. Confirms that a block reading
+      large really has a large tree's closed ground cover.
+
+root: recorded_small
+nodes:
+  recorded_small:
+    label_en: Is the block recorded as small trees?
+    label_ar: هل القطعة مسجّلة بأشجار صغيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: small
+    on_match: small_reads_bigger
+    on_miss: recorded_medium
+
+  recorded_medium:
+    label_en: Is the block recorded as medium trees?
+    label_ar: هل القطعة مسجّلة بأشجار متوسطة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: medium
+    on_match: medium_reads_smaller
+    on_miss: recorded_large
+
+  recorded_large:
+    label_en: Is the block recorded as large trees?
+    label_ar: هل القطعة مسجّلة بأشجار كبيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: large
+    on_match: large_reads_smaller
+    on_miss: leaf_size_unknown
+
+  # ---- recorded small ------------------------------------------------
+  small_reads_bigger:
+    label_en: Does a block recorded as small read like a bigger tree, with closed ground cover to match?
+    label_ar: هل تقرأ قطعة مسجّلة صغيرة كشجرة أكبر مع تغطية أرضية مغلقة تطابقها؟
+    condition:
+      tree:
+        all_of:
+          - op: ge
+            left:
+              source: indices
+              index_code: ndvi
+              key: mean
+            right:
+              source: params
+              name: medium_ndvi_floor
+          - op: lt
+            left:
+              source: indices
+              index_code: bsi
+              key: mean
+            right:
+              source: params
+              name: small_bsi_floor
+    on_match: leaf_looks_bigger
+    on_miss: leaf_match
+
+  # ---- recorded medium -----------------------------------------------
+  medium_reads_smaller:
+    label_en: Does a block recorded as medium read like a small tree, with a small tree's exposed soil?
+    label_ar: هل تقرأ قطعة مسجّلة متوسطة كشجرة صغيرة مع تربة مكشوفة كالصغيرة؟
+    condition:
+      tree:
+        all_of:
+          - op: le
+            left:
+              source: indices
+              index_code: ndvi
+              key: mean
+            right:
+              source: params
+              name: small_ndvi_top
+          - op: ge
+            left:
+              source: indices
+              index_code: bsi
+              key: mean
+            right:
+              source: params
+              name: small_bsi_floor
+    on_match: leaf_looks_smaller
+    on_miss: medium_reads_bigger
+
+  medium_reads_bigger:
+    label_en: Does a block recorded as medium read like a large tree, with closed ground cover?
+    label_ar: هل تقرأ قطعة مسجّلة متوسطة كشجرة كبيرة مع تغطية مغلقة؟
+    condition:
+      tree:
+        all_of:
+          - op: ge
+            left:
+              source: indices
+              index_code: ndvi
+              key: mean
+            right:
+              source: params
+              name: large_ndvi_floor
+          - op: le
+            left:
+              source: indices
+              index_code: bsi
+              key: mean
+            right:
+              source: params
+              name: large_bsi_top
+    on_match: leaf_looks_bigger
+    on_miss: leaf_match
+
+  # ---- recorded large ------------------------------------------------
+  large_reads_smaller:
+    label_en: Does a block recorded as large read a whole class below, with the exposed soil to match?
+    label_ar: هل تقرأ قطعة مسجّلة كبيرة فئة كاملة أدنى مع التربة المكشوفة المطابقة؟
+    condition:
+      tree:
+        all_of:
+          - op: le
+            left:
+              source: indices
+              index_code: ndvi
+              key: mean
+            right:
+              source: params
+              name: medium_ndvi_top
+          - op: gt
+            left:
+              source: indices
+              index_code: bsi
+              key: mean
+            right:
+              source: params
+              name: large_bsi_top
+    on_match: leaf_looks_smaller
+    on_miss: leaf_match
+
+  # ---- leaves --------------------------------------------------------
+  leaf_looks_smaller:
+    label_en: Recorded size looks too large — the imagery reads a smaller tree
+    label_ar: الحجم المسجّل يبدو أكبر من الواقع — الصورة تقرأ شجرة أصغر
+    outcome:
+      action_type: other
+      severity: warning
+      confidence: 0.5
+      valid_for_hours: 336
+      parameters:
+        priority: high
+      text_en: >-
+        This block's greenness and its exposed soil both read a whole size
+        class below the Tree size recorded on it. Until that is settled,
+        every size-aware mango rule is comparing this block against a band
+        meant for bigger trees, so all of them will report it as failing.
+        Check the record before acting on any of those cards.
+      text_ar: >-
+        اخضرار هذه القطعة وتربتها المكشوفة كلاهما يقرأ فئة حجم كاملة أدنى من
+        حجم الشجرة المسجّل عليها. وحتى تُحسم المسألة، تقارن كل قواعد المانجو
+        المعتمدة على الحجم هذه القطعة بنطاق مخصص لأشجار أكبر، فتبلّغ كلها عن
+        فشلها. راجع السجل قبل التصرف بناءً على أي من تلك البطاقات.
+      actions:
+        immediate:
+          - text_en: >-
+              Look at the block and judge the canopy height against the size
+              classes: small under 2 m, medium 2 to 4 m, large over 4 m.
+            text_ar: >-
+              انظر إلى القطعة واحكم على ارتفاع المجموع مقابل فئات الحجم:
+              صغيرة أقل من 2 م، متوسطة 2 إلى 4 م، كبيرة أكثر من 4 م.
+        short_term:
+          - text_en: >-
+              If the record is wrong, correct Tree size on the crop
+              assignment; the size-aware cards clear on the next sweep.
+            text_ar: >-
+              إن كان السجل خطأ فصحّح حجم الشجرة على تخصيص المحصول؛ وتُغلق
+              البطاقات المعتمدة على الحجم في التمريرة التالية.
+          - text_en: >-
+              If the record is right, the block has genuinely lost canopy —
+              treat the other cards as real and scout for the cause.
+            text_ar: >-
+              إن كان السجل صحيحًا فالقطعة فقدت مجموعًا فعلًا — اعتبر البطاقات
+              الأخرى حقيقية واستكشف السبب.
+        monitoring:
+          - text_en: >-
+              Re-check the size record at the start of each season; a growing
+              orchard changes class.
+            text_ar: >-
+              أعد فحص سجل الحجم في بداية كل موسم؛ فالبستان النامي يغيّر فئته.
+
+  leaf_looks_bigger:
+    label_en: Recorded size looks too small — the imagery reads a bigger tree
+    label_ar: الحجم المسجّل يبدو أصغر من الواقع — الصورة تقرأ شجرة أكبر
+    outcome:
+      action_type: other
+      severity: warning
+      confidence: 0.6
+      valid_for_hours: 336
+      parameters:
+        priority: medium
+      text_en: >-
+        This block's greenness reads a whole size class above the Tree size
+        recorded on it, and its ground cover agrees. A size recorded too low
+        is the quiet failure of the pair: every size-aware rule compares this
+        block against an easy band and reports it healthy, so a real problem
+        would go unreported.
+      text_ar: >-
+        اخضرار هذه القطعة يقرأ فئة حجم كاملة أعلى من حجم الشجرة المسجّل عليها،
+        وتغطيتها الأرضية تؤكد ذلك. الحجم المسجّل أدنى من الواقع هو الفشل الصامت
+        في الحالتين: تقارن كل قاعدة معتمدة على الحجم هذه القطعة بنطاق سهل
+        وتبلّغ أنها سليمة، فتمرّ مشكلة حقيقية دون تبليغ.
+      actions:
+        immediate:
+          - text_en: >-
+              Judge the canopy height on the ground against the size classes.
+            text_ar: >-
+              احكم على ارتفاع المجموع في الأرض مقابل فئات الحجم.
+        short_term:
+          - text_en: >-
+              Correct Tree size on the crop assignment so the block is judged
+              against the right band.
+            text_ar: >-
+              صحّح حجم الشجرة على تخصيص المحصول ليُحكم على القطعة بالنطاق
+              الصحيح.
+        monitoring:
+          - text_en: >-
+              After the correction, re-read the size-aware cards — a block
+              that looked healthy may not be.
+            text_ar: >-
+              بعد التصحيح، أعد قراءة البطاقات المعتمدة على الحجم — فقطعة بدت
+              سليمة قد لا تكون كذلك.
+
+  leaf_match:
+    label_en: No action — the recorded size is consistent with the imagery
+    label_ar: لا إجراء — الحجم المسجّل متسق مع الصورة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        Greenness and exposed soil are both consistent with the Tree size
+        recorded on this block, so the size-aware rules are comparing against
+        the right band.
+      text_ar: >-
+        الاخضرار والتربة المكشوفة متسقان مع حجم الشجرة المسجّل على هذه القطعة،
+        فالقواعد المعتمدة على الحجم تقارن بالنطاق الصحيح.
+
+  leaf_size_unknown:
+    label_en: No action — tree size not recorded, so there is nothing to check it against
+    label_ar: لا إجراء — حجم الشجرة غير مسجّل فلا شيء يُقارن به
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        This block has no Tree size recorded. Set it on the crop assignment
+        and this rule, along with every other size-aware mango rule, starts
+        running on the next sweep.
+      text_ar: >-
+        لا يوجد حجم شجرة مسجّل لهذه القطعة. اضبطه على تخصيص المحصول لتبدأ هذه
+        القاعدة، وكل قواعد المانجو المعتمدة على الحجم، في العمل مع التمريرة
+        التالية.

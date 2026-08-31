@@ -20,7 +20,7 @@ function makeWorldGroup(): SVGGElement {
 
 describe("pngFileName", () => {
   it("slugs the tree code", () => {
-    expect(pngFileName("mango_anthracnose_risk_v1")).toBe("mango-anthracnose-risk-v1-tree.png");
+    expect(pngFileName("t_anthracnose_mealybug_watch")).toBe("t-anthracnose-mealybug-watch-tree.png");
   });
 
   it("falls back when the label has nothing usable", () => {
