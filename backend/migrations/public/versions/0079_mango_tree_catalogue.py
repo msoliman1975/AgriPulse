@@ -165,8 +165,7 @@ _INSERT = sa.text(
     "ON CONFLICT (path, code) DO NOTHING"
 )
 _DELETE_NEW = sa.text(
-    "DELETE FROM public.crop_attribute_definitions "
-    "WHERE path = 'mango' AND code = :code"
+    "DELETE FROM public.crop_attribute_definitions WHERE path = 'mango' AND code = :code"
 )
 
 # `tenant_id IS NULL` keeps this to the platform catalog. A tenant that
