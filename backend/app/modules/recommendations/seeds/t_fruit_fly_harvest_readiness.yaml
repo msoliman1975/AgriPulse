@@ -1,0 +1,332 @@
+# t_fruit_fly_harvest_readiness — the pest that closes export markets, and
+# the picking discipline that goes with it.
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# Stage C of the four Plan sheets.
+#
+# Stage C is where the plan stops hedging. Three of its instructions are
+# graded High, the only cluster of High grades in the whole plan, and all
+# three are about fruit fly and the market:
+#
+#   "Bactrocera dorsalis is the single most critical pest for export-bound
+#    mango and the main driver of mandatory quarantine treatment requirements."
+#   "Continue fruit fly trap monitoring and any organic-compatible bait/trap
+#    interventions as thresholds are exceeded."
+#   "For export shipments, apply hot water treatment (HWT) ... 46.1 C for
+#    about 73 minutes ... HWT is mandatory for market access to several
+#    importing countries (e.g. China, Iran)."
+#
+# A fourth instruction sits with them and is graded Medium, and it is the one
+# growers most often get wrong: "mango on the same tree does not ripen
+# uniformly, so repeated selective picking passes are typically required
+# rather than a single harvest date." A single-pass harvest on a mango block
+# leaves half the fruit picked at the wrong maturity.
+#
+# The harvest window itself shifts by variety — late May for Sukkary, into
+# November for Keitt — and the block's stage calendar already carries that
+# shift, so this tree branches on the stage rather than on the variety name.
+
+code: t_fruit_fly_harvest_readiness
+name_en: T_HARVEST — fruit fly monitoring, selective picking and export treatment
+name_ar: T_HARVEST — مراقبة ذبابة الفاكهة والجني الانتقائي ومعالجة التصدير
+description_en: >-
+  Runs on a bearing block through its maturity window. Combines the three
+  things Stage C of the plan grades High — fruit fly trap monitoring, the
+  repeated selective picking passes mango needs, and the hot water treatment
+  that several importing countries require — into the card that is open while
+  the fruit is still on the tree and something can still be done.
+description_ar: >-
+  يعمل على القطعة المثمرة خلال نافذة نضجها. يجمع الأمور الثلاثة التي تصنّفها
+  المرحلة C في الخطة بثقة عالية — مراقبة مصائد ذبابة الفاكهة، وجولات الجني
+  الانتقائي المتكررة التي تحتاجها المانجو، والمعالجة بالماء الساخن التي
+  تشترطها عدة دول مستوردة — في بطاقة واحدة مفتوحة والثمار ما زالت على الشجرة
+  ويمكن فعل شيء.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    The fruit fly and hot water treatment items are graded High in the plan
+    sheets and are backed by published quarantine protocol: the 46.1 C for
+    about 73 minutes figure is the validated protocol for cv. Tommy Atkins,
+    and the plan says so — it is not a general mango number, and a packhouse
+    running it on another cultivar should confirm the protocol for that
+    cultivar before shipping. The weather-driven fruit fly score says
+    conditions favour activity; it is not a trap count, and no trap count
+    reaches this platform, so the card asks for the traps rather than
+    replacing them.
+  citations:
+    - source_type: extension
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), Stage C of the
+        Plan sheets: maturity and harvest
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: high
+  global: medium
+
+parameters:
+  warn_score:
+    type: number
+    default: 40
+    min: 0
+    max: 100
+    description: >-
+      Fruit fly risk score at or above which trap checks move from routine to
+      frequent.
+  high_score:
+    type: number
+    default: 70
+    min: 0
+    max: 100
+    description: >-
+      Risk score at or above which bait or trap intervention is justified
+      immediately.
+
+root: bearing_block
+nodes:
+  bearing_block:
+    label_en: Is this block carrying a crop this season?
+    label_ar: هل تحمل هذه القطعة محصولًا هذا الموسم؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: bearing_status
+          key: value
+        right: bearing
+    on_match: maturity_window
+    on_miss: leaf_not_bearing
+
+  maturity_window:
+    label_en: Is the block inside its maturity and harvest window?
+    label_ar: هل القطعة داخل نافذة نضجها وحصادها؟
+    condition:
+      tree:
+        op: in
+        left:
+          source: block
+          field: growth_stage
+        values: [maturation]
+    on_match: fly_risk_high
+    on_miss: leaf_not_due
+
+  fly_risk_high:
+    label_en: Do conditions strongly favour fruit fly activity?
+    label_ar: هل تُرجّح الظروف بقوة نشاط ذبابة الفاكهة؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: weather_risk
+          risk_code: fruit_fly
+          field: score
+        right:
+          source: params
+          name: high_score
+    on_match: leaf_fly_critical
+    on_miss: fly_risk_warn
+
+  fly_risk_warn:
+    label_en: Are conditions moving toward fruit fly activity?
+    label_ar: هل تتجه الظروف نحو نشاط ذبابة الفاكهة؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: weather_risk
+          risk_code: fruit_fly
+          field: score
+        right:
+          source: params
+          name: warn_score
+    on_match: leaf_fly_watch
+    on_miss: leaf_harvest_routine
+
+  leaf_fly_critical:
+    label_en: Fruit fly pressure high during harvest — trap and bait now
+    label_ar: ضغط ذبابة الفاكهة مرتفع أثناء الحصاد — ضع المصائد والطُعم الآن
+    outcome:
+      action_type: harvest_window
+      severity: critical
+      confidence: 0.65
+      valid_for_hours: 72
+      parameters:
+        priority: high
+      text_en: >-
+        Conditions strongly favour fruit fly activity while this block has
+        ripening fruit on the tree. Bactrocera dorsalis is the single pest
+        that closes export markets: an infested consignment does not get
+        downgraded, it gets rejected, and it drives the quarantine treatment
+        every importing country then demands.
+      text_ar: >-
+        تُرجّح الظروف بقوة نشاط ذبابة الفاكهة والقطعة تحمل ثمارًا ناضجة على
+        الشجرة. ذبابة Bactrocera dorsalis هي الآفة التي تغلق أسواق التصدير
+        وحدها: الإرسالية المصابة لا تُخفَّض درجتها بل تُرفض، وهي التي تفرض
+        معالجة الحجر التي تشترطها بعدها كل دولة مستوردة.
+      actions:
+        immediate:
+          - text_en: >-
+              Check the fruit fly traps now and record the counts; if traps
+              are not installed on this block, install them today.
+            text_ar: >-
+              افحص مصائد ذبابة الفاكهة الآن وسجّل الأعداد؛ وإن لم تكن مركّبة
+              على هذه القطعة فركّبها اليوم.
+          - text_en: >-
+              Apply organic-compatible bait or trap interventions where the
+              counts exceed your threshold.
+            text_ar: >-
+              طبّق تدخلات الطُعم أو المصائد المتوافقة مع الزراعة العضوية حيث
+              تتجاوز الأعداد عتبتك.
+        short_term:
+          - text_en: >-
+              Remove and destroy fallen and infested fruit from under the
+              trees — it is the breeding site, and leaving it undoes the traps.
+            text_ar: >-
+              أزل الثمار الساقطة والمصابة من تحت الأشجار وأتلفها — فهي موقع
+              التكاثر، وتركها يُبطل عمل المصائد.
+          - text_en: >-
+              Bring the harvest forward for the fruit that has reached
+              physiological maturity rather than leaving it hanging under
+              pressure.
+            text_ar: >-
+              قدّم جني الثمار التي بلغت النضج الفسيولوجي بدل تركها معلّقة تحت
+              الضغط.
+        monitoring:
+          - text_en: >-
+              For export, apply hot water treatment: the validated protocol
+              for cv. Tommy Atkins is 46.1 C for about 73 minutes. Confirm the
+              protocol for your own cultivar before shipping.
+            text_ar: >-
+              للتصدير، طبّق المعالجة بالماء الساخن: البروتوكول المعتمد لصنف
+              Tommy Atkins هو 46.1 درجة مئوية لنحو 73 دقيقة. تأكد من
+              البروتوكول الخاص بصنفك قبل الشحن.
+
+  leaf_fly_watch:
+    label_en: Fruit fly pressure rising during harvest — check the traps
+    label_ar: ضغط ذبابة الفاكهة يرتفع أثناء الحصاد — افحص المصائد
+    outcome:
+      action_type: harvest_window
+      severity: warning
+      confidence: 0.55
+      valid_for_hours: 120
+      parameters:
+        priority: medium
+      text_en: >-
+        Conditions are moving toward fruit fly activity on a block that is
+        carrying ripening fruit. Move the trap checks from routine to
+        frequent, and keep picking selectively while you are there.
+      text_ar: >-
+        تتجه الظروف نحو نشاط ذبابة الفاكهة على قطعة تحمل ثمارًا ناضجة. انقل
+        فحص المصائد من روتيني إلى متكرر، وواصل الجني الانتقائي أثناء وجودك.
+      actions:
+        immediate:
+          - text_en: Check the traps and record the counts.
+            text_ar: افحص المصائد وسجّل الأعداد.
+        short_term:
+          - text_en: >-
+              Clear fallen fruit from under the trees on the same visit.
+            text_ar: >-
+              نظّف الثمار الساقطة من تحت الأشجار في الزيارة نفسها.
+          - text_en: >-
+              Assess maturity per fruit as you go. Mango on one tree does not
+              ripen together, so plan repeated selective passes rather than
+              one harvest date.
+            text_ar: >-
+              قيّم نضج كل ثمرة أثناء مرورك. لا تنضج ثمار الشجرة الواحدة معًا،
+              فخطّط لجولات انتقائية متكررة بدل تاريخ حصاد واحد.
+        monitoring:
+          - text_en: >-
+              Keep the export treatment requirement in view if any of this
+              block is going abroad.
+            text_ar: >-
+              ضع في الحسبان اشتراط معالجة التصدير إن كان أي من هذه القطعة
+              متجهًا للخارج.
+
+  leaf_harvest_routine:
+    label_en: Harvest window open — pick selectively, keep the traps running
+    label_ar: نافذة الحصاد مفتوحة — اجنِ انتقائيًا وأبقِ المصائد عاملة
+    outcome:
+      action_type: harvest_window
+      severity: info
+      confidence: 0.6
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        This block is in its maturity and harvest window with fruit fly
+        pressure low for now. The picking discipline still applies: mango on
+        the same tree does not ripen uniformly, so a single harvest date takes
+        half the crop at the wrong maturity.
+      text_ar: >-
+        هذه القطعة في نافذة نضجها وحصادها وضغط ذبابة الفاكهة منخفض حاليًا. ومع
+        ذلك يبقى انضباط الجني قائمًا: لا تنضج ثمار الشجرة الواحدة بانتظام،
+        فتاريخ حصاد واحد يأخذ نصف المحصول عند النضج الخطأ.
+      actions:
+        immediate:
+          - text_en: >-
+              Harvest at physiological maturity using shoulder fill, the skin
+              colour break and firmness, in repeated selective passes.
+            text_ar: >-
+              اجنِ عند النضج الفسيولوجي بامتلاء الكتفين وتحوّل لون القشرة
+              والصلابة، في جولات انتقائية متكررة.
+        short_term:
+          - text_en: >-
+              Handle the fruit carefully to avoid latex sap burn on the skin
+              and mechanical bruising — both show up as a grade loss in the
+              packhouse.
+            text_ar: >-
+              تعامل مع الثمار بعناية لتجنّب حرق العصارة اللبنية على القشرة
+              والرضوض الميكانيكية — وكلاهما يظهر كخسارة درجة في محطة التعبئة.
+          - text_en: >-
+              Grade by size, colour and freedom from blemish, and pack for the
+              target market: fresh local, fresh export, or processing.
+            text_ar: >-
+              فرز حسب الحجم واللون وخلوّ الثمرة من العيوب، وعبّئ حسب السوق
+              المستهدف: طازج محلي، أو طازج للتصدير، أو للتصنيع.
+        monitoring:
+          - text_en: >-
+              Keep checking the fruit fly traps through every picking pass.
+            text_ar: >-
+              واصل فحص مصائد ذبابة الفاكهة في كل جولة جني.
+
+  leaf_not_bearing:
+    label_en: No action — this block is not carrying a crop this season
+    label_ar: لا إجراء — هذه القطعة لا تحمل محصولًا هذا الموسم
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        There is no harvest to plan on a resting block. If this block is in
+        fact carrying fruit, correct the Bearing this season attribute — it
+        does not update on its own.
+      text_ar: >-
+        لا حصاد يُخطَّط له على قطعة مرتاحة. إن كانت هذه القطعة تحمل ثمارًا
+        فعلًا فصحّح خاصية الإثمار هذا الموسم — فهي لا تتحدّث تلقائيًا.
+
+  leaf_not_due:
+    label_en: No action — this block is not in its harvest window
+    label_ar: لا إجراء — هذه القطعة ليست في نافذة حصادها
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        The harvest window opens on a different date per variety — late May
+        for the early group, into November for Keitt — and the block's stage
+        calendar carries that shift. This rule starts when the block reaches
+        maturation.
+      text_ar: >-
+        تفتح نافذة الحصاد في تاريخ مختلف لكل صنف — أواخر مايو للمجموعة المبكرة
+        وحتى نوفمبر لصنف Keitt — ويحمل تقويم مراحل القطعة هذا الاختلاف. تبدأ
+        هذه القاعدة عند وصول القطعة إلى النضج.

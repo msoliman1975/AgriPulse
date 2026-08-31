@@ -1,0 +1,264 @@
+# t_anthracnose_mealybug_watch — the two pests the plan tracks all the way
+# through fruit development.
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# Stage B of the four Plan sheets, plus the Stage 0 sanitation line.
+#
+# Anthracnose and mealybug appear together in the plan because they share a
+# carry-over route — both survive in pruning debris and fallen fruit, which is
+# why Stage 0's sanitation instruction names them both — and because they
+# share a season. Neither is a spray-once problem.
+#
+# They differ in one way that matters here. Anthracnose is weather-driven and
+# the platform models it per block, so a score exists to branch on. Mealybug
+# is not: it walks up the trunk from the soil, and no weather model or index
+# on this platform sees it. So the mealybug half of this card is a standing
+# instruction to look, attached to the anthracnose card that already sends
+# someone into the block. One visit, two things checked.
+#
+# Anthracnose is also the disease that shows up after the customer has paid
+# for the fruit. The infection happens in the field during humid weeks and
+# stays latent; the lesions appear in the box. A card raised during the humid
+# week is the only point where anything can be done.
+
+code: t_anthracnose_mealybug_watch
+name_en: T_ANTHRACNOSE — anthracnose risk and the mealybug check that rides with it
+name_ar: T_ANTHRACNOSE — خطر الأنثراكنوز وفحص البق الدقيقي المصاحب
+description_en: >-
+  Runs from fruit set through maturation. Reads the weather-driven anthracnose
+  risk for the block and, when conditions favour infection, sends someone in
+  with instructions for both anthracnose and mango mealybug — the second has
+  no model on this platform and is checked on the same visit rather than not
+  at all.
+description_ar: >-
+  يعمل من العقد حتى النضج. يقرأ خطر الأنثراكنوز المحسوب من الطقس للقطعة،
+  وعندما تُرجّح الظروف الإصابة يرسل من يفحص ومعه تعليمات للأنثراكنوز وللبق
+  الدقيقي معًا — فالثاني لا نموذج له على هذه المنصة ويُفحص في الزيارة نفسها
+  بدل ألا يُفحص أصلًا.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    The anthracnose score is a weather model: it says conditions favour
+    infection, not that infection has occurred. That distinction matters more
+    here than elsewhere because anthracnose is latent — a block can be
+    infected during a humid week and look perfectly clean until the fruit is
+    in the box. The mealybug half carries no score at all and is an
+    instruction to look, graded Medium in the plan. The organic control
+    options listed are the plan's own.
+  citations:
+    - source_type: extension
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), Stage B of the
+        Plan sheets and the Stage 0 sanitation instruction
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: high
+  global: medium
+
+parameters:
+  warn_score:
+    type: number
+    default: 40
+    min: 0
+    max: 100
+    description: >-
+      Anthracnose risk score at or above which the block is worth a scouting
+      visit.
+  high_score:
+    type: number
+    default: 70
+    min: 0
+    max: 100
+    description: >-
+      Risk score at or above which a protective treatment is justified rather
+      than a look.
+
+root: susceptible_stage
+nodes:
+  susceptible_stage:
+    label_en: Is the block in a stage where anthracnose can reach the fruit?
+    label_ar: هل القطعة في مرحلة يمكن للأنثراكنوز أن يصل فيها الثمار؟
+    condition:
+      tree:
+        op: in
+        left:
+          source: block
+          field: growth_stage
+        values: [flowering, fruit_set, fruit_development, maturation]
+    on_match: risk_high
+    on_miss: leaf_not_due
+
+  risk_high:
+    label_en: Do conditions strongly favour anthracnose infection?
+    label_ar: هل تُرجّح الظروف بقوة الإصابة بالأنثراكنوز؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: weather_risk
+          risk_code: anthracnose
+          field: score
+        right:
+          source: params
+          name: high_score
+    on_match: leaf_treat
+    on_miss: risk_warn
+
+  risk_warn:
+    label_en: Are conditions moving toward anthracnose?
+    label_ar: هل تتجه الظروف نحو الأنثراكنوز؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: weather_risk
+          risk_code: anthracnose
+          field: score
+        right:
+          source: params
+          name: warn_score
+    on_match: leaf_scout
+    on_miss: leaf_low_risk
+
+  leaf_treat:
+    label_en: Anthracnose conditions high — protect the fruit now
+    label_ar: ظروف الأنثراكنوز مرتفعة — احمِ الثمار الآن
+    outcome:
+      action_type: spray
+      severity: critical
+      confidence: 0.6
+      valid_for_hours: 72
+      parameters:
+        priority: high
+      text_en: >-
+        Weather conditions strongly favour anthracnose infection while this
+        block is carrying susceptible tissue. The infection that happens this
+        week will not be visible this week — anthracnose stays latent in the
+        fruit and the sunken dark lesions appear after picking, in the box.
+        This card is raised now because now is the only time anything can be
+        done about it.
+      text_ar: >-
+        تُرجّح ظروف الطقس بقوة الإصابة بالأنثراكنوز والقطعة تحمل أنسجة قابلة
+        للإصابة. الإصابة التي تحدث هذا الأسبوع لن تُرى هذا الأسبوع — يبقى
+        الأنثراكنوز كامنًا في الثمرة وتظهر البقع الداكنة الغائرة بعد الجني في
+        الصندوق. تُرفع هذه البطاقة الآن لأن الآن هو الوقت الوحيد الذي يمكن فيه
+        فعل شيء.
+      actions:
+        immediate:
+          - text_en: >-
+              Apply a protective treatment before the humid period passes,
+              not after the lesions show.
+            text_ar: >-
+              طبّق معالجة وقائية قبل انقضاء الفترة الرطبة لا بعد ظهور البقع.
+          - text_en: >-
+              While you are in the block, check the shoots and leaves for
+              mango mealybug — sap-sucking colonies, honeydew, and the sooty
+              mould that follows it.
+            text_ar: >-
+              وأنت في القطعة، افحص الأفرع والأوراق بحثًا عن البق الدقيقي
+              للمانجو — مستعمرات ماصّة للعصارة وندوة عسلية والعفن الأسود الذي
+              يتبعها.
+        short_term:
+          - text_en: >-
+              For mealybug, organic options are a strong water jet to dislodge
+              the colonies, neem oil, or the biopesticide Metarhizium
+              anisopliae.
+            text_ar: >-
+              للبق الدقيقي، الخيارات العضوية نفث ماء قوي لإزاحة المستعمرات، أو
+              زيت النيم، أو المبيد الحيوي Metarhizium anisopliae.
+          - text_en: >-
+              Clear fallen fruit and pruning debris from the block. Both pests
+              carry over in it, which is why post-harvest sanitation is in the
+              plan.
+            text_ar: >-
+              نظّف الثمار الساقطة وبقايا التقليم من القطعة. تبقى الآفتان فيها
+              إلى الموسم التالي، ولهذا كانت نظافة ما بعد الحصاد في الخطة.
+        monitoring:
+          - text_en: >-
+              Keep checking through every humid stretch until harvest.
+            text_ar: >-
+              واصل الفحص خلال كل فترة رطبة حتى الحصاد.
+
+  leaf_scout:
+    label_en: Anthracnose conditions rising — inspect the block
+    label_ar: ظروف الأنثراكنوز ترتفع — افحص القطعة
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.5
+      valid_for_hours: 120
+      parameters:
+        priority: medium
+      text_en: >-
+        Conditions are moving toward anthracnose on this block. Not enough to
+        justify a treatment on its own, but enough to send someone in and
+        look. Check for both of the season's pests on the same visit.
+      text_ar: >-
+        تتجه الظروف نحو الأنثراكنوز على هذه القطعة. ليس بما يكفي لتبرير معالجة
+        وحدها، لكنه يكفي لإرسال من يفحص. افحص آفتي الموسم في الزيارة نفسها.
+      actions:
+        immediate:
+          - text_en: >-
+              Look for dark sunken lesions on leaves, flowers and young fruit.
+            text_ar: >-
+              ابحث عن بقع داكنة غائرة على الأوراق والأزهار والثمار الصغيرة.
+          - text_en: >-
+              Look for mealybug colonies on the shoots and the underside of
+              leaves, and for the sticky honeydew they leave.
+            text_ar: >-
+              ابحث عن مستعمرات البق الدقيقي على الأفرع وأسفل الأوراق، وعن
+              الندوة العسلية اللزجة التي تتركها.
+        short_term:
+          - text_en: >-
+              Treat only what the visit confirms; conditions alone are not a
+              diagnosis.
+            text_ar: >-
+              عالج ما تؤكده الزيارة فقط؛ فالظروف وحدها ليست تشخيصًا.
+        monitoring:
+          - text_en: >-
+              Repeat the check after every rain or heavy dew through fruit
+              development.
+            text_ar: >-
+              كرّر الفحص بعد كل مطر أو ندى غزير خلال تطور الثمار.
+
+  leaf_low_risk:
+    label_en: No action — anthracnose conditions are low on this block
+    label_ar: لا إجراء — ظروف الأنثراكنوز منخفضة على هذه القطعة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.8
+      parameters: {}
+      text_en: >-
+        Weather conditions do not currently favour anthracnose infection here.
+        Mealybug has no weather model on this platform, so it is worth a look
+        during any routine visit regardless of this card.
+      text_ar: >-
+        لا تُرجّح ظروف الطقس حاليًا الإصابة بالأنثراكنوز هنا. ولا يوجد للبق
+        الدقيقي نموذج طقس على هذه المنصة، فيستحق نظرة في أي زيارة روتينية بصرف
+        النظر عن هذه البطاقة.
+
+  leaf_not_due:
+    label_en: No action — the block has no tissue at risk right now
+    label_ar: لا إجراء — لا توجد أنسجة معرّضة في القطعة حاليًا
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        Anthracnose reaches flowers and fruit, so this rule runs from
+        flowering through maturation. Outside that window the control that
+        matters is sanitation, which is on the post-harvest card.
+      text_ar: >-
+        يصيب الأنثراكنوز الأزهار والثمار، لذا تعمل هذه القاعدة من التزهير حتى
+        النضج. أما خارج تلك النافذة فالمكافحة المهمة هي النظافة، وهي على بطاقة
+        ما بعد الحصاد.

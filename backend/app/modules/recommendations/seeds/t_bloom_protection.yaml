@@ -1,0 +1,256 @@
+# t_bloom_protection — protect the bloom from powdery mildew without killing
+# the insects that are setting the crop.
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# Stage A of the four Plan sheets.
+#
+# Two instructions in the plan pull against each other in the same two weeks:
+#
+#   "Begin daily/weekly monitoring for powdery mildew — humid, cool mornings
+#    and evenings during flowering are the peak-risk window."
+#   "Avoid disruptive sprays during peak bloom to protect pollinating insects
+#    — mango is insect-pollinated (flies, bees) and fruit set benefits
+#    directly from pollinator activity."
+#
+# A rule that only knew the first would spray through peak bloom and cost more
+# fruit than the mildew would have. A rule that only knew the second would
+# watch the bloom rot. The plan resolves it in one line — "time application to
+# avoid the peak pollinator-activity hours" — and that timing instruction is
+# the whole point of this tree, so it is on the card and not buried in a note.
+#
+# The risk score comes from the platform's weather-driven powdery mildew
+# model, which is already computed per block. This tree adds the bloom stage
+# and the pollinator constraint on top of it.
+
+code: t_bloom_protection
+name_en: T_BLOOM — powdery mildew during flowering, timed around the pollinators
+name_ar: T_BLOOM — البياض الدقيقي أثناء التزهير مع مراعاة الملقّحات
+description_en: >-
+  Runs while the block is flowering. Reads the weather-driven powdery mildew
+  risk and, when it is high enough to act on, gives a sulfur treatment that is
+  explicitly timed away from peak pollinator hours. Mango is insect
+  pollinated, so a spray at the wrong hour costs more fruit than the disease
+  it prevents.
+description_ar: >-
+  يعمل أثناء تزهير القطعة. يقرأ خطر البياض الدقيقي المحسوب من الطقس، وعند
+  ارتفاعه بما يكفي للتصرف يعطي معالجة كبريتية موقوتة صراحةً بعيدًا عن ساعات
+  نشاط الملقّحات. تلقيح المانجو حشري، فرشّ في الساعة الخطأ يكلّف من الثمار
+  أكثر مما يمنعه المرض.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    The pollinator constraint and the sulfur option are the plan's own, graded
+    Medium there. The risk score is the platform's weather model, not a
+    measurement of the disease — it says conditions favour powdery mildew, not
+    that powdery mildew is present. The plan pairs it with daily visual
+    monitoring during flowering for that reason, and this card asks for the
+    look before the spray.
+  citations:
+    - source_type: extension
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), Stage A of the
+        Plan sheets: flowering and fruit set
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: high
+  global: medium
+
+parameters:
+  warn_score:
+    type: number
+    default: 40
+    min: 0
+    max: 100
+    description: >-
+      Powdery mildew risk score at or above which the block is worth a daily
+      look during flowering.
+  high_score:
+    type: number
+    default: 70
+    min: 0
+    max: 100
+    description: >-
+      Risk score at or above which a treatment is justified even during
+      bloom, timed away from peak pollinator hours.
+
+root: flowering_now
+nodes:
+  flowering_now:
+    label_en: Is this block flowering or setting fruit?
+    label_ar: هل هذه القطعة في التزهير أو العقد؟
+    condition:
+      tree:
+        op: in
+        left:
+          source: block
+          field: growth_stage
+        values: [flowering, fruit_set]
+    on_match: risk_high
+    on_miss: leaf_not_due
+
+  risk_high:
+    label_en: Is powdery mildew risk high enough to justify spraying during bloom?
+    label_ar: هل خطر البياض الدقيقي مرتفع بما يبرر الرشّ أثناء التزهير؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: weather_risk
+          risk_code: powdery_mildew
+          field: score
+        right:
+          source: params
+          name: high_score
+    on_match: leaf_treat_timed
+    on_miss: risk_warn
+
+  risk_warn:
+    label_en: Is the risk worth a daily look?
+    label_ar: هل يستحق الخطر فحصًا يوميًا؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: weather_risk
+          risk_code: powdery_mildew
+          field: score
+        right:
+          source: params
+          name: warn_score
+    on_match: leaf_monitor
+    on_miss: leaf_low_risk
+
+  leaf_treat_timed:
+    label_en: Treat for powdery mildew — outside peak pollinator hours
+    label_ar: عالج البياض الدقيقي — خارج ساعات ذروة الملقّحات
+    outcome:
+      action_type: spray
+      severity: critical
+      confidence: 0.6
+      valid_for_hours: 48
+      parameters:
+        priority: high
+      text_en: >-
+        Weather conditions strongly favour powdery mildew and this block is in
+        bloom, which is the crop's most vulnerable stage — the disease attacks
+        the flowers and the young fruit directly. Treatment is justified, but
+        the timing is not optional: mango sets its crop through flies and
+        bees, and a spray during their active hours costs fruit that no
+        fungicide brings back.
+      text_ar: >-
+        تُرجّح ظروف الطقس بقوة ظهور البياض الدقيقي، والقطعة في التزهير وهي
+        أضعف مراحل المحصول — إذ يهاجم المرض الأزهار والثمار الصغيرة مباشرة.
+        المعالجة مبرّرة، لكن التوقيت ليس اختياريًا: تعقد المانجو محصولها
+        بالذباب والنحل، والرشّ في ساعات نشاطها يكلّف ثمارًا لا يعيدها أي مبيد.
+      actions:
+        immediate:
+          - text_en: >-
+              Look at the flower panicles first and confirm the white powdery
+              growth is actually there. The score is a weather forecast, not a
+              diagnosis.
+            text_ar: >-
+              انظر إلى النورات أولًا وتأكد من وجود النمو الأبيض الدقيقي فعلًا.
+              الدرجة توقّع طقس لا تشخيص.
+          - text_en: >-
+              If confirmed, apply an organic-compatible sulfur treatment in
+              the late afternoon or early evening, outside peak pollinator
+              hours.
+            text_ar: >-
+              إن تأكد، فطبّق معالجة كبريتية متوافقة مع الزراعة العضوية في آخر
+              العصر أو أول المساء، خارج ساعات ذروة الملقّحات.
+        short_term:
+          - text_en: >-
+              Do not add any other spray to the same pass. Every extra
+              product during bloom is another thing the pollinators meet.
+            text_ar: >-
+              لا تضف أي رشّ آخر إلى الجولة نفسها. كل مستحضر إضافي أثناء
+              التزهير شيء آخر تلاقيه الملقّحات.
+        monitoring:
+          - text_en: >-
+              Check the panicles daily until the risk falls; humid cool
+              mornings and evenings are the peak-risk window.
+            text_ar: >-
+              افحص النورات يوميًا حتى ينخفض الخطر؛ فالصباح والمساء الرطبان
+              الباردان هما نافذة الذروة.
+
+  leaf_monitor:
+    label_en: Watch the bloom daily — risk rising, no spray yet
+    label_ar: افحص التزهير يوميًا — الخطر يرتفع ولا رشّ بعد
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.5
+      valid_for_hours: 72
+      parameters:
+        priority: medium
+      text_en: >-
+        Conditions are moving toward powdery mildew while this block is in
+        bloom. This is not yet enough to justify a spray during peak bloom —
+        the pollinator cost is real and the disease is not confirmed. Daily
+        eyes on the panicles is what the plan asks for at this level.
+      text_ar: >-
+        تتجه الظروف نحو البياض الدقيقي والقطعة في التزهير. هذا لا يكفي بعد
+        لتبرير الرشّ في ذروة التزهير — فتكلفة الملقّحات حقيقية والمرض غير
+        مؤكد. ما تطلبه الخطة عند هذا المستوى فحص يومي بالعين للنورات.
+      actions:
+        immediate:
+          - text_en: >-
+              Inspect the flower panicles every morning for white powdery
+              growth.
+            text_ar: >-
+              افحص النورات كل صباح بحثًا عن نمو أبيض دقيقي.
+        short_term:
+          - text_en: >-
+              Have the sulfur ready so a confirmed find can be treated the
+              same evening rather than two days later.
+            text_ar: >-
+              جهّز الكبريت حتى تُعالج الإصابة المؤكدة في المساء نفسه لا بعد
+              يومين.
+        monitoring:
+          - text_en: >-
+              Avoid every disruptive spray at peak bloom, weeks 3 and 4, not
+              only the fungicide.
+            text_ar: >-
+              تجنّب كل رشّ مزعج في ذروة التزهير، الأسبوعين الثالث والرابع، لا
+              المبيد الفطري وحده.
+
+  leaf_low_risk:
+    label_en: No action — bloom is open and the disease risk is low
+    label_ar: لا إجراء — التزهير قائم وخطر المرض منخفض
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.8
+      parameters: {}
+      text_en: >-
+        Weather conditions do not currently favour powdery mildew on this
+        block. Keep sprays off the block through peak bloom regardless; fruit
+        set benefits directly from pollinator activity and there is nothing
+        here worth trading it for.
+      text_ar: >-
+        لا تُرجّح ظروف الطقس حاليًا البياض الدقيقي على هذه القطعة. أبقِ الرشّ
+        بعيدًا عن القطعة خلال ذروة التزهير على أي حال؛ فالعقد يستفيد مباشرة من
+        نشاط الملقّحات ولا شيء هنا يستحق المقايضة به.
+
+  leaf_not_due:
+    label_en: No action — this block is not in bloom
+    label_ar: لا إجراء — هذه القطعة ليست في التزهير
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        Bloom protection applies during flowering and fruit set. Powdery
+        mildew outside that window is handled by the general risk rules.
+      text_ar: >-
+        تنطبق حماية التزهير أثناء التزهير والعقد. أما البياض الدقيقي خارج تلك
+        النافذة فتتولاه قواعد الخطر العامة.

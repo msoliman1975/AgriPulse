@@ -1,0 +1,427 @@
+# t_deficit_irrigation_verify — the pre-harvest water cut is a plan; did it
+# actually happen, and did it go too far?
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# Stage C of the four Plan sheets, and the maturity-stage CWSI/SMI rows of the
+# value sheets.
+#
+# This is the only tree in the catalogue that runs the check backwards. Every
+# other rule looks for an unwanted reading. This one looks for a WANTED one
+# and complains when it is missing.
+#
+# The plan sheets are explicit: "Begin gradually reducing irrigation (deficit
+# irrigation) ahead of harvest to concentrate fruit sugars and improve eating
+# quality — this is the same practice reflected in the elevated CWSI/SMI
+# ranges for productive Big trees in this phase." That sentence is why 8 of
+# the workbook's 72 index x size x productivity combinations change between
+# stage sheets while the other 64 hold still. The change is not seasonal
+# drift; it is a management decision showing up in the imagery.
+#
+# So a bearing block in its maturity window that still reads fully watered has
+# either skipped the practice or is being irrigated by someone who did not get
+# the message, and the fruit will carry less sugar for it. A block that has
+# gone well past the reduced band has overshot, and deficit irrigation that
+# goes too deep costs fruit size instead of buying sugar.
+#
+# CWSI would be the better instrument here and the guide says so. It is not
+# usable on this platform yet: the value is clipped at its ceiling across
+# production, so this tree reads soil moisture and says plainly when the
+# thermal half is unavailable.
+
+code: t_deficit_irrigation_verify
+name_en: T_DEFICIT_CHECK — pre-harvest deficit irrigation confirmed, missing, or overshot
+name_ar: "T_DEFICIT_CHECK — التحقق من الريّ الناقص قبل الحصاد: مؤكد أو غائب أو مفرط"
+description_en: >-
+  Runs only on bearing blocks inside the maturity window. Checks whether soil
+  moisture has actually fallen into the reduced band that pre-harvest deficit
+  irrigation is meant to produce. Reports three outcomes: the cut is
+  confirmed, the cut has not happened, or the cut has gone deeper than
+  intended and is now costing fruit size. Needs the Bearing this season
+  attribute and the block's growth stage.
+description_ar: >-
+  يعمل فقط على القطع المثمرة داخل نافذة النضج. يفحص هل انخفضت رطوبة التربة
+  فعلًا إلى النطاق المخفّض الذي يُفترض أن ينتجه الريّ الناقص قبل الحصاد. يبلّغ
+  بثلاث نتائج: التخفيض مؤكد، أو التخفيض لم يحدث، أو التخفيض تجاوز المقصود وصار
+  يكلّف حجم الثمرة. يحتاج خاصية الإثمار هذا الموسم ومرحلة نمو القطعة.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    The practice is well documented; the numbers used to detect it are not.
+    Pre-harvest deficit irrigation to raise soluble solids is standard
+    horticulture, and the mango index guide's own Stage C plan calls for it.
+    The SMI bands that detect it are the weakest cells in the guide,
+    Medium-Low across the board, and the guide says there is no single
+    standardized SMI formula. Treat a missing-cut card as a prompt to ask the
+    irrigation manager, not as a measurement of what they did.
+  citations:
+    - source_type: peer_reviewed
+      title: >-
+        Sandholt, I. et al. — A simple interpretation of the surface
+        temperature/vegetation index space for assessment of surface moisture
+        status, Remote Sensing of Environment 79
+      url: https://www.sciencedirect.com/science/article/abs/pii/S003442570100274X
+      year: 2002
+    - source_type: remote_sensing
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), Stage C of
+        the Plan sheets and the maturity-stage CWSI/SMI rows
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: medium
+  global: low
+
+parameters:
+  small_smi_normal_floor:
+    type: number
+    default: 0.35
+    min: -1.0
+    max: 2.0
+    description: >-
+      SMI at or above which a small-tree bearing block is still reading fully
+      watered, so the pre-harvest cut has not taken effect (guide's normal
+      small band 0.35 to 0.55).
+  medium_smi_normal_floor:
+    type: number
+    default: 0.40
+    min: -1.0
+    max: 2.0
+    description: >-
+      Same for a medium-tree block (guide's normal medium band 0.40 to 0.60).
+  large_smi_normal_floor:
+    type: number
+    default: 0.45
+    min: -1.0
+    max: 2.0
+    description: >-
+      Same for a large-tree block (guide's normal large band 0.45 to 0.70).
+  small_smi_deficit_floor:
+    type: number
+    default: 0.27
+    min: -1.0
+    max: 2.0
+    description: >-
+      SMI below which a small-tree bearing block has gone past the reduced
+      band the guide gives for the deficit window (0.27 to 0.47).
+  medium_smi_deficit_floor:
+    type: number
+    default: 0.31
+    min: -1.0
+    max: 2.0
+    description: >-
+      Same for a medium-tree block (guide's deficit band 0.31 to 0.51).
+  large_smi_deficit_floor:
+    type: number
+    default: 0.35
+    min: -1.0
+    max: 2.0
+    description: >-
+      Same for a large-tree block (guide's deficit band 0.35 to 0.60).
+
+root: in_window
+nodes:
+  in_window:
+    label_en: Is this a bearing block inside its maturity window?
+    label_ar: هل هذه قطعة مثمرة داخل نافذة النضج؟
+    condition:
+      tree:
+        all_of:
+          - op: eq
+            left:
+              source: crop_attribute
+              code: bearing_status
+              key: value
+            right: bearing
+          - op: in
+            left:
+              source: block
+              field: growth_stage
+            values: [maturation]
+    on_match: size_small
+    on_miss: leaf_not_in_window
+
+  size_small:
+    label_en: Are the trees in the small size class?
+    label_ar: هل الأشجار في فئة الحجم الصغير؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: small
+    on_match: small_not_cut
+    on_miss: size_medium
+
+  size_medium:
+    label_en: Are the trees in the medium size class?
+    label_ar: هل الأشجار في فئة الحجم المتوسط؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: medium
+    on_match: medium_not_cut
+    on_miss: size_large
+
+  size_large:
+    label_en: Are the trees in the large size class?
+    label_ar: هل الأشجار في فئة الحجم الكبير؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: large
+    on_match: large_not_cut
+    on_miss: leaf_size_unknown
+
+  small_not_cut:
+    label_en: Is soil moisture still at the fully watered level for a small tree?
+    label_ar: هل ما زالت رطوبة التربة عند مستوى الريّ الكامل للشجرة الصغيرة؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: indices
+          index_code: smi
+          key: mean
+        right:
+          source: params
+          name: small_smi_normal_floor
+    on_match: leaf_not_detected
+    on_miss: small_overshot
+
+  small_overshot:
+    label_en: Has soil moisture fallen past the reduced band for a small tree?
+    label_ar: هل انخفضت رطوبة التربة تحت النطاق المخفّض للشجرة الصغيرة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: smi
+          key: mean
+        right:
+          source: params
+          name: small_smi_deficit_floor
+    on_match: leaf_overshot
+    on_miss: leaf_confirmed
+
+  medium_not_cut:
+    label_en: Is soil moisture still at the fully watered level for a medium tree?
+    label_ar: هل ما زالت رطوبة التربة عند مستوى الريّ الكامل للشجرة المتوسطة؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: indices
+          index_code: smi
+          key: mean
+        right:
+          source: params
+          name: medium_smi_normal_floor
+    on_match: leaf_not_detected
+    on_miss: medium_overshot
+
+  medium_overshot:
+    label_en: Has soil moisture fallen past the reduced band for a medium tree?
+    label_ar: هل انخفضت رطوبة التربة تحت النطاق المخفّض للشجرة المتوسطة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: smi
+          key: mean
+        right:
+          source: params
+          name: medium_smi_deficit_floor
+    on_match: leaf_overshot
+    on_miss: leaf_confirmed
+
+  large_not_cut:
+    label_en: Is soil moisture still at the fully watered level for a large tree?
+    label_ar: هل ما زالت رطوبة التربة عند مستوى الريّ الكامل للشجرة الكبيرة؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: indices
+          index_code: smi
+          key: mean
+        right:
+          source: params
+          name: large_smi_normal_floor
+    on_match: leaf_not_detected
+    on_miss: large_overshot
+
+  large_overshot:
+    label_en: Has soil moisture fallen past the reduced band for a large tree?
+    label_ar: هل انخفضت رطوبة التربة تحت النطاق المخفّض للشجرة الكبيرة؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: smi
+          key: mean
+        right:
+          source: params
+          name: large_smi_deficit_floor
+    on_match: leaf_overshot
+    on_miss: leaf_confirmed
+
+  # ---- leaves --------------------------------------------------------
+  leaf_not_detected:
+    label_en: Pre-harvest water cut not detected — the block still reads fully watered
+    label_ar: لم يُرصد تخفيض الماء قبل الحصاد — القطعة ما زالت تقرأ ريًّا كاملًا
+    outcome:
+      action_type: irrigate
+      severity: warning
+      confidence: 0.45
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        This block is bearing and inside its maturity window, which is when
+        the plan calls for irrigation to be reduced so the fruit concentrates
+        its sugars. Soil moisture is still reading at the fully watered level,
+        so either the cut has not started or this block was missed. Fruit
+        harvested from a fully watered block eats flatter.
+      text_ar: >-
+        هذه القطعة مثمرة وداخل نافذة النضج، وهي الوقت الذي تطلب فيه الخطة خفض
+        الريّ ليركّز الثمر سكرياته. ما زالت رطوبة التربة تقرأ عند مستوى الريّ
+        الكامل، فإما أن التخفيض لم يبدأ أو أن هذه القطعة فاتت. الثمرة من قطعة
+        مروية بالكامل أقل نكهة.
+      actions:
+        immediate:
+          - text_en: >-
+              Ask the irrigation manager whether the pre-harvest reduction has
+              started for this block.
+            text_ar: >-
+              اسأل مسؤول الريّ هل بدأ التخفيض قبل الحصاد لهذه القطعة.
+        short_term:
+          - text_en: >-
+              If it has not, begin reducing gradually rather than stopping —
+              a sudden stop splits fruit instead of sweetening it.
+            text_ar: >-
+              إن لم يبدأ، فابدأ الخفض تدريجيًا لا بالإيقاف — فالإيقاف المفاجئ
+              يشقّ الثمار بدل أن يحليها.
+          - text_en: >-
+              Confirm this block is on the same irrigation shift as the rest
+              of its harvest group; a shared valve overrides a per-block plan.
+            text_ar: >-
+              تأكد أن هذه القطعة على نوبة الريّ نفسها مع بقية مجموعة حصادها؛
+              فالمحبس المشترك يتجاوز الخطة الخاصة بكل قطعة.
+        monitoring:
+          - text_en: >-
+              Watch soil moisture fall into the reduced band over the next two
+              scenes.
+            text_ar: >-
+              راقب انخفاض رطوبة التربة إلى النطاق المخفّض خلال المشهدين
+              التاليين.
+
+  leaf_overshot:
+    label_en: Water cut has gone too deep — this now costs fruit size
+    label_ar: التخفيض تجاوز الحد — صار يكلّف حجم الثمرة
+    outcome:
+      action_type: irrigate
+      severity: critical
+      confidence: 0.5
+      valid_for_hours: 72
+      parameters:
+        priority: high
+      text_en: >-
+        Soil moisture has fallen below the reduced band the guide gives for
+        this tree size during the deficit window. Deficit irrigation is meant
+        to stress the tree just enough to concentrate sugars; past that point
+        it stops adding sweetness and starts taking away fruit size, and on a
+        hot week it drops fruit outright.
+      text_ar: >-
+        انخفضت رطوبة التربة دون النطاق المخفّض الذي يعطيه الدليل لهذا الحجم في
+        نافذة العجز. الهدف من الريّ الناقص إجهاد الشجرة بالقدر الكافي لتركيز
+        السكريات فقط؛ وبعد ذلك يتوقف عن زيادة الحلاوة ويبدأ في خصم حجم الثمرة،
+        وفي أسبوع حار يسقطها.
+      actions:
+        immediate:
+          - text_en: Restore a light irrigation to this block now.
+            text_ar: أعد ريًّا خفيفًا لهذه القطعة الآن.
+        short_term:
+          - text_en: >-
+              Check whether the whole harvest group is over-cut or only this
+              block — one block alone points at a valve, the group at the plan.
+            text_ar: >-
+              تحقق هل المجموعة كلها مفرطة في الخفض أم هذه القطعة وحدها — قطعة
+              واحدة تشير إلى محبس، والمجموعة تشير إلى الخطة.
+        monitoring:
+          - text_en: >-
+              Re-read soil moisture on the next scene and hold it inside the
+              reduced band, not below it.
+            text_ar: >-
+              أعد قراءة رطوبة التربة في المشهد التالي وأبقها داخل النطاق
+              المخفّض لا تحته.
+
+  leaf_confirmed:
+    label_en: No action — the pre-harvest water cut is in the intended range
+    label_ar: لا إجراء — تخفيض الماء قبل الحصاد ضمن النطاق المقصود
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.8
+      parameters: {}
+      text_en: >-
+        Soil moisture has fallen into the reduced band the guide gives for
+        this tree size during the pre-harvest deficit window, and has not gone
+        past it. The practice is working as intended. Note that the water
+        cards from T_SMI and T_NDMI on this block are expected in this window
+        and are not faults.
+      text_ar: >-
+        انخفضت رطوبة التربة إلى النطاق المخفّض الذي يعطيه الدليل لهذا الحجم في
+        نافذة العجز قبل الحصاد، ولم تتجاوزه. الممارسة تعمل كما هو مقصود.
+        لاحظ أن بطاقات الماء من T_SMI و T_NDMI على هذه القطعة متوقعة في هذه
+        النافذة وليست أعطالًا.
+
+  leaf_not_in_window:
+    label_en: No action — not a bearing block in its maturity window
+    label_ar: لا إجراء — ليست قطعة مثمرة في نافذة نضجها
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        Pre-harvest deficit irrigation only applies to a block that is
+        carrying fruit and approaching harvest. This block is either resting
+        this season or is at an earlier stage.
+      text_ar: >-
+        لا ينطبق الريّ الناقص قبل الحصاد إلا على قطعة تحمل ثمارًا وتقترب من
+        الحصاد. هذه القطعة إما مرتاحة هذا الموسم أو في مرحلة أبكر.
+
+  leaf_size_unknown:
+    label_en: No action — tree size not recorded, so there is no band to verify against
+    label_ar: لا إجراء — حجم الشجرة غير مسجّل فلا يوجد نطاق للتحقق
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        This rule needs the block's Tree size attribute to know which reduced
+        band applies. Set it on the crop assignment.
+      text_ar: >-
+        تحتاج هذه القاعدة خاصية حجم الشجرة لمعرفة أي نطاق مخفّض ينطبق. اضبطها
+        على تخصيص المحصول.

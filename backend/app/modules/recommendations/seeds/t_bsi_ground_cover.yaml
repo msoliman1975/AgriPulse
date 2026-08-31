@@ -1,0 +1,319 @@
+# t_bsi_ground_cover — BSI against the mango index guide's band for the
+# block's recorded tree size.
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# 10 m column of the three stage value sheets.
+#
+# Size is the axis that matters. Of the workbook's 72 index x size x
+# productivity combinations, 64 hold the same range in all three stage
+# sheets, so this tree takes no stage input; only CWSI and SMI genuinely
+# move, and they move because irrigation is cut on purpose before harvest.
+#
+# BSI is the one index here that measures the ground rather than the tree,
+# so it separates a thinning canopy from a lost tree in a way none of the
+# greenness indices can.
+
+code: t_bsi_ground_cover
+name_en: T_BSI — more bare ground than the band for this tree size
+name_ar: T_BSI — تربة عارية أكثر من نطاق حجم الشجرة
+description_en: >-
+  Checks how much bare ground shows between the trees. A high value means
+  small or widely spaced trees; a low value means the ground is well
+  covered by canopy. Branches on the block's recorded Tree size and
+  compares BSI against the band the guide gives for that size. Opens one
+  card when the reading is above the band. Needs the Tree size attribute
+  to be set on the crop assignment.
+description_ar: >-
+  يفحص كم من الأرض العارية يظهر بين الأشجار. القيمة المرتفعة تعني أشجارًا
+  صغيرة أو متباعدة، والمنخفضة تعني تغطية جيدة بالمجموع. يتفرّع على حجم
+  الشجرة المسجّل للقطعة ويقارن BSI بالنطاق الذي يعطيه الدليل لهذا الحجم.
+  يفتح بطاقة واحدة عندما تكون القراءة فوق النطاق. يحتاج ضبط خاصية حجم
+  الشجرة على تخصيص المحصول.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    Thresholds are the actionable edge of each size's 10 m band in the
+    AgriPulse mango index guide. The guide states its own limit plainly:
+    no published study measures these indices for these nine mango
+    varieties, and field ground-truthing is recommended before the ranges
+    drive a decision. Every bound is therefore a tunable parameter, and
+    small-tree results carry lower confidence because the guide grades
+    every small-tree cell Low. BSI is the one index here that measures the
+    ground rather than the tree, so it separates a thinning canopy from a
+    lost tree in a way none of the greenness indices can.
+  citations:
+    - source_type: remote_sensing
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), Index
+        Definitions + the three stage value sheets, 10 m column
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: medium
+  global: low
+
+parameters:
+  small_bsi_ceiling:
+    type: number
+    default: 0.55
+    min: -2.0
+    max: 3.0
+    description: >-
+      BSI value above which a small-tree mango block is outside the range
+      the index guide expects (guide band 0.35 to 0.55 at 10 m).
+  medium_bsi_ceiling:
+    type: number
+    default: 0.3
+    min: -2.0
+    max: 3.0
+    description: >-
+      BSI value above which a medium-tree mango block is outside the range
+      the index guide expects (guide band 0.15 to 0.3 at 10 m).
+  large_bsi_ceiling:
+    type: number
+    default: 0.14
+    min: -2.0
+    max: 3.0
+    description: >-
+      BSI value above which a large-tree mango block is outside the range
+      the index guide expects (guide band 0.04 to 0.14 at 10 m).
+
+root: size_small
+nodes:
+  size_small:
+    label_en: Are the trees in the small size class?
+    label_ar: هل الأشجار في فئة الحجم صغيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: small
+    on_match: small_check
+    on_miss: size_medium
+
+  size_medium:
+    label_en: Are the trees in the medium size class?
+    label_ar: هل الأشجار في فئة الحجم متوسطة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: medium
+    on_match: medium_check
+    on_miss: size_large
+
+  size_large:
+    label_en: Are the trees in the large size class?
+    label_ar: هل الأشجار في فئة الحجم كبيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: large
+    on_match: large_check
+    on_miss: leaf_size_unknown
+
+  small_check:
+    label_en: Is BSI above the small-tree bound?
+    label_ar: هل BSI فوق حدّ الشجرة صغيرة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: bsi
+          key: mean
+        right:
+          source: params
+          name: small_bsi_ceiling
+    on_match: leaf_out_of_band_small
+    on_miss: leaf_in_band
+
+  medium_check:
+    label_en: Is BSI above the medium-tree bound?
+    label_ar: هل BSI فوق حدّ الشجرة متوسطة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: bsi
+          key: mean
+        right:
+          source: params
+          name: medium_bsi_ceiling
+    on_match: leaf_out_of_band_medium
+    on_miss: leaf_in_band
+
+  large_check:
+    label_en: Is BSI above the large-tree bound?
+    label_ar: هل BSI فوق حدّ الشجرة كبيرة؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: bsi
+          key: mean
+        right:
+          source: params
+          name: large_bsi_ceiling
+    on_match: leaf_out_of_band_large
+    on_miss: leaf_in_band
+
+  leaf_out_of_band_small:
+    label_en: BSI above the small-tree band
+    label_ar: BSI فوق نطاق الشجرة صغيرة
+    outcome:
+      action_type: scout
+      severity: info
+      confidence: 0.4
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        More bare ground is showing than the guide expects for this tree
+        size. Either trees have been lost, or the canopy has thinned
+        enough to open the ground up. The guide's small-tree band for BSI
+        at 10 m is 0.35 to 0.55. The guide grades every small-tree cell
+        Low, so treat this as advisory and confirm on the ground.
+      text_ar: >-
+        التربة العارية الظاهرة أكثر مما يتوقعه الدليل لهذا الحجم. إما أن
+        أشجارًا فُقدت، أو أن المجموع ترقّق حتى انكشفت الأرض. نطاق الدليل
+        للشجرة صغيرة في BSI عند 10 م هو من 0.35 إلى 0.55. يصنّف الدليل كل
+        خلايا الشجرة الصغيرة بثقة منخفضة، فاعتبرها استرشادية وأكّدها في
+        الأرض.
+      actions:
+        immediate:
+          - text_en: >-
+              Count missing or dead trees on the ground.
+            text_ar: >-
+              أحصِ الأشجار المفقودة أو الميتة في الأرض.
+        short_term:
+          - text_en: >-
+              Check whether a cover crop or weed layer was recently
+              removed — that raises BSI without any tree changing.
+            text_ar: >-
+              تحقق مما إذا أُزيل غطاء نباتي أو حشائش مؤخرًا — فذلك يرفع
+              BSI دون أن تتغير أي شجرة.
+        monitoring:
+          - text_en: Re-read BSI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة BSI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_out_of_band_medium:
+    label_en: BSI above the medium-tree band
+    label_ar: BSI فوق نطاق الشجرة متوسطة
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.55
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        More bare ground is showing than the guide expects for this tree
+        size. Either trees have been lost, or the canopy has thinned
+        enough to open the ground up. The guide's medium-tree band for BSI
+        at 10 m is 0.15 to 0.3.
+      text_ar: >-
+        التربة العارية الظاهرة أكثر مما يتوقعه الدليل لهذا الحجم. إما أن
+        أشجارًا فُقدت، أو أن المجموع ترقّق حتى انكشفت الأرض. نطاق الدليل
+        للشجرة متوسطة في BSI عند 10 م هو من 0.15 إلى 0.3.
+      actions:
+        immediate:
+          - text_en: >-
+              Count missing or dead trees on the ground.
+            text_ar: >-
+              أحصِ الأشجار المفقودة أو الميتة في الأرض.
+        short_term:
+          - text_en: >-
+              Check whether a cover crop or weed layer was recently
+              removed — that raises BSI without any tree changing.
+            text_ar: >-
+              تحقق مما إذا أُزيل غطاء نباتي أو حشائش مؤخرًا — فذلك يرفع
+              BSI دون أن تتغير أي شجرة.
+        monitoring:
+          - text_en: Re-read BSI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة BSI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_out_of_band_large:
+    label_en: BSI above the large-tree band
+    label_ar: BSI فوق نطاق الشجرة كبيرة
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.65
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        More bare ground is showing than the guide expects for this tree
+        size. Either trees have been lost, or the canopy has thinned
+        enough to open the ground up. The guide's large-tree band for BSI
+        at 10 m is 0.04 to 0.14.
+      text_ar: >-
+        التربة العارية الظاهرة أكثر مما يتوقعه الدليل لهذا الحجم. إما أن
+        أشجارًا فُقدت، أو أن المجموع ترقّق حتى انكشفت الأرض. نطاق الدليل
+        للشجرة كبيرة في BSI عند 10 م هو من 0.04 إلى 0.14.
+      actions:
+        immediate:
+          - text_en: >-
+              Count missing or dead trees on the ground.
+            text_ar: >-
+              أحصِ الأشجار المفقودة أو الميتة في الأرض.
+        short_term:
+          - text_en: >-
+              Check whether a cover crop or weed layer was recently
+              removed — that raises BSI without any tree changing.
+            text_ar: >-
+              تحقق مما إذا أُزيل غطاء نباتي أو حشائش مؤخرًا — فذلك يرفع
+              BSI دون أن تتغير أي شجرة.
+        monitoring:
+          - text_en: Re-read BSI on the next clear scene and check it has moved back inside the band.
+            text_ar: أعد قراءة BSI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
+
+  leaf_in_band:
+    label_en: No action — BSI inside the band for this tree size
+    label_ar: لا إجراء — BSI داخل نطاق هذا الحجم
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        BSI is inside the range the mango index guide expects for this
+        tree size.
+      text_ar: >-
+        BSI داخل النطاق الذي يتوقعه دليل مؤشرات المانجو لهذا الحجم.
+
+  leaf_size_unknown:
+    label_en: No action — tree size not recorded, so there is no band to compare against
+    label_ar: لا إجراء — حجم الشجرة غير مسجّل فلا يوجد نطاق للمقارنة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        This rule needs the block's Tree size attribute. Open the block's
+        crop assignment, set Tree size, and the rule starts running on the
+        next sweep.
+      text_ar: >-
+        تحتاج هذه القاعدة خاصية حجم الشجرة للقطعة. افتح تخصيص المحصول
+        للقطعة واضبط حجم الشجرة لتبدأ القاعدة في العمل مع أول تمريرة.

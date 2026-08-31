@@ -1,0 +1,409 @@
+# t_vigour_cause_split — the canopy is weaker than it was; which of the three
+# causes fits?
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# Index Definitions sheet — each index's stated purpose.
+#
+# The single-index trees say a number is outside its band. None of them says
+# why, and a scout sent out with "canopy weak" walks the block guessing. The
+# guide already contains the separation, spread across three rows:
+#
+#   NDRE   "detects fertilization shortages, especially nitrogen, very early"
+#   NDMI   "how much water is inside the tree's leaves"
+#   BSI    "how much bare ground shows between trees"
+#
+# A weak canopy with dry leaves is a water problem. A weak canopy with normal
+# water and low red-edge is a nutrition problem. A weak canopy with more bare
+# ground than before is not a weak canopy at all — it is missing trees, and no
+# amount of water or fertilizer brings those back.
+#
+# Everything is read as a deviation from the block's own day-of-year history.
+# That is what makes the three readings comparable to each other: an absolute
+# band would need a tree-size branch on each of the four indices and the
+# question being asked here is about change, not level.
+
+code: t_vigour_cause_split
+name_en: T_VIGOUR_CAUSE — separate water, nutrition and missing trees behind a weak canopy
+name_ar: T_VIGOUR_CAUSE — التفريق بين الماء والتغذية والأشجار المفقودة خلف ضعف المجموع
+description_en: >-
+  Runs when canopy vigour has fallen against the block's own history, and
+  reads leaf water, red-edge and bare soil to name the likely cause instead
+  of leaving the scout to guess. Produces one of four answers: missing trees,
+  water shortage, nitrogen shortage, or a combined stress it will not
+  separate.
+description_ar: >-
+  يعمل عندما تنخفض حيوية المجموع مقارنة بتاريخ القطعة نفسها، ويقرأ ماء
+  الأوراق والحافة الحمراء والتربة العارية ليسمّي السبب المرجّح بدل ترك
+  المستكشف يخمّن. ينتج واحدًا من أربعة: أشجار مفقودة، أو نقص ماء، أو نقص
+  نيتروجين، أو إجهاد مركّب لن يفرّقه.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    Each index's role is the one the mango index guide gives it. The routing
+    between them is a design choice and is not itself published. The
+    nutrition branch is the weakest of the three: NDRE is a chlorophyll proxy,
+    and chlorophyll falls for reasons other than nitrogen, so that leaf asks
+    for a leaf sample rather than a fertilizer change.
+  citations:
+    - source_type: peer_reviewed
+      title: >-
+        Huete, A. — A Soil-Adjusted Vegetation Index (SAVI), Remote Sensing
+        of Environment 25(3)
+      url: https://www.sciencedirect.com/science/article/abs/pii/003442578890106X
+      year: 1988
+    - source_type: peer_reviewed
+      title: >-
+        Rikimaru, A. et al. — Tropical forest cover density mapping (BSI);
+        Nguyen, C.T. et al., Land 10(3)
+      url: https://www.mdpi.com/2073-445X/10/3/231
+      year: 2021
+    - source_type: remote_sensing
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), Index
+        Definitions sheet
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: medium
+  global: medium
+
+parameters:
+  vigour_drop_z:
+    type: number
+    default: -1.0
+    min: -5.0
+    max: 0.0
+    description: >-
+      SAVI deviation from the block's own day-of-year history at or below
+      which the canopy counts as having weakened, and this tree starts asking
+      why. SAVI rather than NDVI because it discounts the soil between the
+      trees, which is most of the pixel in an Egyptian mango block.
+  dry_z:
+    type: number
+    default: -1.0
+    min: -5.0
+    max: 0.0
+    description: >-
+      NDMI deviation at or below which leaf water counts as a contributing
+      cause.
+  low_ndre_z:
+    type: number
+    default: -1.0
+    min: -5.0
+    max: 0.0
+    description: >-
+      NDRE deviation at or below which nutrition counts as a contributing
+      cause.
+  bare_soil_z:
+    type: number
+    default: 1.0
+    min: 0.0
+    max: 5.0
+    description: >-
+      BSI deviation at or above which the ground has opened up enough that
+      missing trees, not weakened ones, is the better explanation.
+
+root: vigour_dropped
+nodes:
+  vigour_dropped:
+    label_en: Has canopy vigour fallen against this block's own history?
+    label_ar: هل انخفضت حيوية المجموع مقارنة بتاريخ هذه القطعة؟
+    condition:
+      tree:
+        op: le
+        left:
+          source: indices
+          index_code: savi
+          key: baseline_deviation
+        right:
+          source: params
+          name: vigour_drop_z
+    on_match: ground_opened
+    on_miss: leaf_no_action
+
+  ground_opened:
+    label_en: Has more bare ground appeared at the same time?
+    label_ar: هل ظهرت تربة عارية أكثر في الوقت نفسه؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: indices
+          index_code: bsi
+          key: baseline_deviation
+        right:
+          source: params
+          name: bare_soil_z
+    on_match: leaf_missing_trees
+    on_miss: both_water_and_nutrition
+
+  both_water_and_nutrition:
+    label_en: Are leaf water and red-edge both below normal?
+    label_ar: هل ماء الأوراق والحافة الحمراء كلاهما دون المعتاد؟
+    condition:
+      tree:
+        all_of:
+          - op: le
+            left:
+              source: indices
+              index_code: ndmi
+              key: baseline_deviation
+            right:
+              source: params
+              name: dry_z
+          - op: le
+            left:
+              source: indices
+              index_code: ndre
+              key: baseline_deviation
+            right:
+              source: params
+              name: low_ndre_z
+    on_match: leaf_combined
+    on_miss: water_only
+
+  water_only:
+    label_en: Is leaf water below normal on its own?
+    label_ar: هل ماء الأوراق وحده دون المعتاد؟
+    condition:
+      tree:
+        op: le
+        left:
+          source: indices
+          index_code: ndmi
+          key: baseline_deviation
+        right:
+          source: params
+          name: dry_z
+    on_match: leaf_water_cause
+    on_miss: nutrition_only
+
+  nutrition_only:
+    label_en: Is red-edge below normal on its own?
+    label_ar: هل الحافة الحمراء وحدها دون المعتاد؟
+    condition:
+      tree:
+        op: le
+        left:
+          source: indices
+          index_code: ndre
+          key: baseline_deviation
+        right:
+          source: params
+          name: low_ndre_z
+    on_match: leaf_nitrogen_cause
+    on_miss: leaf_unseparated
+
+  # ---- leaves --------------------------------------------------------
+  leaf_missing_trees:
+    label_en: Weak canopy with the ground opening up — count the trees
+    label_ar: ضعف المجموع مع انكشاف الأرض — أحصِ الأشجار
+    outcome:
+      action_type: scout
+      severity: critical
+      confidence: 0.6
+      valid_for_hours: 168
+      parameters:
+        priority: high
+      text_en: >-
+        Canopy vigour has fallen and bare ground has increased at the same
+        time. That pair points at trees that have been lost or removed rather
+        than trees that have weakened. Water and fertilizer will not change
+        this reading.
+      text_ar: >-
+        انخفضت حيوية المجموع وزادت التربة العارية في الوقت نفسه. هذا الاقتران
+        يشير إلى أشجار فُقدت أو أُزيلت لا إلى أشجار ضعفت. الماء والسماد لن
+        يغيّرا هذه القراءة.
+      actions:
+        immediate:
+          - text_en: Walk the block and count dead, removed or missing trees.
+            text_ar: تجوّل في القطعة وأحصِ الأشجار الميتة أو المُزالة أو المفقودة.
+        short_term:
+          - text_en: >-
+              If trees were removed on purpose, record it so the block's
+              baseline stops treating the new level as a fall.
+            text_ar: >-
+              إن أُزيلت الأشجار عمدًا فسجّل ذلك حتى يتوقف خط أساس القطعة عن
+              اعتبار المستوى الجديد انخفاضًا.
+          - text_en: >-
+              If a cover crop or weed layer was cleared, that alone raises
+              bare soil with no tree changing — check this before replanting.
+            text_ar: >-
+              إن أُزيل غطاء نباتي أو حشائش، فذلك وحده يرفع التربة العارية دون
+              تغيّر أي شجرة — تحقق من هذا قبل إعادة الزراعة.
+        monitoring:
+          - text_en: Plan replanting for the next planting window if trees were lost.
+            text_ar: خطّط لإعادة الزراعة في نافذة الزراعة القادمة إن فُقدت أشجار.
+
+  leaf_water_cause:
+    label_en: Weak canopy with dry leaves — water first
+    label_ar: ضعف المجموع مع جفاف الأوراق — الماء أولًا
+    outcome:
+      action_type: irrigate
+      severity: warning
+      confidence: 0.6
+      valid_for_hours: 96
+      parameters:
+        priority: high
+      text_en: >-
+        Canopy vigour has fallen and leaf water is down with it, while
+        red-edge and bare soil are normal. Water shortage is the cause that
+        fits. Water is also the fastest of the three to correct and the
+        cheapest to test.
+      text_ar: >-
+        انخفضت حيوية المجموع وانخفض معها ماء الأوراق، بينما الحافة الحمراء
+        والتربة العارية طبيعيتان. نقص الماء هو السبب المطابق. والماء أسرع
+        الأسباب الثلاثة تصحيحًا وأرخصها اختبارًا.
+      actions:
+        immediate:
+          - text_en: Irrigate the block and confirm the water reached it.
+            text_ar: اروِ القطعة وتأكد أن الماء وصلها.
+        short_term:
+          - text_en: >-
+              Inspect the line serving this block for a blockage or a failed
+              emitter row.
+            text_ar: >-
+              افحص الخط الذي يخدم هذه القطعة بحثًا عن انسداد أو صف نقاطات
+              معطّل.
+        monitoring:
+          - text_en: >-
+              If leaf water recovers but vigour does not, come back and look
+              at nutrition.
+            text_ar: >-
+              إن تعافى ماء الأوراق ولم تتعافَ الحيوية، فعُد وانظر في التغذية.
+
+  leaf_nitrogen_cause:
+    label_en: Weak canopy with low red-edge and normal water — sample the leaves
+    label_ar: ضعف المجموع مع حافة حمراء منخفضة وماء طبيعي — خذ عينة أوراق
+    outcome:
+      action_type: fertilize
+      severity: warning
+      confidence: 0.45
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        Canopy vigour has fallen and red-edge is down with it, while leaf
+        water is normal. That pattern points at nutrition, most often
+        nitrogen. NDRE measures chlorophyll rather than nitrogen, and
+        chlorophyll falls for other reasons too, so take a sample before
+        changing the program.
+      text_ar: >-
+        انخفضت حيوية المجموع وانخفضت معها الحافة الحمراء، بينما ماء الأوراق
+        طبيعي. هذا النمط يشير إلى التغذية، والنيتروجين غالبًا. يقيس NDRE
+        الكلوروفيل لا النيتروجين، والكلوروفيل ينخفض لأسباب أخرى أيضًا، فخذ
+        عينة قبل تغيير البرنامج.
+      actions:
+        immediate:
+          - text_en: Take a leaf sample from this block for analysis.
+            text_ar: خذ عينة أوراق من هذه القطعة للتحليل.
+        short_term:
+          - text_en: >-
+              Correct the nitrogen rate only if the analysis confirms the
+              shortage.
+            text_ar: >-
+              صحّح معدل النيتروجين فقط إذا أكد التحليل النقص.
+          - text_en: >-
+              Check the growth stage first: nitrogen is withheld on purpose
+              before flowering, and that shows here as a shortage.
+            text_ar: >-
+              افحص مرحلة النمو أولًا: يُمنع النيتروجين عمدًا قبل التزهير، وهذا
+              يظهر هنا كنقص.
+        monitoring:
+          - text_en: Re-read red-edge four weeks after any change to the program.
+            text_ar: أعد قراءة الحافة الحمراء بعد أربعة أسابيع من أي تغيير في البرنامج.
+
+  leaf_combined:
+    label_en: Weak canopy with both water and nutrition down — water first, then sample
+    label_ar: ضعف المجموع مع انخفاض الماء والتغذية معًا — الماء أولًا ثم العينة
+    outcome:
+      action_type: scout
+      severity: critical
+      confidence: 0.6
+      valid_for_hours: 120
+      parameters:
+        priority: high
+      text_en: >-
+        Leaf water and red-edge are both below this block's normal. A tree
+        short of water cannot take up nutrients either, so these two often
+        appear together with water as the single root cause. Fix the water
+        first and re-read before touching the fertilizer program.
+      text_ar: >-
+        ماء الأوراق والحافة الحمراء كلاهما دون المعتاد لهذه القطعة. الشجرة
+        العطشى لا تمتص الغذاء أيضًا، لذا يظهر الاثنان معًا غالبًا والماء هو
+        السبب الجذري الوحيد. أصلح الماء أولًا وأعد القراءة قبل المساس ببرنامج
+        التسميد.
+      actions:
+        immediate:
+          - text_en: Irrigate the block and confirm the water reached it.
+            text_ar: اروِ القطعة وتأكد أن الماء وصلها.
+        short_term:
+          - text_en: >-
+              Wait for two clear scenes after the water is corrected before
+              judging nutrition.
+            text_ar: >-
+              انتظر مشهدين صافيين بعد تصحيح الماء قبل الحكم على التغذية.
+          - text_en: >-
+              If red-edge is still low once water has recovered, take a leaf
+              sample then.
+            text_ar: >-
+              إن ظلت الحافة الحمراء منخفضة بعد تعافي الماء، فخذ عينة أوراق حينها.
+        monitoring:
+          - text_en: Re-read all three indices on the next two clear scenes.
+            text_ar: أعد قراءة المؤشرات الثلاثة في المشهدين الصافيين التاليين.
+
+  leaf_unseparated:
+    label_en: Canopy weaker with no cause standing out — scout the block
+    label_ar: المجموع أضعف دون سبب بارز — استكشف القطعة
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.4
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        Canopy vigour has fallen but water, nutrition and bare ground are all
+        within this block's normal. None of the three causes this tree can
+        separate fits. That leaves pest, disease, root or trunk damage, or
+        salinity — all of which need eyes on the block.
+      text_ar: >-
+        انخفضت حيوية المجموع لكن الماء والتغذية والتربة العارية كلها ضمن
+        المعتاد لهذه القطعة. لا يطابق أي من الأسباب الثلاثة التي يفرّقها هذا
+        النموذج. يبقى آفة أو مرض أو ضرر بالجذور أو الساق أو ملوحة — وكلها
+        تحتاج عينًا على القطعة.
+      actions:
+        immediate:
+          - text_en: >-
+              Walk the block and inspect trunks, main branches and leaf
+              undersides.
+            text_ar: >-
+              تجوّل في القطعة وافحص السيقان والأفرع الرئيسية وأسفل الأوراق.
+        short_term:
+          - text_en: Check the block's salinity class and last soil test.
+            text_ar: راجع فئة ملوحة القطعة وآخر تحليل تربة لها.
+        monitoring:
+          - text_en: Record what the scouting finds so the next fall has a history.
+            text_ar: سجّل ما يكشفه الاستكشاف ليكون للانخفاض القادم تاريخ.
+
+  leaf_no_action:
+    label_en: No action — canopy vigour is holding against this block's history
+    label_ar: لا إجراء — حيوية المجموع ثابتة مقارنة بتاريخ هذه القطعة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        Canopy vigour is within this block's normal range for this time of
+        year, so there is no fall to explain.
+      text_ar: >-
+        حيوية المجموع ضمن النطاق المعتاد لهذه القطعة في هذا الوقت من السنة،
+        فلا يوجد انخفاض يُفسَّر.

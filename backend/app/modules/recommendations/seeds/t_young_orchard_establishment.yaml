@@ -1,0 +1,298 @@
+# t_young_orchard_establishment — is a newly planted block filling in, or did
+# part of it fail to take?
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# MSAVI, SAVI and BSI rows of the Index Definitions sheet, small-tree rows of
+# the value sheets.
+#
+# The guide names MSAVI "the most accurate option for very young, newly
+# planted trees" and BSI as the measure of "how much bare ground shows between
+# trees". On a small block those two answer different halves of the same
+# question: MSAVI says whether the canopy that exists is healthy, BSI says
+# whether there is as much canopy as there should be. A block where half the
+# saplings died reads a perfectly respectable MSAVI on the survivors while BSI
+# climbs, and no greenness index on its own will ever say so.
+#
+# Small trees only. Every band this reads is graded Low confidence in the
+# guide, which also warns that ground-truthing is needed before the ranges
+# drive a decision — so this tree asks someone to walk the block rather than
+# telling anyone to spend money.
+
+code: t_young_orchard_establishment
+name_en: T_ESTABLISH — young block canopy fill and establishment gaps
+name_ar: T_ESTABLISH — امتلاء المجموع وفجوات التأسيس في القطعة الحديثة
+description_en: >-
+  Runs on blocks recorded as small trees. Reads MSAVI for the health of the
+  canopy that exists and BSI for whether there is as much of it as there
+  should be, and separates a block that is filling in slowly from one that
+  has lost saplings. Needs the Tree size attribute to be set.
+description_ar: >-
+  يعمل على القطع المسجّلة بأشجار صغيرة. يقرأ MSAVI لصحة المجموع الموجود
+  و BSI لمعرفة هل كميته كما ينبغي، ويفرّق بين قطعة تمتلئ ببطء وأخرى فقدت
+  شتلات. يحتاج ضبط خاصية حجم الشجرة.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: low
+  notes: >-
+    The small-tree bands this reads are graded Low in the mango index guide,
+    the lowest grade in the file, and the guide states that no published study
+    measures these indices for these varieties. The index choice is better
+    supported than the numbers: MSAVI2 was designed for sparse cover over
+    bright soil, which is exactly a young Egyptian mango block. Every leaf
+    here asks for a ground check rather than for an input.
+  citations:
+    - source_type: peer_reviewed
+      title: >-
+        Qi, J. et al. — A Modified Soil Adjusted Vegetation Index, Remote
+        Sensing of Environment 48
+      url: https://www.sciencedirect.com/science/article/abs/pii/0034425794901341
+      year: 1994
+    - source_type: remote_sensing
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), small-tree
+        rows of the 10 m value sheets
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: medium
+  global: low
+
+parameters:
+  small_msavi_floor:
+    type: number
+    default: 0.15
+    min: -1.0
+    max: 1.0
+    description: >-
+      MSAVI value below which a small-tree block is under the range the guide
+      expects (guide band 0.15 to 0.28 at 10 m).
+  small_bsi_ceiling:
+    type: number
+    default: 0.55
+    min: -1.0
+    max: 1.0
+    description: >-
+      BSI value above which more ground is exposed than the guide expects even
+      for a small-tree block (guide band 0.35 to 0.55 at 10 m).
+
+root: is_small
+nodes:
+  is_small:
+    label_en: Is this block recorded as small trees?
+    label_ar: هل هذه القطعة مسجّلة بأشجار صغيرة؟
+    condition:
+      tree:
+        op: eq
+        left:
+          source: crop_attribute
+          code: tree_size_class
+          key: value
+        right: small
+    on_match: gaps_and_weak
+    on_miss: leaf_not_applicable
+
+  gaps_and_weak:
+    label_en: Is the canopy both weak and short of ground cover?
+    label_ar: هل المجموع ضعيف وناقص التغطية معًا؟
+    condition:
+      tree:
+        all_of:
+          - op: lt
+            left:
+              source: indices
+              index_code: msavi
+              key: mean
+            right:
+              source: params
+              name: small_msavi_floor
+          - op: gt
+            left:
+              source: indices
+              index_code: bsi
+              key: mean
+            right:
+              source: params
+              name: small_bsi_ceiling
+    on_match: leaf_establishment_gaps
+    on_miss: slow_fill
+
+  slow_fill:
+    label_en: Is the canopy weak while ground cover is as expected?
+    label_ar: هل المجموع ضعيف بينما التغطية كما هو متوقع؟
+    condition:
+      tree:
+        op: lt
+        left:
+          source: indices
+          index_code: msavi
+          key: mean
+        right:
+          source: params
+          name: small_msavi_floor
+    on_match: leaf_slow_fill
+    on_miss: ground_only
+
+  ground_only:
+    label_en: Is ground cover short while the canopy that exists reads healthy?
+    label_ar: هل التغطية ناقصة بينما المجموع الموجود يقرأ سليمًا؟
+    condition:
+      tree:
+        op: gt
+        left:
+          source: indices
+          index_code: bsi
+          key: mean
+        right:
+          source: params
+          name: small_bsi_ceiling
+    on_match: leaf_gaps_only
+    on_miss: leaf_establishing_ok
+
+  # ---- leaves --------------------------------------------------------
+  leaf_establishment_gaps:
+    label_en: Establishment failing — weak canopy and open ground together
+    label_ar: تأسيس متعثر — مجموع ضعيف وأرض مكشوفة معًا
+    outcome:
+      action_type: scout
+      severity: critical
+      confidence: 0.55
+      valid_for_hours: 168
+      parameters:
+        priority: high
+      text_en: >-
+        The canopy that exists is below the range the guide expects for small
+        trees, and more ground is exposed than even a small-tree block should
+        show. Both halves of establishment are behind: the saplings that took
+        are weak, and some appear not to have taken at all.
+      text_ar: >-
+        المجموع الموجود دون النطاق الذي يتوقعه الدليل للأشجار الصغيرة، والأرض
+        المكشوفة أكثر مما ينبغي حتى لقطعة صغيرة الأشجار. نصفا التأسيس متأخران:
+        الشتلات التي نجحت ضعيفة، وبعضها يبدو أنه لم ينجح أصلًا.
+      actions:
+        immediate:
+          - text_en: >-
+              Walk the rows and count the saplings that failed to establish.
+            text_ar: >-
+              تجوّل بين الصفوف وأحصِ الشتلات التي لم تتأسس.
+        short_term:
+          - text_en: >-
+              Check every emitter reaches a tree — a young block dies at the
+              end of a line long before an old one notices.
+            text_ar: >-
+              تأكد أن كل نقاط يصل شجرة — القطعة الحديثة تموت في نهاية الخط قبل
+              أن تلاحظ القطعة القديمة بكثير.
+          - text_en: >-
+              Plan replanting for the failed positions in the next planting
+              window.
+            text_ar: >-
+              خطّط لإعادة زراعة المواضع الفاشلة في نافذة الزراعة القادمة.
+        monitoring:
+          - text_en: >-
+              Re-read MSAVI and BSI monthly through the first two seasons.
+            text_ar: >-
+              أعد قراءة MSAVI و BSI شهريًا خلال الموسمين الأولين.
+
+  leaf_slow_fill:
+    label_en: Canopy filling in slowly — the trees are there but weak
+    label_ar: المجموع يمتلئ ببطء — الأشجار موجودة لكنها ضعيفة
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.45
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        Ground cover is where the guide expects it for a small-tree block, so
+        the saplings are in place, but the canopy they carry is below the
+        expected range. The block is establishing more slowly than it should.
+      text_ar: >-
+        التغطية حيث يتوقعها الدليل لقطعة صغيرة الأشجار، فالشتلات في مواضعها،
+        لكن المجموع الذي تحمله دون النطاق المتوقع. القطعة تتأسس أبطأ مما ينبغي.
+      actions:
+        immediate:
+          - text_en: >-
+              Check irrigation volume per tree — a young tree needs frequent
+              small doses, not the mature schedule.
+            text_ar: >-
+              راجع كمية الريّ لكل شجرة — الشجرة الصغيرة تحتاج جرعات صغيرة
+              متكررة لا جدول الأشجار الناضجة.
+        short_term:
+          - text_en: >-
+              Review the starter fertilization program and check for root
+              damage at planting depth.
+            text_ar: >-
+              راجع برنامج التسميد الابتدائي وافحص ضرر الجذور على عمق الزراعة.
+        monitoring:
+          - text_en: Re-read MSAVI monthly and expect it to climb through the season.
+            text_ar: أعد قراءة MSAVI شهريًا ويُتوقع ارتفاعه خلال الموسم.
+
+  leaf_gaps_only:
+    label_en: Healthy canopy but not enough of it — check for missing trees
+    label_ar: مجموع سليم لكنه غير كافٍ — تحقق من الأشجار المفقودة
+    outcome:
+      action_type: scout
+      severity: warning
+      confidence: 0.5
+      valid_for_hours: 168
+      parameters:
+        priority: medium
+      text_en: >-
+        The canopy that exists reads healthy, but more ground is exposed than
+        the guide expects. That combination is what a block with missing trees
+        looks like: the survivors are fine, there are simply fewer of them
+        than the planting plan says.
+      text_ar: >-
+        المجموع الموجود يقرأ سليمًا، لكن الأرض المكشوفة أكثر مما يتوقعه الدليل.
+        هذا الاقتران هو شكل قطعة تنقصها أشجار: الناجية بخير، لكنها ببساطة أقل
+        عددًا مما تقوله خطة الزراعة.
+      actions:
+        immediate:
+          - text_en: Count the planted positions against the planting plan.
+            text_ar: أحصِ مواضع الزراعة مقابل خطة الزراعة.
+        short_term:
+          - text_en: >-
+              Check whether a weed or cover layer was recently cleared — that
+              raises BSI on its own with no tree missing.
+            text_ar: >-
+              تحقق مما إذا أُزيل غطاء حشائش أو نباتي مؤخرًا — فذلك يرفع BSI
+              وحده دون فقد أي شجرة.
+        monitoring:
+          - text_en: Re-read BSI after replanting to confirm the gap closes.
+            text_ar: أعد قراءة BSI بعد إعادة الزراعة للتأكد من إغلاق الفجوة.
+
+  leaf_establishing_ok:
+    label_en: No action — the young block is inside both expected ranges
+    label_ar: لا إجراء — القطعة الحديثة داخل النطاقين المتوقعين
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        Canopy health and ground cover are both inside the ranges the guide
+        expects for a small-tree mango block.
+      text_ar: >-
+        صحة المجموع والتغطية الأرضية كلتاهما داخل النطاقات التي يتوقعها الدليل
+        لقطعة مانجو صغيرة الأشجار.
+
+  leaf_not_applicable:
+    label_en: No action — this block is not recorded as small trees
+    label_ar: لا إجراء — هذه القطعة ليست مسجّلة بأشجار صغيرة
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        This rule only runs on blocks whose Tree size is set to small. On a
+        medium or large block, use T_SAVI and T_BSI instead.
+      text_ar: >-
+        تعمل هذه القاعدة فقط على القطع التي ضُبط حجم أشجارها على صغيرة. في
+        القطعة المتوسطة أو الكبيرة استخدم T_SAVI و T_BSI بدلًا منها.

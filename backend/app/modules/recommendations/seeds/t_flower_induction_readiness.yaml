@@ -1,0 +1,229 @@
+# t_flower_induction_readiness — is the tree ready for the dry period, or
+# would starting it now waste the season?
+#
+# Source: tatoo Docs/Mango indices- 28_8/AgriPulse_Mango_Indices_Plan_EN.xlsx,
+# Stage 0 weeks 7-11 and Stage A of the four Plan sheets.
+#
+# The plan's flower-induction method is organic and it is the strongest-graded
+# item in the whole file: withhold irrigation for 50 to 60 days. The workbook
+# grades it High and names it "the primary organic alternative to synthetic
+# growth regulators (e.g. paclobutrazol)".
+#
+# It has one hard precondition, stated twice in the plan: vegetative flushing
+# must have STOPPED. "Flowering cannot begin while shoots are still actively
+# flushing; mango typically produces up to four vegetative flows per year and
+# growth must stop first." Start the dry period into an active flush and the
+# tree spends the stress on the flush instead of on floral differentiation,
+# and the year is gone.
+#
+# Nothing on this platform observes a flush directly. What it can observe is
+# the canopy rising against the block's own history for this time of year,
+# which is what a flush looks like from orbit: new leaves, greener than the
+# old ones, appearing over a few weeks. That is a proxy and this tree says so
+# on the card rather than pretending to a measurement it does not have.
+
+code: t_flower_induction_readiness
+name_en: T_INDUCTION — flower induction dry period ready to start, or blocked
+name_ar: T_INDUCTION — فترة التصويم لحثّ التزهير جاهزة للبدء أو معطّلة
+description_en: >-
+  Runs in the pre-flowering stage. Checks whether the vegetative flush has
+  stopped before the 50 to 60 day dry period is started, using canopy
+  greenness against the block's own history as a proxy for active flushing.
+  Says either "hold, still flushing" or "start withholding irrigation", and
+  carries the nitrogen-stop and potassium-only steps that go with it.
+description_ar: >-
+  يعمل في مرحلة ما قبل التزهير. يفحص هل توقف النمو الخضري قبل بدء فترة
+  التصويم من 50 إلى 60 يومًا، مستخدمًا اخضرار المجموع مقابل تاريخ القطعة
+  نفسها كدليل غير مباشر على النمو النشط. يقول إما «انتظر، ما زال ينمو» أو
+  «ابدأ منع الريّ»، ويحمل معه خطوتي إيقاف النيتروجين والتغذية بالبوتاسيوم
+  وحده.
+
+crop_path: mango
+country_codes: [EG]
+applicable_regions: []
+
+evidence:
+  confidence: medium
+  notes: >-
+    The practice is graded High in the mango index guide's plan sheets and is
+    standard in mango horticulture. The detection is not: no published work
+    was found that identifies a mango vegetative flush from Sentinel-2, and
+    using a rising NDVI deviation as a flush proxy is an inference. A rising
+    canopy can also be recovery from a stress that has passed, or a weed flush
+    after rain. The card therefore asks the grower to look at the terminal
+    buds, which is the check the plan itself specifies.
+  citations:
+    - source_type: extension
+      title: >-
+        AgriPulse — Mango Indices & Agriculture Plan (English), Stage 0 weeks
+        7 to 11 of the Plan sheets, organic flower induction
+      url: https://agripulse.cloud/docs/mango-index-guide
+      year: 2026
+
+transferability:
+  egypt: high
+  middle_east: high
+  global: medium
+
+parameters:
+  flush_z:
+    type: number
+    default: 0.8
+    min: 0.0
+    max: 5.0
+    description: >-
+      NDVI deviation from the block's own day-of-year history at or above
+      which the canopy is treated as still actively flushing, so the dry
+      period should not start yet. Set below one standard deviation on
+      purpose: a false hold costs a few days, a false start costs the season.
+
+root: pre_flowering
+nodes:
+  pre_flowering:
+    label_en: Is this block in the pre-flowering stage?
+    label_ar: هل هذه القطعة في مرحلة ما قبل التزهير؟
+    condition:
+      tree:
+        op: in
+        left:
+          source: block
+          field: growth_stage
+        values: [pre_flowering]
+    on_match: still_flushing
+    on_miss: leaf_not_due
+
+  still_flushing:
+    label_en: Is the canopy still rising against this block's own history?
+    label_ar: هل ما زال المجموع يرتفع مقارنة بتاريخ هذه القطعة؟
+    condition:
+      tree:
+        op: ge
+        left:
+          source: indices
+          index_code: ndvi
+          key: baseline_deviation
+        right:
+          source: params
+          name: flush_z
+    on_match: leaf_hold_flushing
+    on_miss: leaf_start_dry_period
+
+  leaf_hold_flushing:
+    label_en: Hold the dry period — the canopy is still growing
+    label_ar: أوقف التصويم — المجموع ما زال ينمو
+    outcome:
+      action_type: other
+      severity: warning
+      confidence: 0.4
+      valid_for_hours: 240
+      parameters:
+        priority: high
+      text_en: >-
+        Canopy greenness is running above this block's own normal for this
+        time of year, which is what an active vegetative flush looks like from
+        orbit. Flowering cannot begin while shoots are still pushing.
+        Starting the dry period now spends the water stress on the flush
+        instead of on flower formation, and there is no second chance in the
+        same season.
+      text_ar: >-
+        اخضرار المجموع أعلى من المعتاد لهذه القطعة في هذا الوقت من السنة، وهذا
+        شكل النمو الخضري النشط من الفضاء. لا يبدأ التزهير والأفرع ما زالت
+        تدفع. بدء التصويم الآن يصرف إجهاد الماء على النمو بدل تكوين الأزهار،
+        ولا فرصة ثانية في الموسم نفسه.
+      actions:
+        immediate:
+          - text_en: >-
+              Look at the terminal buds. The satellite reading is a proxy; the
+              buds are the answer.
+            text_ar: >-
+              انظر إلى البراعم الطرفية. قراءة القمر الصناعي دليل غير مباشر،
+              والبراعم هي الجواب.
+        short_term:
+          - text_en: >-
+              If nitrogen is still being applied, stop it now — nitrogen keeps
+              the flush going, which is what is holding the season up.
+            text_ar: >-
+              إن كان النيتروجين ما زال يُطبّق فأوقفه الآن — فالنيتروجين يبقي
+              النمو مستمرًا، وهو ما يؤخر الموسم.
+          - text_en: >-
+              If you are feeding anything, switch to potassium only, to push
+              the tree from vegetative growth toward reproductive development.
+            text_ar: >-
+              إن كنت تسمّد بشيء فحوّل إلى البوتاسيوم وحده، لدفع الشجرة من النمو
+              الخضري نحو التطور الزهري.
+        monitoring:
+          - text_en: >-
+              Re-check on the next clear scene. Start the dry period as soon
+              as the flush has hardened off.
+            text_ar: >-
+              أعد الفحص في المشهد الصافي التالي. ابدأ التصويم فور تصلّب الدفعة.
+
+  leaf_start_dry_period:
+    label_en: Ready — start the 50 to 60 day dry period
+    label_ar: جاهزة — ابدأ فترة التصويم من 50 إلى 60 يومًا
+    outcome:
+      action_type: other
+      severity: warning
+      confidence: 0.55
+      valid_for_hours: 336
+      parameters:
+        priority: high
+      text_en: >-
+        Canopy growth has settled back to this block's normal, so the flush
+        appears to have stopped and the dry period can start. Withhold
+        irrigation for 50 to 60 days. This water-stress signal advances and
+        synchronises floral bud break while suppressing further vegetative
+        budbreak, and it is the plan's organic alternative to a synthetic
+        growth regulator.
+      text_ar: >-
+        استقر نمو المجموع عند معتاد هذه القطعة، فيبدو أن الدفعة توقفت ويمكن
+        بدء التصويم. امنع الريّ من 50 إلى 60 يومًا. تُقدّم إشارة إجهاد الماء
+        هذه تفتّح البراعم الزهرية وتزامنها وتكبح تفتّح براعم خضرية جديدة، وهي
+        بديل الخطة العضوي عن منظّم النمو الصناعي.
+      actions:
+        immediate:
+          - text_en: >-
+              Confirm on the ground that the terminal buds have hardened
+              before you close the valve.
+            text_ar: >-
+              تأكد في الأرض أن البراعم الطرفية تصلّبت قبل إغلاق المحبس.
+          - text_en: >-
+              Stop nitrogen if it has not already stopped; if feeding, use
+              potassium only.
+            text_ar: >-
+              أوقف النيتروجين إن لم يكن قد توقف؛ وإن سمّدت فبالبوتاسيوم وحده.
+        short_term:
+          - text_en: >-
+              Hold the dry period for the full 50 to 60 days. Cutting it short
+              gives a partial, unsynchronised bloom that is harder to protect
+              and harder to pick.
+            text_ar: >-
+              أكمل التصويم كامل 50 إلى 60 يومًا. تقصيره يعطي تزهيرًا جزئيًا غير
+              متزامن يصعب حمايته ويصعب جنيه.
+        monitoring:
+          - text_en: >-
+              Watch the terminal buds for the change from vegetative to floral
+              differentiation.
+            text_ar: >-
+              راقب البراعم الطرفية لرصد التحول من التمايز الخضري إلى الزهري.
+          - text_en: >-
+              Expect the water cards on this block to fire during the dry
+              period. They are the plan working, not a fault.
+            text_ar: >-
+              توقّع انطلاق بطاقات الماء على هذه القطعة خلال التصويم. هي الخطة
+              تعمل لا خلل.
+
+  leaf_not_due:
+    label_en: No action — this block is not in the pre-flowering stage
+    label_ar: لا إجراء — هذه القطعة ليست في مرحلة ما قبل التزهير
+    outcome:
+      action_type: no_action
+      severity: info
+      confidence: 0.9
+      parameters: {}
+      text_en: >-
+        Flower induction belongs to the pre-flowering window. This rule will
+        start when the block reaches that stage.
+      text_ar: >-
+        ينتمي حثّ التزهير إلى نافذة ما قبل التزهير. تبدأ هذه القاعدة عند وصول
+        القطعة إلى تلك المرحلة.

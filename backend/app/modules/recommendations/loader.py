@@ -184,6 +184,7 @@ def compile_tree(spec: dict[str, Any], *, source_path: str) -> dict[str, Any]:
     # skip this entirely and behave exactly like pre-PR-B trees.
     parameters_decl = _validate_parameters_block(spec, source_path)
     _validate_params_refs(nodes_raw, parameters_decl, source_path)
+    _validate_condition_ops(nodes_raw, source_path)
 
     # Validate the optional scientific-provenance blocks (KB P1-A).
     # These are display/governance metadata only — the evaluator never
@@ -495,6 +496,50 @@ def _validate_params_refs(
         outcome = node.get("outcome")
         if isinstance(outcome, dict):
             _walk(outcome.get("parameters"))
+
+
+# Every operator ``app.shared.conditions.evaluator`` knows. The evaluator is
+# deliberately permissive at request time — an unrecognised node raises
+# ``ConditionParseError``, which ``evaluate`` catches and turns into a plain
+# "did not match". That is the right behaviour for a half-loaded tenant, but
+# it means a MISSPELLED operator is indistinguishable from a condition that
+# legitimately failed: the branch silently takes ``on_miss`` for ever and no
+# card, log line or trace ever says why.
+#
+# Author input reaches ``compile_tree`` from two directions (the seeds on disk
+# and the authoring API), and neither had anything checking this. Writing
+# ``gte`` instead of ``ge`` — the spelling most other rule engines use —
+# produced a tree that compiled, published, ran, and quietly answered "no" to
+# a question it never actually asked.
+_CONDITION_OPS: frozenset[str] = frozenset({"lt", "le", "gt", "ge", "eq", "ne", "between", "in"})
+
+
+def _validate_condition_ops(nodes: dict[str, Any], source_path: str) -> None:
+    """Reject any comparison whose ``op`` the evaluator does not implement."""
+
+    def _walk(value: Any) -> None:
+        if isinstance(value, dict):
+            if "op" in value:
+                op = value.get("op")
+                if op not in _CONDITION_OPS:
+                    raise DecisionTreeParseError(
+                        path=source_path,
+                        detail=(
+                            f"condition operator {op!r} is not one of " f"{sorted(_CONDITION_OPS)}"
+                        ),
+                    )
+            for child in value.values():
+                _walk(child)
+        elif isinstance(value, list):
+            for item in value:
+                _walk(item)
+
+    for node in nodes.values():
+        if not isinstance(node, dict):
+            continue
+        condition = node.get("condition")
+        if isinstance(condition, dict):
+            _walk(condition.get("tree"))
 
 
 def collect_crop_attribute_codes(nodes: dict[str, Any]) -> set[str]:
