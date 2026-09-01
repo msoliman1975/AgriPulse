@@ -204,16 +204,21 @@ export function useFarmConsole(farmId: string) {
     return m;
   }, [summaryQ.data, i18n.language]);
 
+  // The health the server classified for the selected block. The dock shows
+  // the same value the polygon is painted with, because it is the same value.
+  const selectedHealth = selectedId ? (summaryQ.data?.summaries[selectedId]?.health ?? null) : null;
+
   const detailQ = useQuery({
     // Language is part of the key: loadUnitDetail bakes localized alert text
     // into the detail, so switching locale must refetch to re-localize.
-    queryKey: CONSOLE_QK.detail(farmId, selectedId, i18n.language),
+    queryKey: CONSOLE_QK.detail(farmId, selectedId, i18n.language, selectedHealth ?? "unknown"),
     queryFn: () =>
       loadUnitDetail({
         farmId,
         blockId: selectedId as string,
         blocksById,
         activePlan: summaryQ.data?.activePlan,
+        summaryHealth: selectedHealth,
       }),
     enabled: Boolean(selectedId && blocksById.size > 0),
     staleTime: 30_000,

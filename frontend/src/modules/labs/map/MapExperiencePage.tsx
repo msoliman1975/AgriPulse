@@ -366,14 +366,19 @@ function MapForFarm({ farmId }: { farmId: string }) {
       .sort((a, b) => rank[b.level] - rank[a.level] || b.score - a.score);
   }, [riskSummaryQ.data, selectedId]);
 
+  // Same server-classified health the polygon is painted with — the panel
+  // no longer re-derives its own from a different NDVI window.
+  const selectedHealth = selectedId ? (summaryQ.data?.summaries[selectedId]?.health ?? null) : null;
+
   const detailQ = useQuery({
-    queryKey: ["labs/map/detail", farmId, selectedId],
+    queryKey: ["labs/map/detail", farmId, selectedId, selectedHealth ?? "unknown"],
     queryFn: () =>
       loadUnitDetail({
         farmId,
         blockId: selectedId!,
         blocksById,
         activePlan: summaryQ.data?.activePlan ?? null,
+        summaryHealth: selectedHealth,
       }),
     enabled: Boolean(farmId && selectedId && blocksById.size > 0),
     staleTime: 30_000,

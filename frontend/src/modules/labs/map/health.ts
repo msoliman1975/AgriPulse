@@ -1,5 +1,15 @@
-// Health-bucket classification — frontend logic since the backend has no
-// rolled-up summary endpoint. Conservative: any critical alert wins.
+// Health vocabulary and palette. The CLASSIFICATION is not here.
+//
+// It used to be: this file carried its own copy of the rule, and so did
+// `app/shared/health.py` and `farms/blocks_summary_router.py`. The map
+// polygons already coloured from the server's `health` field while the
+// block dock re-derived its own from a different NDVI window, so one page
+// could show two answers for one block. The rule now lives once, in
+// `backend/app/shared/health.py`, and reaches the frontend as the `health`
+// field on GET /farms/{id}/blocks/summary.
+//
+// `mapAlertSeverity` stays: it is not the health rule, it is how an alert
+// row's severity is narrowed for the alert list the dock renders.
 
 import type { Health, MapSeverity } from "./types";
 import type { AlertSeverity } from "@/api/alerts";
@@ -8,18 +18,6 @@ export function mapAlertSeverity(s: AlertSeverity): MapSeverity | null {
   if (s === "critical") return "critical";
   if (s === "warning") return "watch";
   return null;
-}
-
-export function classifyHealth(args: {
-  worstAlertSeverity: MapSeverity | null;
-  ndviCurrent: number | null;
-}): Health {
-  if (args.worstAlertSeverity === "critical") return "critical";
-  if (args.worstAlertSeverity === "watch") return "watch";
-  if (args.ndviCurrent == null) return "unknown";
-  if (args.ndviCurrent < 0.4) return "critical";
-  if (args.ndviCurrent < 0.55) return "watch";
-  return "healthy";
 }
 
 export const HEALTH_FILL: Record<Health, string> = {

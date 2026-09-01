@@ -17,13 +17,10 @@ N blocks. Three SQL queries against the tenant schema (alerts, the block
 roster, and the latest index values), plus a fourth only when a block has
 no reading inside the recent window — see `_RECENT_WINDOW_DAYS`.
 
-Health classification mirrors what the frontend used to do:
-  critical alert → critical
-  warning alert → watch
-  ndvi < 0.4    → critical (only when no overriding alert)
-  ndvi < 0.55   → watch
-  otherwise     → healthy
-  no data       → unknown
+Health classification is NOT decided here. The one rule lives in
+`app.shared.health.classify_health`; this module only gathers its
+inputs and calls it. It used to carry a private copy of the rule, which
+drifted from the shared one and from the frontend's third copy.
 
 Caching: deferred. The prototype exercises this from the polling loop
 (60s interval); add Redis with a 60s TTL when the validation cohort
@@ -45,6 +42,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.auth.context import RequestContext
 from app.shared.db.session import get_db_session
+from app.shared.health import Health, classify_health
 from app.shared.rbac.check import requires_capability
 
 router = APIRouter(prefix="/api/v1", tags=["farms"])
@@ -86,7 +84,10 @@ _MAP_INDICES: tuple[str, ...] = ("ndvi", "ndre", "ndwi")
 # degrading as history accumulates.
 _RECENT_WINDOW_DAYS = 120
 
-Health = Literal["healthy", "watch", "critical", "unknown"]
+# `Health` comes from app.shared.health — the single source for the rule
+# and its vocabulary. `MapSeverity` is the non-null half of the shared
+# `AlertSeverityBucket`: the response field is nullable, so the schema
+# spells the None out itself.
 MapSeverity = Literal["watch", "critical"]
 
 
@@ -425,7 +426,7 @@ async def get_blocks_summary(
         alert_severity: MapSeverity | None = a.get("alert_severity")
         alert_action_type: str | None = a.get("alert_action_type")
 
-        health = _classify_health(worst_alert_severity=alert_severity, ndvi_current=ndvi_current)
+        health = classify_health(worst_alert_severity=alert_severity, ndvi_current=ndvi_current)
 
         units.append(
             BlockSummary(
@@ -449,19 +450,3 @@ async def get_blocks_summary(
         as_of=at or datetime.now(UTC),
         units=units,
     )
-
-
-def _classify_health(
-    *, worst_alert_severity: MapSeverity | None, ndvi_current: float | None
-) -> Health:
-    if worst_alert_severity == "critical":
-        return "critical"
-    if worst_alert_severity == "watch":
-        return "watch"
-    if ndvi_current is None:
-        return "unknown"
-    if ndvi_current < 0.4:
-        return "critical"
-    if ndvi_current < 0.55:
-        return "watch"
-    return "healthy"
