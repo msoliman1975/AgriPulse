@@ -77,10 +77,9 @@ function useRunForm(defaultFrom: string): [FormState, (patch: Partial<FormState>
     to: today(),
     imagery: true,
     weather: true,
-    // Off by default. Most farms have no thermal subscription, and a source
-    // with nothing to fetch is exactly the silent no-op the pre-flight
-    // warnings exist to prevent.
-    thermal: false,
+    // On by default, like the other sources. A farm with no thermal
+    // subscription still gets the pre-flight warning below before the run.
+    thermal: true,
   });
   const patch = (p: Partial<FormState>): void => setState((s) => ({ ...s, ...p }));
   return [state, patch];
