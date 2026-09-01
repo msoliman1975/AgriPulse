@@ -3816,7 +3816,29 @@ global:
       #   shows numbered cards beside the map, each number matches a mark,
       #   the rail still lists everything, and pressing play advances one
       #   day a second at 1x.
-      tag: "c8b2fce"
+      #
+      # e0ed1d4 = #637, the Thermal box starts checked on the platform
+      #   Backfill and Indices form. The form began with imagery and weather
+      #   ticked and thermal unticked, so an operator who wanted all three
+      #   clicked the third box on every run. Thermal now starts ticked, like
+      #   the other two sources.
+      #
+      #   The warning for a farm with no thermal subscription is unchanged,
+      #   and the server still refuses that run, so a ticked box on such a
+      #   farm cannot start a fetch that returns nothing.
+      #
+      #   FRONTEND ONLY. One boolean in the form's initial state. No new
+      #   endpoint, no migration. Rollback is this tag alone back to c8b2fce.
+      #
+      #   e0ed1d4 is the promote commit for #639, one commit after #637.
+      #   The build for e28948f (the merge of #637) was cancelled by the push
+      #   of #640, so no image carries that tag. e0ed1d4 carries the same
+      #   frontend code plus the values.yaml note for #639.
+      #
+      #   After the sync, watch: /admin/backfill opens with three ticked
+      #   boxes on both tabs, and the estimate still warns when the farm has
+      #   no thermal subscription.
+      tag: "e0ed1d4"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
