@@ -217,7 +217,7 @@ function setInput(el: HTMLElement, value: string): void {
   el.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
-function renderPage(): void {
+function renderPage(): QueryClient {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
@@ -230,6 +230,11 @@ function renderPage(): void {
       </PrefsProvider>
     </QueryClientProvider>,
   );
+  // Handed back so a test can say what is in the cache. The prepare step
+  // is only observable against a COLD one, and which passes happen to be
+  // warm by the time play is pressed depends on how many intermediate
+  // renders the window changes produced — a race, not a fact.
+  return client;
 }
 
 /**
@@ -239,12 +244,29 @@ function renderPage(): void {
  * would put the June fixtures outside every frame. Setting the dates
  * through the real controls is also the only thing that exercises them.
  */
-async function renderAtFixtureWindow(): Promise<void> {
-  renderPage();
+async function renderAtFixtureWindow(): Promise<QueryClient> {
+  const client = renderPage();
   await waitFor(() => expect(screen.getByLabelText("From")).toBeInTheDocument());
   setInput(screen.getByLabelText("To"), WINDOW_TO);
   setInput(screen.getByLabelText("From"), WINDOW_FROM);
   await waitFor(() => expect(scrubber().max).toBe("9"));
+  return client;
+}
+
+/**
+ * Make every scene-asset request hang, and empty the cache of the answers
+ * already given, so the prepare step has real work whatever the map warmed.
+ *
+ * Returns the release. `mockImplementationOnce` is not enough here: it
+ * catches ONE call, and whether that call is the prepare's or a refetch
+ * triggered by emptying the cache is exactly the race being removed.
+ */
+function holdSceneAssets(client: QueryClient): () => void {
+  const assets = vi.mocked(listFarmSceneAssets);
+  const pending: (() => void)[] = [];
+  assets.mockImplementation(() => new Promise((resolve) => pending.push(() => resolve(null))));
+  client.removeQueries({ queryKey: ["timeline/sceneAssets"] });
+  return () => pending.forEach((fn) => fn());
 }
 
 /**
@@ -492,20 +514,14 @@ describe("FarmTimelinePage", () => {
 
   it("loads the window's passes before it starts playing", async () => {
     const assets = vi.mocked(listFarmSceneAssets);
-    await renderAtFixtureWindow();
+    const client = await renderAtFixtureWindow();
     await waitFor(() => expect(assets).toHaveBeenCalled());
 
     // Hold the prepare open so the state it puts the button in can be
-    // read. Without this the fixture's single pass resolves from cache
-    // within one tick and the step is invisible to the test — which is
-    // also why it was worth naming on the button in the first place.
-    let release = (): void => {};
-    assets.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          release = () => resolve(null);
-        }),
-    );
+    // read. Without this the passes resolve from cache within one tick and
+    // the step is invisible to the test — which is also why it was worth
+    // naming on the button in the first place.
+    const release = holdSceneAssets(client);
 
     fireEvent.click(screen.getByRole("button", { name: "Play" }));
     expect(await screen.findByRole("button", { name: "Preparing…" })).toBeInTheDocument();
@@ -519,16 +535,10 @@ describe("FarmTimelinePage", () => {
 
   it("a second press during the prepare cancels it rather than queueing a run", async () => {
     const assets = vi.mocked(listFarmSceneAssets);
-    await renderAtFixtureWindow();
+    const client = await renderAtFixtureWindow();
     await waitFor(() => expect(assets).toHaveBeenCalled());
 
-    let release = (): void => {};
-    assets.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          release = () => resolve(null);
-        }),
-    );
+    const release = holdSceneAssets(client);
 
     fireEvent.click(screen.getByRole("button", { name: "Play" }));
     await screen.findByRole("button", { name: "Preparing…" });
