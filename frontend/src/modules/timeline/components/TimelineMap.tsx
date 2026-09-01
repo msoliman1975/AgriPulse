@@ -20,6 +20,7 @@ import type { FeatureCollection, MultiPolygon, Point, Polygon } from "geojson";
 
 import { registerMarkerImages } from "@/modules/labs/map/markerIcons";
 import type { MarkProps } from "../lib/marks";
+import { buildMarkElement, updateMarkElement, type CardMark } from "../lib/cardMarkElement";
 import { boundsOf } from "../lib/mapBounds";
 import { syncRasters, type RasterCache, type RasterFrame } from "../lib/rasterCache";
 
@@ -27,6 +28,7 @@ import { syncRasters, type RasterCache, type RasterFrame } from "../lib/rasterCa
 // map. `rasterCache` is where they are DEFINED, because that module is the
 // one a fake-map test can import.
 export type { RasterFrame, RasterLayer } from "../lib/rasterCache";
+export type { CardMark } from "../lib/cardMarkElement";
 
 export interface BlockFeatureProps {
   block_id: string;
@@ -53,7 +55,23 @@ interface Props {
   fadeMs: number;
   /** Bump to refit the view. Pass the farm id (plus the block, in block scope). */
   fitKey: string;
+  /**
+   * The datapoints the dock has cards for, drawn as DOM markers.
+   *
+   * They must NOT also be in `marks`, or each one is drawn twice. The hook
+   * removes them there; this is the only place they come from.
+   */
+  cardedMarks: readonly CardMark[];
+  /** The card the reader is pointing at, or has clicked. */
+  activeEventId: string | null;
+  /**
+   * Where the connector line starts, in map-container pixels — the edge of
+   * the active card. Null draws no line. Measured by the caller once, on
+   * hover; the map end is re-projected on every pan.
+   */
+  connectorFrom: { x: number; y: number } | null;
   onMarkClick?: (eventId: string) => void;
+  onMarkHover?: (eventId: string | null) => void;
 }
 
 const AOI_SOURCE = "tl-aoi";
@@ -107,7 +125,11 @@ export function TimelineMap({
   showPixels,
   fadeMs,
   fitKey,
+  cardedMarks,
+  activeEventId,
+  connectorFrom,
   onMarkClick,
+  onMarkHover,
 }: Props): React.ReactElement {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
@@ -115,6 +137,15 @@ export function TimelineMap({
   const lastFitRef = useRef<string | null>(null);
   const onMarkClickRef = useRef(onMarkClick);
   onMarkClickRef.current = onMarkClick;
+  const onMarkHoverRef = useRef(onMarkHover);
+  onMarkHoverRef.current = onMarkHover;
+
+  /** Live DOM markers for the carded datapoints, keyed by event id. */
+  const cardMarkersRef = useRef(
+    new Map<string, { marker: maplibregl.Marker; el: HTMLDivElement }>(),
+  );
+  const lineRef = useRef<SVGLineElement | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
 
   // The raster frames on the map, keyed by pass, with the layer ids each
   // one owns. Insertion order is the eviction order.
@@ -129,6 +160,7 @@ export function TimelineMap({
     blocks,
     farmBoundary,
     marks,
+    cardedMarks,
     rasterFrames,
     activeRasterKey,
     showBlocks,
@@ -141,6 +173,7 @@ export function TimelineMap({
     blocks,
     farmBoundary,
     marks,
+    cardedMarks,
     rasterFrames,
     activeRasterKey,
     showBlocks,
@@ -182,6 +215,7 @@ export function TimelineMap({
     // that a ref can change before a cleanup runs, and this one is the
     // cache of layers belonging to the map created in THIS effect.
     const frameCache = frameCacheRef.current;
+    const cardMarkers = cardMarkersRef.current;
 
     map.on("load", () => {
       // Artwork first. MapLibre resolves `icon-image` at draw time and a
@@ -270,6 +304,7 @@ export function TimelineMap({
       applyAoi(map, now.farmBoundary);
       applyBlocks(map, now.blocks);
       applyMarks(map, now.marks);
+      syncCardMarkers(map, now.cardedMarks, cardMarkers, onMarkClickRef, onMarkHoverRef);
       applyVisibility(map, now.showBlocks, now.showFarmBoundary);
       syncRasters(map, {
         frames: now.rasterFrames,
@@ -308,6 +343,10 @@ export function TimelineMap({
       // The cache indexes layers of a map that no longer exists. Leaving it
       // populated would make a remount believe every frame is already on.
       frameCache.clear();
+      // Same reason: these markers belong to a map that no longer exists.
+      // `map.remove()` has already torn their nodes out of the DOM, so only
+      // the index has to go.
+      cardMarkers.clear();
     };
     // Mount once. Every prop is applied by its own effect below.
   }, []);
@@ -331,6 +370,58 @@ export function TimelineMap({
     if (!map || !readyRef.current) return;
     applyMarks(map, marks);
   }, [marks]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+    syncCardMarkers(map, cardedMarks, cardMarkersRef.current, onMarkClickRef, onMarkHoverRef);
+  }, [cardedMarks]);
+
+  // The lift on the active card's marker. Its own effect, and a class
+  // toggle rather than a re-render, so pointing at a card does not rebuild
+  // six markers.
+  useEffect(() => {
+    for (const [eventId, entry] of cardMarkersRef.current) {
+      entry.el.classList.toggle("tl-mark--active", eventId === activeEventId);
+    }
+  }, [activeEventId, cardedMarks]);
+
+  // The connector line.
+  //
+  // The card end is measured by the caller once, on hover. The map end is
+  // `map.project`, which changes on every pan and zoom — so it is written
+  // straight onto the SVG attributes from a `move` listener. Putting it
+  // through React state would re-render the page on every frame of a drag.
+  useEffect(() => {
+    const map = mapRef.current;
+    const svg = svgRef.current;
+    const line = lineRef.current;
+    if (!map || !svg || !line) return;
+
+    const target = activeEventId
+      ? (cardedMarks.find((m) => m.eventId === activeEventId) ?? null)
+      : null;
+    if (!target || !connectorFrom) {
+      svg.style.display = "none";
+      return;
+    }
+    svg.style.display = "";
+
+    const draw = (): void => {
+      const point = map.project(target.coordinates);
+      line.setAttribute("x1", String(connectorFrom.x));
+      line.setAttribute("y1", String(connectorFrom.y));
+      line.setAttribute("x2", String(point.x));
+      line.setAttribute("y2", String(point.y));
+    };
+    draw();
+    map.on("move", draw);
+    map.on("resize", draw);
+    return () => {
+      map.off("move", draw);
+      map.off("resize", draw);
+    };
+  }, [activeEventId, cardedMarks, connectorFrom]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -363,7 +454,70 @@ export function TimelineMap({
     map.fitBounds(b, { padding: 48, duration: 400 });
   }, [fitKey, blocks, farmBoundary]);
 
-  return <div ref={containerRef} className="h-full w-full" data-testid="timeline-map" />;
+  return (
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className="h-full w-full" data-testid="timeline-map" />
+      {/* No text in here, so nothing to mirror under RTL. `pointer-events-none`
+          because the line sits over the canvas and must not eat a drag. */}
+      <svg
+        ref={svgRef}
+        className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
+        style={{ display: "none" }}
+        aria-hidden="true"
+      >
+        <line
+          ref={lineRef}
+          stroke="#facc15"
+          strokeWidth={1.5}
+          strokeDasharray="4 3"
+          strokeLinecap="round"
+        />
+      </svg>
+    </div>
+  );
+}
+
+/**
+ * Add, update and remove the DOM markers for the carded datapoints.
+ *
+ * Keyed on event id and mutated in place, never torn down and rebuilt: a
+ * marker that is removed and re-added loses its CSS transition and its
+ * enter animation restarts, which at playback speed reads as a flicker on
+ * every frame.
+ */
+function syncCardMarkers(
+  map: MlMap,
+  next: readonly CardMark[],
+  live: Map<string, { marker: maplibregl.Marker; el: HTMLDivElement }>,
+  onClick: React.MutableRefObject<((eventId: string) => void) | undefined>,
+  onHover: React.MutableRefObject<((eventId: string | null) => void) | undefined>,
+): void {
+  const wanted = new Set(next.map((m) => m.eventId));
+  for (const [eventId, entry] of live) {
+    if (wanted.has(eventId)) continue;
+    entry.marker.remove();
+    live.delete(eventId);
+  }
+
+  for (const mark of next) {
+    const existing = live.get(mark.eventId);
+    if (existing) {
+      updateMarkElement(existing.el, mark);
+      existing.marker.setLngLat(mark.coordinates);
+      continue;
+    }
+    const el = buildMarkElement(mark);
+    el.addEventListener("click", (event) => {
+      // The marker sits over the canvas; without this the click also
+      // reaches the map and the page treats it as a deselect.
+      event.stopPropagation();
+      onClick.current?.(mark.eventId);
+    });
+    el.addEventListener("mouseenter", () => onHover.current?.(mark.eventId));
+    el.addEventListener("mouseleave", () => onHover.current?.(null));
+    const marker = new maplibregl.Marker({ element: el }).setLngLat(mark.coordinates).addTo(map);
+    live.set(mark.eventId, { marker, el });
+  }
 }
 
 // ---------------------------------------------------------------------------

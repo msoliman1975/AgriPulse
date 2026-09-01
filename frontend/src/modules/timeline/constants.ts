@@ -40,8 +40,40 @@ export const DEFAULT_WINDOW_DAYS = 90;
  */
 export const MAX_WINDOW_DAYS = 366;
 
-/** Frames per second at 1x. The top speed, 4x, is 8 days a second. */
-export const BASE_FPS = 2;
+/**
+ * Frames per second at 1x. With speeds 1, 2 and 4 that is 1, 2 and 4 days
+ * a second.
+ *
+ * It was 2, so the top speed ran 8 days a second and a frame lasted 125 ms.
+ * Nothing on the screen could keep up with that: a datapoint lives for
+ * `FADE_DAYS + 1` frames, which was 500 ms at 4x, and a tile that missed
+ * its frame was already two frames late by the time it arrived. Halving the
+ * clock buys every part of the screen twice as long, and the replay is
+ * still 90 days in about 22 seconds at the top speed.
+ */
+export const BASE_FPS = 1;
+
+/**
+ * How many of the day's datapoints get a card beside the map.
+ *
+ * Six because the dock has to fit under the zoom control without reaching
+ * the scrubber, and because a reader cannot hold more than a handful of
+ * numbered references at once. Everything else is one row saying how many
+ * were left out; the rail still lists all of them.
+ */
+export const CARD_SLOTS = 6;
+
+/**
+ * The shortest time a card keeps its slot, in milliseconds.
+ *
+ * Cards are chosen by rank, and on a busy day the ranking turns over
+ * completely between frames — this farm has 108 alerts on 5 August. Without
+ * a floor the dock would restack every frame and be unreadable at any
+ * speed. A held slot is only protected from being DISPLACED by a
+ * better-ranked event; a card whose datapoint has faded out leaves at once,
+ * because the dock must never show something the map does not.
+ */
+export const CARD_MIN_SLOT_MS = 900;
 
 /**
  * Passes kept on the map ahead of the play head, at zero opacity.
@@ -49,8 +81,8 @@ export const BASE_FPS = 2;
  * A raster layer at zero opacity still loads its tiles, so this is how far
  * in advance TiTiler is asked for the picture the replay is about to need.
  * Sentinel-2 flies every ~5 days, so three passes is roughly a fortnight
- * of replay — about eight seconds at 1x, and about two at the 4x top
- * speed. 8x was dropped partly because no depth here covers it.
+ * of replay — about fifteen seconds at 1x, and about four at the 4x top
+ * speed. Halving `BASE_FPS` doubled both without changing the depth.
  *
  * Three rather than more because each preloaded pass is a live set of tile
  * requests. Ten would put the whole window in flight at once and make the

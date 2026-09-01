@@ -4,7 +4,7 @@
 // right, and the scrubber under both. The two halves read the same frame,
 // so what is drawn and what is listed can never disagree.
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate } from "react-router-dom";
 import type { FeatureCollection, Polygon } from "geojson";
@@ -18,19 +18,22 @@ import { queryState } from "@/components/asyncState";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { localizedName } from "@/lib/localizedField";
 import { useCapability } from "@/rbac/useCapability";
+import { EventCards } from "../components/EventCards";
 import { EventRail } from "../components/EventRail";
 import { ImageDateCaption } from "../components/ImageDateCaption";
 import { Scrubber } from "../components/Scrubber";
 import { TimelineControls } from "../components/TimelineControls";
 import { TimelineLayerBar } from "../components/TimelineLayerBar";
 import { TimelineLegend } from "../components/TimelineLegend";
-import { TimelineMap, type BlockFeatureProps } from "../components/TimelineMap";
+import { TimelineMap, type BlockFeatureProps, type CardMark } from "../components/TimelineMap";
 import {
   BASE_FPS,
   DEFAULT_TIMELINE_INDEX,
   DEFAULT_WINDOW_DAYS,
   MAX_WINDOW_DAYS,
 } from "../constants";
+import { badgeColor, cardIconUrl } from "../lib/cardArtwork";
+import { eventTitle } from "../lib/eventText";
 import { daysBetween, toDayKey } from "../lib/frames";
 import { defaultLayerState, LAYER_KINDS, type TimelineLayerState } from "../lib/layerState";
 import { useFarmTimeline } from "../useFarmTimeline";
@@ -132,6 +135,55 @@ export function FarmTimelinePage(): ReactNode {
     };
   }, [tl.blocks, tl.highlights, blockId, i18n.language]);
 
+  // The map's positioning box. The dock is absolutely positioned inside it
+  // and the connector is measured against it, so both need the same origin.
+  const mapBoxRef = useRef<HTMLDivElement | null>(null);
+
+  // Pointing at a card or at its marker. `connectorFrom` is set only by a
+  // card, because a line from nothing to a marker has no meaning; hovering
+  // the marker still lifts it and highlights the card.
+  const [hoveredEventId, setHoveredEventId] = useState<string | null>(null);
+  const [connectorFrom, setConnectorFrom] = useState<{ x: number; y: number } | null>(null);
+
+  const activateCard = useCallback(
+    (eventId: string | null, from: { x: number; y: number } | null) => {
+      setHoveredEventId(eventId);
+      setConnectorFrom(from);
+    },
+    [],
+  );
+
+  const hoverMark = useCallback((eventId: string | null) => {
+    setHoveredEventId(eventId);
+    setConnectorFrom(null);
+  }, []);
+
+  const activeEventId = hoveredEventId ?? tl.focusedEventId;
+
+  const cardedMarks = useMemo<CardMark[]>(
+    () =>
+      tl.cards.map((card) => ({
+        eventId: card.event.id,
+        number: card.number,
+        coordinates: card.coordinates,
+        opacity: card.opacity,
+        color: badgeColor(card.event.kind, card.event.severity),
+        iconUrl: cardIconUrl(card.event),
+        blockScoped: card.blockScoped,
+        label: `${card.number}. ${eventTitle(card.event, t, i18n.language)}`,
+      })),
+    [tl.cards, t, i18n.language],
+  );
+
+  // "+N more" jumps the rail to the first datapoint the dock left out,
+  // rather than opening a second list. The rail is the full list; the dock
+  // is a shortlist on top of it.
+  const showAll = useCallback(() => {
+    const carded = new Set(tl.cards.map((c) => c.event.id));
+    const rest = tl.visible.find((f) => !carded.has(f.event.id));
+    tl.setFocusedEventId(rest ? rest.event.id : null);
+  }, [tl]);
+
   if (!farmId) return <Navigate to="/farms" replace />;
   if (!canRead) {
     return (
@@ -169,7 +221,10 @@ export function FarmTimelinePage(): ReactNode {
       </div>
 
       <div className="flex min-h-0 flex-1 gap-3 p-3">
-        <div className="relative min-w-0 flex-1 overflow-hidden rounded-card border border-ap-line">
+        <div
+          ref={mapBoxRef}
+          className="relative min-w-0 flex-1 overflow-hidden rounded-card border border-ap-line"
+        >
           <TimelineMap
             blocks={blockGeojson}
             farmBoundary={tl.farmQ.data?.boundary ?? null}
@@ -179,14 +234,28 @@ export function FarmTimelinePage(): ReactNode {
             showBlocks={layers.blocks}
             showFarmBoundary={layers.farmBoundary}
             showPixels={layers.pixels}
-            // Half a frame, capped at 250 ms. At 1x a frame lasts 500 ms
-            // and can afford the full 250; at the 4x top speed it lasts
-            // 125, and a 250 ms fade would still be running a frame later,
-            // which reads as the map lagging the scrubber — the thing this
-            // whole change is here to remove.
-            fadeMs={Math.round(Math.min(250, 1000 / (BASE_FPS * tl.speed) / 2))}
+            // Half a frame, capped at 400 ms. At 1x a frame now lasts a
+            // full second and can afford the whole 400; at the 4x top speed
+            // it lasts 250, and a fade longer than half of that would still
+            // be running a frame later, which reads as the map lagging the
+            // scrubber — the thing the cross-fade is here to remove.
+            fadeMs={Math.round(Math.min(400, 1000 / (BASE_FPS * tl.speed) / 2))}
             fitKey={`${farmId}:${blockId ?? "farm"}`}
+            cardedMarks={cardedMarks}
+            activeEventId={activeEventId}
+            connectorFrom={connectorFrom}
             onMarkClick={tl.setFocusedEventId}
+            onMarkHover={hoverMark}
+          />
+          <EventCards
+            farmId={farmId}
+            cards={tl.cards}
+            overflow={tl.cardOverflow}
+            activeEventId={activeEventId}
+            onActivate={activateCard}
+            onSelect={tl.setFocusedEventId}
+            containerRef={mapBoxRef}
+            onShowAll={showAll}
           />
           <ImageDateCaption imageDay={tl.imageDay} formatDay={formatDay} />
 

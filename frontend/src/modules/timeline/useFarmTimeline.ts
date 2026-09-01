@@ -18,7 +18,15 @@ import { blockTileUrl, farmRasterForPass } from "@/modules/labs/console/pixelTil
 import { useOptionalConfig } from "@/config/ConfigContext";
 import type { TrendPoint } from "./components/Scrubber";
 import type { RasterFrame, RasterLayer } from "./components/TimelineMap";
-import { BASE_FPS, PREFETCH_CONCURRENCY, PRELOAD_PASSES, TIMELINE_QK } from "./constants";
+import {
+  BASE_FPS,
+  CARD_MIN_SLOT_MS,
+  CARD_SLOTS,
+  PREFETCH_CONCURRENCY,
+  PRELOAD_PASSES,
+  TIMELINE_QK,
+} from "./constants";
+import { cardKey, selectCards, type SlotState } from "./lib/cards";
 import {
   buildFrames,
   dayIndex,
@@ -441,7 +449,45 @@ export function useFarmTimeline(input: TimelineInput) {
     [blocks],
   );
 
-  const marks = useMemo(() => buildMarks(visible, anchors), [visible, anchors]);
+  // ---- the dock ---------------------------------------------------------
+  //
+  // Which six datapoints get a card, and which slot each holds. The slot
+  // table is carried between frames in a ref rather than in state: it is an
+  // input to the next selection, not something the screen renders, and
+  // putting it in state would re-run this on its own answer.
+  //
+  // Written during the memo, which is safe because `selectCards` is
+  // idempotent — fed its own output for the same frame it returns the same
+  // slots, with the same `since` values, so React running the memo twice
+  // changes nothing.
+  const slotsRef = useRef<SlotState[]>([]);
+  const cardSelection = useMemo(() => {
+    const selection = selectCards(
+      visible,
+      anchors,
+      slotsRef.current,
+      Date.now(),
+      CARD_SLOTS,
+      CARD_MIN_SLOT_MS,
+    );
+    slotsRef.current = selection.slots;
+    return selection;
+  }, [visible, anchors]);
+
+  const cardedKeys = useMemo(() => new Set(cardSelection.cards.map((c) => c.key)), [cardSelection]);
+
+  // The carded six are drawn as DOM markers, so they must NOT also be in
+  // the symbol source — a datapoint drawn twice is two marks the reader has
+  // to work out are one thing, and the symbol underneath would take part in
+  // collision against its own badge.
+  const marks = useMemo(
+    () =>
+      buildMarks(
+        visible.filter((f) => !cardedKeys.has(cardKey(f.event))),
+        anchors,
+      ),
+    [visible, anchors, cardedKeys],
+  );
   const highlights = useMemo(() => buildBlockHighlights(visible), [visible]);
 
   // ---- trend ------------------------------------------------------------
@@ -487,6 +533,8 @@ export function useFarmTimeline(input: TimelineInput) {
     activeRasterKey,
     imageDay,
     marks,
+    cards: cardSelection.cards,
+    cardOverflow: cardSelection.overflow,
     highlights,
     visible,
     days,
