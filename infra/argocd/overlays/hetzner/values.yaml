@@ -3792,10 +3792,31 @@ global:
       #   NO MIGRATION on the frontend half. Rollback is this tag alone back
       #   to 84a80dc.
       #
-      #   After the sync, watch: /timeline/<farmId> draws the panel with the
-      #   pixel layer on, it swaps its wording and its numbers when the index
-      #   picker changes, and it leaves when "Index pixels" is unticked.
-      tag: "aaf133f"
+      # c8b2fce = #639, the Farm Timeline's datapoints get numbered cards.
+      #   The replay's marks were unreadable: a 30-pixel icon over satellite
+      #   imagery has no edge, carries no words, and at the old top speed a
+      #   datapoint was on screen for 375 ms.
+      #
+      #   Playback is now half as fast. BASE_FPS drops from 2 to 1, so the
+      #   three speeds are 1, 2 and 4 days a second instead of 2, 4 and 8. A
+      #   datapoint lives four frames: 4 seconds at 1x, 1 second at 4x. This
+      #   is the change most likely to be noticed, and it is deliberate.
+      #
+      #   The best six datapoints of the frame get a card down the left of
+      #   the map, numbered 1 to 6, with the same number on the mark. Those
+      #   six draw as DOM markers rather than as symbols, because the symbol
+      #   layer carries no text-field on purpose and a symbol can be
+      #   collided away. Everything else stays on the symbol layer.
+      #
+      #   FRONTEND ONLY. No new endpoint, no migration: the cards are built
+      #   from the timeline payload the screen already reads. Rollback is
+      #   this tag alone back to aaf133f.
+      #
+      #   After the sync, watch: /timeline/<farmId> on a day with datapoints
+      #   shows numbered cards beside the map, each number matches a mark,
+      #   the rail still lists everything, and pressing play advances one
+      #   day a second at 1x.
+      tag: "c8b2fce"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
