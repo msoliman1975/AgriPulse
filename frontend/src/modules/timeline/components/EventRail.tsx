@@ -8,12 +8,12 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { TimelineEvent, TimelineEventKind } from "@/api/timeline";
+import type { TimelineEventKind } from "@/api/timeline";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { Pill } from "@/components/Pill";
 import { localizedField } from "@/lib/localizedField";
-import { markerSeverity } from "@/modules/labs/map/markerIcons";
+import { eventPillKind, eventTitle } from "../lib/eventText";
 import { daysBetween, type FadedEvent } from "../lib/frames";
 
 interface Props {
@@ -27,18 +27,6 @@ interface Props {
   onFocusEvent: (eventId: string | null) => void;
   formatDay: (day: string) => string;
   formatTime: (iso: string) => string;
-}
-
-/** Severity to the `<Pill>` kind. `Pill` carries ok / warn / crit. */
-function pillKind(event: TimelineEvent): "ok" | "warn" | "crit" {
-  switch (markerSeverity(event.severity)) {
-    case "critical":
-      return "crit";
-    case "watch":
-      return "warn";
-    default:
-      return "ok";
-  }
 }
 
 export function EventRail({
@@ -65,20 +53,6 @@ export function EventRail({
     (a, b) => b.opacity - a.opacity || b.event.at.localeCompare(a.event.at),
   );
 
-  const title = (event: TimelineEvent): string => {
-    const own = i18n.language.startsWith("ar")
-      ? (event.title_ar ?? event.title_en)
-      : event.title_en;
-    if (own) return own;
-    // No text on the row. The enum-ish code is the next best thing, and
-    // the kind's own label is the floor — never an empty line, which reads
-    // as a rendering bug rather than as a datapoint with no note.
-    if (event.code) {
-      return t(`code.${event.kind}.${event.code}`, { defaultValue: event.code });
-    }
-    return t(`kind.${event.kind}`);
-  };
-
   return (
     <Card
       className="flex h-full min-h-0 flex-col"
@@ -104,7 +78,7 @@ export function EventRail({
             <EmptyState message={t("rail.empty")} />
           </div>
         ) : (
-          <ul className="divide-y divide-ap-line">
+          <ul className="divide-y divide-ap-line" aria-label={t("rail.listLabel")}>
             {rows.map(({ event, opacity }) => {
               const age = frameDay ? daysBetween(event.day, frameDay) : 0;
               const focused = focusedEventId === event.id;
@@ -123,7 +97,7 @@ export function EventRail({
                     className="w-full px-4 py-2.5 text-start hover:bg-ap-bg"
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <Pill kind={pillKind(event)}>{t(`kind.${event.kind}`)}</Pill>
+                      <Pill kind={eventPillKind(event)}>{t(`kind.${event.kind}`)}</Pill>
                       {event.block_code ? (
                         <span className="text-meta text-ap-muted">
                           {localizedField(i18n.language, event.block_name, event.block_name_ar) ??
@@ -134,7 +108,9 @@ export function EventRail({
                         {age === 0 ? formatTime(event.at) : t("rail.daysAgo", { count: age })}
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-ap-ink">{title(event)}</p>
+                    <p className="mt-1 text-sm text-ap-ink">
+                      {eventTitle(event, t, i18n.language)}
+                    </p>
                     {event.detail ? (
                       <p className="mt-0.5 text-meta text-ap-muted">{event.detail}</p>
                     ) : null}

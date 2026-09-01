@@ -106,7 +106,7 @@ export function markerIconFor(event: TimelineEvent): string | null {
 }
 
 /** Severity to a placement rank. Lower wins. */
-function severityRank(event: TimelineEvent): number {
+export function severityRank(event: TimelineEvent): number {
   switch (markerSeverity(event.severity)) {
     case "critical":
       return 0;
@@ -115,6 +115,36 @@ function severityRank(event: TimelineEvent): number {
     default:
       return 2;
   }
+}
+
+/**
+ * How a datapoint ranks against the others on this frame. Lower wins.
+ *
+ * Fresh beats stale, and within one age the worse severity beats the
+ * better one. Opacity is the age, so `1 - opacity` puts today's datapoint
+ * at 0 and a three-day-old one near 0.75.
+ *
+ * Exported because two things rank by it and they must not drift: the mark
+ * layer's `symbol-sort-key`, which decides who survives a collision, and
+ * the card dock, which decides who gets one of the six slots. A reader who
+ * sees a card must be able to find its mark.
+ */
+export function eventSortKey(event: TimelineEvent, opacity: number): number {
+  return (1 - opacity) * 10 + severityRank(event);
+}
+
+/**
+ * Where one datapoint stands, or null when there is nowhere honest.
+ *
+ * Its own point when it has one, otherwise its block's anchor. Exported
+ * for the same reason `eventSortKey` is: the card dock has to put its
+ * numbered badge on exactly the spot the mark layer would have used.
+ */
+export function anchorFor(event: TimelineEvent, anchors: BlockAnchors): [number, number] | null {
+  const own = event.point?.coordinates;
+  if (own) return [own[0], own[1]];
+  if (event.block_id) return anchors.get(event.block_id) ?? null;
+  return null;
 }
 
 /**
@@ -134,10 +164,7 @@ export function buildMarks(
     const icon = markerIconFor(event);
     if (icon === null) continue;
 
-    const coordinates =
-      event.point?.coordinates ??
-      (event.block_id ? anchors.get(event.block_id) : undefined) ??
-      null;
+    const coordinates = anchorFor(event, anchors);
     if (coordinates === null) continue;
 
     features.push({
@@ -149,10 +176,7 @@ export function buildMarks(
         kind: event.kind,
         marker_icon: icon,
         opacity,
-        // Fresh beats stale, and within one age the worse severity beats
-        // the better one. Opacity is the age, so 1 - opacity puts today's
-        // mark at 0 and a three-day-old one near 0.75.
-        sort_key: (1 - opacity) * 10 + severityRank(event),
+        sort_key: eventSortKey(event, opacity),
         block_id: event.block_id,
         block_name: event.block_name,
       },

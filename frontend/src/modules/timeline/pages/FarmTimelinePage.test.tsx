@@ -247,6 +247,35 @@ async function renderAtFixtureWindow(): Promise<void> {
   await waitFor(() => expect(scrubber().max).toBe("9"));
 }
 
+/**
+ * The two lists, scoped.
+ *
+ * The dock and the rail deliberately show the SAME datapoint, so an
+ * unscoped `getByText` on a title now matches twice and throws. Scoping is
+ * not a workaround for that — it is the assertion: a test that cannot say
+ * which list it is reading cannot prove the two agree.
+ */
+function rail(): ReturnType<typeof within> {
+  return within(screen.getByRole("list", { name: "Datapoints on this day" }));
+}
+
+function dock(): ReturnType<typeof within> {
+  return within(screen.getByRole("list", { name: "Highlighted datapoints" }));
+}
+
+/**
+ * How many datapoints the map is drawing, across both sources.
+ *
+ * The carded few are DOM markers and the rest are symbols. Which source a
+ * datapoint is in is an implementation detail; that it is drawn exactly
+ * once is not.
+ */
+function drawnCount(): number {
+  const marks = mapProps.current?.marks as { features: unknown[] } | undefined;
+  const carded = mapProps.current?.cardedMarks as unknown[] | undefined;
+  return (marks?.features.length ?? 0) + (carded?.length ?? 0);
+}
+
 /** The map's own date caption, which is not the rail's heading. */
 function imageDate(): Promise<HTMLElement> {
   return screen.findByTestId("timeline-image-date");
@@ -291,35 +320,64 @@ describe("FarmTimelinePage", () => {
   it("shows the day's datapoint in the rail when the play head reaches it", async () => {
     await renderAtFixtureWindow();
     seekTo("2026-06-03");
-    expect(await screen.findByText("NDVI fell 22% in seven days")).toBeInTheDocument();
+    expect(await rail().findByText("NDVI fell 22% in seven days")).toBeInTheDocument();
+  });
+
+  it("puts the day's datapoint in the dock with a number", async () => {
+    await renderAtFixtureWindow();
+    seekTo("2026-06-03");
+    // The words, not the props. A card whose title never reaches the
+    // screen is the failure this pins: the marker artwork cannot be drawn
+    // in jsdom, so the number and the text are all a reader would have.
+    const card = await dock().findByText("NDVI fell 22% in seven days");
+    expect(card).toBeInTheDocument();
+    expect(dock().getByText("1")).toBeInTheDocument();
+    // And the tie holds: the same datapoint is in both places, once each.
+    expect(rail().getByText("NDVI fell 22% in seven days")).toBeInTheDocument();
   });
 
   it("drops a datapoint once it is past the fade window", async () => {
     await renderAtFixtureWindow();
     seekTo("2026-06-03");
-    expect(await screen.findByText("NDVI fell 22% in seven days")).toBeInTheDocument();
+    expect(await rail().findByText("NDVI fell 22% in seven days")).toBeInTheDocument();
     // Six days later is well past the three-day fade.
     seekTo("2026-06-09");
     await waitFor(() =>
-      expect(screen.queryByText("NDVI fell 22% in seven days")).not.toBeInTheDocument(),
+      // Everywhere, not only in the rail: a card that outlives its mark is
+      // the dock claiming something the map has stopped drawing.
+      expect(screen.queryAllByText("NDVI fell 22% in seven days")).toHaveLength(0),
     );
-    expect(screen.getByText("Copper")).toBeInTheDocument();
+    expect(rail().getByText("Copper")).toBeInTheDocument();
   });
 
-  it("hands the map a mark for the alert and none for the activity", async () => {
+  it("carries a carded datapoint as a DOM marker, not as a symbol", async () => {
     await renderAtFixtureWindow();
     seekTo("2026-06-03");
     await waitFor(() => {
+      // Drawn ONCE. A datapoint in both sources is two marks the reader
+      // has to work out are one thing, and the symbol underneath would
+      // take part in collision against its own numbered badge.
       const marks = mapProps.current?.marks as { features: unknown[] };
-      expect(marks.features).toHaveLength(1);
+      const carded = mapProps.current?.cardedMarks as { blockScoped: boolean }[];
+      expect(marks.features).toHaveLength(0);
+      expect(carded).toHaveLength(1);
+      expect(carded[0].blockScoped).toBe(false);
     });
+  });
 
+  it("stands a carded activity on the block, without inventing a pin", async () => {
+    await renderAtFixtureWindow();
     seekTo("2026-06-09");
     await waitFor(() => {
       const marks = mapProps.current?.marks as { features: unknown[] };
       // A completed activity is a property of the block, not of a spot in
-      // it — so it lights the block outline instead of dropping a pin.
+      // it. It draws no pin on the symbol layer, and its card marker is
+      // flagged block-scoped so the badge is a ring rather than a pin.
       expect(marks.features).toHaveLength(0);
+      const carded = mapProps.current?.cardedMarks as { blockScoped: boolean }[];
+      expect(carded).toHaveLength(1);
+      expect(carded[0].blockScoped).toBe(true);
+      // The block outline still carries it, exactly as before.
       const blocks = mapProps.current?.blocks as {
         features: { properties: { block_id: string; highlight: number } }[];
       };
@@ -358,11 +416,8 @@ describe("FarmTimelinePage", () => {
   it("hides a datapoint kind from BOTH the map and the rail when its box is off", async () => {
     await renderAtFixtureWindow();
     seekTo("2026-06-03");
-    expect(await screen.findByText("NDVI fell 22% in seven days")).toBeInTheDocument();
-    await waitFor(() => {
-      const marks = mapProps.current?.marks as { features: unknown[] };
-      expect(marks.features).toHaveLength(1);
-    });
+    expect(await rail().findByText("NDVI fell 22% in seven days")).toBeInTheDocument();
+    await waitFor(() => expect(drawnCount()).toBe(1));
 
     fireEvent.click(screen.getByRole("checkbox", { name: "Alert" }));
 
@@ -370,11 +425,8 @@ describe("FarmTimelinePage", () => {
     // rail read the same frame, so a kind that is off must be off in both
     // — a rail listing an alert the map does not draw is the disagreement
     // the whole screen is built to avoid.
-    await waitFor(() => {
-      const marks = mapProps.current?.marks as { features: unknown[] };
-      expect(marks.features).toHaveLength(0);
-    });
-    expect(screen.queryByText("NDVI fell 22% in seven days")).not.toBeInTheDocument();
+    await waitFor(() => expect(drawnCount()).toBe(0));
+    expect(screen.queryAllByText("NDVI fell 22% in seven days")).toHaveLength(0);
   });
 
   it("leaves the scrubber's ticks alone when a kind is switched off", async () => {

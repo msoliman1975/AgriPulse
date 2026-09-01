@@ -19,6 +19,12 @@
     "expand": "Show the colour key",
     "collapse": "Hide the colour key"
   },
+  "cards": {
+    "listLabel": "Highlighted datapoints",
+    "open": "Open",
+    "more_one": "+{{count}} more on the list",
+    "more_other": "+{{count}} more on the list"
+  },
   "controls": {
     "scope": "Scope",
     "wholeFarm": "Whole farm",
@@ -47,6 +53,7 @@
   "rail": {
     "title": "{{date}}",
     "titleNoDay": "Datapoints",
+    "listLabel": "Datapoints on this day",
     "emptyWindow": "Nothing was recorded on this farm in this window. Widen the dates, or pick a different scope.",
     "empty": "Nothing was recorded on this day or the three before it.",
     "daysAgo_one": "{{count}} day earlier",

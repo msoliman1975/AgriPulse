@@ -127,3 +127,124 @@
     animation: none;
   }
 }
+
+/*
+ * Farm Timeline — the six carded datapoints.
+ *
+ * These six are drawn as DOM markers rather than as symbols on
+ * `tl-marks-symbols`, for three reasons. The symbol layer deliberately
+ * carries no `text-field`, because a slow glyph endpoint makes every
+ * symbol on such a layer draw nothing at all — so a number cannot go on
+ * one. A symbol also takes part in collision, and a carded datapoint must
+ * be on the map unconditionally or its card points at empty ground. And
+ * DOM gives real transitions, which is the whole reason this exists: at
+ * playback speed a mark that pops in and out is unreadable.
+ *
+ * Everything not carded stays on the symbol layer, unchanged.
+ */
+.tl-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  cursor: pointer;
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease;
+}
+
+.tl-mark-glyph {
+  width: 1.875rem;
+  height: 1.875rem;
+  object-fit: contain;
+  /* The complaint this whole change answers: a 24px icon over satellite
+     imagery has no edge. A dark drop shadow gives one over bright sand,
+     and the white ring on the badge gives one over dark canopy. */
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
+}
+
+.tl-mark-badge {
+  position: absolute;
+  inset-block-start: -0.125rem;
+  /* Physical, not logical. The badge sits over the glyph's own artwork,
+     which is drawn on a canvas and does not mirror under RTL. */
+  right: -0.125rem;
+  display: grid;
+  place-items: center;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding-inline: 0.1875rem;
+  border-radius: 999px;
+  border: 2px solid #ffffff;
+  color: #ffffff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/*
+ * A datapoint that belongs to the BLOCK, not to a spot in it — a stage
+ * change, a completed activity, a recommendation. It gets a numbered ring
+ * standing at the block's anchor and no pin, because a pin would claim a
+ * precision nobody recorded. The dashed ring says "somewhere in here"; the
+ * block outline is already lit.
+ */
+.tl-mark--block .tl-mark-badge {
+  position: static;
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 0;
+  border-style: dashed;
+  font-size: 0.75rem;
+}
+
+.tl-mark--active {
+  transform: scale(1.2);
+  z-index: 2;
+}
+
+@keyframes tl-mark-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+.tl-mark--fresh {
+  animation: tl-mark-in 260ms ease-out;
+}
+
+/* The dock cards. Opacity carries age, exactly as the mark and the rail
+   row do, so a card and its mark dim together. */
+.tl-card {
+  transition:
+    opacity 260ms ease,
+    transform 260ms ease,
+    background-color 160ms ease;
+}
+
+@keyframes tl-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.375rem);
+  }
+}
+
+.tl-card--fresh {
+  animation: tl-card-in 260ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-mark,
+  .tl-card {
+    transition: none;
+  }
+
+  .tl-mark--fresh,
+  .tl-card--fresh {
+    animation: none;
+  }
+}
