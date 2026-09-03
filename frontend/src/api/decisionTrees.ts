@@ -299,7 +299,9 @@ export interface EvalTrace {
   scope: "block" | "cell";
   status: EvalTraceStatus;
   /** Which targeting axis excluded the tree; only set when status=skipped. */
-  skip_axis: "crop" | "country" | "soil" | null;
+  // `farm` means the farm turned this tree off (tenant migration 0089);
+  // the other three are the tree's own targeting axes.
+  skip_axis: "crop" | "country" | "soil" | "farm" | null;
   skip_detail: { required?: string[]; actual?: string | null } | null;
   outcome: {
     kind?: string;

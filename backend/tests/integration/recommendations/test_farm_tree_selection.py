@@ -238,9 +238,7 @@ async def _list_selection(fixture: _Fixture, farm_id: UUID) -> tuple[dict, ...]:
         await session.execute(text(f'SET LOCAL search_path TO "{fixture.schema_name}", public'))
         async with factory() as public_session:
             svc = get_recommendations_service(tenant_session=session, public_session=public_session)
-            return await svc.list_farm_tree_selection(
-                farm_id=farm_id, tenant_id=fixture.tenant_id
-            )
+            return await svc.list_farm_tree_selection(farm_id=farm_id, tenant_id=fixture.tenant_id)
 
 
 async def _open_recommendations(
@@ -303,9 +301,7 @@ async def test_disabled_tree_skips_only_the_farm_that_turned_it_off(
 
     # The farm that turned it off got nothing from this tree.
     assert (
-        await _open_recommendations(
-            admin_session, tenant.schema_name, off_farm, tenant.tree_code
-        )
+        await _open_recommendations(admin_session, tenant.schema_name, off_farm, tenant.tree_code)
         == []
     )
     # Every other farm is untouched — the setting is per farm, not per tenant.
@@ -322,9 +318,7 @@ async def test_disabled_tree_is_recorded_as_a_skipped_trace(
 ) -> None:
     """A tree that stops firing with no trace is a tree nobody can explain."""
     tenant = await _make_tenant(admin_session, "sel-trace")
-    farm_id, blocks = await _seed_farm(
-        admin_session, tenant.schema_name, code="TRC", block_count=2
-    )
+    farm_id, blocks = await _seed_farm(admin_session, tenant.schema_name, code="TRC", block_count=2)
 
     await _set_enabled(tenant, farm_id=farm_id, tree_id=tenant.tree_id, enabled=False)
     await rec_tasks._evaluate_for_tenant_async(tenant.schema_name)

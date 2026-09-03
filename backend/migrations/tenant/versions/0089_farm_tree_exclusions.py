@@ -108,9 +108,7 @@ def _replace_skip_axis_check(axes: tuple[str, ...]) -> None:
         )
     ).all()
     for row in rows:
-        bind.execute(
-            text(f'ALTER TABLE decision_tree_eval_traces DROP CONSTRAINT "{row.conname}"')
-        )
+        bind.execute(text(f'ALTER TABLE decision_tree_eval_traces DROP CONSTRAINT "{row.conname}"'))
     allowed = ", ".join(f"'{axis}'" for axis in axes)
     bind.execute(
         text(
