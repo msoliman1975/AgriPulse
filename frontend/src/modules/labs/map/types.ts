@@ -1,7 +1,12 @@
 // Map-First validation prototype — see docs/proposals/map-first.md.
 // Types follow the spec; values are derived client-side from existing APIs.
 
+// Imported rather than restated: a second copy of a closed set is a copy
+// that drifts, and this one is already mirrored from Python.
+import type { HealthReason as ApiHealthReason } from "@/api/blocksSummary";
+
 export type Health = "healthy" | "watch" | "critical" | "unknown";
+export type HealthReason = ApiHealthReason;
 export type MapSeverity = "watch" | "critical";
 export type SpecUnitType = "block" | "pivot" | "pivot_section";
 // The three indices `GET /farms/{id}/blocks/summary` publishes as columns, and
@@ -14,6 +19,9 @@ export type IndexCode = "ndvi" | "ndre" | "ndwi";
 export interface UnitSummary {
   id: string;
   health: Health;
+  /** Why `health` is what it is, or null when the backend is still on the
+   *  NDVI rule. Rendered by the block dock under the health chip. */
+  health_reason: ApiHealthReason | null;
   has_alert: boolean;
   alert_severity: MapSeverity | null;
   alert_count: number;
@@ -54,6 +62,7 @@ export interface UnitDetail {
   crop: string | null;
   area_ha: number;
   health: Health;
+  health_reason: ApiHealthReason | null;
   last_updated: string | null;
   alerts: UnitAlert[];
   indices: Record<IndexCode, IndexSeries>;

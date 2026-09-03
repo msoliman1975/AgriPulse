@@ -10,6 +10,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 from app.shared.health import Health
+from app.shared.health_definition import HealthReason
 
 # Granularity is a closed set tied to the indices CAGG mapping
 # (`block_index_daily` / `block_index_weekly`). The insights endpoint
@@ -62,6 +63,12 @@ class BlockHealthRow(BaseModel):
     block_name: str
     block_name_ar: str | None = None
     current_health: Health
+    # Why the block is in that class — one of eight words from
+    # `app.shared.health_definition.HealthReason`. Null while
+    # `health_definition_enabled` is off: the NDVI rule has no reason to
+    # give, because it cannot tell "every tree came out clear" from
+    # "nothing ever ran".
+    health_reason: HealthReason | None = None
     current_value: Decimal | None
     trend_30d_pct: Decimal | None
     alerts_open: int

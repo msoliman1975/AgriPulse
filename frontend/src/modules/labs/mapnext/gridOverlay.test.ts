@@ -15,6 +15,7 @@ const block = (id: string): Block => ({ id }) as Block;
 const summary = (id: string, gridProductId: string | null): UnitSummary => ({
   id,
   health: "unknown",
+  health_reason: null,
   has_alert: false,
   alert_severity: null,
   alert_count: 0,

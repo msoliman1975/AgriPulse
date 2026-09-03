@@ -75,6 +75,26 @@ class Settings(BaseSettings):
     # only if you need to stage the backfill of existing per-block
     # subscriptions before exposing templates. Removed in PR-4.
     farm_config_template_enabled: bool = True
+    # Decides a block's health from decision-tree output instead of NDVI
+    # break points. See `app/shared/health_definition.py`.
+    #
+    # OFF by default, and that is the rollback: with the flag off the answer
+    # is byte-for-byte the old NDVI rule, so turning it back is a config
+    # change and not a redeploy. The evidence and the reason are computed
+    # either way and reported either way — only which of the two answers
+    # lands in the `health` field moves.
+    #
+    # Turning it ON changes what a farm sees, in two directions at once.
+    # Blocks whose NDVI is naturally low — a wide-spaced orchard on desert
+    # soil — stop reading Critical. Blocks nobody has swept, or that no tree
+    # targets, start reading Unknown instead of Healthy. The second is the
+    # one to warn a tenant about: it looks like a regression and it is the
+    # truth arriving late.
+    #
+    # Retire it by deleting `app/shared/health.py` and this flag together.
+    # The NDVI break points live in that module and nowhere else, and they
+    # have to stay while the off-path can still be taken.
+    health_definition_enabled: bool = False
     # Whether a tenant purge may skip the 30-day grace window via `force`.
     # Defaults True, which is exactly today's behaviour — `force` has always
     # been available to anyone holding platform.manage_tenants. It is a setting

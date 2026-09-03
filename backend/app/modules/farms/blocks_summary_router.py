@@ -37,7 +37,6 @@ grows past a single tester.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from decimal import Decimal
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -48,16 +47,16 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.settings import get_settings
 from app.shared.auth.context import RequestContext
 from app.shared.db.session import get_db_session
 from app.shared.health import Health, classify_health
 from app.shared.health_definition import (
     PLATFORM_DEFAULT_DEFINITION,
-    AlertEvidence,
-    HealthInputs,
     HealthReason,
     resolve_health,
 )
+from app.shared.health_evidence import EMPTY_EVIDENCE, BlockEvidence, load_health_evidence
 from app.shared.rbac.check import requires_capability
 
 router = APIRouter(prefix="/api/v1", tags=["farms"])
@@ -174,8 +173,13 @@ class BlockSummary(BaseModel):
     # for the blocks that do — without this it would have to ask every block
     # for its subscriptions first, N requests before drawing anything.
     grid_product_id: UUID | None = None
-    # The inputs to the health definition, and the class it would give.
-    # Additive: nothing renders it yet.
+    # Why `health` is what it is — one of eight words from
+    # `app.shared.health_definition.HealthReason`. Null when the health
+    # definition is off, because the NDVI rule has no reason to give: it
+    # cannot tell "every tree came out clear" from "nothing ever ran".
+    health_reason: HealthReason | None = None
+    # The inputs the health definition read, and the class it gives. When
+    # the flag is on, `preview_health` equals `health` by construction.
     health_evidence: HealthEvidence
 
 
@@ -352,178 +356,6 @@ _ALERT_ROLLUP_AS_OF = text(_alert_rollup_sql(as_of=True)).bindparams(
 )
 
 
-# ---------------------------------------------------------------------------
-# Health-definition evidence.
-#
-# Three more reads, all farm-scoped and all optional to the shipped answer:
-# they fill `health_evidence`, and nothing decides a block's class from them
-# yet. They are separate statements rather than extra columns on the rollup
-# above because the rollup answers a different question — the map badge —
-# and widening it would change what the badge counts.
-#
-# Cost: three round trips on a request the console polls every 60s. That is
-# the same bet the module docstring already records about caching; revisit
-# both together when the cohort grows.
-# ---------------------------------------------------------------------------
-
-
-# Counted alerts, one row per (severity, status, cell) group.
-#
-# The definition decides which statuses count, so SQL must not pre-filter to
-# `open` the way the badge rollup does. Resolved rows are dropped here
-# instead: `counted_statuses` refuses to include 'resolved' at parse time, so
-# no definition can ever ask for them.
-#
-# Grouping rather than returning raw rows is lossless for the resolver. It
-# reads severity and status to pick a class — idempotent across duplicates —
-# and collects cell ids into a set for the share test. `n` carries the real
-# count back for the response's two counters.
-def _alert_evidence_sql(*, as_of: bool) -> str:
-    if as_of:
-        # Status has to be reconstructed, not read. The stored value is
-        # today's; an alert that has since been resolved was still open then.
-        #
-        # `acknowledged_at` replays exactly. `snoozed` does not: the table
-        # keeps `snoozed_until` and no `snoozed_at`, so there is no instant to
-        # compare against and an as-of read reports a snoozed alert as open.
-        # Under the default definition both count, and they differ only when
-        # `snoozed_as` is set — so the loss is bounded and visible here rather
-        # than guessed at.
-        when = """AND a.created_at <= :at
-                  AND (a.resolved_at IS NULL OR a.resolved_at > :at)"""
-        status = """CASE
-                       WHEN a.acknowledged_at IS NOT NULL
-                            AND a.acknowledged_at <= :at THEN 'acknowledged'
-                       ELSE 'open'
-                   END"""
-    else:
-        when = "AND a.status <> 'resolved'"
-        status = "a.status"
-    # Grouped in an outer query rather than by repeating the CASE in a
-    # GROUP BY: the reconstructed status is an expression, and naming it once
-    # is what keeps the two branches the same shape.
-    return f"""
-        SELECT e.block_id,
-               e.severity,
-               e.status,
-               e.cell_id,
-               count(*) AS n
-        FROM (
-            SELECT a.block_id,
-                   a.severity,
-                   {status} AS status,
-                   a.cell_id
-            FROM alerts a
-            JOIN blocks b ON b.id = a.block_id
-            WHERE b.farm_id = :farm_id
-              {when}
-              -- Findings, not rows — same reason as the badge rollup.
-              AND a.group_parent_id IS NULL
-        ) e
-        GROUP BY e.block_id, e.severity, e.status, e.cell_id
-    """
-
-
-_ALERT_EVIDENCE_NOW = text(_alert_evidence_sql(as_of=False)).bindparams(
-    bindparam("farm_id", type_=PG_UUID(as_uuid=True))
-)
-_ALERT_EVIDENCE_AS_OF = text(_alert_evidence_sql(as_of=True)).bindparams(
-    bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
-    bindparam("at", type_=DateTime(timezone=True)),
-)
-
-
-# Highest confidence among the block's open recommendations.
-#
-# `recommendations` carries `farm_id` directly, so this needs no join.
-# Alert leaves are pinned to 1.0 by `recommendations/engine.py`; only
-# recommendation leaves carry a real 0-to-1 number, which is why the
-# platform default leaves `recommendation_floor` unset and this value
-# moves nothing today.
-def _recommendation_floor_sql(*, as_of: bool) -> str:
-    when = (
-        """
-                      AND r.created_at <= :at
-                      AND (r.applied_at IS NULL OR r.applied_at > :at)
-                      AND (r.dismissed_at IS NULL OR r.dismissed_at > :at)
-        """
-        if as_of
-        else """
-                      AND r.state = 'open'
-        """
-    )
-    return f"""
-        SELECT r.block_id,
-               max(r.confidence) AS max_confidence
-        FROM recommendations r
-        WHERE r.farm_id = :farm_id
-          {when}
-          AND r.group_parent_id IS NULL
-        GROUP BY r.block_id
-    """
-
-
-_RECOMMENDATION_FLOOR_NOW = text(_recommendation_floor_sql(as_of=False)).bindparams(
-    bindparam("farm_id", type_=PG_UUID(as_uuid=True))
-)
-_RECOMMENDATION_FLOOR_AS_OF = text(_recommendation_floor_sql(as_of=True)).bindparams(
-    bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
-    bindparam("at", type_=DateTime(timezone=True)),
-)
-
-
-# Trace counts per block from the newest sweep.
-#
-# `kind = 'sweep'` and not simply the newest run: an `on_demand` run covers
-# the one block somebody pressed Evaluate on, and taking it would report zero
-# traces for every other block in the farm — turning the whole map unknown
-# because one person opened one block.
-#
-# A failed sweep is still taken. Its missing blocks then read `no_coverage`,
-# which is the honest answer: the run did not reach them. Skipping it and
-# falling back to an older sweep would present stale verdicts as fresh ones.
-#
-# The run is chosen in a CTE so this stays one statement. The join is on
-# `run_id`, which `ix_decision_tree_eval_traces_run` covers; `farm_id` has no
-# index on that table, and inside a single run it is a filter over a bounded
-# set rather than a scan of the whole history.
-def _trace_counts_sql(*, as_of: bool) -> str:
-    when = "AND r.started_at <= :at" if as_of else ""
-    # `when` is one of two literals chosen by a bool argument, and the only
-    # value it ever carries is a bound-parameter placeholder. Nothing a caller
-    # sends reaches the SQL text — hence the noqa on the closing quote.
-    sql = f"""
-        WITH newest AS (
-            SELECT r.id
-            FROM decision_tree_eval_runs r
-            WHERE r.kind = 'sweep'
-              {when}
-            ORDER BY r.started_at DESC, r.id DESC
-            LIMIT 1
-        )
-        SELECT t.block_id,
-               count(*) FILTER (WHERE t.status = 'fired')   AS traces_fired,
-               count(*) FILTER (WHERE t.status = 'clear')   AS traces_clear,
-               count(*) FILTER (WHERE t.status = 'skipped') AS traces_skipped,
-               count(*) FILTER (WHERE t.status = 'error')   AS traces_error,
-               max(t.evaluated_at) AS last_evaluated_at
-        FROM decision_tree_eval_traces t
-        JOIN newest n ON n.id = t.run_id
-        WHERE t.farm_id = :farm_id
-        GROUP BY t.block_id
-    """  # noqa: S608
-    return sql
-
-
-_TRACE_COUNTS_NOW = text(_trace_counts_sql(as_of=False)).bindparams(
-    bindparam("farm_id", type_=PG_UUID(as_uuid=True))
-)
-_TRACE_COUNTS_AS_OF = text(_trace_counts_sql(as_of=True)).bindparams(
-    bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
-    bindparam("at", type_=DateTime(timezone=True)),
-)
-
-
 @router.get(
     "/farms/{farm_id}/blocks/summary",
     response_model=BlocksSummaryResponse,
@@ -563,6 +395,11 @@ async def get_blocks_summary(
     # the further back you went — the opposite of the truth.
     as_of_alerts = _ALERT_ROLLUP_AS_OF if at is not None else _ALERT_ROLLUP_NOW
 
+    # Read once per request, not once per block: a flag that could change
+    # mid-loop would colour two blocks in the same farm by two different
+    # rules, which is the exact failure this whole phase exists to end.
+    use_definition = get_settings().health_definition_enabled
+
     # 2. Open-alert count + worst severity per block in this farm.
     alert_rows = (
         (
@@ -576,39 +413,10 @@ async def get_blocks_summary(
     )
 
     # 2b. Health-definition evidence: counted alerts, open recommendations,
-    #     and the newest sweep's traces. Nothing here decides `health`; it
-    #     fills `health_evidence` so the new rule can be compared against the
-    #     shipped one on a real farm. All three take the same `at`.
-    params = {"farm_id": farm_id, "at": at} if at is not None else {"farm_id": farm_id}
-
-    evidence_rows = (
-        (
-            await tenant_session.execute(
-                _ALERT_EVIDENCE_AS_OF if at is not None else _ALERT_EVIDENCE_NOW, params
-            )
-        )
-        .mappings()
-        .all()
-    )
-    recommendation_rows = (
-        (
-            await tenant_session.execute(
-                _RECOMMENDATION_FLOOR_AS_OF if at is not None else _RECOMMENDATION_FLOOR_NOW,
-                params,
-            )
-        )
-        .mappings()
-        .all()
-    )
-    trace_rows = (
-        (
-            await tenant_session.execute(
-                _TRACE_COUNTS_AS_OF if at is not None else _TRACE_COUNTS_NOW, params
-            )
-        )
-        .mappings()
-        .all()
-    )
+    #     the newest sweep's traces, and the live grid's cell count. Four
+    #     statements, shared with the scorecard so the two surfaces cannot
+    #     answer from different evidence. All four take the same `at`.
+    evidence_by_block = await load_health_evidence(tenant_session, farm_id=farm_id, at=at)
 
     # 3. Current grid config per block, if any. `retired_at IS NULL` is the
     #    live row; 0054 gave configs valid time, so a rezoned block has an
@@ -622,16 +430,7 @@ async def get_blocks_summary(
                     """
                     SELECT DISTINCT ON (g.block_id)
                            g.block_id,
-                           g.product_id,
-                           -- Denominator for `cell_critical_share`. Counted
-                           -- from the live config only, so a rezoned block
-                           -- is measured against the grid it has now and not
-                           -- against the retired one's cells as well.
-                           (
-                               SELECT count(*)
-                               FROM grid_cells c
-                               WHERE c.grid_config_id = g.id
-                           ) AS total_cells
+                           g.product_id
                     FROM grid_configs g
                     JOIN blocks b ON b.id = g.block_id
                     WHERE b.farm_id = :farm_id
@@ -685,19 +484,6 @@ async def get_blocks_summary(
         }
 
     grid_by_block: dict[UUID, UUID] = {r["block_id"]: r["product_id"] for r in grid_rows}
-    cells_by_block: dict[UUID, int] = {r["block_id"]: int(r["total_cells"] or 0) for r in grid_rows}
-
-    evidence_by_block: dict[UUID, list[dict[str, Any]]] = {}
-    for r in evidence_rows:
-        evidence_by_block.setdefault(r["block_id"], []).append(dict(r))
-
-    recommendation_by_block: dict[UUID, Decimal] = {
-        r["block_id"]: Decimal(str(r["max_confidence"]))
-        for r in recommendation_rows
-        if r["max_confidence"] is not None
-    }
-
-    traces_by_block: dict[UUID, dict[str, Any]] = {r["block_id"]: dict(r) for r in trace_rows}
 
     # One instant for every block in the response, so two blocks cannot be
     # judged stale against clocks a few milliseconds apart. A caller may send
@@ -727,15 +513,17 @@ async def get_blocks_summary(
         alert_severity: MapSeverity | None = a.get("alert_severity")
         alert_action_type: str | None = a.get("alert_action_type")
 
-        health = classify_health(worst_alert_severity=alert_severity, ndvi_current=ndvi_current)
-
-        evidence = _health_evidence(
-            alert_groups=evidence_by_block.get(bid, []),
-            total_cells=cells_by_block.get(bid, 0),
-            max_recommendation_confidence=recommendation_by_block.get(bid),
-            traces=traces_by_block.get(bid),
-            now=resolver_now,
-        )
+        evidence = _health_evidence(evidence_by_block.get(bid, EMPTY_EVIDENCE), now=resolver_now)
+        # The switch. With the flag off this is the NDVI rule, unchanged and
+        # byte for byte; with it on it is the definition's answer, which this
+        # response was already reporting as `preview_health` before anything
+        # was switched over to it.
+        if use_definition:
+            health: Health = evidence.preview_health
+            health_reason: HealthReason | None = evidence.preview_reason
+        else:
+            health = classify_health(worst_alert_severity=alert_severity, ndvi_current=ndvi_current)
+            health_reason = None
 
         units.append(
             BlockSummary(
@@ -748,6 +536,7 @@ async def get_blocks_summary(
                 ndre_current=ndre_current,
                 ndwi_current=ndwi_current,
                 grid_product_id=grid_by_block.get(bid),
+                health_reason=health_reason,
                 health_evidence=evidence,
                 last_index_at=last_at,
             )
@@ -762,61 +551,25 @@ async def get_blocks_summary(
     )
 
 
-def _health_evidence(
-    *,
-    alert_groups: list[dict[str, Any]],
-    total_cells: int,
-    max_recommendation_confidence: Decimal | None,
-    traces: dict[str, Any] | None,
-    now: datetime,
-) -> HealthEvidence:
-    """Turn one block's raw evidence rows into the reported shape.
+def _health_evidence(evidence: BlockEvidence, *, now: datetime) -> HealthEvidence:
+    """Resolve one block's evidence and render it for the response.
 
-    Builds the same `HealthInputs` the resolver will read in Phase 4 and
-    runs it, so `preview_health` cannot drift from what the switch will
-    actually do: there is one construction of the inputs, not one for the
-    preview and another for the real answer.
+    The same `HealthInputs` that decides `health` when the flag is on is
+    what `preview_health` reports when it is off. There is one resolution,
+    not one for the answer and another for the preview, so the two can
+    never drift apart and the preview cannot promise something the switch
+    does not deliver.
     """
-    by_severity: dict[str, int] = {}
-    by_status: dict[str, int] = {}
-    critical_cells: set[Any] = set()
-    alerts: list[AlertEvidence] = []
-
-    for g in alert_groups:
-        severity = str(g["severity"])
-        status = str(g["status"])
-        n = int(g["n"] or 0)
-        cell_id = g["cell_id"]
-        by_severity[severity] = by_severity.get(severity, 0) + n
-        by_status[status] = by_status.get(status, 0) + n
-        if severity == "critical" and cell_id is not None:
-            critical_cells.add(cell_id)
-        # One evidence object per group, not per row. The resolver reads
-        # severity and status to pick a class, which is the same answer for
-        # every row in a group, and collects cell ids into a set.
-        alerts.append(AlertEvidence(severity=severity, status=status, cell_id=cell_id))
-
-    t = traces or {}
-    inputs = HealthInputs(
-        alerts=tuple(alerts),
-        total_cells=total_cells,
-        max_recommendation_confidence=max_recommendation_confidence,
-        traces_fired=int(t.get("traces_fired") or 0),
-        traces_clear=int(t.get("traces_clear") or 0),
-        traces_skipped=int(t.get("traces_skipped") or 0),
-        traces_error=int(t.get("traces_error") or 0),
-        last_evaluated_at=t.get("last_evaluated_at"),
-    )
+    inputs = evidence.inputs
     preview_health, preview_reason = resolve_health(PLATFORM_DEFAULT_DEFINITION, inputs, now=now)
-
     return HealthEvidence(
-        alerts_by_severity=by_severity,
-        alerts_by_status=by_status,
-        critical_cells=len(critical_cells),
-        total_cells=total_cells,
+        alerts_by_severity=evidence.alerts_by_severity,
+        alerts_by_status=evidence.alerts_by_status,
+        critical_cells=evidence.critical_cells,
+        total_cells=inputs.total_cells,
         max_recommendation_confidence=(
-            float(max_recommendation_confidence)
-            if max_recommendation_confidence is not None
+            float(inputs.max_recommendation_confidence)
+            if inputs.max_recommendation_confidence is not None
             else None
         ),
         traces_fired=inputs.traces_fired,

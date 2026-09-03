@@ -5,9 +5,28 @@ import { apiClient } from "./client";
 export type Health = "healthy" | "watch" | "critical" | "unknown";
 export type MapSeverity = "watch" | "critical";
 
+/** Why a block is in its health class. Mirrors
+ *  `app.shared.health_definition.HealthReason` — eight words, closed set.
+ *  Copy lives once, under `common:healthReason.*`, so the Farm Console dock
+ *  and the Insights scorecard cannot word the same block differently. */
+export type HealthReason =
+  | "critical_alert"
+  | "warning_alert"
+  | "cell_share"
+  | "strong_recommendation"
+  | "no_coverage"
+  | "no_tree"
+  | "stale"
+  | "all_clear";
+
 export interface BlockSummary {
   id: string;
   health: Health;
+  /** Why `health` is what it is. Null while the backend's
+   *  `health_definition_enabled` is off: the NDVI rule it falls back to has
+   *  no reason to give, because it cannot tell "every tree came out clear"
+   *  from "nothing ever ran". Optional so an older API still parses. */
+  health_reason?: HealthReason | null;
   alert_count: number;
   alert_severity: MapSeverity | null;
   /** Verb of the worst open alert (`irrigate`, `spray`, ...). Drives the map

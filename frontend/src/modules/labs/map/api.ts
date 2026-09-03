@@ -33,6 +33,7 @@ import { getForecast, type ForecastResponse } from "@/api/weather";
 import { mapAlertSeverity } from "./health";
 import type {
   Health,
+  HealthReason,
   IndexCode,
   IndexSeries,
   UnitAlert,
@@ -157,6 +158,11 @@ export async function loadMapSummary(farmId: string, at?: string | null): Promis
     const summary: UnitSummary = {
       id: b.id,
       health: isLogicalPivot ? "unknown" : (apiSummary?.health ?? "unknown"),
+      // A logical pivot has no health of its own — it is the union of its
+      // sectors — so it has no reason either. Carrying one would put a
+      // sentence under a chip that reads "Unknown" for a structural reason,
+      // not an agronomic one.
+      health_reason: isLogicalPivot ? null : (apiSummary?.health_reason ?? null),
       has_alert: !isLogicalPivot && (apiSummary?.alert_count ?? 0) > 0,
       alert_severity: isLogicalPivot ? null : (apiSummary?.alert_severity ?? null),
       alert_count: isLogicalPivot ? 0 : (apiSummary?.alert_count ?? 0),
@@ -268,15 +274,21 @@ export async function loadUnitDetail(args: {
   // window, which is a second answer to a question the map had already
   // answered. Callers that have no summary pass nothing and get "unknown".
   summaryHealth?: Health | null;
+  // Travels with `summaryHealth` for the same reason: the dock renders the
+  // server's answer, and a class without its reason is the half of it that
+  // cannot be explained.
+  summaryHealthReason?: HealthReason | null;
 }): Promise<UnitDetail> {
   const lang = i18n.language;
   const health: Health = args.summaryHealth ?? "unknown";
+  const healthReason: HealthReason | null = args.summaryHealthReason ?? null;
   const cacheKey = detailCacheKey(args.blockId, lang);
   const cached = detailCache.get(cacheKey);
   // Health is not part of what this cache exists to hold. It rides the
   // summary's 60s poll, so a cache hit re-stamps the current value rather
   // than replaying the one captured up to DETAIL_TTL_MS ago.
-  if (cached && Date.now() - cached.at < DETAIL_TTL_MS) return { ...cached.value, health };
+  if (cached && Date.now() - cached.at < DETAIL_TTL_MS)
+    return { ...cached.value, health, health_reason: healthReason };
 
   const block = args.blocksById.get(args.blockId);
   if (!block) throw new Error(`Block ${args.blockId} not in farm`);
@@ -366,6 +378,7 @@ export async function loadUnitDetail(args: {
     crop: cropAssignmentSummary?.crop_name ?? null,
     area_ha: block.area_m2 / 10_000,
     health,
+    health_reason: healthReason,
     last_updated: blockDetail.updated_at,
     alerts: blockAlerts
       .map((a) => {

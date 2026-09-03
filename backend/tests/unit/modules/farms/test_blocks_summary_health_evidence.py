@@ -20,7 +20,22 @@ from uuid import uuid4
 
 import pytest
 
+from app.core.settings import get_settings
 from app.modules.farms.blocks_summary_router import get_blocks_summary
+
+
+@pytest.fixture
+def _definition_on(monkeypatch: pytest.MonkeyPatch):
+    """Turn `health_definition_enabled` on for one test.
+
+    Env plus `cache_clear`, the way this repo flips every other flag:
+    `get_settings` is an lru_cache, so setting the variable alone changes
+    nothing and the test would silently exercise the off path.
+    """
+    monkeypatch.setenv("HEALTH_DEFINITION_ENABLED", "true")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 class _Result:
@@ -89,6 +104,7 @@ class TestHealthEvidence:
             [],  # alert evidence
             [],  # recommendation confidence
             [],  # trace counts
+            [],  # grid cell counts
             [],  # grid configs
             [b1],  # roster
             [{"block_id": b1, "index_code": "ndvi", "mean": 0.7, "time": now}],
@@ -118,7 +134,8 @@ class TestHealthEvidence:
             [],
             [],
             [_traces(b1, clear=21, at=now - timedelta(hours=6))],
-            [],
+            [],  # grid cell counts
+            [],  # grid configs
             [b1],
             [{"block_id": b1, "index_code": "ndvi", "mean": 0.31, "time": now}],
         )
@@ -140,6 +157,7 @@ class TestHealthEvidence:
             [],
             [_traces(b1, clear=4, at=now - timedelta(hours=72))],
             [],
+            [],
             [b1],
             [{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
         )
@@ -160,6 +178,7 @@ class TestHealthEvidence:
             [],
             [_traces(b1, fired=1, at=now - timedelta(days=7))],
             [],
+            [],
             [b1],
             [{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
         )
@@ -177,6 +196,7 @@ class TestHealthEvidence:
             [],
             [],
             [_traces(b1, skipped=19, at=now)],
+            [],
             [],
             [b1],
             [{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
@@ -204,6 +224,7 @@ class TestHealthEvidence:
             [],
             [_traces(b1, fired=1, at=now)],
             [],
+            [],
             [b1],
             [{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
         )
@@ -230,7 +251,8 @@ class TestHealthEvidence:
             ],
             [],
             [_traces(b1, fired=2, at=now)],
-            [{"block_id": b1, "product_id": product, "total_cells": 121}],
+            [{"block_id": b1, "total_cells": 121}],  # grid cell counts
+            [{"block_id": b1, "product_id": product}],  # grid configs
             [b1],
             [{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
         )
@@ -253,6 +275,7 @@ class TestHealthEvidence:
             [_alert(loud, "critical", "open")],
             [{"block_id": loud, "max_confidence": 0.9}],
             [_traces(loud, fired=1, at=now), _traces(quiet, clear=3, at=now)],
+            [],
             [],
             [loud, quiet],
             [
@@ -282,6 +305,7 @@ class TestHealthEvidence:
             [],
             [_traces(b1, clear=2, at=swept)],
             [],
+            [],
             [b1],
             [{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": swept}],
         )
@@ -294,3 +318,108 @@ class TestHealthEvidence:
         # The echo is left exactly as the caller sent it; only the resolver's
         # own clock is normalised.
         assert out.as_of == naive
+
+
+@pytest.mark.asyncio
+class TestTheSwitch:
+    """`health_definition_enabled` — which of the two answers ships.
+
+    The preview is asserted alongside `health` in every case, because the
+    promise the flag makes is that turning it on delivers exactly what the
+    off state was already reporting. A test that only checked `health`
+    would pass while the two drifted.
+    """
+
+    async def test_off_by_default_the_answer_is_still_ndvi(self) -> None:
+        farm_id, b1 = uuid4(), uuid4()
+        now = datetime.now(UTC)
+        session = _session(
+            [],
+            [],
+            [],
+            [_traces(b1, clear=12, at=now)],
+            [],
+            [],
+            [b1],
+            [{"block_id": b1, "index_code": "ndvi", "mean": 0.31, "time": now}],
+        )
+
+        out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
+
+        unit = out.units[0]
+        assert unit.health == "critical"  # 0.31 is under the 0.40 break point
+        assert unit.health_reason is None  # the NDVI rule has no reason to give
+        assert unit.health_evidence.preview_health == "healthy"
+
+    @pytest.mark.usefixtures("_definition_on")
+    async def test_on_the_answer_is_the_definition_and_it_carries_a_reason(self) -> None:
+        """The mango orchard stops being Critical for its greenness."""
+        farm_id, b1 = uuid4(), uuid4()
+        now = datetime.now(UTC)
+        session = _session(
+            [],
+            [],
+            [],
+            [_traces(b1, clear=12, at=now)],
+            [],
+            [],
+            [b1],
+            [{"block_id": b1, "index_code": "ndvi", "mean": 0.31, "time": now}],
+        )
+
+        out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
+
+        unit = out.units[0]
+        assert unit.health == "healthy"
+        assert unit.health_reason == "all_clear"
+        # The switch delivers exactly what the off state advertised.
+        assert unit.health_evidence.preview_health == unit.health
+        assert unit.health_evidence.preview_reason == unit.health_reason
+
+    @pytest.mark.usefixtures("_definition_on")
+    async def test_on_a_block_nobody_swept_turns_unknown_not_green(self) -> None:
+        """The direction of the change a tenant has to be warned about.
+
+        Healthy NDVI and no alert used to read Healthy. It now reads
+        Unknown, because nothing looked. That is the truth arriving late,
+        and it will be reported as a regression if nobody says so first.
+        """
+        farm_id, b1 = uuid4(), uuid4()
+        now = datetime.now(UTC)
+        session = _session(
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [b1],
+            [{"block_id": b1, "index_code": "ndvi", "mean": 0.82, "time": now}],
+        )
+
+        out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
+
+        assert out.units[0].health == "unknown"
+        assert out.units[0].health_reason == "no_coverage"
+
+    @pytest.mark.usefixtures("_definition_on")
+    async def test_on_the_ndvi_value_is_still_reported(self) -> None:
+        """NDVI leaves the RULE, not the response. The dock charts it and
+        the scorecard shows the number; dropping it would blank both."""
+        farm_id, b1 = uuid4(), uuid4()
+        now = datetime.now(UTC)
+        session = _session(
+            [],
+            [],
+            [],
+            [_traces(b1, clear=3, at=now)],
+            [],
+            [],
+            [b1],
+            [{"block_id": b1, "index_code": "ndvi", "mean": 0.31, "time": now}],
+        )
+
+        out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
+
+        assert out.units[0].ndvi_current == pytest.approx(0.31)
+        assert out.units[0].last_index_at == now

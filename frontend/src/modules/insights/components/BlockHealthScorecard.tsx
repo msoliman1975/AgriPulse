@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
-import { getFarmHealthSummary, type Health } from "@/api/insights";
+import { getFarmHealthSummary, type Health, type HealthReason } from "@/api/insights";
 import { Card } from "@/components/Card";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
@@ -27,7 +27,9 @@ interface Props {
  * read-only summary and the action surface elsewhere.
  */
 export function BlockHealthScorecard({ farmId, blockIds = null }: Props): ReactNode {
-  const { t, i18n } = useTranslation("insights");
+  // "common" carries the health-reason copy, which the Farm Console dock
+  // reads from the same place. One wording, two pages.
+  const { t, i18n } = useTranslation(["insights", "common"]);
   const dateLocale = useDateLocale();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["insights", "health-summary", farmId] as const,
@@ -97,7 +99,7 @@ export function BlockHealthScorecard({ farmId, blockIds = null }: Props): ReactN
                     </Link>
                   </Td>
                   <Td>
-                    <HealthBadge health={b.current_health} t={t} />
+                    <HealthBadge health={b.current_health} reason={b.health_reason} t={t} />
                   </Td>
                   <Td className="text-end tabular-nums text-ap-ink">
                     {formatIndexValue(b.current_value)}
@@ -148,17 +150,29 @@ const HEALTH_CHIP: Record<Health, { bg: string; fg: string }> = {
 
 function HealthBadge({
   health,
+  reason,
   t,
 }: {
   health: Health;
+  reason?: HealthReason | null;
   t: ReturnType<typeof useTranslation>["t"];
 }): ReactNode {
   const { bg, fg } = HEALTH_CHIP[health];
+  const why = reason ? t(`common:healthReason.${reason}`) : null;
   return (
-    <span
-      className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium ${bg} ${fg}`}
-    >
-      {t(`scorecard.health.${health}`)}
+    <span className="inline-flex flex-col items-start gap-0.5">
+      <span
+        className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium ${bg} ${fg}`}
+        // The sentence is also the badge's title so a reader who has the
+        // column narrowed can still get it, and so a screen reader announces
+        // the class and the reason together rather than the colour alone.
+        title={why ?? undefined}
+      >
+        {t(`scorecard.health.${health}`)}
+      </span>
+      {/* Null while the backend runs the old NDVI rule, which has no reason
+          to give. The row then renders exactly as it did before. */}
+      {why ? <span className="text-[10px] leading-tight text-ap-muted">{why}</span> : null}
     </span>
   );
 }
