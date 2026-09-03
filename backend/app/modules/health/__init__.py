@@ -9,7 +9,8 @@ catalog uses.
 
 Public surface (importable by other modules):
 
-  * ``service.load_crop_health_definitions`` — read the catalog once.
+  * ``service.load_health_definitions`` — read the crop catalog and the
+    farm's override once.
   * ``service.CropHealthDefinitions`` — resolve one block's crop path to
     the definition that applies to it.
 

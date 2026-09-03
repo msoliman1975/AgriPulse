@@ -51,6 +51,22 @@ class _Result:
     def all(self) -> list[Any]:
         return self._rows
 
+    def first(self) -> Any:
+        """The farm-override read uses `.first()`, not `.all()`.
+
+        Returning None for an empty set is the "farm has no override" case
+        and is what most of these tests want.
+        """
+        return self._rows[0] if self._rows else None
+
+
+class _Row:
+    """A row object with attribute access, for the reads that use `.first()`
+    and then read a column off it rather than going through `.mappings()`."""
+
+    def __init__(self, **cols: Any) -> None:
+        self.__dict__.update(cols)
+
 
 def _session(
     *,
@@ -61,6 +77,7 @@ def _session(
     cells: list[Any] | None = None,
     crops: list[Any] | None = None,
     definitions: list[Any] | None = None,
+    farm_override: dict[str, Any] | None = None,
     grid: list[Any] | None = None,
     roster: list[Any] | None = None,
     indices: list[Any] | None = None,
@@ -72,7 +89,7 @@ def _session(
     in every call site as a bare list of lists, and it broke silently every
     time a query was added: the rows landed on the wrong reader and
     surfaced as a shape error rather than a missing stub. Phase 3 added
-    three queries and Phase 5 added two more.
+    three queries, Phase 5 added two more, and Phase 6 another.
 
     Order, which is the one thing this function knows:
 
@@ -82,11 +99,12 @@ def _session(
       4. traces        — per-status counts from the newest sweep       │ evidence
       5. cells         — live grid cell count per block                │ loader
       6. crops         — current crop path per block                   ┘
-      7. definitions   — the per-crop health catalog
-      8. grid          — current grid config per block
-      9. roster        — the active block ids
-     10. indices       — latest values, bounded to the recent window
-     11. unbounded     — latest values, unbounded; issued ONLY for blocks
+      7. definitions   — the per-crop health catalog          ┐ the health
+      8. farm_override — this farm's own health override      ┘ definitions
+      9. grid          — current grid config per block
+     10. roster        — the active block ids
+     11. indices       — latest values, bounded to the recent window
+     12. unbounded     — latest values, unbounded; issued ONLY for blocks
                          the recent window returned nothing for
 
     `unbounded` defaults to not being supplied at all, so a test whose
@@ -101,6 +119,7 @@ def _session(
         cells or [],
         crops or [],
         definitions or [],
+        [_Row(health_definition=farm_override)] if farm_override is not None else [],
         grid or [],
         roster or [],
         indices or [],

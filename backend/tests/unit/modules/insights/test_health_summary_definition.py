@@ -35,6 +35,14 @@ class _Result:
     def all(self) -> list[Any]:
         return self._rows
 
+    def first(self) -> Any:
+        return self._rows[0] if self._rows else None
+
+
+class _Row:
+    def __init__(self, **cols: Any) -> None:
+        self.__dict__.update(cols)
+
 
 @pytest.fixture
 def _definition_on(monkeypatch: pytest.MonkeyPatch):
@@ -55,10 +63,12 @@ def _service(
     cells: list[Any] | None = None,
     crops: list[Any] | None = None,
     definitions: list[Any] | None = None,
+    farm_override: dict[str, Any] | None = None,
     with_evidence: bool = True,
 ) -> InsightsService:
     """A service with mocked repos and a session that returns, in order, the
-    evidence loader's five statements and then the per-crop health catalog.
+    evidence loader's five statements, then the per-crop health catalog and
+    this farm's override.
 
     Named rather than positional: this file used to pass a bare list of
     lists, and Phase 5's two extra queries shifted every one of them onto
@@ -73,6 +83,7 @@ def _service(
             cells or [],
             crops or [],
             definitions or [],
+            [_Row(health_definition=farm_override)] if farm_override is not None else [],
         ]
         if with_evidence
         else []
@@ -162,10 +173,10 @@ class TestScorecardUnderTheDefinition:
 
     @pytest.mark.usefixtures("_definition_on")
     async def test_the_evidence_is_loaded_once_for_the_farm(self) -> None:
-        """Six statements for the whole farm, not six per block — the
-        evidence loader's five plus the per-crop catalog. The loop around
-        this call is already N+1 on indices and alerts; a per-block load
-        would have made a 36-block farm 216 round trips."""
+        """Seven statements for the whole farm, not seven per block — the
+        evidence loader's five, the per-crop catalog and the farm override.
+        The loop around this call is already N+1 on indices and alerts; a
+        per-block load would have made a 36-block farm 252 round trips."""
         farm_id = uuid4()
         b1, b2, b3 = uuid4(), uuid4(), uuid4()
         now = datetime.now(UTC)
@@ -182,7 +193,7 @@ class TestScorecardUnderTheDefinition:
 
         out = await svc.get_farm_health_summary(farm_id=farm_id)
 
-        assert svc._session.execute.await_count == 6  # type: ignore[attr-defined]
+        assert svc._session.execute.await_count == 7  # type: ignore[attr-defined]
         by_name = {r.block_name: r for r in out.blocks}
         assert by_name["North"].current_health == "healthy"
         assert by_name["South"].current_health == "healthy"

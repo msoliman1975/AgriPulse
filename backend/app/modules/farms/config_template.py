@@ -1,5 +1,30 @@
 """Farm-level subscription template — read, replace, diff, Apply.
 
+**Health is a resolution tier, not a template.** It is a `Category` here so
+it can be locked and edited alongside the others, and that is the only thing
+it shares with them. `subscriptions`, `irrigation`, `org` and `grid` all
+work the same way: the farm holds a wanted state, each block holds its own
+copy, and an explicit Apply reconciles the two — hence a diff, a preview,
+an Apply endpoint, and a lock meaning "blocks may not diverge from me".
+
+Health has none of that and must never grow it. A block's definition is
+resolved at read time from three tiers:
+
+    PLATFORM_DEFAULT_DEFINITION
+      <- public.crop_health_definitions, merged along the crop path
+        <- farms.health_definition
+
+Shallow merge, deepest tier winning per key. There is no block-side row to
+copy into, so there is nothing to diff and nothing to apply. Adding an Apply
+would write a resolved answer into blocks and start it drifting from the
+tiers it came from — which is exactly the failure this project exists to
+end: three copies of one health rule, two of which disagreed in production.
+
+`health_locked` therefore means something different from its four
+neighbours. Theirs stop BLOCKS diverging from the farm; this one stops the
+farm's own override being edited. Locking it needs no divergence check and
+no "lock and overwrite" modal, because nothing can be out of step.
+
 PR-2 of the farm-block config model rollout. See
 ``docs/proposals/farm-block-config-model.md`` § "Rollout — PR-2".
 
@@ -37,6 +62,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.farms.errors import (
     CategoryLockedError,
     FarmNotFoundError,
+    InvalidHealthDefinitionError,
     LockDivergenceError,
 )
 from app.modules.farms.models import (
@@ -47,14 +73,26 @@ from app.modules.farms.models import (
 )
 from app.modules.imagery.models import ImageryAoiSubscription
 from app.modules.weather.models import WeatherSubscription
+from app.shared.health_definition import HealthDefinitionError, parse_definition
 
-Category = Literal["subscriptions", "irrigation", "org", "grid"]
+# `health` is in this list for the lock and the editor, and for nothing
+# else. See the "Health is a resolution tier, not a template" note in the
+# module docstring before adding it to anything that applies or diffs.
+Category = Literal["subscriptions", "irrigation", "org", "grid", "health"]
 _LOCK_COLUMN: dict[Category, str] = {
     "subscriptions": "subscriptions_locked",
     "irrigation": "irrigation_locked",
     "org": "org_locked",
     "grid": "grid_locked",
+    "health": "health_locked",
 }
+
+# The categories that are templates: a farm-side wanted state, a block-side
+# copy, and an Apply that reconciles them. Every one of them has a diff and
+# a preview. `health` is deliberately absent.
+_TEMPLATE_CATEGORIES: frozenset[Category] = frozenset(
+    {"subscriptions", "irrigation", "org", "grid"}
+)
 
 
 # ---------- Pure data carriers ----------------------------------------------
@@ -574,7 +612,7 @@ async def _resolve_target_blocks(
 
 
 async def get_lock_state(session: AsyncSession, *, farm_id: UUID) -> dict[Category, bool]:
-    """Return the three lock booleans as ``{category: locked}``."""
+    """Return the per-category lock booleans as ``{category: locked}``."""
     row = (
         await session.execute(
             select(
@@ -582,6 +620,7 @@ async def get_lock_state(session: AsyncSession, *, farm_id: UUID) -> dict[Catego
                 Farm.irrigation_locked,
                 Farm.org_locked,
                 Farm.grid_locked,
+                Farm.health_locked,
             ).where(Farm.id == farm_id, Farm.deleted_at.is_(None))
         )
     ).first()
@@ -592,6 +631,8 @@ async def get_lock_state(session: AsyncSession, *, farm_id: UUID) -> dict[Catego
         "irrigation": bool(row.irrigation_locked),
         "org": bool(row.org_locked),
         "grid": bool(row.grid_locked),
+        # Locks the farm's own override, not its blocks. See the module note.
+        "health": bool(row.health_locked),
     }
 
 
@@ -684,7 +725,15 @@ async def _set_lock(
 async def _build_lock_diff(
     session: AsyncSession, *, farm_id: UUID, category: Category
 ) -> dict[str, Any]:
-    """Wrap the right apply-preview for the category in a uniform shape."""
+    """Wrap the right apply-preview for the category in a uniform shape.
+
+    `health` has no apply-preview to wrap. It is a resolution tier, so no
+    block can be out of step with it and the diff is empty by construction.
+    Returning matched == total is what makes `lock_category` skip the
+    "lock and overwrite" path for it without a special case at the caller.
+    """
+    if category not in _TEMPLATE_CATEGORIES:
+        return {"total_blocks": 0, "matched_blocks": 0, "blocks": []}
     if category == "subscriptions":
         sub_diff = await compute_apply_diff(session, farm_id=farm_id, target_block_ids=None)
         return {
@@ -948,6 +997,80 @@ async def replace_grid_template(
     if (getattr(result, "rowcount", 0) or 0) == 0:
         raise FarmNotFoundError(farm_id)
     await session.flush()
+
+
+# ---------- Health category (tenant migration 0089) --------------------------
+#
+# Two functions and no third. There is no `apply_health_template` and no
+# `compute_health_apply_plan`, and the absence is the design — see the note
+# at the top of this module.
+
+
+async def get_health_template(session: AsyncSession, *, farm_id: UUID) -> dict[str, Any] | None:
+    """The farm's health override, or None when it has not set one.
+
+    Returned as the raw authored body, not a resolved definition. The caller
+    is editing the override, and what it holds is the set of keys the farm
+    has chosen to differ on — resolving first would show it the crop's and
+    the platform's values as though the farm had picked them, and saving
+    that back would pin every one of them.
+    """
+    row = (
+        await session.execute(
+            select(Farm.health_definition).where(Farm.id == farm_id, Farm.deleted_at.is_(None))
+        )
+    ).first()
+    if row is None:
+        raise FarmNotFoundError(farm_id)
+    body = row.health_definition
+    return dict(body) if body else None
+
+
+async def replace_health_template(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    body: dict[str, Any] | None,
+    updated_by: UUID | None,
+) -> dict[str, Any] | None:
+    """Replace the farm's override. ``None`` or ``{}`` clears it.
+
+    Clearing and setting-everything-to-default are the same thing to the
+    resolver, but not to a reader: NULL says "this farm follows the
+    knowledge base", and a body full of values that happen to match today's
+    defaults says "this farm has decided" and stops tracking. So an empty
+    body is stored as NULL.
+
+    Raises :class:`CategoryLockedError` when the farm's health is locked,
+    and `HealthDefinitionError` — from `parse_definition`, before any
+    write — on an unknown key or an out-of-bounds value. Validating here
+    rather than at read time is the whole point: a key that fails silently
+    would mean the tier below it for ever, which is how the decision-tree
+    loader's unknown operators behave and is the failure this avoids.
+    """
+    await assert_category_unlocked(session, farm_id=farm_id, category="health")
+
+    stored: dict[str, Any] | None = dict(body) if body else None
+    if stored is not None:
+        try:
+            parse_definition(stored)
+        except HealthDefinitionError as exc:
+            # A ValueError from `app.shared` would leave the router as a 500
+            # on a body the caller can fix. The parser's message names the
+            # key and what was expected, so it is passed through as the
+            # detail rather than being replaced with something vaguer.
+            raise InvalidHealthDefinitionError(farm_id=farm_id, detail=str(exc)) from exc
+
+    stmt = (
+        update(Farm)
+        .where(Farm.id == farm_id, Farm.deleted_at.is_(None))
+        .values(health_definition=stored, updated_by=updated_by)
+    )
+    result = await session.execute(stmt)
+    if (getattr(result, "rowcount", 0) or 0) == 0:
+        raise FarmNotFoundError(farm_id)
+    await session.flush()
+    return stored
 
 
 async def compute_grid_apply_plan(

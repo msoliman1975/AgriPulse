@@ -37,6 +37,11 @@ class _Result:
     def all(self) -> list[Any]:
         return self._rows
 
+    def first(self) -> Any:
+        # The farm-override read uses `.first()`. Empty here means the farm
+        # has no override, which is what every test in this file wants.
+        return self._rows[0] if self._rows else None
+
 
 def _session(
     *,
@@ -66,6 +71,7 @@ def _session(
         [],  # grid cell counts    │
         [],  # crop paths          ┘
         [],  # per-crop health definitions
+        [],  # this farm's health override
         grid or [],
         roster or [],
         indices or [],

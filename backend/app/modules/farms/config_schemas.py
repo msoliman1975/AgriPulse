@@ -100,6 +100,10 @@ class LockStateResponse(BaseModel):
     irrigation: bool
     org: bool
     grid: bool
+    # Health locks the farm's own override, not its blocks — it is a
+    # resolution tier and has no block-side copy to diverge. See the note at
+    # the top of `config_template`.
+    health: bool
 
 
 class LockToggleRequest(BaseModel):
@@ -158,6 +162,66 @@ class GridTemplateSchema(BaseModel):
 
     cell_size_m: float | None = Field(default=None, gt=0)
     anomaly_z_threshold: float | None = Field(default=None, gt=0)
+
+
+class HealthDefinitionBody(BaseModel):
+    """The farm's health override, as a PARTIAL body.
+
+    Every field is optional and "not provided" is not the same as "provided
+    as null". `snoozed_as`, `cell_critical_share` and `recommendation_floor`
+    all take null as a real value — null `snoozed_as` means "a snoozed alert
+    counts by its own severity", not "inherit". The router therefore dumps
+    this with `exclude_unset=True`, and only the keys the caller actually
+    sent are stored. Anything absent keeps coming from the crop, and then
+    the platform.
+
+    `extra="forbid"` is the first of two gates. It turns an unknown key into
+    a 422 at the boundary, before `parse_definition` sees it; the second
+    gate is there because this schema is not the only way a body reaches the
+    column. Bounds live in `app.shared.health_definition`, not here — one
+    of the two would drift, and it would be this one.
+
+    `version` is deliberately not exposed. It identifies the generation of a
+    platform-authored definition; a farm setting it would pin nothing.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    severity_map: dict[str, str] | None = None
+    counted_statuses: list[str] | None = None
+    snoozed_as: str | None = None
+    cell_critical_share: float | None = None
+    recommendation_floor: float | None = None
+    stale_after_hours: int | None = None
+    no_tree_coverage: str | None = None
+
+
+class HealthTemplateRequest(BaseModel):
+    """Body for PUT .../config/health/template.
+
+    `definition: null` and `definition: {}` both CLEAR the override. To the
+    resolver, clearing and setting every key to today's default are the same
+    answer; to a reader they are not. NULL says the farm follows the
+    knowledge base, and a body that happens to match today's defaults says
+    the farm has decided and stops tracking it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    definition: HealthDefinitionBody | None = None
+
+
+class HealthTemplateResponse(BaseModel):
+    """The farm's override as AUTHORED, never as resolved.
+
+    Returning the resolved definition would show the crop's and the
+    platform's values as though the farm had chosen them — and the editor
+    saves back what it read, so the next save would pin every one of them
+    and the farm would silently stop tracking the knowledge base.
+    """
+
+    definition: dict[str, Any] | None
+    locked: bool
 
 
 # The two scopes are separate requests on purpose. One is a sensitivity

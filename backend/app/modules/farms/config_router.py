@@ -19,7 +19,7 @@ parameters, breaking POST validation.
 """
 
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any, cast, get_args
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -35,6 +35,8 @@ from app.modules.farms.config_schemas import (
     GridApplyRequest,
     GridApplyResponse,
     GridTemplateSchema,
+    HealthTemplateRequest,
+    HealthTemplateResponse,
     IrrigationTemplateSchema,
     LockStateResponse,
     LockToggleRequest,
@@ -269,7 +271,7 @@ async def get_locks(
 
 @router.post(
     "/farms/{farm_id}/config/{category}/lock",
-    summary="Lock a Shared category (subscriptions | irrigation | org).",
+    summary="Lock a Shared category (subscriptions | irrigation | org | grid | health).",
 )
 async def lock_category(
     farm_id: UUID,
@@ -599,6 +601,75 @@ async def put_grid_template(
     }
 
 
+# ---------- Health category (tenant migration 0089) --------------------------
+#
+# GET and PUT, and nothing else. There is no apply-preview and no apply, and
+# there must not be: health is a RESOLUTION TIER, not a template. A block's
+# definition is resolved at read time from the platform default, then the
+# crop's row in `public.crop_health_definitions`, then this farm override —
+# shallow merge, deepest tier winning per key. Nothing is copied into blocks,
+# so there is nothing to diff and nothing to reconcile. An Apply here would
+# write a resolved answer into blocks and start it drifting from the tiers it
+# came from, which is the exact failure this project exists to end.
+#
+# Both routes carry `farm_id_param="farm_id"`. Without it `requires_capability`
+# checks the capability tenant-wide and denies every farm-scoped user — the
+# bug that 403'd 16 routes for every scout, including their own inbox.
+
+
+@router.get(
+    "/farms/{farm_id}/config/health/template",
+    response_model=HealthTemplateResponse,
+    summary="Get the farm's health-definition override.",
+)
+async def get_health_template(
+    farm_id: UUID,
+    context: RequestContext = Depends(
+        requires_capability("farm.manage_config", farm_id_param="farm_id")
+    ),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    _ensure_feature_enabled()
+    _require_tenant(context)
+    body = await config_template.get_health_template(session, farm_id=farm_id)
+    locks = await config_template.get_lock_state(session, farm_id=farm_id)
+    return {"definition": body, "locked": locks["health"]}
+
+
+@router.put(
+    "/farms/{farm_id}/config/health/template",
+    response_model=HealthTemplateResponse,
+    summary="Replace the farm's health-definition override.",
+)
+async def put_health_template(
+    farm_id: UUID,
+    payload: HealthTemplateRequest,
+    context: RequestContext = Depends(
+        requires_capability("farm.manage_config", farm_id_param="farm_id")
+    ),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Replace the override. A null or empty `definition` clears it.
+
+    `exclude_unset=True` is load-bearing. Three of the fields take null as a
+    real value — a null `snoozed_as` means "a snoozed alert counts by its own
+    severity", not "inherit" — so dumping every field would store seven keys
+    whatever the caller sent, and the farm would pin values it never chose
+    and stop tracking the knowledge base for all of them.
+    """
+    _ensure_feature_enabled()
+    _require_tenant(context)
+    body = (
+        payload.definition.model_dump(exclude_unset=True)
+        if payload.definition is not None
+        else None
+    )
+    stored = await config_template.replace_health_template(
+        session, farm_id=farm_id, body=body, updated_by=context.user_id
+    )
+    return {"definition": stored, "locked": False}
+
+
 def _grid_rows_to_wire(plan: tuple[Any, ...]) -> dict[str, Any]:
     """Shape a GridPlanRow tuple into the preview response."""
 
@@ -736,8 +807,15 @@ async def apply_grid(
 # ---------- Helpers --------------------------------------------------------
 
 
+# Derived from the type, not restated. The hardcoded tuple this replaces
+# already missed `health`, so locking it 404'd while the column, the service
+# and the lock-state response all knew about it — a category that was
+# lockable everywhere except through the route that locks it.
+_CATEGORIES: frozenset[str] = frozenset(get_args(config_template.Category))
+
+
 def _validate_category(category: str) -> None:
-    if category not in ("subscriptions", "irrigation", "org", "grid"):
+    if category not in _CATEGORIES:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Unknown category {category!r}",

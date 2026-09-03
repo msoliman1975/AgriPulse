@@ -17,7 +17,7 @@ from app.core.settings import get_settings
 from app.modules.alerts.repository import AlertsRepository
 from app.modules.farms.errors import FarmNotFoundError
 from app.modules.farms.repository import FarmsRepository
-from app.modules.health.service import load_crop_health_definitions
+from app.modules.health.service import load_health_definitions
 from app.modules.indices.repository import IndicesRepository
 from app.shared.health import bucket_alert_severity, classify_health
 from app.shared.health_definition import HealthReason, resolve_health
@@ -152,10 +152,15 @@ class InsightsService:
         evidence_by_block = (
             await load_health_evidence(self._session, farm_id=farm_id) if use_definition else {}
         )
-        # The per-crop knowledge base, read once beside the evidence. Both
-        # this page and the map resolve through the same catalog, so a mango
-        # block cannot be judged by one definition here and another there.
-        definitions = await load_crop_health_definitions(self._session) if use_definition else None
+        # The knowledge base and this farm's override, read once beside the
+        # evidence. Both this page and the map resolve through the same two
+        # tiers, so a mango block cannot be judged by one definition here
+        # and another there.
+        definitions = (
+            await load_health_definitions(self._session, farm_id=farm_id)
+            if use_definition
+            else None
+        )
 
         rows: list[BlockHealthRow] = []
         for block in blocks:

@@ -48,10 +48,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import get_settings
-from app.modules.health.service import (
-    CropHealthDefinitions,
-    load_crop_health_definitions,
-)
+from app.modules.health.service import CropHealthDefinitions, load_health_definitions
 from app.shared.auth.context import RequestContext
 from app.shared.db.session import get_db_session
 from app.shared.health import Health, classify_health
@@ -425,11 +422,11 @@ async def get_blocks_summary(
     #     answer from different evidence. All four take the same `at`.
     evidence_by_block = await load_health_evidence(tenant_session, farm_id=farm_id, at=at)
 
-    # 2c. The per-crop knowledge base. One read of a platform table with one
-    #     row per crop that needs its own values, then resolved per block
-    #     against the block's crop path. Read on the tenant session: the
+    # 2c. The knowledge base and the farm's override — the two tiers below
+    #     the platform default. Two statements, resolved per block against
+    #     the block's crop path. Read on the tenant session: the catalog
     #     statement is schema-qualified, so it needs no second connection.
-    definitions = await load_crop_health_definitions(tenant_session)
+    definitions = await load_health_definitions(tenant_session, farm_id=farm_id)
 
     # 3. Current grid config per block, if any. `retired_at IS NULL` is the
     #    live row; 0054 gave configs valid time, so a rezoned block has an
