@@ -49,11 +49,34 @@ def _service(
     farm_id: UUID,
     blocks: list[dict[str, Any]],
     ndvi: dict[UUID, Decimal],
-    evidence_sets: list[list[Any]],
+    alerts: list[Any] | None = None,
+    recommendations: list[Any] | None = None,
+    traces: list[Any] | None = None,
+    cells: list[Any] | None = None,
+    crops: list[Any] | None = None,
+    definitions: list[Any] | None = None,
+    with_evidence: bool = True,
 ) -> InsightsService:
-    """A service with mocked repos and a session that returns the loader's
-    four result sets, in the order `load_health_evidence` asks for them:
-    alerts, recommendation confidence, trace counts, cell counts."""
+    """A service with mocked repos and a session that returns, in order, the
+    evidence loader's five statements and then the per-crop health catalog.
+
+    Named rather than positional: this file used to pass a bare list of
+    lists, and Phase 5's two extra queries shifted every one of them onto
+    the wrong reader. `with_evidence=False` supplies nothing at all, which
+    is what the flag-off path must do — it must not touch the session.
+    """
+    evidence_sets: list[list[Any]] = (
+        [
+            alerts or [],
+            recommendations or [],
+            traces or [],
+            cells or [],
+            crops or [],
+            definitions or [],
+        ]
+        if with_evidence
+        else []
+    )
     svc = InsightsService.__new__(InsightsService)
     now = datetime.now(UTC)
 
@@ -95,7 +118,7 @@ class TestScorecardUnderTheDefinition:
             farm_id=farm_id,
             blocks=[{"id": b1, "name": "North"}],
             ndvi={b1: Decimal("0.31")},
-            evidence_sets=[],
+            with_evidence=False,
         )
 
         out = await svc.get_farm_health_summary(farm_id=farm_id)
@@ -112,7 +135,7 @@ class TestScorecardUnderTheDefinition:
             farm_id=farm_id,
             blocks=[{"id": b1, "name": "North"}],
             ndvi={b1: Decimal("0.31")},
-            evidence_sets=[[], [], [_traces(b1, clear=9, at=now)], []],
+            traces=[_traces(b1, clear=9, at=now)],
         )
 
         out = await svc.get_farm_health_summary(farm_id=farm_id)
@@ -130,7 +153,6 @@ class TestScorecardUnderTheDefinition:
             farm_id=farm_id,
             blocks=[{"id": b1, "name": "North"}],
             ndvi={b1: Decimal("0.82")},
-            evidence_sets=[[], [], [], []],
         )
 
         out = await svc.get_farm_health_summary(farm_id=farm_id)
@@ -140,9 +162,10 @@ class TestScorecardUnderTheDefinition:
 
     @pytest.mark.usefixtures("_definition_on")
     async def test_the_evidence_is_loaded_once_for_the_farm(self) -> None:
-        """Four statements for the whole farm, not four per block. The loop
-        around this call is already N+1 on indices and alerts; a per-block
-        load would have made a 36-block farm 180 round trips."""
+        """Six statements for the whole farm, not six per block — the
+        evidence loader's five plus the per-crop catalog. The loop around
+        this call is already N+1 on indices and alerts; a per-block load
+        would have made a 36-block farm 216 round trips."""
         farm_id = uuid4()
         b1, b2, b3 = uuid4(), uuid4(), uuid4()
         now = datetime.now(UTC)
@@ -154,17 +177,12 @@ class TestScorecardUnderTheDefinition:
                 {"id": b3, "name": "East"},
             ],
             ndvi={b1: Decimal("0.7"), b2: Decimal("0.7"), b3: Decimal("0.7")},
-            evidence_sets=[
-                [],
-                [],
-                [_traces(b1, clear=4, at=now), _traces(b2, clear=4, at=now)],
-                [],
-            ],
+            traces=[_traces(b1, clear=4, at=now), _traces(b2, clear=4, at=now)],
         )
 
         out = await svc.get_farm_health_summary(farm_id=farm_id)
 
-        assert svc._session.execute.await_count == 4  # type: ignore[attr-defined]
+        assert svc._session.execute.await_count == 6  # type: ignore[attr-defined]
         by_name = {r.block_name: r for r in out.blocks}
         assert by_name["North"].current_health == "healthy"
         assert by_name["South"].current_health == "healthy"
@@ -190,20 +208,16 @@ class TestScorecardUnderTheDefinition:
                 {"id": crit, "name": "Ccc critical"},
             ],
             ndvi={ok: Decimal("0.7"), unk: Decimal("0.7"), crit: Decimal("0.7")},
-            evidence_sets=[
-                [
-                    {
-                        "block_id": crit,
-                        "severity": "critical",
-                        "status": "open",
-                        "cell_id": None,
-                        "n": 1,
-                    }
-                ],
-                [],
-                [_traces(ok, clear=4, at=now), _traces(crit, fired=1, at=now)],
-                [],
+            alerts=[
+                {
+                    "block_id": crit,
+                    "severity": "critical",
+                    "status": "open",
+                    "cell_id": None,
+                    "n": 1,
+                }
             ],
+            traces=[_traces(ok, clear=4, at=now), _traces(crit, fired=1, at=now)],
         )
 
         out = await svc.get_farm_health_summary(farm_id=farm_id)

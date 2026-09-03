@@ -53,6 +53,12 @@ class BlockEvidence:
     alerts_by_severity: dict[str, int] = field(default_factory=dict)
     alerts_by_status: dict[str, int] = field(default_factory=dict)
     critical_cells: int = 0
+    # The block's current crop, as the denormalised taxonomy path
+    # (`mango`, `mango.keitt`). Not evidence about the block's condition —
+    # it is what picks WHICH definition judges the evidence, per
+    # `app.modules.health.service`. None when the block has no current
+    # assignment, which resolves to the platform default.
+    crop_path: str | None = None
 
 
 # Counted alerts, one row per (severity, status, cell) group.
@@ -247,16 +253,43 @@ _CELL_COUNTS = text(
 ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True)))
 
 
+# The block's current crop path.
+#
+# `block_crops.crop_path` is denormalised in the tenant schema for exactly
+# this kind of read — the decision-tree engine already uses it for targeting.
+# Reading it here rather than joining the catalog keeps this module free of
+# any dependency on how deep a crop's taxonomy goes.
+#
+# `is_current` and `deleted_at` together are what "the crop growing there
+# now" means; a block carries its whole assignment history.
+_CROP_PATHS = text(
+    """
+    SELECT bc.block_id, bc.crop_path
+    FROM block_crops bc
+    JOIN blocks b ON b.id = bc.block_id
+    WHERE b.farm_id = :farm_id
+      AND bc.is_current = TRUE
+      AND bc.deleted_at IS NULL
+      AND bc.crop_path IS NOT NULL
+    """
+).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True)))
+
+
 async def load_health_evidence(
     session: AsyncSession, *, farm_id: UUID, at: datetime | None = None
 ) -> dict[UUID, BlockEvidence]:
     """Every block's evidence for one farm, keyed by block id.
 
-    Four statements, always the same four in the same order, whether or
+    Five statements, always the same five in the same order, whether or
     not `at` is given. A block with no evidence at all is simply absent
     from the result; callers must read that as "nothing looked", not as
     "nothing found" — `HealthInputs()` with every counter at zero
     resolves to unknown / no_coverage, which is the point.
+
+    The crop path is NOT as-of. A block's crop assignment is what it is
+    now; replaying which crop was growing on a past date would need an
+    assignment timeline the tenant schema does not keep, and guessing
+    would change which definition judged an old day's evidence.
     """
     params: dict[str, Any] = {"farm_id": farm_id}
     if at is not None:
@@ -271,6 +304,7 @@ async def load_health_evidence(
     )
     trace_rows = await rows(_TRACE_COUNTS_AS_OF if at is not None else _TRACE_COUNTS_NOW)
     cell_rows = await rows(_CELL_COUNTS)
+    crop_rows = await rows(_CROP_PATHS)
 
     alerts_by_block: dict[UUID, list[Any]] = {}
     for r in alert_rows:
@@ -283,9 +317,14 @@ async def load_health_evidence(
     }
     traces_by_block = {r["block_id"]: r for r in trace_rows}
     cells_by_block = {r["block_id"]: int(r["total_cells"] or 0) for r in cell_rows}
+    crop_by_block = {r["block_id"]: r["crop_path"] for r in crop_rows}
 
     block_ids = (
-        set(alerts_by_block) | set(confidence_by_block) | set(traces_by_block) | set(cells_by_block)
+        set(alerts_by_block)
+        | set(confidence_by_block)
+        | set(traces_by_block)
+        | set(cells_by_block)
+        | set(crop_by_block)
     )
     return {
         bid: _compose(
@@ -293,6 +332,7 @@ async def load_health_evidence(
             max_recommendation_confidence=confidence_by_block.get(bid),
             traces=traces_by_block.get(bid),
             total_cells=cells_by_block.get(bid, 0),
+            crop_path=crop_by_block.get(bid),
         )
         for bid in block_ids
     }
@@ -304,6 +344,7 @@ def _compose(
     max_recommendation_confidence: Decimal | None,
     traces: Any | None,
     total_cells: int,
+    crop_path: str | None = None,
 ) -> BlockEvidence:
     by_severity: dict[str, int] = {}
     by_status: dict[str, int] = {}
@@ -336,6 +377,7 @@ def _compose(
         alerts_by_severity=by_severity,
         alerts_by_status=by_status,
         critical_cells=len(critical_cells),
+        crop_path=crop_path,
     )
 
 

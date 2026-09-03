@@ -52,12 +52,74 @@ class _Result:
         return self._rows
 
 
-def _session(*result_sets: list[Any]) -> AsyncMock:
-    """Results in call order. See `test_blocks_summary_grid._session` for
-    the full list; the order is the same and is positional."""
+def _session(
+    *,
+    badge: list[Any] | None = None,
+    alerts: list[Any] | None = None,
+    recommendations: list[Any] | None = None,
+    traces: list[Any] | None = None,
+    cells: list[Any] | None = None,
+    crops: list[Any] | None = None,
+    definitions: list[Any] | None = None,
+    grid: list[Any] | None = None,
+    roster: list[Any] | None = None,
+    indices: list[Any] | None = None,
+    unbounded: list[Any] | None = None,
+) -> AsyncMock:
+    """Feed `execute` its results, named rather than positional.
+
+    The endpoint's call order lives HERE and nowhere else. It used to live
+    in every call site as a bare list of lists, and it broke silently every
+    time a query was added: the rows landed on the wrong reader and
+    surfaced as a shape error rather than a missing stub. Phase 3 added
+    three queries and Phase 5 added two more.
+
+    Order, which is the one thing this function knows:
+
+      1. badge         — the map's open-alert rollup
+      2. alerts        — counted alerts per (severity, status, cell)   ┐
+      3. recommendations — max open confidence per block               │ the
+      4. traces        — per-status counts from the newest sweep       │ evidence
+      5. cells         — live grid cell count per block                │ loader
+      6. crops         — current crop path per block                   ┘
+      7. definitions   — the per-crop health catalog
+      8. grid          — current grid config per block
+      9. roster        — the active block ids
+     10. indices       — latest values, bounded to the recent window
+     11. unbounded     — latest values, unbounded; issued ONLY for blocks
+                         the recent window returned nothing for
+
+    `unbounded` defaults to not being supplied at all, so a test whose
+    blocks all have recent readings fails loudly if a fallback sweep
+    happens rather than passing on a stub nobody meant to provide.
+    """
+    sets: list[list[Any]] = [
+        badge or [],
+        alerts or [],
+        recommendations or [],
+        traces or [],
+        cells or [],
+        crops or [],
+        definitions or [],
+        grid or [],
+        roster or [],
+        indices or [],
+    ]
+    if unbounded is not None:
+        sets.append(unbounded)
     session = AsyncMock()
-    session.execute = AsyncMock(side_effect=[_Result(rows) for rows in result_sets])
+    session.execute = AsyncMock(side_effect=[_Result(rows) for rows in sets])
     return session
+
+
+def _definition(crop_path: str, **body: Any) -> dict[str, Any]:
+    """One row of the per-crop catalog, as `load_crop_health_definitions`
+    reads it."""
+    return {"crop_path": crop_path, "definition": body}
+
+
+def _crop(block_id: Any, crop_path: str) -> dict[str, Any]:
+    return {"block_id": block_id, "crop_path": crop_path}
 
 
 def _alert(block_id: Any, severity: str, status: str, cell_id: Any = None, n: int = 1) -> dict:
@@ -100,14 +162,8 @@ class TestHealthEvidence:
         farm_id, b1 = uuid4(), uuid4()
         now = datetime.now(UTC)
         session = _session(
-            [],  # badge rollup
-            [],  # alert evidence
-            [],  # recommendation confidence
-            [],  # trace counts
-            [],  # grid cell counts
-            [],  # grid configs
-            [b1],  # roster
-            [{"block_id": b1, "index_code": "ndvi", "mean": 0.7, "time": now}],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.7, "time": now}],
         )
 
         out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
@@ -130,14 +186,9 @@ class TestHealthEvidence:
         farm_id, b1 = uuid4(), uuid4()
         now = datetime.now(UTC)
         session = _session(
-            [],
-            [],
-            [],
-            [_traces(b1, clear=21, at=now - timedelta(hours=6))],
-            [],  # grid cell counts
-            [],  # grid configs
-            [b1],
-            [{"block_id": b1, "index_code": "ndvi", "mean": 0.31, "time": now}],
+            traces=[_traces(b1, clear=21, at=now - timedelta(hours=6))],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.31, "time": now}],
         )
 
         out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
@@ -152,14 +203,9 @@ class TestHealthEvidence:
         farm_id, b1 = uuid4(), uuid4()
         now = datetime.now(UTC)
         session = _session(
-            [],
-            [],
-            [],
-            [_traces(b1, clear=4, at=now - timedelta(hours=72))],
-            [],
-            [],
-            [b1],
-            [{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
+            traces=[_traces(b1, clear=4, at=now - timedelta(hours=72))],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
         )
 
         out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
@@ -173,14 +219,10 @@ class TestHealthEvidence:
         farm_id, b1 = uuid4(), uuid4()
         now = datetime.now(UTC)
         session = _session(
-            [],
-            [_alert(b1, "critical", "open")],
-            [],
-            [_traces(b1, fired=1, at=now - timedelta(days=7))],
-            [],
-            [],
-            [b1],
-            [{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
+            alerts=[_alert(b1, "critical", "open")],
+            traces=[_traces(b1, fired=1, at=now - timedelta(days=7))],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
         )
 
         out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
@@ -192,14 +234,9 @@ class TestHealthEvidence:
         farm_id, b1 = uuid4(), uuid4()
         now = datetime.now(UTC)
         session = _session(
-            [],
-            [],
-            [],
-            [_traces(b1, skipped=19, at=now)],
-            [],
-            [],
-            [b1],
-            [{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
+            traces=[_traces(b1, skipped=19, at=now)],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
         )
 
         out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
@@ -215,18 +252,13 @@ class TestHealthEvidence:
         farm_id, b1 = uuid4(), uuid4()
         now = datetime.now(UTC)
         session = _session(
-            # The badge sees nothing: this block's only alert is acknowledged.
-            [],
-            [
+            alerts=[
                 _alert(b1, "critical", "acknowledged"),
                 _alert(b1, "info", "open", n=3),
             ],
-            [],
-            [_traces(b1, fired=1, at=now)],
-            [],
-            [],
-            [b1],
-            [{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
+            traces=[_traces(b1, fired=1, at=now)],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
         )
 
         out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
@@ -244,17 +276,15 @@ class TestHealthEvidence:
         product = uuid4()
         now = datetime.now(UTC)
         session = _session(
-            [],
-            [
+            alerts=[
                 _alert(b1, "critical", "open", cell_id=c1, n=2),
                 _alert(b1, "critical", "open", cell_id=c2),
             ],
-            [],
-            [_traces(b1, fired=2, at=now)],
-            [{"block_id": b1, "total_cells": 121}],  # grid cell counts
-            [{"block_id": b1, "product_id": product}],  # grid configs
-            [b1],
-            [{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
+            traces=[_traces(b1, fired=2, at=now)],
+            cells=[{"block_id": b1, "total_cells": 121}],
+            grid=[{"block_id": b1, "product_id": product}],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
         )
 
         out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
@@ -271,14 +301,11 @@ class TestHealthEvidence:
         farm_id, loud, quiet = uuid4(), uuid4(), uuid4()
         now = datetime.now(UTC)
         session = _session(
-            [],
-            [_alert(loud, "critical", "open")],
-            [{"block_id": loud, "max_confidence": 0.9}],
-            [_traces(loud, fired=1, at=now), _traces(quiet, clear=3, at=now)],
-            [],
-            [],
-            [loud, quiet],
-            [
+            alerts=[_alert(loud, "critical", "open")],
+            recommendations=[{"block_id": loud, "max_confidence": 0.9}],
+            traces=[_traces(loud, fired=1, at=now), _traces(quiet, clear=3, at=now)],
+            roster=[loud, quiet],
+            indices=[
                 {"block_id": loud, "index_code": "ndvi", "mean": 0.8, "time": now},
                 {"block_id": quiet, "index_code": "ndvi", "mean": 0.8, "time": now},
             ],
@@ -300,14 +327,9 @@ class TestHealthEvidence:
         naive = datetime(2026, 9, 1, 12, 0, 0)
         swept = datetime(2026, 9, 1, 6, 0, 0, tzinfo=UTC)
         session = _session(
-            [],
-            [],
-            [],
-            [_traces(b1, clear=2, at=swept)],
-            [],
-            [],
-            [b1],
-            [{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": swept}],
+            traces=[_traces(b1, clear=2, at=swept)],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": swept}],
         )
 
         out = await get_blocks_summary(
@@ -334,14 +356,9 @@ class TestTheSwitch:
         farm_id, b1 = uuid4(), uuid4()
         now = datetime.now(UTC)
         session = _session(
-            [],
-            [],
-            [],
-            [_traces(b1, clear=12, at=now)],
-            [],
-            [],
-            [b1],
-            [{"block_id": b1, "index_code": "ndvi", "mean": 0.31, "time": now}],
+            traces=[_traces(b1, clear=12, at=now)],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.31, "time": now}],
         )
 
         out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
@@ -357,14 +374,9 @@ class TestTheSwitch:
         farm_id, b1 = uuid4(), uuid4()
         now = datetime.now(UTC)
         session = _session(
-            [],
-            [],
-            [],
-            [_traces(b1, clear=12, at=now)],
-            [],
-            [],
-            [b1],
-            [{"block_id": b1, "index_code": "ndvi", "mean": 0.31, "time": now}],
+            traces=[_traces(b1, clear=12, at=now)],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.31, "time": now}],
         )
 
         out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
@@ -387,14 +399,8 @@ class TestTheSwitch:
         farm_id, b1 = uuid4(), uuid4()
         now = datetime.now(UTC)
         session = _session(
-            [],
-            [],
-            [],
-            [],
-            [],
-            [],
-            [b1],
-            [{"block_id": b1, "index_code": "ndvi", "mean": 0.82, "time": now}],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.82, "time": now}],
         )
 
         out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
@@ -409,17 +415,136 @@ class TestTheSwitch:
         farm_id, b1 = uuid4(), uuid4()
         now = datetime.now(UTC)
         session = _session(
-            [],
-            [],
-            [],
-            [_traces(b1, clear=3, at=now)],
-            [],
-            [],
-            [b1],
-            [{"block_id": b1, "index_code": "ndvi", "mean": 0.31, "time": now}],
+            traces=[_traces(b1, clear=3, at=now)],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.31, "time": now}],
         )
 
         out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
 
         assert out.units[0].ndvi_current == pytest.approx(0.31)
         assert out.units[0].last_index_at == now
+
+
+@pytest.mark.asyncio
+class TestThePerCropDefinition:
+    """Phase 5 — the crop decides which definition judges the block.
+
+    Every case here turns on freshness, because that is the one value the
+    shipped seeds change and the one where crop and platform genuinely
+    disagree. A 60-hour-old sweep is stale under the platform's 48 and
+    current under mango's 72.
+    """
+
+    async def test_the_crop_definition_beats_the_platform_default(self) -> None:
+        farm_id, b1 = uuid4(), uuid4()
+        now = datetime.now(UTC)
+        session = _session(
+            traces=[_traces(b1, clear=12, at=now - timedelta(hours=60))],
+            crops=[_crop(b1, "mango")],
+            definitions=[_definition("mango", stale_after_hours=72)],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.31, "time": now}],
+        )
+
+        out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
+
+        # 60 hours is past the platform's 48 and inside mango's 72.
+        assert out.units[0].health_evidence.preview_health == "healthy"
+        assert out.units[0].health_evidence.preview_reason == "all_clear"
+
+    async def test_without_the_crop_row_the_same_block_reads_stale(self) -> None:
+        """The other half of the previous test. Same evidence, same
+        definition in the catalog, no crop assignment on the block — so
+        nothing connects the two and the platform default decides."""
+        farm_id, b1 = uuid4(), uuid4()
+        now = datetime.now(UTC)
+        session = _session(
+            traces=[_traces(b1, clear=12, at=now - timedelta(hours=60))],
+            definitions=[_definition("mango", stale_after_hours=72)],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.31, "time": now}],
+        )
+
+        out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
+
+        assert out.units[0].health_evidence.preview_reason == "stale"
+
+    async def test_a_crop_level_file_reaches_a_variety_block(self) -> None:
+        """Mango's `classification_depth` is `variety`, so a real block
+        carries `mango.<variety>`. A seed authored at `mango` that did not
+        reach it would apply to nothing at all."""
+        farm_id, b1 = uuid4(), uuid4()
+        now = datetime.now(UTC)
+        session = _session(
+            traces=[_traces(b1, clear=12, at=now - timedelta(hours=60))],
+            crops=[_crop(b1, "mango.keitt")],
+            definitions=[_definition("mango", stale_after_hours=72)],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.31, "time": now}],
+        )
+
+        out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
+
+        assert out.units[0].health_evidence.preview_health == "healthy"
+
+    async def test_two_crops_on_one_farm_are_judged_by_their_own_definitions(self) -> None:
+        """The case a single shared definition could never get right, and
+        the reason the catalog exists."""
+        farm_id = uuid4()
+        tree, spud = uuid4(), uuid4()
+        now = datetime.now(UTC)
+        stale_by_36h = now - timedelta(hours=36)
+        session = _session(
+            traces=[
+                _traces(tree, clear=12, at=stale_by_36h),
+                _traces(spud, clear=6, at=stale_by_36h),
+            ],
+            crops=[_crop(tree, "mango.keitt"), _crop(spud, "potato")],
+            definitions=[
+                _definition("mango", stale_after_hours=72),
+                _definition("potato", stale_after_hours=24),
+            ],
+            roster=[tree, spud],
+            indices=[
+                {"block_id": tree, "index_code": "ndvi", "mean": 0.31, "time": now},
+                {"block_id": spud, "index_code": "ndvi", "mean": 0.72, "time": now},
+            ],
+        )
+
+        out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
+
+        by_id = {u.id: u.health_evidence for u in out.units}
+        # One sweep, one age, two answers — which is the whole point.
+        assert by_id[tree].preview_health == "healthy"
+        assert by_id[spud].preview_reason == "stale"
+
+    async def test_the_crop_path_is_reported_on_the_response(self) -> None:
+        farm_id, b1 = uuid4(), uuid4()
+        now = datetime.now(UTC)
+        session = _session(
+            crops=[_crop(b1, "mango.keitt")],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.5, "time": now}],
+        )
+
+        out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
+
+        assert out.units[0].health_evidence.crop_path == "mango.keitt"
+
+    @pytest.mark.usefixtures("_definition_on")
+    async def test_with_the_flag_on_the_crop_definition_decides_the_shipped_class(self) -> None:
+        farm_id, b1 = uuid4(), uuid4()
+        now = datetime.now(UTC)
+        session = _session(
+            traces=[_traces(b1, clear=12, at=now - timedelta(hours=60))],
+            crops=[_crop(b1, "mango")],
+            definitions=[_definition("mango", stale_after_hours=72)],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.31, "time": now}],
+        )
+
+        out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
+
+        assert out.units[0].health == "healthy"
+        assert out.units[0].health_reason == "all_clear"

@@ -48,14 +48,14 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import get_settings
+from app.modules.health.service import (
+    CropHealthDefinitions,
+    load_crop_health_definitions,
+)
 from app.shared.auth.context import RequestContext
 from app.shared.db.session import get_db_session
 from app.shared.health import Health, classify_health
-from app.shared.health_definition import (
-    PLATFORM_DEFAULT_DEFINITION,
-    HealthReason,
-    resolve_health,
-)
+from app.shared.health_definition import HealthReason, resolve_health
 from app.shared.health_evidence import EMPTY_EVIDENCE, BlockEvidence, load_health_evidence
 from app.shared.rbac.check import requires_capability
 
@@ -146,6 +146,13 @@ class HealthEvidence(BaseModel):
     traces_skipped: int
     traces_error: int
     last_evaluated_at: datetime | None
+    # The block's crop, as the taxonomy path that picked its definition.
+    # Reported because "which rule judged this block" is half of "why is it
+    # red", and the answer is otherwise invisible: two blocks on one farm
+    # can be judged by different definitions and look identical here.
+    # Null when the block has no current crop assignment, which resolves to
+    # the platform default.
+    crop_path: str | None
     preview_health: Health
     preview_reason: HealthReason
 
@@ -418,6 +425,12 @@ async def get_blocks_summary(
     #     answer from different evidence. All four take the same `at`.
     evidence_by_block = await load_health_evidence(tenant_session, farm_id=farm_id, at=at)
 
+    # 2c. The per-crop knowledge base. One read of a platform table with one
+    #     row per crop that needs its own values, then resolved per block
+    #     against the block's crop path. Read on the tenant session: the
+    #     statement is schema-qualified, so it needs no second connection.
+    definitions = await load_crop_health_definitions(tenant_session)
+
     # 3. Current grid config per block, if any. `retired_at IS NULL` is the
     #    live row; 0054 gave configs valid time, so a rezoned block has an
     #    older superseded row alongside the current one and DISTINCT ON keeps
@@ -513,7 +526,9 @@ async def get_blocks_summary(
         alert_severity: MapSeverity | None = a.get("alert_severity")
         alert_action_type: str | None = a.get("alert_action_type")
 
-        evidence = _health_evidence(evidence_by_block.get(bid, EMPTY_EVIDENCE), now=resolver_now)
+        evidence = _health_evidence(
+            evidence_by_block.get(bid, EMPTY_EVIDENCE), definitions=definitions, now=resolver_now
+        )
         # The switch. With the flag off this is the NDVI rule, unchanged and
         # byte for byte; with it on it is the definition's answer, which this
         # response was already reporting as `preview_health` before anything
@@ -551,7 +566,9 @@ async def get_blocks_summary(
     )
 
 
-def _health_evidence(evidence: BlockEvidence, *, now: datetime) -> HealthEvidence:
+def _health_evidence(
+    evidence: BlockEvidence, *, definitions: CropHealthDefinitions, now: datetime
+) -> HealthEvidence:
     """Resolve one block's evidence and render it for the response.
 
     The same `HealthInputs` that decides `health` when the flag is on is
@@ -559,9 +576,14 @@ def _health_evidence(evidence: BlockEvidence, *, now: datetime) -> HealthEvidenc
     not one for the answer and another for the preview, so the two can
     never drift apart and the preview cannot promise something the switch
     does not deliver.
+
+    Which definition judges the evidence comes from the block's crop path.
+    A crop with no file in the knowledge base gets the platform default,
+    which is what every crop got before this shipped.
     """
     inputs = evidence.inputs
-    preview_health, preview_reason = resolve_health(PLATFORM_DEFAULT_DEFINITION, inputs, now=now)
+    definition = definitions.for_path(evidence.crop_path)
+    preview_health, preview_reason = resolve_health(definition, inputs, now=now)
     return HealthEvidence(
         alerts_by_severity=evidence.alerts_by_severity,
         alerts_by_status=evidence.alerts_by_status,
@@ -577,6 +599,7 @@ def _health_evidence(evidence: BlockEvidence, *, now: datetime) -> HealthEvidenc
         traces_skipped=inputs.traces_skipped,
         traces_error=inputs.traces_error,
         last_evaluated_at=inputs.last_evaluated_at,
+        crop_path=evidence.crop_path,
         preview_health=preview_health,
         preview_reason=preview_reason,
     )

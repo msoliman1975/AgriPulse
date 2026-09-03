@@ -1,0 +1,20 @@
+# Potato — an annual on a short clock.
+#
+# The opposite of the tree crops. A potato crop runs roughly 90 to 120
+# days, and the trees that target it are same-day decisions: frost risk,
+# heat stress, and petiole nitrogen, phosphorus and potassium. A verdict
+# from three nights ago is not a description of the field today.
+#
+# 24 hours matches the nightly sweep: one missed sweep and the block reads
+# Unknown, which is the correct answer for a crop that can be damaged
+# overnight. This trades more Unknown for less stale confidence, and that
+# is the right trade here and the wrong one for mango.
+
+crop_path: potato
+version: 1
+notes: >-
+  Annual, 90-120 day cycle, with frost and heat trees that are same-day
+  decisions. Freshness tightened to 24h: one missed nightly sweep reads
+  Unknown rather than presenting a three-day-old all-clear as current.
+definition:
+  stale_after_hours: 24

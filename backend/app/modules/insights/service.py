@@ -17,13 +17,10 @@ from app.core.settings import get_settings
 from app.modules.alerts.repository import AlertsRepository
 from app.modules.farms.errors import FarmNotFoundError
 from app.modules.farms.repository import FarmsRepository
+from app.modules.health.service import load_crop_health_definitions
 from app.modules.indices.repository import IndicesRepository
 from app.shared.health import bucket_alert_severity, classify_health
-from app.shared.health_definition import (
-    PLATFORM_DEFAULT_DEFINITION,
-    HealthReason,
-    resolve_health,
-)
+from app.shared.health_definition import HealthReason, resolve_health
 from app.shared.health_evidence import EMPTY_EVIDENCE, load_health_evidence
 
 from .schemas import (
@@ -155,6 +152,10 @@ class InsightsService:
         evidence_by_block = (
             await load_health_evidence(self._session, farm_id=farm_id) if use_definition else {}
         )
+        # The per-crop knowledge base, read once beside the evidence. Both
+        # this page and the map resolve through the same catalog, so a mango
+        # block cannot be judged by one definition here and another there.
+        definitions = await load_crop_health_definitions(self._session) if use_definition else None
 
         rows: list[BlockHealthRow] = []
         for block in blocks:
@@ -173,10 +174,11 @@ class InsightsService:
             worst, open_count = await self._block_alert_rollup(block_id=block_id)
 
             health_reason: HealthReason | None = None
-            if use_definition:
+            if definitions is not None:
+                evidence = evidence_by_block.get(block_id, EMPTY_EVIDENCE)
                 health, health_reason = resolve_health(
-                    PLATFORM_DEFAULT_DEFINITION,
-                    evidence_by_block.get(block_id, EMPTY_EVIDENCE).inputs,
+                    definitions.for_path(evidence.crop_path),
+                    evidence.inputs,
                     now=now,
                 )
             else:
