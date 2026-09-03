@@ -2,8 +2,10 @@ import { apiClient } from "./client";
 import type { ResolvedSetting } from "./integrations";
 
 /** `email` + `webhook` were dropped with public migration 0048 — their
- *  keys were inert and the backend no longer accepts those categories. */
-export type Category = "weather" | "imagery" | "detection";
+ *  keys were inert and the backend no longer accepts those categories.
+ *  `recommendations` carries the decision-tree sweep cadence for this
+ *  tenant (public migration 0080). */
+export type Category = "weather" | "imagery" | "detection" | "recommendations";
 
 export interface TenantSettingsBag {
   settings: ResolvedSetting[];

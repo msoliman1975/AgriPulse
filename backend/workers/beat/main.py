@@ -154,8 +154,12 @@ app.conf.beat_schedule = {
         "schedule": float(_settings.weather_spi_sweep_seconds),
         "options": {"queue": "light"},
     },
-    # Recommendations engine: walk every active block per tenant and
-    # evaluate every active decision tree against the latest signals.
+    # Recommendations engine: ask which tenants are due, then walk every
+    # active block of those tenants and evaluate every active decision tree
+    # against the latest signals. The schedule below is the tick, not the
+    # cadence — each tenant's cadence is a settings key the task reads, and
+    # Beat cannot hold a per-tenant schedule because it builds this dict once
+    # at import (public migration 0080).
     # Idempotent on the partial UNIQUE `(block_id, tree_id) WHERE
     # state='open'` — re-running while a prior recommendation is still
     # open is a no-op.

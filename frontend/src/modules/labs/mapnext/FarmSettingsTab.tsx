@@ -14,7 +14,8 @@
 //   2. Imagery           per-farm imagery subscriptions (saves on change)
 //   3. Weather           per-farm weather subscriptions (saves on change)
 //   4. Zones             sub-block cell size + anomaly  (own confirm step)
-//   5. Actions           Save farm details, Edit AoI, then the danger zone
+//   5. Decision trees    which trees run on this farm            (saves on change)
+//   6. Actions           Save farm details, Edit AoI, then the danger zone
 //
 // The save button sits at the bottom but belongs ONLY to section 1, and says
 // so. Sections 2-4 write immediately and own their own feedback — that is the
@@ -28,6 +29,7 @@ import { useTranslation } from "react-i18next";
 
 import { getFarm, updateFarm, type FarmUpdatePayload, type WaterSource } from "@/api/farms";
 
+import { FarmDecisionTreesPanel } from "./FarmDecisionTreesPanel";
 import { FarmSubscriptionsPanel } from "./FarmSubscriptionsPanel";
 import { FarmZonesPanel } from "./FarmZonesPanel";
 import { inputCls } from "./ui";
@@ -241,7 +243,12 @@ export function FarmSettingsTab({
           set cell size?" had no answer on the default one. */}
       <FarmZonesPanel farmId={farmId} farmName={farmName} />
 
-      {/* 5 — Actions. Save belongs to section 1 only; its label says so. */}
+      {/* 5 — Decision trees: which of them run on this farm. Sits after the
+          data sections because it is a choice ABOUT that data, and it saves
+          on change like the three above it. */}
+      <FarmDecisionTreesPanel farmId={farmId} />
+
+      {/* 6 — Actions. Save belongs to section 1 only; its label says so. */}
       {mut.isError ? <div className="text-xs text-ap-crit">{t("manage.saveError")}</div> : null}
       <div className="flex items-center gap-2 border-t border-ap-line pt-4">
         <button

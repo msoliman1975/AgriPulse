@@ -252,11 +252,13 @@ class Settings(BaseSettings):
     # rescores the previous day rather than a partial one.
     weather_spi_sweep_seconds: int = 86400
 
-    # Cadence for `recommendations.evaluate_sweep`. Daily in production
-    # â€” decision trees consume slow-moving signals (NDVI baselines).
-    # Hourly in dev so a fresh aggregate triggers a recommendation
-    # within one Beat cycle. Partial UNIQUE on (block_id, tree_id)
-    # WHERE state='open' keeps re-runs idempotent.
+    # How often Beat asks which tenants are due for a decision-tree sweep.
+    # This is a tick, not a cadence: each tenant's own cadence is the
+    # settings key `recommendations.sweep_cadence_hours` (4, 8, 24 or 168),
+    # and the task enqueues only the tenants whose cadence has elapsed. The
+    # tick has to be at least as frequent as the fastest cadence on offer,
+    # so 3600 (hourly) covers the 4-hour choice with room to spare. See
+    # public migration 0080.
     recommendations_evaluate_sweep_seconds: int = 3600
 
     # Cadence for `recommendations.prune_eval_runs`. Daily — the rows it

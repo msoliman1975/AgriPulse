@@ -645,7 +645,8 @@
     "skipAxis": {
       "crop": "Crop",
       "country": "Country",
-      "soil": "Soil texture"
+      "soil": "Soil texture",
+      "farm": "Farm turned it off"
     },
     "runKind": {
       "sweep": "Nightly sweep",

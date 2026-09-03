@@ -78,6 +78,16 @@ def _check_constraint(*, key: str, value: Any) -> None:
             constraint=constraint.as_dict(),
         )
 
+    if constraint.numeric_choices is not None:
+        numeric = isinstance(value, int | float) and not isinstance(value, bool)
+        if not numeric or float(value) not in {float(c) for c in constraint.numeric_choices}:
+            allowed = ", ".join(str(c) for c in constraint.numeric_choices)
+            raise SettingValueError(
+                key=key,
+                detail=f"Setting {key!r} must be one of: {allowed}. Got {value!r}.",
+                constraint=constraint.as_dict(),
+            )
+
     if isinstance(value, int | float) and not isinstance(value, bool):
         if constraint.integer_only and float(value) != int(value):
             raise SettingValueError(
