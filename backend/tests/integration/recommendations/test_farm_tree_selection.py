@@ -113,6 +113,11 @@ async def _make_tenant(admin: AsyncSession, slug: str) -> _Fixture:
         name="Farm tree selection",
         contact_email="ops@farm-tree-selection.test",
     )
+    # `create_tenant` only flushes — it leaves the commit to the caller. The
+    # cadence tests read `public.tenants` from their own session, so without
+    # this the new tenant is invisible to the dispatcher and the test reads
+    # as "a new tenant is not due", which is not what it is measuring.
+    await admin.commit()
     code = f"farm_selection_{uuid4().hex[:8]}"
     tree_id = await _publish_tree(tenant.tenant_id, code)
     return _Fixture(

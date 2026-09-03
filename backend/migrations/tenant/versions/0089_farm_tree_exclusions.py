@@ -90,7 +90,13 @@ def _replace_skip_axis_check(axes: tuple[str, ...]) -> None:
     Migration 0062 declared it as ``name="skip_axis"`` and the metadata
     naming convention expands that, so the live name is not the literal in
     the migration source and has been doubled on other tables in this
-    schema. Matching on the column the check mentions is the reliable way.
+    schema.
+
+    Two constraints on this table mention `skip_axis`: the list of allowed
+    axes, and `skipped_names_axis`, which says a skipped row must name one.
+    Matching on the column name alone found both and dropped both, leaving
+    the table without the second. The axis list is the only one that names
+    an axis value, so the match takes `'crop'` as well.
     """
     bind = op.get_bind()
     rows = bind.execute(
@@ -104,6 +110,7 @@ def _replace_skip_axis_check(axes: tuple[str, ...]) -> None:
               AND t.relname = 'decision_tree_eval_traces'
               AND c.contype = 'c'
               AND pg_get_constraintdef(c.oid) LIKE '%skip_axis%'
+              AND pg_get_constraintdef(c.oid) LIKE '%crop%'
             """
         )
     ).all()
