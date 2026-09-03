@@ -628,3 +628,39 @@ class TreeParameterOverrideResponse(BaseModel):
     code: str
     param_name: str
     value: Any
+
+
+class FarmTreeSelectionRow(BaseModel):
+    """One tree, and whether this farm runs it (tenant migration 0089)."""
+
+    tree_id: UUID
+    code: str
+    name_en: str
+    name_ar: str | None = None
+    scope: str
+    version: int
+    #: ``platform`` for a tree from the shipped catalog, ``tenant`` for one
+    #: this tenant authored. A farm can turn off either.
+    source: Literal["platform", "tenant"]
+    crop_paths: list[str] = Field(default_factory=list)
+    enabled: bool
+
+
+class FarmTreeSelectionResponse(BaseModel):
+    farm_id: UUID
+    trees: list[FarmTreeSelectionRow]
+
+
+class FarmTreeToggleRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+
+
+class FarmTreeToggleResponse(BaseModel):
+    tree_id: UUID
+    code: str
+    enabled: bool
+    #: False when the tree was already in the requested state. The call still
+    #: succeeds; nothing was written and nothing was audited.
+    changed: bool

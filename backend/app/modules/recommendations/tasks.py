@@ -9,10 +9,14 @@
 * ``recommendations.prune_eval_runs`` — retention for the evaluation
   lineage written by the two above (tenant migration 0062).
 
-Cadence is set in ``workers/beat/main.py`` against
-``recommendations_evaluate_sweep_seconds``. Daily in production; hourly
-in dev so a fresh signal turns into a recommendation within one Beat
-cycle.
+Beat runs ``evaluate_sweep`` on a fixed tick
+(``recommendations_evaluate_sweep_seconds``, hourly). The tick does not
+decide how often a tenant is evaluated; it only asks which tenants are
+due. Each tenant's cadence is the settings key
+``recommendations.sweep_cadence_hours`` — 4, 8, 24 or 168 hours — set by
+a platform admin per tenant and falling back to the platform default.
+Celery Beat reads its schedule once at import, so a per-tenant cadence
+cannot live there. See public migration 0080.
 """
 
 from __future__ import annotations
@@ -72,6 +76,7 @@ async def _evaluate_for_tenant_async(tenant_schema: str) -> dict[str, int]:
     factory = AsyncSessionLocal()
     blocks: tuple[Any, ...] = ()
     tenant_id = None
+    excluded_by_farm: dict[Any, Any] = {}
     async with factory() as session, session.begin():
         await _set_tenant_context(session, tenant_schema)
         async with factory() as public_session:
@@ -80,6 +85,10 @@ async def _evaluate_for_tenant_async(tenant_schema: str) -> dict[str, int]:
             # Resolve once per sweep; the catalog scoping needs a UUID,
             # not a schema name (PR-A).
             tenant_id = await svc._repo.get_tenant_id_by_schema(tenant_schema)
+            # Farm-level tree selection, once per sweep rather than once per
+            # block: the answer is the same for every block of one farm, and
+            # a tenant has far fewer farms than blocks (tenant 0089).
+            excluded_by_farm = await svc._repo.list_all_farm_tree_exclusions()
 
     if tenant_id is None:
         _log.warning("recommendations_tenant_sweep_skip_unknown_schema", schema=tenant_schema)
@@ -113,6 +122,7 @@ async def _evaluate_for_tenant_async(tenant_schema: str) -> dict[str, int]:
                     tenant_schema=tenant_schema,
                     tenant_id=tenant_id,
                     run_id=run_id,
+                    excluded_by_farm=excluded_by_farm,
                 )
         blocks_processed += 1
         recommendations_opened += summary.get("recommendations_opened", 0)
@@ -161,28 +171,104 @@ def evaluate_sweep() -> dict[str, int]:
     return _run_task(_evaluate_sweep_async())
 
 
+# Fallback cadence when neither a tenant override nor the platform default
+# row can be read. It matches the value public migration 0080 seeds, so a
+# database that lost the row behaves the way the documented default says.
+_FALLBACK_CADENCE_HOURS = 24
+
+# Every active tenant needs a dispatch row before the claim below can see
+# it. This runs as its own statement, not as a data-modifying CTE inside the
+# claim: a CTE's inserts are invisible to the rest of the same statement, so
+# a tenant created since the last tick would wait a whole tick for nothing.
+_SEED_DISPATCH_ROWS = """
+INSERT INTO public.tenant_dt_dispatch (tenant_id)
+SELECT id FROM public.tenants
+WHERE status = 'active' AND deleted_at IS NULL
+ON CONFLICT (tenant_id) DO NOTHING
+"""
+
+# Pick the tenants whose own cadence has elapsed and stamp them dispatched in
+# the same statement. Claiming and selecting together is what stops two ticks
+# that overlap from enqueuing one tenant twice.
+#
+# The cadence is resolved inline rather than through SettingsResolver
+# because the resolver answers one tenant per call and this runs for every
+# tenant on every tick. The chain is the same one the resolver walks:
+# tenant override, then platform default.
+_CLAIM_DUE_TENANTS = """
+WITH active AS (
+    SELECT id, schema_name
+    FROM public.tenants
+    WHERE status = 'active' AND deleted_at IS NULL
+), cadence AS (
+    SELECT a.id,
+           a.schema_name,
+           COALESCE(
+               (SELECT (o.value #>> '{}')::numeric
+                  FROM public.tenant_settings_overrides o
+                 WHERE o.tenant_id = a.id AND o.key = :key),
+               (SELECT (d.value #>> '{}')::numeric
+                  FROM public.platform_defaults d
+                 WHERE d.key = :key),
+               :fallback
+           ) AS hours
+    FROM active a
+)
+UPDATE public.tenant_dt_dispatch t
+   SET last_dispatched_at = now()
+  FROM cadence c
+ WHERE c.id = t.tenant_id
+   AND (
+        t.last_dispatched_at IS NULL
+        OR t.last_dispatched_at <= now() - make_interval(hours => c.hours::int)
+   )
+RETURNING c.schema_name, c.hours
+"""
+
+
 async def _evaluate_sweep_async() -> dict[str, int]:
     factory = AsyncSessionLocal()
     async with factory() as session, session.begin():
+        await session.execute(text(_SEED_DISPATCH_ROWS))
         rows = (
             await session.execute(
+                text(_CLAIM_DUE_TENANTS),
+                {
+                    "key": "recommendations.sweep_cadence_hours",
+                    "fallback": _FALLBACK_CADENCE_HOURS,
+                },
+            )
+        ).all()
+        total = (
+            await session.execute(
                 text(
-                    "SELECT schema_name FROM public.tenants "
+                    "SELECT count(*) FROM public.tenants "
                     "WHERE status = 'active' AND deleted_at IS NULL"
                 )
             )
-        ).all()
-    schemas = [str(r[0]) for r in rows]
+        ).scalar_one()
 
     enqueued = 0
-    for schema in schemas:
+    for row in rows:
+        schema = str(row.schema_name)
         try:
             sanitize_tenant_schema(schema)
         except ValueError:
             continue
         evaluate_for_tenant.delay(schema)
         enqueued += 1
-    return {"tenants_scanned": len(schemas), "enqueued": enqueued}
+
+    # A tenant that was claimed but whose task then failed waits a full
+    # cadence for the next attempt. That is deliberate: retrying a failed
+    # sweep every tick would hold the light queue against a tenant that is
+    # broken, and the run row records the failure either way.
+    _log.info(
+        "recommendations_sweep_dispatch",
+        tenants_active=int(total),
+        tenants_due=len(rows),
+        enqueued=enqueued,
+    )
+    return {"tenants_scanned": int(total), "tenants_due": len(rows), "enqueued": enqueued}
 
 
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]

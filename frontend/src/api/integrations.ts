@@ -2,11 +2,25 @@ import { apiClient } from "./client";
 
 export type SettingSource = "platform" | "tenant" | "farm" | "resource";
 
+/** Bounds the backend enforces on a key, mirrored from
+ *  app/shared/settings/constraints.py so a control can offer exactly the
+ *  values the write path accepts instead of holding its own copy. */
+export interface SettingConstraint {
+  minimum?: number;
+  maximum?: number;
+  choices?: string[];
+  numeric_choices?: number[];
+  nullable?: boolean;
+  integer_only?: boolean;
+}
+
 export interface ResolvedSetting {
   key: string;
   value: unknown;
   source: SettingSource;
   overridden_at: string | null;
+  /** Absent on the tenant-facing routes, which do not send it. */
+  constraint?: SettingConstraint | null;
 }
 
 export interface SettingsBag {

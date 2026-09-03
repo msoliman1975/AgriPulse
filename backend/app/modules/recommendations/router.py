@@ -49,6 +49,9 @@ from app.modules.recommendations.schemas import (
     EvalTraceResponse,
     EvaluateBlockResponse,
     ExplainBlockResponse,
+    FarmTreeSelectionResponse,
+    FarmTreeToggleRequest,
+    FarmTreeToggleResponse,
     RecommendationResponse,
     RecommendationScheduleRequest,
     RecommendationTransitionRequest,
@@ -1060,3 +1063,50 @@ async def delete_tree_parameter_override(
             raise mapped from exc
         raise
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---------- Farm-level tree selection (tenant 0089) -------------------------
+
+
+@router.get(
+    "/farms/{farm_id}/decision-trees",
+    response_model=FarmTreeSelectionResponse,
+    summary="List the decision trees this farm runs, and the ones it turned off.",
+)
+async def list_farm_decision_trees(
+    farm_id: UUID,
+    context: RequestContext = Depends(
+        requires_capability("farm.manage_config", farm_id_param="farm_id")
+    ),
+    service: RecommendationsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    assert context.tenant_id is not None  # _ensure_tenant guarantees
+    rows = await service.list_farm_tree_selection(farm_id=farm_id, tenant_id=context.tenant_id)
+    return {"farm_id": farm_id, "trees": list(rows)}
+
+
+@router.put(
+    "/farms/{farm_id}/decision-trees/{tree_id}",
+    response_model=FarmTreeToggleResponse,
+    summary="Turn one decision tree on or off for this farm.",
+)
+async def set_farm_decision_tree(
+    farm_id: UUID,
+    tree_id: UUID,
+    payload: FarmTreeToggleRequest,
+    context: RequestContext = Depends(
+        requires_capability("farm.manage_config", farm_id_param="farm_id")
+    ),
+    service: RecommendationsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    assert context.tenant_id is not None  # _ensure_tenant guarantees
+    return await service.set_farm_tree_enabled(
+        farm_id=farm_id,
+        tree_id=tree_id,
+        tenant_id=context.tenant_id,
+        enabled=payload.enabled,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )

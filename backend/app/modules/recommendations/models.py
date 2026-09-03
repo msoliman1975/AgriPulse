@@ -193,3 +193,50 @@ class RecommendationHistoryEntry(Base):
     to_state: Mapped[str] = mapped_column(Text, nullable=False)
     actor_user_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     details: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
+
+class FarmTreeExclusion(Base):
+    """`tenant_<id>.farm_tree_exclusions` — trees one farm turned off.
+
+    A row is an exception. A farm with no rows runs every tree the tenant
+    can see, which is what every farm did before this table existed. See
+    tenant migration 0089 for why this is an opt-out list and not an
+    allow-list.
+
+    ``tree_id`` is a logical reference to ``public.decision_trees.id``;
+    tenant schemas never carry a foreign key into ``public``.
+    """
+
+    __tablename__ = "farm_tree_exclusions"
+
+    farm_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("farms.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    tree_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    disabled_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    disabled_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+
+
+class TenantDecisionTreeDispatch(Base):
+    """`public.tenant_dt_dispatch` — when the sweep last ran per tenant.
+
+    Read and written by ``recommendations.evaluate_sweep``. Celery Beat
+    keeps one hourly tick; this row decides whether a given tenant is due
+    under its own cadence. See public migration 0080.
+    """
+
+    __tablename__ = "tenant_dt_dispatch"
+    __table_args__ = {"schema": "public"}
+
+    tenant_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("public.tenants.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    last_dispatched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

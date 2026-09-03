@@ -16,7 +16,7 @@ interface Props {
   tenantId: string;
 }
 
-const CATEGORIES: Category[] = ["weather", "imagery", "detection"];
+const CATEGORIES: Category[] = ["weather", "imagery", "detection", "recommendations"];
 
 /**
  * /platform/tenants/:id Integrations tab. Per-category sections, each
@@ -93,15 +93,38 @@ function SettingRow({
   useEffect(() => setDraft(formatValue(setting.value)), [setting.value]);
   const dirty = draft !== formatValue(setting.value);
   const isTenantSet = setting.source === "tenant";
+  // A key that takes one of a fixed set of numbers gets a select. The list
+  // comes from the backend's own constraint, so the page cannot offer a
+  // value the write path rejects, and it cannot fall behind when the list
+  // changes.
+  const numericChoices = setting.constraint?.numeric_choices ?? null;
   return (
     <div className="flex flex-wrap items-center gap-2 py-2">
       <code className="font-mono text-xs text-ap-muted">{setting.key}</code>
       <SourcePill source={setting.source} />
-      <input
-        className="flex-1 rounded-md border border-ap-line bg-white px-2 py-1 text-sm font-mono"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-      />
+      {numericChoices !== null ? (
+        <select
+          className="flex-1 rounded-md border border-ap-line bg-white px-2 py-1 font-mono text-sm"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          aria-label={setting.key}
+        >
+          {numericChoices.map((choice) => (
+            <option key={choice} value={String(choice)}>
+              {t(`integrations.choice.${setting.key}.${choice}`, {
+                defaultValue: String(choice),
+              })}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          className="flex-1 rounded-md border border-ap-line bg-white px-2 py-1 font-mono text-sm"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          aria-label={setting.key}
+        />
+      )}
       <button
         type="button"
         disabled={!dirty || busy}

@@ -28,6 +28,7 @@ from app.modules.audit import get_audit_service
 from app.modules.integrations.service import (
     DETECTION_KEYS,
     IMAGERY_KEYS,
+    RECOMMENDATION_KEYS,
     WEATHER_KEYS,
 )
 from app.shared.auth.context import RequestContext
@@ -40,6 +41,7 @@ from app.shared.settings import (
     invalidate_defaults_cache,
     validate_value,
 )
+from app.shared.settings.constraints import constraint_for
 
 router = APIRouter(
     prefix="/api/v1/admin/tenants/{tenant_id}/integrations",
@@ -48,12 +50,13 @@ router = APIRouter(
 
 # `email` + `webhook` were dropped with public migration 0048 — every key
 # they carried was inert (outbound mail/webhooks read app/core/settings.py).
-Category = Literal["weather", "imagery", "detection"]
+Category = Literal["weather", "imagery", "detection", "recommendations"]
 
 CATEGORY_KEYS: dict[Category, tuple[str, ...]] = {
     "weather": WEATHER_KEYS,
     "imagery": IMAGERY_KEYS,
     "detection": DETECTION_KEYS,
+    "recommendations": RECOMMENDATION_KEYS,
 }
 
 
@@ -64,6 +67,9 @@ class ResolvedSettingResponse(BaseModel):
     value: Any
     source: str
     overridden_at: datetime | None = None
+    # Range or allowed values for this key, so the browser can offer the
+    # same choices the write path enforces instead of holding its own copy.
+    constraint: dict[str, Any] | None = None
 
 
 class TenantSettingsResponse(BaseModel):
@@ -73,6 +79,11 @@ class TenantSettingsResponse(BaseModel):
 class TenantSettingUpsertBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     value: Any = Field(description="JSON value to store at the tenant tier.")
+
+
+def _constraint_dict(key: str) -> dict[str, Any] | None:
+    constraint = constraint_for(key)
+    return constraint.as_dict() if constraint is not None else None
 
 
 def _validate_category(category: str) -> Category:
@@ -111,6 +122,7 @@ async def read_tenant_integration(
                 "value": resolved.value,
                 "source": resolved.source,
                 "overridden_at": resolved.overridden_at,
+                "constraint": _constraint_dict(key),
             }
         )
     return {"settings": out}
@@ -170,6 +182,7 @@ async def write_tenant_integration(
         "value": resolved.value,
         "source": resolved.source,
         "overridden_at": resolved.overridden_at,
+        "constraint": _constraint_dict(key),
     }
 
 
@@ -217,4 +230,5 @@ async def clear_tenant_integration(
         "value": resolved.value,
         "source": resolved.source,
         "overridden_at": resolved.overridden_at,
+        "constraint": _constraint_dict(key),
     }

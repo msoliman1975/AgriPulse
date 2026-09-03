@@ -892,6 +892,21 @@
     "backfillNothingQueued": "No scene was queued. The farm has stored scenes, so its cells will stay empty until this is looked at.",
     "backfillUnreplayable": "{{scenes}} stored scene(s) kept no raw bands and can never be recomputed."
   },
+  "farmTrees": {
+    "title": "Decision trees",
+    "intro": "Every tree runs on this farm until you turn it off here. A tree published later starts running on its own.",
+    "loading": "Loading decision trees…",
+    "loadFailed": "Could not load the decision trees for this farm.",
+    "saveFailed": "Could not save that change. The switch was put back.",
+    "empty": "No decision trees are published for this tenant yet.",
+    "count": "{{running}} of {{total}} running on this farm.",
+    "toggleLabel": "Run {{name}} on this farm",
+    "openItemsNote": "Turning a tree off stops the next run. Recommendations and alerts it already opened stay in the Action Center.",
+    "source": {
+      "platform": "Platform",
+      "tenant": "Yours"
+    }
+  },
   "flags": {
     "title": "Field flag",
     "loading": "Loading…",

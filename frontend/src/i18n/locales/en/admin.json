@@ -140,11 +140,20 @@
     "category": {
       "weather": "Weather",
       "imagery": "Imagery",
-      "detection": "Detection"
+      "detection": "Detection",
+      "recommendations": "Decision trees"
     },
     "loadFailed": "Could not load tenant integration values.",
     "save": "Save",
-    "clear": "Reset to default"
+    "clear": "Reset to default",
+    "choice": {
+      "recommendations.sweep_cadence_hours": {
+        "4": "Every 4 hours",
+        "8": "Every 8 hours",
+        "24": "Daily",
+        "168": "Weekly"
+      }
+    }
   },
   "admins": {
     "title": "Tenant admins",

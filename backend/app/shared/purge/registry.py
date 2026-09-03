@@ -280,6 +280,13 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
         storage_key_column="s3_key",
     ),
     OwnedTable(
+        "farm_tree_exclusions",
+        owner_column="farm_id",
+        order=10,
+        note="decision trees this farm turned off; the trees themselves live in "
+        "public.decision_trees and are not touched",
+    ),
+    OwnedTable(
         "imagery_farm_subscriptions",
         owner_column="farm_id",
         order=10,
@@ -453,6 +460,13 @@ TENANT_PUBLIC_OWNED: tuple[OwnedTable, ...] = (
         note="tenant-authored templates; signal_template_definitions cascades off this",
     ),
     OwnedTable("tenant_settings_overrides", owner_column="tenant_id", schema="public", order=10),
+    OwnedTable(
+        "tenant_dt_dispatch",
+        owner_column="tenant_id",
+        schema="public",
+        order=10,
+        note="one row per tenant holding the decision-tree sweep's last dispatch time",
+    ),
     OwnedTable(
         "tenant_memberships",
         owner_column="tenant_id",

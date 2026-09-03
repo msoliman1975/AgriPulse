@@ -30,6 +30,10 @@ class KeyConstraint:
     minimum: float | None = None
     maximum: float | None = None
     choices: tuple[str, ...] | None = None
+    #: Allowed numbers, when a key takes one of a fixed set rather than a
+    #: range. Kept separate from ``choices`` so the string list stays typed
+    #: as strings on both sides of the wire.
+    numeric_choices: tuple[float, ...] | None = None
     #: Whether JSON ``null`` is a meaningful value (e.g. "inherit / unset").
     nullable: bool = False
     #: Reject non-integral numbers. Only meaningful for value_schema=number.
@@ -44,6 +48,8 @@ class KeyConstraint:
             out["maximum"] = self.maximum
         if self.choices is not None:
             out["choices"] = list(self.choices)
+        if self.numeric_choices is not None:
+            out["numeric_choices"] = list(self.numeric_choices)
         if self.nullable:
             out["nullable"] = True
         if self.integer_only:
@@ -66,6 +72,13 @@ CONSTRAINTS: dict[str, KeyConstraint] = {
     # Std-devs below the block mean. 0 would flag every cell; beyond ~10 the
     # detector can never fire on a real distribution.
     "grid.anomaly_z_threshold": KeyConstraint(minimum=0.1, maximum=10.0),
+    # How often the decision-tree sweep evaluates one tenant. Four choices,
+    # not a range: the Beat tick is hourly, so anything under an hour cannot
+    # be honoured, and a free number invites a cadence that keeps the light
+    # worker queue busy without producing new recommendations.
+    "recommendations.sweep_cadence_hours": KeyConstraint(
+        numeric_choices=(4, 8, 24, 168), integer_only=True
+    ),
 }
 
 

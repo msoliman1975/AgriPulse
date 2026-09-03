@@ -632,6 +632,71 @@ class RecommendationsRepository:
             grouped.setdefault(r.tree_id, {})[r.param_name] = r.value
         return grouped
 
+    # ---- Farm-level tree selection (tenant migration 0089) ------------
+
+    async def list_all_farm_tree_exclusions(self) -> dict[UUID, frozenset[UUID]]:
+        """Every farm's turned-off trees, in one query, keyed by farm.
+
+        The sweep loads this once per tenant and hands it to each block's
+        evaluation. A farm that has turned nothing off is absent from the
+        dict, so callers use ``.get(farm_id, frozenset())``.
+        """
+        rows = (
+            await self._tenant.execute(text("SELECT farm_id, tree_id FROM farm_tree_exclusions"))
+        ).all()
+        grouped: dict[UUID, set[UUID]] = {}
+        for r in rows:
+            grouped.setdefault(r.farm_id, set()).add(r.tree_id)
+        return {farm_id: frozenset(tree_ids) for farm_id, tree_ids in grouped.items()}
+
+    async def list_farm_tree_exclusions(self, *, farm_id: UUID) -> frozenset[UUID]:
+        """The trees one farm has turned off."""
+        rows = (
+            await self._tenant.execute(
+                text("SELECT tree_id FROM farm_tree_exclusions WHERE farm_id = :fid").bindparams(
+                    bindparam("fid", type_=PG_UUID(as_uuid=True))
+                ),
+                {"fid": farm_id},
+            )
+        ).all()
+        return frozenset(r.tree_id for r in rows)
+
+    async def add_farm_tree_exclusion(
+        self, *, farm_id: UUID, tree_id: UUID, actor_user_id: UUID | None
+    ) -> bool:
+        """Turn a tree off for a farm. Returns False if it was already off."""
+        inserted = await self._tenant.execute(
+            text(
+                """
+                INSERT INTO farm_tree_exclusions (farm_id, tree_id, disabled_by)
+                VALUES (:fid, :tid, :actor)
+                ON CONFLICT (farm_id, tree_id) DO NOTHING
+                RETURNING tree_id
+                """
+            ).bindparams(
+                bindparam("fid", type_=PG_UUID(as_uuid=True)),
+                bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"fid": farm_id, "tid": tree_id, "actor": actor_user_id},
+        )
+        return inserted.first() is not None
+
+    async def remove_farm_tree_exclusion(self, *, farm_id: UUID, tree_id: UUID) -> bool:
+        """Turn a tree back on for a farm. Returns False if it was already on."""
+        deleted = await self._tenant.execute(
+            text(
+                "DELETE FROM farm_tree_exclusions "
+                "WHERE farm_id = :fid AND tree_id = :tid "
+                "RETURNING tree_id"
+            ).bindparams(
+                bindparam("fid", type_=PG_UUID(as_uuid=True)),
+                bindparam("tid", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"fid": farm_id, "tid": tree_id},
+        )
+        return deleted.first() is not None
+
     async def upsert_param_override(
         self,
         *,

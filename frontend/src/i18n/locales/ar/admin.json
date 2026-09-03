@@ -140,11 +140,20 @@
     "category": {
       "weather": "الطقس",
       "imagery": "الصور",
-      "detection": "الكشف"
+      "detection": "الكشف",
+      "recommendations": "أشجار القرار"
     },
     "loadFailed": "تعذر تحميل قيم تكاملات المستأجر.",
     "save": "حفظ",
-    "clear": "إعادة للقيمة الافتراضية"
+    "clear": "إعادة للقيمة الافتراضية",
+    "choice": {
+      "recommendations.sweep_cadence_hours": {
+        "4": "كل 4 ساعات",
+        "8": "كل 8 ساعات",
+        "24": "يوميًا",
+        "168": "أسبوعيًا"
+      }
+    }
   },
   "admins": {
     "title": "مسؤولو المستأجر",

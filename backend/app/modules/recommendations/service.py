@@ -41,6 +41,7 @@ from app.modules.recommendations.engine import (
 )
 from app.modules.recommendations.errors import (
     BlockNotInFarmError,
+    DecisionTreeNotFoundError,
     DecisionTreeNotRunnableError,
     FarmNotFoundError,
     GroupMemberNotActionableError,
@@ -330,6 +331,7 @@ class RecommendationsServiceImpl:
         run_id: UUID | None = None,
         only_tree_code: str | None = None,
         tally: dict[str, int] | None = None,
+        excluded_by_farm: dict[UUID, frozenset[UUID]] | None = None,
     ) -> dict[str, int]:
         """Run every active tree visible to this tenant against
         ``block_id``; insert new open recommendations.
@@ -356,9 +358,16 @@ class RecommendationsServiceImpl:
         targeting — is recorded against that run. Omitted, nothing is written
         beyond the recommendations themselves, which keeps the many tests that
         drive this method directly from needing a run row.
+
+        ``excluded_by_farm`` carries the tenant's farm-level tree selection
+        so the sweep reads it once instead of once per block. Omitted, this
+        block's farm is read on its own.
         """
         setup = await self._prepare_block_evaluation(
-            block_id=block_id, tenant_id=tenant_id, only_tree_code=only_tree_code
+            block_id=block_id,
+            tenant_id=tenant_id,
+            only_tree_code=only_tree_code,
+            excluded_by_farm=excluded_by_farm,
         )
         if setup is None:
             return {
@@ -565,12 +574,106 @@ class RecommendationsServiceImpl:
             "blocks": blocks,
         }
 
+    # ---- Farm-level tree selection (tenant 0089) ----------------------
+
+    async def list_farm_tree_selection(
+        self, *, farm_id: UUID, tenant_id: UUID
+    ) -> tuple[dict[str, Any], ...]:
+        """Every tree this tenant can see, with whether the farm runs it.
+
+        The list is the same catalog the sweep walks, so a farm manager sees
+        exactly the trees that can reach their blocks. ``enabled`` is False
+        only for a tree the farm turned off; targeting (crop, country, soil)
+        is not applied here, because a tree that no block currently matches
+        may match tomorrow when a crop is assigned.
+        """
+        if not await self._repo.farm_exists(farm_id=farm_id):
+            raise FarmNotFoundError(farm_id)
+        trees = await self._repo.list_active_trees_with_current_version(
+            visible_to_tenant_id=tenant_id
+        )
+        excluded = await self._repo.list_farm_tree_exclusions(farm_id=farm_id)
+        return tuple(
+            {
+                "tree_id": tree["tree_id"],
+                "code": tree["tree_code"],
+                "name_en": tree["name_en"],
+                "name_ar": tree["name_ar"],
+                "scope": tree.get("scope") or "block",
+                "version": tree["version"],
+                # Where the tree came from. A tenant can turn off either kind.
+                "source": "tenant" if tree["tenant_id"] is not None else "platform",
+                "crop_paths": list(tree["crop_paths"] or []),
+                "enabled": tree["tree_id"] not in excluded,
+            }
+            for tree in trees
+        )
+
+    async def set_farm_tree_enabled(
+        self,
+        *,
+        farm_id: UUID,
+        tree_id: UUID,
+        tenant_id: UUID,
+        enabled: bool,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> dict[str, Any]:
+        """Turn one tree on or off for one farm.
+
+        Turning a tree off stops the next sweep from evaluating it for this
+        farm's blocks. It leaves the recommendations and alerts the tree
+        already opened exactly where they are: they describe something that
+        was true in the field, and closing them would erase work a person
+        still has to answer for.
+        """
+        if not await self._repo.farm_exists(farm_id=farm_id):
+            raise FarmNotFoundError(farm_id)
+        visible = await self._repo.list_active_trees_with_current_version(
+            visible_to_tenant_id=tenant_id
+        )
+        tree = next((t for t in visible if t["tree_id"] == tree_id), None)
+        if tree is None:
+            # Same 404 an unknown code gets. A tree another tenant authored
+            # is invisible here, so it cannot be turned off by guessing an id.
+            raise DecisionTreeNotFoundError(str(tree_id))
+
+        if enabled:
+            changed = await self._repo.remove_farm_tree_exclusion(farm_id=farm_id, tree_id=tree_id)
+        else:
+            changed = await self._repo.add_farm_tree_exclusion(
+                farm_id=farm_id, tree_id=tree_id, actor_user_id=actor_user_id
+            )
+
+        if changed:
+            await self._audit.record(
+                tenant_schema=tenant_schema,
+                event_type=(
+                    "recommendations.farm_tree_enabled"
+                    if enabled
+                    else "recommendations.farm_tree_disabled"
+                ),
+                actor_user_id=actor_user_id,
+                actor_kind="system" if actor_user_id is None else "user",
+                subject_kind="decision_tree",
+                subject_id=tree_id,
+                farm_id=farm_id,
+                details={"tree_code": tree["tree_code"], "enabled": enabled},
+            )
+        return {
+            "tree_id": tree_id,
+            "code": tree["tree_code"],
+            "enabled": enabled,
+            "changed": changed,
+        }
+
     async def _prepare_block_evaluation(
         self,
         *,
         block_id: UUID,
         tenant_id: UUID,
         only_tree_code: str | None = None,
+        excluded_by_farm: dict[UUID, frozenset[UUID]] | None = None,
     ) -> _BlockEvaluation | None:
         """Load the trees, signals and targeting split for ``block_id``.
 
@@ -581,6 +684,13 @@ class RecommendationsServiceImpl:
         ``only_tree_code`` cuts the tree set to one before targeting is
         evaluated, so a single-tree run also skips the parameter-override
         bulk load for every other tree.
+
+        ``excluded_by_farm`` is the tenant's farm-level tree selection, keyed
+        by farm (tenant migration 0089). The sweep loads it once and passes
+        it in, because this method runs once per block and the answer is the
+        same for every block of one farm. A caller that omits it gets that
+        one farm's rows read here, so a single-block caller stays correct
+        without knowing about the table.
         """
         trees = await self._repo.list_active_trees_with_current_version(
             visible_to_tenant_id=tenant_id, only_code=only_tree_code
@@ -606,6 +716,12 @@ class RecommendationsServiceImpl:
 
         # Country axis for targeting — inherited from the parent farm (PR-3).
         country_code = await self._repo.get_farm_country_code(farm_id=farm_id)
+
+        # Trees this farm has turned off (tenant 0089).
+        if excluded_by_farm is not None:
+            excluded_trees = excluded_by_farm.get(farm_id, frozenset())
+        else:
+            excluded_trees = await self._repo.list_farm_tree_exclusions(farm_id=farm_id)
 
         # Pull weather + signals once per evaluation pass. Both loaders
         # return empty data when the block has no provider/observation
@@ -664,6 +780,12 @@ class RecommendationsServiceImpl:
         cell_trees: list[dict[str, Any]] = []
         skipped_trees: list[tuple[dict[str, Any], TargetingVerdict]] = []
         for tree in trees:
+            # Farm-level selection (0089) is checked before targeting so the
+            # trace says the farm turned this tree off, instead of naming a
+            # crop or country axis that had nothing to do with the decision.
+            if tree["tree_id"] in excluded_trees:
+                skipped_trees.append((tree, _FARM_DISABLED))
+                continue
             # Multi-axis targeting (PR-3): a tree fires on this block only if
             # its crop / country / soil sets all admit the block (AND across
             # axes, OR within; empty set = matches any). See evaluate_targeting.
@@ -1947,6 +2069,12 @@ class TargetingVerdict:
 
 
 _MATCHED = TargetingVerdict(matched=True)
+# The farm turned this tree off. `axis="farm"` is one of the values the
+# `skip_axis` CHECK on decision_tree_eval_traces accepts; tenant migration
+# 0089 widened it to take this one.
+_FARM_DISABLED = TargetingVerdict(
+    matched=False, axis="farm", required=("enabled",), actual="disabled"
+)
 
 
 def evaluate_targeting(
