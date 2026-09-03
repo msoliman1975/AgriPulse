@@ -41,11 +41,14 @@ class _Result:
 def _session(*result_sets: list[Any]) -> AsyncMock:
     """Feed `execute` a fixed sequence of results, in call order:
 
-    1. open alerts per block
-    2. current grid config per block
-    3. the block-id roster
-    4. latest index values, bounded to the recent window
-    5. latest index values, unbounded — issued ONLY for blocks the recent
+    1. open alerts per block (the badge rollup)
+    2. counted alerts per (severity, status, cell) — health evidence
+    3. max open recommendation confidence per block — health evidence
+    4. trace counts from the newest sweep per block — health evidence
+    5. current grid config per block
+    6. the block-id roster
+    7. latest index values, bounded to the recent window
+    8. latest index values, unbounded — issued ONLY for blocks the recent
        window returned nothing for (see `_latest_indices`)
 
     Order matters and is positional, so this breaks silently if the endpoint
@@ -54,7 +57,7 @@ def _session(*result_sets: list[Any]) -> AsyncMock:
     index lookup and moved the roster, which is exactly how that happened.
 
     Pass only as many sets as the endpoint will actually consume — a test
-    whose blocks all have recent readings must NOT supply (5), so that an
+    whose blocks all have recent readings must NOT supply (8), so that an
     unexpected fallback sweep fails loudly instead of silently passing.
     """
     session = AsyncMock()
@@ -73,7 +76,10 @@ class TestGridSignal:
         # fallback sweep runs too — hence the fifth set.
         session = _session(
             [],  # alerts
-            [{"block_id": gridded, "product_id": product}],  # grid configs
+            [],  # alert evidence
+            [],  # recommendation confidence
+            [],  # trace counts
+            [{"block_id": gridded, "product_id": product, "total_cells": 0}],  # grid configs
             [gridded, plain],  # roster
             [],  # indices, recent window
             [],  # indices, unbounded fallback
@@ -89,7 +95,7 @@ class TestGridSignal:
 
     async def test_a_farm_with_no_zoning_reports_no_products(self) -> None:
         farm_id, b1 = uuid4(), uuid4()
-        session = _session([], [], [b1], [], [])
+        session = _session([], [], [], [], [], [b1], [], [])
 
         out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
 
@@ -114,7 +120,12 @@ class TestGridSignal:
                     "alert_action_type": "irrigate",
                 }
             ],
-            [{"block_id": b1, "product_id": product}],  # grid configs
+            [
+                {"block_id": b1, "severity": "critical", "status": "open", "cell_id": None, "n": 2}
+            ],  # alert evidence
+            [],  # recommendation confidence
+            [],  # trace counts
+            [{"block_id": b1, "product_id": product, "total_cells": 0}],  # grid configs
             [b1],  # roster
             [{"block_id": b1, "index_code": "ndvi", "mean": 0.3, "time": now}],  # recent
         )
