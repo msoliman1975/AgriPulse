@@ -3391,10 +3391,40 @@ global:
     #   somebody may be working through.
     #
     #   Rollback is this tag back to aaf133f on api + workers.
+    #
+    #   a60b9e8 = #642, two controls over the decision-tree engine.
+    #
+    #   A farm can turn a tree off for itself. Tenant migration 0089 adds
+    #   `farm_tree_exclusions`, an opt-out list: a farm with no rows runs
+    #   every tree, so nothing changes for any farm until somebody opens the
+    #   new section in the farm settings drawer. The same migration widens
+    #   the `skip_axis` CHECK on `decision_tree_eval_traces` to accept
+    #   'farm', because a turned-off tree is recorded as a skipped trace.
+    #
+    #   A platform admin can set how often the sweep runs for one tenant.
+    #   Public migration 0080 adds the settings key
+    #   `recommendations.sweep_cadence_hours` (4, 8, 24 or 168, default 24)
+    #   and `public.tenant_dt_dispatch`. Beat keeps its hourly tick; the
+    #   tick now enqueues only the tenants whose cadence has elapsed.
+    #
+    #   Watch for this: the sweep stops running hourly per tenant and starts
+    #   running daily, because 24 is the seeded default and no tenant has an
+    #   override. That is the intended change, not a stalled worker. The
+    #   first tick after the sync dispatches every tenant, since no tenant
+    #   has a dispatch row yet.
+    #
+    #   After the sync, check: `SELECT count(*) FROM public.tenant_dt_dispatch`
+    #   is one row per active tenant, and `SELECT value FROM
+    #   public.platform_defaults WHERE key = 'recommendations.sweep_cadence_hours'`
+    #   reads 24.
+    #
+    #   Rollback is this tag back to 76a6411 on api + workers and e0ed1d4 on
+    #   frontend. Both migrations have a downgrade, but neither needs to run
+    #   to roll back: the old code ignores the new table and the new key.
     api:
-      tag: "76a6411"
+      tag: "a60b9e8"
     workers:
-      tag: "76a6411"
+      tag: "a60b9e8"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3838,7 +3868,14 @@ global:
       #   After the sync, watch: /admin/backfill opens with three ticked
       #   boxes on both tabs, and the estimate still warns when the farm has
       #   no thermal subscription.
-      tag: "e0ed1d4"
+      #
+      # a60b9e8 = the frontend half of #642: the farm settings drawer gains a
+      #   Decision trees section, the platform tenant settings page gains a
+      #   Decision trees category with the cadence, and the decision-tree
+      #   traces page learns the 'farm' skip axis. The API half must move in
+      #   the same sync — the new section calls two routes that do not exist
+      #   on 76a6411.
+      tag: "a60b9e8"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
