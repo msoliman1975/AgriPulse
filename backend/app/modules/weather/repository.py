@@ -294,12 +294,12 @@ class WeatherRepository:
                     """
                 UPDATE weather_ingestion_attempts
                    SET status = 'failed',
-                       completed_at = now(),
+                       completed_at = public.app_now(),
                        error_code = 'reaped_stale',
                        error_message = 'Attempt left running by a worker '
                                        'that did not report a result.'
                  WHERE status = 'running'
-                   AND started_at < now() - make_interval(hours => :stale_hours)
+                   AND started_at < public.app_now() - make_interval(hours => :stale_hours)
              RETURNING id
                 """
                 ),
@@ -470,7 +470,7 @@ class WeatherRepository:
                     """
                     UPDATE weather_farm_subscriptions
                        SET cadence_hours = :cadence, is_active = TRUE,
-                           updated_by = :actor, updated_at = now()
+                           updated_by = :actor, updated_at = public.app_now()
                      WHERE id = :id
                     """
                 ).bindparams(
@@ -519,7 +519,7 @@ class WeatherRepository:
         if not changes:
             return await self.get_farm_subscription_by_id(subscription_id)
         sets = [f"{col} = :{col}" for col in changes]
-        sets += ["updated_by = :actor", "updated_at = now()"]
+        sets += ["updated_by = :actor", "updated_at = public.app_now()"]
         params: dict[str, Any] = {**changes, "id": subscription_id, "actor": actor_user_id}
         await self._session.execute(
             text(
@@ -541,7 +541,7 @@ class WeatherRepository:
         success: bool,
     ) -> None:
         """Heartbeat the farm subscription; advance the watermark on success."""
-        sets = ["last_attempted_at = :at", "updated_at = now()"]
+        sets = ["last_attempted_at = :at", "updated_at = public.app_now()"]
         if success:
             sets.append("last_successful_ingest_at = :at")
         await self._session.execute(
@@ -862,7 +862,7 @@ class WeatherRepository:
                     :precip, :et0,
                     :gdd10, :gdd15, :gdd_cum,
                     :p7, :p30,
-                    now()
+                    public.app_now()
                 )
                 ON CONFLICT (farm_id, date) DO UPDATE SET
                     temp_min_c = EXCLUDED.temp_min_c,
@@ -875,7 +875,7 @@ class WeatherRepository:
                     gdd_cumulative_base10_season = EXCLUDED.gdd_cumulative_base10_season,
                     precip_mm_7d = EXCLUDED.precip_mm_7d,
                     precip_mm_30d = EXCLUDED.precip_mm_30d,
-                    computed_at = now()
+                    computed_at = public.app_now()
                 """
             ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
             {
@@ -958,7 +958,7 @@ class WeatherRepository:
                 ) VALUES (
                     :farm_id, :date, :index_code,
                     :value, :value_min, :value_max, CAST(:value_aux AS jsonb),
-                    :baseline_deviation, :is_forecast, now()
+                    :baseline_deviation, :is_forecast, public.app_now()
                 )
                 ON CONFLICT (farm_id, date, index_code) DO UPDATE SET
                     value = EXCLUDED.value,
@@ -967,7 +967,7 @@ class WeatherRepository:
                     value_aux = EXCLUDED.value_aux,
                     baseline_deviation = EXCLUDED.baseline_deviation,
                     is_forecast = EXCLUDED.is_forecast,
-                    computed_at = now()
+                    computed_at = public.app_now()
                 """
             ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
             {
@@ -1081,7 +1081,7 @@ class WeatherRepository:
                 ) VALUES (
                     :farm_id, :index_code, :doy,
                     :mean, :std, :sample_count,
-                    :window_days, :years_observed, now()
+                    :window_days, :years_observed, public.app_now()
                 )
                 ON CONFLICT (farm_id, index_code, day_of_year) DO UPDATE SET
                     baseline_mean = EXCLUDED.baseline_mean,
@@ -1089,7 +1089,7 @@ class WeatherRepository:
                     sample_count = EXCLUDED.sample_count,
                     window_days = EXCLUDED.window_days,
                     years_observed = EXCLUDED.years_observed,
-                    computed_at = now()
+                    computed_at = public.app_now()
                 """
             ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
             {
@@ -1279,13 +1279,13 @@ class WeatherRepository:
                     block_id, date, risk_code, score, level, inputs, computed_at
                 ) VALUES (
                     :block_id, :date, :risk_code, :score, :level,
-                    CAST(:inputs AS jsonb), now()
+                    CAST(:inputs AS jsonb), public.app_now()
                 )
                 ON CONFLICT (block_id, date, risk_code) DO UPDATE SET
                     score = EXCLUDED.score,
                     level = EXCLUDED.level,
                     inputs = EXCLUDED.inputs,
-                    computed_at = now()
+                    computed_at = public.app_now()
                 """
             ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
             {

@@ -87,7 +87,7 @@ class PlatformAlertsRepository:
                     tenant_slug   = EXCLUDED.tenant_slug,
                     tenant_name   = EXCLUDED.tenant_name,
                     farm_name     = EXCLUDED.farm_name,
-                    last_seen_at  = now(),
+                    last_seen_at  = public.app_now(),
                     occurrences   = public.platform_alerts.occurrences + 1
                 """
             ).bindparams(
@@ -127,7 +127,7 @@ class PlatformAlertsRepository:
                 """
                 UPDATE public.platform_alerts
                    SET status = 'resolved',
-                       resolved_at = now(),
+                       resolved_at = public.app_now(),
                        resolved_reason = 'auto'
                  WHERE status <> 'resolved'
                    AND kind = ANY(:kinds)
@@ -152,11 +152,11 @@ class PlatformAlertsRepository:
                 """
                 UPDATE public.platform_alerts
                    SET status = 'resolved',
-                       resolved_at = now(),
+                       resolved_at = public.app_now(),
                        resolved_reason = 'auto'
                  WHERE status <> 'resolved'
                    AND kind = :kind
-                   AND last_seen_at < now() - make_interval(hours => :quiet_hours)
+                   AND last_seen_at < public.app_now() - make_interval(hours => :quiet_hours)
                 """
             ),
             {"kind": kind, "quiet_hours": quiet_hours},
@@ -175,7 +175,7 @@ class PlatformAlertsRepository:
                 """
                 UPDATE public.platform_alerts
                    SET status = 'resolved',
-                       resolved_at = now(),
+                       resolved_at = public.app_now(),
                        resolved_reason = 'auto'
                  WHERE status <> 'resolved'
                    AND tenant_id IS NOT NULL
@@ -242,7 +242,7 @@ class PlatformAlertsRepository:
             text(
                 """
                 UPDATE public.platform_alerts
-                   SET notified_at = now(),
+                   SET notified_at = public.app_now(),
                        notified_severity = severity
                  WHERE id = ANY(:ids)
                 """
@@ -396,7 +396,7 @@ class PlatformAlertsRepository:
                         f"""
                         UPDATE public.platform_alerts
                            SET status = 'acknowledged',
-                               acknowledged_at = COALESCE(acknowledged_at, now()),
+                               acknowledged_at = COALESCE(acknowledged_at, public.app_now()),
                                acknowledged_by = COALESCE(acknowledged_by, :user_id),
                                acknowledged_by_email =
                                    COALESCE(acknowledged_by_email, :user_email)
@@ -430,7 +430,7 @@ class PlatformAlertsRepository:
                         f"""
                         UPDATE public.platform_alerts
                            SET status = 'resolved',
-                               resolved_at = now(),
+                               resolved_at = public.app_now(),
                                resolved_reason = 'manual'
                          WHERE id = :alert_id
                            AND status <> 'resolved'

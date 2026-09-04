@@ -14,7 +14,7 @@ connection pool are reused across requests.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from functools import lru_cache
 from typing import Any, Protocol
 
@@ -23,6 +23,7 @@ from botocore.client import Config
 from botocore.exceptions import ClientError
 
 from app.core.settings import get_settings
+from app.shared import clock
 
 
 class StorageObjectMissingError(Exception):
@@ -147,7 +148,7 @@ class _Boto3StorageClient:
                 "Content-Type": content_type,
                 "Content-Length": str(content_length),
             },
-            expires_at=datetime.now(UTC) + timedelta(seconds=expires),
+            expires_at=clock.now() + timedelta(seconds=expires),
         )
 
     def presign_download(
@@ -165,7 +166,7 @@ class _Boto3StorageClient:
         )
         return PresignedDownload(
             url=url,
-            expires_at=datetime.now(UTC) + timedelta(seconds=expires),
+            expires_at=clock.now() + timedelta(seconds=expires),
         )
 
     def head_object(self, *, key: str) -> dict[str, Any]:

@@ -8,8 +8,8 @@ request via `get_farm_service`.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import UTC, datetime
 from datetime import date as _date
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Protocol
 from uuid import UUID
@@ -97,6 +97,7 @@ from app.modules.farms.validity import (
     open_assignment_to_close,
 )
 from app.modules.weather.snapshot import load_gdd_since
+from app.shared import clock
 from app.shared.db.ids import uuid7
 from app.shared.eventbus import EventBus, get_default_bus
 from app.shared.keycloak.client import KeycloakAdminClient, get_keycloak_client
@@ -944,7 +945,7 @@ class FarmServiceImpl:
         await self._repo.inactivate_farm(farm_id=farm_id, actor_user_id=actor_user_id)
         await self._tenant_session.flush()
 
-        today_str = datetime.now(UTC).date().isoformat()
+        today_str = clock.now().date().isoformat()
         await self._audit.record(
             tenant_schema=tenant_schema,
             event_type="farms.farm_inactivated",
@@ -1601,7 +1602,7 @@ class FarmServiceImpl:
         farm_id = await self._repo.inactivate_block(block_id=block_id, actor_user_id=actor_user_id)
         await self._tenant_session.flush()
 
-        today_str = datetime.now(UTC).date().isoformat()
+        today_str = clock.now().date().isoformat()
         await self._audit.record(
             tenant_schema=tenant_schema,
             event_type="farms.block_inactivated",
@@ -2695,7 +2696,7 @@ class FarmServiceImpl:
                 target_block_crop_id = current["id"]
 
         log_id = uuid7()
-        when = transition_date or datetime.now(UTC)
+        when = transition_date or clock.now()
         log = await self._repo.insert_growth_stage_log(
             log_id=log_id,
             block_id=block_id,

@@ -70,7 +70,7 @@ class UserPreferences(Base):
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
 
 
@@ -115,7 +115,7 @@ class TenantRoleAssignment(Base):
         PG_UUID(as_uuid=True), ForeignKey("public.users.id"), nullable=True
     )
     granted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -138,7 +138,7 @@ class FarmScope(Base):
         PG_UUID(as_uuid=True), ForeignKey("public.users.id"), nullable=True
     )
     granted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -160,6 +160,6 @@ class PlatformRoleAssignment(Base):
         PG_UUID(as_uuid=True), ForeignKey("public.users.id"), nullable=True
     )
     granted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

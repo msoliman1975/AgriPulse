@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -13,6 +13,7 @@ from app.core.errors import APIError
 from app.core.logging import get_logger
 from app.modules.field_flags.events import FieldFlagRaisedV1
 from app.modules.field_flags.repository import FieldFlagRepository
+from app.shared import clock
 from app.shared.eventbus import get_default_bus
 from app.shared.storage.client import PresignedUpload, StorageClient, get_storage_client
 
@@ -125,7 +126,7 @@ class FieldFlagService:
         # Stored on the row, not computed from the farm setting on read:
         # otherwise editing one number silently removes every existing pin
         # from the map with nothing connecting cause to effect.
-        pin_until = datetime.now(UTC) + timedelta(days=days)
+        pin_until = clock.now() + timedelta(days=days)
         flag_id = await self._repo.insert_flag(
             values={
                 "farm_id": farm_id,
@@ -199,9 +200,7 @@ class FieldFlagService:
         await self._repo.insert_comment(
             flag_id=flag_id, body=comment, author_id=actor_user_id, kind="reopen"
         )
-        await self._repo.reopen_flag(
-            flag_id=flag_id, pin_until=datetime.now(UTC) + timedelta(days=days)
-        )
+        await self._repo.reopen_flag(flag_id=flag_id, pin_until=clock.now() + timedelta(days=days))
         return await self.get_flag(flag_id=flag_id)
 
     async def init_photo_upload(

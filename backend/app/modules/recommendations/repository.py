@@ -12,7 +12,7 @@ Two sessions:
 from __future__ import annotations
 
 import json
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID
@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.indices.trends import compute_trend
 from app.modules.recommendations.models import DecisionTree, DecisionTreeVersion
+from app.shared import clock
 from app.shared.action_items import REC_SQL, TENANT_TODAY_SQL
 
 
@@ -742,7 +743,7 @@ class RecommendationsRepository:
         await self._public.execute(
             text(
                 "UPDATE public.decision_trees "
-                "SET current_version_id = :vid, updated_by = :actor, updated_at = now() "
+                "SET current_version_id = :vid, updated_by = :actor, updated_at = public.app_now() "
                 "WHERE id = :tid"
             ).bindparams(
                 bindparam("tid", type_=PG_UUID(as_uuid=True)),
@@ -780,7 +781,7 @@ class RecommendationsRepository:
                        crop_path = :crop_path,
                        applicable_regions = :applicable_regions,
                        updated_by = :actor,
-                       updated_at = now()
+                       updated_at = public.app_now()
                  WHERE id = :tid
                 """
             ).bindparams(
@@ -838,7 +839,7 @@ class RecommendationsRepository:
                        soil_textures = :soil_textures,
                        scope = :scope,
                        updated_by = :actor,
-                       updated_at = now()
+                       updated_at = public.app_now()
                  WHERE id = :tid
                 """
             ).bindparams(
@@ -869,7 +870,7 @@ class RecommendationsRepository:
         archived: bool,
         actor_user_id: UUID | None,
     ) -> None:
-        """Soft-archive (``deleted_at = now()``) or restore
+        """Soft-archive (``deleted_at = public.app_now()``) or restore
         (``deleted_at = NULL``) one tree. Archived trees drop out of the
         catalog + are never evaluated (every read filters
         ``deleted_at IS NULL``) but the row + its version history stay
@@ -879,11 +880,11 @@ class RecommendationsRepository:
         # construction (and the linter happy).
         sql = (
             "UPDATE public.decision_trees "
-            "SET deleted_at = now(), updated_by = :actor, updated_at = now() "
+            "SET deleted_at = public.app_now(), updated_by = :actor, updated_at = public.app_now() "
             "WHERE id = :tid"
             if archived
             else "UPDATE public.decision_trees "
-            "SET deleted_at = NULL, updated_by = :actor, updated_at = now() "
+            "SET deleted_at = NULL, updated_by = :actor, updated_at = public.app_now() "
             "WHERE id = :tid"
         )
         await self._public.execute(
@@ -1190,7 +1191,7 @@ class RecommendationsRepository:
                 ON CONFLICT (tree_id, param_name) DO UPDATE
                 SET value = EXCLUDED.value,
                     updated_by = EXCLUDED.updated_by,
-                    updated_at = now()
+                    updated_at = public.app_now()
                 """
             ).bindparams(
                 bindparam("tid", type_=PG_UUID(as_uuid=True)),
@@ -1280,7 +1281,7 @@ class RecommendationsRepository:
                         :valid_until, CAST(:snapshot AS jsonb), 'open',
                         :actor, :actor,
                         :group_key, :group_parent_id, :is_group,
-                        now(), now(), CAST(:today AS date)
+                        public.app_now(), public.app_now(), CAST(:today AS date)
                     )
                     """
                 ).bindparams(
@@ -1346,7 +1347,7 @@ class RecommendationsRepository:
         consecutive days into two runs of one.
         """
         row = await self._public.execute(text(TENANT_TODAY_SQL), {"s": tenant_schema})
-        return cast(date, row.scalar_one_or_none() or datetime.now(UTC).date())
+        return cast(date, row.scalar_one_or_none() or clock.now().date())
 
     async def find_open_group_parent(self, *, block_id: UUID, group_key: str) -> UUID | None:
         return (
@@ -1441,7 +1442,7 @@ class RecommendationsRepository:
                        text_en = :text_en, text_ar = :text_ar,
                        evaluation_snapshot = CAST(:snapshot AS jsonb),
                        cleared_at = NULL,
-                       updated_at = now(), updated_by = :actor
+                       updated_at = public.app_now(), updated_by = :actor
                  WHERE id = :id
                 """
             ).bindparams(
@@ -1579,16 +1580,16 @@ class RecommendationsRepository:
         """
         sets = [
             "state = :state",
-            "updated_at = now()",
+            "updated_at = public.app_now()",
             "updated_by = :actor",
             "dismissal_reason = :reason",
             "deferred_until = :deferred",
             "outcome_notes = :notes",
         ]
         if new_state == "applied":
-            sets += ["applied_at = now()", "applied_by = :actor"]
+            sets += ["applied_at = public.app_now()", "applied_by = :actor"]
         elif new_state == "dismissed":
-            sets += ["dismissed_at = now()", "dismissed_by = :actor"]
+            sets += ["dismissed_at = public.app_now()", "dismissed_by = :actor"]
         rows = (
             (
                 await self._tenant.execute(
@@ -1717,21 +1718,21 @@ class RecommendationsRepository:
         outcome_notes: str | None = None,
     ) -> None:
         """Stamp the *_at / *_by columns for the new state. Caller validates."""
-        sets = ["state = :state", "updated_at = now()", "updated_by = :actor"]
+        sets = ["state = :state", "updated_at = public.app_now()", "updated_by = :actor"]
         params: dict[str, Any] = {
             "id": recommendation_id,
             "state": new_state,
             "actor": actor_user_id,
         }
         if new_state == "applied":
-            sets.append("applied_at = now()")
+            sets.append("applied_at = public.app_now()")
             sets.append("applied_by = :actor")
             sets.append("deferred_until = NULL")
             if outcome_notes is not None:
                 sets.append("outcome_notes = :outcome_notes")
                 params["outcome_notes"] = outcome_notes
         elif new_state == "dismissed":
-            sets.append("dismissed_at = now()")
+            sets.append("dismissed_at = public.app_now()")
             sets.append("dismissed_by = :actor")
             sets.append("deferred_until = NULL")
             sets.append("dismissal_reason = :reason")
@@ -1898,7 +1899,7 @@ class RecommendationsRepository:
                         FROM block_index_aggregates
                         WHERE block_id = :block_id
                           AND mean IS NOT NULL
-                          AND time >= now() - make_interval(days => :window_days)
+                          AND time >= public.app_now() - make_interval(days => :window_days)
                         ORDER BY index_code, time
                         """
                     ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
@@ -2223,9 +2224,9 @@ class RecommendationsRepository:
             text(
                 """
                 UPDATE decision_tree_eval_runs
-                   SET finished_at = now(),
+                   SET finished_at = public.app_now(),
                        duration_ms =
-                           (EXTRACT(EPOCH FROM (now() - started_at)) * 1000)::int,
+                           (EXTRACT(EPOCH FROM (public.app_now() - started_at)) * 1000)::int,
                        blocks_evaluated = :blocks,
                        trees_evaluated = :trees,
                        trees_skipped = :skipped,

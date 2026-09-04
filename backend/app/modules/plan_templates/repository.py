@@ -295,9 +295,9 @@ class PlanTemplatesRepository:
         template.status = "archived"
         template.updated_by = actor_user_id
         await self._public.execute(
-            text("UPDATE public.plan_templates SET deleted_at = now() WHERE id = :id").bindparams(
-                bindparam("id", type_=PG_UUID(as_uuid=True))
-            ),
+            text(
+                "UPDATE public.plan_templates SET deleted_at = public.app_now() WHERE id = :id"
+            ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
             {"id": template.id},
         )
         await self._public.flush()

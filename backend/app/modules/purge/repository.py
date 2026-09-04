@@ -130,7 +130,7 @@ class PurgeRepository:
     async def mark_running(self, job_id: UUID) -> None:
         await self._s.execute(
             text(
-                "UPDATE public.purge_jobs SET status = 'running', started_at = now() "
+                "UPDATE public.purge_jobs SET status = 'running', started_at = public.app_now() "
                 "WHERE id = :id AND started_at IS NULL"
             ),
             {"id": str(job_id)},
@@ -162,7 +162,7 @@ class PurgeRepository:
         await self._s.execute(
             text(
                 "UPDATE public.purge_jobs SET status = :status, error = :error, "
-                "completed_at = now() WHERE id = :id"
+                "completed_at = public.app_now() WHERE id = :id"
             ),
             {"id": str(job_id), "status": status, "error": error},
         )
@@ -196,7 +196,7 @@ class PurgeRepository:
                         deleted, verification, errors
                     ) VALUES (
                         :job_id, :kind, :target_id, :target_label, :tenant_id, :tenant_slug,
-                        :actor_user_id, :actor_email, :reason, :started_at, now(),
+                        :actor_user_id, :actor_email, :reason, :started_at, public.app_now(),
                         CAST(:deleted AS jsonb), CAST(:verification AS jsonb),
                         CAST(:errors AS jsonb)
                     )

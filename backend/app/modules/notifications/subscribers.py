@@ -20,7 +20,7 @@ items (one per scoped user) plus M ``notification_dispatches`` rows
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime
 from html import escape
 from typing import Any
 from uuid import UUID, uuid4
@@ -61,6 +61,7 @@ from app.modules.recommendations.events import (
     RecommendationOpenedV1,
 )
 from app.modules.scouting.events import ScoutingVisitAssignedV1
+from app.shared import clock
 from app.shared.db.session import sanitize_tenant_schema
 from app.shared.eventbus import EventBus, get_default_bus
 from app.shared.finding_evidence import evidence_rows, evidence_text
@@ -493,7 +494,7 @@ def _insert_dispatch(
                     :alert_id, :rec_id, :visit_id, :code, :loc, :chan,
                     :uid, :addr,
                     :status, :rs, :rb, :err,
-                    CASE WHEN :status = 'sent' THEN now() ELSE NULL END
+                    CASE WHEN :status = 'sent' THEN public.app_now() ELSE NULL END
                 )
                 """
             ),
@@ -545,7 +546,7 @@ def _insert_inbox_item(
             INSERT INTO in_app_inbox (
                 id, user_id, alert_id, recommendation_id, severity, title, body, link_url,
                 created_at, updated_at
-            ) VALUES (:id, :uid, :alert_id, :rec_id, :sev, :title, :body, :link, now(), now())
+            ) VALUES (:id, :uid, :alert_id, :rec_id, :sev, :title, :body, :link, public.app_now(), public.app_now())
             """
         ),
         {
@@ -967,7 +968,7 @@ def _send_push_channel(
             if exc.unregistered:
                 session.execute(
                     text(
-                        "UPDATE device_tokens SET revoked_at = now() "
+                        "UPDATE device_tokens SET revoked_at = public.app_now() "
                         "WHERE token = :t AND revoked_at IS NULL"
                     ),
                     {"t": token},
@@ -2690,7 +2691,7 @@ def _on_scouting_visit_assigned(event: ScoutingVisitAssignedV1) -> None:
                 if exc.unregistered:
                     session.execute(
                         text(
-                            "UPDATE device_tokens SET revoked_at = now() "
+                            "UPDATE device_tokens SET revoked_at = public.app_now() "
                             "WHERE token = :t AND revoked_at IS NULL"
                         ),
                         {"t": token},
@@ -2720,7 +2721,7 @@ def _humanise_due(due_by: datetime | None) -> str:
     """
     if due_by is None:
         return ""
-    delta = due_by - datetime.now(UTC)
+    delta = due_by - clock.now()
     # Round rather than floor: a visit created with within_hours=24 is a
     # microsecond short of 24h by the time this renders, and announcing "23h"
     # reads as if the scout has already lost an hour they have not.

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import contextlib
 import json
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Literal
 from uuid import UUID
 
@@ -26,6 +26,7 @@ from app.modules.observer.weather import (
     COVERAGE_WARN_HOURS as WEATHER_COVERAGE_WARN_HOURS,
 )
 from app.modules.observer.weather import ObserverWeatherRepository
+from app.shared import clock
 from app.shared.storage import get_storage_client
 
 # Widest window the overview will scan in one request. The overview fires
@@ -757,7 +758,7 @@ class ObserverService:
         """
         from app.modules.observer.verify import verify_scene_fast, verify_scene_full
 
-        started = datetime.now(UTC)
+        started = clock.now()
         ctx, _ = await self._scene_context_and_formulas(tenant_schema, job_id)
         if ctx["scope"] != "block":
             raise BlockScopedSceneRequiredError(str(job_id))
@@ -804,7 +805,7 @@ class ObserverService:
                 stored=stored,
             )
 
-        duration_ms = int((datetime.now(UTC) - started).total_seconds() * 1000)
+        duration_ms = int((clock.now() - started).total_seconds() * 1000)
         await self._scope(tenant_schema)
         try:
             row = await self._store.insert_verification(

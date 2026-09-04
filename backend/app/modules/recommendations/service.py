@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from time import perf_counter
 from typing import Any, Protocol
@@ -64,6 +64,7 @@ from app.modules.weather.snapshot import load_index_snapshot as load_weather_ind
 from app.modules.weather.snapshot import load_risk_snapshot as load_weather_risk_snapshot
 from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
 from app.modules.weather.snapshot import load_water_balance_snapshot
+from app.shared import clock
 from app.shared.action_items import build_group_key
 from app.shared.conditions import ConditionContext
 from app.shared.crop_taxonomy import path_matches
@@ -1074,7 +1075,7 @@ class RecommendationsServiceImpl:
                     action_type=first["action_type"],
                     severity=first["severity"],
                     confidence=Decimal("1.0"),
-                    created_at=datetime.now(UTC),
+                    created_at=clock.now(),
                     tenant_schema=tenant_schema,
                     # Lead with what the tree concluded, not with the
                     # aggregation. "12 zones flagged" tells a supervisor how
@@ -1407,7 +1408,7 @@ class RecommendationsServiceImpl:
 
         return {
             "block_id": str(block_id),
-            "evaluated_at": datetime.now(UTC),
+            "evaluated_at": clock.now(),
             "crop_path": setup.crop_path,
             "trees": trees,
         }
@@ -1666,7 +1667,7 @@ class RecommendationsServiceImpl:
                     action_type=result.outcome.action_type,
                     severity=result.outcome.severity,
                     confidence=result.outcome.confidence,
-                    created_at=datetime.now(UTC),
+                    created_at=clock.now(),
                     tenant_schema=tenant_schema,
                     text_en=result.outcome.text_en,
                     text_ar=result.outcome.text_ar,
@@ -1725,7 +1726,7 @@ class RecommendationsServiceImpl:
         """
         valid_until: datetime | None = None
         if result.outcome.valid_for_hours is not None:
-            valid_until = datetime.now(UTC) + timedelta(hours=result.outcome.valid_for_hours)
+            valid_until = clock.now() + timedelta(hours=result.outcome.valid_for_hours)
 
         # Snapshot the block's crop path (+ cell id when cell-scoped) alongside
         # the evaluated signals so the recommendation stays self-describing.
@@ -2017,7 +2018,7 @@ class RecommendationsServiceImpl:
                 cell_id=None,
                 rule_code=rule_code,
                 severity=outcome.severity,
-                created_at=datetime.now(UTC),
+                created_at=clock.now(),
                 tenant_schema=tenant_schema,
                 farm_id=farm_id,
                 diagnosis_en=outcome.text_en,
@@ -3101,11 +3102,11 @@ class DecisionTreesAuthorService:
             }
         # Stamp published_at via a direct UPDATE — `insert_version` doesn't
         # have a published-stamp setter for an existing row.
-        published_at = datetime.now(UTC)
+        published_at = clock.now()
         await self._public.execute(
             text(
                 "UPDATE public.decision_tree_versions "
-                "SET published_at = :pub, published_by = :actor, updated_at = now() "
+                "SET published_at = :pub, published_by = :actor, updated_at = public.app_now() "
                 "WHERE id = :vid"
             ),
             {"pub": published_at, "actor": actor_user_id, "vid": version_row["id"]},

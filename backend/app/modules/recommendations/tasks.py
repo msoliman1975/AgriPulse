@@ -272,12 +272,12 @@ WITH active AS (
     FROM active a
 )
 UPDATE public.tenant_dt_dispatch t
-   SET last_dispatched_at = now()
+   SET last_dispatched_at = public.app_now()
   FROM cadence c
  WHERE c.id = t.tenant_id
    AND (
         t.last_dispatched_at IS NULL
-        OR t.last_dispatched_at <= now() - make_interval(hours => c.hours::int)
+        OR t.last_dispatched_at <= public.app_now() - make_interval(hours => c.hours::int)
    )
 RETURNING c.schema_name, c.hours
 """
@@ -384,7 +384,7 @@ async def _prune_eval_runs_async(*, retention_days: int) -> dict[str, int]:
                                 """
                                 DELETE FROM decision_tree_eval_runs
                                  WHERE started_at
-                                       < now() - make_interval(days => :days)
+                                       < public.app_now() - make_interval(days => :days)
                                 RETURNING id
                                 """
                             ),

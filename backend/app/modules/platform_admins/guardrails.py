@@ -89,7 +89,7 @@ async def _insert_inbox_row(
                 severity, title, body, link_url, created_at, updated_at
             ) VALUES (
                 :id, :uid, NULL, NULL,
-                'warning', :title, :body, :link, now(), now()
+                'warning', :title, :body, :link, public.app_now(), public.app_now()
             )
             """
         ).bindparams(

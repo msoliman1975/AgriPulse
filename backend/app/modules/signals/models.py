@@ -189,7 +189,7 @@ class SignalObservation(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     recorded_by: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     inserted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
 
     # CS-1 D2: how the observation is geolocated.

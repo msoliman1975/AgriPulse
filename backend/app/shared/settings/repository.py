@@ -74,7 +74,7 @@ class SettingsRepository:
                 """
                 UPDATE public.platform_defaults
                 SET value = CAST(:value AS jsonb),
-                    updated_at = now(),
+                    updated_at = public.app_now(),
                     updated_by = :actor
                 WHERE key = :key
                 """
@@ -140,7 +140,7 @@ class SettingsRepository:
                 INSERT INTO public.tenant_settings_overrides
                     (tenant_id, key, value, updated_at, updated_by)
                 VALUES
-                    (:tid, :key, CAST(:value AS jsonb), now(), :actor)
+                    (:tid, :key, CAST(:value AS jsonb), public.app_now(), :actor)
                 ON CONFLICT (tenant_id, key) DO UPDATE SET
                     value = EXCLUDED.value,
                     updated_at = EXCLUDED.updated_at,

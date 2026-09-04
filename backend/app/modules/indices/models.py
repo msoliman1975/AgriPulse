@@ -113,7 +113,7 @@ class BlockIndexAggregate(Base):
     # by a trigger — see `IndicesService.record_aggregate_row`.
     baseline_deviation: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
     inserted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
 
 
@@ -140,5 +140,5 @@ class BlockIndexBaseline(Base):
     window_days: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("7"))
     years_observed: Mapped[int] = mapped_column(Integer, nullable=False)
     computed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )

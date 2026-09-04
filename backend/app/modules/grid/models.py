@@ -150,5 +150,5 @@ class BlockGridAggregate(Base):
     cloud_cover_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     stac_item_id: Mapped[str] = mapped_column(Text, nullable=False)
     inserted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )

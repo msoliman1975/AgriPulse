@@ -176,7 +176,7 @@ class PlatformAdminsService:
             text(
                 """
                 UPDATE public.tenant_role_assignments
-                SET revoked_at = now()
+                SET revoked_at = public.app_now()
                 WHERE membership_id = :mid
                   AND role = :role
                   AND revoked_at IS NULL
@@ -221,7 +221,7 @@ class PlatformAdminsService:
             text(
                 """
                 UPDATE public.tenant_role_assignments
-                SET revoked_at = now()
+                SET revoked_at = public.app_now()
                 WHERE membership_id = :mid
                   AND role = 'TenantOwner'
                   AND revoked_at IS NULL

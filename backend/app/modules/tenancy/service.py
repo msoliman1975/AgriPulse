@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Protocol
 from uuid import UUID
 
@@ -29,6 +29,7 @@ from app.modules.tenancy.events import (
 )
 from app.modules.tenancy.models import Tenant
 from app.modules.tenancy.repository import TenantRepository
+from app.shared import clock
 from app.shared.auth.tenant_status import invalidate as invalidate_tenant_status_cache
 from app.shared.db.ids import schema_name_for, uuid7
 from app.shared.eventbus import EventBus, get_default_bus
@@ -522,7 +523,7 @@ class TenantServiceImpl:
                 slug=slug,
                 schema_name=schema_name,
                 contact_email=contact_email,
-                created_at=tenant.created_at or datetime.now(UTC),
+                created_at=tenant.created_at or clock.now(),
                 actor_user_id=actor_user_id,
             )
         )
@@ -546,7 +547,7 @@ class TenantServiceImpl:
             default_locale=default_locale,
             default_unit_system=default_unit_system,
             status=tenant.status,
-            created_at=tenant.created_at or datetime.now(UTC),
+            created_at=tenant.created_at or clock.now(),
             provisioning_failed=provisioning_failed,
             owner_user_id=owner_user_id,
         )
@@ -723,7 +724,7 @@ class TenantServiceImpl:
         if tenant.status != "active":
             raise InvalidStatusTransitionError(tenant.status, "suspend")
 
-        when = datetime.now(UTC)
+        when = clock.now()
         tenant = await self._repo.set_status(
             tenant=tenant,
             status="suspended",
@@ -779,7 +780,7 @@ class TenantServiceImpl:
         if tenant.status != "suspended":
             raise InvalidStatusTransitionError(tenant.status, "reactivate")
 
-        when = datetime.now(UTC)
+        when = clock.now()
         tenant = await self._repo.set_status(
             tenant=tenant,
             status="active",
@@ -828,7 +829,7 @@ class TenantServiceImpl:
         if tenant.status not in ("active", "suspended"):
             raise InvalidStatusTransitionError(tenant.status, "request_delete")
 
-        when = datetime.now(UTC)
+        when = clock.now()
         tenant = await self._repo.set_status(
             tenant=tenant,
             status="pending_delete",
@@ -874,7 +875,7 @@ class TenantServiceImpl:
         if tenant.status != "pending_delete":
             raise InvalidStatusTransitionError(tenant.status, "cancel_delete")
 
-        when = datetime.now(UTC)
+        when = clock.now()
         # Returning to suspended (not active) is the conservative default —
         # whoever cancelled deletion still has to make an explicit "OK to
         # log in" decision via reactivate.
@@ -928,13 +929,13 @@ class TenantServiceImpl:
 
         if force and not get_settings().purge_allow_immediate:
             raise PurgeNotEligibleError(
-                (tenant.deleted_at or datetime.now(UTC)) + timedelta(days=PURGE_GRACE_DAYS)
+                (tenant.deleted_at or clock.now()) + timedelta(days=PURGE_GRACE_DAYS)
             )
 
         deleted_at = tenant.deleted_at
         if deleted_at is not None and not force:
             eligible_at = deleted_at + timedelta(days=PURGE_GRACE_DAYS)
-            if datetime.now(UTC) < eligible_at:
+            if clock.now() < eligible_at:
                 raise PurgeNotEligibleError(eligible_at)
 
         slug = tenant.slug
@@ -942,7 +943,7 @@ class TenantServiceImpl:
 
         # Capture archive event first so the trail survives even if the
         # schema-drop step fails or the process dies.
-        when = datetime.now(UTC)
+        when = clock.now()
         await self._audit.record_archive(
             event_type="platform.tenant_purged",
             actor_user_id=actor_user_id,

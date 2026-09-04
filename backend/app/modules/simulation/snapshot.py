@@ -56,6 +56,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.shared import clock
 from app.shared.db.session import sanitize_tenant_schema
 
 # 2: `latest_observed_at` excludes forward-looking tables. The file layout is
@@ -277,7 +278,7 @@ async def extract(
         # Recorded for provenance, not for reconnection: nothing in a load
         # path reads it back.
         "source_schema": schema,
-        "extracted_at": datetime.now(UTC).isoformat(),
+        "extracted_at": clock.now().isoformat(),
         "latest_observed_at": latest.isoformat() if latest else None,
         "farm_count": len(farm_ids),
         "block_count": len(block_ids),
@@ -497,7 +498,7 @@ async def load(
             f"!= supported {SNAPSHOT_VERSION}"
         )
 
-    offset = _offset_for(snapshot, as_of or datetime.now(UTC))
+    offset = _offset_for(snapshot, as_of or clock.now())
     report: dict[str, Any] = {
         "target_schema": schema,
         "offset_days": round(offset.total_seconds() / 86400, 2),

@@ -8,7 +8,7 @@ async session this repository assumes.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -16,6 +16,8 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.shared import clock
 
 
 class NotificationsRepository:
@@ -94,13 +96,13 @@ class NotificationsRepository:
         Returns True iff a row was updated."""
         if action == "read":
             sql = (
-                "UPDATE in_app_inbox SET read_at = now(), updated_at = now() "
+                "UPDATE in_app_inbox SET read_at = public.app_now(), updated_at = public.app_now() "
                 "WHERE id = :iid AND user_id = :uid AND read_at IS NULL "
                 "  AND deleted_at IS NULL"
             )
         elif action == "archive":
             sql = (
-                "UPDATE in_app_inbox SET archived_at = now(), updated_at = now() "
+                "UPDATE in_app_inbox SET archived_at = public.app_now(), updated_at = public.app_now() "
                 "WHERE id = :iid AND user_id = :uid AND archived_at IS NULL "
                 "  AND deleted_at IS NULL"
             )
@@ -180,7 +182,7 @@ class NotificationsRepository:
                         :code, :loc, :chan,
                         :uid, :addr,
                         :status, :rs, :rb, :err,
-                        CASE WHEN :status = 'sent' THEN now() ELSE NULL END
+                        CASE WHEN :status = 'sent' THEN public.app_now() ELSE NULL END
                     )
                     """
                 ).bindparams(
@@ -237,7 +239,7 @@ class NotificationsRepository:
                 ) VALUES (
                     :id, :uid, :alert_id, :rec_id,
                     :sev, :title, :body, :link,
-                    COALESCE(:created, now()), now()
+                    COALESCE(:created, public.app_now()), public.app_now()
                 )
                 """
             ).bindparams(
@@ -255,6 +257,6 @@ class NotificationsRepository:
                 "title": title,
                 "body": body,
                 "link": link_url,
-                "created": created_at or datetime.now(UTC),
+                "created": created_at or clock.now(),
             },
         )

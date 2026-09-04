@@ -82,5 +82,5 @@ class BlockWaterBalanceDaily(Base):
     #: as permanently in deficit.
     irrigation_logged: Mapped[bool] = mapped_column(Boolean, nullable=False)
     computed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )

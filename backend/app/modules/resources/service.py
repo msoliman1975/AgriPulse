@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -15,6 +14,7 @@ from app.modules.resources.errors import (
     ResourceNotFoundError,
 )
 from app.modules.resources.repository import ResourcesRepository
+from app.shared import clock
 from app.shared.db.ids import uuid7
 
 
@@ -155,7 +155,7 @@ class ResourcesServiceImpl:
         normalized: dict[str, Any] = {}
         archive = changes.pop("archive", None)
         if archive is True:
-            normalized["archived_at"] = datetime.now(UTC)
+            normalized["archived_at"] = clock.now()
         elif archive is False:
             normalized["archived_at"] = None
         # `phone` and `membership_id` are nullable links the caller may

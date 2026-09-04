@@ -36,7 +36,7 @@ grows past a single tester.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -53,6 +53,7 @@ from app.modules.health.service import (
     DefinitionSource,
     load_health_definitions,
 )
+from app.shared import clock
 from app.shared.auth.context import RequestContext
 from app.shared.db.session import get_db_session
 from app.shared.health import Health, classify_health
@@ -225,7 +226,11 @@ class BlocksSummaryResponse(BaseModel):
 # evaporates. `_RECENT_WINDOW_DAYS` is a module constant, never user input,
 # so interpolating it carries no injection surface.
 def _latest_indices_sql(*, cutoff_days: int | None) -> str:
-    window = "" if cutoff_days is None else f"AND a.time > now() - interval '{cutoff_days} days'"
+    window = (
+        ""
+        if cutoff_days is None
+        else f"AND a.time > public.app_now() - interval '{cutoff_days} days'"
+    )
     return f"""
         SELECT DISTINCT ON (a.block_id, a.index_code)
                a.block_id,
@@ -582,7 +587,7 @@ async def get_blocks_summary(
         farm_id=farm_id,
         # Echoes the instant the answer describes, so a caller can tell an
         # as-of response from a live one without re-reading its own request.
-        as_of=at or datetime.now(UTC),
+        as_of=at or clock.now(),
         units=units,
     )
 

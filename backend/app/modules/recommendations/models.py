@@ -102,10 +102,10 @@ class DecisionTreeVersion(Base):
     published_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
 
 
@@ -206,7 +206,7 @@ class RecommendationHistoryEntry(Base):
         PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
     )
     time: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
     recommendation_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     block_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
@@ -239,7 +239,7 @@ class FarmTreeExclusion(Base):
     )
     tree_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
     disabled_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
     disabled_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
 

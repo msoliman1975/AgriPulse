@@ -134,7 +134,7 @@ class ImageryIngestionJob(Base):
     scene_id: Mapped[str] = mapped_column(Text, nullable=False)
     scene_datetime: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     requested_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

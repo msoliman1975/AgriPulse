@@ -696,7 +696,7 @@ class ObserverRepository:
              WHERE {scope_clause}
                AND r.product_id = :pid
                AND r.scene_time = {_ts(scene_time)}
-             -- `id` breaks the tie: `created_at` defaults to now(), which is
+             -- `id` breaks the tie: `created_at` defaults to public.app_now(), which is
              -- the *transaction* timestamp, so two runs recorded in one
              -- transaction share it exactly. uuid_generate_v7 is
              -- time-ordered, which makes this ordering total.

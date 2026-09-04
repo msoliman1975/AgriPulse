@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Coroutine
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from datetime import date as date_type
 from decimal import Decimal
 from typing import Any
@@ -62,7 +62,7 @@ from app.modules.weather.risk import RiskBlockContext, evaluate_risks
 from app.modules.weather.risk_projection import build_risk_window
 from app.modules.weather.spi import accumulate, comparable_history, compute_spi
 from app.modules.weather.timezone import tz_for_centroid
-from app.shared import backfill_progress
+from app.shared import backfill_progress, clock
 from app.shared.db.ids import uuid7
 from app.shared.db.session import AsyncSessionLocal, dispose_engine, sanitize_tenant_schema
 
@@ -208,7 +208,7 @@ async def _fetch_weather_async(
     factory = AsyncSessionLocal()
 
     # Step 1: resolve farm centroid + open an attempt row per subscription.
-    started_at = datetime.now(UTC)
+    started_at = clock.now()
     async with factory() as session, session.begin():
         await _set_tenant_context(session, tenant_schema)
         repo = WeatherRepository(session)
@@ -240,7 +240,7 @@ async def _fetch_weather_async(
                 forecast_hours=settings.weather_forecast_hours,
             )
         except Exception as exc:
-            now = datetime.now(UTC)
+            now = clock.now()
             error_code = _classify_error(exc)
             error_message = str(exc)
             async with factory() as session, session.begin():
@@ -298,7 +298,7 @@ async def _fetch_weather_async(
             forecast_issued_at=result.forecast_issued_at,
             forecasts=result.forecasts,
         )
-        now = datetime.now(UTC)
+        now = clock.now()
         for sub_id in subscription_ids:
             await repo.touch_subscription_attempt(
                 subscription_id=sub_id, attempted_at=now, success=True
@@ -587,7 +587,7 @@ async def _derive_weather_daily_async(farm_id: UUID, tenant_schema: str) -> dict
         # 30-day total and evaporation_coeff dry-down reach 30 days behind
         # *it*, not behind today. A flat 31 would silently under-count both
         # on exactly the days at the far end of the chart.
-        now_utc = datetime.now(UTC)
+        now_utc = clock.now()
         forecast_hours = get_settings().weather_forecast_hours
         horizon_days = -(-forecast_hours // 24)  # ceil, so a part-day counts
         until_utc = now_utc + timedelta(days=1)
@@ -617,7 +617,7 @@ async def _derive_weather_daily_async(farm_id: UUID, tenant_schema: str) -> dict
 
     # Recompute today + yesterday in farm-local time. Today's row is the
     # partial-but-real one and self-corrects as observations land.
-    today_local = datetime.now(tz).date()
+    today_local = clock.now().astimezone(tz).date()
     yesterday_local = today_local - timedelta(days=1)
     targets = (yesterday_local, today_local)
 
@@ -727,7 +727,7 @@ async def _backfill_weather_indices_async(
         if centroid is None:
             return {"farm_id": str(farm_id), "status": "farm_missing"}
         tz = tz_for_centroid(centroid["latitude"], centroid["longitude"])
-        now_utc = datetime.now(UTC)
+        now_utc = clock.now()
         obs_rows = await repo.read_observations(
             farm_id=farm_id,
             provider_code=None,
@@ -740,7 +740,7 @@ async def _backfill_weather_indices_async(
     # capped at today: this task seeds the climatology's sample set, which
     # must never contain a prediction. The forward half belongs to
     # `derive_weather_daily`, which runs off the same fetch.
-    today_local = datetime.now(tz).date()
+    today_local = clock.now().astimezone(tz).date()
     targets = sorted(d for d in daily if d <= today_local)
 
     written = 0
@@ -1032,7 +1032,7 @@ async def _discover_due_subscriptions_async() -> dict[str, int]:
                 repo = WeatherRepository(session)
                 due = await repo.list_due_farm_provider_pairs(
                     default_cadence_hours=settings.weather_default_cadence_hours,
-                    now=datetime.now(UTC),
+                    now=clock.now(),
                 )
         except Exception:
             _log.exception("weather_due_sweep_tenant_failed", tenant_schema=tenant_schema)
@@ -1153,7 +1153,7 @@ async def _compute_weather_risk_for_tenant_async(tenant_schema: str) -> dict[str
             if centroid is None:
                 continue
             tz = tz_for_centroid(centroid["latitude"], centroid["longitude"])
-            now_utc = datetime.now(UTC)
+            now_utc = clock.now()
             obs_rows = await repo.read_observations(
                 farm_id=farm_id,
                 provider_code=None,
@@ -1162,7 +1162,7 @@ async def _compute_weather_risk_for_tenant_async(tenant_schema: str) -> dict[str
             )
 
         daily, radwind_by_date = _aggregate_obs_window(obs_rows, tz)
-        as_of = datetime.now(tz).date()
+        as_of = clock.now().astimezone(tz).date()
         window = build_risk_window(
             daily, radwind_by_date, as_of=as_of, window_days=_RISK_WINDOW_DAYS
         )
@@ -1280,7 +1280,7 @@ async def _compute_spi_for_tenant_async(
     target = (
         date_type.fromisoformat(target_iso)
         if target_iso
-        else datetime.now(UTC).date() - timedelta(days=1)
+        else clock.now().date() - timedelta(days=1)
     )
 
     factory = AsyncSessionLocal()

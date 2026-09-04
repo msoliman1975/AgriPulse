@@ -26,7 +26,7 @@ so partially-loaded blocks don't spuriously fire.
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -35,6 +35,7 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.shared import clock
 from app.shared.conditions import WeatherIndexEntry, WeatherRiskEntry, WeatherSnapshot
 from app.shared.conditions.context import WaterBalanceEntry
 
@@ -60,7 +61,7 @@ async def load_snapshot(
     any predicate that references it.
     """
     if now is None:
-        now = datetime.now(UTC)
+        now = clock.now()
     provider_code = await _pick_provider(session, farm_id=farm_id)
 
     latest = await _load_latest_observation(session, farm_id=farm_id, provider_code=provider_code)

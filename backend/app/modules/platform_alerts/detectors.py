@@ -280,7 +280,7 @@ idx AS (
            NULL::numeric AS attempts
       FROM block_index_aggregates a
       JOIN blocks b ON b.id = a.block_id AND b.deleted_at IS NULL
-     WHERE a.inserted_at > now() - interval '120 days'
+     WHERE a.inserted_at > public.app_now() - interval '120 days'
      GROUP BY 1
 ),
 streams AS (
@@ -295,8 +295,8 @@ SELECT f.id AS farm_id,
        s.stream,
        s.active_subs,
        s.last_ok,
-       EXTRACT(epoch FROM (now() - s.last_ok)) / 3600.0 AS age_hours,
-       EXTRACT(epoch FROM (now() - s.first_subscribed_at)) / 3600.0
+       EXTRACT(epoch FROM (public.app_now() - s.last_ok)) / 3600.0 AS age_hours,
+       EXTRACT(epoch FROM (public.app_now() - s.first_subscribed_at)) / 3600.0
          AS subscribed_hours,
        COALESCE(s.attempts, 0) AS attempts
   FROM streams s
@@ -419,14 +419,14 @@ farm_scene AS (
       FROM imagery_ingestion_jobs j
       JOIN blocks b ON b.id = j.block_id AND b.deleted_at IS NULL
      WHERE j.status = 'succeeded'
-       AND j.scene_datetime > now() - interval '30 days'
+       AND j.scene_datetime > public.app_now() - interval '30 days'
      GROUP BY 1, 2, 3
     UNION ALL
     SELECT j.farm_id, j.product_id, j.scene_datetime::date AS scene_day,
            max(j.completed_at) AS ingested_at
       FROM imagery_farm_ingestion_jobs j
      WHERE j.status = 'succeeded'
-       AND j.scene_datetime > now() - interval '30 days'
+       AND j.scene_datetime > public.app_now() - interval '30 days'
      GROUP BY 1, 2, 3
 ),
 -- The reference: newest scene day seen anywhere in the tenant per product.
@@ -444,7 +444,7 @@ SELECT f.id AS farm_id,
        (n.product_id IN (SELECT id FROM thermal_products)) AS is_thermal,
        n.scene_day,
        n.peer_ingested_at,
-       EXTRACT(epoch FROM (now() - n.peer_ingested_at)) / 3600.0 AS lag_hours,
+       EXTRACT(epoch FROM (public.app_now() - n.peer_ingested_at)) / 3600.0 AS lag_hours,
        (SELECT count(DISTINCT fs.farm_id)
           FROM farm_scene fs
          WHERE fs.product_id = n.product_id AND fs.scene_day = n.scene_day) AS peer_farms
@@ -458,7 +458,7 @@ SELECT f.id AS farm_id,
            AND fs.product_id = n.product_id
            AND fs.scene_day = n.scene_day
  )
-   AND n.peer_ingested_at < now() - make_interval(hours => :peer_lag_hours)
+   AND n.peer_ingested_at < public.app_now() - make_interval(hours => :peer_lag_hours)
    -- A farm cannot be behind on a scene its peer ingested before this farm
    -- had a subscription at all. Without this, switching a product on for a
    -- farm opens a critical alert on the very next sweep, minutes later and
@@ -550,7 +550,7 @@ SELECT b.farm_id,
   JOIN blocks b ON b.id = c.block_id
   LEFT JOIN farms f ON f.id = b.farm_id
  WHERE c.outcome = 'failed'
-   AND c.completed_at > now() - interval '24 hours'
+   AND c.completed_at > public.app_now() - interval '24 hours'
  GROUP BY 1, 2
 """
 
@@ -645,20 +645,20 @@ WITH stuck AS (
       FROM imagery_ingestion_jobs j
       JOIN blocks b ON b.id = j.block_id AND b.deleted_at IS NULL
      WHERE j.status IN ('pending', 'requested', 'running')
-       AND j.requested_at < now() - make_interval(hours => :stuck_hours)
-       AND j.requested_at > now() - interval '60 days'
+       AND j.requested_at < public.app_now() - make_interval(hours => :stuck_hours)
+       AND j.requested_at > public.app_now() - interval '60 days'
     UNION ALL
     SELECT j.farm_id, j.id AS job_id, j.status, j.requested_at
       FROM imagery_farm_ingestion_jobs j
      WHERE j.status IN ('pending', 'requested', 'running')
-       AND j.requested_at < now() - make_interval(hours => :stuck_hours)
-       AND j.requested_at > now() - interval '60 days'
+       AND j.requested_at < public.app_now() - make_interval(hours => :stuck_hours)
+       AND j.requested_at > public.app_now() - interval '60 days'
 )
 SELECT s.farm_id,
        f.name AS farm_name,
        count(*) AS stuck_jobs,
        min(s.requested_at) AS oldest_requested_at,
-       EXTRACT(epoch FROM (now() - min(s.requested_at))) / 3600.0 AS oldest_age_hours
+       EXTRACT(epoch FROM (public.app_now() - min(s.requested_at))) / 3600.0 AS oldest_age_hours
   FROM stuck s
   LEFT JOIN farms f ON f.id = s.farm_id
  GROUP BY 1, 2
@@ -753,14 +753,14 @@ SELECT g.farm_id,
        f.name AS farm_name,
        g.live_grids,
        g.newest_grid_at,
-       EXTRACT(EPOCH FROM (now() - g.newest_grid_at)) / 3600.0 AS age_hours,
+       EXTRACT(EPOCH FROM (public.app_now() - g.newest_grid_at)) / 3600.0 AS age_hours,
        s.block_scenes,
        s.farm_scenes
 FROM gridded g
 JOIN scenes s ON s.farm_id = g.farm_id
 JOIN farms f ON f.id = g.farm_id AND f.deleted_at IS NULL
 WHERE (s.block_scenes + s.farm_scenes) > 0
-  AND g.newest_grid_at < now() - make_interval(hours => :grace_hours)
+  AND g.newest_grid_at < public.app_now() - make_interval(hours => :grace_hours)
   AND NOT EXISTS (
       SELECT 1
       FROM block_grid_aggregates o

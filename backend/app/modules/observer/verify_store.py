@@ -146,7 +146,7 @@ class VerifyStore:
                 """
                 UPDATE observer_verify_runs
                    SET status = 'running',
-                       started_at = COALESCE(started_at, now()),
+                       started_at = COALESCE(started_at, public.app_now()),
                        progress = CAST(:progress AS jsonb)
                  WHERE id = :rid AND status = 'queued'
                 """
@@ -198,7 +198,7 @@ class VerifyStore:
                 UPDATE observer_verify_runs
                    SET status = :status,
                        error = :error,
-                       completed_at = now()
+                       completed_at = public.app_now()
                  WHERE id = :rid
                 """
             ),
@@ -217,7 +217,7 @@ class VerifyStore:
                 text(
                     f"""
                     UPDATE observer_verify_runs
-                       SET status = 'cancelled', completed_at = now()
+                       SET status = 'cancelled', completed_at = public.app_now()
                      WHERE id = :rid AND status IN ('queued', 'running')
                     RETURNING {_RUN_COLS}
                     """  # noqa: S608 - only the _RUN_COLS constant interpolates

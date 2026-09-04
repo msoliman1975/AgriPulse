@@ -6,7 +6,7 @@ the signup path — at that point no tenant exists.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -14,6 +14,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.billing.models import LIVE_STATUSES, QUEUE_STATUSES, TrialSignup
+from app.shared import clock
 
 #: Matches `farms.service._M2_PER_FEDDAN`. Duplicated rather than imported:
 #: importing another module's private helper is what the import contracts
@@ -55,7 +56,7 @@ class TrialRepository:
             status_handle=status_handle,
             verification_token_hash=verification_token_hash,
             verification_expires_at=verification_expires_at,
-            verification_sent_at=datetime.now(UTC),
+            verification_sent_at=clock.now(),
             source_ip=source_ip,
             user_agent=user_agent,
         )
@@ -64,7 +65,7 @@ class TrialRepository:
         return signup
 
     async def save(self, signup: TrialSignup) -> TrialSignup:
-        signup.updated_at = datetime.now(UTC)
+        signup.updated_at = clock.now()
         await self._session.flush()
         return signup
 
@@ -152,7 +153,7 @@ class TrialRepository:
         oldest_wait_hours: float | None = None
         if queue:
             oldest = min(s.created_at for s in queue if s.created_at is not None)
-            oldest_wait_hours = (datetime.now(UTC) - oldest).total_seconds() / 3600.0
+            oldest_wait_hours = (clock.now() - oldest).total_seconds() / 3600.0
 
         live_trials = await self._session.execute(
             text(
@@ -251,7 +252,7 @@ def day_and_week_start(now: datetime | None = None) -> tuple[datetime, datetime]
     The day resets at midnight UTC and the week on Monday. Stated here once
     so the screen and the check cannot disagree about when a cap lifts.
     """
-    moment = now or datetime.now(UTC)
+    moment = now or clock.now()
     day_start = moment.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = day_start - timedelta(days=day_start.weekday())
     return day_start, week_start

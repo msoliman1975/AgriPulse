@@ -44,7 +44,7 @@ failures_24h AS (
     SELECT provider_kind, provider_code, COUNT(*) AS n
     FROM public.provider_probe_results
     WHERE status IN ('error', 'timeout')
-      AND probe_at > now() - interval '24 hours'
+      AND probe_at > public.app_now() - interval '24 hours'
     GROUP BY provider_kind, provider_code
 )
 """
@@ -258,7 +258,7 @@ class ProviderHealthService:
                                     FROM weather_ingestion_attempts
                                     WHERE status = 'failed'
                                       AND provider_code = :p
-                                      AND started_at > now() - make_interval(hours => :h)
+                                      AND started_at > public.app_now() - make_interval(hours => :h)
                                     GROUP BY 1
                                     """
                                 ),
@@ -286,13 +286,13 @@ class ProviderHealthService:
                                         FROM imagery_ingestion_jobs ij
                                         WHERE ij.status = 'failed'
                                           AND ij.requested_at >
-                                              now() - make_interval(hours => :h)
+                                              public.app_now() - make_interval(hours => :h)
                                         UNION ALL
                                         SELECT fj.error_code, fj.product_id
                                         FROM imagery_farm_ingestion_jobs fj
                                         WHERE fj.status = 'failed'
                                           AND fj.requested_at >
-                                              now() - make_interval(hours => :h)
+                                              public.app_now() - make_interval(hours => :h)
                                     )
                                     SELECT COALESCE(f.error_code, 'uncategorized') AS code,
                                            COUNT(*)::int AS n

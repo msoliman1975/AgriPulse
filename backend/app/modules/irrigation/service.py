@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from datetime import date as date_type
 from decimal import Decimal
 from typing import Any, Protocol
@@ -25,6 +24,7 @@ from app.modules.irrigation.events import (
     IrrigationSkippedV1,
 )
 from app.modules.irrigation.repository import IrrigationRepository
+from app.shared import clock
 from app.shared.db.ids import uuid7
 from app.shared.eventbus import EventBus, get_default_bus
 
@@ -112,7 +112,7 @@ class IrrigationServiceImpl:
             partial UNIQUE rejected the insert — re-running the daily
             sweep is intentionally idempotent).
         """
-        target = scheduled_for or datetime.now(UTC).date()
+        target = scheduled_for or clock.now().date()
 
         ctx = await self._repo.get_block_context(block_id=block_id)
         if ctx is None or ctx.get("crop_id") is None:

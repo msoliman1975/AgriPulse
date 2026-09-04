@@ -206,7 +206,7 @@ class IndicesRepository:
                     :block_id, :index_code, :doy,
                     :mean, :std,
                     :sample_count, :window_days, :years_observed,
-                    now()
+                    public.app_now()
                 )
                 ON CONFLICT (block_id, index_code, day_of_year) DO UPDATE SET
                     baseline_mean = EXCLUDED.baseline_mean,
@@ -214,7 +214,7 @@ class IndicesRepository:
                     sample_count = EXCLUDED.sample_count,
                     window_days = EXCLUDED.window_days,
                     years_observed = EXCLUDED.years_observed,
-                    computed_at = now()
+                    computed_at = public.app_now()
                 """
             ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
             {

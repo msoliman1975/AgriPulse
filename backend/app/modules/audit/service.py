@@ -11,7 +11,6 @@ ambient session is on `public`, e.g., from the tenancy admin endpoint).
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -20,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.modules.audit.models import AuditEvent, AuditEventArchive
+from app.shared import clock
 from app.shared.db.ids import uuid7
 from app.shared.db.session import AsyncSessionLocal, sanitize_tenant_schema
 
@@ -101,7 +101,7 @@ class AuditServiceImpl:
             actor_kind = "system"
 
         event_id = uuid7()
-        when = datetime.now(UTC)
+        when = clock.now()
         resolved_subject_id = subject_id if subject_id is not None else _NIL_SUBJECT_ID
 
         factory = AsyncSessionLocal()
@@ -148,7 +148,7 @@ class AuditServiceImpl:
             actor_kind = "system"
 
         event_id = uuid7()
-        when = datetime.now(UTC)
+        when = clock.now()
         resolved_subject_id = subject_id if subject_id is not None else _NIL_SUBJECT_ID
 
         factory = AsyncSessionLocal()

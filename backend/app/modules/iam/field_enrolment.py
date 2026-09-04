@@ -263,7 +263,7 @@ class FieldEnrolmentService:
                          created_by, updated_by)
                     VALUES (:id, :tid, :uid, 'active',
                             (SELECT id FROM public.users WHERE id = :actor),
-                            now(), :actor, :actor)
+                            public.app_now(), :actor, :actor)
                     """
                 ).bindparams(
                     bindparam("id", type_=PG_UUID(as_uuid=True)),
@@ -501,7 +501,7 @@ class FieldEnrolmentService:
             return 0
         result = await self._tenant.execute(
             text(
-                "UPDATE resources SET role = :role, updated_at = now() "
+                "UPDATE resources SET role = :role, updated_at = public.app_now() "
                 "WHERE id = ANY(:ids) AND kind = 'worker' "
                 "AND role = 'FieldWorker' AND archived_at IS NULL "
                 "AND EXISTS (SELECT 1 FROM resource_farms rf "
@@ -768,7 +768,7 @@ class FieldEnrolmentService:
             # scope/availability mismatch the audit now reports.
             result = await self._tenant.execute(
                 text(
-                    "UPDATE resources SET membership_id = :mid, updated_at = now() "
+                    "UPDATE resources SET membership_id = :mid, updated_at = public.app_now() "
                     "WHERE id = :wid AND kind = 'worker' AND archived_at IS NULL "
                     "  AND EXISTS (SELECT 1 FROM resource_farms rf "
                     "               WHERE rf.resource_id = resources.id AND rf.farm_id = :fid)"

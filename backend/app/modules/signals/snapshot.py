@@ -182,7 +182,7 @@ async def load_snapshot(
                       AND o.farm_id = :farm_id
                       AND (
                           a.aggregation_window_days IS NULL
-                          OR o.time >= now()
+                          OR o.time >= public.app_now()
                                      - make_interval(days => a.aggregation_window_days)
                       )
                     GROUP BY o.signal_definition_id, a.aggregation
@@ -269,7 +269,7 @@ async def _load_numeric_trends(
                     WHERE o.value_numeric IS NOT NULL
                       AND (o.block_id = :block_id OR o.block_id IS NULL)
                       AND o.farm_id = :farm_id
-                      AND o.time >= now() - make_interval(days => :window_days)
+                      AND o.time >= public.app_now() - make_interval(days => :window_days)
                     ORDER BY a.code, o.time
                     """
                 ).bindparams(

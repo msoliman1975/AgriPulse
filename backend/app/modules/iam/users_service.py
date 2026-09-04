@@ -442,7 +442,7 @@ class TenantUsersService:
                 text(
                     """
                     UPDATE public.tenant_role_assignments
-                       SET revoked_at = now()
+                       SET revoked_at = public.app_now()
                      WHERE membership_id = :mid AND revoked_at IS NULL
                     RETURNING role
                     """
@@ -455,7 +455,7 @@ class TenantUsersService:
                 text(
                     """
                     UPDATE public.farm_scopes
-                       SET revoked_at = now()
+                       SET revoked_at = public.app_now()
                      WHERE membership_id = :mid AND revoked_at IS NULL
                     RETURNING farm_id, role
                     """
@@ -875,7 +875,7 @@ class TenantUsersService:
                                full_name_ar = :name_ar,
                                phone = COALESCE(:phone, phone),
                                updated_by = :actor,
-                               updated_at = now()
+                               updated_at = public.app_now()
                          WHERE id = :uid
                         """
                     ).bindparams(
@@ -1050,7 +1050,7 @@ class TenantUsersService:
                 sets.append(f"{col} = :{col}")
                 params[col] = value
             if sets:
-                sets.extend(["updated_by = :actor", "updated_at = now()"])
+                sets.extend(["updated_by = :actor", "updated_at = public.app_now()"])
                 await self._public.execute(
                     text(
                         f"UPDATE public.users SET {', '.join(sets)} "
@@ -1077,7 +1077,7 @@ class TenantUsersService:
                 cols = ", ".join(["user_id", *patch.keys()])
                 placeholders = ", ".join([":user_id", *(f":{k}" for k in patch)])
                 update_set = ", ".join(
-                    [f"{k} = EXCLUDED.{k}" for k in patch] + ["updated_at = now()"]
+                    [f"{k} = EXCLUDED.{k}" for k in patch] + ["updated_at = public.app_now()"]
                 )
                 bind_params: list[Any] = [bindparam("user_id", type_=PG_UUID(as_uuid=True))]
                 await self._public.execute(
@@ -1210,8 +1210,8 @@ class TenantUsersService:
         await self._public.execute(
             text(
                 "UPDATE public.tenant_memberships "
-                "SET deleted_at = now(), status = 'archived', "
-                "    updated_by = :actor, updated_at = now() "
+                "SET deleted_at = public.app_now(), status = 'archived', "
+                "    updated_by = :actor, updated_at = public.app_now() "
                 "WHERE user_id = :uid AND tenant_id = :tid AND deleted_at IS NULL"
             ).bindparams(
                 bindparam("uid", type_=PG_UUID(as_uuid=True)),
@@ -1231,7 +1231,7 @@ class TenantUsersService:
         for table in ("public.tenant_role_assignments", "public.farm_scopes"):
             await self._public.execute(
                 text(
-                    f"UPDATE {table} SET revoked_at = now() "
+                    f"UPDATE {table} SET revoked_at = public.app_now() "
                     f"WHERE revoked_at IS NULL AND {_membership_filter}"
                 ).bindparams(
                     bindparam("uid", type_=PG_UUID(as_uuid=True)),
@@ -1286,8 +1286,8 @@ class TenantUsersService:
             await self._public.execute(
                 text(
                     "UPDATE public.users "
-                    "SET deleted_at = now(), status = 'archived', "
-                    "    updated_by = :actor, updated_at = now() "
+                    "SET deleted_at = public.app_now(), status = 'archived', "
+                    "    updated_by = :actor, updated_at = public.app_now() "
                     "WHERE id = :uid AND deleted_at IS NULL"
                 ).bindparams(
                     bindparam("uid", type_=PG_UUID(as_uuid=True)),
@@ -1346,7 +1346,7 @@ class TenantUsersService:
         await self._public.execute(
             text(
                 "UPDATE public.tenant_memberships SET status = :status, "
-                "updated_at = now() "
+                "updated_at = public.app_now() "
                 "WHERE user_id = :uid AND tenant_id = :tid AND deleted_at IS NULL"
             ).bindparams(
                 bindparam("uid", type_=PG_UUID(as_uuid=True)),

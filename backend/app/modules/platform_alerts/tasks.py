@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Coroutine
-from datetime import UTC, datetime
 from typing import Any
 
 from celery import shared_task
@@ -48,6 +47,7 @@ from app.modules.platform_alerts.detectors import (
 )
 from app.modules.platform_alerts.email import notify
 from app.modules.platform_alerts.repository import PlatformAlertsRepository
+from app.shared import clock
 from app.shared.db.session import (
     AsyncSessionLocal,
     dispose_engine,
@@ -196,7 +196,7 @@ async def run_sweep() -> dict[str, Any]:
         "resolved": resolved,
         "emails_sent": email["sent"],
         "emails_alerts": email["alerts"],
-        "swept_at": datetime.now(UTC).isoformat(),
+        "swept_at": clock.now().isoformat(),
     }
     _log.info("platform_alert_sweep_done", **result)
     return result
@@ -211,7 +211,7 @@ async def _scan_tenant(*, schema: str, tenant_key: str, th: Thresholds) -> list[
     the default search_path and read the wrong schema - or, worse, whatever
     schema the previous statement left behind.
 
-    A single transaction also pins `now()` for the whole tenant scan, so the
+    A single transaction also pins `public.app_now()` for the whole tenant scan, so the
     ages two detectors report about the same farm cannot disagree.
     """
     factory = AsyncSessionLocal()
@@ -276,6 +276,6 @@ async def _record_task_failure(
                 "exception_type": exc_type,
                 "message": message,
                 "last_task_id": task_id,
-                "last_failed_at": datetime.now(UTC).isoformat(),
+                "last_failed_at": clock.now().isoformat(),
             },
         )

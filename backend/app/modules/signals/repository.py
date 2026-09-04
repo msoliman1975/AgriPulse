@@ -245,7 +245,7 @@ class SignalsRepository:
             params[col] = value
         if not sets:
             return await self.get_definition(definition_id=definition_id)
-        sets.extend(["updated_at = now()", "updated_by = :actor"])
+        sets.extend(["updated_at = public.app_now()", "updated_by = :actor"])
         await self._session.execute(
             text(
                 f"UPDATE public.signal_definitions SET {', '.join(sets)} "
@@ -269,7 +269,7 @@ class SignalsRepository:
         result = await self._session.execute(
             text(
                 "UPDATE public.signal_definitions "
-                "SET deleted_at = now(), updated_by = :actor, updated_at = now() "
+                "SET deleted_at = public.app_now(), updated_by = :actor, updated_at = public.app_now() "
                 "WHERE id = :id AND deleted_at IS NULL "
                 "AND tenant_id IS NOT DISTINCT FROM (SELECT t.id FROM public.tenants t "
                 "WHERE replace(t.id::text, '-', '') "
@@ -370,7 +370,7 @@ class SignalsRepository:
         result = await self._session.execute(
             text(
                 "UPDATE signal_assignments "
-                "SET deleted_at = now(), updated_by = :actor, updated_at = now() "
+                "SET deleted_at = public.app_now(), updated_by = :actor, updated_at = public.app_now() "
                 "WHERE id = :id AND deleted_at IS NULL"
             ).bindparams(
                 bindparam("id", type_=PG_UUID(as_uuid=True)),
@@ -584,7 +584,7 @@ class SignalsRepository:
             sets.append(f"{col} = :{col}")
             params[col] = value
         if sets:
-            sets.extend(["updated_at = now()", "updated_by = :actor"])
+            sets.extend(["updated_at = public.app_now()", "updated_by = :actor"])
             await self._session.execute(
                 text(
                     f"UPDATE public.signal_templates SET {', '.join(sets)} "
@@ -621,7 +621,7 @@ class SignalsRepository:
         result = await self._session.execute(
             text(
                 "UPDATE public.signal_templates "
-                "SET deleted_at = now(), updated_by = :actor, updated_at = now() "
+                "SET deleted_at = public.app_now(), updated_by = :actor, updated_at = public.app_now() "
                 "WHERE id = :id AND deleted_at IS NULL "
                 "AND tenant_id IS NOT DISTINCT FROM (SELECT t.id FROM public.tenants t "
                 "WHERE replace(t.id::text, '-', '') "

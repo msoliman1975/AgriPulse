@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
-from datetime import UTC, datetime
 from datetime import date as _date
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -50,6 +50,7 @@ from app.modules.farms.models import (
     GrowthStageLog,
 )
 from app.modules.farms.validity import is_active_on, state_on
+from app.shared import clock
 
 # Allowlists for dynamic UPDATE clauses — every column name interpolated
 # into an UPDATE … SET list MUST be in one of these sets. The router only
@@ -423,13 +424,13 @@ class FarmsRepository:
         ``active_to`` so they continue to exclude inactivated rows
         without each module having to be touched at once.
         """
-        effective = effective_date or datetime.now(UTC).date()
+        effective = effective_date or clock.now().date()
         result = await self._tenant.execute(
             update(Farm)
             .where(and_(Farm.id == farm_id, Farm.deleted_at.is_(None)))
             .values(
                 active_to=effective,
-                deleted_at=datetime.now(UTC),
+                deleted_at=clock.now(),
                 updated_by=actor_user_id,
             )
             .returning(Farm.id)
@@ -760,13 +761,13 @@ class FarmsRepository:
         if row is None:
             raise BlockNotFoundError(block_id)
 
-        effective = effective_date or datetime.now(UTC).date()
+        effective = effective_date or clock.now().date()
         await self._tenant.execute(
             update(Block)
             .where(and_(Block.id == block_id, Block.deleted_at.is_(None)))
             .values(
                 active_to=effective,
-                deleted_at=datetime.now(UTC),
+                deleted_at=clock.now(),
                 updated_by=actor_user_id,
             )
         )
@@ -1780,7 +1781,7 @@ class FarmsRepository:
         """Append a transition log row.
 
         ``transition_date=None`` falls through to the column default
-        ``now()`` so the manual path doesn't have to fabricate a clock.
+        ``public.app_now()`` so the manual path doesn't have to fabricate a clock.
         """
         block_exists = await self._tenant.execute(
             select(Block.id).where(Block.id == block_id, Block.deleted_at.is_(None))
@@ -1918,7 +1919,7 @@ class FarmsRepository:
             text(
                 """
                 UPDATE public.farm_scopes
-                SET revoked_at = now()
+                SET revoked_at = public.app_now()
                 WHERE id = :sid AND farm_id = :fid AND revoked_at IS NULL
                 RETURNING id, membership_id, farm_id, role, granted_at, revoked_at
                 """
@@ -2278,7 +2279,7 @@ class FarmsRepository:
         result = await self._tenant.execute(
             update(FarmAttachment)
             .where(FarmAttachment.id == attachment_id, FarmAttachment.deleted_at.is_(None))
-            .values(deleted_at=datetime.now(UTC), updated_by=actor_user_id)
+            .values(deleted_at=clock.now(), updated_by=actor_user_id)
         )
         # CursorResult exposes rowcount; cast keeps mypy happy under strict.
         from sqlalchemy.engine import CursorResult
@@ -2292,7 +2293,7 @@ class FarmsRepository:
         result = await self._tenant.execute(
             update(BlockAttachment)
             .where(BlockAttachment.id == attachment_id, BlockAttachment.deleted_at.is_(None))
-            .values(deleted_at=datetime.now(UTC), updated_by=actor_user_id)
+            .values(deleted_at=clock.now(), updated_by=actor_user_id)
         )
         # CursorResult exposes rowcount; cast keeps mypy happy under strict.
         from sqlalchemy.engine import CursorResult

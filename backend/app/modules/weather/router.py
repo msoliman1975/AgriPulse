@@ -20,8 +20,8 @@ reason as imagery/router.py â€” FastAPI's TypeAdapter cannot resolve
 string annotations on Request injection).
 """
 
-from datetime import UTC, datetime, timedelta
 from datetime import date as date_type
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -50,6 +50,7 @@ from app.modules.weather.schemas import (
     WeatherRiskTimeseriesResponse,
 )
 from app.modules.weather.service import WeatherServiceImpl, get_weather_service
+from app.shared import clock
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
 from app.shared.db.session import get_admin_db_session, get_db_session
@@ -291,7 +292,7 @@ async def get_weather_index_summary(
     """
     _ensure_tenant(context)
     repo = WeatherRepository(tenant_session)
-    since = datetime.now(UTC).date() - timedelta(days=_SUMMARY_WINDOW_DAYS)
+    since = clock.now().date() - timedelta(days=_SUMMARY_WINDOW_DAYS)
     rows = await repo.read_weather_index_recent(farm_id=farm_id, since=since)
 
     by_code: dict[str, list[dict[str, Any]]] = {}
@@ -322,7 +323,7 @@ async def get_weather_index_summary(
         )
 
     return WeatherIndexSummaryResponse.model_validate(
-        {"farm_id": farm_id, "as_of": datetime.now(UTC), "indices": list(entries)}
+        {"farm_id": farm_id, "as_of": clock.now(), "indices": list(entries)}
     )
 
 
@@ -389,7 +390,7 @@ async def get_weather_risk_summary(
     repo = WeatherRepository(tenant_session)
     rows = await repo.read_weather_risk_summary(farm_id=farm_id)
     return WeatherRiskSummaryResponse.model_validate(
-        {"farm_id": farm_id, "as_of": datetime.now(UTC), "risks": list(rows)}
+        {"farm_id": farm_id, "as_of": clock.now(), "risks": list(rows)}
     )
 
 

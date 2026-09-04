@@ -72,7 +72,7 @@ from app.modules.indices.computation import MASK_RULESET, PRODUCT_MASK_RULESETS
 from app.modules.indices.tasks import recompute_baselines_for_farm
 from app.modules.integrations_health.error_codes import classify_error
 from app.modules.weather.service import get_weather_service
-from app.shared import backfill_progress
+from app.shared import backfill_progress, clock
 from app.shared.db.ids import uuid7
 from app.shared.db.session import AsyncSessionLocal, dispose_engine, sanitize_tenant_schema
 from app.shared.eventbus import get_default_bus
@@ -371,7 +371,7 @@ async def _discover_scenes_async(
         # skipped forever. Re-scanning the buffer each poll is safe because
         # `upsert_pending_ingestion_job` is idempotent (already-seen scenes
         # return created=False and are skipped without re-acquisition).
-        now = datetime.now(UTC)
+        now = clock.now()
         window_start, window_end = _resolve_discovery_window(
             subscription=subscription,
             settings=settings,
@@ -414,7 +414,7 @@ async def _discover_scenes_async(
                             requested_at, completed_at
                         ) VALUES (
                             :id, :sub, :block, :prod,
-                            :scene, :sdt, 'failed', :err, now(), now()
+                            :scene, :sdt, 'failed', :err, public.app_now(), public.app_now()
                         )
                         ON CONFLICT (subscription_id, scene_id) DO NOTHING
                         """
@@ -1037,14 +1037,14 @@ async def _acquire_scene_async(
         if block is None:
             await repo.mark_failed(
                 job_id=job_id,
-                completed_at=datetime.now(UTC),
+                completed_at=clock.now(),
                 error_message="block_missing",
                 error_code="config_error",
             )
             bus.publish(IngestionFailedV1(job_id=job_id, error="block_missing"))
             return {"job_id": str(job_id), "status": "failed"}
         product = await _lookup_product(session, job["product_id"])
-        await repo.mark_running(job_id=job_id, started_at=datetime.now(UTC))
+        await repo.mark_running(job_id=job_id, started_at=clock.now())
 
     # Step 2: fetch from the provider.
     provider = _provider_factory(product["provider_code"])
@@ -1141,7 +1141,7 @@ async def _register_stac_item_async(
         if block is None:
             await repo.mark_failed(
                 job_id=job_id,
-                completed_at=datetime.now(UTC),
+                completed_at=clock.now(),
                 error_message="block_missing",
                 error_code="config_error",
             )
@@ -1191,7 +1191,7 @@ async def _register_stac_item_async(
         except Exception as exc:
             await repo.mark_failed(
                 job_id=job_id,
-                completed_at=datetime.now(UTC),
+                completed_at=clock.now(),
                 error_message=f"stac_register_failed: {exc}",
                 error_code="stac_register_failed",
             )
@@ -1207,7 +1207,7 @@ async def _register_stac_item_async(
 
         await repo.mark_succeeded(
             job_id=job_id,
-            completed_at=datetime.now(UTC),
+            completed_at=clock.now(),
             stac_item_id=item_id,
             assets_written=assets_written,
         )
@@ -1752,7 +1752,7 @@ async def _record_farm_scene_success(
         await repo.set_farm_job_status(
             job_id=job_id,
             status="succeeded",
-            completed_at=datetime.now(UTC),
+            completed_at=clock.now(),
             stac_item_id=stac_item_id,
             # index_keys maps code -> written key; assets_written wants the
             # keys. Iterating the dict gives the codes, which recorded
@@ -1787,7 +1787,7 @@ async def _fail_farm_job(
         await ImageryRepository(session).set_farm_job_status(
             job_id=job_id,
             status="failed",
-            completed_at=datetime.now(UTC),
+            completed_at=clock.now(),
             error_message=error[:1000],
             error_code=error_code,
         )
@@ -1954,7 +1954,7 @@ async def _discover_farm_scenes_async(
                 await _touch_farm_if_live(
                     repo,
                     subscription_id=subscription_id,
-                    now=datetime.now(UTC),
+                    now=clock.now(),
                     bump_watermark=bump_watermark,
                 )
                 # Logged, not audited. The audit service opens its own session,
@@ -1964,7 +1964,7 @@ async def _discover_farm_scenes_async(
                 # and there is no such point on this path.
                 return empty
 
-        now = datetime.now(UTC)
+        now = clock.now()
         window_start, window_end = _resolve_discovery_window(
             subscription=subscription,
             settings=settings,
@@ -2102,7 +2102,7 @@ async def _acquire_farm_scene_async(job_id: UUID, tenant_schema: str) -> dict[st
             await repo.set_farm_job_status(
                 job_id=job_id,
                 status="failed",
-                completed_at=datetime.now(UTC),
+                completed_at=clock.now(),
                 error_message="farm_missing",
                 error_code="config_error",
             )
@@ -2116,9 +2116,7 @@ async def _acquire_farm_scene_async(job_id: UUID, tenant_schema: str) -> dict[st
             if product["code"] == "landsat_c2_l2_st"
             else None
         )
-        await repo.set_farm_job_status(
-            job_id=job_id, status="running", started_at=datetime.now(UTC)
-        )
+        await repo.set_farm_job_status(job_id=job_id, status="running", started_at=clock.now())
 
     # Every failure below lands in one place: the job is marked failed with a
     # code, once, rather than at eight separate exits.
@@ -2239,7 +2237,7 @@ async def _discover_active_farm_subscriptions_async() -> dict[str, int]:
                 await _set_tenant_context(session2, tenant_schema)
                 due = await ImageryRepository(session2).list_farm_subscriptions_due(
                     default_cadence_hours=24,
-                    now=datetime.now(UTC),
+                    now=clock.now(),
                     anchor_hour_utc=get_settings().imagery_discovery_anchor_hour_utc,
                 )
         except Exception:
@@ -2312,7 +2310,7 @@ async def _compute_indices_async(
     raw_uri = f"s3://{bucket}/{raw_bands_key_str}"
     # Lineage clock. Started before the raster read so the recorded duration
     # covers the part of this task that can actually be slow.
-    calc_started_at = datetime.now(UTC)
+    calc_started_at = clock.now()
     aoi_pixel_count: int | None = None
     masked_pixel_count: int | None = None
     try:
@@ -2665,7 +2663,7 @@ async def _record_calc_run(
                 outcome=outcome,
                 error=error,
                 started_at=started_at,
-                completed_at=datetime.now(UTC),
+                completed_at=clock.now(),
             )
     except Exception as exc:  # lineage must never fail the task
         _log.warning(
@@ -2725,7 +2723,7 @@ async def _discover_active_subscriptions_async() -> dict[str, int]:
                 repo = ImageryRepository(session2)
                 due = await repo.list_active_subscriptions_due(
                     default_cadence_hours=24,  # fallback; per-row cadence applies first
-                    now=datetime.now(UTC),
+                    now=clock.now(),
                     anchor_hour_utc=get_settings().imagery_discovery_anchor_hour_utc,
                 )
         except Exception:
@@ -2944,7 +2942,7 @@ async def _fail_job(
         repo = ImageryRepository(session)
         await repo.mark_failed(
             job_id=job_id,
-            completed_at=datetime.now(UTC),
+            completed_at=clock.now(),
             error_message=error,
             error_code=error_code,
         )

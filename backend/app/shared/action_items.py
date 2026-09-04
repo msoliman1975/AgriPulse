@@ -83,7 +83,7 @@ GRID_GROUP_RULE_CODE = "grid:spatial_anomaly"
 # write recurrence counters and the day boundary must be the same one — a
 # streak cut at a different midnight on each table is worse than no streak.
 TENANT_TODAY_SQL = (
-    "SELECT (now() AT TIME ZONE default_timezone)::date "
+    "SELECT (public.app_now() AT TIME ZONE default_timezone)::date "
     "FROM public.tenants WHERE schema_name = :s"
 )
 
@@ -241,7 +241,7 @@ class GroupingSQL:
         """
         return f"""
             UPDATE {self.table}
-               SET last_seen_at = now(),
+               SET last_seen_at = public.app_now(),
                    occurrence_count = occurrence_count + CASE
                        WHEN last_seen_day IS DISTINCT FROM CAST(:today AS date) THEN 1
                        ELSE 0 END,
@@ -251,7 +251,7 @@ class GroupingSQL:
                        ELSE 1 END,
                    last_seen_day = CAST(:today AS date),
                    first_seen_at = COALESCE(first_seen_at, created_at),
-                   updated_at = now(),
+                   updated_at = public.app_now(),
                    updated_by = :actor
              WHERE id = :id
          RETURNING id, occurrence_count, day_streak
@@ -285,7 +285,7 @@ class GroupingSQL:
                           AND c.cleared_at IS NULL
                           AND c.{self.state_column} IN ({self.active})
                    ),
-                   updated_at = now()
+                   updated_at = public.app_now()
              WHERE p.id = :parent_id
          RETURNING p.member_count
         """  # noqa: S608
@@ -302,7 +302,7 @@ class GroupingSQL:
         """
         return f"""
             UPDATE {self.table}
-               SET cleared_at = now(), updated_at = now()
+               SET cleared_at = public.app_now(), updated_at = public.app_now()
              WHERE block_id = :block_id
                AND {scope}
                AND group_parent_id IS NOT NULL
@@ -334,7 +334,7 @@ class GroupingSQL:
                           AND c.cleared_at IS NULL
                           AND c.{self.state_column} IN ({self.active})
                    ),
-                   updated_at = now()
+                   updated_at = public.app_now()
              WHERE p.block_id = :block_id
                AND {scope}
                AND p.is_group = TRUE

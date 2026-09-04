@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -17,6 +16,7 @@ from app.modules.resources.errors import (
     InvalidResourceShapeError,
 )
 from app.modules.resources.models import ActivityResource, Resource, ResourceFarm
+from app.shared import clock
 
 
 class ResourcesRepository:
@@ -213,7 +213,7 @@ class ResourcesRepository:
             ActivityResource(
                 activity_id=activity_id,
                 resource_id=resource_id,
-                created_at=datetime.now(UTC),
+                created_at=clock.now(),
                 created_by=actor_user_id,
             )
         )

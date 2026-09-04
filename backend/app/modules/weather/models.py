@@ -208,7 +208,7 @@ class WeatherIngestionAttempt(Base):
     farm_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     provider_code: Mapped[str] = mapped_column(Text, nullable=False)
     started_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'running'"))
@@ -255,7 +255,7 @@ class WeatherObservation(Base):
     cloud_cover_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     et0_mm: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     inserted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
 
 
@@ -300,7 +300,7 @@ class WeatherForecast(Base):
     solar_radiation_w_m2: Mapped[Decimal | None] = mapped_column(Numeric(7, 2), nullable=True)
     et0_mm: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     inserted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
 
 
@@ -338,7 +338,7 @@ class WeatherDerivedDaily(Base):
     temp_max_c: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     temp_mean_c: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     computed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
 
 
@@ -379,7 +379,7 @@ class WeatherIndexDaily(Base):
     baseline_deviation: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
     is_forecast: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     computed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
 
 
@@ -413,7 +413,7 @@ class WeatherIndexBaseline(Base):
     window_days: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("7"))
     years_observed: Mapped[int] = mapped_column(Integer, nullable=False)
     computed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
 
 
@@ -447,5 +447,5 @@ class WeatherRiskDaily(Base):
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
     computed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )

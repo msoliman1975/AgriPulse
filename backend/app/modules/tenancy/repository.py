@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.models import AuditEventArchive
 from app.modules.tenancy.models import Tenant, TenantSettings, TenantSubscription
+from app.shared import clock
 
 _UPDATABLE_FIELDS: frozenset[str] = frozenset(
     {
@@ -160,7 +161,7 @@ class TenantRepository:
         sub = TenantSubscription(
             tenant_id=tenant_id,
             tier=tier,
-            started_at=datetime.now(UTC),
+            started_at=clock.now(),
             is_current=True,
             feature_flags=feature_flags or {},
             created_by=actor_user_id,

@@ -121,7 +121,7 @@ async def _probe_providers_async() -> dict[str, Any]:
             text(
                 """
                 DELETE FROM public.provider_probe_results
-                WHERE probe_at < now() - make_interval(days => :days)
+                WHERE probe_at < public.app_now() - make_interval(days => :days)
                 """
             ),
             {"days": _PROBE_RETENTION_DAYS},

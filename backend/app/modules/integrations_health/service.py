@@ -11,13 +11,14 @@ via the auth middleware.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.shared import clock
 
 # Columns are listed explicitly so adding view columns can't accidentally
 # break the API contract — we'd see the schema mismatch immediately.
@@ -204,7 +205,7 @@ class IntegrationsHealthService:
                           )
                           AND (ws.last_successful_ingest_at IS NULL
                                OR ws.last_successful_ingest_at <
-                                  now() - make_interval(
+                                  public.app_now() - make_interval(
                                     hours => COALESCE(ws.cadence_hours,
                                                       :default_cadence)))
 
@@ -225,7 +226,7 @@ class IntegrationsHealthService:
                           AND f.deleted_at IS NULL
                           AND (wfs.last_successful_ingest_at IS NULL
                                OR wfs.last_successful_ingest_at <
-                                  now() - make_interval(
+                                  public.app_now() - make_interval(
                                     hours => COALESCE(wfs.cadence_hours,
                                                       :default_cadence)))
                         ORDER BY since NULLS FIRST
@@ -278,7 +279,7 @@ class IntegrationsHealthService:
                 # Determine state per row in Python. Running the query twice,
                 # once for stuck and once for not-stuck, would read the same
                 # rows twice to split them on a clock.
-                age_min = (datetime.now(UTC) - d["since"]).total_seconds() / 60
+                age_min = (clock.now() - d["since"]).total_seconds() / 60
                 row_state = "stuck" if age_min >= stuck_minutes else "running"
                 if state is None or state == row_state:
                     d.update({"kind": "weather", "state": row_state})
@@ -344,7 +345,7 @@ class IntegrationsHealthService:
                         -- cadence, so a gap there is a real fault.
                           AND (ias.last_attempted_at IS NULL
                                OR ias.last_attempted_at <
-                                  now() - make_interval(
+                                  public.app_now() - make_interval(
                                     hours => COALESCE(ias.cadence_hours,
                                                       :default_cadence)))
 
@@ -368,7 +369,7 @@ class IntegrationsHealthService:
                           -- Poll clock here too; see the block arm.
                           AND (ifs.last_attempted_at IS NULL
                                OR ifs.last_attempted_at <
-                                  now() - make_interval(
+                                  public.app_now() - make_interval(
                                     hours => COALESCE(ifs.cadence_hours,
                                                       :default_cadence)))
                         ORDER BY since NULLS FIRST
@@ -439,7 +440,7 @@ class IntegrationsHealthService:
             )
             for x in r:
                 d = dict(x)
-                age_min = (datetime.now(UTC) - d["since"]).total_seconds() / 60
+                age_min = (clock.now() - d["since"]).total_seconds() / 60
                 row_state = "stuck" if age_min >= stuck_minutes else "running"
                 if state is None or state == row_state:
                     d.update({"kind": "imagery", "state": row_state})

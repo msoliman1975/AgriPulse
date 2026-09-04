@@ -155,7 +155,7 @@ class BackfillRepository:
                 text(
                     f"""
                     UPDATE public.backfill_runs
-                       SET status = 'failed', error = :err, completed_at = now()
+                       SET status = 'failed', error = :err, completed_at = public.app_now()
                      WHERE id = :rid
                        AND status IN ('queued', 'running')
                     RETURNING {_COLS}
@@ -172,7 +172,7 @@ class BackfillRepository:
             text(
                 """
                 UPDATE public.backfill_runs
-                   SET status = 'failed', error = :err, completed_at = now()
+                   SET status = 'failed', error = :err, completed_at = public.app_now()
                  WHERE id = :rid
                 """
             ),

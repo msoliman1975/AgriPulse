@@ -28,6 +28,7 @@ from app.modules.billing.errors import (
     SignupNotFoundError,
 )
 from app.modules.billing.service import TrialService, is_free_mail
+from app.shared import clock
 from app.shared.auth.context import RequestContext
 from app.shared.db.session import get_admin_db_session
 from app.shared.rbac.check import requires_capability
@@ -240,7 +241,7 @@ def _row(signup: Any) -> TrialSignupRow:
     row.is_free_mail = is_free_mail(signup.email_domain)
     if signup.created_at is not None and signup.status in ("awaiting_approval", "paused"):
         row.waiting_hours = round(
-            (datetime.now(signup.created_at.tzinfo) - signup.created_at).total_seconds() / 3600.0,
+            (clock.now() - signup.created_at).total_seconds() / 3600.0,
             1,
         )
     return row

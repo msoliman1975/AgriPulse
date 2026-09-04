@@ -265,7 +265,7 @@ class GridRepository:
                 """
                 UPDATE grid_configs
                 SET anomaly_z_threshold = :v,
-                    updated_at = now()
+                    updated_at = public.app_now()
                 WHERE id = :config_id
                   AND retired_at IS NULL
                 """
@@ -387,7 +387,7 @@ class GridRepository:
                 """
                 UPDATE grid_configs
                 SET anomaly_z_threshold = :threshold,
-                    updated_at = now()
+                    updated_at = public.app_now()
                 WHERE id = ANY(:config_ids)
                   AND retired_at IS NULL
                   AND deleted_at IS NULL
@@ -419,7 +419,7 @@ class GridRepository:
                 UPDATE grid_configs
                 SET retired_at   = :retired_at,
                     effective_to = :retired_at,
-                    updated_at   = now()
+                    updated_at   = public.app_now()
                 WHERE id = :config_id
                   AND retired_at IS NULL
                 """

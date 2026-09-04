@@ -14,7 +14,7 @@ enforcement about what is currently in force.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -22,6 +22,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import APIError
+from app.shared import clock
 from app.shared.rbac.check import (
     WILDCARD,
     CapabilityRegistry,
@@ -301,7 +302,7 @@ async def build_matrix(
     roles.sort(key=lambda r: (tier_order.get(r.tier, 9), -r.capability_count, r.name))
 
     return RbacMatrixResponse(
-        generated_at=datetime.now(UTC),
+        generated_at=clock.now(),
         capabilities=capability_rows,
         roles=roles,
         capability_count=len(capability_rows),
@@ -486,12 +487,12 @@ async def apply_override(
             """
             INSERT INTO public.rbac_role_capability_overrides
                    (role, capability, granted, note, updated_by, updated_at)
-            VALUES (:role, :capability, :granted, :note, :actor, now())
+            VALUES (:role, :capability, :granted, :note, :actor, public.app_now())
             ON CONFLICT ON CONSTRAINT uq_rbac_override_role_capability
             DO UPDATE SET granted = EXCLUDED.granted,
                           note = EXCLUDED.note,
                           updated_by = EXCLUDED.updated_by,
-                          updated_at = now()
+                          updated_at = public.app_now()
             """
         ),
         {
