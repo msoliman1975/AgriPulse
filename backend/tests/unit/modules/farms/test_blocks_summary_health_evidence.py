@@ -141,13 +141,30 @@ def _crop(block_id: Any, crop_path: str) -> dict[str, Any]:
     return {"block_id": block_id, "crop_path": crop_path}
 
 
-def _alert(block_id: Any, severity: str, status: str, cell_id: Any = None, n: int = 1) -> dict:
+def _alert(block_id: Any, severity: str, status: str, n: int = 1, cells: int = 0) -> dict[str, Any]:
+    """One FINDING. `cells` is how many distinct cells it is made of; zero
+    means it is a statement about the whole block."""
     return {
+        "kind": "finding",
+        "block_id": block_id,
+        "severity": severity,
+        "status": status,
+        "cell_id": None,
+        "n": n,
+        "cells": cells,
+    }
+
+
+def _cell(block_id: Any, severity: str, status: str, cell_id: Any, n: int = 1) -> dict[str, Any]:
+    """One distinct cell of a grouped finding, with its OWN severity."""
+    return {
+        "kind": "cell",
         "block_id": block_id,
         "severity": severity,
         "status": status,
         "cell_id": cell_id,
         "n": n,
+        "cells": 0,
     }
 
 
@@ -296,8 +313,10 @@ class TestHealthEvidence:
         now = datetime.now(UTC)
         session = _session(
             alerts=[
-                _alert(b1, "critical", "open", cell_id=c1, n=2),
-                _alert(b1, "critical", "open", cell_id=c2),
+                # One grouped finding made of two cells, plus the cells.
+                _alert(b1, "critical", "open", cells=2),
+                _cell(b1, "critical", "open", c1, n=2),
+                _cell(b1, "critical", "open", c2),
             ],
             traces=[_traces(b1, fired=2, at=now)],
             cells=[{"block_id": b1, "total_cells": 121}],
@@ -309,10 +328,11 @@ class TestHealthEvidence:
         out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
 
         ev = out.units[0].health_evidence
-        # Three rows, two cells. The share test counts cells, not alerts.
+        # Two distinct cells. The share test counts cells, not alert rows.
         assert ev.critical_cells == 2
         assert ev.total_cells == 121
-        assert ev.alerts_by_severity == {"critical": 3}
+        # One finding, though. A 12-cell outbreak is one thing that is wrong.
+        assert ev.alerts_by_severity == {"critical": 1}
         # The platform default sets no share, so one critical cell is enough.
         assert ev.preview_health == "critical"
 
@@ -567,3 +587,135 @@ class TestThePerCropDefinition:
 
         assert out.units[0].health == "healthy"
         assert out.units[0].health_reason == "all_clear"
+
+
+@pytest.mark.asyncio
+class TestTheCellShare:
+    """Phase 8 — `cell_critical_share` was unreachable, and this is why.
+
+    A grouped alert is one finding stored as a parent plus one child per
+    cell, and the parent carries `cell_id = NULL`. The evidence query
+    filtered to findings — which the counters must do, or a 12-cell outbreak
+    reads as 13 — and so threw away every cell there was. Measured on prod:
+    ZERO cell-scoped findings out of 542 unresolved rows. `critical_cells`
+    was always 0 and no share a farm set could ever be reached.
+    """
+
+    async def test_a_grouped_finding_is_judged_by_its_cells_not_by_its_parent(self) -> None:
+        farm_id, b1 = uuid4(), uuid4()
+        cells = [uuid4() for _ in range(3)]
+        now = datetime.now(UTC)
+        session = _session(
+            alerts=[
+                _alert(b1, "critical", "open", cells=3),
+                *[_cell(b1, "critical", "open", c) for c in cells],
+            ],
+            cells=[{"block_id": b1, "total_cells": 100}],
+            traces=[_traces(b1, fired=1, at=now)],
+            crops=[_crop(b1, "mango")],
+            # 50% of the block's cells must be critical. 3 of 100 is not.
+            definitions=[_definition("mango", cell_critical_share=0.5)],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
+        )
+
+        out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
+
+        ev = out.units[0].health_evidence
+        assert ev.critical_cells == 3
+        assert ev.total_cells == 100
+        # Held back to watch, and the reason names the test that decided.
+        assert ev.preview_health == "watch"
+        assert ev.preview_reason == "cell_share"
+
+    async def test_enough_cells_still_make_the_block_critical(self) -> None:
+        farm_id, b1 = uuid4(), uuid4()
+        cells = [uuid4() for _ in range(60)]
+        now = datetime.now(UTC)
+        session = _session(
+            alerts=[
+                _alert(b1, "critical", "open", cells=60),
+                *[_cell(b1, "critical", "open", c) for c in cells],
+            ],
+            cells=[{"block_id": b1, "total_cells": 100}],
+            traces=[_traces(b1, fired=1, at=now)],
+            crops=[_crop(b1, "mango")],
+            definitions=[_definition("mango", cell_critical_share=0.5)],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
+        )
+
+        out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
+
+        assert out.units[0].health_evidence.preview_health == "critical"
+        assert out.units[0].health_evidence.preview_reason == "critical_alert"
+
+    async def test_a_block_scoped_critical_ignores_the_share(self) -> None:
+        """An alert about the whole block is already about the whole block.
+        Holding it back for want of cells would hide a real finding behind a
+        test that does not apply to it."""
+        farm_id, b1 = uuid4(), uuid4()
+        now = datetime.now(UTC)
+        session = _session(
+            alerts=[_alert(b1, "critical", "open")],
+            cells=[{"block_id": b1, "total_cells": 100}],
+            traces=[_traces(b1, fired=1, at=now)],
+            crops=[_crop(b1, "mango")],
+            definitions=[_definition("mango", cell_critical_share=0.5)],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
+        )
+
+        out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
+
+        assert out.units[0].health_evidence.preview_health == "critical"
+
+    async def test_the_counters_still_count_findings_not_cells(self) -> None:
+        """The two readings disagree on purpose. One outbreak is one thing
+        that is wrong; the share needs to know it covers twelve cells."""
+        farm_id, b1 = uuid4(), uuid4()
+        cells = [uuid4() for _ in range(12)]
+        now = datetime.now(UTC)
+        session = _session(
+            alerts=[
+                _alert(b1, "critical", "open", cells=12),
+                *[_cell(b1, "critical", "open", c) for c in cells],
+            ],
+            cells=[{"block_id": b1, "total_cells": 100}],
+            traces=[_traces(b1, fired=1, at=now)],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
+        )
+
+        out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
+
+        ev = out.units[0].health_evidence
+        assert ev.alerts_by_severity == {"critical": 1}
+        assert ev.critical_cells == 12
+
+    async def test_a_cell_carries_its_own_severity_not_its_parent_card_s(self) -> None:
+        """`attach_child` updates a member's severity in place, so a card at
+        critical can hold cells that have since dropped to warning. Counting
+        those as critical cells would inflate the share."""
+        farm_id, b1 = uuid4(), uuid4()
+        hot, cool = uuid4(), uuid4()
+        now = datetime.now(UTC)
+        session = _session(
+            alerts=[
+                _alert(b1, "critical", "open", cells=2),
+                _cell(b1, "critical", "open", hot),
+                _cell(b1, "warning", "open", cool),
+            ],
+            cells=[{"block_id": b1, "total_cells": 4}],
+            traces=[_traces(b1, fired=1, at=now)],
+            crops=[_crop(b1, "mango")],
+            definitions=[_definition("mango", cell_critical_share=0.5)],
+            roster=[b1],
+            indices=[{"block_id": b1, "index_code": "ndvi", "mean": 0.8, "time": now}],
+        )
+
+        out = await get_blocks_summary(farm_id=farm_id, context=None, tenant_session=session)
+
+        # One critical cell of four is 25%, under the 50% share.
+        assert out.units[0].health_evidence.critical_cells == 1
+        assert out.units[0].health_evidence.preview_reason == "cell_share"

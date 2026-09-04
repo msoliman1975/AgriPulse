@@ -47,6 +47,10 @@ class BlockEvidence:
     reporting: the resolver reads one alert per (severity, status, cell)
     group and does not care how many rows were in each group, but a
     reader looking at why a block is red does.
+
+    The two disagree on purpose where a finding is made of cells. The
+    counters see one finding; the resolver sees each cell, because that is
+    what `cell_critical_share` compares against the block's grid.
     """
 
     inputs: HealthInputs
@@ -61,17 +65,36 @@ class BlockEvidence:
     crop_path: str | None = None
 
 
-# Counted alerts, one row per (severity, status, cell) group.
+# Counted alerts, in two kinds of row.
 #
 # The definition decides which statuses count, so SQL must not pre-filter to
 # `open` the way the map's badge rollup does. Resolved rows are dropped here
 # instead: `counted_statuses` refuses to include 'resolved' at parse time, so
 # no definition can ever ask for them.
 #
-# Grouping rather than returning raw rows is lossless for the resolver. It
-# reads severity and status to pick a class — the same answer for every row
-# in a group — and collects cell ids into a set for the share test. `n`
-# carries the real count back for the two counters.
+# **`kind` is what makes `cell_critical_share` able to fire at all.** A
+# grouped alert is one finding stored as a parent plus one child per cell,
+# and the parent carries `cell_id = NULL`. Filtering to findings — which the
+# counters must do, or a 12-cell outbreak reads as 13 — therefore threw away
+# every cell there was. Measured on prod 2026-09-03: of 542 unresolved rows,
+# every single one with a `cell_id` was a child, and there were ZERO
+# cell-scoped findings. So `critical_cells` was always 0 and the share could
+# never be reached, whatever a farm set it to. Present, correct, and reaching
+# nothing.
+#
+# So the statement returns both:
+#
+#   kind='finding'  one row per (severity, status) group, plus how many
+#                   distinct cells that finding is made of. These feed the
+#                   counters, and feed the resolver ONLY when they have no
+#                   cells of their own.
+#   kind='cell'     one row per distinct child cell, carrying the CHILD's own
+#                   severity and status — "this cell is critical" is a fact
+#                   about the cell, not about the card it hangs under.
+#
+# A finding with cells is not also emitted to the resolver as a block-scoped
+# alert. It IS its cells; counting it both ways would force critical from the
+# parent and make the share unreachable a second time.
 def _alert_evidence_sql(*, as_of: bool) -> str:
     if as_of:
         # Status has to be reconstructed, not read. The stored value is
@@ -96,28 +119,64 @@ def _alert_evidence_sql(*, as_of: bool) -> str:
     # Grouped in an outer query rather than by repeating the CASE in a
     # GROUP BY: the reconstructed status is an expression, and naming it once
     # is what keeps the two branches the same shape.
-    return f"""
-        SELECT e.block_id,
-               e.severity,
-               e.status,
-               e.cell_id,
-               count(*) AS n
-        FROM (
-            SELECT a.block_id,
+    #
+    # `status` and `when` are each one of two literals chosen by a bool
+    # argument; the only caller-supplied values they carry are bound-parameter
+    # placeholders. Hence the noqa on the closing quote — it cannot go on the
+    # `return f"""` line, where it would land inside the string.
+    sql = f"""
+        WITH counted AS (
+            SELECT a.id,
+                   a.block_id,
                    a.severity,
                    {status} AS status,
-                   a.cell_id
+                   a.cell_id,
+                   a.group_parent_id
             FROM alerts a
             JOIN blocks b ON b.id = a.block_id
             WHERE b.farm_id = :farm_id
               {when}
-              -- Findings, not rows. A grouped alert is one finding stored as
-              -- a parent plus one child per cell; counting both would read a
-              -- 12-cell outbreak as 13 findings.
-              AND a.group_parent_id IS NULL
-        ) e
-        GROUP BY e.block_id, e.severity, e.status, e.cell_id
-    """
+        )
+        -- Findings. A grouped alert is one finding stored as a parent plus
+        -- one child per cell; counting both would read a 12-cell outbreak as
+        -- 13 findings.
+        SELECT 'finding' AS kind,
+               f.block_id,
+               f.severity,
+               f.status,
+               NULL::uuid AS cell_id,
+               count(*) AS n,
+               -- How many distinct cells this finding is actually made of.
+               -- Zero means it is a statement about the whole block.
+               coalesce(max(f.cells), 0) AS cells
+        FROM (
+            SELECT c.block_id,
+                   c.severity,
+                   c.status,
+                   (
+                       SELECT count(DISTINCT k.cell_id)
+                       FROM counted k
+                       WHERE k.group_parent_id = c.id
+                         AND k.cell_id IS NOT NULL
+                   ) AS cells
+            FROM counted c
+            WHERE c.group_parent_id IS NULL
+        ) f
+        GROUP BY f.block_id, f.severity, f.status
+        UNION ALL
+        -- The cells themselves, with their OWN severity and status.
+        SELECT 'cell',
+               c.block_id,
+               c.severity,
+               c.status,
+               c.cell_id,
+               count(*),
+               0
+        FROM counted c
+        WHERE c.cell_id IS NOT NULL
+        GROUP BY c.block_id, c.severity, c.status, c.cell_id
+    """  # noqa: S608
+    return sql
 
 
 _ALERT_EVIDENCE_NOW = text(_alert_evidence_sql(as_of=False)).bindparams(
@@ -356,9 +415,22 @@ def _compose(
         status = str(g["status"])
         n = int(g["n"] or 0)
         cell_id = g["cell_id"]
-        by_severity[severity] = by_severity.get(severity, 0) + n
-        by_status[status] = by_status.get(status, 0) + n
-        if severity == "critical" and cell_id is not None:
+
+        if g["kind"] == "finding":
+            # The counters count findings, always. A 12-cell outbreak is one
+            # thing that is wrong, whatever the resolver does with it below.
+            by_severity[severity] = by_severity.get(severity, 0) + n
+            by_status[status] = by_status.get(status, 0) + n
+            # A finding made of cells IS its cells, and they are emitted as
+            # their own rows. Passing the parent through as well would force
+            # critical from a block-scoped alert and make the share
+            # unreachable — the bug this shape exists to fix.
+            if int(g["cells"] or 0) == 0:
+                alerts.append(AlertEvidence(severity=severity, status=status, cell_id=None))
+            continue
+
+        # kind == "cell": one distinct cell of a grouped finding.
+        if severity == "critical":
             critical_cells.add(cell_id)
         alerts.append(AlertEvidence(severity=severity, status=status, cell_id=cell_id))
 

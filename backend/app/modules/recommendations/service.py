@@ -1522,6 +1522,17 @@ class RecommendationsServiceImpl:
                 await alert_repo.bump_recurrence(
                     row_id=alert_id, today=today, actor_user_id=actor_user_id
                 )
+                # The dedup index has no severity in it, so this row may have
+                # been opened by an older version of the same leaf at a
+                # different one. Health reads severity; without this a block
+                # whose leaf was republished as critical stays on Watch until
+                # somebody resolves the alert by hand.
+                await alert_repo.restate_from_leaf(
+                    row_id=alert_id,
+                    severity=outcome.severity,
+                    group_key=group_key,
+                    action_type=outcome.action_type,
+                )
         else:
             alert_id = await alert_repo.find_open_group_parent(
                 block_id=block_id, group_key=group_key

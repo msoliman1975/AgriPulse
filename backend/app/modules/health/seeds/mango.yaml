@@ -17,6 +17,14 @@
 # recommendation floor, and inventing one here would put a number in front
 # of a grower that no agronomist has agreed to.
 #
+# `cell_critical_share` in particular is left unset after being made to work
+# at all in Phase 8. Prod on 2026-09-03 carries 33 cell-scoped alerts and
+# NOT ONE of them is critical, so there is nothing to calibrate a share
+# against. Unset means one critical cell is enough, which is the
+# conservative reading: it can never hide a finding. A farm that wants a
+# share can set one on its own config screen, and that is the right place
+# for a number nobody has evidence for yet.
+#
 # Applies to every mango variety. `crops.classification_depth` is
 # `variety` for mango, so a block carries `mango.<variety>`; the
 # resolution walks the path shallow-first, so this file reaches all of

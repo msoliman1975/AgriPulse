@@ -221,11 +221,13 @@ class TestScorecardUnderTheDefinition:
             ndvi={ok: Decimal("0.7"), unk: Decimal("0.7"), crit: Decimal("0.7")},
             alerts=[
                 {
+                    "kind": "finding",
                     "block_id": crit,
                     "severity": "critical",
                     "status": "open",
                     "cell_id": None,
                     "n": 1,
+                    "cells": 0,
                 }
             ],
             traces=[_traces(ok, clear=4, at=now), _traces(crit, fired=1, at=now)],
