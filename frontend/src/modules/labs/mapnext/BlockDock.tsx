@@ -437,11 +437,23 @@ export function BlockDock({
           reason is a full sentence, and putting it in the chip would wrap the
           whole bar into a second row on a narrow map column. */}
       {detail.health_reason ? (
-        <div className="flex flex-none items-center gap-1.5 border-b border-ap-line px-4 py-1.5">
+        <div className="flex flex-none flex-wrap items-center gap-1.5 border-b border-ap-line px-4 py-1.5">
           <Dot color={healthColor} />
           <span className="text-xs text-ap-muted">
             {t(`common:healthReason.${detail.health_reason}`)}
           </span>
+          {/* Whose rule read the evidence. The reason alone answers half of
+              "why is my block red"; without the source, a farm admin who has
+              overridden the definition cannot tell whether their own setting
+              or the crop's default produced the answer. */}
+          {detail.health_source ? (
+            <span className="text-xs text-ap-muted">
+              ·{" "}
+              {detail.health_source === "crop" && detail.health_definition_version != null
+                ? t("healthSource.cropVersioned", { version: detail.health_definition_version })
+                : t(`healthSource.${detail.health_source}`)}
+            </span>
+          ) : null}
         </div>
       ) : null}
 

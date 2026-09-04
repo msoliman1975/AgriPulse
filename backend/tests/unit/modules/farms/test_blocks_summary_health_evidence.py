@@ -131,10 +131,10 @@ def _session(
     return session
 
 
-def _definition(crop_path: str, **body: Any) -> dict[str, Any]:
-    """One row of the per-crop catalog, as `load_crop_health_definitions`
-    reads it."""
-    return {"crop_path": crop_path, "definition": body}
+def _definition(crop_path: str, *, version: int = 1, **body: Any) -> dict[str, Any]:
+    """One row of the per-crop catalog, as `load_health_definitions` reads
+    it. `version` is what the dock renders beside the class."""
+    return {"crop_path": crop_path, "definition": body, "version": version}
 
 
 def _crop(block_id: Any, crop_path: str) -> dict[str, Any]:

@@ -25,6 +25,7 @@ vi.mock("@/api/farms", async (importOriginal) => ({
 // add network mocks here.
 vi.mock("./FarmSubscriptionsPanel", () => ({ FarmSubscriptionsPanel: () => null }));
 vi.mock("./FarmZonesPanel", () => ({ FarmZonesPanel: () => null }));
+vi.mock("./FarmHealthPanel", () => ({ FarmHealthPanel: () => null }));
 
 function farm(over: Record<string, unknown> = {}) {
   return {

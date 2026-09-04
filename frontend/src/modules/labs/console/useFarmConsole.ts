@@ -226,6 +226,12 @@ export function useFarmConsole(farmId: string) {
         activePlan: summaryQ.data?.activePlan,
         summaryHealth: selectedHealth,
         summaryHealthReason: selectedHealthReason,
+        summaryHealthSource: selectedId
+          ? (summaryQ.data?.summaries[selectedId]?.health_source ?? null)
+          : null,
+        summaryHealthVersion: selectedId
+          ? (summaryQ.data?.summaries[selectedId]?.health_definition_version ?? null)
+          : null,
       }),
     enabled: Boolean(selectedId && blocksById.size > 0),
     staleTime: 30_000,

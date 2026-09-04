@@ -16,6 +16,8 @@ function summary(
     id,
     health: opts.health ?? "healthy",
     health_reason: null,
+    health_source: null,
+    health_definition_version: null,
     has_alert: (opts.alerts ?? 0) > 0,
     alert_severity: null,
     alert_count: opts.alerts ?? 0,

@@ -17,7 +17,7 @@ from app.core.settings import get_settings
 from app.modules.alerts.repository import AlertsRepository
 from app.modules.farms.errors import FarmNotFoundError
 from app.modules.farms.repository import FarmsRepository
-from app.modules.health.service import load_health_definitions
+from app.modules.health.service import DefinitionSource, load_health_definitions
 from app.modules.indices.repository import IndicesRepository
 from app.shared.health import bucket_alert_severity, classify_health
 from app.shared.health_definition import HealthReason, resolve_health
@@ -179,10 +179,15 @@ class InsightsService:
             worst, open_count = await self._block_alert_rollup(block_id=block_id)
 
             health_reason: HealthReason | None = None
+            health_source: DefinitionSource | None = None
+            health_version: int | None = None
             if definitions is not None:
                 evidence = evidence_by_block.get(block_id, EMPTY_EVIDENCE)
+                resolved = definitions.for_path(evidence.crop_path)
+                health_source = resolved.source
+                health_version = resolved.version
                 health, health_reason = resolve_health(
-                    definitions.for_path(evidence.crop_path),
+                    resolved.definition,
                     evidence.inputs,
                     now=now,
                 )
@@ -196,6 +201,8 @@ class InsightsService:
                     block_name_ar=block_name_ar,
                     current_health=health,
                     health_reason=health_reason,
+                    health_source=health_source,
+                    health_definition_version=health_version,
                     current_value=current,
                     trend_30d_pct=trend_pct,
                     alerts_open=open_count,

@@ -16,6 +16,8 @@ const summary = (id: string, gridProductId: string | null): UnitSummary => ({
   id,
   health: "unknown",
   health_reason: null,
+  health_source: null,
+  health_definition_version: null,
   has_alert: false,
   alert_severity: null,
   alert_count: 0,

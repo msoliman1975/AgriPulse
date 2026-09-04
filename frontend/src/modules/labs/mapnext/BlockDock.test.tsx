@@ -77,6 +77,8 @@ function point(time: string, mean: string) {
 const DETAIL: UnitDetail = {
   id: "b1",
   health_reason: null,
+  health_source: null,
+  health_definition_version: null,
   name: "Block A2",
   type: "block",
   parent_pivot_id: null,
@@ -517,6 +519,33 @@ describe("BlockDock", () => {
     renderDock({ ...DETAIL, health: "unknown", health_reason: "no_coverage" });
     await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
     expect(screen.getByText("No decision tree has run on this block")).toBeTruthy();
+  });
+
+  it("names the tier that decided, and its version", async () => {
+    // The reason answers half of "why is my block red". Without the source a
+    // farm admin who has overridden the definition cannot tell whether their
+    // own setting or the crop's default produced the answer.
+    renderDock({
+      ...DETAIL,
+      health: "healthy",
+      health_reason: "all_clear",
+      health_source: "crop",
+      health_definition_version: 2,
+    });
+    await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
+    expect(screen.getByText(/Crop defaults \(v2\)/)).toBeTruthy();
+  });
+
+  it("names a farm override as the farm's own", async () => {
+    renderDock({
+      ...DETAIL,
+      health: "healthy",
+      health_reason: "all_clear",
+      health_source: "farm",
+      health_definition_version: null,
+    });
+    await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
+    expect(screen.getByText(/This farm's setting/)).toBeTruthy();
   });
 
   it("shows nothing extra when the server sent no reason", async () => {

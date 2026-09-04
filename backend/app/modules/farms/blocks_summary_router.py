@@ -48,7 +48,11 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import get_settings
-from app.modules.health.service import CropHealthDefinitions, load_health_definitions
+from app.modules.health.service import (
+    CropHealthDefinitions,
+    DefinitionSource,
+    load_health_definitions,
+)
 from app.shared.auth.context import RequestContext
 from app.shared.db.session import get_db_session
 from app.shared.health import Health, classify_health
@@ -152,6 +156,14 @@ class HealthEvidence(BaseModel):
     crop_path: str | None
     preview_health: Health
     preview_reason: HealthReason
+    # Where the definition that produced `preview_health` came from, and
+    # which authored row. `preview_definition_crop_path` is the CROP row
+    # that applied, not the block's own crop: a `mango.keitt` block judged
+    # by a definition authored at `mango` reports `mango`, which is what
+    # makes "go and edit the rule that did this" a findable action.
+    preview_source: DefinitionSource
+    preview_definition_crop_path: str | None
+    preview_definition_version: int | None
 
 
 class BlockSummary(BaseModel):
@@ -182,6 +194,12 @@ class BlockSummary(BaseModel):
     # definition is off, because the NDVI rule has no reason to give: it
     # cannot tell "every tree came out clear" from "nothing ever ran".
     health_reason: HealthReason | None = None
+    # Which tier had the last word on `health`, and the version of the crop
+    # row behind it. Null for the same reason `health_reason` is: the NDVI
+    # rule has no tiers. When the definition is on, these equal their
+    # `preview_` twins in `health_evidence` by construction.
+    health_source: DefinitionSource | None = None
+    health_definition_version: int | None = None
     # The inputs the health definition read, and the class it gives. When
     # the flag is on, `preview_health` equals `health` by construction.
     health_evidence: HealthEvidence
@@ -533,9 +551,13 @@ async def get_blocks_summary(
         if use_definition:
             health: Health = evidence.preview_health
             health_reason: HealthReason | None = evidence.preview_reason
+            health_source: DefinitionSource | None = evidence.preview_source
+            health_version: int | None = evidence.preview_definition_version
         else:
             health = classify_health(worst_alert_severity=alert_severity, ndvi_current=ndvi_current)
             health_reason = None
+            health_source = None
+            health_version = None
 
         units.append(
             BlockSummary(
@@ -549,6 +571,8 @@ async def get_blocks_summary(
                 ndwi_current=ndwi_current,
                 grid_product_id=grid_by_block.get(bid),
                 health_reason=health_reason,
+                health_source=health_source,
+                health_definition_version=health_version,
                 health_evidence=evidence,
                 last_index_at=last_at,
             )
@@ -579,8 +603,8 @@ def _health_evidence(
     which is what every crop got before this shipped.
     """
     inputs = evidence.inputs
-    definition = definitions.for_path(evidence.crop_path)
-    preview_health, preview_reason = resolve_health(definition, inputs, now=now)
+    resolved = definitions.for_path(evidence.crop_path)
+    preview_health, preview_reason = resolve_health(resolved.definition, inputs, now=now)
     return HealthEvidence(
         alerts_by_severity=evidence.alerts_by_severity,
         alerts_by_status=evidence.alerts_by_status,
@@ -599,4 +623,7 @@ def _health_evidence(
         crop_path=evidence.crop_path,
         preview_health=preview_health,
         preview_reason=preview_reason,
+        preview_source=resolved.source,
+        preview_definition_crop_path=resolved.crop_path,
+        preview_definition_version=resolved.version,
     )

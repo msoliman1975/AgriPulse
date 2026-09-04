@@ -979,5 +979,54 @@
     "indexUnavailable": "no block has an image for this date",
     "fullscreen": "Full screen",
     "exitFullscreen": "Exit full screen"
+  },
+  "farmHealth": {
+    "title": "Health definition",
+    "intro": "What counts as healthy on this farm. Block health is decided by decision-tree results, not by NDVI.",
+    "inheritNote": "Every setting is inherited from the crop's defaults until you switch it on here. Switching one on fixes that value for this farm and it stops following the crop.",
+    "loading": "Loading...",
+    "loadFailed": "Could not load the health definition.",
+    "saveFailed": "Could not save the health definition.",
+    "saved": "Saved.",
+    "cleared": "Cleared. This farm follows the crop defaults again.",
+    "save": "Save",
+    "saving": "Saving...",
+    "clearAll": "Clear all",
+    "inherited": "Inherited",
+    "noOverrides": "Nothing overridden on this farm.",
+    "locked": "This farm's health definition is locked. Unlock it before editing.",
+    "staleAfterHours": "Trust a clear result for",
+    "staleAfterHoursHint": "Hours. After this, a block with nothing found reads Unknown instead of Healthy. It does not hide an open alert.",
+    "noTreeCoverage": "Blocks no tree covers",
+    "noTreeCoverageHint": "What to show when no decision tree applies to the block at all.",
+    "countedStatuses": "Alerts that count",
+    "countedStatusesHint": "Which alert states affect health. A resolved alert never counts.",
+    "snoozedAs": "A snoozed alert counts as",
+    "snoozedAsHint": "Only applies when snoozed alerts are counted above.",
+    "snoozedOwnSeverity": "Its own severity",
+    "severityMap": "Alert severity means",
+    "severityMapHint": "Which health class one alert of each severity argues for.",
+    "cellCriticalShare": "Cells needed for a critical block",
+    "cellCriticalShareHint": "Share of a block's grid cells that must be critical before the block reads Critical. Alerts about the whole block ignore this.",
+    "recommendationFloor": "Recommendation confidence floor",
+    "recommendationFloorHint": "An open recommendation at or above this confidence moves the block to Watch.",
+    "status": {
+      "open": "Open",
+      "acknowledged": "Acknowledged",
+      "snoozed": "Snoozed"
+    },
+    "severity": {
+      "critical": "Critical",
+      "warning": "Warning",
+      "info": "Info"
+    },
+    "overrideCount_one": "{{count}} setting overridden on this farm.",
+    "overrideCount_other": "{{count}} settings overridden on this farm."
+  },
+  "healthSource": {
+    "platform": "Platform default",
+    "crop": "Crop defaults",
+    "cropVersioned": "Crop defaults (v{{version}})",
+    "farm": "This farm's setting"
   }
 }

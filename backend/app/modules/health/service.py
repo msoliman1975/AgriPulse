@@ -39,7 +39,8 @@ and there would be no way to say "inherit this one".
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal
 from uuid import UUID
 
 from sqlalchemy import bindparam, text
@@ -52,6 +53,31 @@ from app.shared.health_definition import (
     parse_definition,
 )
 
+# Which tier had the last word. Rendered beside the class, because "why is
+# my block red" has two halves and this is the other one: the reason says
+# what the evidence showed, the source says whose rule read it.
+DefinitionSource = Literal["platform", "crop", "farm"]
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedDefinition:
+    """A definition and where it came from.
+
+    ``crop_path`` and ``version`` describe the CROP row that contributed,
+    not the block's own crop — a block on ``mango.keitt`` judged by a
+    definition authored at ``mango`` reports ``mango``. That is what makes
+    "edit the rule that produced this" a findable action.
+
+    Both are None when no crop row applied, whatever ``source`` says: a farm
+    override over the platform default is ``source="farm"`` with no crop
+    behind it.
+    """
+
+    definition: HealthDefinition
+    source: DefinitionSource
+    crop_path: str | None = None
+    version: int | None = None
+
 
 class CropHealthDefinitions:
     """The catalog, indexed by crop path, with the resolution rule.
@@ -61,26 +87,29 @@ class CropHealthDefinitions:
     cache 34 times instead of merging and re-parsing per block.
     """
 
-    __slots__ = ("_by_path", "_cache", "_farm_override")
+    __slots__ = ("_by_path", "_cache", "_farm_override", "_versions")
 
     def __init__(
         self,
         by_path: Mapping[str, Mapping[str, Any]],
         *,
+        versions: Mapping[str, int] | None = None,
         farm_override: Mapping[str, Any] | None = None,
     ) -> None:
         self._by_path = dict(by_path)
+        self._versions = dict(versions or {})
         # Baked in rather than passed to `for_path`, so the memo cannot be
         # keyed on the crop path alone while the answer depends on two
         # things. One instance is one farm's view of the catalog.
         self._farm_override = dict(farm_override) if farm_override else None
-        self._cache: dict[str | None, HealthDefinition] = {}
+        self._cache: dict[str | None, ResolvedDefinition] = {}
 
     def __len__(self) -> int:
         return len(self._by_path)
 
-    def for_path(self, crop_path: str | None) -> HealthDefinition:
-        """The definition that applies to a block on ``crop_path``.
+    def for_path(self, crop_path: str | None) -> ResolvedDefinition:
+        """The definition that applies to a block on ``crop_path``, and where
+        it came from.
 
         ``None`` — a block with no current crop assignment — skips the crop
         tier. It is not an error and not Unknown: a block without a crop
@@ -89,13 +118,13 @@ class CropHealthDefinitions:
         """
         if crop_path in self._cache:
             return self._cache[crop_path]
-        definition = self._resolve(crop_path)
-        self._cache[crop_path] = definition
-        return definition
+        resolved = self._resolve(crop_path)
+        self._cache[crop_path] = resolved
+        return resolved
 
-    def _resolve(self, crop_path: str | None) -> HealthDefinition:
+    def _resolve(self, crop_path: str | None) -> ResolvedDefinition:
         merged: dict[str, Any] = {}
-        found = False
+        matched_path: str | None = None
 
         segments = crop_path.split(".") if crop_path else []
         # Shallowest first, so the deeper level's keys land on top.
@@ -105,25 +134,35 @@ class CropHealthDefinitions:
         # is a single-character wildcard in LIKE, so a pattern match here
         # would let `sugarXbeet` inherit sugar beet's definition.
         for depth in range(1, len(segments) + 1):
-            body = self._by_path.get(".".join(segments[:depth]))
+            candidate = ".".join(segments[:depth])
+            body = self._by_path.get(candidate)
             if body is not None:
-                found = True
+                # Deepest wins, so the last one seen is the one to report.
+                matched_path = candidate
                 merged.update(body)
 
         # The farm has the last word: over whatever the crop tier resolved
         # to, and over the platform default when it resolved to nothing.
+        has_farm = bool(self._farm_override)
         if self._farm_override:
-            found = True
             merged.update(self._farm_override)
 
-        if not found:
-            return PLATFORM_DEFAULT_DEFINITION
+        source: DefinitionSource = (
+            "farm" if has_farm else ("crop" if matched_path is not None else "platform")
+        )
+        if source == "platform":
+            return ResolvedDefinition(PLATFORM_DEFAULT_DEFINITION, "platform")
         # `parse_definition` and not `HealthDefinition(**merged)`: the body
         # comes from the database, and the loader that wrote it may be older
         # than this process. Re-checking costs one dict scan and turns a key
         # this version does not know into a loud error instead of a
         # TypeError from the constructor.
-        return parse_definition(merged)
+        return ResolvedDefinition(
+            parse_definition(merged),
+            source,
+            crop_path=matched_path,
+            version=self._versions.get(matched_path) if matched_path else None,
+        )
 
 
 async def load_health_definitions(session: AsyncSession, *, farm_id: UUID) -> CropHealthDefinitions:
@@ -143,7 +182,7 @@ async def load_health_definitions(session: AsyncSession, *, farm_id: UUID) -> Cr
             await session.execute(
                 text(
                     """
-                    SELECT crop_path, definition
+                    SELECT crop_path, definition, version
                     FROM public.crop_health_definitions
                     ORDER BY crop_path
                     """
@@ -173,5 +212,6 @@ async def load_health_definitions(session: AsyncSession, *, farm_id: UUID) -> Cr
 
     return CropHealthDefinitions(
         {r["crop_path"]: dict(r["definition"] or {}) for r in rows},
+        versions={r["crop_path"]: int(r["version"]) for r in rows},
         farm_override=farm_override,
     )

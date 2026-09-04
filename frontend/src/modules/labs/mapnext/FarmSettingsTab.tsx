@@ -31,6 +31,7 @@ import { getFarm, updateFarm, type FarmUpdatePayload, type WaterSource } from "@
 
 import { FarmDecisionTreesPanel } from "./FarmDecisionTreesPanel";
 import { FarmSubscriptionsPanel } from "./FarmSubscriptionsPanel";
+import { FarmHealthPanel } from "./FarmHealthPanel";
 import { FarmZonesPanel } from "./FarmZonesPanel";
 import { inputCls } from "./ui";
 
@@ -248,7 +249,14 @@ export function FarmSettingsTab({
           on change like the three above it. */}
       <FarmDecisionTreesPanel farmId={farmId} />
 
-      {/* 6 — Actions. Save belongs to section 1 only; its label says so. */}
+      {/* 6 — Health: what "healthy" means on this farm. A resolution tier,
+          so it has no Apply and no preview; see the panel's header. Mounted
+          HERE, in the tab both consoles import, and not in either console's
+          own drawer — that is how farm subscriptions and the farm-level cell
+          size ended up reachable from one console and not the other. */}
+      <FarmHealthPanel farmId={farmId} />
+
+      {/* 7 — Actions. Save belongs to section 1 only; its label says so. */}
       {mut.isError ? <div className="text-xs text-ap-crit">{t("manage.saveError")}</div> : null}
       <div className="flex items-center gap-2 border-t border-ap-line pt-4">
         <button

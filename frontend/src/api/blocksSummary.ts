@@ -19,6 +19,11 @@ export type HealthReason =
   | "stale"
   | "all_clear";
 
+/** Which tier had the last word on a block's health definition. Mirrors
+ *  `app.modules.health.service.DefinitionSource`. The reason says what the
+ *  evidence showed; the source says whose rule read it. */
+export type HealthSource = "platform" | "crop" | "farm";
+
 export interface BlockSummary {
   id: string;
   health: Health;
@@ -27,6 +32,10 @@ export interface BlockSummary {
    *  no reason to give, because it cannot tell "every tree came out clear"
    *  from "nothing ever ran". Optional so an older API still parses. */
   health_reason?: HealthReason | null;
+  /** Which tier decided, and the version of the crop row behind it. Null for
+   *  the same reason `health_reason` is: the NDVI rule has no tiers. */
+  health_source?: HealthSource | null;
+  health_definition_version?: number | null;
   alert_count: number;
   alert_severity: MapSeverity | null;
   /** Verb of the worst open alert (`irrigate`, `spray`, ...). Drives the map

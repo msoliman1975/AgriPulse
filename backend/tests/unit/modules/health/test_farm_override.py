@@ -22,7 +22,7 @@ class TestTheThirdTier:
             {"mango": {"stale_after_hours": 72}},
             farm_override={"stale_after_hours": 12},
         )
-        assert cat.for_path("mango.keitt").stale_after_hours == 12
+        assert cat.for_path("mango.keitt").definition.stale_after_hours == 12
 
     def test_the_farm_only_overwrites_what_it_names(self) -> None:
         """The reason the override is stored as a partial body. A farm that
@@ -33,8 +33,8 @@ class TestTheThirdTier:
             farm_override={"stale_after_hours": 12},
         )
         got = cat.for_path("mango")
-        assert got.stale_after_hours == 12  # the farm's
-        assert got.no_tree_coverage == "healthy"  # still the crop's
+        assert got.definition.stale_after_hours == 12  # the farm's
+        assert got.definition.no_tree_coverage == "healthy"  # still the crop's
 
     def test_the_farm_applies_to_a_crop_with_no_file(self) -> None:
         """The override is about the farm's own operations, not agronomy, so
@@ -43,38 +43,38 @@ class TestTheThirdTier:
             {"mango": {"stale_after_hours": 72}},
             farm_override={"stale_after_hours": 12},
         )
-        assert cat.for_path("wheat").stale_after_hours == 12
+        assert cat.for_path("wheat").definition.stale_after_hours == 12
 
     def test_the_farm_applies_to_a_block_with_no_crop(self) -> None:
         cat = CropHealthDefinitions({}, farm_override={"stale_after_hours": 12})
-        assert cat.for_path(None).stale_after_hours == 12
+        assert cat.for_path(None).definition.stale_after_hours == 12
 
     def test_the_farm_applies_when_the_catalog_is_empty(self) -> None:
         """The crop tier can resolve to nothing at all. The farm still has
         the last word, over the platform default directly."""
         cat = CropHealthDefinitions({}, farm_override={"no_tree_coverage": "healthy"})
-        assert cat.for_path("mango").no_tree_coverage == "healthy"
+        assert cat.for_path("mango").definition.no_tree_coverage == "healthy"
 
     def test_two_crops_on_one_farm_both_take_the_override(self) -> None:
         cat = CropHealthDefinitions(
             {"mango": {"stale_after_hours": 72}, "potato": {"stale_after_hours": 24}},
             farm_override={"stale_after_hours": 6},
         )
-        assert cat.for_path("mango.keitt").stale_after_hours == 6
-        assert cat.for_path("potato").stale_after_hours == 6
+        assert cat.for_path("mango.keitt").definition.stale_after_hours == 6
+        assert cat.for_path("potato").definition.stale_after_hours == 6
 
     def test_no_override_changes_nothing(self) -> None:
         cat = CropHealthDefinitions({"mango": {"stale_after_hours": 72}}, farm_override=None)
-        assert cat.for_path("mango").stale_after_hours == 72
-        assert cat.for_path("wheat") is PLATFORM_DEFAULT_DEFINITION
+        assert cat.for_path("mango").definition.stale_after_hours == 72
+        assert cat.for_path("wheat").definition is PLATFORM_DEFAULT_DEFINITION
 
     def test_an_empty_override_changes_nothing(self) -> None:
         """`{}` and NULL are the same to the resolver. The API stores `{}` as
         NULL so the difference does not survive to be read here, but nothing
         stops an older row holding one."""
         cat = CropHealthDefinitions({"mango": {"stale_after_hours": 72}}, farm_override={})
-        assert cat.for_path("mango").stale_after_hours == 72
-        assert cat.for_path("wheat") is PLATFORM_DEFAULT_DEFINITION
+        assert cat.for_path("mango").definition.stale_after_hours == 72
+        assert cat.for_path("wheat").definition is PLATFORM_DEFAULT_DEFINITION
 
     def test_a_bad_override_raises_rather_than_being_ignored(self) -> None:
         """The column has no CHECK that can express the schema, so a row
@@ -92,5 +92,5 @@ class TestTheThirdTier:
         overridden = CropHealthDefinitions(
             {"mango": {"stale_after_hours": 72}}, farm_override={"stale_after_hours": 12}
         )
-        assert plain.for_path("mango").stale_after_hours == 72
-        assert overridden.for_path("mango").stale_after_hours == 12
+        assert plain.for_path("mango").definition.stale_after_hours == 72
+        assert overridden.for_path("mango").definition.stale_after_hours == 12

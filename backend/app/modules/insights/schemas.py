@@ -9,6 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from app.modules.health.service import DefinitionSource
 from app.shared.health import Health
 from app.shared.health_definition import HealthReason
 
@@ -69,6 +70,10 @@ class BlockHealthRow(BaseModel):
     # give, because it cannot tell "every tree came out clear" from
     # "nothing ever ran".
     health_reason: HealthReason | None = None
+    # Which tier had the last word, and the version of the crop row behind
+    # it. Null while the definition is off, like `health_reason`.
+    health_source: DefinitionSource | None = None
+    health_definition_version: int | None = None
     current_value: Decimal | None
     trend_30d_pct: Decimal | None
     alerts_open: int
