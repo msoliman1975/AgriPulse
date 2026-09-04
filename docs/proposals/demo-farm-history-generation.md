@@ -52,23 +52,49 @@ stronger guard than the tenant flag first considered.
 
 ### The clock
 
+Built, 2026-09-04. The clock has two halves that must report the same instant.
+
 `app/shared/clock.py` exposes `now()`. In every normal run it returns the real
-time. During a replay a context variable holds the simulated day.
+time. During a replay a context variable holds the simulated day. All 124 direct
+`datetime.now(...)` calls in 45 files now go through it.
 
-Two parts still need a decision, listed under Open questions:
+`public.app_now()` is the SQL half. It returns `now()` unless the Postgres
+setting `agripulse.now` is present. All 234 bare `now()` calls in SQL strings go
+through it, as do `public.set_updated_at()` and every column default that was
+`now()`. `app/shared/db/session.py` writes the setting on transaction begin
+while a simulated clock is active.
 
-- Database columns that default to `now()`. The context variable does not reach
-  them. Either the replay passes the value explicitly, or the replay sets the
-  Postgres session time.
-- Celery tasks. A task runs in a worker process, so the context variable does
-  not cross the queue. The replay must either run the task functions in process
-  or pass the simulated day as a task argument.
+Both halves were needed. A Python-only clock cannot reach the 234 SQL call
+sites, the `BEFORE UPDATE` trigger, or a stored column default.
+
+Why not shadow `now()` through `search_path`. Measured on the production
+database: a function in a schema placed ahead of `pg_catalog` does redirect raw
+SQL and plpgsql bodies, including the existing trigger, but a stored column
+default keeps calling `pg_catalog.now()` because the default is resolved when
+the column is created. On top of that, 46 places in the application set their
+own `search_path`, so any of them would drop the shim and the timestamps would
+quietly become real again.
+
+One rule follows from the design. The setting is written when a transaction
+begins, so a replay must enter `clock.simulate(...)` before any statement opens
+one. Entering it half way through a transaction moves the Python side and not
+the SQL side. An integration test records this.
+
+Celery is still open. A task runs in a worker process, so the context variable
+does not cross the queue. The replay must run the task functions in its own
+process, inside the simulate block.
 
 ### The flag
 
-`farms.is_demo`, a boolean on the farm row. It drives four behaviours: exclusion
-from the meter and caps (D10), the read-only switch (D11), stopping the imagery
-and recommendation schedules (D11), and a label in the interface.
+Built, 2026-09-04, in tenant migration 0091. `farms.is_demo` says the farm is
+the seeded demo. `farms.demo_frozen_at` records when it was made read-only; NULL
+means still live. A CHECK stops the two drifting: only a demo farm can be
+frozen.
+
+The flag drives four behaviours: exclusion from the meter and caps (D10), the
+read-only switch (D11), stopping the imagery and recommendation schedules (D11),
+and a label in the interface. The first is done. Nothing sets the flag yet; the
+writer comes with tenant creation and trial provisioning.
 
 ### Scripted incidents
 
@@ -96,7 +122,8 @@ screen then has a case to show.
 
 ## Open questions
 
-1. How the database `now()` defaults are handled during replay.
+1. ~~How the database `now()` defaults are handled during replay.~~ Answered:
+   migrations 0081 and 0090 rewrite every one of them to `public.app_now()`.
 2. How the simulated day reaches a Celery worker.
 3. Whether the customer can delete the demo farm, and what a complete delete
    removes.
