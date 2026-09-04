@@ -300,6 +300,16 @@ class Farm(Base, TimestampedMixin):
     )
     active_to: Mapped[date | None] = mapped_column(Date, nullable=True)
 
+    # The seeded demo farm (tenant migration 0091). A tenant has at most
+    # one. It is excluded from the meter, the plan caps and billing, and
+    # the interface labels it so nobody mistakes it for their own land.
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("FALSE"))
+    # When the demo farm was made read-only, at trial end or on moving to
+    # a paid plan. NULL means it is still live and editable. A frozen farm
+    # accepts no writes and consumes no compute: no imagery import, no
+    # decision tree runs, no index recomputation.
+    demo_frozen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Farm-block config model PR-1 (tenant migration 0027): Shared-bucket
     # templates + per-category locks. Inert until PR-2/PR-3 wire them up.
     # (The Farm-only "manager" pointer farm_manager_id was dropped in U-4a /

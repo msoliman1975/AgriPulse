@@ -227,9 +227,14 @@ class TrialRepository:
             try:
                 result = await self._session.execute(
                     text(
+                        # The seeded demo farm is excluded. It is our land,
+                        # not the trial's, so counting it would overstate
+                        # what every trial is using and push the platform
+                        # against its own capacity numbers for nothing.
                         "SELECT COUNT(*), COALESCE(SUM(area_m2), 0) "  # noqa: S608
                         f'FROM "{schema_name}".farms '
-                        "WHERE active_to IS NULL OR active_to > CURRENT_DATE"
+                        "WHERE (active_to IS NULL OR active_to > CURRENT_DATE) "
+                        "AND NOT is_demo"
                     )
                 )
                 farm_count, farm_area = result.one()
