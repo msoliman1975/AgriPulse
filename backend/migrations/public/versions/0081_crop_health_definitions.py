@@ -38,8 +38,8 @@ Rows are platform-authored only. There is no tenant column and no API that
 writes here: a farm's own override is a tenant-schema concern and arrives in
 Phase 6.
 
-Revision ID: 0080
-Revises: 0079
+Revision ID: 0081
+Revises: 0080
 Create Date: 2026-09-03
 """
 
@@ -51,8 +51,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0080"
-down_revision: str | Sequence[str] | None = "0079"
+revision: str = "0081"
+down_revision: str | Sequence[str] | None = "0080"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
