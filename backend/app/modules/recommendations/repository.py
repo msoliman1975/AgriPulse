@@ -187,6 +187,49 @@ class VERDICT_SQL:  # named after REC_SQL / ALERT_SQL in shared.action_items
                       c.row_idx NULLS FIRST, c.col_idx NULLS FIRST
         """
 
+    # Every answer that stood at any point inside a window. The overlap
+    # test is the interval one turned inside out: a row counts when it
+    # started before the window ended and had not ended when the window
+    # began.
+    #
+    # This is one row per change, not one per day. A block holding the same
+    # verdict for a month is a single row, which is what makes a year of
+    # replay one request instead of 365.
+    HISTORY_WINDOW = (
+        "v.valid_from < CAST(:to_at AS timestamptz) "
+        "AND (v.valid_to IS NULL OR v.valid_to > CAST(:from_at AS timestamptz))"
+    )
+
+    @classmethod
+    def history(cls, *, tree_filter: str) -> str:
+        """One farm's verdicts across a date window.
+
+        ``tree_filter`` is a literal fragment from this file, never caller
+        text. The screen shows one tree at a time, and filtering here rather
+        than in the client is what keeps a year inside one response.
+
+        Ordered so the client can walk the rows once per block: a frame
+        builder that has to sort 40,000 rows itself pays for it on every
+        scrub.
+        """
+        return f"""
+            SELECT v.id, v.farm_id, v.block_id, v.cell_id, v.scope,
+                   v.tree_id, v.tree_code, v.tree_version, v.leaf_node_id,
+                   v.kind, v.status_code, v.severity,
+                   v.text_en, v.text_ar,
+                   v.valid_from, v.valid_to, v.last_evaluated_at,
+                   v.alert_id, v.recommendation_id, v.last_run_id,
+                   c.row_idx AS cell_row, c.col_idx AS cell_col
+              FROM decision_tree_block_verdicts v
+              LEFT JOIN grid_cells c ON c.id = v.cell_id
+             WHERE v.farm_id = :farm_id
+               AND {cls.HISTORY_WINDOW}
+               {tree_filter}
+             ORDER BY v.block_id, v.tree_code,
+                      c.row_idx NULLS FIRST, c.col_idx NULLS FIRST,
+                      v.valid_from
+        """
+
     @classmethod
     def insert_new(cls) -> str:
         """Everything with no open row: the ones just closed, and the new ones."""
@@ -2261,6 +2304,47 @@ class RecommendationsRepository:
                         """
                     ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
                     {"block_id": block_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]
+
+    async def list_verdict_history(
+        self,
+        *,
+        farm_id: UUID,
+        from_at: datetime,
+        to_at: datetime,
+        tree_code: str | None = None,
+        limit: int = 200_000,
+    ) -> list[dict[str, Any]]:
+        """Every verdict that stood at any point in the window, once each.
+
+        The screen replays a range day by day. Asking per day would be 365
+        requests for a year; this is one, and the client rebuilds each frame
+        with the same interval test the SQL uses.
+
+        ``limit`` is a guard, not a page. A farm that exceeds it has more
+        history than a replay can draw, and the caller is told rather than
+        handed a silently short list — see the service.
+        """
+        tree_filter = "AND v.tree_code = :tree_code" if tree_code else ""
+        params: dict[str, Any] = {
+            "farm_id": farm_id,
+            "from_at": from_at,
+            "to_at": to_at,
+            "limit": limit,
+        }
+        if tree_code:
+            params["tree_code"] = tree_code
+        sql = VERDICT_SQL.history(tree_filter=tree_filter) + " LIMIT :limit"
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(sql).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                    params,
                 )
             )
             .mappings()
