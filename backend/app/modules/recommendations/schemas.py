@@ -198,6 +198,11 @@ class EvaluateBlockResponse(BaseModel):
     trees_skipped_crop: int
     recommendations_opened: int
     traces_written: int = 0
+    # Verdicts stored for this block: one per tree that reached a leaf,
+    # including the trees that found nothing wrong. Counts the rows opened
+    # plus the ones confirmed, so a quiet night reports work rather than
+    # zero (tenant 0091).
+    verdicts_written: int = 0
 
 
 class ExplainStep(BaseModel):

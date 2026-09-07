@@ -428,6 +428,7 @@ async def evaluate_block(
         "trees_skipped_crop": summary["trees_skipped_crop"],
         "recommendations_opened": summary["recommendations_opened"],
         "traces_written": summary.get("traces_written", 0),
+        "verdicts_written": summary.get("verdicts_written", 0),
     }
 
 

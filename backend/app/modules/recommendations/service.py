@@ -36,6 +36,7 @@ from app.modules.farms.attribute_snapshot import load_crop_attribute_snapshot
 from app.modules.grid.snapshot import load_snapshot as load_grid_snapshot
 from app.modules.recommendations.engine import (
     EvaluationResult,
+    TreeOutcome,
     TreePathStep,
     evaluate_tree,
 )
@@ -129,6 +130,69 @@ class _BlockEvaluation:
 # ref). `clear` keeps the path but drops the values, and `skipped` never walked
 # at all — see migration 0062 for why the grain is uneven.
 _FULL_PAYLOAD_STATUSES = frozenset({"fired", "error"})
+
+
+@dataclass(slots=True)
+class _VerdictBuffer:
+    """Accumulates one block's verdicts, then writes them in three statements.
+
+    A verdict is what every evaluation leaves behind, including the ones that
+    open nothing. Before this existed a leaf that found nothing wrong wrote no
+    row anywhere, so "checked and fine", "excluded by targeting" and "never
+    ran" were the same blank on screen.
+
+    Buffered for the same reason the traces are: a cell-scoped tree over a
+    121-cell grid produces 121 verdicts for one block, and a round trip each
+    would cost more than the evaluation.
+
+    ``seen_trees`` and ``seen_cells`` are the other half of the write. A row
+    that was NOT produced this pass has to be closed, and that is invisible to
+    a loop over the rows that were.
+    """
+
+    run_id: UUID | None = None
+    rows: list[dict[str, Any]] = field(default_factory=list)
+    seen_trees: set[UUID] = field(default_factory=set)
+    seen_cells: dict[UUID, list[UUID]] = field(default_factory=dict)
+
+    def add(
+        self,
+        *,
+        tree: dict[str, Any],
+        farm_id: UUID,
+        block_id: UUID,
+        cell_id: UUID | None,
+        outcome: TreeOutcome,
+        alert_id: UUID | None = None,
+        recommendation_id: UUID | None = None,
+    ) -> None:
+        tree_id = tree["tree_id"]
+        self.seen_trees.add(tree_id)
+        if cell_id is not None:
+            self.seen_cells.setdefault(tree_id, []).append(cell_id)
+        self.rows.append(
+            {
+                "farm_id": farm_id,
+                "block_id": block_id,
+                "cell_id": cell_id,
+                "scope": "cell" if cell_id is not None else "block",
+                "tree_id": tree_id,
+                "tree_code": tree["tree_code"],
+                "tree_version": tree["version"],
+                "leaf_node_id": outcome.leaf_node_id or "",
+                "kind": outcome.kind,
+                "status_code": outcome.status_code,
+                # Only the two kinds that ask for work carry one; the table's
+                # CHECK refuses the other combinations either way.
+                "severity": (
+                    outcome.severity if outcome.kind in ("alert", "recommendation") else None
+                ),
+                "text_en": outcome.text_en,
+                "text_ar": outcome.text_ar,
+                "alert_id": alert_id,
+                "recommendation_id": recommendation_id,
+            }
+        )
 
 
 @dataclass(slots=True)
@@ -375,6 +439,7 @@ class RecommendationsServiceImpl:
                 "trees_skipped_crop": 0,
                 "recommendations_opened": 0,
                 "traces_written": 0,
+                "verdicts_written": 0,
             }
 
         farm_id = setup.farm_id
@@ -389,6 +454,10 @@ class RecommendationsServiceImpl:
         trees_evaluated = len(block_trees) + len(cell_trees)
         recommendations_opened = 0
         trace = _TraceBuffer(run_id=run_id) if run_id is not None else None
+        # Unconditional, unlike the trace. A trace is lineage a caller can opt
+        # into; a verdict is the answer itself, and a sweep that skipped it
+        # would leave the map showing yesterday.
+        verdicts = _VerdictBuffer(run_id=run_id)
 
         # Targeting exclusions first: these never reach the engine, so this is
         # the only place they can be recorded at all.
@@ -418,6 +487,7 @@ class RecommendationsServiceImpl:
                 actor_user_id=actor_user_id,
                 tenant_schema=tenant_schema,
                 trace=trace,
+                verdicts=verdicts,
                 tally=tally,
             )
             # A re-fire into a still-open item now returns a result instead of
@@ -435,6 +505,10 @@ class RecommendationsServiceImpl:
             trees_skipped_crop=trees_skipped_crop,
             recommendations_opened=recommendations_opened,
             trace=trace,
+            verdicts=verdicts,
+            # A run cut to one tree must not close the other trees' verdicts:
+            # they were never walked, so their answers still stand.
+            covers_every_tree=only_tree_code is None,
             tally=tally,
         )
 
@@ -834,6 +908,8 @@ class RecommendationsServiceImpl:
         trees_skipped_crop: int,
         recommendations_opened: int,
         trace: _TraceBuffer | None = None,
+        verdicts: _VerdictBuffer | None = None,
+        covers_every_tree: bool = True,
         tally: dict[str, int] | None = None,
     ) -> dict[str, int]:
         """Run the cell-scoped trees and emit their digest notifications."""
@@ -882,6 +958,7 @@ class RecommendationsServiceImpl:
                         actor_user_id=actor_user_id,
                         tenant_schema=tenant_schema,
                         trace=trace,
+                        verdicts=verdicts,
                         tally=tally,
                     )
                     if opened is None:
@@ -963,6 +1040,17 @@ class RecommendationsServiceImpl:
                 )
             )
 
+        # The verdicts for the whole block, written before the traces because
+        # a verdict is an answer a user reads, not a record of the work.
+        verdicts_written = 0
+        if verdicts is not None:
+            verdicts_written = await self._write_verdicts(
+                verdicts=verdicts,
+                block_id=block_id,
+                cell_trees=cell_trees,
+                covers_every_tree=covers_every_tree,
+            )
+
         # One bulk insert for the whole block — see _TraceBuffer. Deliberately
         # last: a trace describes work that already happened, so a failure here
         # must not be able to roll back the recommendations it describes.
@@ -975,7 +1063,48 @@ class RecommendationsServiceImpl:
             "trees_skipped_crop": trees_skipped_crop,
             "recommendations_opened": recommendations_opened,
             "traces_written": traces_written,
+            "verdicts_written": verdicts_written,
         }
+
+    async def _write_verdicts(
+        self,
+        *,
+        verdicts: _VerdictBuffer,
+        block_id: UUID,
+        cell_trees: list[dict[str, Any]],
+        covers_every_tree: bool,
+    ) -> int:
+        """Store this block's verdicts and end the ones it no longer holds.
+
+        One instant for the whole block. Reading the clock per statement would
+        let an as-of read land between a close and the insert that replaces
+        it, and report a block with no verdict at all for that microsecond.
+
+        The two closing passes are the part a loop over the rows cannot do:
+
+          * a tree that produced nothing — excluded by targeting, turned off
+            for the farm, archived, or erroring — must not keep yesterday's
+            answer open, or the block goes on claiming it was checked;
+          * a cell the pass never reached, because the grid was rezoned or the
+            tree stopped running there, holds a row nothing would touch again.
+
+        Skipped entirely when the caller ran one tree instead of the whole
+        set: the other trees were never walked, so their answers still stand.
+        """
+        at = datetime.now(UTC)
+        counts = await self._repo.sync_verdicts(rows=verdicts.rows, run_id=verdicts.run_id, at=at)
+        if covers_every_tree:
+            await self._repo.close_absent_verdicts(
+                block_id=block_id, tree_ids=sorted(verdicts.seen_trees), at=at
+            )
+            for tree in cell_trees:
+                await self._repo.close_stale_cell_verdicts(
+                    block_id=block_id,
+                    tree_id=tree["tree_id"],
+                    seen_cell_ids=verdicts.seen_cells.get(tree["tree_id"], []),
+                    at=at,
+                )
+        return int(counts["opened"]) + int(counts["confirmed"])
 
     # ---- Read-only explain -------------------------------------------
 
@@ -1071,6 +1200,7 @@ class RecommendationsServiceImpl:
         actor_user_id: UUID | None,
         tenant_schema: str,
         trace: _TraceBuffer | None = None,
+        verdicts: _VerdictBuffer | None = None,
         tally: dict[str, int] | None = None,
     ) -> dict[str, Any] | None:
         """Evaluate one tree against one context (block or cell) and persist its
@@ -1098,6 +1228,21 @@ class RecommendationsServiceImpl:
             if tally is not None:
                 key = "deduped" if (outcome or {}).get("deduped") else status
                 tally[key] = tally.get(key, 0) + 1
+            # Every walk that reached a leaf leaves a verdict, whether it
+            # opened work or not. `error` is the one status that does not:
+            # the tree produced no leaf, so it has nothing to say, and the
+            # close-absent pass at the end of the block ends whatever it
+            # said yesterday rather than leaving a stale answer standing.
+            if verdicts is not None and result.outcome is not None and status != "error":
+                verdicts.add(
+                    tree=tree,
+                    farm_id=farm_id,
+                    block_id=block_id,
+                    cell_id=cell_id,
+                    outcome=result.outcome,
+                    alert_id=alert_id,
+                    recommendation_id=recommendation_id,
+                )
             if trace is None:
                 return
             trace.add(
