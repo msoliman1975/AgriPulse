@@ -55,6 +55,11 @@ async def _seed(admin_session: Any) -> dict[str, Any]:
         {"id": block_id, "farm": farm_id, "poly": _POLY},
     )
     await admin_session.commit()
+    # ROLLBACK and COMMIT both drop a plain `SET search_path`, with no error
+    # to say so. Without this the alert insert below lands in whatever schema
+    # the session falls back to, and fails on a foreign key to a block that
+    # is sitting in this tenant's schema all along.
+    await admin_session.execute(text(f"SET search_path TO {schema}, public"))
     return {"schema": schema, "farm_id": farm_id, "block_id": block_id}
 
 

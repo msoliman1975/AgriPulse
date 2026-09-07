@@ -97,6 +97,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint("ck_farms_health_definition_is_object", "farms", type_="check")
+    # The SUFFIX again, for the same reason the create passes one:
+    # `drop_constraint` runs the name through the same naming convention, so
+    # a full name here becomes `ck_farms_ck_farms_health_definition_is_object`
+    # and the drop fails on a constraint that was never created. Every test
+    # that downgrades a tenant schema past this point hits it.
+    op.drop_constraint("health_definition_is_object", "farms", type_="check")
     op.drop_column("farms", "health_locked")
     op.drop_column("farms", "health_definition")

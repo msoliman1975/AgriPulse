@@ -55,7 +55,7 @@ from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
-from sqlalchemy import and_, bindparam, delete, select, text, update
+from sqlalchemy import and_, bindparam, delete, null, select, text, update
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1062,9 +1062,16 @@ async def replace_health_template(
             raise InvalidHealthDefinitionError(farm_id=farm_id, detail=str(exc)) from exc
 
     stmt = (
-        update(Farm)
-        .where(Farm.id == farm_id, Farm.deleted_at.is_(None))
-        .values(health_definition=stored, updated_by=updated_by)
+        update(Farm).where(Farm.id == farm_id, Farm.deleted_at.is_(None))
+        # `null()`, not Python None. A None bound to a JSONB column is the
+        # JSON value `null`, not SQL NULL, and `jsonb_typeof('null') = 'null'`
+        # fails the column's CHECK. Clearing the override would 500 on a
+        # request that is asking for the default — the one thing this route
+        # must always be able to do.
+        .values(
+            health_definition=(null() if stored is None else stored),
+            updated_by=updated_by,
+        )
     )
     result = await session.execute(stmt)
     if (getattr(result, "rowcount", 0) or 0) == 0:
