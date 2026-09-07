@@ -325,6 +325,15 @@ Read on the `ma-health` branch, rebased on `origin/main` on 2026-09-07.
 status labels, one set, read from the endpoint and not hard-coded in the
 frontend.
 
+## Where it stands, 2026-09-07
+
+Phases 1 to 7 are written on `feat/health-rule-single-source`, commits
+`ec8d3464`, `c628bc2a`, `cb651c03`, `bc322abf`, `cbceba56`, `e770b577`,
+`e2090428`. Nothing is pushed and `health_definition_enabled` is still off.
+
+Left: rewrite the shipped trees (63 no-action leaves in 33 files), then
+measure on production, then turn the flag on.
+
 ## Suggested phases
 
 1. Status catalog in the backend, loader accepts four kinds, compatibility for
