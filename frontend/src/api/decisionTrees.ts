@@ -306,6 +306,8 @@ export interface EvalTrace {
   outcome: {
     kind?: string;
     action_type?: string;
+    /** The status the leaf resolved to; every kind has one. */
+    status_code?: string;
     severity?: string;
     confidence?: string;
     leaf_node_id?: string | null;
@@ -469,5 +471,87 @@ export async function runDecisionTreeOnFarm(
   payload: TreeRunPayload,
 ): Promise<TreeRunResponse> {
   const { data } = await apiClient.post<TreeRunResponse>(`/v1/decision-trees/${code}:run`, payload);
+  return data;
+}
+
+// ---- Verdicts (tenant 0091) ----------------------------------------
+//
+// What each tree says about a block, including the trees that found nothing
+// wrong. A block with no row for a tree was not evaluated by it.
+
+/** One of the five platform status codes. Closed set; tenants cannot add. */
+export type VerdictStatusCode = "na" | "very_good" | "good" | "issue" | "alert";
+
+export interface VerdictStatusDefinition {
+  code: VerdictStatusCode;
+  /** Highest rank wins when one block holds several verdicts. `na` is 0. */
+  rank: number;
+  color: string;
+  label_en: string;
+  label_ar: string;
+}
+
+export interface Verdict {
+  id: string;
+  farm_id: string;
+  block_id: string;
+  cell_id: string | null;
+  cell_row: number | null;
+  cell_col: number | null;
+  scope: string;
+  tree_id: string;
+  tree_code: string;
+  tree_version: number;
+  leaf_node_id: string;
+  kind: "alert" | "recommendation" | "status" | "no_action";
+  status_code: VerdictStatusCode;
+  severity: "info" | "warning" | "critical" | null;
+  text_en: string;
+  text_ar: string | null;
+  valid_from: string;
+  valid_to: string | null;
+  last_evaluated_at: string;
+  alert_id: string | null;
+  recommendation_id: string | null;
+}
+
+export interface BlockVerdicts {
+  block_id: string;
+  as_of: string | null;
+  /** Null when no tree has run on the block — not `na`, which means a tree
+   *  ran and had nothing to say. */
+  worst_status: VerdictStatusCode | null;
+  last_evaluated_at: string | null;
+  verdicts: Verdict[];
+}
+
+export interface FarmVerdicts {
+  farm_id: string;
+  as_of: string | null;
+  blocks: BlockVerdicts[];
+}
+
+// The legend. Fetched, never hard-coded: a frontend copy of a backend list
+// has drifted here before, and this one decides what colour a block is.
+export async function getVerdictStatuses(): Promise<VerdictStatusDefinition[]> {
+  const { data } = await apiClient.get<VerdictStatusDefinition[]>("/v1/verdict-statuses");
+  return data;
+}
+
+export async function getBlockVerdicts(
+  blockId: string,
+  farmId: string,
+  at?: string,
+): Promise<BlockVerdicts> {
+  const { data } = await apiClient.get<BlockVerdicts>(`/v1/blocks/${blockId}/verdicts`, {
+    params: { farm_id: farmId, ...(at ? { at } : {}) },
+  });
+  return data;
+}
+
+export async function getFarmVerdicts(farmId: string, at?: string): Promise<FarmVerdicts> {
+  const { data } = await apiClient.get<FarmVerdicts>(`/v1/farms/${farmId}/verdicts`, {
+    params: at ? { at } : undefined,
+  });
   return data;
 }

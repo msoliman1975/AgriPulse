@@ -1014,6 +1014,12 @@ function RoleChip({
       c !== undefined
         ? `${t("viewer.chips.recommendation")} · ${c}`
         : t("viewer.chips.recommendation");
+  } else if (role === "leaf-status") {
+    // The code itself, not the word "status": which one it is is the
+    // whole content of the node.
+    text = t(`verdictStatus.${(data.outcome?.status ?? "good").toString()}`, {
+      defaultValue: (data.outcome?.status ?? "good").toString(),
+    });
   } else {
     text = t("viewer.chips.noop");
   }
@@ -1075,6 +1081,18 @@ function paletteFor(role: PositionedNode["role"]): Palette {
         chipBg: "#a7f3d0",
         chipBorder: "#10b981",
         chipText: "#065f46",
+      };
+    case "leaf-status":
+      // The platform's `good` green, so a status leaf on the canvas reads
+      // as the same thing the map will paint. The node shows its own code
+      // in the chip; this is the family colour, not the code's.
+      return {
+        bg: "#f0fdf4",
+        border: "#6FBF4B",
+        dim: "#166534",
+        chipBg: "#dcfce7",
+        chipBorder: "#6FBF4B",
+        chipText: "#14532d",
       };
     case "leaf-noop":
       return {

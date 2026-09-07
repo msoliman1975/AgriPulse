@@ -4,9 +4,11 @@
 // Edit scope:
 //   * Decision nodes: label_en / label_ar (the visible explanatory
 //     text on the canvas; doesn't affect evaluation).
-//   * Leaf nodes: label_en / label_ar + outcome fields (kind,
-//     action_type, severity OR confidence depending on kind, text_en,
-//     text_ar).
+//   * Leaf nodes: label_en / label_ar + outcome fields. A leaf is one
+//     of four kinds — alert, recommendation, status, no_action — and the
+//     kind decides which fields mean anything: alert takes a severity,
+//     recommendation a confidence, status a status code, and no_action
+//     none of them.
 //
 // NOT editable from this panel (deferred to a follow-up PR or kept in
 // the YAML editor):
@@ -23,11 +25,12 @@ import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { PositionedNode } from "../layout/treeLayout";
-import type { LeafOutcomePatch, NodePatch } from "../lib/treeEdit";
+import type { LeafKind, LeafOutcomePatch, NodePatch } from "../lib/treeEdit";
 import { parseConditionTree } from "../lib/conditionEdit";
 import { ConditionBuilder } from "./ConditionBuilder";
 import { Card } from "@/components/Card";
 import { ACTION_TYPES } from "@/lib/actionTypes";
+import { useVerdictStatuses } from "../lib/useVerdictStatuses";
 
 interface NodeDetailsPanelProps {
   node: PositionedNode;
@@ -300,55 +303,84 @@ function LeafOutcomeSection({
   onPatch: (nodeId: string, patch: NodePatch) => void;
 }): ReactNode {
   const { t } = useTranslation("decisionTrees");
+  const statuses = useVerdictStatuses();
   const outcome = node.data.outcome ?? {};
   const pending: LeafOutcomePatch = pendingPatch?.outcome ?? {};
-  // The compiled-node outcome has `kind: string` (looser than the
-  // patch's `"alert" | "recommendation"`); narrow at the boundary
-  // here so the form fields below get a stable union type.
+  // The compiled-node outcome types `kind` as a plain string, and a tree
+  // published before the four kinds existed carries no `kind` at all — it
+  // says `action_type: no_action` instead. Read both spellings here, the
+  // same way the loader and the engine do, or every one of those leaves
+  // would show as a recommendation in the editor.
   const rawKind = pending.kind ?? outcome.kind;
-  const kind: "recommendation" | "alert" = rawKind === "alert" ? "alert" : "recommendation";
+  const kind: LeafKind = ((): LeafKind => {
+    if (rawKind === "alert" || rawKind === "status") return rawKind;
+    if ((pending.action_type ?? outcome.action_type) === "no_action") return "no_action";
+    if (rawKind === "recommendation" || rawKind === "no_action") return rawKind;
+    return "recommendation";
+  })();
+  const asksForWork = kind === "alert" || kind === "recommendation";
   const effective: {
     action_type?: string;
+    status?: string;
     severity?: string;
     confidence?: number | string;
     text_en?: string | null;
     text_ar?: string | null;
   } = {
     action_type: pending.action_type ?? outcome.action_type,
+    status: pending.status ?? (outcome.status as string | undefined),
     severity: pending.severity ?? outcome.severity,
     confidence: pending.confidence ?? outcome.confidence,
     text_en: pending.text_en ?? outcome.text_en,
     text_ar: pending.text_ar ?? outcome.text_ar,
   };
+  const statusCode = effective.status ?? "good";
+  const statusOf = statuses.find((s) => s.code === statusCode);
 
   if (mode === "view") {
     return (
       <Section title={t("editor.panel.outcome.heading")}>
-        <KeyValue label={t("editor.panel.outcome.kind")} value={kind} mono />
-        <KeyValue
-          label={t("editor.panel.outcome.actionType")}
-          value={effective.action_type ?? "—"}
-          mono
-        />
+        <KeyValue label={t("editor.panel.outcome.kind")} value={t(`leafKind.${kind}`)} />
+        {kind === "status" ? (
+          <KeyValue
+            label={t("editor.panel.outcome.status")}
+            value={statusOf ? statusOf.label_en : statusCode}
+            swatch={statusOf?.color}
+          />
+        ) : null}
+        {asksForWork ? (
+          <KeyValue
+            label={t("editor.panel.outcome.actionType")}
+            value={effective.action_type ?? "—"}
+            mono
+          />
+        ) : null}
         {kind === "alert" ? (
           <KeyValue
             label={t("editor.panel.outcome.severity")}
             value={effective.severity ?? "—"}
             mono
           />
-        ) : (
+        ) : null}
+        {kind === "recommendation" ? (
           <KeyValue
             label={t("editor.panel.outcome.confidence")}
             value={effective.confidence !== undefined ? String(effective.confidence) : "—"}
             mono
           />
+        ) : null}
+        {kind === "no_action" ? (
+          <p className="text-xs text-ap-muted">{t("editor.panel.outcome.noActionHint")}</p>
+        ) : (
+          <>
+            <KeyValue label={t("editor.panel.outcome.textEn")} value={effective.text_en ?? "—"} />
+            <KeyValue
+              label={t("editor.panel.outcome.textAr")}
+              value={effective.text_ar ?? "—"}
+              dir="rtl"
+            />
+          </>
         )}
-        <KeyValue label={t("editor.panel.outcome.textEn")} value={effective.text_en ?? "—"} />
-        <KeyValue
-          label={t("editor.panel.outcome.textAr")}
-          value={effective.text_ar ?? "—"}
-          dir="rtl"
-        />
       </Section>
     );
   }
@@ -362,27 +394,54 @@ function LeafOutcomeSection({
         label={t("editor.panel.outcome.kind")}
         value={kind}
         options={[
-          { value: "recommendation", label: t("viewer.legend.recommendation") },
-          { value: "alert", label: t("viewer.legend.alert") },
+          { value: "alert", label: t("leafKind.alert") },
+          { value: "recommendation", label: t("leafKind.recommendation") },
+          { value: "status", label: t("leafKind.status") },
+          { value: "no_action", label: t("leafKind.no_action") },
         ]}
-        onChange={(v) => updateOutcome({ kind: v as "recommendation" | "alert" })}
+        onChange={(v) => updateOutcome({ kind: v as LeafKind })}
       />
+      <p className="text-xs text-ap-muted">{t(`leafKindHint.${kind}`)}</p>
+      {kind === "status" ? (
+        <>
+          <SelectField
+            label={t("editor.panel.outcome.status")}
+            value={statusCode}
+            options={statuses.map((s) => ({ value: s.code, label: s.label_en }))}
+            onChange={(v) => updateOutcome({ status: v })}
+          />
+          {/* The colour is the platform's, not the author's. Showing it here
+              is what stops "good" and "issue" being picked by feel. */}
+          {statusOf ? (
+            <div className="flex items-center gap-2 text-xs text-ap-muted">
+              <span
+                className="inline-block h-3 w-3 rounded-sm border border-ap-line"
+                style={{ backgroundColor: statusOf.color }}
+                aria-hidden
+              />
+              <span>{t("editor.panel.outcome.statusColorHint")}</span>
+            </div>
+          ) : null}
+        </>
+      ) : null}
       {/* Was a free-text box sitting between two dropdowns. `action_type` is a
           closed set enforced by a CHECK constraint at persist time, so a typo
           here saved and published cleanly and then 500'd when a tree actually
           fired. The vocabulary is shared with the Action Center. */}
-      <SelectField
-        label={t("editor.panel.outcome.actionType")}
-        value={effective.action_type ?? ""}
-        options={[
-          { value: "", label: t("editor.panel.outcome.actionTypeUnset") },
-          ...ACTION_TYPES.map((a) => ({
-            value: a,
-            label: t(`actionType.${a}`, { ns: "actionCenter", defaultValue: a }),
-          })),
-        ]}
-        onChange={(v) => updateOutcome({ action_type: v })}
-      />
+      {asksForWork ? (
+        <SelectField
+          label={t("editor.panel.outcome.actionType")}
+          value={effective.action_type ?? ""}
+          options={[
+            { value: "", label: t("editor.panel.outcome.actionTypeUnset") },
+            ...ACTION_TYPES.filter((a) => a !== "no_action").map((a) => ({
+              value: a,
+              label: t(`actionType.${a}`, { ns: "actionCenter", defaultValue: a }),
+            })),
+          ]}
+          onChange={(v) => updateOutcome({ action_type: v })}
+        />
+      ) : null}
       {kind === "alert" ? (
         <SelectField
           label={t("editor.panel.outcome.severity")}
@@ -394,7 +453,8 @@ function LeafOutcomeSection({
           ]}
           onChange={(v) => updateOutcome({ severity: v })}
         />
-      ) : (
+      ) : null}
+      {kind === "recommendation" ? (
         <NumberField
           label={t("editor.panel.outcome.confidence")}
           value={typeof effective.confidence === "number" ? effective.confidence : 0.5}
@@ -403,20 +463,26 @@ function LeafOutcomeSection({
           step={0.05}
           onChange={(v) => updateOutcome({ confidence: v })}
         />
+      ) : null}
+      {kind === "no_action" ? (
+        <p className="text-xs text-ap-muted">{t("editor.panel.outcome.noActionHint")}</p>
+      ) : (
+        <>
+          <TextField
+            label={t("editor.panel.outcome.textEn")}
+            value={effective.text_en ?? ""}
+            multiline
+            onChange={(v) => updateOutcome({ text_en: v })}
+          />
+          <TextField
+            label={t("editor.panel.outcome.textAr")}
+            value={effective.text_ar ?? ""}
+            dir="rtl"
+            multiline
+            onChange={(v) => updateOutcome({ text_ar: v || null })}
+          />
+        </>
       )}
-      <TextField
-        label={t("editor.panel.outcome.textEn")}
-        value={effective.text_en ?? ""}
-        multiline
-        onChange={(v) => updateOutcome({ text_en: v })}
-      />
-      <TextField
-        label={t("editor.panel.outcome.textAr")}
-        value={effective.text_ar ?? ""}
-        dir="rtl"
-        multiline
-        onChange={(v) => updateOutcome({ text_ar: v || null })}
-      />
     </Section>
   );
 }
@@ -437,16 +503,30 @@ function KeyValue({
   value,
   mono,
   dir,
+  swatch,
 }: {
   label: string;
   value: string;
   mono?: boolean;
   dir?: "rtl";
+  /** A colour to show beside the value. Used for a status code, where the
+   *  colour is half of what the reader is being told. */
+  swatch?: string;
 }): JSX.Element {
   return (
     <div className="grid grid-cols-[120px_1fr] gap-2 text-xs">
       <span className="text-ap-muted">{label}</span>
-      <span className={mono ? "break-all font-mono text-ap-ink" : "text-ap-ink"} dir={dir}>
+      <span
+        className={mono ? "break-all font-mono text-ap-ink" : "text-ap-ink"}
+        dir={dir}
+      >
+        {swatch ? (
+          <span
+            className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm border border-ap-line align-middle"
+            style={{ backgroundColor: swatch }}
+            aria-hidden
+          />
+        ) : null}
         {value}
       </span>
     </div>
@@ -562,6 +642,8 @@ function roleLabel(
       return t("viewer.legend.alert");
     case "leaf-recommendation":
       return t("viewer.legend.recommendation");
+    case "leaf-status":
+      return t("leafKind.status");
     case "leaf-noop":
       return t("viewer.legend.noop");
     case "decision":
