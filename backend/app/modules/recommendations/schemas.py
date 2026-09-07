@@ -9,6 +9,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.modules.recommendations import status_codes
+
 ActionType = Literal[
     "irrigate",
     "fertilize",
@@ -21,6 +23,29 @@ ActionType = Literal[
 ]
 RecommendationState = Literal["open", "applied", "dismissed", "deferred", "expired"]
 Severity = Literal["info", "warning", "critical"]
+
+# The four kinds a leaf can be, and the five status codes an evaluation
+# resolves to. Both come from `status_codes.py`, which is the one place the
+# list is written; re-declaring them here would let the API and the engine
+# drift apart.
+LeafKind = status_codes.LeafKind
+StatusCode = status_codes.StatusCode
+
+
+class StatusDefinitionResponse(BaseModel):
+    """One entry of the platform status list.
+
+    The frontend reads this instead of holding its own copy of the codes and
+    colours. A frontend copy of a backend list has drifted before.
+    """
+
+    code: StatusCode
+    # Highest rank wins when one block holds several verdicts. `na` is 0, so
+    # a tree with nothing to say never outranks a real answer.
+    rank: int
+    color: str
+    label_en: str
+    label_ar: str
 
 
 ActionHorizon = Literal["immediate", "short_term", "long_term", "monitoring"]
