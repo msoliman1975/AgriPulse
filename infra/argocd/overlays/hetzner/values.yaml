@@ -3421,10 +3421,43 @@ global:
     #   Rollback is this tag back to 76a6411 on api + workers and e0ed1d4 on
     #   frontend. Both migrations have a downgrade, but neither needs to run
     #   to roll back: the old code ignores the new table and the new key.
+    #
+    # 0af9a38 = #643, a decision tree says what it found, including when it
+    #   finds nothing wrong. A leaf is one of four kinds now — alert,
+    #   recommendation, status, no_action — and EVERY evaluation stores a
+    #   verdict carrying one of five status codes. Before this, a branch that
+    #   found nothing wrong wrote no row at all, so on screen it read exactly
+    #   like a tree that was skipped or never ran.
+    #
+    #   Three migrations run: tenant 0090 (farms.health_definition +
+    #   health_locked), tenant 0091 (decision_tree_block_verdicts), public
+    #   0081 (crop_health_definitions). Tenant 0090 and public 0081 belong to
+    #   the block-health work that was written weeks ago and never pushed;
+    #   this tag carries both projects.
+    #
+    #   Watch for this: the startup sync publishes 33 NEW TREE VERSIONS,
+    #   one per seed whose compiled hash changed, because all 63 no-action
+    #   leaves were rewritten as status leaves. Open recommendations and
+    #   alerts keep naming the version that opened them.
+    #
+    #   No health number on screen moves. `health_definition_enabled` is
+    #   false, so block health still comes from the old rule. Verdicts start
+    #   being written on the next sweep, which is what makes it possible to
+    #   measure the change BEFORE turning that flag on.
+    #
+    #   After the sync, check: `SELECT count(*) FROM
+    #   tenant_<id>.decision_tree_block_verdicts` is 0 until the sweep runs,
+    #   then one row per block per tree that reached a leaf; and
+    #   `SELECT count(*) FROM public.decision_tree_versions` has grown by 33.
+    #
+    #   Rollback is this tag back to a60b9e8 on api, workers and frontend.
+    #   The three migrations have downgrades and none needs to run: the old
+    #   code does not read the verdict table, and tenant 0090's columns are
+    #   nullable.
     api:
-      tag: "a60b9e8"
+      tag: "0af9a38"
     workers:
-      tag: "a60b9e8"
+      tag: "0af9a38"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3875,7 +3908,7 @@ global:
       #   traces page learns the 'farm' skip axis. The API half must move in
       #   the same sync — the new section calls two routes that do not exist
       #   on 76a6411.
-      tag: "a60b9e8"
+      tag: "0af9a38"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
