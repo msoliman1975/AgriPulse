@@ -48,6 +48,68 @@ class StatusDefinitionResponse(BaseModel):
     label_ar: str
 
 
+class VerdictResponse(BaseModel):
+    """One tree's answer about one block, or one of its grid cells.
+
+    A row exists for every leaf the tree reached, including the ones that
+    found nothing wrong. No row means the tree did not run there.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    farm_id: UUID
+    block_id: UUID
+    # NULL = the whole block. Set = one grid cell; row and column are joined
+    # in so a reader can say "zone B4" instead of showing a UUID.
+    cell_id: UUID | None = None
+    cell_row: int | None = None
+    cell_col: int | None = None
+    scope: str
+    tree_id: UUID
+    tree_code: str
+    tree_version: int
+    leaf_node_id: str
+    kind: LeafKind
+    status_code: StatusCode
+    # Set on alert and recommendation verdicts only.
+    severity: Severity | None = None
+    text_en: str
+    text_ar: str | None = None
+    # The interval this answer has held. `valid_to` is null while it is the
+    # current one; a replay reads a row whose interval contains the date.
+    valid_from: datetime
+    valid_to: datetime | None = None
+    last_evaluated_at: datetime
+    # The work item this verdict came with, when it had one.
+    alert_id: UUID | None = None
+    recommendation_id: UUID | None = None
+
+
+class BlockVerdictsResponse(BaseModel):
+    """Every tree's answer about one block."""
+
+    block_id: UUID
+    # Echoed exactly as the caller sent it, time zone or not. The comparison
+    # itself uses a separate UTC instant: subtracting a naive datetime from a
+    # timestamptz raises TypeError.
+    as_of: datetime | None = None
+    # The highest-ranking status across the block's verdicts, which is what
+    # the block reads as. None when no tree has run on it.
+    worst_status: StatusCode | None = None
+    # The newest evaluation behind these rows. None when the list is empty.
+    last_evaluated_at: datetime | None = None
+    verdicts: list[VerdictResponse] = Field(default_factory=list)
+
+
+class FarmVerdictsResponse(BaseModel):
+    """Every block of one farm, with its verdicts. One statement behind it."""
+
+    farm_id: UUID
+    as_of: datetime | None = None
+    blocks: list[BlockVerdictsResponse] = Field(default_factory=list)
+
+
 ActionHorizon = Literal["immediate", "short_term", "long_term", "monitoring"]
 
 

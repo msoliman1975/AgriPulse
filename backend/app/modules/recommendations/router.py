@@ -19,6 +19,7 @@ RBAC:
 from __future__ import annotations
 
 from datetime import date as date_type
+from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
@@ -32,6 +33,7 @@ from app.modules.recommendations.errors import (
     RecommendationNotFoundError,
 )
 from app.modules.recommendations.schemas import (
+    BlockVerdictsResponse,
     DecisionTreeCreateRequest,
     DecisionTreeDetailResponse,
     DecisionTreeDryRunRequest,
@@ -52,9 +54,11 @@ from app.modules.recommendations.schemas import (
     FarmTreeSelectionResponse,
     FarmTreeToggleRequest,
     FarmTreeToggleResponse,
+    FarmVerdictsResponse,
     RecommendationResponse,
     RecommendationScheduleRequest,
     RecommendationTransitionRequest,
+    StatusDefinitionResponse,
     TreeParameterOverrideResponse,
     TreeParameterOverridesResponse,
     TreeParameterOverrideUpsertRequest,
@@ -1111,3 +1115,108 @@ async def set_farm_decision_tree(
         actor_user_id=context.user_id,
         tenant_schema=schema,
     )
+
+
+# =====================================================================
+# Verdicts (tenant 0091)
+# =====================================================================
+#
+# What each tree says about a block, including the trees that found nothing
+# wrong. Registered under `/verdict-*` and `/farms/{farm_id}/verdicts` rather
+# than under `/decision-trees/…`, where a literal segment would have to be
+# declared ahead of `/decision-trees/{code}` to avoid being swallowed by it —
+# a route-ordering dependency that breaks silently on the next reorder.
+
+
+@router.get(
+    "/verdict-statuses",
+    response_model=list[StatusDefinitionResponse],
+    summary="The five platform status codes, with colour and both labels.",
+)
+async def list_verdict_statuses(
+    context: RequestContext = Depends(requires_capability("recommendation.read", any_farm=True)),
+    service: RecommendationsServiceImpl = Depends(_service),
+) -> list[dict[str, Any]]:
+    """The legend. Served rather than shipped in the frontend bundle.
+
+    ``any_farm`` because the list belongs to no farm: it is the same five
+    rows for everyone. Naming neither that nor a farm parameter would deny
+    every farm-scoped caller — a Scout holds their capabilities on a farm and
+    has no tenant-wide role to fall back on — and the denial is a silent 403
+    on a request that looks correct.
+    """
+    _ensure_tenant(context)
+    return service.status_catalog()
+
+
+@router.get(
+    "/blocks/{block_id}/verdicts",
+    response_model=BlockVerdictsResponse,
+    summary="What each tree says about one block.",
+)
+async def get_block_verdicts(
+    block_id: UUID,
+    farm_id: UUID = Query(
+        ...,
+        description=(
+            "The block's parent farm. Required because it is what the request "
+            "is authorized against — a farm-scoped user has no tenant-wide "
+            "role to fall back on."
+        ),
+    ),
+    at: datetime | None = Query(
+        default=None,
+        description=(
+            "Replay: what the trees said at this instant. Omitted, the "
+            "current answers are returned."
+        ),
+    ),
+    context: RequestContext = Depends(
+        requires_capability("recommendation.read", farm_id_param="farm_id")
+    ),
+    service: RecommendationsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    """One block's verdicts, plus the worst of them, which is what it reads as.
+
+    A tree missing from the list did not run on this block — excluded by
+    targeting, turned off for the farm, archived, or the sweep never reached
+    it. That absence is the point of the table: before it existed, "checked
+    and fine" and "never ran" were the same blank.
+
+    Gated on ``recommendation.read`` rather than ``decision_tree.read``, for
+    the same reason as ``:explain``: this is what a block's readers see, and
+    Agronomist, FarmManager, Scout and Viewer all hold the first and none
+    hold the second.
+    """
+    _ensure_tenant(context)
+    return await service.block_verdicts(block_id=block_id, at=at)
+
+
+@router.get(
+    "/farms/{farm_id}/verdicts",
+    response_model=FarmVerdictsResponse,
+    summary="Every block of one farm, with what each tree says about it.",
+)
+async def get_farm_verdicts(
+    farm_id: UUID,
+    at: datetime | None = Query(
+        default=None,
+        description=(
+            "Replay: what the trees said at this instant. Omitted, the "
+            "current answers are returned."
+        ),
+    ),
+    context: RequestContext = Depends(
+        requires_capability("recommendation.read", farm_id_param="farm_id")
+    ),
+    service: RecommendationsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    """The whole farm in one statement.
+
+    The map reads this. A block with no verdicts is absent rather than
+    present and empty: this read cannot tell "no tree ran here" from "no such
+    block", and an empty entry would invite a map to paint a confident grey
+    over the second case.
+    """
+    _ensure_tenant(context)
+    return await service.farm_verdicts(farm_id=farm_id, at=at)

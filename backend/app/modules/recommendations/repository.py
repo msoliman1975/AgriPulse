@@ -151,6 +151,42 @@ class VERDICT_SQL:  # named after REC_SQL / ALERT_SQL in shared.action_items
                AND NOT ({cls.SAME})
         """  # noqa: S608 - every fragment is a literal in this file
 
+    # Current, or as of an instant. Omitting the instant takes the
+    # `valid_to IS NULL` path so the partial index does the work; with one it
+    # becomes the interval predicate, which is why the rows are intervals.
+    WINDOW_NOW = "v.valid_to IS NULL"
+    WINDOW_AT = (
+        "v.valid_from <= CAST(:at AS timestamptz) "
+        "AND (v.valid_to IS NULL OR v.valid_to > CAST(:at AS timestamptz))"
+    )
+
+    @classmethod
+    def read(cls, *, scope: str, window: str) -> str:
+        """One farm's or one block's verdicts.
+
+        One statement either way. The Farm Console's block loop is already
+        N+1 on indices and alerts; a read per block here would add another 72
+        round trips on the production farm.
+
+        The grid cell join is a LEFT JOIN and must stay one: a block-scoped
+        verdict has no cell, and an inner join would drop exactly the rows
+        the map paints most.
+        """
+        return f"""
+            SELECT v.id, v.farm_id, v.block_id, v.cell_id, v.scope,
+                   v.tree_id, v.tree_code, v.tree_version, v.leaf_node_id,
+                   v.kind, v.status_code, v.severity,
+                   v.text_en, v.text_ar,
+                   v.valid_from, v.valid_to, v.last_evaluated_at,
+                   v.alert_id, v.recommendation_id,
+                   c.row_idx AS cell_row, c.col_idx AS cell_col
+              FROM decision_tree_block_verdicts v
+              LEFT JOIN grid_cells c ON c.id = v.cell_id
+             WHERE {scope} AND {window}
+             ORDER BY v.block_id, v.tree_code,
+                      c.row_idx NULLS FIRST, c.col_idx NULLS FIRST
+        """
+
     @classmethod
     def insert_new(cls) -> str:
         """Everything with no open row: the ones just closed, and the new ones."""
@@ -2225,6 +2261,42 @@ class RecommendationsRepository:
                         """
                     ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
                     {"block_id": block_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]
+
+    async def list_verdicts(
+        self,
+        *,
+        farm_id: UUID | None = None,
+        block_id: UUID | None = None,
+        at: datetime | None = None,
+    ) -> list[dict[str, Any]]:
+        """Verdicts for one farm or one block, current or as of an instant.
+
+        One statement either way. The Farm Console's block loop is already
+        N+1 on indices and alerts; a per-block read here would add another 72
+        round trips on the production farm.
+
+        ``at`` omitted means now, and takes the ``valid_to IS NULL`` path so
+        the partial index does the work. With an instant it becomes the
+        interval predicate, which is the whole reason the rows are intervals.
+        """
+        window = VERDICT_SQL.WINDOW_NOW if at is None else VERDICT_SQL.WINDOW_AT
+        scope = "v.farm_id = :farm_id" if block_id is None else "v.block_id = :block_id"
+        key = "farm_id" if block_id is None else "block_id"
+        params: dict[str, Any] = {"at": at, key: farm_id if block_id is None else block_id}
+
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(VERDICT_SQL.read(scope=scope, window=window)).bindparams(
+                        bindparam(key, type_=PG_UUID(as_uuid=True))
+                    ),
+                    params,
                 )
             )
             .mappings()

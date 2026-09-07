@@ -56,6 +56,7 @@ from app.modules.recommendations.events import (
     RecommendationOpenedV1,
 )
 from app.modules.recommendations.repository import RecommendationsRepository
+from app.modules.recommendations.status_codes import STATUS_DEFINITIONS, worst
 from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
 from app.modules.weather.snapshot import load_index_snapshot as load_weather_index_snapshot
 from app.modules.weather.snapshot import load_risk_snapshot as load_weather_risk_snapshot
@@ -299,6 +300,38 @@ class RecommendationsService(Protocol):
         actor_user_id: UUID | None,
         tenant_schema: str,
     ) -> dict[str, Any]: ...
+
+
+def _as_utc(at: datetime | None) -> datetime | None:
+    """Give a caller's instant a time zone before it meets a timestamptz.
+
+    A query string can carry `2026-09-01T00:00` with no offset, and
+    subtracting a naive datetime from a timestamptz raises TypeError. The
+    value the caller sent is echoed back untouched; only the comparison is
+    stamped, and UTC is the stamp because every other instant in this system
+    is stored that way.
+    """
+    if at is None:
+        return None
+    return at.replace(tzinfo=UTC) if at.tzinfo is None else at
+
+
+def _block_group(
+    *, block_id: UUID, rows: list[dict[str, Any]], as_of: datetime | None
+) -> dict[str, Any]:
+    """One block's verdicts plus the two numbers a reader wants first.
+
+    ``worst_status`` is the block's answer: the highest-ranking status any of
+    its trees returned. `na` ranks 0, so a tree with nothing to say never
+    outranks a real one.
+    """
+    return {
+        "block_id": block_id,
+        "as_of": as_of,
+        "worst_status": worst([str(r["status_code"]) for r in rows]),
+        "last_evaluated_at": (max(r["last_evaluated_at"] for r in rows) if rows else None),
+        "verdicts": rows,
+    }
 
 
 class RecommendationsServiceImpl:
@@ -1105,6 +1138,53 @@ class RecommendationsServiceImpl:
                     at=at,
                 )
         return int(counts["opened"]) + int(counts["confirmed"])
+
+    # ---- Verdict reads (tenant 0091) ----------------------------------
+
+    @staticmethod
+    def status_catalog() -> list[dict[str, Any]]:
+        """The five platform status codes, with rank, colour and both labels.
+
+        Served rather than shipped in the frontend bundle. A frontend copy of
+        a backend list has drifted before, and this one decides what colour a
+        block is painted.
+        """
+        return [
+            {
+                "code": d.code,
+                "rank": d.rank,
+                "color": d.color,
+                "label_en": d.label_en,
+                "label_ar": d.label_ar,
+            }
+            for d in STATUS_DEFINITIONS
+        ]
+
+    async def block_verdicts(self, *, block_id: UUID, at: datetime | None = None) -> dict[str, Any]:
+        """One block's verdicts, current or as of an instant."""
+        rows = await self._repo.list_verdicts(block_id=block_id, at=_as_utc(at))
+        return _block_group(block_id=block_id, rows=rows, as_of=at)
+
+    async def farm_verdicts(self, *, farm_id: UUID, at: datetime | None = None) -> dict[str, Any]:
+        """Every block of one farm, grouped, from a single statement.
+
+        A block with no verdicts is absent from the list rather than present
+        and empty: this read cannot tell "no tree ran here" from "this block
+        does not exist", and inventing an entry would let a map paint a
+        confident grey over the second case.
+        """
+        rows = await self._repo.list_verdicts(farm_id=farm_id, at=_as_utc(at))
+        by_block: dict[UUID, list[dict[str, Any]]] = {}
+        for row in rows:
+            by_block.setdefault(row["block_id"], []).append(row)
+        return {
+            "farm_id": farm_id,
+            "as_of": at,
+            "blocks": [
+                _block_group(block_id=block_id, rows=block_rows, as_of=at)
+                for block_id, block_rows in by_block.items()
+            ],
+        }
 
     # ---- Read-only explain -------------------------------------------
 
