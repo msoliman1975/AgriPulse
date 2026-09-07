@@ -178,7 +178,7 @@ class VERDICT_SQL:  # named after REC_SQL / ALERT_SQL in shared.action_items
                    v.kind, v.status_code, v.severity,
                    v.text_en, v.text_ar,
                    v.valid_from, v.valid_to, v.last_evaluated_at,
-                   v.alert_id, v.recommendation_id,
+                   v.alert_id, v.recommendation_id, v.last_run_id,
                    c.row_idx AS cell_row, c.col_idx AS cell_col
               FROM decision_tree_block_verdicts v
               LEFT JOIN grid_cells c ON c.id = v.cell_id
@@ -186,6 +186,35 @@ class VERDICT_SQL:  # named after REC_SQL / ALERT_SQL in shared.action_items
              ORDER BY v.block_id, v.tree_code,
                       c.row_idx NULLS FIRST, c.col_idx NULLS FIRST
         """
+
+    # The walk behind one verdict. `last_run_id` names the sweep that last
+    # produced this answer, and a trace row from that sweep for the same
+    # block, cell and tree is the walk that produced it.
+    #
+    # LEFT JOIN, not INNER: `decision_tree_eval_runs` is pruned by the
+    # retention task, and its traces go with it. An old verdict that is
+    # still the current answer then has no walk left. That reads as "the
+    # reasoning is no longer kept", which is a different sentence from "this
+    # verdict does not exist", and an inner join would collapse the two into
+    # one 404.
+    REASONING = """
+        SELECT v.id AS verdict_id, v.block_id, v.cell_id, v.scope,
+               v.tree_id, v.tree_code, v.tree_version, v.leaf_node_id,
+               v.kind, v.status_code, v.severity,
+               v.valid_from, v.last_evaluated_at, v.last_run_id,
+               t.id AS trace_id, t.evaluated_at, t.status AS trace_status,
+               t.node_path, t.resolved_values, t.param_overrides,
+               c.row_idx AS cell_row, c.col_idx AS cell_col
+          FROM decision_tree_block_verdicts v
+          LEFT JOIN decision_tree_eval_traces t
+                 ON t.run_id = v.last_run_id
+                AND t.block_id = v.block_id
+                AND t.tree_id = v.tree_id
+                AND t.cell_id IS NOT DISTINCT FROM v.cell_id
+          LEFT JOIN grid_cells c ON c.id = v.cell_id
+         WHERE v.id = CAST(:verdict_id AS uuid)
+           AND v.block_id = CAST(:block_id AS uuid)
+    """
 
     @classmethod
     def insert_new(cls) -> str:
@@ -2267,6 +2296,31 @@ class RecommendationsRepository:
             .all()
         )
         return [dict(r) for r in rows]
+
+    async def get_verdict_reasoning(
+        self, *, block_id: UUID, verdict_id: UUID
+    ) -> dict[str, Any] | None:
+        """One verdict with the node walk that produced it.
+
+        The block is part of the key, not a filter applied afterwards: the
+        route is authorized against the block's farm, so a verdict id from
+        another farm must not resolve just because the caller guessed it.
+
+        Returns None when there is no such verdict on this block. A verdict
+        whose trace has been pruned returns a row with the trace columns
+        null — see ``VERDICT_SQL.REASONING``.
+        """
+        row = (
+            (
+                await self._tenant.execute(
+                    text(VERDICT_SQL.REASONING),
+                    {"verdict_id": verdict_id, "block_id": block_id},
+                )
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row is not None else None
 
     async def list_verdicts(
         self,
