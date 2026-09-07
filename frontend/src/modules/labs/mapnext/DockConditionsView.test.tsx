@@ -17,6 +17,23 @@ vi.mock("@/api/recommendations", async () => {
   return { ...actual, explainBlock: h.explainMock };
 });
 
+// The status list, with its colours, is served rather than bundled.
+vi.mock("@/api/decisionTrees", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/api/decisionTrees")>("@/api/decisionTrees");
+  return {
+    ...actual,
+    getVerdictStatuses: () =>
+      Promise.resolve([
+        { code: "na", rank: 0, color: "#9AA0A6", label_en: "Not applicable", label_ar: "لا ينطبق" },
+        { code: "very_good", rank: 1, color: "#1B873F", label_en: "Very good", label_ar: "ممتاز" },
+        { code: "good", rank: 2, color: "#6FBF4B", label_en: "Good", label_ar: "جيد" },
+        { code: "issue", rank: 3, color: "#E8A33D", label_en: "Issue", label_ar: "مشكلة" },
+        { code: "alert", rank: 4, color: "#D64545", label_en: "Alert", label_ar: "إنذار" },
+      ]),
+  };
+});
+
 function tree(over: Partial<ExplainBlockResponse["trees"][number]>) {
   return {
     tree_id: "t1",
@@ -27,6 +44,7 @@ function tree(over: Partial<ExplainBlockResponse["trees"][number]>) {
     scope: "block",
     status: "clear" as const,
     steps: [],
+    status_code: null,
     kind: null,
     action_type: null,
     severity: null,
@@ -173,5 +191,98 @@ describe("DockConditionsView", () => {
     await waitFor(() =>
       expect(screen.getByText(/runs per grid cell, not per block/i)).toBeTruthy(),
     );
+  });
+});
+
+describe("a tree that checked and approved", () => {
+  beforeEach(async () => {
+    await setupTestI18n("en");
+    h.explainMock.mockReset();
+  });
+
+  const CHECKED_TREE = tree({
+    tree_id: "t9",
+    code: "canopy_v1",
+    name_en: "Canopy vigour",
+    status: "clear",
+    status_code: "very_good",
+    text_en: "Canopy is dense for the tree size.",
+    steps: [
+      {
+        node_id: "ndvi",
+        matched: true,
+        label_en: "NDVI in the high band",
+        label_ar: null,
+        values: { "indices.ndvi.mean": "0.61" },
+        condition: {
+          op: "gt",
+          left: { source: "indices", index_code: "ndvi", key: "mean" },
+          right: 0.5,
+        },
+      },
+      { node_id: "leaf_ok", matched: null, label_en: null, label_ar: null, values: {}, condition: null },
+    ],
+  });
+
+  it("says which status the tree gave, not just 'clear'", async () => {
+    // The reading this whole change exists to end: a tree that checked and
+    // approved said the same word as a tree with nothing to report.
+    h.explainMock.mockResolvedValue({
+      block_id: "b1",
+      evaluated_at: new Date().toISOString(),
+      crop_path: null,
+      trees: [CHECKED_TREE],
+    });
+
+    renderView(<DockConditionsView blockId="b1" farmId="f1" />);
+
+    await waitFor(() => expect(screen.getAllByText("Canopy vigour").length).toBe(2));
+    // Once in the tree list, once as the chip beside the outcome.
+    expect(screen.getAllByText("Very good").length).toBeGreaterThan(0);
+  });
+
+  it("shows the leaf's own words for a tree that opened nothing", async () => {
+    h.explainMock.mockResolvedValue({
+      block_id: "b1",
+      evaluated_at: new Date().toISOString(),
+      crop_path: null,
+      trees: [CHECKED_TREE],
+    });
+
+    renderView(<DockConditionsView blockId="b1" farmId="f1" />);
+
+    expect(
+      await screen.findByText("Canopy is dense for the tree size."),
+    ).toBeTruthy();
+  });
+
+  it("still says 'clear' for a tree that declared no status", async () => {
+    // A tree published before status leaves existed. The old wording is
+    // still correct for it, and must not be replaced by a blank.
+    h.explainMock.mockResolvedValue({
+      block_id: "b1",
+      evaluated_at: new Date().toISOString(),
+      crop_path: null,
+      trees: [tree({ tree_id: "t8", name_en: "Old tree", status: "clear", status_code: null })],
+    });
+
+    renderView(<DockConditionsView blockId="b1" farmId="f1" />);
+
+    await waitFor(() => expect(screen.getAllByText("Old tree").length).toBe(2));
+    expect(screen.queryByText("Very good")).toBeNull();
+  });
+
+  it("names the status in Arabic", async () => {
+    await setupTestI18n("ar");
+    h.explainMock.mockResolvedValue({
+      block_id: "b1",
+      evaluated_at: new Date().toISOString(),
+      crop_path: null,
+      trees: [CHECKED_TREE],
+    });
+
+    renderView(<DockConditionsView blockId="b1" farmId="f1" />);
+
+    await waitFor(() => expect(screen.getAllByText("ممتاز").length).toBeGreaterThan(0));
   });
 });

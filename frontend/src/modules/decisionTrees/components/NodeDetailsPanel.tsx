@@ -30,7 +30,7 @@ import { parseConditionTree } from "../lib/conditionEdit";
 import { ConditionBuilder } from "./ConditionBuilder";
 import { Card } from "@/components/Card";
 import { ACTION_TYPES } from "@/lib/actionTypes";
-import { useVerdictStatuses } from "../lib/useVerdictStatuses";
+import { useVerdictStatuses } from "@/lib/verdictStatuses";
 
 interface NodeDetailsPanelProps {
   node: PositionedNode;

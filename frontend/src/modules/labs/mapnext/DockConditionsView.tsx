@@ -9,14 +9,36 @@ import { useTranslation } from "react-i18next";
 
 import { explainBlock, type ExplainStep, type ExplainTree } from "@/api/recommendations";
 import { localizedField } from "@/lib/localizedField";
+import { useVerdictStatuses } from "@/lib/verdictStatuses";
+import type { VerdictStatusDefinition } from "@/api/decisionTrees";
 import { HEALTH_DOT } from "./constants";
 import { decisionSteps, failingCount, leafStep, readCondition } from "./dockFormat";
 import { Dot } from "./ui";
 
-function statusColor(tree: ExplainTree): string {
+// The colour a tree's answer paints. A tree that came out clear used to be
+// green whatever it actually said, which is the reading this whole change
+// exists to end: "checked and fine" and "nothing to say" were one colour.
+function statusColor(tree: ExplainTree, statuses: VerdictStatusDefinition[]): string {
+  const code = tree.status_code;
+  if (code) {
+    const found = statuses.find((s) => s.code === code);
+    if (found) return found.color;
+  }
   if (tree.status === "fired") return HEALTH_DOT.critical;
   if (tree.status === "clear") return HEALTH_DOT.healthy;
   return HEALTH_DOT.unknown;
+}
+
+/** The label of the status a tree's leaf declared, in the reader's language. */
+function statusLabel(
+  tree: ExplainTree,
+  statuses: VerdictStatusDefinition[],
+  language: string,
+): string | null {
+  if (!tree.status_code) return null;
+  const found = statuses.find((s) => s.code === tree.status_code);
+  if (!found) return null;
+  return localizedField(language, found.label_en, found.label_ar) ?? found.label_en;
 }
 
 function StepRow({ step, fired }: { step: ExplainStep; fired: boolean }): ReactNode {
@@ -61,6 +83,9 @@ export function DockConditionsView({
 }): ReactNode {
   const { t, i18n } = useTranslation("farmConsole");
   const [selectedTreeId, setSelectedTreeId] = useState<string | null>(null);
+  // The status list, with the colours the map will use. Served, so this dock
+  // and the map cannot disagree about what green means.
+  const statuses = useVerdictStatuses();
 
   const explainQ = useQuery({
     queryKey: ["labs/mapnext/explain", blockId, farmId],
@@ -117,10 +142,16 @@ export function DockConditionsView({
   const active = ran.find((tr) => tr.tree_id === selectedTreeId) ?? ran[0];
   const checks = decisionSteps(active.steps);
   const leaf = leafStep(active.steps);
+  // The leaf's own words come through for a status leaf too now, so a clear
+  // tree says what it checked instead of the bare "No action required." that
+  // read the same as a tree nobody had run.
   const verdict =
     localizedField(i18n.language, active.text_en, active.text_ar) ??
     localizedField(i18n.language, leaf?.label_en ?? null, leaf?.label_ar ?? null) ??
     (active.status === "clear" ? t("dock.conditions.noAction") : null);
+  const activeStatus = active.status_code
+    ? statuses.find((s) => s.code === active.status_code)
+    : undefined;
 
   return (
     <div className="grid h-full grid-cols-[236px_minmax(0,1fr)] gap-6">
@@ -146,7 +177,7 @@ export function DockConditionsView({
                     : "text-ap-ink hover:bg-ap-bg/60",
                 )}
               >
-                <Dot color={statusColor(tr)} />
+                <Dot color={statusColor(tr, statuses)} />
                 <span className="min-w-0 flex-1 truncate">{name}</span>
                 <span className="whitespace-nowrap text-xs text-ap-muted">
                   {tr.status === "per_cell"
@@ -155,7 +186,12 @@ export function DockConditionsView({
                       ? t("dock.conditions.nFailing", { count: failing })
                       : tr.status === "fired"
                         ? t("dock.conditions.action")
-                        : t("inspector.clear")}
+                        : /* The status the leaf declared, when it declared
+                             one. "Clear" is what every quiet tree said before,
+                             whether it had checked and approved or had
+                             nothing to say at all. */
+                          (statusLabel(tr, statuses, i18n.language) ??
+                          t("inspector.clear"))}
                 </span>
               </button>
             );
@@ -187,6 +223,22 @@ export function DockConditionsView({
                 <StepRow key={s.node_id} step={s} fired={active.status === "fired"} />
               ))}
             </div>
+            {activeStatus ? (
+              /* The status the tree declared, in its own colour. Without it
+                 a tree that checked and approved reads exactly like a tree
+                 that had nothing to say. */
+              <p className="mt-2.5 flex items-center gap-1.5 text-sm">
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-sm"
+                  style={{ backgroundColor: activeStatus.color }}
+                  aria-hidden
+                />
+                <span className="font-semibold text-ap-ink">
+                  {localizedField(i18n.language, activeStatus.label_en, activeStatus.label_ar) ??
+                    activeStatus.label_en}
+                </span>
+              </p>
+            ) : null}
             {verdict ? (
               <p className="mt-2.5 text-sm text-ap-ink">
                 <span className="text-ap-muted">{t("dock.conditions.outcome")} </span>

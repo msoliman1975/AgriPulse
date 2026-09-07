@@ -288,7 +288,8 @@ class ExplainTree(BaseModel):
 
     ``status``:
       * ``fired``    — reached a leaf that opens a recommendation/alert
-      * ``clear``    — evaluated to no_action
+      * ``clear``    — reached a status or no_action leaf; ``status_code``
+        says which, and the leaf's own words ride along
       * ``per_cell`` — cell-scoped; evaluated per grid cell, not here
       * ``skipped``  — targeting (crop/country/soil) excluded this block
       * ``error``    — the walk hit a malformed node
@@ -302,6 +303,10 @@ class ExplainTree(BaseModel):
     scope: str = "block"
     status: str
     steps: list[ExplainStep] = Field(default_factory=list)
+    # The status code the leaf resolved to, for every walk that reached one.
+    # `clear` used to be the whole answer for a tree that found nothing,
+    # which read the same as a tree nobody had run.
+    status_code: StatusCode | None = None
     kind: str | None = None
     action_type: str | None = None
     severity: str | None = None

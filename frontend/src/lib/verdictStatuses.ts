@@ -1,5 +1,9 @@
 // The five platform status codes, fetched once and shared.
 //
+// Lives here, not under decisionTrees: the tree editor authors a status,
+// the block dock reads one, and the map will paint one. Three modules, one
+// list.
+//
 // Fetched rather than hard-coded. A frontend copy of a backend list has
 // drifted here before, and this one decides what colour a block is painted
 // on the map — a code the frontend does not know about would be silently

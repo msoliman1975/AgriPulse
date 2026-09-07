@@ -1235,6 +1235,16 @@ class RecommendationsServiceImpl:
                 status = "clear"
             entry = _explain_entry(tree, status=status, steps=_explain_steps(tree, result))
             entry["error"] = result.error
+            if outcome is not None:
+                # The status code and the leaf's own words ride every walk
+                # that reached a leaf, not only the ones that opened work.
+                # "Clear" with no other detail was the screen equivalent of
+                # the blank row this whole change exists to end.
+                entry["status_code"] = outcome.status_code
+                entry["kind"] = outcome.kind
+                if not fired:
+                    entry["text_en"] = outcome.text_en
+                    entry["text_ar"] = outcome.text_ar
             if fired and outcome is not None:
                 entry.update(
                     kind=outcome.kind,
@@ -1351,13 +1361,29 @@ class RecommendationsServiceImpl:
             _trace("error")
             return None
         if result.outcome is None or result.outcome.action_type == "no_action":
-            # Either a malformed leaf or an explicit "no action" leaf — record
-            # nothing; the daily evaluator re-walks tomorrow as signals change.
-            _trace("clear")
+            # A status leaf or a no-action leaf. No work item opens, but the
+            # verdict written above says what the block is, and the trace now
+            # carries the same code so the lineage page can show it. A bare
+            # "clear" was the screen equivalent of the blank row this change
+            # exists to end.
+            _trace(
+                "clear",
+                outcome=(
+                    {
+                        "kind": result.outcome.kind,
+                        "status_code": result.outcome.status_code,
+                        "leaf_node_id": result.path[-1].node_id if result.path else None,
+                        "text_en": result.outcome.text_en,
+                    }
+                    if result.outcome is not None
+                    else None
+                ),
+            )
             return None
 
         leaf_outcome = {
             "kind": result.outcome.kind,
+            "status_code": result.outcome.status_code,
             "action_type": result.outcome.action_type,
             "severity": result.outcome.severity,
             "confidence": str(result.outcome.confidence),
