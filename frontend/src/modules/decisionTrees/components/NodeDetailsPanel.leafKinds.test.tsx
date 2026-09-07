@@ -24,14 +24,14 @@ vi.mock("@/api/decisionTrees", async () => {
   };
 });
 
-function leaf(outcome: Record<string, unknown>): PositionedNode {
+function leaf(outcome: PositionedNode["data"]["outcome"]): PositionedNode {
   return {
     id: "leaf_1",
     x: 0,
     y: 0,
     role: "leaf-status",
     data: { label_en: "A leaf", outcome },
-  } as PositionedNode;
+  };
 }
 
 async function renderPanel(node: PositionedNode, canEdit: boolean, onPatch = vi.fn()) {
