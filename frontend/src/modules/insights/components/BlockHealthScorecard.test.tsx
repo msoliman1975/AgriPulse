@@ -106,6 +106,35 @@ describe("BlockHealthScorecard", () => {
     expect(screen.getByText(common.healthReason.cell_share)).toBeTruthy();
   });
 
+  it("says a decision tree found nothing wrong, in words", async () => {
+    // The reason this whole change exists. Before verdicts, a block whose
+    // trees all came out clear had no row anywhere to say so, and the page
+    // could only report the absence of alerts.
+    renderCard([row("North", "healthy", "verdict_good")]);
+
+    await waitFor(() => expect(screen.getByText("North")).toBeTruthy());
+    expect(
+      screen.getByText("Every decision tree checked this block and found nothing wrong"),
+    ).toBeTruthy();
+  });
+
+  it("names a verdict alert and a verdict issue separately", async () => {
+    renderCard([row("North", "critical", "verdict_alert")]);
+
+    await waitFor(() => expect(screen.getByText("North")).toBeTruthy());
+    expect(screen.getByText("A decision tree reports an alert on this block")).toBeTruthy();
+  });
+
+  it("translates a verdict reason", async () => {
+    await setupTestI18n("ar");
+    renderCard([row("North", "healthy", "verdict_good")]);
+
+    await waitFor(() => expect(screen.getByText("North")).toBeTruthy());
+    expect(
+      screen.getByText("كل أشجار القرار فحصت هذا الحقل ولم تجد أي خطأ"),
+    ).toBeTruthy();
+  });
+
   it("translates the reason", async () => {
     await setupTestI18n("ar");
     renderCard([row("North", "healthy", "all_clear")]);

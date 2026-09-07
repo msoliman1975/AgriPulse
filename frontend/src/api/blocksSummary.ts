@@ -6,10 +6,18 @@ export type Health = "healthy" | "watch" | "critical" | "unknown";
 export type MapSeverity = "watch" | "critical";
 
 /** Why a block is in its health class. Mirrors
- *  `app.shared.health_definition.HealthReason` — eight words, closed set.
+ *  `app.shared.health_definition.HealthReason` — eleven words, closed set.
  *  Copy lives once, under `common:healthReason.*`, so the Farm Console dock
- *  and the Insights scorecard cannot word the same block differently. */
+ *  and the Insights scorecard cannot word the same block differently.
+ *
+ *  The three `verdict_*` reasons are the primary ones: a decision tree
+ *  leaves a verdict for every leaf it reaches, including the leaves that
+ *  find nothing wrong. The rest are the fallback for a block whose sweep
+ *  predates the verdict table. */
 export type HealthReason =
+  | "verdict_alert"
+  | "verdict_issue"
+  | "verdict_good"
   | "critical_alert"
   | "warning_alert"
   | "cell_share"

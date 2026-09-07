@@ -287,9 +287,7 @@ async def extract(
 
 
 async def _farm_ids(session: AsyncSession, schema: str, limit: int | None) -> list[UUID]:
-    sql = (
-        f'SELECT id FROM "{schema}".farms WHERE deleted_at IS NULL ORDER BY code, id'  # noqa: S608
-    )
+    sql = f'SELECT id FROM "{schema}".farms WHERE deleted_at IS NULL ORDER BY code, id'  # noqa: S608
     if limit is not None:
         sql += f" LIMIT {int(limit)}"
     return [r[0] for r in await session.execute(text(sql))]

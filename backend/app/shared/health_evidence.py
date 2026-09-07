@@ -36,7 +36,7 @@ from sqlalchemy import DateTime, bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.shared.health_definition import AlertEvidence, HealthInputs
+from app.shared.health_definition import AlertEvidence, HealthInputs, VerdictEvidence
 
 
 @dataclass(frozen=True, slots=True)
@@ -282,6 +282,43 @@ _TRACE_COUNTS_AS_OF = text(_trace_counts_sql(as_of=True)).bindparams(
 )
 
 
+# The block's current decision-tree verdicts — the primary evidence.
+#
+# One row per open verdict: its status code, and the cell it is about when it
+# is about a cell. The resolver ranks them and takes the worst, and counts the
+# `alert` cells against the block's grid for `cell_critical_share`.
+#
+# This is a far better source for that share than the alert children it
+# replaces. A tree writes a verdict for every cell it evaluates, whether or
+# not anything fired, so the denominator and the numerator finally come from
+# the same pass.
+def _verdict_evidence_sql(*, as_of: bool) -> str:
+    # `window` is one of two literals chosen by a bool argument, and the only
+    # value it carries is a bound-parameter placeholder.
+    window = (
+        "v.valid_from <= :at AND (v.valid_to IS NULL OR v.valid_to > :at)"
+        if as_of
+        else "v.valid_to IS NULL"
+    )
+    sql = f"""
+        SELECT v.block_id, v.status_code, v.cell_id,
+               max(v.last_evaluated_at) AS last_evaluated_at
+        FROM decision_tree_block_verdicts v
+        WHERE v.farm_id = :farm_id AND {window}
+        GROUP BY v.block_id, v.status_code, v.cell_id
+    """
+    return sql
+
+
+_VERDICTS_NOW = text(_verdict_evidence_sql(as_of=False)).bindparams(
+    bindparam("farm_id", type_=PG_UUID(as_uuid=True))
+)
+_VERDICTS_AS_OF = text(_verdict_evidence_sql(as_of=True)).bindparams(
+    bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
+    bindparam("at", type_=DateTime(timezone=True)),
+)
+
+
 # Cell count of the block's live grid — the denominator for
 # `cell_critical_share`.
 #
@@ -339,7 +376,7 @@ async def load_health_evidence(
 ) -> dict[UUID, BlockEvidence]:
     """Every block's evidence for one farm, keyed by block id.
 
-    Five statements, always the same five in the same order, whether or
+    Six statements, always the same six in the same order, whether or
     not `at` is given. A block with no evidence at all is simply absent
     from the result; callers must read that as "nothing looked", not as
     "nothing found" — `HealthInputs()` with every counter at zero
@@ -362,6 +399,7 @@ async def load_health_evidence(
         _RECOMMENDATION_FLOOR_AS_OF if at is not None else _RECOMMENDATION_FLOOR_NOW
     )
     trace_rows = await rows(_TRACE_COUNTS_AS_OF if at is not None else _TRACE_COUNTS_NOW)
+    verdict_rows = await rows(_VERDICTS_AS_OF if at is not None else _VERDICTS_NOW)
     cell_rows = await rows(_CELL_COUNTS)
     crop_rows = await rows(_CROP_PATHS)
 
@@ -375,6 +413,9 @@ async def load_health_evidence(
         if r["max_confidence"] is not None
     }
     traces_by_block = {r["block_id"]: r for r in trace_rows}
+    verdicts_by_block: dict[UUID, list[Any]] = {}
+    for r in verdict_rows:
+        verdicts_by_block.setdefault(r["block_id"], []).append(r)
     cells_by_block = {r["block_id"]: int(r["total_cells"] or 0) for r in cell_rows}
     crop_by_block = {r["block_id"]: r["crop_path"] for r in crop_rows}
 
@@ -382,6 +423,7 @@ async def load_health_evidence(
         set(alerts_by_block)
         | set(confidence_by_block)
         | set(traces_by_block)
+        | set(verdicts_by_block)
         | set(cells_by_block)
         | set(crop_by_block)
     )
@@ -390,6 +432,7 @@ async def load_health_evidence(
             alert_groups=alerts_by_block.get(bid, []),
             max_recommendation_confidence=confidence_by_block.get(bid),
             traces=traces_by_block.get(bid),
+            verdicts=verdicts_by_block.get(bid, []),
             total_cells=cells_by_block.get(bid, 0),
             crop_path=crop_by_block.get(bid),
         )
@@ -404,6 +447,7 @@ def _compose(
     traces: Any | None,
     total_cells: int,
     crop_path: str | None = None,
+    verdicts: list[Any] | None = None,
 ) -> BlockEvidence:
     by_severity: dict[str, int] = {}
     by_status: dict[str, int] = {}
@@ -434,10 +478,22 @@ def _compose(
             critical_cells.add(cell_id)
         alerts.append(AlertEvidence(severity=severity, status=status, cell_id=cell_id))
 
+    verdict_rows = verdicts or []
+    verdict_evidence = tuple(
+        VerdictEvidence(status_code=str(v["status_code"]), cell_id=v["cell_id"])
+        for v in verdict_rows
+    )
+    verdict_seen = max(
+        (v["last_evaluated_at"] for v in verdict_rows if v["last_evaluated_at"] is not None),
+        default=None,
+    )
+
     t = traces or {}
     return BlockEvidence(
         inputs=HealthInputs(
             alerts=tuple(alerts),
+            verdicts=verdict_evidence,
+            verdict_last_evaluated_at=verdict_seen,
             total_cells=total_cells,
             max_recommendation_confidence=max_recommendation_confidence,
             traces_fired=int(t.get("traces_fired") or 0),

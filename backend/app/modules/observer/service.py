@@ -1191,7 +1191,6 @@ def _raw_bands_key(ctx: dict[str, Any]) -> str:
 
 
 def _raw_bands_uri(ctx: dict[str, Any]) -> str:
-
     return f"s3://{get_storage_client().bucket}/{_raw_bands_key(ctx)}"
 
 

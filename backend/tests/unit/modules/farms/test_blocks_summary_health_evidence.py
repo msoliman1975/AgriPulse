@@ -74,6 +74,7 @@ def _session(
     alerts: list[Any] | None = None,
     recommendations: list[Any] | None = None,
     traces: list[Any] | None = None,
+    verdicts: list[Any] | None = None,
     cells: list[Any] | None = None,
     crops: list[Any] | None = None,
     definitions: list[Any] | None = None,
@@ -97,14 +98,15 @@ def _session(
       2. alerts        — counted alerts per (severity, status, cell)   ┐
       3. recommendations — max open confidence per block               │ the
       4. traces        — per-status counts from the newest sweep       │ evidence
-      5. cells         — live grid cell count per block                │ loader
-      6. crops         — current crop path per block                   ┘
-      7. definitions   — the per-crop health catalog          ┐ the health
-      8. farm_override — this farm's own health override      ┘ definitions
-      9. grid          — current grid config per block
-     10. roster        — the active block ids
-     11. indices       — latest values, bounded to the recent window
-     12. unbounded     — latest values, unbounded; issued ONLY for blocks
+      5. verdicts      — each tree's current status for the block      │ loader
+      6. cells         — live grid cell count per block                │
+      7. crops         — current crop path per block                   ┘
+      8. definitions   — the per-crop health catalog          ┐ the health
+      9. farm_override — this farm's own health override      ┘ definitions
+     10. grid          — current grid config per block
+     11. roster        — the active block ids
+     12. indices       — latest values, bounded to the recent window
+     13. unbounded     — latest values, unbounded; issued ONLY for blocks
                          the recent window returned nothing for
 
     `unbounded` defaults to not being supplied at all, so a test whose
@@ -116,6 +118,7 @@ def _session(
         alerts or [],
         recommendations or [],
         traces or [],
+        verdicts or [],
         cells or [],
         crops or [],
         definitions or [],

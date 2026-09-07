@@ -40,6 +40,8 @@ a stale or uncovered block: a real finding is never hidden behind
 
 Order the resolver applies
 --------------------------
+  0. Any decision-tree verdict at all: worst
+     status wins and nothing below is read.   -> critical / watch / healthy
   1. Counted alerts, worst class wins.        -> critical / watch
   2. Open recommendations at or above the
      confidence floor.                        -> watch
@@ -63,6 +65,11 @@ from app.shared.health import Health
 # Why the block ended up in the class it did. Rendered next to the class so
 # "why is my block red" has an answer that is not a guess.
 HealthReason = Literal[
+    # From a decision-tree verdict, which is the primary source: every tree
+    # leaves one, including the leaves that find nothing wrong.
+    "verdict_alert",
+    "verdict_issue",
+    "verdict_good",
     "critical_alert",
     "warning_alert",
     "cell_share",
@@ -166,6 +173,20 @@ class AlertEvidence:
 
 
 @dataclass(frozen=True, slots=True)
+class VerdictEvidence:
+    """One decision-tree verdict, reduced to what the resolver reads.
+
+    `cell_id` is None for a verdict about the whole block. A cell verdict is
+    what `cell_critical_share` compares against the block's grid — and it is
+    a far better source than the alert children that fed it before, because
+    a tree writes one per cell it evaluated whether or not anything fired.
+    """
+
+    status_code: str
+    cell_id: Any | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class HealthInputs:
     """Everything known about one block at one instant.
 
@@ -176,6 +197,14 @@ class HealthInputs:
     """
 
     alerts: tuple[AlertEvidence, ...] = ()
+    # Decision-tree verdicts. When there is at least one, they decide the
+    # block's class on their own and the alert path below is not consulted:
+    # an alert leaf already writes a verdict, so reading both would count
+    # one finding twice.
+    verdicts: tuple[VerdictEvidence, ...] = ()
+    # The newest verdict's evaluation time. Separate from the trace stamp
+    # because the two can be hours apart on a block whose sweep half ran.
+    verdict_last_evaluated_at: datetime | None = None
     total_cells: int = 0
     max_recommendation_confidence: Decimal | None = None
     traces_fired: int = 0
@@ -195,7 +224,16 @@ def resolve_health(
 
     `now` is passed in rather than read from the clock, so a caller
     resolving a whole farm gives every block the same instant.
+
+    Verdicts decide on their own when the block has any. An alert leaf
+    already writes a verdict, so consulting the alert path as well would
+    count one finding twice — and the verdict is the better source, because
+    a tree writes one whether or not anything fired. The alert path below
+    stays for blocks whose sweep predates the verdict table.
     """
+    if inputs.verdicts:
+        return _from_verdicts(definition, inputs, now=now)
+
     alert_class, alert_reason = _from_alerts(definition, inputs)
     if alert_class is not None and alert_reason is not None:
         return alert_class, alert_reason
@@ -206,6 +244,53 @@ def resolve_health(
     # Past this point the evidence says "nothing found". Whether that is
     # health depends on whether anything actually looked.
     return _gate_the_healthy_answer(definition, inputs, now=now)
+
+
+# ---------- Step 0: verdicts, when there are any -----------------------------
+
+
+def _from_verdicts(  # noqa: PLR0911 - one return per status the block can land on
+    definition: HealthDefinition, inputs: HealthInputs, *, now: datetime
+) -> tuple[Health, HealthReason]:
+    """The block's class from what its trees actually said.
+
+    Worst wins, and the ranking is the status list's own: alert beats issue
+    beats good beats very_good beats na. `na` argues for nothing — a tree
+    that ran and had nothing to say is not evidence of health — so a block
+    whose every verdict is `na` lands on the same answer as a block no tree
+    covers.
+
+    Freshness gates the healthy answer only, never a critical. A block whose
+    sweep is three days old and whose trees found an alert is still red; it
+    is the "everything is fine" claim that goes stale, because that claim is
+    only as good as the last look.
+    """
+    codes = {v.status_code for v in inputs.verdicts}
+    alert_cells = {
+        v.cell_id for v in inputs.verdicts if v.status_code == "alert" and v.cell_id is not None
+    }
+    block_alert = any(v.status_code == "alert" and v.cell_id is None for v in inputs.verdicts)
+
+    if block_alert:
+        return "critical", "verdict_alert"
+    if alert_cells:
+        # The same test the alert path applies, on a source that can
+        # actually reach it: a tree writes a verdict per cell it evaluated.
+        if _share_is_met(definition, len(alert_cells), inputs.total_cells):
+            return "critical", "verdict_alert"
+        return "watch", "cell_share"
+    if "issue" in codes:
+        return "watch", "verdict_issue"
+    if codes & {"good", "very_good"}:
+        seen = inputs.verdict_last_evaluated_at
+        if seen is None:
+            return "unknown", "no_coverage"
+        if now - seen > timedelta(hours=definition.stale_after_hours):
+            return "unknown", "stale"
+        return "healthy", "verdict_good"
+    # Every verdict is `na`: the trees ran and none of them had anything to
+    # say about this block. Same answer as no tree covering it at all.
+    return definition.no_tree_coverage, "no_tree"
 
 
 # ---------- Step 1: alerts ---------------------------------------------------

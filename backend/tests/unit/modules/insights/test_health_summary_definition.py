@@ -60,6 +60,7 @@ def _service(
     alerts: list[Any] | None = None,
     recommendations: list[Any] | None = None,
     traces: list[Any] | None = None,
+    verdicts: list[Any] | None = None,
     cells: list[Any] | None = None,
     crops: list[Any] | None = None,
     definitions: list[Any] | None = None,
@@ -67,7 +68,7 @@ def _service(
     with_evidence: bool = True,
 ) -> InsightsService:
     """A service with mocked repos and a session that returns, in order, the
-    evidence loader's five statements, then the per-crop health catalog and
+    evidence loader's six statements, then the per-crop health catalog and
     this farm's override.
 
     Named rather than positional: this file used to pass a bare list of
@@ -80,6 +81,7 @@ def _service(
             alerts or [],
             recommendations or [],
             traces or [],
+            verdicts or [],
             cells or [],
             crops or [],
             definitions or [],
@@ -193,7 +195,8 @@ class TestScorecardUnderTheDefinition:
 
         out = await svc.get_farm_health_summary(farm_id=farm_id)
 
-        assert svc._session.execute.await_count == 7  # type: ignore[attr-defined]
+        # Six evidence statements, the crop catalog, and the farm override.
+        assert svc._session.execute.await_count == 8  # type: ignore[attr-defined]
         by_name = {r.block_name: r for r in out.blocks}
         assert by_name["North"].current_health == "healthy"
         assert by_name["South"].current_health == "healthy"
