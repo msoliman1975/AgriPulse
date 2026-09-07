@@ -16,6 +16,11 @@ export type NodeKind =
   | "decision"
   | "leaf-recommendation"
   | "leaf-alert"
+  // Says what the block is, in words and in one of five platform status
+  // codes, without asking anyone to do anything.
+  | "leaf-status"
+  // The tree ran and has nothing to say. Distinct from `leaf-status`: this
+  // one paints the block "not applicable", not "good".
   | "leaf-noop";
 
 export type Branch = "match" | "miss";
@@ -30,6 +35,8 @@ export interface YamlNode {
   outcome?: {
     action_type?: string;
     kind?: string;
+    /** One of the five platform status codes; only a `status` leaf has one. */
+    status?: string;
     severity?: string;
     confidence?: number | string;
     text_en?: string;
@@ -189,7 +196,9 @@ export function generateNodeId(doc: YamlDoc, kind: NodeKind): string {
         ? "leaf_rec"
         : kind === "leaf-alert"
           ? "leaf_alert"
-          : "leaf_noop";
+          : kind === "leaf-status"
+            ? "leaf_status"
+            : "leaf_noop";
   const taken = new Set(Object.keys(doc.nodes ?? {}));
   for (let i = 1; i < 10_000; i++) {
     const candidate = `${prefix}_${i}`;
@@ -232,6 +241,19 @@ export function buildNodeBody(kind: NodeKind, labelEn?: string): YamlNode {
       },
     };
   }
+  if (kind === "leaf-status") {
+    return {
+      label_en: labelEn ?? "Status",
+      outcome: {
+        // No action_type, no severity, no confidence: a status leaf asks
+        // for no work, and its status code is what ranks and colours it.
+        kind: "status",
+        status: "good",
+        text_en: "Checked. Nothing wrong here.",
+        text_ar: "",
+      },
+    };
+  }
   if (kind === "leaf-recommendation") {
     return {
       label_en: labelEn ?? "Recommendation",
@@ -247,10 +269,12 @@ export function buildNodeBody(kind: NodeKind, labelEn?: string): YamlNode {
   return {
     label_en: labelEn ?? "No action",
     outcome: {
+      // `kind: no_action` and `action_type: no_action` say the same thing.
+      // Both are written because every tree published before the four kinds
+      // existed carries only the second, and the loader reads either.
+      kind: "no_action",
       action_type: "no_action",
-      kind: "recommendation",
-      confidence: 0.9,
-      text_en: "No action.",
+      text_en: "Nothing to report.",
       text_ar: "",
     },
   };

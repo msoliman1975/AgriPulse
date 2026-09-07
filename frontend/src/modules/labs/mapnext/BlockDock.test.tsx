@@ -76,6 +76,9 @@ function point(time: string, mean: string) {
 
 const DETAIL: UnitDetail = {
   id: "b1",
+  health_reason: null,
+  health_source: null,
+  health_definition_version: null,
   name: "Block A2",
   type: "block",
   parent_pivot_id: null,
@@ -504,6 +507,55 @@ describe("BlockDock", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Field & plan/ }));
     expect(screen.getByText("Soil prep")).toBeTruthy();
   });
+
+  // ---- why the block is in its class ------------------------------------
+  //
+  // These assert the rendered SENTENCE, not the reason code. The code is what
+  // the component is handed; the sentence is what a grower reads, and a
+  // missing translation would leave the raw key on screen while a code-level
+  // assertion still passed.
+
+  it("says why the block is in its health class", async () => {
+    renderDock({ ...DETAIL, health: "unknown", health_reason: "no_coverage" });
+    await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
+    expect(screen.getByText("No decision tree has run on this block")).toBeTruthy();
+  });
+
+  it("names the tier that decided, and its version", async () => {
+    // The reason answers half of "why is my block red". Without the source a
+    // farm admin who has overridden the definition cannot tell whether their
+    // own setting or the crop's default produced the answer.
+    renderDock({
+      ...DETAIL,
+      health: "healthy",
+      health_reason: "all_clear",
+      health_source: "crop",
+      health_definition_version: 2,
+    });
+    await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
+    expect(screen.getByText(/Crop defaults \(v2\)/)).toBeTruthy();
+  });
+
+  it("names a farm override as the farm's own", async () => {
+    renderDock({
+      ...DETAIL,
+      health: "healthy",
+      health_reason: "all_clear",
+      health_source: "farm",
+      health_definition_version: null,
+    });
+    await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
+    expect(screen.getByText(/This farm's setting/)).toBeTruthy();
+  });
+
+  it("shows nothing extra when the server sent no reason", async () => {
+    // The backend's `health_definition_enabled` is off, so `health_reason` is
+    // null and the dock has to look exactly as it did before this shipped.
+    renderDock({ ...DETAIL, health_reason: null });
+    await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
+    expect(screen.queryByText(/decision tree/i)).toBeNull();
+    expect(screen.queryByText(/Every check passed/)).toBeNull();
+  });
 });
 
 // Everything the dock renders has to follow the UI language, not just the
@@ -561,5 +613,13 @@ describe("BlockDock — Arabic", () => {
     // en-US browser kept printing "Jun 30, 2026" beside Arabic chip labels.
     await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
     expect(screen.queryByText(/Jun 30, 2026/)).toBeNull();
+  });
+
+  it("translates the reason", async () => {
+    renderDock({ ...DETAIL, health: "healthy", health_reason: "all_clear" });
+    await waitFor(() => expect(screen.getByText("Block A2")).toBeTruthy());
+    // Asserting the Arabic string, not that a key resolved: 1656 green tests
+    // once shipped English under Arabic names because they checked the key.
+    expect(screen.getByText("اجتازت كل الفحوصات")).toBeTruthy();
   });
 });

@@ -86,13 +86,16 @@ export async function applySubscriptions(farmId: string, blockIds: string[]): Pr
 
 // ---------- PR-3: locks ---------------------------------------------------
 
-export type LockCategory = "subscriptions" | "irrigation" | "org" | "grid";
+export type LockCategory = "subscriptions" | "irrigation" | "org" | "grid" | "health";
 
 export interface LockState {
   subscriptions: boolean;
   irrigation: boolean;
   org: boolean;
   grid: boolean;
+  /** Health locks the farm's own override, not its blocks — it is a
+   *  resolution tier and has no block-side copy to diverge. */
+  health: boolean;
 }
 
 export async function getLocks(farmId: string): Promise<LockState> {
@@ -346,5 +349,55 @@ export async function applyGridCellSize(
     confirm_farm_name: confirmFarmName,
     backfill_budget_scenes: backfillBudgetScenes,
   });
+  return data;
+}
+
+// ---------- Health definition (farm override) ----------------------------
+//
+// A RESOLUTION TIER, not a template. There is no apply and no apply-preview,
+// and there must not be: a block's definition is resolved at read time as
+// platform default <- crop catalog <- this farm override, shallow merge with
+// the deepest tier winning per key. Nothing is copied into blocks, so there
+// is nothing to reconcile.
+
+/** The bounded values a farm may set. Every field is OPTIONAL and omitted
+ *  means "inherit" — which is not the same as null. `snoozed_as`,
+ *  `cell_critical_share` and `recommendation_floor` all take null as a real
+ *  value, so a caller must send only the keys it means to set. */
+export interface HealthDefinitionBody {
+  severity_map?: Record<string, string> | null;
+  counted_statuses?: string[] | null;
+  snoozed_as?: string | null;
+  cell_critical_share?: number | null;
+  recommendation_floor?: number | null;
+  stale_after_hours?: number | null;
+  no_tree_coverage?: string | null;
+}
+
+export interface HealthTemplate {
+  /** The farm's override AS AUTHORED, never as resolved. Null means the farm
+   *  follows the knowledge base. */
+  definition: HealthDefinitionBody | null;
+  locked: boolean;
+}
+
+export async function getHealthTemplate(farmId: string): Promise<HealthTemplate> {
+  const { data } = await apiClient.get<HealthTemplate>(
+    `/v1/farms/${farmId}/config/health/template`,
+  );
+  return data;
+}
+
+/** `null` clears the override. The body must carry only the keys the farm
+ *  is setting — sending every field would pin values it never chose and stop
+ *  it tracking the knowledge base for them. */
+export async function putHealthTemplate(
+  farmId: string,
+  definition: HealthDefinitionBody | null,
+): Promise<HealthTemplate> {
+  const { data } = await apiClient.put<HealthTemplate>(
+    `/v1/farms/${farmId}/config/health/template`,
+    { definition },
+  );
   return data;
 }

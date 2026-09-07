@@ -61,6 +61,7 @@ from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any
 
+from app.modules.recommendations.status_codes import kind_of, status_for
 from app.shared.conditions import ConditionContext
 from app.shared.conditions import evaluate as _evaluate_condition_tree
 
@@ -128,13 +129,20 @@ def _substitute_params_in_outcome_params(raw: Any, params: Mapping[str, Any]) ->
 class TreeOutcome:
     """Resolved leaf outcome — what the service writes downstream.
 
-    ``kind`` (PR-E) discriminates where the outcome lands:
+    ``kind`` discriminates where the outcome lands:
       * ``"recommendation"`` (default) — writes to ``tenant.recommendations``;
         ``confidence`` is meaningful, ``severity`` defaults to ``"info"``.
       * ``"alert"`` — writes to ``tenant.alerts`` via the alerts repo;
         ``severity`` is the lifecycle-driving field (one of
         info / warning / critical), ``confidence`` is fixed at 1.0
         (alerts express certainty, not probability).
+      * ``"status"`` — opens no work item. It says what the block is, in
+        words and in one of the five platform status codes.
+      * ``"no_action"`` — the tree ran and has nothing to say.
+
+    ``status_code`` is set for every kind, so a caller never has to map a
+    kind to a colour itself. An alert is always ``alert`` and a
+    recommendation is always ``issue``; only a ``status`` leaf chooses.
 
     ``leaf_node_id`` is the id of the leaf node that produced the
     outcome. For alert outcomes the service combines it with the tree
@@ -150,6 +158,7 @@ class TreeOutcome:
     text_ar: str | None
     valid_for_hours: int | None
     kind: str = "recommendation"
+    status_code: str = "issue"
     leaf_node_id: str | None = None
     # Structured guidance split by time horizon (KB P1-B). Maps a horizon
     # in ``_ACTION_HORIZONS`` to an ordered list of ``{text_en, text_ar}``
@@ -298,17 +307,25 @@ def _step_for_leaf(node_id: str, node: Mapping[str, Any]) -> TreePathStep:
 def _parse_outcome(raw: Any, *, leaf_node_id: str, params: Mapping[str, Any]) -> TreeOutcome | None:
     if not isinstance(raw, dict):
         return None
-    action_type = raw.get("action_type")
     text_en = raw.get("text_en")
-    if not isinstance(action_type, str) or not isinstance(text_en, str):
+    if not isinstance(text_en, str):
         return None
 
-    kind = str(raw.get("kind", "recommendation"))
-    if kind not in ("recommendation", "alert"):
-        # Malformed leaf — leave as recommendation, the loader's compile
-        # step already rejects unknown kinds at startup so reaching here
-        # means the compiled JSON was hand-tampered. Permissive fallback.
-        kind = "recommendation"
+    # One function decides the kind, shared with the loader, so a leaf
+    # cannot validate as one kind and evaluate as another.
+    kind = kind_of(raw)
+
+    action_type = raw.get("action_type")
+    if not isinstance(action_type, str):
+        # A `status` or `no_action` leaf carries no action_type — there is
+        # no action to type.
+        if kind in ("status", "no_action"):
+            action_type = "no_action"
+        else:
+            return None
+
+    declared_status = raw.get("status")
+    status_code = status_for(kind, declared_status if isinstance(declared_status, str) else None)
 
     # Alert leaves carry severity and certainty (no probabilistic
     # confidence); recommendation leaves keep the existing confidence
@@ -346,6 +363,7 @@ def _parse_outcome(raw: Any, *, leaf_node_id: str, params: Mapping[str, Any]) ->
         text_ar=raw.get("text_ar"),
         valid_for_hours=valid_for_hours,
         kind=kind,
+        status_code=status_code,
         leaf_node_id=leaf_node_id,
         actions=_parse_actions(raw.get("actions")),
     )

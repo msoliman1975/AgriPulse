@@ -26,7 +26,11 @@ export interface CompiledNode {
   on_miss?: string;
   outcome?: {
     action_type?: string;
-    kind?: string; // "alert" | "recommendation" (PR-E); default "recommendation"
+    // One of the four leaf kinds. Absent on every tree published before
+    // they existed, where `action_type: no_action` is the quiet branch.
+    kind?: string;
+    /** One of the five platform status codes; only a `status` leaf has one. */
+    status?: string;
     severity?: string;
     confidence?: number | string;
     text_en?: string | null;
@@ -45,7 +49,12 @@ export interface CompiledTree {
   parameters?: Record<string, unknown>;
 }
 
-export type NodeRole = "decision" | "leaf-recommendation" | "leaf-alert" | "leaf-noop";
+export type NodeRole =
+  | "decision"
+  | "leaf-recommendation"
+  | "leaf-alert"
+  | "leaf-status"
+  | "leaf-noop";
 
 export interface PositionedNode {
   id: string;
@@ -143,11 +152,19 @@ export function layoutTree(compiled: CompiledTree | undefined | null): LayoutRes
 
     let role: NodeRole = "decision";
     if (node.outcome) {
-      const kind = (node.outcome.kind ?? "recommendation").toString();
-      if (node.outcome.action_type === "no_action") {
-        role = "leaf-noop";
+      // Read the kind the way the loader and the engine do. An explicit
+      // `status` or `alert` wins; otherwise `action_type: no_action` means
+      // no_action, which is how every tree published before the four kinds
+      // existed spells its quiet branches. Reading the declared kind first
+      // would draw 15 of the 63 shipped no-action leaves as recommendations,
+      // because they say `kind: recommendation` next to it.
+      const kind = (node.outcome.kind ?? "").toString();
+      if (kind === "status") {
+        role = "leaf-status";
       } else if (kind === "alert") {
         role = "leaf-alert";
+      } else if (node.outcome.action_type === "no_action" || kind === "no_action") {
+        role = "leaf-noop";
       } else {
         role = "leaf-recommendation";
       }

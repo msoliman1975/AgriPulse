@@ -20,12 +20,21 @@ from uuid import UUID
 from sqlalchemy import Text, bindparam, select, text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.indices.trends import compute_trend
 from app.modules.recommendations.models import DecisionTree, DecisionTreeVersion
 from app.shared.action_items import REC_SQL, TENANT_TODAY_SQL
+
+
+def _rowcount(result: Any) -> int:
+    """Rows a write actually touched.
+
+    `Result` does not declare `rowcount`; the cursor result behind it does.
+    """
+    return int(cast("CursorResult[Any]", result).rowcount or 0)
 
 
 def _serialize_jsonb(value: Any) -> str | None:
@@ -38,6 +47,169 @@ def _json_default(value: Any) -> Any:
     if isinstance(value, Decimal):
         return str(value)
     raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
+class VERDICT_SQL:  # named after REC_SQL / ALERT_SQL in shared.action_items
+    """The verdict write, as three statements a probe can run verbatim.
+
+    Module level rather than inline so the SQL sent to Postgres is one named
+    thing. There is no Docker on the development machine, so these are
+    checked by running this exact text against a real database inside a
+    transaction that rolls back.
+
+    Three statements, never one. A data-modifying CTE is invisible to the
+    rest of its own statement, so an INSERT that had to see the rows a
+    sibling UPDATE just closed would read the state from before the close and
+    collide with the open-row unique index.
+    """
+
+    # What makes two verdicts the same answer. The text is part of it: a
+    # republished leaf that keeps its status but rewrites its sentence is a
+    # new thing to read, and a reader looking at "since Tuesday" should not be
+    # shown wording that only appeared today.
+    SAME = (
+        "v.status_code = i.status_code "
+        "AND v.leaf_node_id = i.leaf_node_id "
+        "AND v.kind = i.kind "
+        "AND v.text_en = i.text_en "
+        "AND v.text_ar IS NOT DISTINCT FROM i.text_ar "
+        "AND v.severity IS NOT DISTINCT FROM i.severity"
+    )
+
+    # The block's rows as one zipped relation. Multi-argument `unnest` walks
+    # the arrays in lockstep; separate `unnest` calls in a SELECT list do not
+    # promise that. Every array is cast: a text bind against a uuid column
+    # defeats the index the statement was written for.
+    INCOMING = """
+        unnest(
+            CAST(:block_ids AS uuid[]),
+            CAST(:cell_ids AS uuid[]),
+            CAST(:tree_ids AS uuid[]),
+            CAST(:farm_ids AS uuid[]),
+            CAST(:scopes AS text[]),
+            CAST(:tree_codes AS text[]),
+            CAST(:tree_versions AS int[]),
+            CAST(:leaf_node_ids AS text[]),
+            CAST(:kinds AS text[]),
+            CAST(:status_codes AS text[]),
+            CAST(:severities AS text[]),
+            CAST(:texts_en AS text[]),
+            CAST(:texts_ar AS text[]),
+            CAST(:alert_ids AS uuid[]),
+            CAST(:recommendation_ids AS uuid[])
+        ) AS i(
+            block_id, cell_id, tree_id, farm_id, scope,
+            tree_code, tree_version, leaf_node_id, kind, status_code,
+            severity, text_en, text_ar, alert_id, recommendation_id
+        )
+    """
+
+    # The identity of a verdict: one tree's answer about one block or one
+    # cell. `IS NOT DISTINCT FROM` because cell_id is NULL on a block verdict
+    # and `= NULL` would match nothing.
+    IDENTITY = (
+        "v.valid_to IS NULL "
+        "AND v.block_id = i.block_id "
+        "AND v.tree_id = i.tree_id "
+        "AND v.cell_id IS NOT DISTINCT FROM i.cell_id"
+    )
+
+    @classmethod
+    def confirm(cls) -> str:
+        """The same answer as last time: say when it was last seen.
+
+        Also re-points the work item, which can be a different row once a
+        dedup window has closed, and the tree version, which moves when a
+        leaf is republished without changing what it says.
+        """
+        return f"""
+            UPDATE decision_tree_block_verdicts v
+               SET last_evaluated_at = CAST(:at AS timestamptz),
+                   last_run_id = CAST(:run_id AS uuid),
+                   alert_id = i.alert_id,
+                   recommendation_id = i.recommendation_id,
+                   tree_version = i.tree_version,
+                   updated_at = CAST(:at AS timestamptz)
+              FROM {cls.INCOMING}
+             WHERE {cls.IDENTITY}
+               AND {cls.SAME}
+        """  # noqa: S608 - every fragment is a literal in this file
+
+    @classmethod
+    def close_changed(cls) -> str:
+        """A different answer: end the interval.
+
+        `insert_new` starts the replacement at the same instant, so an as-of
+        read never lands in a gap where the block has no verdict at all.
+        """
+        return f"""
+            UPDATE decision_tree_block_verdicts v
+               SET valid_to = CAST(:at AS timestamptz),
+                   updated_at = CAST(:at AS timestamptz)
+              FROM {cls.INCOMING}
+             WHERE {cls.IDENTITY}
+               AND NOT ({cls.SAME})
+        """  # noqa: S608 - every fragment is a literal in this file
+
+    # Current, or as of an instant. Omitting the instant takes the
+    # `valid_to IS NULL` path so the partial index does the work; with one it
+    # becomes the interval predicate, which is why the rows are intervals.
+    WINDOW_NOW = "v.valid_to IS NULL"
+    WINDOW_AT = (
+        "v.valid_from <= CAST(:at AS timestamptz) "
+        "AND (v.valid_to IS NULL OR v.valid_to > CAST(:at AS timestamptz))"
+    )
+
+    @classmethod
+    def read(cls, *, scope: str, window: str) -> str:
+        """One farm's or one block's verdicts.
+
+        One statement either way. The Farm Console's block loop is already
+        N+1 on indices and alerts; a read per block here would add another 72
+        round trips on the production farm.
+
+        The grid cell join is a LEFT JOIN and must stay one: a block-scoped
+        verdict has no cell, and an inner join would drop exactly the rows
+        the map paints most.
+        """
+        return f"""
+            SELECT v.id, v.farm_id, v.block_id, v.cell_id, v.scope,
+                   v.tree_id, v.tree_code, v.tree_version, v.leaf_node_id,
+                   v.kind, v.status_code, v.severity,
+                   v.text_en, v.text_ar,
+                   v.valid_from, v.valid_to, v.last_evaluated_at,
+                   v.alert_id, v.recommendation_id,
+                   c.row_idx AS cell_row, c.col_idx AS cell_col
+              FROM decision_tree_block_verdicts v
+              LEFT JOIN grid_cells c ON c.id = v.cell_id
+             WHERE {scope} AND {window}
+             ORDER BY v.block_id, v.tree_code,
+                      c.row_idx NULLS FIRST, c.col_idx NULLS FIRST
+        """
+
+    @classmethod
+    def insert_new(cls) -> str:
+        """Everything with no open row: the ones just closed, and the new ones."""
+        return f"""
+            INSERT INTO decision_tree_block_verdicts (
+                farm_id, block_id, cell_id, scope,
+                tree_id, tree_code, tree_version, leaf_node_id,
+                kind, status_code, severity, text_en, text_ar,
+                run_id, last_run_id, valid_from, last_evaluated_at,
+                alert_id, recommendation_id
+            )
+            SELECT i.farm_id, i.block_id, i.cell_id, i.scope,
+                   i.tree_id, i.tree_code, i.tree_version, i.leaf_node_id,
+                   i.kind, i.status_code, i.severity, i.text_en, i.text_ar,
+                   CAST(:run_id AS uuid), CAST(:run_id AS uuid),
+                   CAST(:at AS timestamptz), CAST(:at AS timestamptz),
+                   i.alert_id, i.recommendation_id
+              FROM {cls.INCOMING}
+             WHERE NOT EXISTS (
+                   SELECT 1 FROM decision_tree_block_verdicts v
+                    WHERE {cls.IDENTITY}
+             )
+        """  # noqa: S608 - every fragment is a literal in this file
 
 
 class RecommendationsRepository:
@@ -1950,3 +2122,184 @@ class RecommendationsRepository:
             .first()
         )
         return dict(row) if row is not None else None
+
+    # ---- Verdicts (tenant 0091) — SQL in VERDICT_SQL ------------------
+
+    @staticmethod
+    def _verdict_params(
+        rows: list[dict[str, Any]], *, run_id: UUID | None, at: datetime
+    ) -> dict[str, Any]:
+        return {
+            "block_ids": [r["block_id"] for r in rows],
+            "cell_ids": [r["cell_id"] for r in rows],
+            "tree_ids": [r["tree_id"] for r in rows],
+            "farm_ids": [r["farm_id"] for r in rows],
+            "scopes": [r["scope"] for r in rows],
+            "tree_codes": [r["tree_code"] for r in rows],
+            "tree_versions": [r["tree_version"] for r in rows],
+            "leaf_node_ids": [r["leaf_node_id"] for r in rows],
+            "kinds": [r["kind"] for r in rows],
+            "status_codes": [r["status_code"] for r in rows],
+            "severities": [r["severity"] for r in rows],
+            "texts_en": [r["text_en"] for r in rows],
+            "texts_ar": [r["text_ar"] for r in rows],
+            "alert_ids": [r["alert_id"] for r in rows],
+            "recommendation_ids": [r["recommendation_id"] for r in rows],
+            "run_id": run_id,
+            "at": at,
+        }
+
+    async def sync_verdicts(
+        self, *, rows: list[dict[str, Any]], run_id: UUID | None, at: datetime
+    ) -> dict[str, int]:
+        """Write one block's verdicts as intervals. Returns what changed.
+
+        Three statements, never one. A data-modifying CTE is invisible to the
+        rest of its own statement, so an INSERT that had to see the rows a
+        sibling UPDATE just closed would read the state from before the close
+        and collide with the open-row unique index.
+
+        Order matters. Confirming the unchanged rows first is what keeps the
+        history honest: closing everything and re-inserting would end an
+        interval that is still true and restart it with today's date, and the
+        replay would report that every block changed every night.
+        """
+        if not rows:
+            return {"confirmed": 0, "closed": 0, "opened": 0}
+        params = self._verdict_params(rows, run_id=run_id, at=at)
+
+        # 1. The same answer as last time. Touch when it was last seen, and
+        #    re-point the work item, which can be a different row once a
+        #    dedup window has closed.
+        confirmed = _rowcount(await self._tenant.execute(text(VERDICT_SQL.confirm()), params))
+        closed = _rowcount(await self._tenant.execute(text(VERDICT_SQL.close_changed()), params))
+        opened = _rowcount(await self._tenant.execute(text(VERDICT_SQL.insert_new()), params))
+
+        return {"confirmed": confirmed, "closed": closed, "opened": opened}
+
+    async def close_absent_verdicts(
+        self, *, block_id: UUID, tree_ids: list[UUID], at: datetime
+    ) -> int:
+        """End the open verdicts of trees that produced none in this pass.
+
+        A verdict must not outlive the reason it exists. Targeting can stop
+        matching after a crop change, a farm can turn a tree off, a tree can
+        be archived, and a malformed tree starts erroring — in each case the
+        tree said nothing today, and leaving yesterday's green row open would
+        keep telling a user the block was checked.
+
+        Only safe when the caller ran the block's whole tree set. A run cut to
+        one tree must not close the other trees' verdicts, which is why the
+        sweep passes the ids it actually evaluated and the single-tree run
+        does not call this at all.
+        """
+        return _rowcount(
+            await self._tenant.execute(
+                text(
+                    """
+                    UPDATE decision_tree_block_verdicts
+                       SET valid_to = CAST(:at AS timestamptz),
+                           updated_at = CAST(:at AS timestamptz)
+                     WHERE block_id = :block_id
+                       AND valid_to IS NULL
+                       AND NOT (tree_id = ANY(CAST(:tree_ids AS uuid[])))
+                    """
+                ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                {"block_id": block_id, "tree_ids": tree_ids, "at": at},
+            )
+        )
+
+    async def close_stale_cell_verdicts(
+        self, *, block_id: UUID, tree_id: UUID, seen_cell_ids: list[UUID], at: datetime
+    ) -> int:
+        """End the open cell verdicts this tree did not reach in the pass.
+
+        The counterpart of ``clear_stale_children`` for verdicts, and needed
+        for the same reason: a cell the loop never visited — because the grid
+        was rezoned, or the tree stopped running there — holds a row no later
+        pass would ever touch again.
+        """
+        return _rowcount(
+            await self._tenant.execute(
+                text(
+                    """
+                    UPDATE decision_tree_block_verdicts
+                       SET valid_to = CAST(:at AS timestamptz),
+                           updated_at = CAST(:at AS timestamptz)
+                     WHERE block_id = :block_id
+                       AND tree_id = :tree_id
+                       AND cell_id IS NOT NULL
+                       AND valid_to IS NULL
+                       AND NOT (cell_id = ANY(CAST(:seen AS uuid[])))
+                    """
+                ).bindparams(
+                    bindparam("block_id", type_=PG_UUID(as_uuid=True)),
+                    bindparam("tree_id", type_=PG_UUID(as_uuid=True)),
+                ),
+                {"block_id": block_id, "tree_id": tree_id, "seen": seen_cell_ids, "at": at},
+            )
+        )
+
+    async def list_open_verdicts(self, *, block_id: UUID) -> list[dict[str, Any]]:
+        """One block's current verdicts, newest interval first.
+
+        The read API is the next phase; this exists so the write path can be
+        asserted against what it actually stored.
+        """
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        """
+                        SELECT id, block_id, cell_id, scope, tree_id, tree_code,
+                               tree_version, leaf_node_id, kind, status_code,
+                               severity, text_en, text_ar, valid_from, valid_to,
+                               last_evaluated_at, alert_id, recommendation_id
+                          FROM decision_tree_block_verdicts
+                         WHERE block_id = :block_id AND valid_to IS NULL
+                         ORDER BY tree_code, cell_id NULLS FIRST
+                        """
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                    {"block_id": block_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]
+
+    async def list_verdicts(
+        self,
+        *,
+        farm_id: UUID | None = None,
+        block_id: UUID | None = None,
+        at: datetime | None = None,
+    ) -> list[dict[str, Any]]:
+        """Verdicts for one farm or one block, current or as of an instant.
+
+        One statement either way. The Farm Console's block loop is already
+        N+1 on indices and alerts; a per-block read here would add another 72
+        round trips on the production farm.
+
+        ``at`` omitted means now, and takes the ``valid_to IS NULL`` path so
+        the partial index does the work. With an instant it becomes the
+        interval predicate, which is the whole reason the rows are intervals.
+        """
+        window = VERDICT_SQL.WINDOW_NOW if at is None else VERDICT_SQL.WINDOW_AT
+        scope = "v.farm_id = :farm_id" if block_id is None else "v.block_id = :block_id"
+        key = "farm_id" if block_id is None else "block_id"
+        params: dict[str, Any] = {"at": at, key: farm_id if block_id is None else block_id}
+
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(VERDICT_SQL.read(scope=scope, window=window)).bindparams(
+                        bindparam(key, type_=PG_UUID(as_uuid=True))
+                    ),
+                    params,
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]

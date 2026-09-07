@@ -12,8 +12,11 @@ export const CONSOLE_QK = {
   // date the timeline is parked on.
   summary: (farmId: string, at: string | null = null) =>
     ["labs/console/summary", farmId, at] as const,
-  detail: (farmId: string, unitId: string | null, lang: string) =>
-    ["labs/console/detail", farmId, unitId, lang] as const,
+  // `health` is in the key so the dock re-stamps when the summary poll
+  // changes a block's class. The detail's own 30s memo makes that refetch
+  // a cache hit, so the extra key costs a re-render, not a request.
+  detail: (farmId: string, unitId: string | null, lang: string, health: string = "unknown") =>
+    ["labs/console/detail", farmId, unitId, lang, health] as const,
   blockHealth: (farmId: string) => ["labs/console/blockHealth", farmId] as const,
   subs: (blockId: string | null) => ["labs/console/subs", blockId] as const,
   // `at` is part of the key, not just the fetcher: the same farm and index at

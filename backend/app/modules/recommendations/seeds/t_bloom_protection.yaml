@@ -223,12 +223,11 @@ nodes:
               المبيد الفطري وحده.
 
   leaf_low_risk:
-    label_en: No action — bloom is open and the disease risk is low
-    label_ar: لا إجراء — التزهير قائم وخطر المرض منخفض
+    label_en: Good — bloom is open and the disease risk is low
+    label_ar: جيد — التزهير قائم وخطر المرض منخفض
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.8
+      kind: status
+      status: good
       parameters: {}
       text_en: >-
         Weather conditions do not currently favour powdery mildew on this
@@ -241,12 +240,11 @@ nodes:
         نشاط الملقّحات ولا شيء هنا يستحق المقايضة به.
 
   leaf_not_due:
-    label_en: No action — this block is not in bloom
-    label_ar: لا إجراء — هذه القطعة ليست في التزهير
+    label_en: Not applicable — this block is not in bloom
+    label_ar: لا ينطبق — هذه القطعة ليست في التزهير
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: na
       parameters: {}
       text_en: >-
         Bloom protection applies during flowering and fruit set. Powdery

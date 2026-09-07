@@ -13,11 +13,15 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.settings import get_settings
 from app.modules.alerts.repository import AlertsRepository
 from app.modules.farms.errors import FarmNotFoundError
 from app.modules.farms.repository import FarmsRepository
+from app.modules.health.service import DefinitionSource, load_health_definitions
 from app.modules.indices.repository import IndicesRepository
 from app.shared.health import bucket_alert_severity, classify_health
+from app.shared.health_definition import HealthReason, resolve_health
+from app.shared.health_evidence import EMPTY_EVIDENCE, load_health_evidence
 
 from .schemas import (
     AlertTrendPoint,
@@ -118,7 +122,17 @@ class InsightsService:
         1. blocks list (farms repo)
         2. NDVI current + 30d-ago point (indices repo, daily CAGG)
         3. open alert count + worst severity (alerts repo)
-        4. classify_health(worst, current) → health bucket
+        4. the health class, from one of two rules
+
+        Which rule is `health_definition_enabled`. Off, it is
+        `classify_health` on NDVI, exactly as before. On, it is
+        `resolve_health` over the evidence loaded once for the whole farm
+        by `app.shared.health_evidence` — the same loader and the same
+        definition the map reads, which is what stops this page and the
+        map from answering differently about one block.
+
+        `current_value` and `trend_30d_pct` stay NDVI either way. They are
+        a reading, not a verdict, and the scorecard shows them as one.
         """
         farm = await self._farms.get_farm_by_id(farm_id, with_boundary=False)
         if farm is None:
@@ -130,6 +144,23 @@ class InsightsService:
 
         now = datetime.now(UTC)
         trend_anchor = now - _TREND_WINDOW
+
+        use_definition = get_settings().health_definition_enabled
+        # One load for the farm, outside the per-block loop. The loop is
+        # already N+1 on indices and alerts; adding four more statements per
+        # block would have made a 36-block farm 180 round trips.
+        evidence_by_block = (
+            await load_health_evidence(self._session, farm_id=farm_id) if use_definition else {}
+        )
+        # The knowledge base and this farm's override, read once beside the
+        # evidence. Both this page and the map resolve through the same two
+        # tiers, so a mango block cannot be judged by one definition here
+        # and another there.
+        definitions = (
+            await load_health_definitions(self._session, farm_id=farm_id)
+            if use_definition
+            else None
+        )
 
         rows: list[BlockHealthRow] = []
         for block in blocks:
@@ -146,7 +177,22 @@ class InsightsService:
 
             trend_pct = _trend_pct(current=current, anchor=anchor)
             worst, open_count = await self._block_alert_rollup(block_id=block_id)
-            health = classify_health(worst_alert_severity=worst, ndvi_current=current)
+
+            health_reason: HealthReason | None = None
+            health_source: DefinitionSource | None = None
+            health_version: int | None = None
+            if definitions is not None:
+                evidence = evidence_by_block.get(block_id, EMPTY_EVIDENCE)
+                resolved = definitions.for_path(evidence.crop_path)
+                health_source = resolved.source
+                health_version = resolved.version
+                health, health_reason = resolve_health(
+                    resolved.definition,
+                    evidence.inputs,
+                    now=now,
+                )
+            else:
+                health = classify_health(worst_alert_severity=worst, ndvi_current=current)
 
             rows.append(
                 BlockHealthRow(
@@ -154,6 +200,9 @@ class InsightsService:
                     block_name=block_name,
                     block_name_ar=block_name_ar,
                     current_health=health,
+                    health_reason=health_reason,
+                    health_source=health_source,
+                    health_definition_version=health_version,
                     current_value=current,
                     trend_30d_pct=trend_pct,
                     alerts_open=open_count,

@@ -214,12 +214,11 @@ nodes:
               تعمل لا خلل.
 
   leaf_not_due:
-    label_en: No action — this block is not in the pre-flowering stage
-    label_ar: لا إجراء — هذه القطعة ليست في مرحلة ما قبل التزهير
+    label_en: Not applicable — this block is not in the pre-flowering stage
+    label_ar: لا ينطبق — هذه القطعة ليست في مرحلة ما قبل التزهير
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: na
       parameters: {}
       text_en: >-
         Flower induction belongs to the pre-flowering window. This rule will

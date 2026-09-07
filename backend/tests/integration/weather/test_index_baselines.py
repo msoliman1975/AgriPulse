@@ -1,10 +1,10 @@
 """Integration tests for the PR-W3 climatology baseline sweep + backfill.
 
-  * `recompute_weather_baselines_for_tenant` — builds farm-scoped
-    `weather_index_baselines` from `weather_index_daily` history and
-    re-derives the z-score on existing rows.
-  * `backfill_weather_indices` — reprojects a wide window of observations
-    so the sweep has multi-day history to chew on.
+* `recompute_weather_baselines_for_tenant` — builds farm-scoped
+  `weather_index_baselines` from `weather_index_daily` history and
+  re-derives the z-score on existing rows.
+* `backfill_weather_indices` — reprojects a wide window of observations
+  so the sweep has multi-day history to chew on.
 """
 
 from __future__ import annotations

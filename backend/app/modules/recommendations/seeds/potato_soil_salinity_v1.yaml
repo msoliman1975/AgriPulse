@@ -195,12 +195,11 @@ nodes:
             text_ar: أعد قياس ECe خلال 2–3 أسابيع لتأكيد الاتجاه.
 
   leaf_no_action:
-    label_en: No action — salinity within tolerance
-    label_ar: لا إجراء — الملوحة ضمن التحمّل
+    label_en: Good — salinity within tolerance
+    label_ar: جيد — الملوحة ضمن التحمّل
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: good
       parameters: {}
       text_en: Soil ECe is within potato's salinity tolerance; no action needed.
       text_ar: ملوحة التربة ضمن تحمّل البطاطس؛ لا حاجة لإجراء.

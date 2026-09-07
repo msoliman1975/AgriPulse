@@ -5,9 +5,45 @@ import { apiClient } from "./client";
 export type Health = "healthy" | "watch" | "critical" | "unknown";
 export type MapSeverity = "watch" | "critical";
 
+/** Why a block is in its health class. Mirrors
+ *  `app.shared.health_definition.HealthReason` — eleven words, closed set.
+ *  Copy lives once, under `common:healthReason.*`, so the Farm Console dock
+ *  and the Insights scorecard cannot word the same block differently.
+ *
+ *  The three `verdict_*` reasons are the primary ones: a decision tree
+ *  leaves a verdict for every leaf it reaches, including the leaves that
+ *  find nothing wrong. The rest are the fallback for a block whose sweep
+ *  predates the verdict table. */
+export type HealthReason =
+  | "verdict_alert"
+  | "verdict_issue"
+  | "verdict_good"
+  | "critical_alert"
+  | "warning_alert"
+  | "cell_share"
+  | "strong_recommendation"
+  | "no_coverage"
+  | "no_tree"
+  | "stale"
+  | "all_clear";
+
+/** Which tier had the last word on a block's health definition. Mirrors
+ *  `app.modules.health.service.DefinitionSource`. The reason says what the
+ *  evidence showed; the source says whose rule read it. */
+export type HealthSource = "platform" | "crop" | "farm";
+
 export interface BlockSummary {
   id: string;
   health: Health;
+  /** Why `health` is what it is. Null while the backend's
+   *  `health_definition_enabled` is off: the NDVI rule it falls back to has
+   *  no reason to give, because it cannot tell "every tree came out clear"
+   *  from "nothing ever ran". Optional so an older API still parses. */
+  health_reason?: HealthReason | null;
+  /** Which tier decided, and the version of the crop row behind it. Null for
+   *  the same reason `health_reason` is: the NDVI rule has no tiers. */
+  health_source?: HealthSource | null;
+  health_definition_version?: number | null;
   alert_count: number;
   alert_severity: MapSeverity | null;
   /** Verb of the worst open alert (`irrigate`, `spray`, ...). Drives the map

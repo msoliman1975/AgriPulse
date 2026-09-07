@@ -1,4 +1,4 @@
-﻿{
+{
   "app": {
     "name": "AgriPulse",
     "tagline": "Satellite-driven farm management"
@@ -119,5 +119,18 @@
     "body": "Something in the page failed while it was being drawn. The rest of the app still works, so you can go somewhere else and come back.",
     "retry": "Try again",
     "reload": "Reload the page"
+  },
+  "healthReason": {
+    "verdict_alert": "A decision tree reports an alert on this block",
+    "verdict_issue": "A decision tree reports an issue on this block",
+    "verdict_good": "Every decision tree checked this block and found nothing wrong",
+    "critical_alert": "A critical alert is open",
+    "warning_alert": "A warning alert is open",
+    "cell_share": "Some cells are critical, but not enough to mark the whole block",
+    "strong_recommendation": "An open recommendation needs attention",
+    "no_coverage": "No decision tree has run on this block",
+    "no_tree": "No decision tree applies to this block",
+    "stale": "The last check is too old to rely on",
+    "all_clear": "Every check passed"
   }
 }

@@ -299,12 +299,11 @@ nodes:
             text_ar: أعد قراءة NDRE في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
 
   leaf_in_band:
-    label_en: No action — NDRE inside the band for this tree size
-    label_ar: لا إجراء — NDRE داخل نطاق هذا الحجم
+    label_en: Good — NDRE inside the band for this tree size
+    label_ar: جيد — NDRE داخل نطاق هذا الحجم
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: good
       parameters: {}
       text_en: >-
         NDRE is inside the range the mango index guide expects for this
@@ -313,12 +312,11 @@ nodes:
         NDRE داخل النطاق الذي يتوقعه دليل مؤشرات المانجو لهذا الحجم.
 
   leaf_size_unknown:
-    label_en: No action — tree size not recorded, so there is no band to compare against
-    label_ar: لا إجراء — حجم الشجرة غير مسجّل فلا يوجد نطاق للمقارنة
+    label_en: Not applicable — tree size not recorded, so there is no band to compare against
+    label_ar: لا ينطبق — حجم الشجرة غير مسجّل فلا يوجد نطاق للمقارنة
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: na
       parameters: {}
       text_en: >-
         This rule needs the block's Tree size attribute. Open the block's
@@ -329,12 +327,11 @@ nodes:
         للقطعة واضبط حجم الشجرة لتبدأ القاعدة في العمل مع أول تمريرة.
 
   leaf_stage_suppressed:
-    label_en: No action — nitrogen is withheld on purpose at this stage
-    label_ar: لا إجراء — يُمنع النيتروجين عمدًا في هذه المرحلة
+    label_en: Good — nitrogen is withheld on purpose at this stage
+    label_ar: جيد — يُمنع النيتروجين عمدًا في هذه المرحلة
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: good
       parameters: {}
       text_en: >-
         Nitrogen is withheld on purpose in the run-up to flowering, so a

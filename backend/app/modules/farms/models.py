@@ -339,6 +339,24 @@ class Farm(Base, TimestampedMixin):
         Boolean, nullable=False, server_default=text("FALSE")
     )
 
+    # Health category (tenant migration 0090). A RESOLUTION TIER, not a
+    # template: there is no block-side copy, no diff and no Apply. A block's
+    # definition is resolved at read time as platform default <- crop
+    # (`public.crop_health_definitions`, merged along the crop path) <- this
+    # column, shallow merge with the deepest tier winning per key.
+    #
+    # NULL means no override, and a PARTIAL body is the normal case — the
+    # farm names what differs and keeps tracking the knowledge base for the
+    # rest. Storing a resolved definition would freeze whatever the crop and
+    # platform said on the day it was saved.
+    health_definition: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    # Unlike the other `_locked` flags, which stop BLOCKS diverging from the
+    # farm, this one stops the farm's own override being edited. There are
+    # no blocks to diverge.
+    health_locked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("FALSE")
+    )
+
 
 class Block(Base, TimestampedMixin):
     __tablename__ = "blocks"

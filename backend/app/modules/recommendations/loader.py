@@ -37,6 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import get_logger
 from app.modules.recommendations.errors import DecisionTreeParseError
 from app.modules.recommendations.models import DecisionTree
+from app.modules.recommendations.status_codes import LEAF_KINDS, STATUS_CODES, kind_of
 
 _log = get_logger(__name__)
 
@@ -609,23 +610,30 @@ def _validate_reachability(
                     path=source_path,
                     detail=f"leaf {nid!r} 'outcome' must be a mapping",
                 )
-            if not isinstance(outcome.get("action_type"), str):
+            # Leaf kind discriminator. Four kinds: alert, recommendation,
+            # status, no_action. A tree published before `status` existed
+            # names no kind and says `action_type: no_action` instead, so
+            # that spelling still compiles and means kind=no_action.
+            declared_kind = outcome.get("kind")
+            if declared_kind is not None and declared_kind not in LEAF_KINDS:
+                raise DecisionTreeParseError(
+                    path=source_path,
+                    detail=(
+                        f"leaf {nid!r} 'outcome.kind' must be one of "
+                        f"{sorted(LEAF_KINDS)}, got {declared_kind!r}"
+                    ),
+                )
+            kind = kind_of(outcome)
+            # An action type is what a person does about it, so only the two
+            # kinds that ask for work carry one.
+            if kind in ("alert", "recommendation") and not isinstance(
+                outcome.get("action_type"), str
+            ):
                 raise DecisionTreeParseError(
                     path=source_path,
                     detail=f"leaf {nid!r} 'outcome.action_type' must be a string",
                 )
-            # Leaf kind discriminator (PR-E): defaults to recommendation
-            # for backward compat; "alert" requires a severity in the
-            # alerts module's vocabulary.
-            kind = outcome.get("kind", "recommendation")
-            if kind not in ("recommendation", "alert"):
-                raise DecisionTreeParseError(
-                    path=source_path,
-                    detail=(
-                        f"leaf {nid!r} 'outcome.kind' must be 'alert' "
-                        f"or 'recommendation', got {kind!r}"
-                    ),
-                )
+            _validate_outcome_status(outcome, nid, source_path, kind=kind)
             if kind == "alert":
                 severity = outcome.get("severity")
                 if severity not in ("info", "warning", "critical"):
@@ -655,6 +663,42 @@ def _validate_reachability(
 # localized action items. Optional — leaves without it keep their single
 # ``text_en`` summary as the only guidance.
 _ACTION_HORIZONS: frozenset[str] = frozenset({"immediate", "short_term", "long_term", "monitoring"})
+
+
+def _validate_outcome_status(
+    outcome: dict[str, Any], nid: str, source_path: str, *, kind: str
+) -> None:
+    """Strict-parse a leaf outcome's ``status`` field.
+
+    Only a ``status`` leaf names one. An alert leaf that named `good` would
+    paint itself green while opening a red card, so naming a status on any
+    other kind is an error and not a value we quietly drop.
+
+    An unknown status is a hard error here on purpose. An unknown condition
+    operator used to compile, publish and run without showing any error,
+    because the evaluator caught the parse failure and answered "did not
+    match"; that branch then took `on_miss` for ever with no card and no log
+    line. A typo in a status must not be able to do the same.
+    """
+    declared = outcome.get("status")
+    if declared is None:
+        return
+    if kind != "status":
+        raise DecisionTreeParseError(
+            path=source_path,
+            detail=(
+                f"leaf {nid!r} sets 'outcome.status' but its kind is {kind!r}. "
+                f"Only a 'status' leaf names a status."
+            ),
+        )
+    if declared not in STATUS_CODES:
+        raise DecisionTreeParseError(
+            path=source_path,
+            detail=(
+                f"leaf {nid!r} 'outcome.status' must be one of "
+                f"{sorted(STATUS_CODES)}, got {declared!r}"
+            ),
+        )
 
 
 def _validate_outcome_actions(outcome: dict[str, Any], nid: str, source_path: str) -> None:

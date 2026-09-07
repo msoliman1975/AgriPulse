@@ -226,6 +226,9 @@ def test_seed_targets_date_palm_and_carries_provenance(name: str) -> None:
 def test_actionable_leaves_carry_horizoned_actions(name: str) -> None:
     for node_id, node in _tree(name)["nodes"].items():
         outcome = node.get("outcome")
-        if not outcome or outcome["action_type"] == "no_action":
+        # A status leaf asks for nothing, so it has no horizons to fill. It
+        # also carries no `action_type` at all, which is why this reads the
+        # kind rather than looking for the old "no_action" spelling.
+        if not outcome or outcome.get("kind") in ("status", "no_action"):
             continue
         assert outcome.get("actions"), f"{node_id} is actionable but carries no actions block"

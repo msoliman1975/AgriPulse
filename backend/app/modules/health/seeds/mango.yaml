@@ -1,0 +1,40 @@
+# Mango — how long a "nothing found" answer stays believable.
+#
+# Mango is the crop this platform knows best: 22 T_ trees from the 28/8
+# index guide cover irrigation, canopy vigour, bloom, fruit development,
+# pests and harvest readiness. A sweep that reaches a mango block and
+# comes out clear is a real statement, not silence for lack of rules.
+#
+# The one value that differs from the platform default is freshness.
+# Mango is a perennial tree crop: canopy, water status and fruit load move
+# over weeks, not hours. The platform's 48 hours tolerates one missed
+# nightly sweep; 72 tolerates two, which is the difference between a
+# retried worker and a whole farm turning Unknown overnight for a reason
+# that has nothing to do with the orchard.
+#
+# Everything else is inherited on purpose. Nothing in the guide gives a
+# basis for a mango-specific alert-severity map, cell share or
+# recommendation floor, and inventing one here would put a number in front
+# of a grower that no agronomist has agreed to.
+#
+# `cell_critical_share` in particular is left unset after being made to work
+# at all in Phase 8. Prod on 2026-09-03 carries 33 cell-scoped alerts and
+# NOT ONE of them is critical, so there is nothing to calibrate a share
+# against. Unset means one critical cell is enough, which is the
+# conservative reading: it can never hide a finding. A farm that wants a
+# share can set one on its own config screen, and that is the right place
+# for a number nobody has evidence for yet.
+#
+# Applies to every mango variety. `crops.classification_depth` is
+# `variety` for mango, so a block carries `mango.<variety>`; the
+# resolution walks the path shallow-first, so this file reaches all of
+# them and a variety that genuinely differs can add its own file later.
+
+crop_path: mango
+version: 1
+notes: >-
+  Perennial tree crop with full decision-tree coverage (22 T_ trees).
+  Freshness widened to 72h so two missed nightly sweeps do not turn the
+  orchard Unknown; a mango canopy does not move materially in three days.
+definition:
+  stale_after_hours: 72

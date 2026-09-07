@@ -139,6 +139,16 @@ BLOCK_OWNED: tuple[OwnedTable, ...] = (
         "the run covered blocks that no longer exist",
     ),
     OwnedTable(
+        "decision_tree_block_verdicts",
+        owner_column="block_id",
+        order=10,
+        fk=False,
+        note="what each decision tree said about this block, including the "
+        "verdicts that found nothing wrong. No FK at all — tree_id points "
+        "into public and the alert/recommendation ids are logical — so "
+        "block_id would orphan without this entry",
+    ),
+    OwnedTable(
         "block_index_aggregates",
         owner_column="block_id",
         order=10,
@@ -345,6 +355,14 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
         fk=False,
         note="also registered under block_id; a farm purge takes the traces of "
         "blocks it owns without walking every block first",
+    ),
+    OwnedTable(
+        "decision_tree_block_verdicts",
+        owner_column="farm_id",
+        order=10,
+        fk=False,
+        note="also registered under block_id; a farm purge takes its blocks' "
+        "verdicts without walking every block first",
     ),
     OwnedTable(
         "signal_observations",

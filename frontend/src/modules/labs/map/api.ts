@@ -30,8 +30,11 @@ import { listRecommendations, type Recommendation } from "@/api/recommendations"
 import { listSignalObservations, type SignalObservation } from "@/api/signals";
 import { getForecast, type ForecastResponse } from "@/api/weather";
 
-import { classifyHealth, mapAlertSeverity } from "./health";
+import { mapAlertSeverity } from "./health";
 import type {
+  Health,
+  HealthReason,
+  HealthSource,
   IndexCode,
   IndexSeries,
   UnitAlert,
@@ -156,6 +159,15 @@ export async function loadMapSummary(farmId: string, at?: string | null): Promis
     const summary: UnitSummary = {
       id: b.id,
       health: isLogicalPivot ? "unknown" : (apiSummary?.health ?? "unknown"),
+      // A logical pivot has no health of its own — it is the union of its
+      // sectors — so it has no reason either. Carrying one would put a
+      // sentence under a chip that reads "Unknown" for a structural reason,
+      // not an agronomic one.
+      health_reason: isLogicalPivot ? null : (apiSummary?.health_reason ?? null),
+      health_source: isLogicalPivot ? null : (apiSummary?.health_source ?? null),
+      health_definition_version: isLogicalPivot
+        ? null
+        : (apiSummary?.health_definition_version ?? null),
       has_alert: !isLogicalPivot && (apiSummary?.alert_count ?? 0) > 0,
       alert_severity: isLogicalPivot ? null : (apiSummary?.alert_severity ?? null),
       alert_count: isLogicalPivot ? 0 : (apiSummary?.alert_count ?? 0),
@@ -261,11 +273,37 @@ export async function loadUnitDetail(args: {
   blockId: string;
   blocksById: Map<string, Block>;
   activePlan?: Plan | null;
+  // The block's health as the server classified it, taken from the summary
+  // the caller already holds (`MapSummary.summaries[blockId].health`). The
+  // dock used to re-derive this in the browser from its own 30-day NDVI
+  // window, which is a second answer to a question the map had already
+  // answered. Callers that have no summary pass nothing and get "unknown".
+  summaryHealth?: Health | null;
+  // Travels with `summaryHealth` for the same reason: the dock renders the
+  // server's answer, and a class without its reason is the half of it that
+  // cannot be explained.
+  summaryHealthReason?: HealthReason | null;
+  summaryHealthSource?: HealthSource | null;
+  summaryHealthVersion?: number | null;
 }): Promise<UnitDetail> {
   const lang = i18n.language;
+  const health: Health = args.summaryHealth ?? "unknown";
+  const healthReason: HealthReason | null = args.summaryHealthReason ?? null;
+  const healthSource: HealthSource | null = args.summaryHealthSource ?? null;
+  const healthVersion: number | null = args.summaryHealthVersion ?? null;
   const cacheKey = detailCacheKey(args.blockId, lang);
   const cached = detailCache.get(cacheKey);
-  if (cached && Date.now() - cached.at < DETAIL_TTL_MS) return cached.value;
+  // Health is not part of what this cache exists to hold. It rides the
+  // summary's 60s poll, so a cache hit re-stamps the current value rather
+  // than replaying the one captured up to DETAIL_TTL_MS ago.
+  if (cached && Date.now() - cached.at < DETAIL_TTL_MS)
+    return {
+      ...cached.value,
+      health,
+      health_reason: healthReason,
+      health_source: healthSource,
+      health_definition_version: healthVersion,
+    };
 
   const block = args.blocksById.get(args.blockId);
   if (!block) throw new Error(`Block ${args.blockId} not in farm`);
@@ -304,25 +342,6 @@ export async function loadUnitDetail(args: {
     ndre: asoIndexSeries(indicesNdre),
     ndwi: asoIndexSeries(indicesNdwi),
   };
-
-  const ndviCur = indexBundle.ndvi.current;
-  const worstAlert = blockAlerts.reduce<UnitAlert | null>((acc, a) => {
-    const sev = mapAlertSeverity(a.severity);
-    if (!sev) return acc;
-    const ua: UnitAlert = {
-      id: a.id,
-      severity: sev,
-      code: a.rule_code,
-      message:
-        localizedField(lang, a.diagnosis_en, a.diagnosis_ar) ??
-        localizedField(lang, a.prescription_en, a.prescription_ar) ??
-        a.rule_code,
-      raised_at: a.created_at,
-    };
-    if (sev === "critical") return ua;
-    if (sev === "watch" && (!acc || acc.severity !== "critical")) return ua;
-    return acc;
-  }, null);
 
   const sortedSchedules = irrigation
     .filter((s) => s.block_id === args.blockId)
@@ -373,10 +392,10 @@ export async function loadUnitDetail(args: {
     // crop/variety/strain triple for callers that want it.
     crop: cropAssignmentSummary?.crop_name ?? null,
     area_ha: block.area_m2 / 10_000,
-    health: classifyHealth({
-      worstAlertSeverity: worstAlert?.severity ?? null,
-      ndviCurrent: ndviCur,
-    }),
+    health,
+    health_reason: healthReason,
+    health_source: healthSource,
+    health_definition_version: healthVersion,
     last_updated: blockDetail.updated_at,
     alerts: blockAlerts
       .map((a) => {

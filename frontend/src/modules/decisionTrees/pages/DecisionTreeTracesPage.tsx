@@ -237,6 +237,12 @@ function WhyCell({ row }: { row: EvalTrace }): ReactNode {
       </span>
     );
   }
+  // A clear row now carries the status its leaf declared. It used to show a
+  // dash, which is what a tree that had nothing to say showed as well —
+  // the two were one row on this page for as long as it existed.
+  if (row.outcome?.status_code) {
+    return <span>{t(`verdictStatus.${row.outcome.status_code}`)}</span>;
+  }
   return <span>—</span>;
 }
 

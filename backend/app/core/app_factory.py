@@ -54,6 +54,21 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             await sync_from_disk(session)
     except Exception as exc:
         log.warning("decision_trees_sync_failed", error=str(exc))
+    # Sync the per-crop health definitions, same idea and same idempotence.
+    #
+    # Logged at ERROR, not WARNING, and named as the consequence: a failed
+    # sync here does not break the app, it silently leaves every crop on the
+    # platform default. A warning in a startup log is not enough to notice
+    # that a knowledge base stopped applying.
+    try:
+        from app.modules.health.loader import sync_from_disk as sync_health_definitions
+        from app.shared.db.session import AsyncSessionLocal as HealthSessionLocal
+
+        health_factory = HealthSessionLocal()
+        async with health_factory() as session:
+            await sync_health_definitions(session)
+    except Exception as exc:
+        log.error("crop_health_definitions_sync_failed", error=str(exc))
     # PR-Reorg6: cold-start platform-admin bootstrap. Idempotent â€”
     # only fires when zero active PlatformAdmins exist.
     try:

@@ -17,13 +17,17 @@ N blocks. Three SQL queries against the tenant schema (alerts, the block
 roster, and the latest index values), plus a fourth only when a block has
 no reading inside the recent window — see `_RECENT_WINDOW_DAYS`.
 
-Health classification mirrors what the frontend used to do:
-  critical alert → critical
-  warning alert → watch
-  ndvi < 0.4    → critical (only when no overriding alert)
-  ndvi < 0.55   → watch
-  otherwise     → healthy
-  no data       → unknown
+Health classification is NOT decided here. The one rule lives in
+`app.shared.health.classify_health`; this module only gathers its
+inputs and calls it. It used to carry a private copy of the rule, which
+drifted from the shared one and from the frontend's third copy.
+
+Each unit also carries `health_evidence`: the inputs the bounded health
+definition reads (`app.shared.health_definition`), plus the class that
+definition WOULD give the block. That preview is reported and not
+applied — `health` is still the NDVI rule. Shipping the evidence one
+step ahead of the switch is what makes the switch checkable: the two
+answers can be compared on a real farm before either page changes.
 
 Caching: deferred. The prototype exercises this from the polling loop
 (60s interval); add Redis with a 60s TTL when the validation cohort
@@ -43,8 +47,17 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.settings import get_settings
+from app.modules.health.service import (
+    CropHealthDefinitions,
+    DefinitionSource,
+    load_health_definitions,
+)
 from app.shared.auth.context import RequestContext
 from app.shared.db.session import get_db_session
+from app.shared.health import Health, classify_health
+from app.shared.health_definition import HealthReason, resolve_health
+from app.shared.health_evidence import EMPTY_EVIDENCE, BlockEvidence, load_health_evidence
 from app.shared.rbac.check import requires_capability
 
 router = APIRouter(prefix="/api/v1", tags=["farms"])
@@ -86,8 +99,71 @@ _MAP_INDICES: tuple[str, ...] = ("ndvi", "ndre", "ndwi")
 # degrading as history accumulates.
 _RECENT_WINDOW_DAYS = 120
 
-Health = Literal["healthy", "watch", "critical", "unknown"]
+# `Health` comes from app.shared.health — the single source for the rule
+# and its vocabulary. `MapSeverity` is the non-null half of the shared
+# `AlertSeverityBucket`: the response field is nullable, so the schema
+# spells the None out itself.
 MapSeverity = Literal["watch", "critical"]
+
+
+class HealthEvidence(BaseModel):
+    """What the bounded health definition reads about one block.
+
+    Reported, never applied. `BlockSummary.health` is still the NDVI rule
+    in `app.shared.health`. `preview_health` is what
+    `app.shared.health_definition.resolve_health` gives the same block
+    under the platform default definition, so the two can be compared on
+    a real farm before anything is switched over.
+
+    The alert counters here do NOT match `BlockSummary.alert_count`, and
+    that is the point. `alert_count` is open, warning-or-critical only.
+    These count every alert the definition may count — open, acknowledged
+    and snoozed — at every severity including `info`. A block can show
+    `alert_count: 0` and a non-empty `alerts_by_status` when its only
+    alert has been acknowledged and not fixed.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    # Counted alerts (see the class docstring for what "counted" means),
+    # bucketed two ways. Both count findings, not rows: grouped children
+    # are excluded the same way `alert_count` excludes them.
+    alerts_by_severity: dict[str, int]
+    alerts_by_status: dict[str, int]
+    # Distinct grid cells carrying a critical alert, and how many cells the
+    # block has. `cell_critical_share` compares these two; until a definition
+    # sets that share, one critical cell is enough to make the block critical.
+    critical_cells: int
+    total_cells: int
+    # Highest confidence among the block's open recommendations, or null.
+    # Alert leaves are pinned to 1.0 by the engine, so this is only ever
+    # informative for recommendation leaves.
+    max_recommendation_confidence: float | None
+    # Per-status trace counts from the newest sweep, for THIS block. All
+    # four zero means the sweep never reached the block, which is why
+    # "no open alert" cannot be read as health on its own.
+    traces_fired: int
+    traces_clear: int
+    traces_skipped: int
+    traces_error: int
+    last_evaluated_at: datetime | None
+    # The block's crop, as the taxonomy path that picked its definition.
+    # Reported because "which rule judged this block" is half of "why is it
+    # red", and the answer is otherwise invisible: two blocks on one farm
+    # can be judged by different definitions and look identical here.
+    # Null when the block has no current crop assignment, which resolves to
+    # the platform default.
+    crop_path: str | None
+    preview_health: Health
+    preview_reason: HealthReason
+    # Where the definition that produced `preview_health` came from, and
+    # which authored row. `preview_definition_crop_path` is the CROP row
+    # that applied, not the block's own crop: a `mango.keitt` block judged
+    # by a definition authored at `mango` reports `mango`, which is what
+    # makes "go and edit the rule that did this" a findable action.
+    preview_source: DefinitionSource
+    preview_definition_crop_path: str | None
+    preview_definition_version: int | None
 
 
 class BlockSummary(BaseModel):
@@ -113,6 +189,20 @@ class BlockSummary(BaseModel):
     # for the blocks that do — without this it would have to ask every block
     # for its subscriptions first, N requests before drawing anything.
     grid_product_id: UUID | None = None
+    # Why `health` is what it is — one of eight words from
+    # `app.shared.health_definition.HealthReason`. Null when the health
+    # definition is off, because the NDVI rule has no reason to give: it
+    # cannot tell "every tree came out clear" from "nothing ever ran".
+    health_reason: HealthReason | None = None
+    # Which tier had the last word on `health`, and the version of the crop
+    # row behind it. Null for the same reason `health_reason` is: the NDVI
+    # rule has no tiers. When the definition is on, these equal their
+    # `preview_` twins in `health_evidence` by construction.
+    health_source: DefinitionSource | None = None
+    health_definition_version: int | None = None
+    # The inputs the health definition read, and the class it gives. When
+    # the flag is on, `preview_health` equals `health` by construction.
+    health_evidence: HealthEvidence
 
 
 class BlocksSummaryResponse(BaseModel):
@@ -327,6 +417,11 @@ async def get_blocks_summary(
     # the further back you went — the opposite of the truth.
     as_of_alerts = _ALERT_ROLLUP_AS_OF if at is not None else _ALERT_ROLLUP_NOW
 
+    # Read once per request, not once per block: a flag that could change
+    # mid-loop would colour two blocks in the same farm by two different
+    # rules, which is the exact failure this whole phase exists to end.
+    use_definition = get_settings().health_definition_enabled
+
     # 2. Open-alert count + worst severity per block in this farm.
     alert_rows = (
         (
@@ -338,6 +433,18 @@ async def get_blocks_summary(
         .mappings()
         .all()
     )
+
+    # 2b. Health-definition evidence: counted alerts, open recommendations,
+    #     the newest sweep's traces, and the live grid's cell count. Four
+    #     statements, shared with the scorecard so the two surfaces cannot
+    #     answer from different evidence. All four take the same `at`.
+    evidence_by_block = await load_health_evidence(tenant_session, farm_id=farm_id, at=at)
+
+    # 2c. The knowledge base and the farm's override — the two tiers below
+    #     the platform default. Two statements, resolved per block against
+    #     the block's crop path. Read on the tenant session: the catalog
+    #     statement is schema-qualified, so it needs no second connection.
+    definitions = await load_health_definitions(tenant_session, farm_id=farm_id)
 
     # 3. Current grid config per block, if any. `retired_at IS NULL` is the
     #    live row; 0054 gave configs valid time, so a rezoned block has an
@@ -406,6 +513,15 @@ async def get_blocks_summary(
 
     grid_by_block: dict[UUID, UUID] = {r["block_id"]: r["product_id"] for r in grid_rows}
 
+    # One instant for every block in the response, so two blocks cannot be
+    # judged stale against clocks a few milliseconds apart. A caller may send
+    # `at` with no offset; the resolver subtracts it from a timestamp that has
+    # one, so it is stamped UTC here. `as_of` in the response is left exactly
+    # as it was — this normalisation is the resolver's, not the echo's.
+    resolver_now = at if at is not None else datetime.now(UTC)
+    if resolver_now.tzinfo is None:
+        resolver_now = resolver_now.replace(tzinfo=UTC)
+
     units: list[BlockSummary] = []
     for bid in block_ids:
         idx = idx_by_block.get(bid, {})
@@ -425,7 +541,23 @@ async def get_blocks_summary(
         alert_severity: MapSeverity | None = a.get("alert_severity")
         alert_action_type: str | None = a.get("alert_action_type")
 
-        health = _classify_health(worst_alert_severity=alert_severity, ndvi_current=ndvi_current)
+        evidence = _health_evidence(
+            evidence_by_block.get(bid, EMPTY_EVIDENCE), definitions=definitions, now=resolver_now
+        )
+        # The switch. With the flag off this is the NDVI rule, unchanged and
+        # byte for byte; with it on it is the definition's answer, which this
+        # response was already reporting as `preview_health` before anything
+        # was switched over to it.
+        if use_definition:
+            health: Health = evidence.preview_health
+            health_reason: HealthReason | None = evidence.preview_reason
+            health_source: DefinitionSource | None = evidence.preview_source
+            health_version: int | None = evidence.preview_definition_version
+        else:
+            health = classify_health(worst_alert_severity=alert_severity, ndvi_current=ndvi_current)
+            health_reason = None
+            health_source = None
+            health_version = None
 
         units.append(
             BlockSummary(
@@ -438,6 +570,10 @@ async def get_blocks_summary(
                 ndre_current=ndre_current,
                 ndwi_current=ndwi_current,
                 grid_product_id=grid_by_block.get(bid),
+                health_reason=health_reason,
+                health_source=health_source,
+                health_definition_version=health_version,
+                health_evidence=evidence,
                 last_index_at=last_at,
             )
         )
@@ -451,17 +587,43 @@ async def get_blocks_summary(
     )
 
 
-def _classify_health(
-    *, worst_alert_severity: MapSeverity | None, ndvi_current: float | None
-) -> Health:
-    if worst_alert_severity == "critical":
-        return "critical"
-    if worst_alert_severity == "watch":
-        return "watch"
-    if ndvi_current is None:
-        return "unknown"
-    if ndvi_current < 0.4:
-        return "critical"
-    if ndvi_current < 0.55:
-        return "watch"
-    return "healthy"
+def _health_evidence(
+    evidence: BlockEvidence, *, definitions: CropHealthDefinitions, now: datetime
+) -> HealthEvidence:
+    """Resolve one block's evidence and render it for the response.
+
+    The same `HealthInputs` that decides `health` when the flag is on is
+    what `preview_health` reports when it is off. There is one resolution,
+    not one for the answer and another for the preview, so the two can
+    never drift apart and the preview cannot promise something the switch
+    does not deliver.
+
+    Which definition judges the evidence comes from the block's crop path.
+    A crop with no file in the knowledge base gets the platform default,
+    which is what every crop got before this shipped.
+    """
+    inputs = evidence.inputs
+    resolved = definitions.for_path(evidence.crop_path)
+    preview_health, preview_reason = resolve_health(resolved.definition, inputs, now=now)
+    return HealthEvidence(
+        alerts_by_severity=evidence.alerts_by_severity,
+        alerts_by_status=evidence.alerts_by_status,
+        critical_cells=evidence.critical_cells,
+        total_cells=inputs.total_cells,
+        max_recommendation_confidence=(
+            float(inputs.max_recommendation_confidence)
+            if inputs.max_recommendation_confidence is not None
+            else None
+        ),
+        traces_fired=inputs.traces_fired,
+        traces_clear=inputs.traces_clear,
+        traces_skipped=inputs.traces_skipped,
+        traces_error=inputs.traces_error,
+        last_evaluated_at=inputs.last_evaluated_at,
+        crop_path=evidence.crop_path,
+        preview_health=preview_health,
+        preview_reason=preview_reason,
+        preview_source=resolved.source,
+        preview_definition_crop_path=resolved.crop_path,
+        preview_definition_version=resolved.version,
+    )

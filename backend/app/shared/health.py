@@ -1,9 +1,22 @@
-"""Shared health-bucket classifier.
+"""The health-bucket classifier. One rule, one place.
 
-Backend port of `frontend/src/modules/labs/map/health.ts`. Kept here
-(not in any one feature module) because both the insights rollup
-endpoints (`/farms/{id}/health-summary`) and any future health-aware
-service can share the same rule.
+Every caller that needs a block's health class calls this. There is no
+second copy. There were three before: this module, a private
+``_classify_health`` in ``farms/blocks_summary_router.py``, and
+``classifyHealth`` in ``frontend/src/modules/labs/map/health.ts``. The
+frontend one is gone; the class reaches the browser as the ``health``
+field on ``GET /farms/{id}/blocks/summary``.
+
+Callers today:
+  * ``farms/blocks_summary_router`` — map polygons + the block dock
+  * ``insights/service.get_farm_health_summary`` — the scorecard
+
+Known caller drift, NOT a difference in this rule: the two callers do
+not count the same alerts. The summary router counts ``status='open'``
+only; the insights rollup counts ``open + acknowledged + snoozed``. So
+one block can read Critical on the scorecard and Healthy on the map.
+Normalising which statuses count is a caller-side change and belongs
+with the definition work, not here.
 
 Rule (conservative — any critical alert wins):
 

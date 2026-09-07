@@ -16,9 +16,20 @@
 
 import jsYaml from "js-yaml";
 
+/** The four things a terminal node can be.
+ *
+ * `status` says what the block is without asking anyone to do anything;
+ * `no_action` says the tree ran and has nothing to say. Before those two
+ * existed, every quiet branch wrote `action_type: no_action` and no row at
+ * all, so "checked and fine" and "never ran" looked the same on screen.
+ */
+export type LeafKind = "alert" | "recommendation" | "status" | "no_action";
+
 export interface LeafOutcomePatch {
   action_type?: string;
-  kind?: "alert" | "recommendation";
+  kind?: LeafKind;
+  /** One of the five platform status codes. Only a `status` leaf names one. */
+  status?: string;
   severity?: string;
   // confidence is sent as a number; YAML dump prints it natively.
   confidence?: number;
@@ -73,11 +84,16 @@ interface ParsedYamlNode {
  * defending here avoids losing other valid edits if a stale node
  * sneaks through.
  *
- * Leaf-kind transitions (recommendation → alert and vice versa) clear
- * the field that's no longer meaningful: switching to ``alert`` drops
- * ``confidence``; switching to ``recommendation`` drops ``severity``
- * unless the patch explicitly sets it. Keeps the persisted YAML
- * coherent with what the loader's compile_tree validates.
+ * Leaf-kind transitions clear the fields that are no longer meaningful,
+ * so the persisted YAML stays coherent with what compile_tree validates:
+ * ``alert`` drops ``confidence``, ``recommendation`` drops ``severity``,
+ * ``status`` drops all three of ``action_type`` / ``severity`` /
+ * ``confidence`` and gains a status code, and ``no_action`` drops
+ * everything but its own ``action_type: no_action``.
+ *
+ * The status drop matters more than the others: the loader REFUSES a
+ * ``status`` on any leaf that is not a status leaf, because an alert that
+ * declared `good` would paint itself green while opening a red card.
  */
 export function applyEditsToYaml(
   yaml: string,
@@ -104,6 +120,25 @@ export function applyEditsToYaml(
       }
       if (newKind === "recommendation" && patch.outcome.severity === undefined) {
         delete outcome.severity;
+      }
+      if (newKind === "status") {
+        // A status leaf asks for no work, so it types no action and ranks
+        // itself by its status code rather than by a severity.
+        delete outcome.action_type;
+        delete outcome.severity;
+        delete outcome.confidence;
+        if (outcome.status === undefined) outcome.status = "good";
+      }
+      if (newKind === "no_action") {
+        delete outcome.status;
+        delete outcome.severity;
+        delete outcome.confidence;
+        // The spelling every tree published before the four kinds existed
+        // uses, and the one the loader reads as kind=no_action.
+        outcome.action_type = "no_action";
+      }
+      if (newKind !== "status" && patch.outcome.status === undefined) {
+        delete outcome.status;
       }
       node.outcome = outcome;
     }

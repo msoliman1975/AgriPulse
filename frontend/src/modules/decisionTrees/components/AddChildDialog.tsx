@@ -42,6 +42,11 @@ const KINDS: { value: NodeKind; labelKey: string; descKey: string }[] = [
     descKey: "editor.addChild.kindAlertDesc",
   },
   {
+    value: "leaf-status",
+    labelKey: "editor.addChild.kindStatus",
+    descKey: "editor.addChild.kindStatusDesc",
+  },
+  {
     value: "leaf-noop",
     labelKey: "editor.addChild.kindNoop",
     descKey: "editor.addChild.kindNoopDesc",
@@ -76,7 +81,7 @@ export function AddChildDialog({
     // Detect "still the suggested id" by checking if the field still
     // starts with one of the known prefixes from generateNodeId. If the
     // author typed something custom, we leave it alone.
-    const prefixes = ["decision_", "leaf_rec_", "leaf_alert_", "leaf_noop_"];
+    const prefixes = ["decision_", "leaf_rec_", "leaf_alert_", "leaf_status_", "leaf_noop_"];
     const isStock = prefixes.some((p) => nodeId.startsWith(p));
     if (!isStock) return;
     // We can't re-call generateNodeId here without the doc; rely on the
@@ -89,7 +94,9 @@ export function AddChildDialog({
           ? "leaf_rec_"
           : kind === "leaf-alert"
             ? "leaf_alert_"
-            : "leaf_noop_";
+            : kind === "leaf-status"
+              ? "leaf_status_"
+              : "leaf_noop_";
     const stockTail = nodeId.split("_").pop() ?? "1";
     setNodeId(`${newPrefix}${stockTail}`);
     // Intentionally omit `nodeId` from deps — we only want this to

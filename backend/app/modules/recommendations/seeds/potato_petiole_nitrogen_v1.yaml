@@ -415,13 +415,11 @@ nodes:
               أو المرض أو ضرر الجذور لا إلى النيتروجين.
 
   leaf_sufficient:
-    label_en: No action — petiole nitrate within the stage band
-    label_ar: لا إجراء — النترات ضمن نطاق المرحلة
+    label_en: Good — petiole nitrate within the stage band
+    label_ar: جيد — النترات ضمن نطاق المرحلة
     outcome:
-      kind: recommendation
-      action_type: no_action
-      severity: info
-      confidence: 0.85
+      kind: status
+      status: good
       parameters: {}
       text_en: >-
         Petiole sap nitrate is within the sufficiency band for the
@@ -431,13 +429,11 @@ nodes:
         الحالية.
 
   leaf_no_data:
-    label_en: No action — no petiole test on record
-    label_ar: لا إجراء — لا يوجد تحليل أعناق مسجّل
+    label_en: Not applicable — no petiole test on record
+    label_ar: لا ينطبق — لا يوجد تحليل أعناق مسجّل
     outcome:
-      kind: recommendation
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: na
       parameters: {}
       text_en: >-
         No petiole sap nitrate reading has been ingested for this block,
@@ -448,13 +444,11 @@ nodes:
         النيتروجين غير معروفة — وهذا ليس تأكيدًا بأن النيتروجين كافٍ.
 
   leaf_out_of_window:
-    label_en: No action — outside the interpretable stage window
-    label_ar: لا إجراء — خارج نافذة المراحل القابلة للتفسير
+    label_en: Not applicable — outside the interpretable stage window
+    label_ar: لا ينطبق — خارج نافذة المراحل القابلة للتفسير
     outcome:
-      kind: recommendation
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: na
       parameters: {}
       text_en: >-
         The block is at emergence or has no resolved growth stage.

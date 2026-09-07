@@ -2,8 +2,12 @@
 // Two read endpoints powering the "Farm health overview" page.
 
 import { apiClient } from "./client";
+import type { HealthReason as ApiHealthReason } from "./blocksSummary";
 
 export type Health = "healthy" | "watch" | "critical" | "unknown";
+// The same closed set the map reads, imported rather than restated so the
+// two surfaces cannot end up with different reason vocabularies.
+export type { HealthReason } from "./blocksSummary";
 export type TimeseriesGranularity = "daily" | "weekly";
 
 export interface FarmIndexTimeseriesPoint {
@@ -27,6 +31,10 @@ export interface BlockHealthRow {
   block_name: string;
   block_name_ar: string | null;
   current_health: Health;
+  /** Why the block is in that class. Null while the backend's
+   *  `health_definition_enabled` is off — the NDVI rule it falls back to has
+   *  no reason to give. Optional so an older API still parses. */
+  health_reason?: ApiHealthReason | null;
   current_value: string | null;
   trend_30d_pct: string | null;
   alerts_open: number;

@@ -357,9 +357,13 @@ async def test_get_lock_state(admin_session: AsyncSession) -> None:
         farm_id = farm.json()["id"]
         resp = await c.get(f"/api/v1/farms/{farm_id}/config/locks")
         assert resp.status_code == 200
+        # `health` is the fifth category. It is not a template like the other
+        # four — it locks the farm's own override rather than stopping blocks
+        # diverging — but it locks, so it reports here.
         assert resp.json() == {
             "subscriptions": False,
             "irrigation": False,
             "org": False,
             "grid": False,
+            "health": False,
         }

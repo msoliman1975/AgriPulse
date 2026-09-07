@@ -356,7 +356,9 @@
       "create": "Add node",
       "cancel": "Cancel",
       "failed": "Couldn't add — try a different id.",
-      "idTaken": "That node id is already used in this tree. Pick another."
+      "idTaken": "That node id is already used in this tree. Pick another.",
+      "kindStatus": "Status",
+      "kindStatusDesc": "Reports what the block is without opening work."
     },
     "condition": {
       "match": "Match",
@@ -567,7 +569,10 @@
         "severity": "Severity",
         "confidence": "Confidence",
         "textEn": "Text (EN)",
-        "textAr": "Text (AR)"
+        "textAr": "Text (AR)",
+        "status": "Status",
+        "statusColorHint": "This colour is what the map paints for this status.",
+        "noActionHint": "A no-action leaf carries no message. Use a status leaf to say that the block is fine."
       },
       "condition": {
         "heading": "Condition",
@@ -687,5 +692,24 @@
       "clearNoValues": "Resolved values are not stored for a clear verdict — the node walk above shows which branch was taken.",
       "skippedExplainer": "Excluded before evaluation: the tree's {{axis}} targeting requires {{required}}, and this block has {{actual}}."
     }
+  },
+  "leafKind": {
+    "alert": "Alert",
+    "recommendation": "Recommendation",
+    "status": "Status",
+    "no_action": "No action"
+  },
+  "leafKindHint": {
+    "alert": "Opens an alert and paints the block red.",
+    "recommendation": "Opens a recommendation and paints the block amber.",
+    "status": "Says what the block is, in words and colour. Opens no work.",
+    "no_action": "The tree ran and has nothing to say. The block reads as not applicable."
+  },
+  "verdictStatus": {
+    "na": "Not applicable",
+    "very_good": "Very good",
+    "good": "Good",
+    "issue": "Issue",
+    "alert": "Alert"
   }
 }

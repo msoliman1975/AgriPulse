@@ -196,6 +196,55 @@ class AlertsRepository:
             )
         ).scalar_one_or_none()
 
+    async def restate_from_leaf(
+        self, *, row_id: UUID, severity: str, group_key: str, action_type: str | None
+    ) -> None:
+        """Bring a re-firing alert back in line with what its leaf says NOW.
+
+        The dedup index `uq_alerts_block_rule_open` is `(block_id,
+        rule_code)`, and `rule_code` is `tree:<tree_code>:<leaf_node_id>`.
+        There is no severity in either. So when a tree author republishes a
+        leaf at a higher severity, the next sweep's INSERT is refused, the
+        row is bumped, and it keeps the OLD severity until somebody resolves
+        it by hand. Block health reads severity, so a block that should have
+        escalated to Critical stays on Watch — silently, and for as long as
+        the alert stays open.
+
+        `group_key` moves with it because it CONTAINS the severity
+        (`tree:leaf:action:severity`): a row left on the old key would sit
+        under the old severity's card in the Action Center while reading
+        critical everywhere else.
+
+        Not the diagnosis text. That is what a human already read and may
+        have acknowledged; re-writing it under them is a different decision
+        from correcting the severity, and it is not this one.
+
+        Only the block-scoped path needs this. A cell-scoped finding is
+        looked up BY `group_key`, which already carries the severity, so an
+        escalation there finds no parent and opens a new one at the new
+        severity — it moves card rather than changing in place.
+        """
+        await self._tenant.execute(
+            text(
+                """
+                UPDATE alerts
+                   SET severity = :severity,
+                       group_key = :group_key,
+                       action_type = COALESCE(:action_type, action_type),
+                       updated_at = now()
+                 WHERE id = :id
+                   AND (severity IS DISTINCT FROM :severity
+                        OR group_key IS DISTINCT FROM :group_key)
+                """
+            ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+            {
+                "id": row_id,
+                "severity": severity,
+                "group_key": group_key,
+                "action_type": action_type,
+            },
+        )
+
     async def bump_recurrence(
         self, *, row_id: UUID, today: date, actor_user_id: UUID | None
     ) -> dict[str, Any]:

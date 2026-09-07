@@ -1,6 +1,7 @@
 // Mirrors backend/app/modules/recommendations/schemas.py — keep in lock-step.
 
 import { apiClient } from "./client";
+import type { VerdictStatusCode } from "./decisionTrees";
 
 export type RecommendationState = "open" | "applied" | "dismissed" | "deferred" | "expired";
 
@@ -210,6 +211,9 @@ export interface ExplainTree {
   scope: string;
   status: ExplainStatus;
   steps: ExplainStep[];
+  /** The status code the leaf resolved to, for every walk that reached one.
+   *  Null on a skipped tree, and on a walk that errored before a leaf. */
+  status_code: VerdictStatusCode | null;
   kind: string | null;
   action_type: RecommendationActionType | null;
   severity: RecommendationSeverity | null;

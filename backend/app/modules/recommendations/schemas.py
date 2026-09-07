@@ -9,6 +9,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.modules.recommendations import status_codes
+
 ActionType = Literal[
     "irrigate",
     "fertilize",
@@ -21,6 +23,91 @@ ActionType = Literal[
 ]
 RecommendationState = Literal["open", "applied", "dismissed", "deferred", "expired"]
 Severity = Literal["info", "warning", "critical"]
+
+# The four kinds a leaf can be, and the five status codes an evaluation
+# resolves to. Both come from `status_codes.py`, which is the one place the
+# list is written; re-declaring them here would let the API and the engine
+# drift apart.
+LeafKind = status_codes.LeafKind
+StatusCode = status_codes.StatusCode
+
+
+class StatusDefinitionResponse(BaseModel):
+    """One entry of the platform status list.
+
+    The frontend reads this instead of holding its own copy of the codes and
+    colours. A frontend copy of a backend list has drifted before.
+    """
+
+    code: StatusCode
+    # Highest rank wins when one block holds several verdicts. `na` is 0, so
+    # a tree with nothing to say never outranks a real answer.
+    rank: int
+    color: str
+    label_en: str
+    label_ar: str
+
+
+class VerdictResponse(BaseModel):
+    """One tree's answer about one block, or one of its grid cells.
+
+    A row exists for every leaf the tree reached, including the ones that
+    found nothing wrong. No row means the tree did not run there.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    farm_id: UUID
+    block_id: UUID
+    # NULL = the whole block. Set = one grid cell; row and column are joined
+    # in so a reader can say "zone B4" instead of showing a UUID.
+    cell_id: UUID | None = None
+    cell_row: int | None = None
+    cell_col: int | None = None
+    scope: str
+    tree_id: UUID
+    tree_code: str
+    tree_version: int
+    leaf_node_id: str
+    kind: LeafKind
+    status_code: StatusCode
+    # Set on alert and recommendation verdicts only.
+    severity: Severity | None = None
+    text_en: str
+    text_ar: str | None = None
+    # The interval this answer has held. `valid_to` is null while it is the
+    # current one; a replay reads a row whose interval contains the date.
+    valid_from: datetime
+    valid_to: datetime | None = None
+    last_evaluated_at: datetime
+    # The work item this verdict came with, when it had one.
+    alert_id: UUID | None = None
+    recommendation_id: UUID | None = None
+
+
+class BlockVerdictsResponse(BaseModel):
+    """Every tree's answer about one block."""
+
+    block_id: UUID
+    # Echoed exactly as the caller sent it, time zone or not. The comparison
+    # itself uses a separate UTC instant: subtracting a naive datetime from a
+    # timestamptz raises TypeError.
+    as_of: datetime | None = None
+    # The highest-ranking status across the block's verdicts, which is what
+    # the block reads as. None when no tree has run on it.
+    worst_status: StatusCode | None = None
+    # The newest evaluation behind these rows. None when the list is empty.
+    last_evaluated_at: datetime | None = None
+    verdicts: list[VerdictResponse] = Field(default_factory=list)
+
+
+class FarmVerdictsResponse(BaseModel):
+    """Every block of one farm, with its verdicts. One statement behind it."""
+
+    farm_id: UUID
+    as_of: datetime | None = None
+    blocks: list[BlockVerdictsResponse] = Field(default_factory=list)
 
 
 ActionHorizon = Literal["immediate", "short_term", "long_term", "monitoring"]
@@ -173,6 +260,11 @@ class EvaluateBlockResponse(BaseModel):
     trees_skipped_crop: int
     recommendations_opened: int
     traces_written: int = 0
+    # Verdicts stored for this block: one per tree that reached a leaf,
+    # including the trees that found nothing wrong. Counts the rows opened
+    # plus the ones confirmed, so a quiet night reports work rather than
+    # zero (tenant 0091).
+    verdicts_written: int = 0
 
 
 class ExplainStep(BaseModel):
@@ -196,7 +288,8 @@ class ExplainTree(BaseModel):
 
     ``status``:
       * ``fired``    — reached a leaf that opens a recommendation/alert
-      * ``clear``    — evaluated to no_action
+      * ``clear``    — reached a status or no_action leaf; ``status_code``
+        says which, and the leaf's own words ride along
       * ``per_cell`` — cell-scoped; evaluated per grid cell, not here
       * ``skipped``  — targeting (crop/country/soil) excluded this block
       * ``error``    — the walk hit a malformed node
@@ -210,6 +303,10 @@ class ExplainTree(BaseModel):
     scope: str = "block"
     status: str
     steps: list[ExplainStep] = Field(default_factory=list)
+    # The status code the leaf resolved to, for every walk that reached one.
+    # `clear` used to be the whole answer for a tree that found nothing,
+    # which read the same as a tree nobody had run.
+    status_code: StatusCode | None = None
     kind: str | None = None
     action_type: str | None = None
     severity: str | None = None

@@ -1,0 +1,21 @@
+# Date palm — same freshness reasoning as mango, weaker tree coverage.
+#
+# Perennial, and slower than mango: a date palm's condition is a season's
+# story, not a week's. 72 hours is if anything conservative.
+#
+# Coverage is the honest caveat and it is NOT worked around here. Three
+# trees target date palm (pollination rain, ripening rain risk, soil
+# salinity) and all three are event-driven, so most blocks on most days
+# will have every tree either clear or skipped. A block no tree applies to
+# reads Unknown, and that is left alone deliberately: setting
+# `no_tree_coverage: healthy` would paint a farm green on the strength of
+# rules nobody has written yet.
+
+crop_path: date_palm
+version: 1
+notes: >-
+  Perennial, slower than mango. Freshness widened to 72h. Tree coverage is
+  three event-driven trees, so Unknown is expected on quiet blocks and is
+  left as Unknown rather than being defaulted to healthy.
+definition:
+  stale_after_hours: 72

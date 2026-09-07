@@ -410,6 +410,25 @@ class CategoryLockedError(APIError):
         )
 
 
+class InvalidHealthDefinitionError(APIError):
+    """A farm health override that `parse_definition` will not accept.
+
+    `HealthDefinitionError` is a plain ValueError from `app.shared`, so
+    letting it out of the service would surface as a 500 on a body the
+    caller can fix. The detail is the parser's own message, which names the
+    key and what was expected.
+    """
+
+    def __init__(self, *, farm_id: UUID, detail: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            title="Invalid health definition",
+            detail=detail,
+            type_=f"{_TYPE_BASE}/invalid-health-definition",
+            extras={"farm_id": str(farm_id)},
+        )
+
+
 class LockDivergenceError(APIError):
     """Attempted to lock a category while blocks diverge from the template.
 

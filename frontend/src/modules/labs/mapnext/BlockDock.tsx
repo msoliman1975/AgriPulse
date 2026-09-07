@@ -200,7 +200,10 @@ export function BlockDock({
   // `insights` carries the shared activity-type catalogue and `weather` the
   // day labels; both are bundled eagerly, so borrowing them costs nothing and
   // beats keeping a second copy of the same words under `farmConsole`.
-  const { t, i18n } = useTranslation(["farmConsole", "insights", "weather"]);
+  // "common" is listed even though it is the default namespace: the reason
+  // line reads `common:healthReason.*`, and naming it here is what keeps a
+  // future namespace reshuffle from silently rendering the raw key.
+  const { t, i18n } = useTranslation(["farmConsole", "insights", "weather", "common"]);
   const lang = i18n.language;
   const qc = useQueryClient();
   const [tab, setTab] = useState<DockTab>("overview");
@@ -424,6 +427,35 @@ export function BlockDock({
           </button>
         </span>
       </div>
+
+      {/* ---- why the block is in that class ----
+          One line, only when the server sent a reason. It is null while the
+          backend runs the old NDVI rule, which has no reason to give, so this
+          renders nothing and the dock looks exactly as it did.
+
+          Under the chip row rather than inside the health chip: the longest
+          reason is a full sentence, and putting it in the chip would wrap the
+          whole bar into a second row on a narrow map column. */}
+      {detail.health_reason ? (
+        <div className="flex flex-none flex-wrap items-center gap-1.5 border-b border-ap-line px-4 py-1.5">
+          <Dot color={healthColor} />
+          <span className="text-xs text-ap-muted">
+            {t(`common:healthReason.${detail.health_reason}`)}
+          </span>
+          {/* Whose rule read the evidence. The reason alone answers half of
+              "why is my block red"; without the source, a farm admin who has
+              overridden the definition cannot tell whether their own setting
+              or the crop's default produced the answer. */}
+          {detail.health_source ? (
+            <span className="text-xs text-ap-muted">
+              ·{" "}
+              {detail.health_source === "crop" && detail.health_definition_version != null
+                ? t("healthSource.cropVersioned", { version: detail.health_definition_version })
+                : t(`healthSource.${detail.health_source}`)}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       {collapsed ? null : (
         <>

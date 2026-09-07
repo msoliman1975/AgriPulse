@@ -204,16 +204,34 @@ export function useFarmConsole(farmId: string) {
     return m;
   }, [summaryQ.data, i18n.language]);
 
+  // The health the server classified for the selected block. The dock shows
+  // the same value the polygon is painted with, because it is the same value.
+  const selectedHealth = selectedId ? (summaryQ.data?.summaries[selectedId]?.health ?? null) : null;
+  // The reason travels with the class. It is NOT in the query key: it is a
+  // function of the class and the same evidence, so it cannot move on its
+  // own, and keying on it would refetch the detail for no new data.
+  const selectedHealthReason = selectedId
+    ? (summaryQ.data?.summaries[selectedId]?.health_reason ?? null)
+    : null;
+
   const detailQ = useQuery({
     // Language is part of the key: loadUnitDetail bakes localized alert text
     // into the detail, so switching locale must refetch to re-localize.
-    queryKey: CONSOLE_QK.detail(farmId, selectedId, i18n.language),
+    queryKey: CONSOLE_QK.detail(farmId, selectedId, i18n.language, selectedHealth ?? "unknown"),
     queryFn: () =>
       loadUnitDetail({
         farmId,
         blockId: selectedId as string,
         blocksById,
         activePlan: summaryQ.data?.activePlan,
+        summaryHealth: selectedHealth,
+        summaryHealthReason: selectedHealthReason,
+        summaryHealthSource: selectedId
+          ? (summaryQ.data?.summaries[selectedId]?.health_source ?? null)
+          : null,
+        summaryHealthVersion: selectedId
+          ? (summaryQ.data?.summaries[selectedId]?.health_definition_version ?? null)
+          : null,
       }),
     enabled: Boolean(selectedId && blocksById.size > 0),
     staleTime: 30_000,

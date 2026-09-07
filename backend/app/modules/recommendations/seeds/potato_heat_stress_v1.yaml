@@ -173,12 +173,11 @@ nodes:
             text_ar: راقب ما إذا بدأت الصغرى الليلية تبقى فوق 18 °م.
 
   leaf_no_action:
-    label_en: No action — temperatures within range
-    label_ar: لا إجراء — الحرارة ضمن المدى
+    label_en: Good — temperatures within range
+    label_ar: جيد — الحرارة ضمن المدى
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: good
       parameters: {}
       text_en: Forecast temperatures are within potato's tolerance; no action needed.
       text_ar: الحرارة المتوقعة ضمن تحمّل البطاطس؛ لا حاجة لإجراء.

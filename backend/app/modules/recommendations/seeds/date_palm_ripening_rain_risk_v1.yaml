@@ -330,13 +330,11 @@ nodes:
               تابع الرطوبة يوميًا حتى انتهاء نافذة النضج.
 
   leaf_no_action:
-    label_en: No action — ripening weather is dry
-    label_ar: لا إجراء — طقس النضج جاف
+    label_en: Good — ripening weather is dry
+    label_ar: جيد — طقس النضج جاف
     outcome:
-      kind: recommendation
-      action_type: no_action
-      severity: info
-      confidence: 0.85
+      kind: status
+      status: good
       parameters: {}
       text_en: >-
         No meaningful rain or sustained humidity in the 72-hour forecast
@@ -345,13 +343,11 @@ nodes:
         لا مطر مؤثر ولا رطوبة مستمرة في توقعات 72 ساعة لهذه المرحلة.
 
   leaf_out_of_window:
-    label_en: No action — outside the moisture-sensitive stages
-    label_ar: لا إجراء — خارج المراحل الحسّاسة للرطوبة
+    label_en: Not applicable — outside the moisture-sensitive stages
+    label_ar: لا ينطبق — خارج المراحل الحسّاسة للرطوبة
     outcome:
-      kind: recommendation
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: na
       parameters: {}
       text_en: >-
         The block is in dormancy, pollination or fruit set, where rain
