@@ -232,28 +232,34 @@ worktree at `C:/Users/mosoliman/projects/ma-health`, branch
 
 ## Seed trees
 
-Not in this change. Mohamed will rewrite the trees later.
+Rewritten on 2026-09-07. All 63 no-action leaves in the 33 seed files are
+status leaves now. Not one no-action leaf is left in the shipped trees.
 
-The size of that later work, counted on `origin/main` on 2026-09-07: 63
-`no_action` leaves across 33 seed files.
+| Status | Leaves | What the branch means |
+| --- | --- | --- |
+| `good` | 30 | The tree looked and found the block inside the range it screens for. |
+| `na` | 33 | The tree could not judge: no reading, wrong stage, a missing attribute, or an input at its ceiling. |
 
-- 22 `T_` mango trees: 39 leaves
-- date palm, 3 files: 6 leaves
-- potato, 6 files: 12 leaves
-- other, 2 files: 6 leaves
+`very_good` is deliberately unused. These trees have one "in band" branch
+each; none distinguishes "inside with margin" from "inside", and inventing
+that distinction would be agronomy this rewrite has no source for.
 
-All 33 are seed files in `backend/app/modules/recommendations/seeds`. The `T_`
-trees are seeds too, added by PR #638. No data migration is needed for them.
+Every one of the 63 already carried English and Arabic text, so no new copy
+was written. What changed is the shape — `kind: status` plus a code, with
+`action_type`, `severity` and `confidence` dropped — and the label, which
+read "No action — ..." on all 63 and now reads "Good — ..." or
+"Not applicable — ...". The label is what the canvas and the block dock show,
+so leaving it would have put the old wording back on screen next to the new
+colour.
 
-Note. A tenant can also author a tree through the screen, and those live only
-as rows in `public.decision_trees` with a non-null `tenant_id`. Count them with
-one query before the rewrite, because a seed edit does not reach them.
+Note. The loader publishes a new version of a tree whose compiled hash
+changes, so the first deploy after this creates 33 new tree versions. A
+recommendation or alert already open still names the version that opened it.
 
-Warning. Until the trees are rewritten, every healthy path still ends in
-`no_action`, which writes `na`. Under the health rule in this document, `na`
-reads Unknown. Turning `health_definition_enabled` on before the rewrite would
-move all 72 production blocks to Unknown. The order is: build the capability,
-rewrite the trees, then turn the flag on.
+Open item. A tenant can also author a tree through the screen, and those live
+only as rows in `public.decision_trees` with a non-null `tenant_id`. Count
+them with `SELECT count(*) FROM public.decision_trees WHERE tenant_id IS NOT
+NULL` before turning the flag on; a seed edit does not reach them.
 
 ## Authoring screen
 
@@ -331,8 +337,8 @@ Phases 1 to 7 are written on `feat/health-rule-single-source`, commits
 `ec8d3464`, `c628bc2a`, `cb651c03`, `bc322abf`, `cbceba56`, `e770b577`,
 `e2090428`. Nothing is pushed and `health_definition_enabled` is still off.
 
-Left: rewrite the shipped trees (63 no-action leaves in 33 files), then
-measure on production, then turn the flag on.
+The 63 shipped leaves are rewritten too. Left: push, CI, deploy, measure on
+production, then turn the flag on per tenant.
 
 ## Suggested phases
 
@@ -345,12 +351,15 @@ measure on production, then turn the flag on.
 5. Authoring screen.
 6. Health resolver reads verdicts, behind the existing flag, flag left off.
 7. Explain and traces show the status.
+8. Rewrite the 63 shipped leaves.
 
-Then, as separate work: rewrite the trees, then turn the flag on.
+All eight are written. Left: push, CI, deploy, measure, then turn the flag on.
 
 Phases 1 to 5 change no number already on screen. Before the flag goes on,
 measure it on production the way the health work did: 72 blocks, count how many
-change class.
+change class. The measurement can only run after a deploy, because the
+verdicts a block will hold are written by the sweep, not derivable from what
+is stored today.
 
 ## Open questions
 

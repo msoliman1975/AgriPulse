@@ -215,12 +215,11 @@ nodes:
               طبيعية، وخطّط التسميد على هذا الأساس.
 
   leaf_not_due:
-    label_en: No action — this block is not in its post-harvest window
-    label_ar: لا إجراء — هذه القطعة ليست في نافذة ما بعد الحصاد
+    label_en: Not applicable — this block is not in its post-harvest window
+    label_ar: لا ينطبق — هذه القطعة ليست في نافذة ما بعد الحصاد
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: na
       parameters: {}
       text_en: >-
         Post-harvest care is due once the block enters the post-harvest flush

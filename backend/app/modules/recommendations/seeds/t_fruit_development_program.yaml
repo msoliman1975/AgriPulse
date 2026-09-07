@@ -223,12 +223,11 @@ nodes:
               الورقة إلى الثمرة ولا يظهر عليها إلا بعد الجني.
 
   leaf_not_bearing:
-    label_en: No action — this block is not carrying a crop this season
-    label_ar: لا إجراء — هذه القطعة لا تحمل محصولًا هذا الموسم
+    label_en: Not applicable — this block is not carrying a crop this season
+    label_ar: لا ينطبق — هذه القطعة لا تحمل محصولًا هذا الموسم
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: na
       parameters: {}
       text_en: >-
         The fruit development program only applies to a block that set a crop.
@@ -240,12 +239,11 @@ nodes:
         تلقائيًا.
 
   leaf_not_due:
-    label_en: No action — this block is not in the fruit development window
-    label_ar: لا إجراء — هذه القطعة ليست في نافذة تطور الثمار
+    label_en: Not applicable — this block is not in the fruit development window
+    label_ar: لا ينطبق — هذه القطعة ليست في نافذة تطور الثمار
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: na
       parameters: {}
       text_en: >-
         The Stage B program runs between fruit set and the start of

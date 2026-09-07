@@ -174,25 +174,21 @@ nodes:
             text_ar: أعد أخذ عيّنة الأعناق خلال 10-14 يومًا مع تحليل تربة.
 
   leaf_sufficient:
-    label_en: No action — petiole phosphorus within range
-    label_ar: لا إجراء — الفوسفور ضمن النطاق
+    label_en: Good — petiole phosphorus within range
+    label_ar: جيد — الفوسفور ضمن النطاق
     outcome:
-      kind: recommendation
-      action_type: no_action
-      severity: info
-      confidence: 0.85
+      kind: status
+      status: good
       parameters: {}
       text_en: Petiole phosphorus is within the 0.22-0.40% sufficiency range.
       text_ar: فوسفور عنق الورقة ضمن نطاق الكفاية 0.22-0.40%.
 
   leaf_no_data:
-    label_en: No action — no petiole test on record
-    label_ar: لا إجراء — لا يوجد تحليل أعناق مسجّل
+    label_en: Not applicable — no petiole test on record
+    label_ar: لا ينطبق — لا يوجد تحليل أعناق مسجّل
     outcome:
-      kind: recommendation
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: na
       parameters: {}
       text_en: >-
         No petiole phosphorus reading has been ingested for this block,
@@ -202,13 +198,11 @@ nodes:
         الفوسفور غير معروفة.
 
   leaf_out_of_window:
-    label_en: No action — outside the calibrated stage window
-    label_ar: لا إجراء — خارج نافذة المرحلة المعايَرة
+    label_en: Not applicable — outside the calibrated stage window
+    label_ar: لا ينطبق — خارج نافذة المرحلة المعايَرة
     outcome:
-      kind: recommendation
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: na
       parameters: {}
       text_en: >-
         The published petiole phosphorus range is defined for tuber

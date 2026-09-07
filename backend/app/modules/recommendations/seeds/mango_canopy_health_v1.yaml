@@ -147,12 +147,11 @@ nodes:
             text_ar: أعد فحص المؤشر في المشهد القادم لتأكيد التعافي.
 
   leaf_no_action:
-    label_en: No action — greenness within baseline
-    label_ar: لا إجراء — الاخضرار ضمن خط الأساس
+    label_en: Good — greenness within baseline
+    label_ar: جيد — الاخضرار ضمن خط الأساس
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: good
       parameters: {}
       text_en: Canopy greenness is within the seasonal baseline.
       text_ar: اخضرار المجموع ضمن خط الأساس الموسمي.

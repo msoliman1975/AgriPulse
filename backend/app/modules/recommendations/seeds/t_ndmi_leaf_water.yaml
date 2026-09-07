@@ -291,12 +291,11 @@ nodes:
             text_ar: أعد قراءة NDMI في أول مشهد صافٍ وتأكد أنه عاد داخل النطاق.
 
   leaf_in_band:
-    label_en: No action — NDMI inside the band for this tree size
-    label_ar: لا إجراء — NDMI داخل نطاق هذا الحجم
+    label_en: Good — NDMI inside the band for this tree size
+    label_ar: جيد — NDMI داخل نطاق هذا الحجم
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: good
       parameters: {}
       text_en: >-
         NDMI is inside the range the mango index guide expects for this
@@ -305,12 +304,11 @@ nodes:
         NDMI داخل النطاق الذي يتوقعه دليل مؤشرات المانجو لهذا الحجم.
 
   leaf_size_unknown:
-    label_en: No action — tree size not recorded, so there is no band to compare against
-    label_ar: لا إجراء — حجم الشجرة غير مسجّل فلا يوجد نطاق للمقارنة
+    label_en: Not applicable — tree size not recorded, so there is no band to compare against
+    label_ar: لا ينطبق — حجم الشجرة غير مسجّل فلا يوجد نطاق للمقارنة
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: na
       parameters: {}
       text_en: >-
         This rule needs the block's Tree size attribute. Open the block's

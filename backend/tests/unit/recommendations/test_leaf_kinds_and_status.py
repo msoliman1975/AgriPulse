@@ -248,9 +248,10 @@ def test_a_recommendation_of_no_action_is_not_a_recommendation() -> None:
 def test_every_shipped_seed_leaf_resolves_to_a_known_status() -> None:
     """All 33 seed files compile, and no leaf lands on an unknown status.
 
-    Counted on 2026-09-07: 5 alert leaves, 83 recommendation leaves and 63
-    no-action leaves. The no-action count is the one that matters — it is
-    the work the tree rewrite will turn into real statuses.
+    Counted after the rewrite on 2026-09-07: 5 alert leaves, 83
+    recommendation leaves, and the 63 that used to be no-action leaves now
+    split 30 `good` and 33 `na`. Not one no-action leaf is left, which is
+    the point: a branch that found nothing wrong now says so.
     """
     import collections
     import pathlib
@@ -270,7 +271,16 @@ def test_every_shipped_seed_leaf_resolves_to_a_known_status() -> None:
             assert outcome is not None, f"{path.name}:{nid} did not parse"
             assert outcome.status_code in STATUS_CODES
             counts[outcome.kind] += 1
+            if outcome.kind == "status":
+                counts[f"status:{outcome.status_code}"] += 1
+                # A status leaf's whole job is to say something. One with no
+                # words is the blank row again, wearing a colour.
+                assert outcome.text_en, f"{path.name}:{nid} has no English text"
+                assert outcome.text_ar, f"{path.name}:{nid} has no Arabic text"
 
-    assert counts["no_action"] == 63
+    assert counts["no_action"] == 0
     assert counts["alert"] == 5
     assert counts["recommendation"] == 83
+    assert counts["status"] == 63
+    assert counts["status:good"] == 30
+    assert counts["status:na"] == 33

@@ -298,12 +298,11 @@ nodes:
               واصل فحص مصائد ذبابة الفاكهة في كل جولة جني.
 
   leaf_not_bearing:
-    label_en: No action — this block is not carrying a crop this season
-    label_ar: لا إجراء — هذه القطعة لا تحمل محصولًا هذا الموسم
+    label_en: Not applicable — this block is not carrying a crop this season
+    label_ar: لا ينطبق — هذه القطعة لا تحمل محصولًا هذا الموسم
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: na
       parameters: {}
       text_en: >-
         There is no harvest to plan on a resting block. If this block is in
@@ -314,12 +313,11 @@ nodes:
         فعلًا فصحّح خاصية الإثمار هذا الموسم — فهي لا تتحدّث تلقائيًا.
 
   leaf_not_due:
-    label_en: No action — this block is not in its harvest window
-    label_ar: لا إجراء — هذه القطعة ليست في نافذة حصادها
+    label_en: Not applicable — this block is not in its harvest window
+    label_ar: لا ينطبق — هذه القطعة ليست في نافذة حصادها
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: na
       parameters: {}
       text_en: >-
         The harvest window opens on a different date per variety — late May

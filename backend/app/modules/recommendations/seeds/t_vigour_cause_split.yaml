@@ -394,12 +394,11 @@ nodes:
             text_ar: سجّل ما يكشفه الاستكشاف ليكون للانخفاض القادم تاريخ.
 
   leaf_no_action:
-    label_en: No action — canopy vigour is holding against this block's history
-    label_ar: لا إجراء — حيوية المجموع ثابتة مقارنة بتاريخ هذه القطعة
+    label_en: Good — canopy vigour is holding against this block's history
+    label_ar: جيد — حيوية المجموع ثابتة مقارنة بتاريخ هذه القطعة
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: good
       parameters: {}
       text_en: >-
         Canopy vigour is within this block's normal range for this time of

@@ -125,9 +125,10 @@ nodes:
         المتابعة. أضف هذا الحقل إلى جولة الفحص الروتينية التالية.
 
   leaf_no_alert:
-    label_en: No alert — NDVI within baseline
-    label_ar: لا تنبيه — NDVI ضمن المعدل
+    label_en: Good — NDVI within baseline
+    label_ar: جيد — NDVI ضمن المعدل
     outcome:
-      action_type: no_action
+      kind: status
+      status: good
       text_en: NDVI is within the seasonal baseline; no alert.
       text_ar: NDVI ضمن المعدل الموسمي؛ لا تنبيه.

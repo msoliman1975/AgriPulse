@@ -376,12 +376,11 @@ nodes:
               المخفّض لا تحته.
 
   leaf_confirmed:
-    label_en: No action — the pre-harvest water cut is in the intended range
-    label_ar: لا إجراء — تخفيض الماء قبل الحصاد ضمن النطاق المقصود
+    label_en: Good — the pre-harvest water cut is in the intended range
+    label_ar: جيد — تخفيض الماء قبل الحصاد ضمن النطاق المقصود
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.8
+      kind: status
+      status: good
       parameters: {}
       text_en: >-
         Soil moisture has fallen into the reduced band the guide gives for
@@ -396,12 +395,11 @@ nodes:
         النافذة وليست أعطالًا.
 
   leaf_not_in_window:
-    label_en: No action — not a bearing block in its maturity window
-    label_ar: لا إجراء — ليست قطعة مثمرة في نافذة نضجها
+    label_en: Not applicable — not a bearing block in its maturity window
+    label_ar: لا ينطبق — ليست قطعة مثمرة في نافذة نضجها
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: na
       parameters: {}
       text_en: >-
         Pre-harvest deficit irrigation only applies to a block that is
@@ -412,12 +410,11 @@ nodes:
         الحصاد. هذه القطعة إما مرتاحة هذا الموسم أو في مرحلة أبكر.
 
   leaf_size_unknown:
-    label_en: No action — tree size not recorded, so there is no band to verify against
-    label_ar: لا إجراء — حجم الشجرة غير مسجّل فلا يوجد نطاق للتحقق
+    label_en: Not applicable — tree size not recorded, so there is no band to verify against
+    label_ar: لا ينطبق — حجم الشجرة غير مسجّل فلا يوجد نطاق للتحقق
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: na
       parameters: {}
       text_en: >-
         This rule needs the block's Tree size attribute to know which reduced

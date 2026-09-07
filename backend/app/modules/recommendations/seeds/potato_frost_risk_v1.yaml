@@ -173,12 +173,11 @@ nodes:
             text_ar: أعد فحص التوقّع كل مساء خلال موجة البرد.
 
   leaf_no_action:
-    label_en: No action — no frost in the forecast
-    label_ar: لا إجراء — لا صقيع في التوقّع
+    label_en: Good — no frost in the forecast
+    label_ar: جيد — لا صقيع في التوقّع
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: good
       parameters: {}
       text_en: Forecast minimums stay above frost-injury thresholds; no action needed.
       text_ar: تبقى الصغرى المتوقعة فوق عتبات إصابة الصقيع؛ لا حاجة لإجراء.

@@ -418,12 +418,11 @@ nodes:
               راقب انضمام مؤشر ثانٍ في المشهد التالي — فذلك ما يحوّلها إلى قرار.
 
   leaf_no_stress:
-    label_en: No action — no water reading is below this block's normal
-    label_ar: لا إجراء — لا توجد قراءة مائية دون معتاد هذه القطعة
+    label_en: Good — no water reading is below this block's normal
+    label_ar: جيد — لا توجد قراءة مائية دون معتاد هذه القطعة
     outcome:
-      action_type: no_action
-      severity: info
-      confidence: 0.9
+      kind: status
+      status: good
       parameters: {}
       text_en: >-
         Leaf water, soil moisture and canopy temperature are all within this
