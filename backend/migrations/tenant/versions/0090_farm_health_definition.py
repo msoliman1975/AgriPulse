@@ -43,8 +43,8 @@ run before the write in `farms/config_template.replace_health_template`,
 and it refuses an unknown key rather than letting it mean the default for
 ever. The CHECK here only pins the JSON shape.
 
-Revision ID: 0089
-Revises: 0088
+Revision ID: 0090
+Revises: 0089
 Create Date: 2026-09-03
 """
 
@@ -56,8 +56,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0089"
-down_revision: str | Sequence[str] | None = "0088"
+revision: str = "0090"
+down_revision: str | Sequence[str] | None = "0089"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

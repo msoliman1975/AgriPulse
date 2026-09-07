@@ -601,7 +601,7 @@ async def put_grid_template(
     }
 
 
-# ---------- Health category (tenant migration 0089) --------------------------
+# ---------- Health category (tenant migration 0090) --------------------------
 #
 # GET and PUT, and nothing else. There is no apply-preview and no apply, and
 # there must not be: health is a RESOLUTION TIER, not a template. A block's

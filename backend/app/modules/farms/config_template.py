@@ -999,7 +999,7 @@ async def replace_grid_template(
     await session.flush()
 
 
-# ---------- Health category (tenant migration 0089) --------------------------
+# ---------- Health category (tenant migration 0090) --------------------------
 #
 # Two functions and no third. There is no `apply_health_template` and no
 # `compute_health_apply_plan`, and the absence is the design — see the note

@@ -240,3 +240,70 @@ class TenantDecisionTreeDispatch(Base):
     last_dispatched_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+class DecisionTreeBlockVerdict(Base):
+    """`tenant_<id>.decision_tree_block_verdicts` — what each tree said, and when.
+
+    One row per block (or grid cell) per tree, for an interval of time. A
+    sweep that returns the same status as yesterday touches
+    ``last_evaluated_at``; a sweep that returns a different status closes the
+    open row with ``valid_to`` and opens a new one. ``valid_to IS NULL`` is
+    the current verdict, and reading a past date is one predicate::
+
+        valid_from <= :at AND (valid_to IS NULL OR valid_to > :at)
+
+    **A missing row is information.** It means the tree did not run for that
+    block — excluded by targeting, turned off for the farm, or the sweep
+    never reached it. That is the whole point: a branch that found nothing
+    wrong used to write nothing, so "checked and fine" and "never ran" looked
+    the same on screen.
+
+    No foreign keys. ``tree_id`` names a row in ``public.decision_trees`` and
+    a tenant schema never references public; ``alert_id`` and
+    ``recommendation_id`` point at rows that can be purged, and this verdict
+    outliving them is deliberate. See tenant migration 0091.
+
+    **No ``TimestampedMixin``.** That mixin brings five columns, and three of
+    them would be dead here: nobody authors a verdict, so ``created_by`` and
+    ``updated_by`` have no value to hold, and a verdict is ended by
+    ``valid_to`` rather than soft-deleted, so a ``deleted_at`` would be a
+    second way to say the same thing and the two would disagree.
+    """
+
+    __tablename__ = "decision_tree_block_verdicts"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=UUID_V7_DEFAULT
+    )
+    farm_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    block_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    # NULL = the whole block; set = one grid cell. Logical ref to grid_cells.
+    cell_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    scope: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'block'"))
+    tree_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    tree_code: Mapped[str] = mapped_column(Text, nullable=False)
+    tree_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    leaf_node_id: Mapped[str] = mapped_column(Text, nullable=False)
+    # One of the four leaf kinds: alert, recommendation, status, no_action.
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    # One of the five platform status codes; see `status_codes.py`.
+    status_code: Mapped[str] = mapped_column(Text, nullable=False)
+    # Set for alert and recommendation verdicts only. A status leaf carries
+    # none — its status code already ranks and colours it.
+    severity: Mapped[str | None] = mapped_column(Text, nullable=True)
+    text_en: Mapped[str] = mapped_column(Text, nullable=False)
+    text_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    run_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    last_run_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    valid_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    valid_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    alert_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    recommendation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )

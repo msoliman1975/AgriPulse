@@ -6,7 +6,7 @@ absences — no apply, no apply-preview, and a lock that needs no divergence
 modal because nothing can be out of step with it.
 
 The unit tests around this cover the merge rule and the schema. What only a
-real database can show is that the column exists with the CHECK 0089 adds,
+real database can show is that the column exists with the CHECK 0090 adds,
 that `extra="forbid"` and `parse_definition` both fire on the wire, and that
 the capability check does not deny a farm-scoped user.
 """

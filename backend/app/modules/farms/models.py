@@ -339,7 +339,7 @@ class Farm(Base, TimestampedMixin):
         Boolean, nullable=False, server_default=text("FALSE")
     )
 
-    # Health category (tenant migration 0089). A RESOLUTION TIER, not a
+    # Health category (tenant migration 0090). A RESOLUTION TIER, not a
     # template: there is no block-side copy, no diff and no Apply. A block's
     # definition is resolved at read time as platform default <- crop
     # (`public.crop_health_definitions`, merged along the crop path) <- this
