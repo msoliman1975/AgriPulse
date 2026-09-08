@@ -1,0 +1,29 @@
+{
+  "title": "حالة المزرعة",
+  "treePicker": {
+    "label": "شجرة القرار"
+  },
+  "rail": {
+    "heading": "القطع · الأسوأ أولاً",
+    "didNotRun": "لم تُشغَّل الشجرة",
+    "verdictCount_zero": "لا نتائج",
+    "verdictCount_one": "نتيجة واحدة",
+    "verdictCount_two": "نتيجتان",
+    "verdictCount_few": "{{count}} نتائج",
+    "verdictCount_many": "{{count}} نتيجة",
+    "verdictCount_other": "{{count}} نتيجة",
+    "noBlocks": "لا توجد قطع في هذه المزرعة بعد."
+  },
+  "block": {
+    "verdictSummary_one": "نتيجة واحدة من {{tree}}.",
+    "verdictSummary_two": "نتيجتان من {{tree}}.",
+    "verdictSummary_few": "{{count}} نتائج من {{tree}}.",
+    "verdictSummary_many": "{{count}} نتيجة من {{tree}}.",
+    "verdictSummary_other": "{{count}} نتيجة من {{tree}}.",
+    "didNotRun": "لم تُشغَّل {{tree}} على هذه القطعة. لا يوجد سجل نتيجة، وهذا يختلف عن نتيجة «لا ينطبق»."
+  },
+  "empty": {
+    "noTrees": "لم تسجّل أي شجرة قرار نتيجة على هذه المزرعة بعد.",
+    "noBlock": "اختر قطعة لعرض ما قالته الشجرة عنها."
+  }
+}

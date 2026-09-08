@@ -1231,6 +1231,30 @@ class RecommendationsServiceImpl:
             "verdicts": rows[:limit],
         }
 
+    async def verdict_reasoning(self, *, block_id: UUID, verdict_id: UUID) -> dict[str, Any] | None:
+        """The walk behind one verdict, for the audience that reads verdicts.
+
+        The trace endpoints under ``/decision-tree-traces`` answer the same
+        question for a tree author, and they are gated on
+        ``decision_tree.read``. Five roles hold ``recommendation.read`` and
+        not that one — FarmManager, Agronomist, FieldOperator, Scout and
+        Viewer — so every reader of the map would get a silent 403 on the
+        one request that says why a cell is red. Hence a second door, gated
+        the way the verdict reads are.
+
+        ``reasoning_available`` is false when the run behind the verdict has
+        been pruned by retention. The verdict is still correct; only the walk
+        is gone, and the caller can say so instead of showing an empty list.
+        """
+        row = await self._repo.get_verdict_reasoning(block_id=block_id, verdict_id=verdict_id)
+        if row is None:
+            return None
+        row["reasoning_available"] = row.get("trace_id") is not None
+        row["node_path"] = row.get("node_path") or []
+        row["resolved_values"] = row.get("resolved_values") or {}
+        row["param_overrides"] = row.get("param_overrides") or {}
+        return row
+
     # ---- Read-only explain -------------------------------------------
 
     async def explain_block(

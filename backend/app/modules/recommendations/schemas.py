@@ -84,6 +84,13 @@ class VerdictResponse(BaseModel):
     # The work item this verdict came with, when it had one.
     alert_id: UUID | None = None
     recommendation_id: UUID | None = None
+    # The sweep that last produced this answer. `confirm()` re-points it on
+    # every run that reaches the same leaf, so it names the newest walk, not
+    # the one that first opened the interval. It is how a reader gets from a
+    # colour on a map to the conditions behind it:
+    # `GET /decision-tree-traces?run_id=<this>&block_id=<block>` returns the
+    # trace, and that trace carries `node_path` and `resolved_values`.
+    last_run_id: UUID | None = None
 
 
 class BlockVerdictsResponse(BaseModel):
@@ -100,6 +107,46 @@ class BlockVerdictsResponse(BaseModel):
     # The newest evaluation behind these rows. None when the list is empty.
     last_evaluated_at: datetime | None = None
     verdicts: list[VerdictResponse] = Field(default_factory=list)
+
+
+class VerdictReasoningResponse(BaseModel):
+    """One verdict with the node walk that produced it.
+
+    The same shape a tree author sees under `/decision-tree-traces/{id}`,
+    reachable by the roles that read verdicts rather than the ones that
+    author trees.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    verdict_id: UUID
+    block_id: UUID
+    cell_id: UUID | None = None
+    cell_row: int | None = None
+    cell_col: int | None = None
+    scope: str
+    tree_id: UUID
+    tree_code: str
+    tree_version: int
+    leaf_node_id: str
+    kind: LeafKind
+    status_code: StatusCode
+    severity: Severity | None = None
+    valid_from: datetime
+    last_evaluated_at: datetime
+    # False when retention has pruned the run behind this verdict. The
+    # verdict still stands; only the walk is gone.
+    reasoning_available: bool = False
+    trace_id: UUID | None = None
+    evaluated_at: datetime | None = None
+    # The ordered walk: [{node_id, matched, label_en, label_ar, condition,
+    # values}]. Empty when `reasoning_available` is false.
+    node_path: list[dict[str, Any]] = Field(default_factory=list)
+    # Merged resolved refs, {"indices.ndvi.mean": "0.39"}.
+    resolved_values: dict[str, Any] = Field(default_factory=dict)
+    # Tenant overrides in force for this walk, so a threshold that differs
+    # from the tree's declared default is visible.
+    param_overrides: dict[str, Any] = Field(default_factory=dict)
 
 
 class FarmVerdictsResponse(BaseModel):

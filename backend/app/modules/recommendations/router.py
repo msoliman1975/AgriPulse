@@ -64,6 +64,7 @@ from app.modules.recommendations.schemas import (
     TreeParameterOverridesResponse,
     TreeParameterOverrideUpsertRequest,
     TreeRunCandidateFarm,
+    VerdictReasoningResponse,
 )
 
 # Importing the private authoring errors to map them at the route layer is
@@ -1244,6 +1245,55 @@ async def get_farm_verdict_history(
     return await service.farm_verdict_history(
         farm_id=farm_id, from_at=from_at, to_at=to_at, tree_code=tree_code
     )
+
+
+@router.get(
+    "/blocks/{block_id}/verdicts/{verdict_id}/reasoning",
+    response_model=VerdictReasoningResponse,
+    summary="The node walk behind one verdict.",
+)
+async def get_verdict_reasoning(
+    block_id: UUID,
+    verdict_id: UUID,
+    farm_id: UUID = Query(
+        ...,
+        description=(
+            "The block's parent farm. Required because it is what the request "
+            "is authorized against — a farm-scoped user has no tenant-wide "
+            "role to fall back on."
+        ),
+    ),
+    context: RequestContext = Depends(
+        requires_capability("recommendation.read", farm_id_param="farm_id")
+    ),
+    service: RecommendationsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    """Why this verdict, with the values the tree read.
+
+    `/decision-tree-traces/{id}` answers the same question for a tree author
+    and is gated on `decision_tree.read`. FarmManager, Agronomist,
+    FieldOperator, Scout and Viewer hold `recommendation.read` and not that
+    one, so pointing the map at the author's endpoint would 403 every reader
+    it was built for. This is the same walk, gated the way the verdict reads
+    are.
+
+    `reasoning_available` is false when retention has pruned the run behind
+    the verdict. The verdict still stands and its status is still correct;
+    only the walk is gone. That is a different sentence from "no such
+    verdict", which is a 404, so the two are not collapsed.
+    """
+    _ensure_tenant(context)
+    from app.core.errors import APIError
+
+    row = await service.verdict_reasoning(block_id=block_id, verdict_id=verdict_id)
+    if row is None:
+        raise APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Verdict not found",
+            detail=f"No verdict {verdict_id} on block {block_id} in this tenant.",
+            type_="https://agripulse.cloud/problems/verdict-not-found",
+        )
+    return row
 
 
 @router.get(
