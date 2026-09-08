@@ -25,6 +25,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { Feature, FeatureCollection, Polygon } from "geojson";
 
 import type { StatusCode } from "@/api/farmHealth";
+import { areaBounds, farmBounds, boundsOfPolygon, padBounds, toLngLatBounds } from "../lib/fit";
 import {
   bboxToImageCoordinates,
   blurRadius,
@@ -65,9 +66,16 @@ interface Props {
   colorOf: (status: StatusCode) => string;
   onSelectBlock: (blockId: string) => void;
   onSelectCell: (cellId: string) => void;
-  /** Changing this refits the map. Pass the selected block id. */
+  /**
+   * What to frame. "block" follows the selection, "area" frames the open
+   * area, "farm" shows every block and stops greying the unselected ones.
+   */
+  fitMode: FitMode;
+  /** Changing this refits without changing the mode: pass the block id. */
   fitKey: string;
 }
+
+export type FitMode = "block" | "area" | "farm";
 
 /**
  * One string property off a clicked feature.
@@ -115,7 +123,7 @@ function buildStyle(): StyleSpecification {
   };
 }
 
-function blockFeatures(blocks: MapBlock[]): FeatureCollection {
+function blockFeatures(blocks: MapBlock[], showAll: boolean): FeatureCollection {
   return {
     type: "FeatureCollection",
     features: blocks.map(
@@ -123,7 +131,14 @@ function blockFeatures(blocks: MapBlock[]): FeatureCollection {
         type: "Feature",
         id: block.blockId,
         geometry: block.boundary,
-        properties: { block_id: block.blockId, code: block.code, selected: block.selected },
+        properties: {
+          block_id: block.blockId,
+          code: block.code,
+          selected: block.selected,
+          // In the whole-farm view nothing is greyed: the point of that view
+          // is to compare the blocks, not to focus one.
+          showAll: showAll,
+        },
       }),
     ),
   };
@@ -165,6 +180,7 @@ export function HealthMap({
   colorOf,
   onSelectBlock,
   onSelectCell,
+  fitMode,
   fitKey,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -199,7 +215,12 @@ export function HealthMap({
           // The unselected blocks are greyed so the eye stays on the one in
           // focus. Mohamed asked for that on 2026-09-07.
           "fill-color": "#5f675c",
-          "fill-opacity": ["case", ["get", "selected"], 0, 0.45],
+          "fill-opacity": [
+            "case",
+            ["any", ["get", "selected"], ["get", "showAll"]],
+            0,
+            0.45,
+          ],
         },
       });
       map.addLayer({
@@ -291,8 +312,8 @@ export function HealthMap({
     if (!map || !readyRef.current) return;
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- tsc types getSource as the Source base, which has no setData/setCoordinates
     const source = map.getSource(BLOCK_SOURCE) as GeoJSONSource | undefined;
-    source?.setData(blockFeatures(blocks));
-  }, [blocks]);
+    source?.setData(blockFeatures(blocks, fitMode === "farm"));
+  }, [blocks, fitMode]);
 
   // Cells: the blurred image, and the invisible polygons under it
   useEffect(() => {
@@ -349,20 +370,30 @@ export function HealthMap({
     source?.setData(outlineFeatures(cells, highlighted));
   }, [cells, highlighted]);
 
-  // Frame the selected block
+  // Framing. Three answers, one effect, so they cannot disagree about
+  // padding or duration.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
-    const selected = blocks.find((block) => block.selected);
-    const ring = selected?.boundary.coordinates[0];
-    if (!ring || ring.length === 0) return;
-    const bounds = new maplibregl.LngLatBounds(
-      ring[0] as [number, number],
-      ring[0] as [number, number],
-    );
-    for (const point of ring) bounds.extend(point as [number, number]);
-    map.fitBounds(bounds, { padding: 48, duration: 450 });
-  }, [fitKey, blocks]);
+
+    let box = null;
+    if (fitMode === "farm") {
+      box = farmBounds(blocks.map((block) => block.boundary));
+    } else if (fitMode === "area") {
+      const chosen = cells.filter((cell) => highlighted.has(cell.cellId));
+      box = areaBounds(chosen.map((cell) => cell.ring));
+      // An area with no cells is not a reason to sit on the last frame.
+      if (box === null) box = boundsOfPolygon(blocks.find((b) => b.selected)?.boundary);
+    } else {
+      box = boundsOfPolygon(blocks.find((block) => block.selected)?.boundary);
+    }
+    if (box === null) return;
+
+    map.fitBounds(toLngLatBounds(padBounds(box, 0.08)), { padding: 40, duration: 450 });
+    // `highlighted` is deliberately not a dependency: hovering a chip
+    // previews an area on the map and must not fly the camera to it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitKey, fitMode, blocks, cells]);
 
   return <div ref={containerRef} className="h-full w-full" data-testid="health-map" />;
 }

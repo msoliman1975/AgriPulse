@@ -72,5 +72,33 @@
     "loading": "Reading the walk behind this verdict…",
     "failed": "The reasoning could not be loaded. Try again in a moment.",
     "pruned": "The walk behind this verdict is no longer kept. The verdict still stands; only the record of how the tree reached it has been cleared by retention."
+  },
+  "range": {
+    "label": "Range",
+    "d30": "Last 30 days",
+    "d90": "Last 90 days",
+    "y1": "Last year",
+    "custom": "Custom dates",
+    "showing": "Showing",
+    "from": "From",
+    "to": "to",
+    "toDate": "To",
+    "truncated": "This window holds more history than the replay can draw. Narrow the dates to see all of it."
+  },
+  "transport": {
+    "back": "One day back",
+    "forward": "One day forward",
+    "play": "Play the replay",
+    "pause": "Pause the replay",
+    "latest": "Latest",
+    "date": "Date",
+    "speed": "Replay speed"
+  },
+  "map": {
+    "fitBlock": "Fit block",
+    "fitArea": "Fit selected area",
+    "fitFarm": "Whole farm",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out"
   }
 }

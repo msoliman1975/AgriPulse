@@ -142,6 +142,7 @@ vi.mock("@/api/blocks", () => ({
 
 const farmVerdicts = vi.hoisted((): { current: unknown } => ({ current: null }));
 const reasoning = vi.hoisted((): { current: unknown } => ({ current: null }));
+const history = vi.hoisted((): { current: unknown } => ({ current: null }));
 
 vi.mock("@/api/farmHealth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/api/farmHealth")>();
@@ -156,6 +157,7 @@ vi.mock("@/api/farmHealth", async (importOriginal) => {
     ]),
     getFarmVerdicts: vi.fn(async () => farmVerdicts.current),
     getVerdictReasoning: vi.fn(async () => reasoning.current),
+    getFarmVerdictHistory: vi.fn(async () => history.current),
   };
 });
 
@@ -203,6 +205,7 @@ describe("FarmHealthViewPage", () => {
   beforeEach(async () => {
     await setupTestI18n("en");
     grid.current = { farm_id: FARM_ID, index_code: "ndvi", blocks: [] };
+    history.current = { farm_id: FARM_ID, from_at: "", to_at: "", tree_code: null, truncated: false, verdicts: [] };
     reasoning.current = {
       verdict_id: "v1",
       block_id: "b2",
@@ -564,6 +567,171 @@ describe("FarmHealthViewPage", () => {
       await screen.findByText(/The walk behind this verdict is no longer kept/),
     ).toBeInTheDocument();
     expect(screen.queryByText("Steps the tree took, root to leaf")).not.toBeInTheDocument();
+  });
+
+  it("opens on the newest day, with nothing further forward to go", async () => {
+    renderPage();
+
+    const latest = await screen.findByRole("button", { name: "Latest" });
+    // Already there, so the way back is off.
+    expect(latest).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Range" })).toHaveValue("30");
+  });
+
+  it("shows a past day from the intervals, not from the live read", async () => {
+    // The live read says the block is good today. The history says it was an
+    // alert a week ago. Stepping back must show the alert; showing today's
+    // answer on an earlier date is the failure this guards.
+    const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    history.current = {
+      farm_id: FARM_ID,
+      from_at: "",
+      to_at: "",
+      tree_code: null,
+      truncated: false,
+      verdicts: [
+        {
+          ...verdict("b1", "t_cwsi", "alert"),
+          id: "old",
+          valid_from: weekAgo,
+          valid_to: twoDaysAgo,
+        },
+      ],
+    };
+    farmVerdicts.current = {
+      farm_id: FARM_ID,
+      as_of: null,
+      blocks: [farmBlock("b1", [verdict("b1", "t_cwsi", "good")])],
+    };
+    renderPage();
+
+    const scrubber = await screen.findByRole("slider", { name: "Date" });
+    // 30-day window, newest is index 29; five days back lands inside the
+    // interval that closed two days ago.
+    fireEvent.change(scrubber, { target: { value: "24" } });
+
+    const rail = await screen.findByRole("list");
+    await waitFor(() => {
+      expect(within(rail).getByText("Alert")).toBeInTheDocument();
+    });
+  });
+
+  it("changing the range jumps to the newest day of the new window", async () => {
+    renderPage();
+
+    const scrubber = await screen.findByRole("slider", { name: "Date" });
+    fireEvent.change(scrubber, { target: { value: "3" } });
+    expect(screen.getByRole("button", { name: "Latest" })).toBeEnabled();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Range" }), {
+      target: { value: "365" },
+    });
+
+    // A new window opens on its newest day, whatever was showing before.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Latest" })).toBeDisabled();
+    });
+    expect(screen.getByRole("slider", { name: "Date" })).toHaveAttribute("max", "364");
+  });
+
+  it("editing a date asks for a custom range", async () => {
+    renderPage();
+
+    const from = await screen.findByLabelText("From");
+    fireEvent.change(from, { target: { value: "2026-01-01" } });
+
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "Range" })).toHaveValue("custom");
+    });
+  });
+
+  it("says when the window holds more history than it can draw", async () => {
+    history.current = {
+      farm_id: FARM_ID,
+      from_at: "",
+      to_at: "",
+      tree_code: null,
+      truncated: true,
+      verdicts: [],
+    };
+    renderPage();
+
+    expect(
+      await screen.findByText(/more history than the replay can draw/),
+    ).toBeInTheDocument();
+  });
+
+  it("frames the selected block by default", async () => {
+    renderPage();
+
+    await screen.findByTestId("health-map");
+    expect(mapProps.current?.fitMode).toBe("block");
+    expect(screen.getByRole("button", { name: "Fit block" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("frames the whole farm when asked, and stops greying the other blocks", async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Whole farm" }));
+
+    await waitFor(() => {
+      expect(mapProps.current?.fitMode).toBe("farm");
+    });
+    expect(screen.getByRole("button", { name: "Whole farm" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("frames the open area when asked", async () => {
+    withCells();
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Fit selected area" }));
+
+    await waitFor(() => {
+      expect(mapProps.current?.fitMode).toBe("area");
+    });
+  });
+
+  it("returns to the block when one is picked from the rail", async () => {
+    // Clicking a block while looking at the whole farm is a request to look
+    // at that block, not to stay zoomed out.
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Whole farm" }));
+    await waitFor(() => {
+      expect(mapProps.current?.fitMode).toBe("farm");
+    });
+
+    const rail = await screen.findByRole("list");
+    const target = within(rail)
+      .getAllByRole("button")
+      .find((button) => button.textContent?.includes("AG-R02-C01"));
+    fireEvent.click(target as HTMLElement);
+
+    await waitFor(() => {
+      expect(mapProps.current?.fitMode).toBe("block");
+    });
+  });
+
+  it("refits when the open area changes, not when one is merely hovered", async () => {
+    // The fit key carries the chosen area. Hovering a chip previews it on
+    // the map, and flying the camera on hover would make the map unusable.
+    withCells();
+    renderPage();
+
+    await screen.findByTestId("health-map");
+    const before = mapProps.current?.fitKey;
+    const chip = screen.getAllByRole("button", { name: /cells/ })[0];
+    fireEvent.mouseEnter(chip);
+
+    await waitFor(() => {
+      expect(mapProps.current?.fitKey).toBe(before);
+    });
   });
 
   it("says so when no tree has run on the farm at all", async () => {

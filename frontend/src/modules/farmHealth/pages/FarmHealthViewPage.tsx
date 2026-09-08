@@ -14,6 +14,7 @@ import { Navigate } from "react-router-dom";
 
 import { listBlocks, type BlockListItem } from "@/api/blocks";
 import { getFarmGridCells, type FarmGridCellsResponse } from "@/api/grid";
+import { getFarmVerdictHistory } from "@/api/farmHealth";
 import { getFarm } from "@/api/farms";
 import {
   getFarmVerdicts,
@@ -32,8 +33,21 @@ import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useCapability } from "@/rbac/useCapability";
 import { BlockList } from "../components/BlockList";
 import { AreaChips, AreaDetail, BlockSummary } from "../components/AreaPanel";
-import { HealthMap, type MapBlock, type MapCell } from "../components/HealthMap";
+import { HealthMap, type FitMode, type MapBlock, type MapCell } from "../components/HealthMap";
+import { Transport } from "../components/Transport";
 import { buildAreas, pickArea, type AreaCell } from "../lib/areas";
+import {
+  DEFAULT_RANGE,
+  byBlock,
+  customWindow,
+  dayOf,
+  isoOf,
+  rangeWindow,
+  verdictsOn,
+  windowLength,
+  type DayWindow,
+  type RangeId,
+} from "../lib/window";
 import { buildBlockRows, treeOptions, type BlockMeta } from "../lib/blockRows";
 
 interface HealthData {
@@ -42,6 +56,9 @@ interface HealthData {
   verdicts: FarmVerdicts;
   /** Null when the farm has no grid. The map then draws blocks only. */
   grid: FarmGridCellsResponse | null;
+  /** Every verdict that stood at any point in the window, as intervals. */
+  history: FarmVerdicts["blocks"][number]["verdicts"];
+  truncated: boolean;
 }
 
 export function FarmHealthViewPage(): ReactNode {
@@ -55,6 +72,19 @@ export function FarmHealthViewPage(): ReactNode {
   // One flag for the screen, not per area: opening the reasoning is a mode a
   // reader stays in while stepping through areas.
   const [reasoningOpen, setReasoningOpen] = useState(false);
+  const [fitMode, setFitMode] = useState<FitMode>("block");
+
+  // The clock is read once per mount. Reading it per render would move the
+  // window under a replay that is running across midnight.
+  const [today] = useState(() => dayOf(new Date()));
+  const [rangeId, setRangeId] = useState<RangeId>(DEFAULT_RANGE);
+  const [win, setWin] = useState<DayWindow>(() => rangeWindow("30", today));
+  const [dayIndex, setDayIndex] = useState(() => windowLength(rangeWindow("30", today)) - 1);
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(1);
+
+  const days = windowLength(win);
+  const atLatest = dayIndex >= days - 1;
 
   const farmQuery = useQuery({
     queryKey: ["farm", farmId],
@@ -89,6 +119,16 @@ export function FarmHealthViewPage(): ReactNode {
     queryFn: () => getFarmVerdicts(farmId as string),
     enabled: Boolean(farmId),
   });
+  // The whole window in one read. Asking per day would be 365 requests for a
+  // farm whose answers change a handful of times, and the client rebuilds
+  // each frame from the intervals with the same test the SQL uses.
+  const historyQuery = useQuery({
+    queryKey: ["farm-verdict-history", farmId, win.fromDay, win.toDay],
+    queryFn: () =>
+      getFarmVerdictHistory(farmId as string, isoOf(win.fromDay), isoOf(win.toDay + 1)),
+    enabled: Boolean(farmId),
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Three reads, one ladder. `queryState` takes a single query, so the
   // combination is written out: the first failure wins, and nothing renders
@@ -107,6 +147,7 @@ export function FarmHealthViewPage(): ReactNode {
     // and block-scoped verdicts — but not still loading, or the map would
     // draw once without cells and again with them.
     if (gridQuery.isPending) return { status: "loading" };
+    if (historyQuery.isPending) return { status: "loading" };
     return {
       status: "success",
       data: {
@@ -114,9 +155,11 @@ export function FarmHealthViewPage(): ReactNode {
         statuses: statusesQuery.data,
         verdicts: verdictsQuery.data,
         grid: gridQuery.data ?? null,
+        history: historyQuery.data?.verdicts ?? [],
+        truncated: historyQuery.data?.truncated ?? false,
       },
     };
-  }, [blocksQuery, statusesQuery, verdictsQuery, gridQuery]);
+  }, [blocksQuery, statusesQuery, verdictsQuery, gridQuery, historyQuery]);
 
   if (!farmId) return <Navigate to="/farms" replace />;
   if (!canRead) return <Navigate to="/" replace />;
@@ -134,7 +177,21 @@ export function FarmHealthViewPage(): ReactNode {
           isEmpty={(data) => data.verdicts.blocks.length === 0}
         >
           {(data) => {
-            const trees = treeOptions(data.verdicts.blocks);
+            // On the newest day the live read is the truth; on any earlier
+            // day the frame is rebuilt from the intervals. Both produce the
+            // same shape, so nothing below knows which it is looking at.
+            const frameBlocks = atLatest
+              ? data.verdicts.blocks
+              : [...byBlock(verdictsOn(data.history, win.fromDay + dayIndex))].map(
+                  ([blockId, verdicts]) => ({
+                    block_id: blockId,
+                    as_of: null,
+                    worst_status: null,
+                    last_evaluated_at: null,
+                    verdicts,
+                  }),
+                );
+            const trees = treeOptions(frameBlocks);
             // The picker defaults to the first tree that has said anything
             // here. A tree with no verdict on this farm paints an entirely
             // blank screen, which a reader cannot tell from a broken one.
@@ -144,7 +201,7 @@ export function FarmHealthViewPage(): ReactNode {
               code: block.code,
               name: block.name ?? block.code,
             }));
-            const rows = buildBlockRows(blocks, data.verdicts.blocks, activeTree, data.statuses);
+            const rows = buildBlockRows(blocks, frameBlocks, activeTree, data.statuses);
             const selectedBlockId = blockId ?? rows[0]?.blockId ?? null;
             const selected = rows.find((row) => row.blockId === selectedBlockId) ?? null;
 
@@ -243,6 +300,43 @@ export function FarmHealthViewPage(): ReactNode {
                   </label>
                 </div>
 
+                <Transport
+                  win={win}
+                  dayIndex={dayIndex}
+                  rangeId={rangeId}
+                  today={today}
+                  playing={playing}
+                  speed={speed}
+                  onDayIndex={setDayIndex}
+                  onRange={(next) => {
+                    setPlaying(false);
+                    setRangeId(next);
+                    if (next !== "custom") {
+                      const w = rangeWindow(next, today);
+                      setWin(w);
+                      // A new window always opens on its newest day.
+                      setDayIndex(windowLength(w) - 1);
+                    }
+                  }}
+                  onCustom={(fromIso, toIso) => {
+                    const w = customWindow(fromIso, toIso, today);
+                    if (!w) return;
+                    setPlaying(false);
+                    setRangeId("custom");
+                    setWin(w);
+                    setDayIndex(windowLength(w) - 1);
+                  }}
+                  onPlay={() => setPlaying(true)}
+                  onStop={() => setPlaying(false)}
+                  onSpeed={setSpeed}
+                />
+
+                {data.truncated ? (
+                  <p className="border-b border-ap-line bg-ap-warn-soft px-4 py-2 text-sm text-ap-warn">
+                    {t("farmHealth:range.truncated")}
+                  </p>
+                ) : null}
+
                 <div className="grid min-h-0 flex-1 grid-cols-[308px_minmax(0,1fr)]">
                   <aside className="min-h-0 overflow-y-auto border-e border-ap-line bg-ap-panel">
                     <div className="border-b border-ap-line px-3 py-2.5">
@@ -257,12 +351,37 @@ export function FarmHealthViewPage(): ReactNode {
                       onSelect={(id) => {
                         setBlockId(id);
                         setAreaKey(null);
+                        setFitMode("block");
                       }}
                     />
                   </aside>
 
                   <section className="grid min-h-0 grid-rows-[minmax(240px,46%)_minmax(0,1fr)]">
-                    <div className="min-h-0 border-b border-ap-line">
+                    <div className="relative min-h-0 border-b border-ap-line">
+                      <div className="absolute inset-inline-start-3 top-3 z-10 flex flex-col items-start gap-1.5">
+                        {(
+                          [
+                            ["block", "farmHealth:map.fitBlock"],
+                            ["area", "farmHealth:map.fitArea"],
+                            ["farm", "farmHealth:map.fitFarm"],
+                          ] as [FitMode, string][]
+                        ).map(([mode, key]) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            aria-pressed={fitMode === mode}
+                            onClick={() => setFitMode(mode)}
+                            className={[
+                              "rounded border px-2.5 py-1 text-meta shadow-sm",
+                              fitMode === mode
+                                ? "border-ap-primary bg-ap-primary text-white"
+                                : "border-ap-line bg-ap-panel text-ap-ink",
+                            ].join(" ")}
+                          >
+                            {t(key)}
+                          </button>
+                        ))}
+                      </div>
                       <HealthMap
                         blocks={mapBlocks}
                         cells={mapCells}
@@ -271,6 +390,9 @@ export function FarmHealthViewPage(): ReactNode {
                         onSelectBlock={(id) => {
                           setBlockId(id);
                           setAreaKey(null);
+                          // Clicking a block in the whole-farm view is a
+                          // request to look at that block.
+                          setFitMode("block");
                         }}
                         onSelectCell={(cellId) => {
                           const found = areas.find((area) =>
@@ -278,7 +400,8 @@ export function FarmHealthViewPage(): ReactNode {
                           );
                           if (found) setAreaKey(found.key);
                         }}
-                        fitKey={selectedBlockId ?? ""}
+                        fitMode={fitMode}
+                        fitKey={`${selectedBlockId ?? ""}|${activeArea?.key ?? ""}`}
                       />
                     </div>
                     <div className="grid min-h-0 gap-4 overflow-y-auto p-4">
