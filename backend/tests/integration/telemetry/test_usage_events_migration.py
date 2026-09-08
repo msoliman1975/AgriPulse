@@ -117,7 +117,7 @@ async def test_constraint_names_are_not_convention_doubled(
 
     The metadata naming convention templates `%(constraint_name)s`, so declaring
     a constraint inside `op.create_table` with an explicit name doubles it —
-    0030, 0036 and tenant/0054 all carry scar tissue from this. 0049 uses raw
+    0030, 0036 and tenant/0054 all carry scar tissue from this. 0056 uses raw
     ALTER TABLE to dodge it; this asserts the dodge worked.
     """
     names = {
