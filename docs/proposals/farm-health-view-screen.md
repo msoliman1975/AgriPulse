@@ -6,7 +6,8 @@ so CI is the first place the backend tests execute.
 
 Written on 2026-09-07 and 2026-09-08, in the worktree
 `C:/Users/mosoliman/projects/ma-fhvspec`. PRs 1 and 2 branch off
-`origin/main`; PRs 3 to 8 stack, each on the one before.
+`origin/main`; PRs 3 to 7 stack, each on the one before, and PR 8 sits on top of
+PR 7 on the same branch.
 
 | Branch | Commit | What |
 | --- | --- | --- |
@@ -17,7 +18,7 @@ Written on 2026-09-07 and 2026-09-08, in the worktree
 | `feat/farm-health-areas` | `0a9524d6` | PR 5 — areas and block summary |
 | `feat/farm-health-reasoning` | `02442394` | PR 6 — why this colour |
 | `feat/farm-health-replay` | `694a4fa6` | PR 7 — the date range and replay |
-| `feat/farm-health-map` (fit) | `efe1f501` | PR 8 — frame block, area, farm |
+| `feat/farm-health-replay` | `efe1f501` | PR 8 — frame block, area, farm |
 | `fix/sweep-log-verdicts-written` | `cb33fdcb` | the sweep's verdict tally |
 
 Two things the work found that changed the plan, both recorded in place:
