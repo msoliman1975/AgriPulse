@@ -967,9 +967,14 @@ function LeafBody({
   role: PositionedNode["role"];
   data: PositionedNode["data"];
 }): JSX.Element {
-  const { i18n } = useTranslation("decisionTrees");
+  const { t, i18n } = useTranslation("decisionTrees");
   const outcome = data.outcome ?? {};
-  const actionType = outcome.action_type ?? "—";
+  // A status leaf has no action type — it asks for no action. Showing "—"
+  // in the node's headline put a dash where the answer is.
+  const headline =
+    outcome.kind === "status" && outcome.status
+      ? t(`verdictStatus.${outcome.status}`, { defaultValue: outcome.status })
+      : (outcome.action_type ?? "—");
   // The outcome text wins over the node label, and each pair picks its
   // own language. Resolving the pair first, then falling back, keeps a
   // node with an Arabic outcome text and an English label readable.
@@ -981,7 +986,7 @@ function LeafBody({
   return (
     <>
       <text x={x + 12} y={y + 42} fontSize={13} fontWeight={600} fill="#0f172a">
-        {actionType}
+        {headline}
       </text>
       <text x={x + 12} y={y + 64} fontSize={12} fill="#475569">
         {truncate(text, 36)}

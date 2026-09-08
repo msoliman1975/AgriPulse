@@ -555,14 +555,80 @@ export function validateTreeStructure(yaml: string): StructuralError[] {
         });
       }
     } else {
-      // Leaf: cleanup-time invariant — outcome must have action_type.
-      if (!node.outcome?.action_type) {
-        errors.push({
-          nodeId: id,
-          message: "Leaf outcome is missing `action_type`.",
-        });
-      }
+      errors.push(...leafErrors(id, node.outcome));
     }
+  }
+  return errors;
+}
+
+/** The five platform status codes. Mirrors
+ *  `app.modules.recommendations.status_codes.STATUS_CODES`; the loader
+ *  refuses anything else when the tree is published. */
+const STATUS_CODES: readonly string[] = ["na", "very_good", "good", "issue", "alert"];
+
+/** The four things a terminal node can be. Mirrors
+ *  `app.modules.recommendations.status_codes.LEAF_KINDS`. */
+const LEAF_KINDS: readonly string[] = ["alert", "recommendation", "status", "no_action"];
+
+/** The kind a leaf is, read the way the loader and the engine read it.
+ *
+ *  An explicit `status` or `alert` wins. Otherwise `action_type: no_action`
+ *  means no_action — that is how every tree published before the four kinds
+ *  existed spells its quiet branches, and 15 of the shipped ones say
+ *  `kind: recommendation` right next to it. Anything else is a
+ *  recommendation, which is what a leaf with no kind has always been.
+ */
+function leafKindOf(outcome: YamlNode["outcome"]): string {
+  const declared = outcome?.kind;
+  if (declared === "status" || declared === "alert") return declared;
+  if (outcome?.action_type === "no_action") return "no_action";
+  if (declared === "recommendation" || declared === "no_action") return declared;
+  return "recommendation";
+}
+
+/** What a leaf must carry, by kind.
+ *
+ *  Only the two kinds that ask for work carry an `action_type`: it is what a
+ *  person does about it, and a status leaf asks for nothing. Requiring one
+ *  everywhere blocked save on every status leaf — including all 63 in the
+ *  shipped trees — with an error naming a field that kind does not have.
+ */
+function leafErrors(id: string, outcome: YamlNode["outcome"]): StructuralError[] {
+  const errors: StructuralError[] = [];
+  const kind = leafKindOf(outcome);
+  const declared = outcome?.kind;
+
+  if (declared !== undefined && !LEAF_KINDS.includes(declared)) {
+    errors.push({
+      nodeId: id,
+      message: `Leaf \`kind\` must be one of ${LEAF_KINDS.join(", ")} — got "${declared}".`,
+    });
+  }
+  if ((kind === "alert" || kind === "recommendation") && !outcome?.action_type) {
+    errors.push({
+      nodeId: id,
+      message: "Leaf outcome is missing `action_type`.",
+    });
+  }
+  if (kind === "status") {
+    if (!outcome?.status) {
+      errors.push({
+        nodeId: id,
+        message: "Status leaf is missing `status` — pick one before saving.",
+      });
+    } else if (!STATUS_CODES.includes(outcome.status)) {
+      errors.push({
+        nodeId: id,
+        message: `Status must be one of ${STATUS_CODES.join(", ")} — got "${outcome.status}".`,
+      });
+    }
+  } else if (outcome?.status) {
+    // The loader refuses this: an alert declaring `good` would paint itself
+    // green while opening a red card.
+    errors.push({
+      nodeId: id,
+      message: `Only a status leaf may set \`status\` — this leaf is a ${kind}.`,
+    });
   }
   return errors;
 }
