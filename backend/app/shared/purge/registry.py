@@ -585,9 +585,23 @@ EXEMPT_PAIRS: dict[tuple[str, str], str] = {
     # `activity_resources` history on *other* farms with them.
     ("resources", "farm_id"): "tenant-level since W2-A; archived, not deleted, by delete_farms",
     # Views and continuous aggregates are not independently deletable; they
-    # follow their source tables (CAGGs via BLOCK_CAGGS refresh).
+    # follow their source tables (CAGGs via BLOCK_CAGGS / PUBLIC_CAGGS refresh).
     ("block_index_daily", "block_id"): "continuous aggregate over block_index_aggregates",
     ("block_index_weekly", "block_id"): "continuous aggregate over block_index_aggregates",
+    # Exempt from the DELETE, NOT from the purge. You cannot DELETE from a
+    # continuous aggregate, but these two do have to be emptied of a purged
+    # tenant — they group by tenant_id and run with real-time aggregation, so
+    # stale buckets would keep serving it. PUBLIC_CAGGS + refresh_public_caggs
+    # is what actually clears them (TEL-6b); this entry only tells the guard
+    # that a DELETE is the wrong mechanism.
+    (
+        "usage_daily",
+        "tenant_id",
+    ): "continuous aggregate over usage_events; cleared by PUBLIC_CAGGS refresh",
+    (
+        "usage_flow_daily",
+        "tenant_id",
+    ): "continuous aggregate over usage_events; cleared by PUBLIC_CAGGS refresh",
     ("v_block_own_integration_health", "block_id"): "view",
     ("v_block_own_integration_health", "farm_id"): "view",
     ("v_block_integration_health", "block_id"): "view",

@@ -27,13 +27,19 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
+from app.core.settings import get_settings
 from app.shared.purge.engine import PurgeEngine, refresh_public_caggs
 from app.shared.purge.registry import PUBLIC_CAGGS
 
 pytestmark = [pytest.mark.integration]
 
+# `route` is a BIND, not a literal. A route template contains ":farmId", and
+# SQLAlchemy's text() parses ":name" inside the string as a bind parameter — so
+# an inlined template turns into a missing-parameter error at execute time.
+# Same family as the CAST-and-string-bind bugs: the SQL looks right and fails
+# only when it runs.
 _INSERT = text(
     """
     INSERT INTO public.usage_events (
@@ -42,7 +48,7 @@ _INSERT = text(
         duration_ms, locale, app_version, props
     ) VALUES (
         :time, :id, 1, :session_id, :user_id, :tenant_id, 'Agronomist',
-        false, :event_name, 'insights', '/insights/:farmId', :flow, :step, 'ok',
+        false, :event_name, 'insights', :route, :flow, :step, 'ok',
         1000, 'en', 'purgetest', '{}'::jsonb
     )
     """
@@ -60,6 +66,7 @@ def _events(tenant_id: UUID, when: datetime) -> list[dict[str, Any]]:
             "user_id": user_id,
             "tenant_id": tenant_id,
             "event_name": "page_view",
+            "route": "/insights/:farmId",
             "flow": None,
             "step": None,
         },
@@ -70,29 +77,35 @@ def _events(tenant_id: UUID, when: datetime) -> list[dict[str, Any]]:
             "user_id": user_id,
             "tenant_id": tenant_id,
             "event_name": "flow_start",
+            "route": "/insights/:farmId",
             "flow": "farm_onboarding",
             "step": None,
         },
     ]
 
 
-async def _autocommit(session: AsyncSession):
-    engine = session.get_bind().engine  # type: ignore[union-attr]
-    conn = await engine.connect()
-    await conn.execution_options(isolation_level="AUTOCOMMIT")
-    return conn
+def _autocommit_engine():
+    """A dedicated autocommit engine.
+
+    Not `session.get_bind()`: on an AsyncSession that returns a sync-style bind
+    and awaiting IO through it raises MissingGreenlet. `compress_chunk` and
+    `refresh_continuous_aggregate` also cannot run inside a transaction block,
+    so a separate autocommit connection is required regardless.
+    """
+    return create_async_engine(str(get_settings().database_url), isolation_level="AUTOCOMMIT")
 
 
-async def _refresh_all(session: AsyncSession, around: datetime) -> None:
-    conn = await _autocommit(session)
+async def _refresh_all(around: datetime) -> None:
+    engine = _autocommit_engine()
     try:
-        for view, _src in PUBLIC_CAGGS:
-            await conn.execute(
-                text(f"CALL refresh_continuous_aggregate('public.\"{view}\"', :s, :e)"),
-                {"s": around - timedelta(days=2), "e": around + timedelta(days=2)},
-            )
+        async with engine.connect() as conn:
+            for view, _src in PUBLIC_CAGGS:
+                await conn.execute(
+                    text(f"CALL refresh_continuous_aggregate('public.\"{view}\"', :s, :e)"),
+                    {"s": around - timedelta(days=2), "e": around + timedelta(days=2)},
+                )
     finally:
-        await conn.close()
+        await engine.dispose()
 
 
 async def _aggregate_rows(session: AsyncSession, tenant_id: UUID) -> dict[str, int]:
@@ -130,8 +143,6 @@ async def _purge(session: AsyncSession, tenant_id: UUID) -> list[str]:
     # Post-commit, on its own autocommit connection — exactly as the purge
     # service does it, because refresh_continuous_aggregate cannot run inside a
     # transaction block.
-    from app.core.settings import get_settings
-
     return await refresh_public_caggs(
         engine_url=str(get_settings().database_url),
         window=report.public_cagg_range,
@@ -144,7 +155,7 @@ async def test_recent_telemetry_dies_with_the_tenant(admin_session: AsyncSession
     when = datetime.now(UTC) - timedelta(days=1)
     await admin_session.execute(_INSERT, _events(tenant_id, when))
     await admin_session.commit()
-    await _refresh_all(admin_session, when)
+    await _refresh_all(when)
 
     assert await _raw_rows(admin_session, tenant_id) == 2
     before = await _aggregate_rows(admin_session, tenant_id)
@@ -178,12 +189,13 @@ async def test_telemetry_older_than_the_compression_threshold_also_dies(
     when = datetime.now(UTC) - timedelta(days=45)
     await admin_session.execute(_INSERT, _events(tenant_id, when))
     await admin_session.commit()
-    await _refresh_all(admin_session, when)
+    await _refresh_all(when)
 
     # Force compression on the chunk holding these rows rather than waiting for
     # the background policy, which will not have run inside a test session.
-    conn = await _autocommit(admin_session)
+    engine = _autocommit_engine()
     compressed = 0
+    conn = await engine.connect()
     try:
         chunks = (
             await conn.execute(
@@ -205,6 +217,7 @@ async def test_telemetry_older_than_the_compression_threshold_also_dies(
             compressed += 1
     finally:
         await conn.close()
+        await engine.dispose()
 
     assert compressed > 0, (
         "no chunk older than 14 days was compressed, so this test would exercise "
@@ -232,9 +245,6 @@ async def test_a_tenant_with_no_telemetry_skips_the_refresh(
     engine = PurgeEngine(admin_session)
     report = await engine.delete_tenant_public([uuid4()])
     assert report.public_cagg_range is None
-
-    from app.core.settings import get_settings
-
     assert (
         await refresh_public_caggs(
             engine_url=str(get_settings().database_url),

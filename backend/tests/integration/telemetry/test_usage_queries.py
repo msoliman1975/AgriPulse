@@ -19,8 +19,9 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
+from app.core.settings import get_settings
 from app.modules.telemetry.repository import TelemetryRepository, UsageWindow
 
 pytestmark = [pytest.mark.integration]
@@ -79,16 +80,23 @@ async def _refresh(session: AsyncSession) -> None:
     aggregate reads empty and every assertion below would pass vacuously.
     """
     await session.commit()
-    engine = session.get_bind().engine  # type: ignore[union-attr]
+    # A dedicated engine, not `session.get_bind()`. On an AsyncSession that
+    # returns a sync-style bind and awaiting IO through it raises
+    # MissingGreenlet. `refresh_continuous_aggregate` is also a procedure that
+    # cannot run inside a transaction block, so it needs its own autocommit
+    # connection either way — which is exactly what the purge engine does.
     start = TODAY - timedelta(days=10)
     end = TODAY + timedelta(days=1)
-    async with engine.connect() as conn:
-        await conn.execution_options(isolation_level="AUTOCOMMIT")
-        for view in ("usage_daily", "usage_flow_daily"):
-            await conn.execute(
-                text(f"CALL refresh_continuous_aggregate('public.\"{view}\"', :s, :e)"),
-                {"s": start, "e": end},
-            )
+    engine = create_async_engine(str(get_settings().database_url), isolation_level="AUTOCOMMIT")
+    try:
+        async with engine.connect() as conn:
+            for view in ("usage_daily", "usage_flow_daily"):
+                await conn.execute(
+                    text(f"CALL refresh_continuous_aggregate('public.\"{view}\"', :s, :e)"),
+                    {"s": start, "e": end},
+                )
+    finally:
+        await engine.dispose()
 
 
 @pytest.fixture
@@ -232,9 +240,14 @@ async def seeded(admin_session: AsyncSession) -> AsyncIterator[UUID]:
     await admin_session.execute(_INSERT, rows)
     await _refresh(admin_session)
     yield tenant_id
-    async with admin_session.get_bind().engine.connect() as conn:  # type: ignore[union-attr]
-        await conn.execution_options(isolation_level="AUTOCOMMIT")
-        await conn.execute(text("DELETE FROM public.usage_events WHERE app_version = 'testbuild'"))
+    engine = create_async_engine(str(get_settings().database_url), isolation_level="AUTOCOMMIT")
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(
+                text("DELETE FROM public.usage_events WHERE app_version = 'testbuild'")
+            )
+    finally:
+        await engine.dispose()
 
 
 def _window(tenant_id: UUID | None, **over: object) -> UsageWindow:
