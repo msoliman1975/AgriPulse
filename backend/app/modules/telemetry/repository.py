@@ -485,7 +485,7 @@ class TelemetryRepository:
     ) -> list[dict[str, Any]]:
         """p95 perceived latency per feature, at or over the threshold.
 
-        `percentile_cont` over raw, not the aggregate — see migration 0057 for
+        `percentile_cont` over raw, not the aggregate — see migration 0083 for
         why there is no p95 column.
         """
         rows = (

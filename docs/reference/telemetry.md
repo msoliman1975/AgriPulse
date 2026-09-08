@@ -60,7 +60,7 @@ Stated first, because it is the part people actually want to know.
 
 ## 3. Retention
 
-Enforced by TimescaleDB policies in migrations `0056` and `0057`, not by intent.
+Enforced by TimescaleDB policies in migrations `0082` and `0083`, not by intent.
 
 | Store | Kept | Compressed |
 |---|---|---|

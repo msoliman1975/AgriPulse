@@ -38,8 +38,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0057"
-down_revision: str | Sequence[str] | None = "0056"
+revision: str = "0083"
+down_revision: str | Sequence[str] | None = "0082"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
