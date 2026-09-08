@@ -16,6 +16,12 @@ Three rules hold across all of them:
    24 months and is far smaller than raw. Raw is read only for the questions the
    aggregate structurally cannot answer: distinct sessions, pairing a flow start
    with its completion, and percentiles.
+4. **Cast `day` to `date` at the edge.** The aggregate's `day` column is
+   `time_bucket('1 day', time)` over a `timestamptz`, so it comes back as a
+   midnight `timestamptz`, not a `date`. The response models declare `date`, and
+   Pydantic will quietly coerce a midnight datetime — which means the contract
+   would be true by luck rather than by construction, and any consumer comparing
+   to a real `date` gets a surprise. `::date` makes it true.
 """
 
 from __future__ import annotations
@@ -223,7 +229,7 @@ class TelemetryRepository:
                            sum(events)               AS events,
                            count(DISTINCT user_id)   AS users,
                            count(DISTINCT tenant_id) AS tenants,
-                           max(day)                  AS last_used
+                           max(day)::date            AS last_used
                       FROM public.usage_daily
                      WHERE day >= :start AND day <= :end
                        AND event_name = 'feature_used'
@@ -533,7 +539,7 @@ class TelemetryRepository:
                 text(
                     """
                     SELECT tenant_id,
-                           max(day)                                AS last_seen,
+                           max(day)::date                          AS last_seen,
                            count(DISTINCT user_id) FILTER (
                              WHERE day > CAST(:end AS date) - 7)   AS wau,
                            count(DISTINCT feature)                 AS features_used,
@@ -569,7 +575,7 @@ class TelemetryRepository:
             await self._s.execute(
                 text(
                     f"""
-                    SELECT day,
+                    SELECT day::date AS day,
                            sum(events)             AS events,
                            count(DISTINCT user_id) AS users
                       FROM public.usage_daily

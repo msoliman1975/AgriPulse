@@ -30,7 +30,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.core.settings import get_settings
-from app.shared.purge.engine import PurgeEngine, refresh_public_caggs
+from app.shared.purge.engine import PurgeEngine, PurgeReport, refresh_public_caggs
 from app.shared.purge.registry import PUBLIC_CAGGS
 
 pytestmark = [pytest.mark.integration]
@@ -137,18 +137,25 @@ async def _raw_rows(session: AsyncSession, tenant_id: UUID) -> int:
     )
 
 
-async def _purge(session: AsyncSession, tenant_id: UUID) -> list[str]:
-    """Run the tenant public-schema delete and the CAGG phase after it."""
+async def _purge(session: AsyncSession, tenant_id: UUID) -> tuple[list[str], PurgeReport]:
+    """Run the tenant public-schema delete and the CAGG phase after it.
+
+    Returns the report as well as the refreshed views. The window is captured
+    inside `delete_tenant_public`, so when the refresh does nothing there are two
+    possible causes — the capture found no rows, or the refresh itself failed —
+    and the caller needs the report to tell them apart.
+    """
     engine = PurgeEngine(session)
     report = await engine.delete_tenant_public([tenant_id])
     await session.commit()
     # Post-commit, on its own autocommit connection — exactly as the purge
     # service does it, because refresh_continuous_aggregate cannot run inside a
     # transaction block.
-    return await refresh_public_caggs(
+    refreshed = await refresh_public_caggs(
         engine_url=str(get_settings().database_url),
         window=report.public_cagg_range,
     )
+    return refreshed, report
 
 
 @pytest.mark.asyncio
@@ -166,15 +173,29 @@ async def test_recent_telemetry_dies_with_the_tenant(admin_session: AsyncSession
         "would pass without proving anything"
     )
 
-    refreshed = await _purge(admin_session, tenant_id)
+    refreshed, report = await _purge(admin_session, tenant_id)
 
-    assert sorted(refreshed) == sorted(v for v, _ in PUBLIC_CAGGS)
+    # Outcome first, mechanism second. The property this test exists to prove is
+    # "no row attributable to the tenant survives"; which views got refreshed is
+    # an implementation detail, and asserting it first hid the real answer.
     assert await _raw_rows(admin_session, tenant_id) == 0
     after = await _aggregate_rows(admin_session, tenant_id)
     assert after == dict.fromkeys(after, 0), (
         f"a purged tenant is still visible in the aggregates: {after}. The raw "
         "rows are gone, so the orphan scanner reports clean and the dashboard "
         "still shows this tenant."
+    )
+
+    # Mechanism, checked last and reported separately. An empty window means the
+    # pre-delete capture found nothing; a captured window with no refreshed views
+    # means the refresh itself failed. The two need different fixes.
+    assert report.public_cagg_range is not None, (
+        "the pre-delete capture found no usage_events for this tenant, so the "
+        "refresh was skipped — even though the rows were there a moment earlier"
+    )
+    assert sorted(refreshed) == sorted(v for v, _ in PUBLIC_CAGGS), (
+        f"window was captured ({report.public_cagg_range}) but these views came "
+        f"back refreshed: {refreshed}. The refresh call itself failed."
     )
 
 
@@ -226,9 +247,9 @@ async def test_telemetry_older_than_the_compression_threshold_also_dies(
         "the same uncompressed path as the one above and prove nothing"
     )
 
-    refreshed = await _purge(admin_session, tenant_id)
+    refreshed, report = await _purge(admin_session, tenant_id)
 
-    assert sorted(refreshed) == sorted(v for v, _ in PUBLIC_CAGGS)
+    # The assertion this whole test exists for, checked before anything else.
     assert await _raw_rows(admin_session, tenant_id) == 0, (
         "DELETE did not reach the compressed chunk — an old tenant cannot be "
         "fully purged. Fallback is decompress_chunk before the delete, or "
@@ -236,6 +257,12 @@ async def test_telemetry_older_than_the_compression_threshold_also_dies(
     )
     after = await _aggregate_rows(admin_session, tenant_id)
     assert after == dict.fromkeys(after, 0)
+
+    assert report.public_cagg_range is not None
+    assert sorted(refreshed) == sorted(v for v, _ in PUBLIC_CAGGS), (
+        f"window was captured ({report.public_cagg_range}) but these views came "
+        f"back refreshed: {refreshed}. The refresh call itself failed."
+    )
 
 
 @pytest.mark.asyncio
