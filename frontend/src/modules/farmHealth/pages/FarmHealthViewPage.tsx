@@ -13,11 +13,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
 
 import { listBlocks, type BlockListItem } from "@/api/blocks";
+import { getFarmGridCells, type FarmGridCellsResponse } from "@/api/grid";
 import { getFarm } from "@/api/farms";
 import {
   getFarmVerdicts,
   getVerdictStatuses,
   type FarmVerdicts,
+  type StatusCode,
   type StatusDefinition,
 } from "@/api/farmHealth";
 import { AsyncBoundary } from "@/components/AsyncBoundary";
@@ -26,15 +28,19 @@ import { EmptyState } from "@/components/EmptyState";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import type { AsyncState } from "@/components/asyncState";
+import type { Polygon } from "geojson";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useCapability } from "@/rbac/useCapability";
 import { BlockList } from "../components/BlockList";
+import { HealthMap, type MapBlock, type MapCell } from "../components/HealthMap";
 import { buildBlockRows, treeOptions, type BlockMeta } from "../lib/blockRows";
 
 interface HealthData {
   blocks: BlockListItem[];
   statuses: StatusDefinition[];
   verdicts: FarmVerdicts;
+  /** Null when the farm has no grid. The map then draws blocks only. */
+  grid: FarmGridCellsResponse | null;
 }
 
 export function FarmHealthViewPage(): ReactNode {
@@ -50,9 +56,20 @@ export function FarmHealthViewPage(): ReactNode {
     enabled: Boolean(farmId),
   });
   const blocksQuery = useQuery({
-    queryKey: ["blocks", farmId],
-    queryFn: () => listBlocks(farmId as string),
+    // The map needs every polygon, and the list endpoint will hand them all
+    // over in one call rather than a GET per block.
+    queryKey: ["blocks", farmId, "with-boundary"],
+    queryFn: () => listBlocks(farmId as string, { include_boundary: true }),
     enabled: Boolean(farmId),
+  });
+  // Cell geometry. It is the same on every replay frame and for every tree,
+  // so it is fetched once per farm and joined on cell_id, rather than
+  // travelling with each verdict.
+  const gridQuery = useQuery({
+    queryKey: ["farm-grid-cells", farmId],
+    queryFn: () => getFarmGridCells(farmId as string, "ndvi"),
+    enabled: Boolean(farmId),
+    staleTime: 60 * 60 * 1000,
   });
   // The legend. Served rather than shipped in the bundle, so the colours the
   // map paints and the ranks the backend sorts by cannot drift apart.
@@ -80,15 +97,20 @@ export function FarmHealthViewPage(): ReactNode {
     if (!blocksQuery.data || !statusesQuery.data || !verdictsQuery.data) {
       return { status: "loading" };
     }
+    // The grid is allowed to be absent — an ungridded farm still has blocks
+    // and block-scoped verdicts — but not still loading, or the map would
+    // draw once without cells and again with them.
+    if (gridQuery.isPending) return { status: "loading" };
     return {
       status: "success",
       data: {
         blocks: blocksQuery.data.items,
         statuses: statusesQuery.data,
         verdicts: verdictsQuery.data,
+        grid: gridQuery.data ?? null,
       },
     };
-  }, [blocksQuery, statusesQuery, verdictsQuery]);
+  }, [blocksQuery, statusesQuery, verdictsQuery, gridQuery]);
 
   if (!farmId) return <Navigate to="/farms" replace />;
   if (!canRead) return <Navigate to="/" replace />;
@@ -119,6 +141,45 @@ export function FarmHealthViewPage(): ReactNode {
             const rows = buildBlockRows(blocks, data.verdicts.blocks, activeTree, data.statuses);
             const selectedBlockId = blockId ?? rows[0]?.blockId ?? null;
             const selected = rows.find((row) => row.blockId === selectedBlockId) ?? null;
+
+            const colorFor = new Map(data.statuses.map((s) => [s.code, s.color]));
+            const colorOf = (status: StatusCode): string =>
+              colorFor.get(status) ?? "#9AA0A6";
+
+            const mapBlocks: MapBlock[] = data.blocks
+              .filter((block): block is BlockListItem & { boundary: Polygon } =>
+                Boolean(block.boundary),
+              )
+              .map((block) => ({
+                blockId: block.id,
+                code: block.code,
+                boundary: block.boundary,
+                selected: block.id === selectedBlockId,
+              }));
+
+            // Geometry from the grid read, verdict from the farm read, joined
+            // on cell_id. A cell with geometry and no verdict is left out:
+            // the tree did not reach it, and painting it any colour would say
+            // otherwise.
+            const gridBlock = data.grid?.blocks.find((b) => b.block_id === selectedBlockId);
+            const statusByCell = new Map<string, StatusCode>();
+            if (selected) {
+              for (const verdict of selected.verdicts) {
+                if (verdict.cell_id) statusByCell.set(verdict.cell_id, verdict.status_code);
+              }
+            }
+            const mapCells: MapCell[] = (gridBlock?.cells ?? [])
+              .filter((cell) => statusByCell.has(cell.cell_id))
+              .map((cell) => ({
+                cellId: cell.cell_id,
+                row: cell.row_idx,
+                col: cell.col_idx,
+                ring: (cell.geometry.coordinates[0] ?? []) as [number, number][],
+                status: statusByCell.get(cell.cell_id) as StatusCode,
+              }));
+            // The area picker arrives in the next change; until then nothing
+            // is outlined.
+            const highlighted = new Set<string>();
 
             return (
               <div className="flex min-h-0 flex-1 flex-col">
@@ -162,25 +223,46 @@ export function FarmHealthViewPage(): ReactNode {
                     />
                   </aside>
 
-                  <section className="min-h-0 overflow-y-auto p-4">
-                    {selected === null ? (
-                      <p className="text-sm text-ap-muted">{t("farmHealth:empty.noBlock")}</p>
-                    ) : (
-                      <Card>
-                        <h2 className="text-section-title font-semibold text-ap-ink">
-                          {selected.code}
-                        </h2>
-                        <p className="mt-1 text-sm text-ap-muted">
-                          {selected.didNotRun
-                            ? t("farmHealth:block.didNotRun", { tree: activeTree })
-                            : t("farmHealth:block.verdictSummary", {
-                                count: selected.verdicts.length,
-                                tree: activeTree,
-                              })}
-                        </p>
-                        {/* The map, the areas and the reasoning arrive here. */}
-                      </Card>
-                    )}
+                  <section className="grid min-h-0 grid-rows-[minmax(240px,46%)_minmax(0,1fr)]">
+                    <div className="min-h-0 border-b border-ap-line">
+                      <HealthMap
+                        blocks={mapBlocks}
+                        cells={mapCells}
+                        highlighted={highlighted}
+                        colorOf={colorOf}
+                        onSelectBlock={setBlockId}
+                        onSelectCell={() => {
+                          /* The area picker lands in a later change; a cell
+                             click already moves the block through the map's
+                             own block handler. */
+                        }}
+                        fitKey={selectedBlockId ?? ""}
+                      />
+                    </div>
+                    <div className="min-h-0 overflow-y-auto p-4">
+                      {selected === null ? (
+                        <p className="text-sm text-ap-muted">{t("farmHealth:empty.noBlock")}</p>
+                      ) : (
+                        <Card>
+                          <h2 className="text-section-title font-semibold text-ap-ink">
+                            {selected.code}
+                          </h2>
+                          <p className="mt-1 text-sm text-ap-muted">
+                            {selected.didNotRun
+                              ? t("farmHealth:block.didNotRun", { tree: activeTree })
+                              : t("farmHealth:block.verdictSummary", {
+                                  count: selected.verdicts.length,
+                                  tree: activeTree,
+                                })}
+                          </p>
+                          {mapCells.length === 0 && !selected.didNotRun ? (
+                            <p className="mt-2 text-meta text-ap-muted">
+                              {t("farmHealth:block.noGrid")}
+                            </p>
+                          ) : null}
+                        </Card>
+                      )}
+                    </div>
                   </section>
                 </div>
               </div>
