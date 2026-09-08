@@ -3454,10 +3454,24 @@ global:
     #   The three migrations have downgrades and none needs to run: the old
     #   code does not read the verdict table, and tenant 0090's columns are
     #   nullable.
+    # f26355e = #655, a status leaf is not missing an action type, plus #654,
+    #   the farm-health api client's missing /v1 segment.
+    #
+    #   The editor's structural check required `action_type` on every leaf, so
+    #   opening ANY of the 33 shipped trees reported "save is blocked" and
+    #   named a field a status leaf does not have. No tree could be edited on
+    #   0af9a38. The check reads the leaf's kind now, the way the loader does.
+    #
+    #   No migration. The api half carries one added field on the :dry-run
+    #   response (`kind`, `status_code`), which the panel needs to show what a
+    #   status branch decided.
+    #
+    #   Rollback is these three tags back to 890e158, which also takes #654
+    #   back out.
     api:
-      tag: "890e158"
+      tag: "f26355e"
     workers:
-      tag: "890e158"
+      tag: "f26355e"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3908,7 +3922,7 @@ global:
       #   traces page learns the 'farm' skip axis. The API half must move in
       #   the same sync — the new section calls two routes that do not exist
       #   on 76a6411.
-      tag: "890e158"
+      tag: "f26355e"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
