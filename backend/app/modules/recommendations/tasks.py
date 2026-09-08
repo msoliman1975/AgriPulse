@@ -109,6 +109,11 @@ async def _evaluate_for_tenant_async(tenant_schema: str) -> dict[str, int]:
     trees_evaluated = 0
     trees_skipped = 0
     traces_written = 0
+    # Counted for the same reason as the traces: without it, a sweep that
+    # walks every tree and writes no verdict at all looks identical in the
+    # log to one that wrote thousands. That is the state production was in
+    # on 2026-09-07 — 4,752 traces, zero verdicts — and nothing recorded it.
+    verdicts_written = 0
     for block_id in blocks:
         async with factory() as session, session.begin():
             await _set_tenant_context(session, tenant_schema)
@@ -129,6 +134,7 @@ async def _evaluate_for_tenant_async(tenant_schema: str) -> dict[str, int]:
         trees_evaluated += summary.get("trees_evaluated", 0)
         trees_skipped += summary.get("trees_skipped_crop", 0)
         traces_written += summary.get("traces_written", 0)
+        verdicts_written += summary.get("verdicts_written", 0)
 
     async with factory() as session, session.begin():
         await _set_tenant_context(session, tenant_schema)
@@ -154,10 +160,12 @@ async def _evaluate_for_tenant_async(tenant_schema: str) -> dict[str, int]:
         blocks_processed=blocks_processed,
         recommendations_opened=recommendations_opened,
         traces_written=traces_written,
+        verdicts_written=verdicts_written,
     )
     return {
         "blocks_processed": blocks_processed,
         "recommendations_opened": recommendations_opened,
+        "verdicts_written": verdicts_written,
         "traces_written": traces_written,
     }
 
