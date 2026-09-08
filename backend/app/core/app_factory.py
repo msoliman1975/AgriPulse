@@ -216,6 +216,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     )
     from app.modules.signals.router import router as signals_router
     from app.modules.telemetry.router import router as telemetry_router
+    from app.modules.telemetry.usage_router import router as telemetry_usage_router
     from app.modules.tenancy.router import router as tenancy_router
     from app.modules.timeline.router import router as timeline_router
     from app.modules.weather.router import router as weather_router
@@ -254,6 +255,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     app.include_router(integrations_health_router)
     app.include_router(integrations_router)
     app.include_router(telemetry_router)
+    app.include_router(telemetry_usage_router)
     app.include_router(platform_defaults_router)
     app.include_router(platform_admins_router)
     app.include_router(platform_tenant_integrations_router)

@@ -138,6 +138,18 @@ capabilities:
     description: Approve, pause or reject a trial signup, including approving past a cap.
     scope: platform
     status: active
+  platform.read_usage:
+    # Deliberately NOT folded into platform.read (open question O4, decided
+    # here). platform.read gates the tenant list and system status — facts
+    # about tenants. This gates the product-telemetry store, which carries a
+    # named user's per-session navigation across every tenant. That is a
+    # materially stronger read and must be withholdable on its own.
+    # PlatformAdmin picks it up through its "*" wildcard; PlatformSupport is
+    # granted it explicitly, because "which customer went quiet" is a support
+    # question before it is a product one.
+    description: View the product-usage dashboard — engagement, adoption, funnels and struggle signals.
+    scope: platform
+    status: active
   platform.manage_rbac:
     # Deliberately NOT folded into platform.read, which gates *viewing* the
     # matrix. This one rewrites the authorization policy for every tenant at

@@ -38,6 +38,7 @@ from app.shared.purge.registry import (
     BLOCK_CAGGS,
     BLOCK_OWNED,
     FARM_OWNED,
+    PUBLIC_CAGGS,
     TENANT_PUBLIC_OWNED,
     OwnedTable,
     ordered,
@@ -60,6 +61,12 @@ class PurgeReport:
     # Time span of deleted block_index_aggregates rows, bounding the CAGG
     # refresh so it does not recompute the tenant's entire history.
     cagg_range: tuple[datetime, datetime] | None = None
+    # Same idea for the public-schema aggregates over usage_events (TEL-6b).
+    # Kept separate from `cagg_range` because the two are measured over
+    # different source tables, in different schemas, and a purge can produce
+    # one without the other — a tenant with telemetry but no imagery, or the
+    # reverse.
+    public_cagg_range: tuple[datetime, datetime] | None = None
 
     @property
     def total_rows(self) -> int:
@@ -69,14 +76,8 @@ class PurgeReport:
         for table, n in other.rows.items():
             self.rows[table] = self.rows.get(table, 0) + n
         self.storage_keys.extend(other.storage_keys)
-        if other.cagg_range is not None:
-            if self.cagg_range is None:
-                self.cagg_range = other.cagg_range
-            else:
-                self.cagg_range = (
-                    min(self.cagg_range[0], other.cagg_range[0]),
-                    max(self.cagg_range[1], other.cagg_range[1]),
-                )
+        self.cagg_range = _widen(self.cagg_range, other.cagg_range)
+        self.public_cagg_range = _widen(self.public_cagg_range, other.public_cagg_range)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -84,6 +85,18 @@ class PurgeReport:
             "total_rows": self.total_rows,
             "storage_objects": len(self.storage_keys),
         }
+
+
+def _widen(
+    current: tuple[datetime, datetime] | None,
+    other: tuple[datetime, datetime] | None,
+) -> tuple[datetime, datetime] | None:
+    """Union of two time windows, either of which may be absent."""
+    if other is None:
+        return current
+    if current is None:
+        return other
+    return (min(current[0], other[0]), max(current[1], other[1]))
 
 
 class PurgeEngine:
@@ -257,7 +270,10 @@ class PurgeEngine:
         # Captured before the manifest empties tenant_memberships — afterwards
         # there is nothing left to say who belonged to this tenant.
         members = await self._tenant_member_ids(tenant_ids)
-        report = await self._delete(TENANT_PUBLIC_OWNED, tenant_ids)
+        # Same reason, different table: once usage_events is empty for this
+        # tenant there is no span left to bound the aggregate refresh with.
+        report = await self._capture_public_cagg_range(tenant_ids)
+        report.merge(await self._delete(TENANT_PUBLIC_OWNED, tenant_ids))
         report.rows["tenants"] = await self._rowcount(
             text("DELETE FROM public.tenants WHERE id = ANY(:ids)").bindparams(_IDS),
             {"ids": tenant_ids},
@@ -343,6 +359,31 @@ class PurgeEngine:
     @staticmethod
     def cagg_names() -> tuple[str, ...]:
         return tuple(view for view, _ in BLOCK_CAGGS)
+
+    @staticmethod
+    def public_cagg_names() -> tuple[str, ...]:
+        return tuple(view for view, _ in PUBLIC_CAGGS)
+
+    async def _capture_public_cagg_range(self, tenant_ids: list[UUID]) -> PurgeReport:
+        """Bound the public CAGG refresh to the tenant's telemetry span.
+
+        Must run BEFORE the delete. Afterwards there are no rows left to
+        measure, and an unbounded refresh over 24 months of buckets on every
+        tenant purge is not an acceptable substitute.
+        """
+        report = PurgeReport()
+        row = (
+            await self._s.execute(
+                text(
+                    "SELECT min(time), max(time) FROM public.usage_events "
+                    "WHERE tenant_id = ANY(:ids)"
+                ).bindparams(_IDS),
+                {"ids": tenant_ids},
+            )
+        ).one_or_none()
+        if row is not None and row[0] is not None:
+            report.public_cagg_range = (row[0], row[1])
+        return report
 
     async def _capture_cagg_range(self, block_ids: list[UUID]) -> PurgeReport:
         """Bound the post-commit CAGG refresh to the deleted block's data span."""
@@ -455,6 +496,57 @@ async def refresh_caggs(
                     logger.warning(
                         "cagg_refresh_failed", extra={"view": view, "schema": tenant_schema}
                     )
+    finally:
+        await engine.dispose()
+    return refreshed
+
+
+async def refresh_public_caggs(
+    *,
+    engine_url: str,
+    window: tuple[datetime, datetime] | None,
+) -> list[str]:
+    """Re-materialise the public usage aggregates after a tenant purge (TEL-6b).
+
+    The sibling of :func:`refresh_caggs`, and it exists because that one cannot
+    do this job: it qualifies every view with the tenant schema, and these views
+    live in ``public``. Before this the tenant-purge path refreshed nothing at
+    all in ``public``.
+
+    Why it is required rather than tidy: ``usage_daily`` and ``usage_flow_daily``
+    both GROUP BY ``tenant_id`` and run with real-time aggregation on. Deleting
+    the raw rows leaves the already-materialised buckets serving the purged
+    tenant's numbers to every chart, and the orphan scanner will not catch it —
+    it inspects tables, not aggregates. The purge would report success and the
+    tenant would still be visible.
+
+    ``window`` is captured before the delete and bounds the work. None means the
+    tenant produced no telemetry at all, in which case there is nothing to
+    recompute; refreshing 24 months of buckets "just in case" on every purge is
+    not a safe default.
+
+    Failure is logged, not raised, matching :func:`refresh_caggs`: by the time
+    this runs the database work has committed, and a stale aggregate bucket is a
+    smaller problem than a purge marked failed that in fact deleted everything.
+    """
+    if window is None:
+        return []
+    start, end = window
+    refreshed: list[str] = []
+    engine = create_async_engine(engine_url, isolation_level="AUTOCOMMIT")
+    try:
+        async with engine.connect() as conn:
+            for view, _source in PUBLIC_CAGGS:
+                try:
+                    await conn.execute(
+                        text(
+                            f"CALL refresh_continuous_aggregate('public.\"{view}\"', :start, :end)"
+                        ),
+                        {"start": start, "end": end},
+                    )
+                    refreshed.append(view)
+                except Exception:
+                    logger.warning("public_cagg_refresh_failed", extra={"view": view})
     finally:
         await engine.dispose()
     return refreshed

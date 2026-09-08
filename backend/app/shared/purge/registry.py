@@ -257,6 +257,28 @@ BLOCK_CAGGS: tuple[tuple[str, str], ...] = (
     ("block_index_weekly", "block_index_aggregates"),
 )
 
+# Continuous aggregates in the PUBLIC schema, keyed by tenant_id (TEL-6b).
+#
+# BLOCK_CAGGS above is not enough and the difference is easy to miss: it is
+# block-scoped AND tenant-schema-scoped. `Engine.cagg_names()` returns only
+# those, `_capture_cagg_range` bounds its window by querying
+# `block_index_aggregates`, and the refresh is qualified
+# `"{tenant_schema}"."{view}"`. Before this tuple existed the tenant-purge path
+# had no CAGG phase at all.
+#
+# That matters because both usage aggregates GROUP BY tenant_id and run with
+# real-time aggregation on. Deleting the raw `usage_events` rows leaves the
+# already-materialised daily buckets intact, so a purged tenant keeps its
+# numbers in every chart — and the orphan scanner cannot see it, because it
+# only looks at tables. Silent, and it looks like the purge worked.
+#
+# (view, source table). The source is what the pre-delete window is measured
+# over; there is nothing left to measure afterwards.
+PUBLIC_CAGGS: tuple[tuple[str, str], ...] = (
+    ("usage_daily", "usage_events"),
+    ("usage_flow_daily", "usage_events"),
+)
+
 
 # --- Farm ------------------------------------------------------------------
 #

@@ -762,6 +762,8 @@ forbidden_modules = [
   "app.modules.telemetry.schemas",
   "app.modules.telemetry.service",
   "app.modules.telemetry.taxonomy",
+  "app.modules.telemetry.usage_router",
+  "app.modules.telemetry.read_schemas",
 ]
 allow_indirect_imports = true
 
