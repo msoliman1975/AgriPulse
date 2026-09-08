@@ -107,6 +107,7 @@ export const ROUTE_MANIFEST: RouteObject[] = [
       { path: "observer/scenes/:jobId" },
       { path: "admins" },
       { path: "roles" },
+      { path: "usage" },
       { path: "integrations/health" },
       { path: "integrations/health/tenants/:tenantId" },
       { path: "alerts" },
