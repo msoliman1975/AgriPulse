@@ -31,10 +31,11 @@ function pinnedPrefixes(): string[] {
 }
 
 describe("viewport pinning", () => {
-  it("pins the two map consoles and the timeline", () => {
+  it("pins the two map consoles, the timeline and the health view", () => {
     const prefixes = pinnedPrefixes();
     expect(prefixes).toContain("/labs/map");
     expect(prefixes).toContain("/timeline");
+    expect(prefixes).toContain("/farm-health");
   });
 
   it("every full-bleed route is pinned", () => {
@@ -50,6 +51,7 @@ describe("viewport pinning", () => {
       "FarmConsoleV2Page",
       "MapExperiencePage",
       "FarmTimelinePage",
+      "FarmHealthViewPage",
     ];
     const missing: string[] = [];
     for (const page of bleedPages) {

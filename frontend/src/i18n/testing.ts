@@ -18,6 +18,7 @@ import enDecisionTrees from "./locales/en/decisionTrees.json";
 import enBulkUpdates from "./locales/en/bulkUpdates.json";
 import enActionCenter from "./locales/en/actionCenter.json";
 import enUsers from "./locales/en/users.json";
+import enFarmHealth from "./locales/en/farmHealth.json";
 import enTimeline from "./locales/en/timeline.json";
 import enReports from "./locales/en/reports.json";
 import enFieldAccess from "./locales/en/fieldAccess.json";
@@ -39,6 +40,7 @@ import arDecisionTrees from "./locales/ar/decisionTrees.json";
 import arBulkUpdates from "./locales/ar/bulkUpdates.json";
 import arActionCenter from "./locales/ar/actionCenter.json";
 import arUsers from "./locales/ar/users.json";
+import arFarmHealth from "./locales/ar/farmHealth.json";
 import arTimeline from "./locales/ar/timeline.json";
 import arReports from "./locales/ar/reports.json";
 import arFieldAccess from "./locales/ar/fieldAccess.json";
@@ -73,7 +75,8 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           bulkUpdates: enBulkUpdates,
           actionCenter: enActionCenter,
           users: enUsers,
-          timeline: enTimeline,
+          farmHealth: enFarmHealth,
+    timeline: enTimeline,
           reports: enReports,
           fieldAccess: enFieldAccess,
           integrationsHealth: enIntegrationsHealth,
@@ -96,7 +99,8 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           bulkUpdates: arBulkUpdates,
           actionCenter: arActionCenter,
           users: arUsers,
-          timeline: arTimeline,
+          farmHealth: arFarmHealth,
+    timeline: arTimeline,
           reports: arReports,
           fieldAccess: arFieldAccess,
           integrationsHealth: arIntegrationsHealth,

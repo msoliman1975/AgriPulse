@@ -16,6 +16,7 @@ import {
   ReportsIcon,
   RulesIcon,
   SignalsIcon,
+  HealthIcon,
   TimelineIcon,
   TenantIcon,
   UsersIcon,
@@ -326,6 +327,17 @@ export function SideNav(): ReactNode {
         icon={<TimelineIcon className="h-4 w-4" />}
         disabled={!hasFarm}
         activePathPrefix="/timeline/"
+        collapsed={collapsed}
+      />
+      {/* Farm Health View. Next to the replay because both are read-only
+          history; this one answers "what does the tree say", the other
+          "what happened". */}
+      <SideNavItem
+        to={hasFarm ? `/farm-health/${farmSegment}` : "#"}
+        label={t("common:workspaceNav.farmHealth")}
+        icon={<HealthIcon className="h-4 w-4" />}
+        disabled={!hasFarm}
+        activePathPrefix="/farm-health/"
         collapsed={collapsed}
       />
       <SideNavItem

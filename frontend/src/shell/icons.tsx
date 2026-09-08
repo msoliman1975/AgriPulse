@@ -94,6 +94,18 @@ export function InsightsIcon(props: IconProps): ReactNode {
   );
 }
 
+// Farm Health View. A leaf inside a shield: what the crop is, and the
+// judgement being made about it.
+export function HealthIcon(props: IconProps): ReactNode {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" {...props}>
+      <path d="M12 3l7 3v5.5c0 4.3-2.9 7.7-7 9.5-4.1-1.8-7-5.2-7-9.5V6l7-3z" strokeLinejoin="round" />
+      <path d="M12 15c0-3 1.6-4.8 3.6-5.2C15.6 12.4 14.2 15 12 15z" strokeLinejoin="round" />
+      <path d="M12 15v2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // Farm Timeline. A play triangle inside a clock face — the two things the
 // screen is: a moment in time, and a replay running through it.
 export function TimelineIcon(props: IconProps): ReactNode {

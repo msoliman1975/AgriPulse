@@ -22,6 +22,7 @@ import { BlockDetailPage } from "@/modules/farms/pages/BlockDetailPage";
 import { BlockEditPage } from "@/modules/farms/pages/BlockEditPage";
 import { InsightsPage } from "@/modules/insights/pages/InsightsPage";
 import { BoardPage } from "@/modules/board/pages/BoardPage";
+import { FarmHealthViewPage } from "@/modules/farmHealth/pages/FarmHealthViewPage";
 import { FarmTimelinePage } from "@/modules/timeline/pages/FarmTimelinePage";
 import { ActionCenterPage } from "@/modules/actionCenter/pages/ActionCenterPage";
 import { AlertsPage } from "@/modules/alerts/pages/AlertsPage";
@@ -197,6 +198,10 @@ export function App(): ReactNode {
                   not a route segment, because changing scope must not push
                   history on every pick. */}
                 <Route path="/timeline/:farmId" element={<FarmTimelinePage />} />
+                {/* Farm Health View — the farm coloured by one tree's verdict.
+                  Farm-scoped like the rest of the workspace; the block and
+                  the tree are controls on the page, not route segments. */}
+                <Route path="/farm-health/:farmId" element={<FarmHealthViewPage />} />
                 {/* The unified queue. /alerts and /recommendations stay routed
                     until this screen is signed off. */}
                 <Route path="/action-center/:farmId" element={<ActionCenterPage />} />
