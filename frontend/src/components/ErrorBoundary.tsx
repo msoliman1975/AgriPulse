@@ -2,6 +2,8 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
 
+import { reportClientError } from "@/telemetry/capture";
+
 import { Button } from "./Button";
 
 /**
@@ -108,7 +110,34 @@ function ErrorPanel({ error, reset }: { error: unknown; reset: () => void }): Re
  */
 export function RouteErrorBoundary({ children }: { children: ReactNode }): ReactNode {
   const { pathname } = useLocation();
-  return <ErrorBoundary key={pathname}>{children}</ErrorBoundary>;
+  return (
+    <ErrorBoundary key={pathname} onError={reportRenderError}>
+      {children}
+    </ErrorBoundary>
+  );
+}
+
+/**
+ * A caught render error is a telemetry event. Without this the boundary shows
+ * the user a panel and tells nobody — which is how "the page is broken" stayed
+ * a support ticket instead of a number.
+ *
+ * The component NAME is taken from React's component stack; the message is
+ * not sent at all. See `telemetry/capture.ts` for why.
+ */
+function reportRenderError(error: unknown, info: ErrorInfo): void {
+  reportClientError(error, componentNameOf(info.componentStack));
+}
+
+function componentNameOf(stack: string | null | undefined): string {
+  if (!stack) return "unknown";
+  const first = stack.split("\n").find((line) => line.trim().startsWith("at "));
+  return (
+    first
+      ?.trim()
+      .replace(/^at\s+/, "")
+      .split(/[\s(]/)[0] ?? "unknown"
+  );
 }
 
 /**
@@ -120,7 +149,12 @@ export function RouteErrorBoundary({ children }: { children: ReactNode }): React
  */
 export function AppErrorBoundary({ children }: { children: ReactNode }): ReactNode {
   return (
-    <ErrorBoundary fallback={(error) => <ShellFallback error={error} />}>{children}</ErrorBoundary>
+    <ErrorBoundary
+      onError={reportRenderError}
+      fallback={(error) => <ShellFallback error={error} />}
+    >
+      {children}
+    </ErrorBoundary>
   );
 }
 

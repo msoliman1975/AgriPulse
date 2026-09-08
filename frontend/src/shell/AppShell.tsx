@@ -1,8 +1,11 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { RouteErrorBoundary } from "@/components/ErrorBoundary";
+import { initTelemetry } from "@/telemetry";
+import { installGlobalErrorCapture } from "@/telemetry/capture";
+import { useTelemetryRoute } from "@/telemetry/useTelemetryRoute";
 
 import { Header } from "./Header";
 import { PlatformAlertBanner } from "./PlatformAlertBanner";
@@ -10,6 +13,17 @@ import { SideNav } from "./SideNav";
 
 export function AppShell(): ReactNode {
   const { t } = useTranslation("common");
+
+  // Telemetry is mounted here, and only here. The shell is inside
+  // ProtectedRoute, so by this point there is a token to authenticate the
+  // ingest call with and an identity for the server to stamp. Both calls are
+  // idempotent and both no-op entirely when VITE_TELEMETRY_ENABLED=false.
+  useEffect(() => {
+    initTelemetry();
+    installGlobalErrorCapture();
+  }, []);
+  useTelemetryRoute();
+
   // The Farm Console (and the legacy map) pin to the viewport and own their
   // internal scrolling. That's a shell-level concern — an inner element can't
   // opt its ancestors into `h-screen` — so it stays keyed off the pathname.

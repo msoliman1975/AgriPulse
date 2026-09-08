@@ -4,3 +4,9 @@ package.json
 node_modules
 dist
 coverage
+
+# Written by `python backend/scripts/gen_telemetry_taxonomy.py` from
+# backend/app/modules/telemetry/taxonomy.yaml. Prettier and the generator would
+# fight over it; the generator wins, and src/telemetry/taxonomy.test.ts is what
+# actually keeps it honest.
+src/telemetry/taxonomy.generated.ts
