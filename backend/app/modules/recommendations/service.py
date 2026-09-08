@@ -2264,6 +2264,12 @@ def _dry_run_outcome(result: EvaluationResult) -> dict[str, Any] | None:
     if result.outcome is None:
         return None
     return {
+        # The kind and the status ride every dry run, not only the ones that
+        # would open work. A status leaf has no action_type, and without
+        # these two the panel had nothing to show for it — the author would
+        # test a status branch and see a blank where the answer is.
+        "kind": result.outcome.kind,
+        "status_code": result.outcome.status_code,
         "action_type": result.outcome.action_type,
         "severity": result.outcome.severity,
         "confidence": str(result.outcome.confidence),

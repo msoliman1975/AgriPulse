@@ -188,6 +188,11 @@ export interface DryRunResponse {
   scope: "block" | "cell";
   targeting: DryRunTargeting | null;
   outcome: {
+    /** One of the four leaf kinds. */
+    kind?: string;
+    /** The status the leaf resolved to. Every kind has one, so this is what
+     *  a status leaf shows where the others show an action type. */
+    status_code?: VerdictStatusCode;
     action_type: string;
     severity: string;
     confidence: string;

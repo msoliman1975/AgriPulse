@@ -160,10 +160,20 @@ export function CanvasDryRunPanel({
             ) : (
               <Pill kind="neutral">{t("editor.dryRun.noMatch")}</Pill>
             )}
-            {result.outcome?.action_type ? (
+            {/* A status leaf carries no action type. Before this the panel
+                showed nothing at all for one, so an author testing a status
+                branch saw a matched pill and no answer. */}
+            {result.outcome?.kind === "status" && result.outcome.status_code ? (
+              <span className="font-semibold">
+                {t(`verdictStatus.${result.outcome.status_code}`, {
+                  defaultValue: result.outcome.status_code,
+                })}
+              </span>
+            ) : null}
+            {result.outcome?.action_type && result.outcome.kind !== "status" ? (
               <span className="font-mono">{result.outcome.action_type}</span>
             ) : null}
-            {result.outcome?.severity ? (
+            {result.outcome?.severity && result.outcome.kind !== "status" ? (
               <span className="text-ap-muted">· {result.outcome.severity}</span>
             ) : null}
           </div>
