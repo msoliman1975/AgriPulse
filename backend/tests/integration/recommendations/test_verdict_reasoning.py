@@ -161,7 +161,7 @@ async def _seed(
                 ) VALUES (
                     :farm_id, :block_id, NULL, 'block', :tree_id,
                     't_cwsi_irrigation_stress', 1, 'leaf_above', 'recommendation',
-                    'issue', 'medium', 'Add one irrigation set.',
+                    'issue', 'warning', 'Add one irrigation set.',
                     :run_id, :run_id, :at, :at
                 )
                 RETURNING id
