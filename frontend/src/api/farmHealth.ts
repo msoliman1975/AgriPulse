@@ -78,7 +78,7 @@ export interface FarmVerdicts {
 
 /** The legend. Served rather than shipped in the bundle. */
 export async function getVerdictStatuses(): Promise<StatusDefinition[]> {
-  const { data } = await apiClient.get<StatusDefinition[]>("/verdict-statuses");
+  const { data } = await apiClient.get<StatusDefinition[]>("/v1/verdict-statuses");
   return data;
 }
 
@@ -88,7 +88,7 @@ export async function getVerdictStatuses(): Promise<StatusDefinition[]> {
  * `at` replays a past instant. Omitted, the current answers come back.
  */
 export async function getFarmVerdicts(farmId: string, at?: string): Promise<FarmVerdicts> {
-  const { data } = await apiClient.get<FarmVerdicts>(`/farms/${farmId}/verdicts`, {
+  const { data } = await apiClient.get<FarmVerdicts>(`/v1/farms/${farmId}/verdicts`, {
     params: at ? { at } : undefined,
   });
   return data;
@@ -106,7 +106,7 @@ export async function getBlockVerdicts(
   farmId: string,
   at?: string,
 ): Promise<BlockVerdicts> {
-  const { data } = await apiClient.get<BlockVerdicts>(`/blocks/${blockId}/verdicts`, {
+  const { data } = await apiClient.get<BlockVerdicts>(`/v1/blocks/${blockId}/verdicts`, {
     params: at ? { farm_id: farmId, at } : { farm_id: farmId },
   });
   return data;
@@ -167,7 +167,7 @@ export async function getVerdictReasoning(
   farmId: string,
 ): Promise<VerdictReasoning> {
   const { data } = await apiClient.get<VerdictReasoning>(
-    `/blocks/${blockId}/verdicts/${verdictId}/reasoning`,
+    `/v1/blocks/${blockId}/verdicts/${verdictId}/reasoning`,
     { params: { farm_id: farmId } },
   );
   return data;
@@ -201,7 +201,7 @@ export async function getFarmVerdictHistory(
   treeCode?: string | null,
 ): Promise<FarmVerdictHistory> {
   const { data } = await apiClient.get<FarmVerdictHistory>(
-    `/farms/${farmId}/verdict-history`,
+    `/v1/farms/${farmId}/verdict-history`,
     { params: { from, to, ...(treeCode ? { tree_code: treeCode } : {}) } },
   );
   return data;
