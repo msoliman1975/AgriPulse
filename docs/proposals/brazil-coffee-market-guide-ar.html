@@ -1,0 +1,832 @@
+<title>دليل البُن البرازيلي</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+:root{
+  --ground:#FBFAF6;
+  --surface:#F1F0E7;
+  --surface-2:#E6E5D8;
+  --ink:#151811;
+  --muted:#5D6353;
+  --rule:#DBD9C9;
+  --accent:#2C5C3D;
+  --accent-soft:#E2EBE1;
+  --cherry:#A63A2B;
+  --cherry-soft:#F4E7E3;
+  --amber:#8C6A0D;
+  --amber-soft:#F5EEDC;
+  --conilon:#2A5566;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#111310;
+    --surface:#1A1D17;
+    --surface-2:#242820;
+    --ink:#E8EADF;
+    --muted:#9BA18F;
+    --rule:#2E3329;
+    --accent:#8CC29A;
+    --accent-soft:#1C2820;
+    --cherry:#E39182;
+    --cherry-soft:#2C1E1A;
+    --amber:#D3A742;
+    --amber-soft:#2A2416;
+    --conilon:#7FB2C6;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#111310;
+  --surface:#1A1D17;
+  --surface-2:#242820;
+  --ink:#E8EADF;
+  --muted:#9BA18F;
+  --rule:#2E3329;
+  --accent:#8CC29A;
+  --accent-soft:#1C2820;
+  --cherry:#E39182;
+  --cherry-soft:#2C1E1A;
+  --amber:#D3A742;
+  --amber-soft:#2A2416;
+  --conilon:#7FB2C6;
+}
+
+*{box-sizing:border-box}
+body{
+  direction:rtl;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:"Noto Naskh Arabic","Segoe UI",Tahoma,serif;
+  font-size:17.5px;
+  line-height:1.9;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,.rail a,.rail-title,.eyebrow,.tag,thead th,caption,.kv dt,.pill,.meta{
+  font-family:"IBM Plex Sans Arabic","Segoe UI",Tahoma,sans-serif;
+}
+code,pre,.num{font-family:"IBM Plex Mono",ui-monospace,"SF Mono",Consolas,monospace}
+
+.shell{max-width:1400px;margin:0 auto;padding:0 24px}
+@media (min-width:1120px){
+  .shell{display:grid;grid-template-columns:250px minmax(0,1fr);gap:56px;padding:0 40px}
+}
+.rail{display:none}
+@media (min-width:1120px){
+  .rail{display:block;position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto;padding:44px 0}
+}
+.rail-title{font-size:12px;font-weight:600;color:var(--muted);margin:0 0 14px}
+.rail ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.rail a{
+  display:grid;grid-template-columns:26px 1fr;gap:8px;align-items:baseline;
+  font-size:14px;line-height:1.6;color:var(--ink);text-decoration:none;
+  padding:5px 0 5px 6px;border-radius:3px;
+}
+.rail a:hover{color:var(--accent)}
+.rail a .n{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);direction:ltr;unicode-bidi:isolate}
+main{min-width:0;padding:0 0 88px}
+
+.masthead{padding:56px 0 40px;border-bottom:2px solid var(--ink)}
+.eyebrow{font-size:13px;font-weight:600;color:var(--accent);margin:0 0 18px}
+h1{font-size:clamp(36px,5.4vw,58px);line-height:1.28;font-weight:700;margin:0 0 18px;text-wrap:balance}
+.standfirst{font-size:20px;line-height:1.85;color:var(--muted);margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:6px 28px;margin-top:28px;font-size:13px;color:var(--muted)}
+.meta b{font-weight:600;color:var(--ink)}
+.meta .ltr{direction:ltr;unicode-bidi:isolate}
+
+section{padding:52px 0;border-bottom:1px solid var(--rule)}
+section:last-of-type{border-bottom:0}
+.part{display:flex;align-items:center;gap:14px;margin:0 0 10px;font-size:13px;font-weight:600;color:var(--accent)}
+.part::after{content:"";flex:1;height:1px;background:var(--rule)}
+h2{font-size:clamp(25px,3.1vw,33px);line-height:1.4;font-weight:700;margin:0 0 16px;text-wrap:balance}
+h3{font-size:20.5px;line-height:1.6;font-weight:600;margin:34px 0 10px}
+p{margin:0 0 16px}
+ul,ol{margin:0 0 18px;padding-inline-start:24px;padding-inline-end:0}
+li{margin:0 0 9px}
+li::marker{color:var(--muted)}
+a{color:var(--accent);text-underline-offset:3px}
+strong{font-weight:700}
+code{
+  font-size:.82em;background:var(--surface-2);padding:1px 5px;border-radius:3px;
+  direction:ltr;unicode-bidi:isolate;word-break:break-word;
+}
+
+.tablewrap{overflow-x:auto;margin:0 0 24px;border:1px solid var(--rule);border-radius:4px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:15px}
+caption{text-align:start;padding:13px 16px 3px;font-size:13px;font-weight:600;color:var(--muted)}
+th,td{text-align:start;padding:10px 16px;border-bottom:1px solid var(--rule);vertical-align:top;line-height:1.75}
+thead th{font-size:13px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--ink)}
+tbody tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap;direction:ltr;unicode-bidi:isolate;text-align:start}
+td code{background:transparent;padding:0;color:var(--accent)}
+
+.note{
+  border-inline-start:3px solid var(--accent);background:var(--accent-soft);
+  padding:18px 22px;margin:0 0 24px;border-radius:4px;
+}
+.note.gap{border-inline-start-color:var(--cherry);background:var(--cherry-soft)}
+.note.watch{border-inline-start-color:var(--amber);background:var(--amber-soft)}
+.note p:last-child{margin-bottom:0}
+.note .tag{display:block;font-size:13px;font-weight:700;margin-bottom:7px;color:var(--accent)}
+.note.gap .tag{color:var(--cherry)}
+.note.watch .tag{color:var(--amber)}
+
+.pill{
+  display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;
+  border-radius:99px;border:1px solid currentColor;white-space:nowrap;
+}
+.pill.build{color:var(--cherry)}
+.pill.reuse{color:var(--accent)}
+.pill.config{color:var(--conilon)}
+
+pre{
+  direction:ltr;text-align:left;
+  background:var(--surface);border:1px solid var(--rule);border-radius:4px;
+  padding:16px 18px;overflow-x:auto;font-size:13px;line-height:1.6;margin:0 0 24px;
+  color:var(--ink);
+}
+pre code{background:transparent;padding:0;font-size:13px}
+.k{color:var(--accent)}
+.s{color:var(--cherry)}
+.c{color:var(--muted);font-style:italic}
+
+.kv{
+  display:grid;grid-template-columns:1fr;border:1px solid var(--rule);
+  border-radius:4px;overflow:hidden;margin:0 0 24px;background:var(--surface);
+}
+@media (min-width:700px){.kv{grid-template-columns:repeat(2,1fr)}}
+.kv > div{padding:15px 18px;border-bottom:1px solid var(--rule)}
+@media (min-width:700px){.kv > div:nth-child(odd){border-inline-end:1px solid var(--rule)}}
+.kv dt{font-size:13px;font-weight:600;color:var(--muted);margin:0 0 5px}
+.kv dd{margin:0;font-size:15.5px;line-height:1.75}
+
+.footer{padding:36px 0 0;color:var(--muted);font-size:15px}
+.langswitch{
+  display:inline-block;margin-top:22px;font-size:13.5px;padding:6px 14px;
+  border:1px solid var(--rule);border-radius:99px;text-decoration:none;color:var(--muted);
+}
+.langswitch:hover{border-color:var(--accent);color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+</style>
+
+<div class="shell" dir="rtl" lang="ar">
+
+<nav class="rail" aria-label="المحتويات">
+  <p class="rail-title">المحتويات</p>
+  <ol>
+    <li><a href="#p1"><span class="n">01</span><span>قطاع البُن في البرازيل</span></a></li>
+    <li><a href="#p2"><span class="n">02</span><span>لمن نبيع</span></a></li>
+    <li><a href="#p3"><span class="n">03</span><span>زراعة البُن</span></a></li>
+    <li><a href="#p4"><span class="n">04</span><span>سنة البُن</span></a></li>
+    <li><a href="#p5"><span class="n">05</span><span>الآفات والأمراض والمناخ</span></a></li>
+    <li><a href="#p6"><span class="n">06</span><span>ربط البُن بمنصة AgriPulse</span></a></li>
+    <li><a href="#p7"><span class="n">07</span><span>صور الأقمار والمؤشرات</span></a></li>
+    <li><a href="#p8"><span class="n">08</span><span>أشجار القرار المطلوبة</span></a></li>
+    <li><a href="#p9"><span class="n">09</span><span>ما يجب بناؤه</span></a></li>
+    <li><a href="#p10"><span class="n">10</span><span>خطة الإطلاق والأسئلة المفتوحة</span></a></li>
+  </ol>
+</nav>
+
+<main>
+
+<header class="masthead">
+  <p class="eyebrow">دراسة دخول سوق &middot; AgriPulse</p>
+  <h1>دليل البُن البرازيلي</h1>
+  <p class="standfirst">كيف يعمل إنتاج البُن في البرازيل، وأي أجزاء من منصة AgriPulse تخدمه اليوم، وأي أجزاء تحتاج إعدادًا فقط، وأي أجزاء لم تُبنَ بعد.</p>
+  <div class="meta">
+    <span><b>التاريخ</b> <span class="ltr">2026-09-07</span></span>
+    <span><b>المحصول</b> <span class="ltr">Coffea arabica</span> &middot; <span class="ltr">C. canephora</span></span>
+    <span><b>الحالة</b> مسودة للمراجعة</span>
+    <span><b>الجمهور</b> المنتج والزراعة والهندسة</span>
+  </div>
+  <a class="langswitch" href="https://claude.ai/code/artifact/a5052be0-d507-4b9e-acc2-58ae9fa773ff">English version</a>
+</header>
+
+<section id="p1">
+<p class="part">الجزء 01</p>
+<h2>قطاع البُن في البرازيل</h2>
+
+<p>البرازيل هي أكبر منتج للبُن في العالم، وظلت كذلك لأكثر من قرن. وهي تزرع النوعين التجاريين معًا: <span class="ltr">Coffea arabica</span> (أرابيكا) على الهضاب المرتفعة في الجنوب الشرقي، و<span class="ltr">Coffea canephora</span>، ويُسمى في البرازيل <strong>كونيلون</strong> ويُسمى روبوستا في غيرها، في الأراضي المنخفضة الأدفأ.</p>
+
+<div class="note watch">
+  <span class="tag">اقرأ الأرقام كأحجام تقريبية</span>
+  <p>الأرقام في هذا الجزء مأخوذة من معرفة عامة بالقطاع، لا من مصدر بيانات حي. قبل أن يدخل أي رقم منها في عرض للعميل، راجعه مع CONAB (المسح الحكومي للمحاصيل) ووزارة الزراعة ومجلس المصدّرين CECAFÉ. تعامل معها كشكل عام، لا كحقائق.</p>
+</div>
+
+<h3>الحجم</h3>
+<div class="kv">
+  <div><dt>الإنتاج الوطني</dt><dd>نحو 55 إلى 65 مليون جوال سنويًا، والجوال (<span class="ltr">saca</span>) هو 60 كجم من البُن الأخضر.</dd></div>
+  <div><dt>التقسيم بين النوعين</dt><dd>نحو الثلثين أرابيكا والثلث كونيلون. وحصة الكونيلون في ارتفاع.</dd></div>
+  <div><dt>المساحة المزروعة</dt><dd>نحو 2.2 إلى 2.3 مليون هكتار في الإنتاج.</dd></div>
+  <div><dt>عدد المزارع المنتجة</dt><dd>نحو 300 ألف. أغلبها أقل من 20 هكتارًا. وعدد قليل من الضياع الكبيرة يزرع من 1000 إلى 10000 هكتار.</dd></div>
+</div>
+
+<h3>أين يُزرع</h3>
+<p>يتركز الإنتاج في عدد محدود من الولايات، وكل ولاية تعني عميلًا مختلفًا ومشكلة زراعية مختلفة.</p>
+
+<div class="tablewrap">
+<table>
+  <caption>مناطق الإنتاج وما تعنيه لنا</caption>
+  <thead>
+    <tr><th>المنطقة</th><th>الولاية</th><th>النوع</th><th>شكل التشغيل</th><th>الخطر الأساسي</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>سول دي ميناس</td><td>ميناس جيرايس</td><td>أرابيكا</td><td>تلال، 10 إلى 100 هكتار، مزارع عائلية وأعضاء تعاونيات، حصاد يدوي جزئيًا</td><td>الصقيع، الصدأ، عدم انتظام النضج</td></tr>
+    <tr><td>سيرادو مينيرو</td><td>ميناس جيرايس</td><td>أرابيكا</td><td>أرض مستوية، ميكنة كاملة، 200 إلى 3000 هكتار، ري محوري، منطقة منشأ معتمدة</td><td>فترات الجفاف، الحرارة وقت التزهير</td></tr>
+    <tr><td>ماتاس دي ميناس</td><td>ميناس جيرايس</td><td>أرابيكا</td><td>منحدرات شديدة، مزارع صغيرة، حصاد يدوي، توجه نحو البُن المتخصص</td><td>الصدأ، صانعة الأنفاق، انجراف التربة</td></tr>
+    <tr><td>موجيانا</td><td>ساو باولو</td><td>أرابيكا</td><td>أرض متموجة، مزارع متوسطة وكبيرة، ميكنة حيث يسمح الانحدار</td><td>الجفاف، والصقيع على الأطراف</td></tr>
+    <tr><td>غرب باهيا وشابادا</td><td>باهيا</td><td>أرابيكا وكونيلون</td><td>ضياع كبيرة مروية، ري محوري وتنقيط، تجهيز قياس مكثف</td><td>تخصيص المياه، الحرارة</td></tr>
+    <tr><td>إسبيريتو سانتو</td><td>إسبيريتو سانتو</td><td>كونيلون، ومعه أرابيكا الجبال</td><td>مزارع صغيرة ومتوسطة، ري بالتنقيط، زراعة كلونية</td><td>الجفاف، ترشيد المياه</td></tr>
+    <tr><td>روندونيا</td><td>روندونيا</td><td>كونيلون أمازوني</td><td>صغار المزارعين، زراعة كلونية، مساحة سريعة النمو</td><td>الامتثال لقوانين إزالة الغابات، أمراض الرطوبة</td></tr>
+    <tr><td>شمال بارانا</td><td>بارانا</td><td>أرابيكا</td><td>مساحة متقلصة منذ موجات الصقيع التاريخية، زراعة مكثفة</td><td>الصقيع</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>قوتان بنيويتان نبيع في مواجهتهما</h3>
+
+<p><strong>المعاومة، أي تبادل الحمل.</strong> حقل الأرابيكا يتناوب بين سنة حمل غزير وسنة حمل خفيف. المحصول الغزير يستنزف مخزون النبات، فتعقد السنة التالية عددًا أقل من العقد الثمرية. مناطق كاملة تتأرجح معًا، فيتأرجح الإنتاج الوطني كذلك. كل حديث عن الإنتاجية، وكل خطة تسميد، وكل مقارنة بخط أساس في البرازيل، يجب أن تعرف في أي نصف من الدورة تقع القطعة. هذه ليست تفصيلة، بل هي الحقيقة المنظِّمة لإدارة البُن البرازيلي كله.</p>
+
+<p><strong>التتبع حتى مستوى القطعة.</strong> لائحة الاتحاد الأوروبي الخاصة بإزالة الغابات تشمل البُن، وتُلزم المشغّلين بالاحتفاظ ببيانات الموقع الجغرافي لقطع الأرض التي أُنتج فيها البُن، بمضلعات للقطع الأكبر، مع بيان بذل العناية الواجبة. وتشغّل البرازيل بشكل منفصل السجل البيئي الريفي (<span class="ltr">CAR</span>)، وهو سجل إلزامي لحدود الملكيات الزراعية. وكلاهما مسألة مضلعات.</p>
+
+<div class="note">
+  <span class="tag">هذه هي نقطة الدخول</span>
+  <p>منصة AgriPulse تخزّن بالفعل المزارع والقطع كأشكال هندسية حقيقية، مع صور أقمار لكل قطعة وسجل نشاط كامل. متطلب الامتثال يمنح المصدّر أو التعاونية البرازيلية سببًا لرسم كل قطعة كمضلع داخل <em>نظام ما</em> هذا العام. أن نكون نحن ذلك النظام هو بيعة أولى أرخص من "زراعة أفضل"، وهي تضع قطعنا تحت أقدامهم قبل أن نبيع شجرة قرار واحدة. تحقق من مواعيد التطبيق الحالية قبل ذكرها، فقد تغيّرت أكثر من مرة.</p>
+</div>
+</section>
+
+<section id="p2">
+<p class="part">الجزء 02</p>
+<h2>لمن نبيع</h2>
+
+<p>البُن البرازيلي ليس له نوع مشترٍ واحد، بل أربعة، واثنان منها فقط يشبهان عملاءنا الحاليين.</p>
+
+<div class="tablewrap">
+<table>
+  <caption>أنواع المشترين، مرتبة حسب ملاءمتها للمنصة كما هي اليوم</caption>
+  <thead>
+    <tr><th>المشتري</th><th>الشكل</th><th>ما يريده</th><th>الملاءمة اليوم</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>ضيعة كبيرة مميكنة</strong></td>
+      <td>500 إلى 5000 هكتار، مهندس زراعي داخلي، تستخدم بالفعل بيانات الآلات</td>
+      <td>انتظام الإنتاجية والجودة على مستوى القطعة، قرارات الري، ترتيب الحصاد</td>
+      <td><span class="pill reuse">قوية</span> نفس شكل بشاير بمحصول مختلف</td>
+    </tr>
+    <tr>
+      <td><strong>تعاونية</strong></td>
+      <td>آلاف المزارع الأعضاء، فريق من المهندسين الميدانيين، مخازن ومعمل تذوق خاص</td>
+      <td>لوحة واحدة فوق مزارع كثيرة صغيرة، جدولة عمل المهندس الميداني، تقارير للأعضاء، أدلة امتثال</td>
+      <td><span class="pill config">جزئية</span> تعدد المزارع موجود، وعبء العمل الميداني هو ما يفعله تطبيق Scout</td>
+    </tr>
+    <tr>
+      <td><strong>مصدّر أو تاجر</strong></td>
+      <td>يشتري من آلاف المزارع، ويتحمل التزام الامتثال</td>
+      <td>مضلعات القطع، أدلة عدم إزالة الغابات، تتبع المنشأ، مخاطر الموردين</td>
+      <td><span class="pill build">ضعيفة</span> لدينا الشكل الهندسي ولا نملك أي تقارير امتثال</td>
+    </tr>
+    <tr>
+      <td><strong>مكتب استشارات زراعية مستقل</strong></td>
+      <td>عدد قليل من المهندسين يخدمون 20 إلى 80 مزرعة باتفاق شهري</td>
+      <td>أداة تجعل كل زيارة ذات قيمة، ودليل يبرر الأتعاب</td>
+      <td><span class="pill reuse">قوية</span> مركز الإجراءات مع Scout هو هذا المنتج بالضبط</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>التعاونية هي أعلى نقاط الدخول رافعة، لأن عقدًا واحدًا يجلب آلاف المزارع وفريقًا ميدانيًا موجودًا بالفعل على كشف الرواتب. والضيعة هي أسرع إثبات تقني، لأنها الأقرب شبهًا بما نشغّله اليوم. الخطة المعقولة تكسب ضيعة واحدة لإثبات الجانب الزراعي، ثم تستخدمها لفتح تعاونية.</p>
+</section>
+
+<section id="p3">
+<p class="part">الجزء 03</p>
+<h2>زراعة البُن، بالمصطلحات التي تحتاجها المنصة</h2>
+
+<h3>النبات</h3>
+<p>البُن شجيرة معمرة دائمة الخضرة، تُبقى على ارتفاع 2 إلى 3.5 متر وتُزرع في خطوط. تبدأ الإنتاج في السنة الثالثة أو الرابعة، وتبلغ ذروتها بين السنة السادسة والثانية عشرة، وتُجدَّد بالتقليم لا بإعادة الزراعة. لذلك فإن للقطعة <strong>عمرًا</strong> و<strong>موقعًا داخل دورة تقليم</strong>، وكلاهما يغيّر معنى أي قياس. القطعة في سنتها الأولى بعد قطع التجديد لا تكاد تملك مجموعًا خضريًا، وهي مع ذلك سليمة تمامًا.</p>
+
+<h3>الأصناف</h3>
+<p>اختيار الصنف يحدد مقاومة الأمراض وموعد النضج وارتفاع النبات والمسافات. وهو ليس بيانات تجميلية، بل مفتاح استهداف.</p>
+
+<div class="tablewrap">
+<table>
+  <caption>الأصناف ومجموعات الكلونات الشائعة</caption>
+  <thead><tr><th>النوع</th><th>الصنف أو المجموعة</th><th>ملاحظة</th></tr></thead>
+  <tbody>
+    <tr><td>أرابيكا</td><td>كاتواي الأحمر والأصفر (144، 62، 99)</td><td>صنف العمل الأساسي. قصير القامة، يناسب الزراعة المكثفة والمميكنة.</td></tr>
+    <tr><td>أرابيكا</td><td>موندو نوفو</td><td>طويل، قوي النمو، عالي الإنتاج، حساس للصدأ.</td></tr>
+    <tr><td>أرابيكا</td><td>كاتوكاي، أرارا، وسلالات سارشيمور وكاتيمور</td><td>تحمل مقاومة للصدأ موروثة من <span class="ltr">C. canephora</span>. المقاومة قد تنهار مع الوقت.</td></tr>
+    <tr><td>أرابيكا</td><td>سلاسل IPR وIAC، توباسيو، بوربون الأصفر</td><td>انتخابات إقليمية ومتخصصة. بوربون يُزرع للجودة وإنتاجه منخفض.</td></tr>
+    <tr><td>كونيلون</td><td>أصناف كلونية مثل فيتوريا INCAPER 8142، ودياماني، ومارلانديا</td><td>الحقل فسيفساء من كلونات تُزرع معًا للتلقيح الخلطي. الكلونات داخل القطعة الواحدة تنضج في تواريخ مختلفة.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note gap">
+  <span class="tag">مشكلة نمذجة: القطعة متعددة الكلونات</span>
+  <p>قطعة الكونيلون تُزرع عمدًا بعدة كلونات تزهر وتنضج في أوقات مختلفة. وتصنيف المحاصيل لدينا يمنح كل قطعة مسارًا واحدًا. لا يمكن بصدق أن يكون حقل كونيلون هو <code>coffee.conilon.vitoria</code>، لأنه ستة كلونات في آن واحد. إما أن تصبح مجموعة الكلونات هي الصنف (<code>coffee.conilon.vitoria_group</code>)، أو أن تحمل القطعة خاصية تسرد كلوناتها. يجب حسم هذا قبل أول عميل كونيلون، لأن الاختيار يمتد إلى مراحل النمو وتخطيط الحصاد وكل شجرة قرار.</p>
+</div>
+
+<h3>هندسة الزراعة</h3>
+<p>المسافات تحدد كم من التربة يراه بكسل القمر الصناعي، وكم من السماد يحتاجه الهكتار، وهل تستطيع الحاصدة دخول الخط أصلًا.</p>
+
+<div class="tablewrap">
+<table>
+  <caption>نظم الزراعة الشائعة</caption>
+  <thead><tr><th>النظام</th><th>الخط × النبات</th><th>عدد النباتات في الهكتار</th><th>الحصاد</th></tr></thead>
+  <tbody>
+    <tr><td>تقليدي ومميكن</td><td class="num">3.5–4.0 m × 0.5–0.8 m</td><td class="num">3,000–5,500</td><td>حاصدة ذاتية الدفع</td></tr>
+    <tr><td>مكثف (<span class="ltr">adensado</span>)</td><td class="num">2.0–2.5 m × 0.5–0.7 m</td><td class="num">6,000–10,000</td><td>يدوي أو بمشط محمول</td></tr>
+    <tr><td>كونيلون مروي</td><td class="num">3.0–3.5 m × 1.0–1.5 m</td><td class="num">2,000–3,300</td><td>يدوي على عدة مرات</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note gap">
+  <span class="tag">عيب معروف سيظهر هنا</span>
+  <p>كثافة الزراعة غير موجودة اليوم في أي مكان، ولا لدى أي مستأجر. الهجرة <code>0061_drop_unused_block_crop_agronomy_columns</code> حذفت <code>plant_density_per_ha</code> و<code>row_spacing_m</code> و<code>plant_spacing_m</code> من <code>block_crops</code> على مستوى المنصة كلها، لأن لا شيء كتب فيها قط: قُرئ كل صف إسناد محصول في الإنتاج قبل الحذف، وكانت الأعمدة الخمسة المحذوفة كلها فارغة بلا استثناء. والهجرة نفسها حررت تلك الأكواد من <code>RESERVED_ATTRIBUTE_CODES</code>، فصارت متاحة للتأليف في نظام خصائص المحاصيل. والبُن يجعل ذلك عاجلًا، لأن المعدلات لكل نبات هي الطريقة المعتادة لكتابة التوصيات البرازيلية: جرامات لكل نبات، لا كيلوجرامات لكل هكتار. يجب أن تكون الكثافة خاصية محصول إلزامية مُتحقَّقًا منها قبل إنشاء أول قطعة برازيلية.</p>
+</div>
+
+<h3>تقليم التجديد</h3>
+<p>بدل إعادة الزراعة، يقطع المزارع النبات ويتركه يعيد البناء. وهذا قرار مجدول بحجم استثماري، وينتج عنه قطعة تبدو ميتة من الفضاء لمدة عام.</p>
+<ul>
+  <li><strong><span class="ltr">Esqueletamento</span> &mdash; التهيكل.</strong> قص الأفرع الجانبية إلى كعوب قصيرة مع إبقاء الساق الرئيسي.</li>
+  <li><strong><span class="ltr">Decote</span> &mdash; التطويش.</strong> إزالة القمة على ارتفاع محدد، وغالبًا يُدمج مع التهيكل.</li>
+  <li><strong><span class="ltr">Recepa</span> &mdash; القطع الجائر.</strong> قطع النبات كله قرب سطح الأرض. أشد صور التجديد.</li>
+  <li><strong><span class="ltr">Safra zero</span> &mdash; سنة بلا محصول.</strong> سنة بلا إنتاج بقرار متعمد، عادة بعد تقليم جائر.</li>
+</ul>
+
+<div class="note gap">
+  <span class="tag">مشكلة نمذجة: قطعة سليمة بلا مجموع خضري</span>
+  <p>القطعة المقطوعة حديثًا تقرأ منخفضة جدًا على كل مؤشرات الغطاء النباتي لموسم كامل. وإذا عاملت المنصة ذلك كفشل صحي، فسنغرق مركز الإجراءات لدى العميل البرازيلي بتنبيهات حرجة كاذبة في شهره الأول، وهذا أسرع طريق لخسارة الحساب. حالة التقليم يجب أن تُوقف الحكم الصحي المبني على المؤشرات، لا أن تكتفي بالإشارة إليه.</p>
+</div>
+
+<h3>الحصاد وما بعده</h3>
+<p>جودة الحصاد هي المكان الذي يربح فيه المزارع البرازيلي هامشه أو يخسره، وتحسمها درجة انتظام النضج لحظة القطف.</p>
+<ul>
+  <li><strong><span class="ltr">Derriça</span> &mdash; التمشيط.</strong> تجريد كل الثمار عن الفرع دفعة واحدة، يدويًا أو آليًا. ولأنه يأخذ كل شيء، يجب أن تكون القطعة منتظمة النضج قدر الإمكان قبل الدخول.</li>
+  <li><strong>الجني الانتقائي.</strong> قطف الثمار الناضجة فقط على عدة مرات. يُستخدم للبُن المتخصص وعلى المنحدرات.</li>
+  <li><strong>التجفيف الطبيعي.</strong> تجفيف الثمرة كاملة. الطريقة البرازيلية التقليدية.</li>
+  <li><strong><span class="ltr">Cereja descascado</span>.</strong> نزع القشرة مع إبقاء الطبقة اللزجة ثم التجفيف.</li>
+  <li><strong>المغسول والمُخمَّر.</strong> غسيل كامل أو تخمير محكوم، للدفعات المتخصصة.</li>
+  <li><strong>التجفيف.</strong> على أرضية إسمنتية (<span class="ltr">terreiro</span>)، أو على مناضد مرفوعة، أو في مجفف آلي، حتى رطوبة نحو 11 إلى 12 بالمائة.</li>
+</ul>
+<p>الوحدة التجارية في كل مكان هي <strong>الجوال 60 كجم</strong> من البُن الأخضر، والإنتاجية تُذكر بـ<strong>الجوالات لكل هكتار</strong>. الأرقام المعتادة نحو 25 إلى 45 جوالًا للهكتار لأرابيكا مطرية جيدة الإدارة، وأعلى تحت الري، ومن 40 إلى 80 للكونيلون المروي.</p>
+</section>
+
+<section id="p4">
+<p class="part">الجزء 04</p>
+<h2>سنة البُن، ولماذا ينكسر تقويمنا</h2>
+
+<p>البرازيل في نصف الكرة الجنوبي، فموسمها يعبر حد السنة الميلادية. والأسوأ أن محصول الأرابيكا يستغرق نحو عامين من بدء تكوين البرعم حتى الحصاد، فيوجد محصولان على النبات نفسه في كل لحظة. الوصف البرازيلي المعياري، تبعًا لكامارجو وكامارجو، يستخدم ست مراحل فينولوجية عبر 24 شهرًا.</p>
+
+<div class="tablewrap">
+<table>
+  <caption>مراحل نمو الأرابيكا في البرازيل، مع أكواد المراحل المقترحة</caption>
+  <thead><tr><th>الشهور تقريبًا</th><th>المرحلة</th><th><code>stage_code</code> المقترح</th><th>ما تفعله الإدارة</th></tr></thead>
+  <tbody>
+    <tr><td class="num">Sep–Mar</td><td>النمو الخضري للبراعم والعقد الجديدة</td><td><code>veg_growth</code></td><td>نيتروجين وبوتاسيوم، مكافحة حشائش، مراقبة صانعة الأنفاق</td></tr>
+    <tr><td class="num">Apr–Aug</td><td>حث البراعم الزهرية وسكونها</td><td><code>bud_induction</code></td><td>الحصاد يقع هنا. والبراعم تنتظر محفز مطر أو ري.</td></tr>
+    <tr><td class="num">Sep–Oct</td><td>التزهير، ويُحفَّز بالمطر بعد إجهاد جاف</td><td><code>flowering</code></td><td>أهم تاريخ منفرد في السنة</td></tr>
+    <tr><td class="num">Oct–Dec</td><td>تكوين الحبة الصغيرة وتمدد الثمرة (<span class="ltr">chumbinho</span>)</td><td><code>fruit_expansion</code></td><td>الماء حاسم. البورون والكالسيوم.</td></tr>
+    <tr><td class="num">Jan–Mar</td><td>امتلاء الحبة (<span class="ltr">granação</span>)</td><td><code>grain_filling</code></td><td>ذروة الطلب الغذائي، وذروة ضغط الصدأ</td></tr>
+    <tr><td class="num">Apr–Jun</td><td>النضج (<span class="ltr">maturação</span>)</td><td><code>ripening</code></td><td>متابعة النضج وترتيب الحصاد</td></tr>
+    <tr><td class="num">May–Sep</td><td>الحصاد وراحة ما بعد الحصاد</td><td><code>harvest</code>، <code>post_harvest_rest</code></td><td>القطف والتجفيف وتقليم التجديد وتسميد إعادة بناء المخزون</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note gap">
+  <span class="tag">فجوة هندسية: المراحل مربوطة بالوحدات الحرارية</span>
+  <p>كتالوج مراحل النمو لدينا يخزّن المراحل كصفوف <code>{stage, start_gdd, end_gdd}</code> تُحل عبر تصنيف المحاصيل في <code>backend/app/modules/farms/crop_thresholds.py</code>. وتزهير البُن ليس حدثًا حراريًا تراكميًا، بل يُحفَّز بدفعة مطر أو ري تبلغ نحو 10 إلى 20 مم بعد فترة حث جافة باردة. العمود الفقري القائم على الوحدات الحرارية سيضع <code>flowering</code> في اليوم الخطأ، وكل ما يُبنى عليه داخل قالب خطة سيصبح خطأ بدوره.</p>
+  <p>ما يحتاجه البُن هو <strong>مرحلة مربوطة بحدث</strong>: يُرصد تاريخ التزهير أو يُكتشف، ثم يُحسب باقي الموسم بإزاحة عنه. وقوالب الخطط تدعم بالفعل مرساة <code>milestone</code> إلى جانب <code>stage</code>، وهي أقرب آلية قائمة.</p>
+</div>
+
+<div class="note gap">
+  <span class="tag">فجوة هندسية: عدة موجات تزهير في قطعة واحدة</span>
+  <p>إذا جاءت أمطار الربيع على دفعتين أو ثلاث، تزهر القطعة مرتين أو ثلاثًا وتحمل عدة أجيال من الثمار معًا. هذه هي مشكلة عدم انتظام النضج البرازيلية الكلاسيكية، وهي سبب لجوء المزارعين المرويين إلى إجهاد مائي محكوم متعمد ثم رية واحدة غزيرة، لفرض تزهير واحد متزامن. النموذج الذي يفترض تاريخ تزهير واحد لكل قطعة في السنة لا يستطيع تمثيل المشكلة التي يدفع العميل ثمن حلها.</p>
+</div>
+</section>
+
+<section id="p5">
+<p class="part">الجزء 05</p>
+<h2>الآفات والأمراض ومخاطر المناخ</h2>
+
+<h3>الخمسة التي تهم</h3>
+<div class="tablewrap">
+<table>
+  <caption>أهم المشكلات الحيوية والظروف التي تحركها</caption>
+  <thead><tr><th>المشكلة</th><th>الكائن</th><th>يشجعها</th><th>عتبة التدخل عمليًا</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>صدأ أوراق البُن</strong></td>
+      <td><span class="ltr">Hemileia vastatrix</span></td>
+      <td>متوسط حرارة نحو 21 إلى 25 درجة مئوية، وبلل ورقي مطوّل، ومجموع خضري كثيف، وقبل كل شيء <strong>حمل ثمري غزير</strong> يُضعف النبات</td>
+      <td>برنامج وقائي من ديسمبر تقريبًا. وتجاوز نسبة الإصابة في الفحص نحو 5 إلى 10 بالمائة من الأوراق يستدعي تدخلًا علاجيًا.</td>
+    </tr>
+    <tr>
+      <td><strong>صانعة أنفاق الأوراق</strong></td>
+      <td><span class="ltr">Leucoptera coffeella</span></td>
+      <td>الطقس الحار <strong>الجاف</strong>. المطر يقلل اليرقات، فهي الصورة المعكوسة للصدأ.</td>
+      <td>نحو 20 إلى 30 بالمائة من الأوراق مصابة بأنفاق</td>
+    </tr>
+    <tr>
+      <td><strong>حفار ثمار البُن</strong></td>
+      <td><span class="ltr">Hypothenemus hampei</span></td>
+      <td>وجود ثمار عند رطوبة مناسبة، وبقاء العدوى في الثمار المتروكة على النبات وعلى الأرض بعد الحصاد.</td>
+      <td>نحو 3 إلى 5 بالمائة من الثمار مثقوبة</td>
+    </tr>
+    <tr>
+      <td><strong>تبقع العين البني</strong></td>
+      <td><span class="ltr">Cercospora coffeicola</span></td>
+      <td>نقص غذائي، إجهاد مائي، تعرض ضوئي عالٍ، تربة فقيرة</td>
+      <td>يُعامل كإشارة تغذية بقدر ما هو مرض</td>
+    </tr>
+    <tr>
+      <td><strong>النيماتودا</strong></td>
+      <td><span class="ltr">Meloidogyne</span> و<span class="ltr">Pratylenchus</span></td>
+      <td>تربة وشتلات ملوثة. تنتشر من بؤرة إلى الخارج.</td>
+      <td>لا يعالجها رش. الرد هو أصول مقاومة واحتواء البؤرة.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+  <span class="tag">ملاءمتان جيدتان لما نفعله بالفعل</span>
+  <p><strong>النيماتودا تظهر كبقع.</strong> تنتشر كبؤر متسعة لا بشكل منتظم. وهذا بالضبط الشكل الذي يجده كشف الشذوذ لدينا على مستوى الخلية: تجمع خلايا منخفض المؤشر ومستمر داخل قطعة سليمة فيما عدا ذلك. والمهندس البرازيلي سيتعرف على هذه الصورة فورًا.</p>
+  <p><strong>الصدأ وصانعة الأنفاق يتحركان في اتجاهين متعاكسين على الطقس نفسه.</strong> أسبوعان رطبان يرفعان الصدأ ويكبحان صانعة الأنفاق، وأسبوعان حاران جافان يفعلان العكس. تشغيل النموذجين جنبًا إلى جنب يعطي قراءة ذات وجهين من مصدر بيانات واحد.</p>
+</div>
+
+<h3>مخاطر المناخ</h3>
+<ul>
+  <li><strong>الصقيع.</strong> الخطر الكارثي المميز لسول دي ميناس وموجيانا وبارانا، من يونيو إلى أغسطس. الصقيع الإشعاعي يتكون في الليالي الصافية الساكنة، والهواء البارد ينحدر إلى أسفل، فـ<strong>قاع الوادي يتجمد بينما الحافة فوقه لا تتجمد</strong>. والضرر يتدرج من لفحة الأوراق إلى فقد النبات حتى سطح الأرض.</li>
+  <li><strong>الانقطاع المطري داخل الموسم (<span class="ltr">veranico</span>).</strong> فترة حارة بلا مطر داخل موسم الأمطار، وأشد ضررها أثناء تمدد الثمرة.</li>
+  <li><strong>الحرارة وقت التزهير.</strong> الحرارة فوق نحو 34 درجة مئوية أثناء التزهير تُسقط الأزهار وتنتج حبوبًا فارغة.</li>
+  <li><strong>البَرَد.</strong> موضعي ومفاجئ. ومرور قمر صناعي بعد الحدث هو أرخص تقدير متاح للضرر.</li>
+  <li><strong>تخصيص المياه.</strong> في إسبيريتو سانتو وأجزاء من باهيا، سحب مياه الري منظَّم وقُيِّد في سنوات الجفاف، وهو ما يحوّل كفاءة المياه من مسألة اقتصاد إلى مسألة امتثال.</li>
+</ul>
+
+<div class="note gap">
+  <span class="tag">فجوة هندسية: الصقيع مسألة تضاريس</span>
+  <p>متوسط درجة الحرارة الصغرى للقطعة، مأخوذًا من شبكة طقس، لا يمثل انحدار الهواء البارد. تقدير خطر الصقيع يحتاج بيانات ارتفاع، ويحتاج مثاليًا الموقع التضاريسي داخل القطعة. وجدولا <code>farms</code> و<code>blocks</code> يحملان عمود <code>elevation_m</code>، لكنه رقم واحد لكل مضلع لا سطح تضاريسي، وليس أي منهما متاحًا لشجرة قرار: <code>BLOCK_FIELDS</code> لا يحمل سوى <code>growth_stage</code> و<code>soil_texture</code> و<code>salinity_class</code>. أي أن الشجرة لا تستطيع قراءة الارتفاع أصلًا اليوم، ولا شيء نخزنه يصف انحدار الهواء البارد داخل القطعة. النسخة الأولى يمكن أن تكون صادقة في ذلك: تستخدم الصغرى المتوقعة عند القطعة، وتصنفها، وتقول صراحة إن الأرض المنخفضة داخل القطعة ستكون أبرد من الرقم المعروض. لا تقدّم رقمًا واحدًا كأنه ينطبق بانتظام.</p>
+</div>
+</section>
+
+<section id="p6">
+<p class="part">الجزء 06</p>
+<h2>ربط البُن بمنصة AgriPulse</h2>
+
+<p>هذا الجزء هو مقصد الوثيقة. كل صف يقول هل المفهوم موجود، أم يحتاج إعدادًا فقط، أم يحتاج بناءً.</p>
+
+<h3>التسلسل</h3>
+<div class="tablewrap">
+<table>
+  <caption>كيانات المنصة ومقابلها البرازيلي</caption>
+  <thead><tr><th>في AgriPulse</th><th>الاسم في البرازيل</th><th>ما يحمله للبُن</th><th>الحالة</th></tr></thead>
+  <tbody>
+    <tr><td>المستأجر</td><td><span class="ltr">Grupo, cooperativa, exportadora</span></td><td>الجهة المتعاقدة</td><td><span class="pill reuse">موجود</span></td></tr>
+    <tr><td>المزرعة</td><td><span class="ltr">Fazenda, sítio, propriedade</span></td><td>ملكية واحدة، تسجيل CAR واحد، سياق طقس واحد</td><td><span class="pill reuse">موجود</span></td></tr>
+    <tr><td>القطعة</td><td><span class="ltr">Talhão, gleba, lavoura</span></td><td>صنف واحد، سنة زراعة واحدة، مسافة واحدة، دورة تقليم واحدة</td><td><span class="pill reuse">موجود</span></td></tr>
+    <tr><td>خلية الشبكة</td><td>&mdash;</td><td>التباين داخل القطعة: بؤر النيماتودا، فوات التسميد، ضرر الحاصدة</td><td><span class="pill reuse">موجود</span></td></tr>
+    <tr><td>مسار تصنيف المحصول</td><td>النوع والصنف والكلون</td><td><code>coffee.arabica.catuai_144</code>، <code>coffee.conilon.vitoria</code></td><td><span class="pill config">إعداد</span></td></tr>
+    <tr><td>وحدة الأرض</td><td><span class="ltr">Reserva legal, APP, estrada, terreiro</span></td><td>مساحات غير إنتاجية يجب مع ذلك رسمها للسجل البيئي وللملف الأوروبي</td><td><span class="pill config">إعداد</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+  <span class="tag">الاستهداف يتم ببادئة المسار</span>
+  <p>التصنيف يطابق عند حدود المقاطع. الشجرة المكتوبة لـ<code>coffee</code> تعمل على كل قطعة بُن، والمكتوبة لـ<code>coffee.arabica</code> تعمل على كل أصناف الأرابيكا. والصدأ يهم الأرابيكا أكثر بكثير من الكونيلون، فمستوى النوع هو الموضع الصحيح لأغلب أشجار الأمراض، ومستوى الصنف هو موضع تجاوز المقاومة.</p>
+</div>
+
+<h3>خصائص المحصول المخصصة لقطعة البُن</h3>
+<p>هذه هي الحقول التي يتوقع المهندس البرازيلي ملأها عند إسناد البُن إلى قطعة. وهي أيضًا المدخلات التي تقرأها أشجار القرار عبر مصدر شرط "حقل المحصول".</p>
+
+<div class="tablewrap">
+<table>
+  <caption>مجموعة خصائص البُن المقترحة</caption>
+  <thead><tr><th>الكود</th><th>النوع</th><th>لماذا تحتاجها شجرة القرار</th></tr></thead>
+  <tbody>
+    <tr><td><code>planting_year</code></td><td>عدد صحيح</td><td>يفصل الحقل الصغير عن الحقل المتراجع. ويحكم كل توقع إنتاجية.</td></tr>
+    <tr><td><code>plant_density_per_ha</code></td><td>عدد صحيح</td><td>يحوّل المعدلات لكل نبات إلى كميات لكل هكتار. يجب أن يكون إلزاميًا.</td></tr>
+    <tr><td><code>row_spacing_m</code>، <code>plant_spacing_m</code></td><td>عدد عشري</td><td>يحدد كم من التربة العارية يحتويها بكسل 10 أمتار</td></tr>
+    <tr><td><code>bearing_year</code></td><td>اختيار مفرد: <code>high</code>، <code>low</code></td><td>موقع المعاومة. خطر الصدأ ومعدل التسميد وتوقع الإنتاجية كلها تعتمد عليه.</td></tr>
+    <tr><td><code>last_pruning_type</code></td><td>اختيار مفرد: <code>none</code>، <code>decote</code>، <code>esqueletamento</code>، <code>recepa</code></td><td>يوقف الحكم الصحي المبني على المؤشرات أثناء إعادة بناء المجموع الخضري</td></tr>
+    <tr><td><code>last_pruning_date</code></td><td>تاريخ</td><td>يقول إلى أي مدى قطعت القطعة شوط إعادة البناء</td></tr>
+    <tr><td><code>irrigation_method</code></td><td>اختيار مفرد: <code>rainfed</code>، <code>pivot</code>، <code>drip</code>، <code>sprinkler</code></td><td>يحدد هل توصية المياه قابلة للتنفيذ أصلًا</td></tr>
+    <tr><td><code>rust_resistance</code></td><td>اختيار مفرد: <code>susceptible</code>، <code>partial</code>، <code>resistant</code></td><td>يرفع عتبة التدخل ضد الصدأ للأصناف المقاومة</td></tr>
+    <tr><td><code>altitude_m</code></td><td>عدد صحيح</td><td>يحدد موعد النضج وإمكان الجودة. وهو أيضًا مؤشر بديل للصقيع.</td></tr>
+    <tr><td><code>harvest_method</code></td><td>اختيار مفرد: <code>manual</code>، <code>derricadeira</code>، <code>colhedora</code></td><td>يحدد هل انتظام النضج حاسم أم مفيد فقط</td></tr>
+    <tr><td><code>expected_yield_sacas_ha</code></td><td>عدد عشري</td><td>الرقم الذي تُنسب إليه كل توصية برازيلية</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note watch">
+  <span class="tag">تعديل الخصائص استبدال كامل للنموذج</span>
+  <p>نقطة تحديث خصائص المحصول تستبدل المجموعة كلها، وتعيد تشغيل كل بوابة <code>required_when</code> على كل ما أُرسل. وقد نسخت هجرة سابقة قيمًا دون التحقق منها، فكانت النتيجة قطعًا لم تعد خصائصها قابلة للتعديل إطلاقًا. أي تعبئة أولية برازيلية يجب أن تمر بنفس التحقق الذي يمر به النموذج، وإلا شحنّا حقلًا غير قابل للإصلاح من اليوم الأول.</p>
+</div>
+
+<h3>إشارات الفحص الحقلي للبُن</h3>
+<p>الفحص الحقلي للبُن في البرازيل كمي وموحد، وهو ما يناسب نموذج الإشارات لدينا. المهندس الميداني يعد على عدد ثابت من النباتات ويسجل نسبة مئوية.</p>
+
+<div class="tablewrap">
+<table>
+  <caption>تعريفات الإشارات المطلوب إنشاؤها</caption>
+  <thead><tr><th>الإشارة</th><th>نوع القيمة</th><th>الوحدة أو الخيارات</th><th>التجميع</th></tr></thead>
+  <tbody>
+    <tr><td>نسبة الإصابة بالصدأ</td><td>رقمية</td><td>نسبة الأوراق الحاملة للبثرات</td><td>متوسط الزيارة</td></tr>
+    <tr><td>نسبة صانعة الأنفاق</td><td>رقمية</td><td>نسبة الأوراق المصابة بأنفاق</td><td>متوسط</td></tr>
+    <tr><td>نسبة إصابة الحفار</td><td>رقمية</td><td>نسبة الثمار المثقوبة</td><td>متوسط</td></tr>
+    <tr><td>التساقط الورقي</td><td>رقمية</td><td>نسبة الأوراق المفقودة</td><td>متوسط</td></tr>
+    <tr><td>تركيب النضج</td><td>مجموعة أرقام</td><td>نسبة الأخضر و<span class="ltr">verde-cana</span> والناضج و<span class="ltr">passa</span> والجاف</td><td>الأحدث لكل قطعة</td></tr>
+    <tr><td>حدث التزهير</td><td>تاريخ وشدة</td><td>تاريخ الرصد، ونسبة العقد المزهرة</td><td>الأحدث. وهو الذي يثبّت الموسم.</td></tr>
+    <tr><td>أعراض النيماتودا</td><td>قائمة اختيار</td><td>لا شيء، مشتبه، مؤكد</td><td>الأحدث</td></tr>
+    <tr><td>درجة ضرر الصقيع</td><td>قائمة اختيار</td><td>لا شيء، لفحة أوراق، موت أفرع، فقد النبات</td><td>الأحدث</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note watch">
+  <span class="tag">تطبيق الهاتف يقرأ <code>value_kind</code></span>
+  <p>وقع في Scout عيب فعلي: التطبيق كان يقرأ <code>value_type</code> بينما ترسل الواجهة <code>value_kind</code>، فكانت كل قوائم الاختيار تصل فارغة، ولم يمسكها TypeScript لأن الحقل اختياري. وإشارات النضج والنيماتودا والصقيع أعلاه من نوع قوائم الاختيار، وهي بالضبط الشكل الذي فشل من قبل. تأكد من ظهور قوائم الاختيار على جهاز حقيقي قبل أي تجربة برازيلية.</p>
+</div>
+</section>
+
+<section id="p7">
+<p class="part">الجزء 07</p>
+<h2>صور الأقمار والمؤشرات فوق البُن</h2>
+
+<p>قراءة البُن من المدار أصعب من قراءة محصول حقلي واسع، لثلاثة أسباب كلها هندسية.</p>
+
+<ol>
+  <li><strong>خطوط من الشجيرات بينها تربة عارية.</strong> بكسل سنتينل-2 يبلغ 10 أمتار، وخطوط البُن تبعد 3.5 إلى 4 أمتار. كل بكسل يخلط المجموع الخضري مع تربة ما بين الخطوط، فتقرأ القطعة المميكنة السليمة أقل بكثير من حقل مغلق الغطاء، وتقرأ الزراعة المكثفة أعلى بكثير من الواسعة. <strong>لذلك فإن العتبات المطلقة للمؤشرات بلا معنى بين قطع مختلفة المسافات.</strong></li>
+  <li><strong>غطاء دائم الخضرة.</strong> لا يوجد منحنى من التربة العارية إلى الغطاء الكامل يُثبَّت عليه الموسم. الإشارة انجراف بطيء عليه تذبذب موسمي.</li>
+  <li><strong>الثمرة غير مرئية.</strong> الإنتاج يقع تحت الغطاء. ولا يرى أي مؤشر بصري ثمار البُن. وكل ما نقوله عن الإنتاجية مستنتج من قوة الغطاء والطقس ودورة المعاومة، وعلينا أن نقول ذلك صراحة.</li>
+</ol>
+
+<div class="tablewrap">
+<table>
+  <caption>سلوك المؤشرات على البُن</caption>
+  <thead><tr><th>المؤشر</th><th>الحزم</th><th>الاستخدام على البُن</th></tr></thead>
+  <tbody>
+    <tr><td><code>ndvi</code></td><td>أحمر، قريب تحت الحمراء</td><td>يتشبع على غطاء بُن مغلق. مفيد للتغير النسبي، ضعيف للحالة المطلقة.</td></tr>
+    <tr><td><code>ndre</code></td><td>حافة الأحمر 1، قريب تحت الحمراء</td><td>مؤشر القوة الأفضل هنا. يتشبع متأخرًا، ويستجيب للكلوروفيل وحالة النيتروجين.</td></tr>
+    <tr><td><code>ndmi</code></td><td>قريب تحت الحمراء، الأشعة تحت الحمراء القصيرة</td><td>محتوى ماء الغطاء. المؤشر الصحيح للجفاف وللانقطاع المطري. <strong>سنتينل-2 فقط</strong>، لأن PlanetScope لا يحمل حزمة SWIR.</td></tr>
+    <tr><td><code>savi</code>، <code>msavi</code></td><td>أحمر، قريب تحت الحمراء</td><td>معدّل لأثر التربة، وهو بالضبط مشكلة خلط الخطوط. أفضل من NDVI على القطع واسعة المسافات.</td></tr>
+    <tr><td><code>gndvi</code>، <code>evi</code></td><td>أخضر أو أزرق، أحمر، قريب تحت الحمراء</td><td>ثانوية. وEVI يقاوم التشبع أفضل من NDVI على غطاء كثيف.</td></tr>
+    <tr><td><code>ndwi</code></td><td>أخضر، قريب تحت الحمراء</td><td><strong>لا تستخدمه لماء النبات.</strong> فـNDWI لدينا هو صيغة ماكفيترز للمياه السطحية. الرطوبة هي <code>ndmi</code>.</td></tr>
+    <tr><td>الحرارية: <code>lst</code>، <code>cwsi</code>، <code>smi</code></td><td>حرارية</td><td>حرارة الغطاء والإجهاد المائي. أقوى ملاءمة لسيرادو وباهيا المرويتين، ولمحفز التزهير بالإجهاد المحكوم.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note gap">
+  <span class="tag">فجوة هندسية: الحالة الصحية خرجت من NDVI بالفعل، لكن خلف إعداد مُطفأ</span>
+  <p>لم تعد الحالة الصحية مضطرة أن تأتي من مؤشر. الملف <code>backend/app/shared/health_definition.py</code> يحسب تصنيف القطعة من مخرجات أشجار القرار عبر خمس قيم محدودة: <code>severity_map</code> و<code>snoozed_as</code> و<code>cell_critical_share</code> و<code>recommendation_floor</code> و<code>stale_after_hours</code>. ولا يظهر أي مؤشر بينها. والسلسلة هي الافتراضي على مستوى المنصة، ثم صف لكل محصول في <code>public.crop_health_definitions</code> يُستهدف بمسار المحصول، ثم تجاوز لكل مزرعة في <code>farms.health_definition</code>. أما نسخة الواجهة الأمامية من القاعدة القديمة فقد حُذفت، ولم يعد <code>frontend/src/modules/labs/map/health.ts</code> يحمل سوى الألوان.</p>
+  <p>الإعداد <code>health_definition_enabled</code> قيمته الافتراضية false. وما دام مُطفأً، فالقاعدة القديمة في <code>backend/app/shared/health.py</code> هي التي تعمل: أقل من 0.40 حرج، وأقل من 0.55 مراقبة، لكل المحاصيل. وقطعة بُن مميكنة واسعة المسافات تقع تحت 0.55 وهي سليمة تمامًا، والقطعة المقطوعة حديثًا تقع تحت 0.40. أي أن عمل البُن هنا هو تشغيل الإعداد وإضافة بذرة <code>coffee.yaml</code> إلى <code>backend/app/modules/health/seeds/</code>، لا بناء نظام عتبات لكل محصول.</p>
+  <p>ويبقى طريق واحد من المؤشر إلى الحالة الصحية بعد التبديل. الشجرة المبنية على مؤشر ما زالت تفتح تنبيهًا، ودرجة خطورة التنبيه ما زالت تحدد التصنيف عبر <code>severity_map</code>. لذلك تبقى قطعة البُن المقطوعة تُقرأ حرجة إذا اشتعلت عليها شجرة NDVI أو NDRE. وهذه مسألة تأليف أشجار، لا تغيير في المنصة.</p>
+</div>
+
+<div class="note gap">
+  <span class="tag">فجوة هندسية: خطوط الأساس والمعاومة</span>
+  <p>خط أساس المؤشر يحتاج ثلاث عينات على الأقل داخل نافذة سبعة أيام على جانبي اليوم من السنة قبل أن ينتج قيمة انحراف لذلك اليوم، فتبقى المزرعة الجديدة بلا درجات انحراف حتى يتراكم التاريخ. ومع البُن، الأمر أسوأ من مجرد البطء: تبادل سنوات الحمل الغزير والخفيف يعني أن عينة سنتين تقارن سنة غزيرة بسنة خفيفة، فيكون الانحراف حقيقيًا وبلا معنى. خط أساس البُن يجب أن يقارن المثيل بالمثيل، أي سنة غزيرة بسنوات غزيرة، وهو ما يحتاج إما أربع سنوات من التاريخ أو خط أساس يعتمد على خاصية <code>bearing_year</code>.</p>
+</div>
+</section>
+
+<section id="p8">
+<p class="part">الجزء 08</p>
+<h2>أشجار القرار المطلوب تأليفها</h2>
+
+<p>الشجرة تقرأ من عشرة مصادر شروط: مؤشر الصور، خاصية القطعة، الطقس، شذوذ مؤشر الطقس، خطر المرض والآفة، الميزان المائي للقطعة، الإشارة المخصصة، شذوذ الشبكة، حقل المحصول، ومعامل الشجرة. المجموعة المقترحة أدناه مرتبة بحسب مقدار ما يمكن بناؤه منها من مصادر تعمل بالفعل.</p>
+
+<div class="tablewrap">
+<table>
+  <caption>أشجار قرار البُن المرشحة</caption>
+  <thead><tr><th>الشجرة</th><th>تقرأ</th><th>الحكم الذي تنتجه</th><th>معطلة على</th></tr></thead>
+  <tbody>
+    <tr><td><code>coffee_rust_risk_v1</code></td><td><code>weather_risk</code> (نموذج جديد)، <code>crop_attribute</code> سنة الحمل والمقاومة</td><td>فحص حقلي، ثم قرار رش وقائي</td><td>نموذج صدأ في السجل</td></tr>
+    <tr><td><code>coffee_leaf_miner_risk_v1</code></td><td><code>weather_risk</code> (نموذج جديد)، <code>signals</code> نسبة الأوراق المصابة</td><td>فحص حقلي، ثم علاج فوق العتبة</td><td>نموذج صانعة أنفاق</td></tr>
+    <tr><td><code>coffee_berry_borer_v1</code></td><td><code>signals</code> نسبة الثمار المثقوبة، <code>block</code> مرحلة النمو</td><td>قرار مصائد وعلاج، ومهمة تنظيف بعد الحصاد</td><td>لا شيء. الإشارات تعمل بالفعل.</td></tr>
+    <tr><td><code>coffee_water_stress_v1</code></td><td><code>indices</code> <code>ndmi</code>، الحراري <code>cwsi</code>، <code>water_balance</code>، <code>weather</code> البخر والنتح والمطر</td><td>كمية الري وتوقيته</td><td>لا شيء، حيث يكون الحراري مشتركًا</td></tr>
+    <tr><td><code>coffee_flowering_trigger_v1</code></td><td><code>weather</code> مجموع المطر، <code>crop_attribute</code> طريقة الري، <code>block</code> المرحلة</td><td>طبّق رية التزهير الآن، أو استمر في الإجهاد</td><td>المراحل المربوطة بحدث</td></tr>
+    <tr><td><code>coffee_frost_alert_v1</code></td><td><code>weather</code> النطاق <code>forecast_72h</code>، الحقل <code>air_temp_c_min</code></td><td>تحذير صقيع مع إجراءات تخفيف</td><td>لا شيء. <code>potato_frost_risk_v1</code> يقرأ هذا بالضبط بالفعل.</td></tr>
+    <tr><td><code>coffee_patch_anomaly_v1</code></td><td><code>grid</code> عدد الخلايا المعلَّمة على <code>ndre</code></td><td>افحص الخلايا المعلَّمة. اشتبه في نيماتودا أو فوات تسميد.</td><td>لا شيء. شذوذ الشبكة يعمل بالفعل.</td></tr>
+    <tr><td><code>coffee_post_harvest_recovery_v1</code></td><td><code>indices</code> اتجاه <code>ndre</code>، <code>crop_attribute</code> تاريخ التقليم</td><td>تسميد إعادة بناء المخزون بعد الحصاد</td><td>لا شيء</td></tr>
+    <tr><td><code>coffee_uneven_ripening_v1</code></td><td><code>signals</code> تركيب النضج، <code>block</code> المرحلة</td><td>أجّل مرور الحصاد أو قسّمه</td><td>لا شيء</td></tr>
+    <tr><td><code>coffee_hail_damage_v1</code></td><td><code>indices</code> هبوط مفاجئ في <code>ndre</code>، <code>weather</code> الحدث</td><td>زيارة تقدير ضرر</td><td>لا شيء</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>سبع من العشر لا تحتاج أي قدرة جديدة في المنصة. وهذه إصدارة أولى حقيقية. والصقيع أرخصها: الملف <code>backend/app/modules/recommendations/seeds/potato_frost_risk_v1.yaml</code> يقرأ الحرارة الصغرى المتوقعة بالفعل، فشجرة البُن هي تلك البذرة نفسها بمسار محصول البُن وبمعاملات حرارة البُن.</p>
+
+<h3>إضافة نموذج خطر الصدأ</h3>
+<p>سجل مخاطر الطقس في <code>backend/app/modules/weather/risk/registry.py</code> مصمم للإضافة فقط. وهو يحمل اليوم ثلاثة نماذج للمانجو. ومُمرض جديد يعني مدخلة <code>RiskModelSpec</code> واحدة ودالة نقية واحدة: بلا تغيير في المخطط، وبلا تغيير في المهمة، وبلا تغيير في نقطة النهاية. وانطباق المحصول يتم ببادئة مسار التصنيف، فمدخلة واحدة تغطي كل أصناف الأرابيكا.</p>
+
+<pre><code><span class="c"># backend/app/modules/weather/risk/registry.py</span>
+REGISTRY: tuple[RiskModelSpec, ...] = (
+    RiskModelSpec(<span class="s">"powdery_mildew"</span>, <span class="s">"mango"</span>, <span class="s">"disease"</span>, models.powdery_mildew),
+    RiskModelSpec(<span class="s">"anthracnose"</span>,    <span class="s">"mango"</span>, <span class="s">"disease"</span>, models.anthracnose),
+    RiskModelSpec(<span class="s">"fruit_fly"</span>,      <span class="s">"mango"</span>, <span class="s">"pest"</span>,    models.fruit_fly),
+    <span class="c"># --- proposed, Brazil coffee ---</span>
+    RiskModelSpec(<span class="s">"coffee_rust"</span>, <span class="s">"coffee.arabica"</span>, <span class="s">"disease"</span>,
+                  models.coffee_rust, window_days=<span class="k">30</span>),
+    RiskModelSpec(<span class="s">"leaf_miner"</span>,  <span class="s">"coffee"</span>,         <span class="s">"pest"</span>,
+                  models.leaf_miner),
+)</code></pre>
+
+<p>دالة النموذج تجمع الظروف المواتية عبر نافذة زمنية متحركة في درجة من 0 إلى 100، وتصنفها منخفضة ومتوسطة ومرتفعة عند عتبتي 40 و70. وفي حالة الصدأ، الظروف المواتية هي الأيام الدافئة الرطبة، والحمل الثمري يرفع الدرجة. وهذا الحد الأخير هو ما يجعله نموذج بُن لا نموذج طقس رطب عام.</p>
+
+<div class="note watch">
+  <span class="tag">الدرجة من 0 إلى 100، لا من 0 إلى 1</span>
+  <p>كل عتبة تُكتب في معاملات شجرة بُن يجب أن تكون على مقياس 0 إلى 100. والشجرة التي تقارن درجة خطر بـ0.7 لن تعمل أبدًا، ولن تبلّغ عن خطأ أبدًا.</p>
+</div>
+
+<h3>شجرة كاملة، بصيغة البذرة الحقيقية</h3>
+<pre><code><span class="k">code</span>: coffee_rust_risk_v1
+<span class="k">name_en</span>: Coffee — leaf rust risk
+<span class="k">crop_path</span>: coffee.arabica
+
+<span class="k">evidence</span>:
+  <span class="k">confidence</span>: medium
+  <span class="k">notes</span>: >-
+    Hemileia vastatrix needs warm temperatures with prolonged leaf
+    wetness, and pressure rises sharply on plants carrying a heavy
+    fruit load. The score accumulates favourable days; it is not a
+    validated infection model, so the tree recommends scouting and a
+    protective decision rather than a blind application.
+
+<span class="k">parameters</span>:
+  <span class="k">warn_score</span>: { type: number, default: <span class="k">40</span>, min: 0, max: 100 }
+  <span class="k">high_score</span>: { type: number, default: <span class="k">70</span>, min: 0, max: 100 }
+
+<span class="k">root</span>: root
+<span class="k">nodes</span>:
+  <span class="k">root</span>:
+    <span class="k">label_en</span>: Is rust pressure elevated?
+    <span class="k">condition</span>:
+      <span class="k">tree</span>:
+        <span class="k">op</span>: ge
+        <span class="k">left</span>:  { source: weather_risk, risk_code: coffee_rust, field: score }
+        <span class="k">right</span>: { source: params, name: warn_score }
+    <span class="k">on_match</span>: bearing_check
+    <span class="k">on_miss</span>:  leaf_no_action
+
+  <span class="k">bearing_check</span>:
+    <span class="k">label_en</span>: Is this a high-bearing year?
+    <span class="k">condition</span>:
+      <span class="k">tree</span>:
+        <span class="k">op</span>: eq
+        <span class="k">left</span>:  { source: crop_attribute, code: bearing_year, key: value }
+        <span class="k">right</span>: <span class="s">"high"</span>
+    <span class="k">on_match</span>: leaf_critical
+    <span class="k">on_miss</span>:  leaf_warning</code></pre>
+
+<p>معاملات المقارنة التي يقبلها المُقيِّم هي <code>lt</code> و<code>le</code> و<code>gt</code> و<code>ge</code> و<code>eq</code> و<code>ne</code>، إضافة إلى <code>in</code> و<code>between</code>. والطرف الأيمن إما قيمة صريحة كما أعلاه، أو مرجع <code>params</code>. وانتبه إلى أن <code>between</code> لا يأخذ <code>right</code>، بل يأخذ <code>low</code> و<code>high</code>.</p>
+
+<div class="note gap">
+  <span class="tag">مصيدتان وقع فيهما هذا المستودع من قبل</span>
+  <p><strong>المعامل غير المعروف يرفع خطأ، أما المرجع الذي لا يُحل فلا.</strong> كتابة <code>gte</code> حيث يتوقع المُقيِّم <code>ge</code> ترفع <code>ConditionParseError</code> في <code>backend/app/shared/conditions/evaluator.py:140</code>، فهذا الخطأ يُلتقط. والعطل الصامت هو الآخر: حين لا يُحل مرجع إلى قيمة، تُرجع المقارنة "لم يتطابق" بلا أي خطأ. كود <code>crop_attribute</code> مكتوب خطأً، وصف خطر لم يكتبه النموذج قط، ومعامل مفقود، كلها تسلك <code>on_miss</code> إلى الأبد. راجع كل كود خاصية وكل كود خطر في بذور البُن مقابل البيانات، لا المعاملات وحدها مقابل قائمة المُقيِّم.</p>
+  <p><strong>الشجرة التي لا تُختار أصلًا تبلّغ عن نجاح.</strong> مسح دليل مؤشرات المانجو لم يُقيِّم شجرة واحدة في الإنتاج، لأن اختيار الحزمة سمّى الشيء الخطأ، ولم يبلّغ أي شيء عن فشل. بعد إنشاء أشجار البُن، تأكد من وجود آثار تقييم لقطع حقيقية. والتشغيل الذي يبلّغ "0 مفتوحة" ليس في ذاته دليلًا على أن الأشجار عملت.</p>
+</div>
+</section>
+
+<section id="p9">
+<p class="part">الجزء 09</p>
+<h2>ما يجب بناؤه</h2>
+
+<p>مرتب بحسب هل البرازيل ممكنة بدونه.</p>
+
+<h3>معطِّل</h3>
+<div class="tablewrap">
+<table>
+  <caption>عمل لا يمكن أن تبدأ تجربة برازيلية بدونه</caption>
+  <thead><tr><th>المرجع</th><th>البند</th><th>لماذا</th><th>الحجم التقريبي</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="num">B1</td>
+      <td><strong>البرتغالية كلغة ثالثة</strong></td>
+      <td>المنصة ثنائية اللغة بالأعمدة لا بجدول لغات: 37 عمود <code>*_ar</code> عبر نماذج الوحدات، و122 ملفًا في الواجهة الخلفية تشير إلى اسم <code>_ar</code>، ومجلدا لغات في الواجهة الأمامية (<code>en</code> و<code>ar</code>)، و33 بذرة شجرة قرار تحمل كل واحدة <code>name_en</code> و<code>name_ar</code> و<code>text_en</code> و<code>text_ar</code>. وإضافة مجموعة أعمدة <code>*_pt</code> ثالثة إجابة خاطئة مرتين، لأن اللغة الرابعة ستحتاج عندئذ هجرة ثالثة.</td>
+      <td>كبير. تغيير في نموذج البيانات، لا عمل ترجمة.</td>
+    </tr>
+    <tr>
+      <td class="num">B2</td>
+      <td><strong>تشغيل تعريف الحالة الصحية وبذر البُن فيه</strong></td>
+      <td>ما دام <code>health_definition_enabled</code> مُطفأً، تصنّف عتبات NDVI الثابتة البُن واسع المسافات والمقلّم حديثًا تصنيفًا خاطئًا. والبديل مدموج بالفعل، فالعمل هو تشغيل إعداد وإضافة صف بُن إلى كتالوج الحالة الصحية للمحاصيل، لا بناء نظام عتبات. وحذّر أولًا: المستأجر الذي لا تصل مسحته إلى كل قطعة سيرى "غير معروف" حيث كان يرى "سليم".</td>
+      <td>صغير. إعداد واحد وملف بذرة واحد.</td>
+    </tr>
+    <tr>
+      <td class="num">B3</td>
+      <td><strong>التعامل مع موسم نصف الكرة الجنوبي</strong></td>
+      <td>الموسم الذي يعبر السنة الميلادية يجب ألا يُقطع عند 31 ديسمبر في الخطط ولا التقارير ولا خطوط الأساس. والمنصة لا تملك كيان موسم رسمي اليوم، وأربعة أجزاء من النظام تختار بداية الموسم كل على حدة.</td>
+      <td>متوسط. يحتاج حسم مسألة الموسم أولًا.</td>
+    </tr>
+    <tr>
+      <td class="num">B4</td>
+      <td><strong>الوحدات والصيغ البرازيلية</strong></td>
+      <td>الجوال 60 كجم، والجوالات لكل هكتار، والفاصلة العشرية، والريال البرازيلي، ومعرّفا CPF وCNPJ، وأكواد ملكيات السجل البيئي CAR.</td>
+      <td>صغير إلى متوسط</td>
+    </tr>
+    <tr>
+      <td class="num">B5</td>
+      <td><strong>حالة التقليم تضبط أشجار المؤشرات</strong></td>
+      <td>القطعة المقطوعة تُقرأ منخفضة على كل مؤشر لموسم كامل. والحالة الصحية نفسها تتوقف عن قراءة NDVI بعد إنجاز B2، لكن شجرة المؤشر التي تشتعل ما زالت تفتح تنبيهًا، والتنبيه ما زال يحدد التصنيف. فيجب أن تضبط أشجار المؤشرات نفسها على <code>last_pruning_date</code>.</td>
+      <td>صغير. تأليف أشجار، لا عمل منصة.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>عالي القيمة وغير معطِّل</h3>
+<ul>
+  <li><strong>نموذجا خطر الصدأ وصانعة الأنفاق</strong> في سجل مخاطر الطقس. مدخلتان ودالتان نقيتان. أعلى عائد على الجهد في القائمة كلها.</li>
+  <li><strong>مراحل نمو مربوطة بحدث</strong>، بحيث يُرصد تاريخ التزهير أو يُكتشف ثم يُزاح باقي الموسم عنه.</li>
+  <li><strong>خطوط أساس واعية بسنة الحمل</strong>، تقارن سنة غزيرة بسنوات غزيرة.</li>
+  <li><strong>كتالوج أصناف البُن</strong>، مُعبَّأ بسلاسل كاتواي وموندو نوفو وكاتوكاي وأرارا وIPR الشائعة ومجموعات كلونات الكونيلون الرئيسية، وكل منها يحمل مقاومة الصدأ وفئة النضج.</li>
+</ul>
+
+<h3>استراتيجي تجاريًا</h3>
+<ul>
+  <li><strong>تصدير مضلعات القطع للامتثال.</strong> شكل هندسي لكل قطعة، والمساحة، ومعرّف المزرعة، وكود قطعة ثابت، بالصيغة التي يحتاجها ملف العناية الواجبة لدى العميل. نحن نملك البيانات بالفعل. وهذا تقرير، لا تغيير في المنصة.</li>
+  <li><strong>رفع المرفقات.</strong> صور بثرات الصدأ وضرر الحفار ولفحة الصقيع هي الطريقة التي يتواصل بها المهندس الميداني البرازيلي. ورفع الملفات من المتصفح إلى مخزن الكائنات لدينا لم يعمل قط في الإنتاج، لغياب سياسة CORS، ولا يوجد أي صف مرفق في أي مستأجر إنتاجي. وفي محصول يعتمد على الصور يتحول هذا من عيب كامن إلى عائق.</li>
+  <li><strong>مراجعة قانون حماية البيانات LGPD.</strong> القانون البرازيلي يغطي البيانات الشخصية للأعضاء والعمال، وهي كثيرة جدًا في نشر تعاوني.</li>
+</ul>
+</section>
+
+<section id="p10">
+<p class="part">الجزء 10</p>
+<h2>خطة الإطلاق والأسئلة المفتوحة</h2>
+
+<h3>خطة على مراحل</h3>
+<div class="tablewrap">
+<table>
+  <caption>المراحل المقترحة</caption>
+  <thead><tr><th>المرحلة</th><th>الهدف</th><th>تتضمن</th><th>تكتمل عندما</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>0. عمل مكتبي</strong></td>
+      <td>استبدال تقديرات هذه الوثيقة بأرقام موثقة</td>
+      <td>بيانات CONAB وCECAFÉ، ومواعيد الامتثال الحالية، ومنطقة مستهدفة محددة بالاسم، وعميل محتمل أول محدد بالاسم</td>
+      <td>كل رقم في الجزء 01 يحمل مرجعًا</td>
+    </tr>
+    <tr>
+      <td><strong>1. الكتالوج</strong></td>
+      <td>البُن موجود كمحصول من الدرجة الأولى</td>
+      <td>مسارات التصنيف، والأصناف، ومجموعة الخصائص من الجزء 06، والعتبات لكل محصول، ومراحل النمو</td>
+      <td>يمكن إنشاء قطعة بُن وتعديل خصائصها بلا خطأ</td>
+    </tr>
+    <tr>
+      <td><strong>2. مزرعة حقيقية واحدة</strong></td>
+      <td>الصور والطقس يعملان من الطرف إلى الطرف على أرض برازيلية</td>
+      <td>ضيعة واحدة، مضلعات حقيقية، استقبال سنتينل-2، المؤشرات، خلايا الشبكة، تاريخ الطقس</td>
+      <td>حساب المؤشرات لكل قطعة، وإعادة عرض زمنية يتعرف عليها المهندس الزراعي</td>
+    </tr>
+    <tr>
+      <td><strong>3. ست أشجار</strong></td>
+      <td>ظهور التوصيات بلا أي قدرة جديدة في المنصة</td>
+      <td>الأشجار السبع غير المعطلة من الجزء 08، مع تعريفات إشارات البُن</td>
+      <td>وجود آثار تقييم لقطع حقيقية، ووجود بطاقات في مركز الإجراءات يوافق عليها المهندس الزراعي</td>
+    </tr>
+    <tr>
+      <td><strong>4. اللغة والوحدات</strong></td>
+      <td>أن يستطيع برازيلي استخدامه</td>
+      <td>B1 وB4</td>
+      <td>ناطق أصلي يُكمل جولة فحص حقلي بالبرتغالية دون تبديل اللغة</td>
+    </tr>
+    <tr>
+      <td><strong>5. نماذج المخاطر</strong></td>
+      <td>أن يؤدي الطقس دوره</td>
+      <td>الصدأ وصانعة الأنفاق</td>
+      <td>مراجعة الدرجات مقابل موسم كامل من سجلات الفحص الحقلي لدى العميل نفسه</td>
+    </tr>
+    <tr>
+      <td><strong>6. الامتثال</strong></td>
+      <td>نقطة الدخول التجارية</td>
+      <td>تصدير القطع، والمرفقات، وLGPD</td>
+      <td>مصدّر يقدّم ملفه من تصديرنا</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>أسئلة مفتوحة</h3>
+<ol>
+  <li><strong>قطع الكونيلون متعددة الكلونات.</strong> هل تصبح مجموعة الكلونات هي الصنف، أم تحمل القطعة خاصية قائمة؟ هذا القرار يسبق مراحل النمو وتخطيط الحصاد.</li>
+  <li><strong>كيف تُضاف البرتغالية؟</strong> مجموعة أعمدة ثالثة سريعة وخاطئة. وجدول لغات صحيح وكبير. أيهما، وهل يفتح القرار نفسه الطريق للإسبانية في بقية أمريكا اللاتينية؟</li>
+  <li><strong>هل نتصدى للصقيع كما ينبغي؟</strong> إتقانه يحتاج بيانات تضاريس لا نملكها. وإتقانه بشكل رديء، في محصول يكون فيه الصقيع الخطر الكارثي، يضر بالثقة.</li>
+  <li><strong>بماذا تَعِد المنصة بخصوص الإنتاجية؟</strong> المزارع البرازيلي يتوقع توقعًا بالجوالات لكل هكتار، ولا يرى أي مؤشر بصري الثمار. فإما أن نبني توقعًا يجمع قوة الغطاء والطقس وسنة الحمل ونعلن مقدار عدم اليقين فيه، أو نقول بوضوح إننا لا نتنبأ بالإنتاجية.</li>
+  <li><strong>هل صار كيان الموسم أمرًا لا مفر منه؟</strong> محصول تعبر دورته السنة الميلادية، وتتداخل فيه دورتان متعاقبتان، حالة أصعب من أي شيء تحمله المنصة اليوم.</li>
+  <li><strong>من هي المرجعية الزراعية؟</strong> كل عتبة في هذه الوثيقة قاعدة تجريبية من أدبيات الإرشاد الزراعي. وللبرازيل قاعدة بحثية عامة قوية: Embrapa وIAC وINCAPER وIAPAR ومؤسسة Procafé وتعاونيات السيرادو. ومراجعة مهندس زراعي برازيلي واحد محدد بالاسم للبذور أثمن من أي قدر من الضبط.</li>
+</ol>
+
+<div class="footer">
+  <p><strong>ملاحظة نطاق.</strong> المحتوى الزراعي معرفة عامة بالقطاع ولم يُراجع مقابل مصدر بيانات حي أثناء الكتابة. أما نتائج المنصة فمختلفة: كل واحدة منها تسمي ملفًا أو سلوكًا، وقُرئت مباشرة من هذا المستودع بتاريخ 2026-09-07. وحيث لا يحمل رقم مرجعًا، تعامل معه كنقطة بداية للبحث، لا كإجابة.</p>
+</div>
+</section>
+
+</main>
+</div>
