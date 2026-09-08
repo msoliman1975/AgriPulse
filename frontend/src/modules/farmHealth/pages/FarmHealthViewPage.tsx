@@ -52,6 +52,9 @@ export function FarmHealthViewPage(): ReactNode {
   const [blockId, setBlockId] = useState<string | null>(null);
   const [areaKey, setAreaKey] = useState<string | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  // One flag for the screen, not per area: opening the reasoning is a mode a
+  // reader stays in while stepping through areas.
+  const [reasoningOpen, setReasoningOpen] = useState(false);
 
   const farmQuery = useQuery({
     queryKey: ["farm", farmId],
@@ -317,7 +320,15 @@ export function FarmHealthViewPage(): ReactNode {
                                 onSelect={setAreaKey}
                                 onHover={setHoveredKey}
                               />
-                              {activeArea ? <AreaDetail area={activeArea} /> : null}
+                              {activeArea ? (
+                                <AreaDetail
+                                  area={activeArea}
+                                  farmId={farmId}
+                                  blockId={selected.blockId}
+                                  open={reasoningOpen}
+                                  onToggle={() => setReasoningOpen((was) => !was)}
+                                />
+                              ) : null}
                             </div>
                           )}
                         </>

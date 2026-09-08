@@ -11,6 +11,7 @@ import { Card } from "@/components/Card";
 import { Pill } from "@/components/Pill";
 import type { Area } from "../lib/areas";
 import { areaLabel } from "../lib/areaLabel";
+import { Reasoning } from "./Reasoning";
 import { STATUS_ORDER, type BlockRow } from "../lib/blockRows";
 
 interface SummaryProps {
@@ -140,10 +141,20 @@ export function AreaChips({ areas, statuses, selectedKey, onSelect, onHover }: C
 
 interface DetailProps {
   area: Area;
+  farmId: string;
+  blockId: string;
+  /** Open by default is wrong: the reasoning is a follow-up question. */
+  open: boolean;
+  onToggle: () => void;
 }
 
-export function AreaDetail({ area }: DetailProps) {
-  const { t } = useTranslation(["farmHealth"]);
+export function AreaDetail({ area, farmId, blockId, open, onToggle }: DetailProps) {
+  const { t, i18n } = useTranslation(["farmHealth"]);
+  const arabic = i18n.language.startsWith("ar");
+  // The verdict text is the tree author's own sentence, so it is chosen
+  // rather than translated.
+  const text = arabic ? (area.sample.text_ar ?? area.sample.text_en) : area.sample.text_en;
+
   return (
     <Card>
       <div className="flex flex-wrap items-baseline gap-3">
@@ -155,9 +166,34 @@ export function AreaDetail({ area }: DetailProps) {
           {t("farmHealth:area.share", { share: area.share })}
         </span>
       </div>
-      {/* The reason sentence and the reasoning panel land here next. Until
-          then the leaf's own text is what the area has to say. */}
-      <p className="mt-2 max-w-none text-sm text-ap-ink">{area.sample.text_en}</p>
+
+      {/* Full width on purpose. A narrow measure here cost height the
+          reasoning below needs — Mohamed, 2026-09-07. */}
+      <p className="mt-2 text-sm text-ap-ink">{text}</p>
+
+      <div className="mt-2">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={onToggle}
+          className="text-sm font-medium text-ap-accent underline underline-offset-4"
+        >
+          {open ? t("farmHealth:reasoning.hide") : t("farmHealth:reasoning.show")}
+        </button>
+      </div>
+
+      {open ? (
+        <div className="mt-3 border-t border-ap-line pt-3">
+          <Reasoning
+            blockId={blockId}
+            verdictId={area.sample.id}
+            farmId={farmId}
+            leafNodeId={area.leafNodeId}
+            kind={area.sample.kind}
+            statusCode={area.status}
+          />
+        </div>
+      ) : null}
     </Card>
   );
 }

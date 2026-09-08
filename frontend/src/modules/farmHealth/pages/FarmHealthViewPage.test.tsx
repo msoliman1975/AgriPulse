@@ -141,6 +141,7 @@ vi.mock("@/api/blocks", () => ({
 }));
 
 const farmVerdicts = vi.hoisted((): { current: unknown } => ({ current: null }));
+const reasoning = vi.hoisted((): { current: unknown } => ({ current: null }));
 
 vi.mock("@/api/farmHealth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/api/farmHealth")>();
@@ -154,8 +155,36 @@ vi.mock("@/api/farmHealth", async (importOriginal) => {
       { code: "alert", rank: 4, color: "#D64545", label_en: "Alert", label_ar: "إنذار" },
     ]),
     getFarmVerdicts: vi.fn(async () => farmVerdicts.current),
+    getVerdictReasoning: vi.fn(async () => reasoning.current),
   };
 });
+
+/** A block with three alert cells, which is what an open area needs. */
+function withCells() {
+  grid.current = {
+    farm_id: FARM_ID,
+    index_code: "ndvi",
+    blocks: [
+      {
+        block_id: "b2",
+        product_id: "p1",
+        at: null,
+        cells: [gridCell("c00", 0, 0), gridCell("c01", 0, 1), gridCell("c02", 0, 2)],
+      },
+    ],
+  };
+  farmVerdicts.current = {
+    farm_id: FARM_ID,
+    as_of: null,
+    blocks: [
+      farmBlock("b2", [
+        { ...verdict("b2", "t_cwsi", "alert", 0), id: "v1", cell_id: "c00", leaf_node_id: "leaf_dry" },
+        { ...verdict("b2", "t_cwsi", "alert", 1), id: "v2", cell_id: "c01", leaf_node_id: "leaf_dry" },
+        { ...verdict("b2", "t_cwsi", "alert", 2), id: "v3", cell_id: "c02", leaf_node_id: "leaf_dry" },
+      ]),
+    ],
+  };
+}
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -174,6 +203,46 @@ describe("FarmHealthViewPage", () => {
   beforeEach(async () => {
     await setupTestI18n("en");
     grid.current = { farm_id: FARM_ID, index_code: "ndvi", blocks: [] };
+    reasoning.current = {
+      verdict_id: "v1",
+      block_id: "b2",
+      cell_id: null,
+      cell_row: null,
+      cell_col: null,
+      scope: "cell",
+      tree_id: "tree-1",
+      tree_code: "t_cwsi",
+      tree_version: 1,
+      leaf_node_id: "leaf_dry",
+      kind: "recommendation",
+      status_code: "alert",
+      severity: "medium",
+      valid_from: "2026-09-01T00:00:00Z",
+      last_evaluated_at: "2026-09-07T00:00:00Z",
+      reasoning_available: true,
+      trace_id: "trace-1",
+      evaluated_at: "2026-09-07T00:00:00Z",
+      node_path: [
+        {
+          node_id: "saturation",
+          matched: false,
+          label_en: "Is CWSI clipped at the index ceiling?",
+          condition: { tree: { op: "ge", right: 0.99 } },
+          values: { "indices.cwsi.mean": "0.47" },
+        },
+        {
+          node_id: "medium_check",
+          matched: true,
+          label_en: "Is CWSI above the medium-tree bound?",
+          condition: {
+            tree: { op: "gt", right: { source: "params", name: "medium_cwsi_ceiling" } },
+          },
+          values: { "indices.cwsi.mean": "0.47" },
+        },
+      ],
+      resolved_values: { "indices.cwsi.mean": "0.47" },
+      param_overrides: {},
+    };
     farmVerdicts.current = {
       farm_id: FARM_ID,
       as_of: null,
@@ -447,6 +516,54 @@ describe("FarmHealthViewPage", () => {
     expect(
       await screen.findByText("This block has no cell verdicts for this tree."),
     ).toBeInTheDocument();
+  });
+
+  it("keeps the reasoning closed until it is asked for", async () => {
+    // It is a follow-up question, not the answer. Opening by default would
+    // push the map off the screen on every block.
+    withCells();
+    renderPage();
+
+    const link = await screen.findByRole("button", { name: "Show how this was decided" });
+    expect(link).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Steps the tree took, root to leaf")).not.toBeInTheDocument();
+  });
+
+  it("shows the walk in place, with each step's reading and test", async () => {
+    withCells();
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Show how this was decided" }));
+
+    expect(await screen.findByText("Steps the tree took, root to leaf")).toBeInTheDocument();
+    // The question, the value it read, and what it was compared with — the
+    // three things that answer "why this colour".
+    expect(screen.getByText("Is CWSI above the medium-tree bound?")).toBeInTheDocument();
+    // Both steps read the same index, and each says so on its own row.
+    expect(screen.getAllByText(/read indices\.cwsi\.mean = 0\.47/)).toHaveLength(2);
+    expect(screen.getByText(/test > medium_cwsi_ceiling/)).toBeInTheDocument();
+    // It expands in the page. A dialog is what this replaced.
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("says the walk is gone rather than showing no steps", async () => {
+    // Retention prunes eval runs. An empty step list would read as "the tree
+    // did nothing", which is a different and wrong sentence.
+    reasoning.current = {
+      ...(reasoning.current as Record<string, unknown>),
+      reasoning_available: false,
+      trace_id: null,
+      node_path: [],
+    };
+    withCells();
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Show how this was decided" }));
+
+    expect(
+      await screen.findByText(/The walk behind this verdict is no longer kept/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Steps the tree took, root to leaf")).not.toBeInTheDocument();
   });
 
   it("says so when no tree has run on the farm at all", async () => {
