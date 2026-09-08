@@ -119,8 +119,8 @@ async def _seed(
         await session.execute(
             text(
                 """
-                INSERT INTO decision_tree_eval_runs (id, started_at, finished_at, status)
-                VALUES (:run_id, :at, :at, 'ok')
+                INSERT INTO decision_tree_eval_runs (id, kind, started_at, finished_at)
+                VALUES (:run_id, 'sweep', :at, :at)
                 """
             ),
             {"run_id": run_id, "at": at},
