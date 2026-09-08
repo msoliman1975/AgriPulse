@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -454,6 +454,37 @@ class PurgeEngine:
         return int(getattr(result, "rowcount", 0) or 0)
 
 
+# The widest bucket any registered continuous aggregate uses is 7 days
+# (block_index_weekly). See `_bucket_aligned` for why the margin exists.
+_WIDEST_BUCKET = timedelta(days=7)
+
+
+def _bucket_aligned(window: tuple[datetime, datetime]) -> tuple[datetime, datetime]:
+    """Widen a refresh window outward so it covers WHOLE buckets.
+
+    `refresh_continuous_aggregate` only recomputes buckets that fall entirely
+    inside the window. A window taken from real data almost never does: the
+    purged rows' `min(time)`/`max(time)` land mid-bucket, so the first and last
+    buckets are skipped — and when the whole span is shorter than one bucket,
+    nothing is refreshed at all and the call reports success.
+
+    That is not theoretical. TEL-6b's test purges a tenant whose two events are
+    a minute apart; the captured window was one minute wide, no whole day-bucket
+    fitted inside it, and the purged tenant stayed in `usage_daily` while the
+    call returned normally.
+
+    Flooring to midnight and padding by the widest registered bucket on each
+    side is deliberately generous. The cost of over-refreshing is recomputing a
+    few extra buckets from a source table that has just had rows removed; the
+    cost of under-refreshing is a purged tenant still showing on the dashboard
+    with the orphan scanner reporting clean.
+    """
+    start, end = window
+    start = start.replace(hour=0, minute=0, second=0, microsecond=0) - _WIDEST_BUCKET
+    end = end.replace(hour=0, minute=0, second=0, microsecond=0) + _WIDEST_BUCKET
+    return start, end
+
+
 async def refresh_caggs(
     *,
     engine_url: str,
@@ -483,7 +514,7 @@ async def refresh_caggs(
     """
     if window is None:
         return []
-    start, end = window
+    start, end = _bucket_aligned(window)
     refreshed: list[str] = []
     engine = create_async_engine(engine_url, isolation_level="AUTOCOMMIT")
     try:
@@ -546,7 +577,7 @@ async def refresh_public_caggs(
     """
     if window is None:
         return []
-    start, end = window
+    start, end = _bucket_aligned(window)
     refreshed: list[str] = []
     engine = create_async_engine(engine_url, isolation_level="AUTOCOMMIT")
     try:
