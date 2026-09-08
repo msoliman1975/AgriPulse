@@ -31,6 +31,7 @@ import enReports from "./locales/en/reports.json";
 import enFarmConsole from "./locales/en/farmConsole.json";
 import enPlanTemplates from "./locales/en/planTemplates.json";
 import enBulkUpdates from "./locales/en/bulkUpdates.json";
+import enFarmHealth from "./locales/en/farmHealth.json";
 import enTimeline from "./locales/en/timeline.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
@@ -61,6 +62,7 @@ import arReports from "./locales/ar/reports.json";
 import arFarmConsole from "./locales/ar/farmConsole.json";
 import arPlanTemplates from "./locales/ar/planTemplates.json";
 import arBulkUpdates from "./locales/ar/bulkUpdates.json";
+import arFarmHealth from "./locales/ar/farmHealth.json";
 import arTimeline from "./locales/ar/timeline.json";
 
 export type SupportedLanguage = "en" | "ar";
@@ -102,6 +104,7 @@ const resources = {
     farmConsole: enFarmConsole,
     planTemplates: enPlanTemplates,
     bulkUpdates: enBulkUpdates,
+    farmHealth: enFarmHealth,
     timeline: enTimeline,
   },
   ar: {
@@ -134,6 +137,7 @@ const resources = {
     farmConsole: arFarmConsole,
     planTemplates: arPlanTemplates,
     bulkUpdates: arBulkUpdates,
+    farmHealth: arFarmHealth,
     timeline: arTimeline,
   },
 } as const;

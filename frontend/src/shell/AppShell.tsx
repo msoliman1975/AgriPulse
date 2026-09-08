@@ -28,7 +28,10 @@ export function AppShell(): ReactNode {
   // and every /settings/* page triple-padded. <Page> owns the inset now, so a
   // page's declared width is also its declared padding.
   const { pathname } = useLocation();
-  const viewportPinned = pathname.startsWith("/labs/map") || pathname.startsWith("/timeline");
+  const viewportPinned =
+    pathname.startsWith("/labs/map") ||
+    pathname.startsWith("/timeline") ||
+    pathname.startsWith("/farm-health");
   return (
     <div
       className={

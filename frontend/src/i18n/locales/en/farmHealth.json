@@ -1,0 +1,22 @@
+{
+  "title": "Farm Health View",
+  "treePicker": {
+    "label": "Decision tree"
+  },
+  "rail": {
+    "heading": "Blocks · worst verdict first",
+    "didNotRun": "Tree did not run",
+    "verdictCount_one": "{{count}} verdict",
+    "verdictCount_other": "{{count}} verdicts",
+    "noBlocks": "This farm has no blocks yet."
+  },
+  "block": {
+    "verdictSummary_one": "{{count}} verdict from {{tree}}.",
+    "verdictSummary_other": "{{count}} verdicts from {{tree}}.",
+    "didNotRun": "{{tree}} did not run on this block. No verdict row exists, which is not the same as a verdict of \"not assessed\"."
+  },
+  "empty": {
+    "noTrees": "No decision tree has recorded a verdict on this farm yet.",
+    "noBlock": "Pick a block to see what the tree said about it."
+  }
+}
