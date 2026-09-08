@@ -457,37 +457,44 @@ asking him.
 
 ## 8b. What production holds today
 
-Measured on 2026-09-07 against the production database, over SSH.
+Measured on 2026-09-07 and 2026-09-08 against the production database, over
+SSH.
 
-**The verdict table is empty on every tenant.** Two tenant schemas have
-`decision_tree_block_verdicts` and both hold 0 rows. The third,
-`tenant_019ecf24bb59752f8b24762ceb5af639`, does not have the table at all:
-tenant migration 0091 has not been applied to it.
+**The verdict table is empty, and that is correct.** The image carrying the
+verdict code, `0af9a38`, rolled out at 2026-09-07T22:24Z. The last
+recommendations sweep ran at 14:21Z the same day, eight hours earlier, on the
+previous image `a60b9e8`. So no sweep has yet run with the write in it.
+`pg_stat_user_tables` agrees: `n_tup_ins` is 0, meaning not one row has ever
+been attempted, rather than rows written and removed.
 
-The sweep is running. On `tenant_019eafdc242c7320948e13490efc67dd` the run of
-2026-09-07 evaluated 72 blocks and 1728 trees, and
-`decision_tree_eval_traces` holds 379,946 rows, 4,752 of them from the last two
-days: 3,056 `clear`, 1,296 `skipped`, 400 `fired`. So trees are being walked
-and their traces stored, while no verdict row is written.
+The first sweep to produce verdicts is the one at about 14:21Z on 2026-09-08.
+Check it before concluding anything from an empty screen:
 
-The write is not behind the feature flag. `evaluate_block` creates the verdict
-buffer unconditionally at `service.py:493`, the sweep task calls
-`evaluate_block`, and I confirmed that exact line is present inside the running
-worker image. Both API and workers run `0af9a38`, which is the commit that
-added verdicts.
+```sql
+SET search_path TO "tenant_019eafdc242c7320948e13490efc67dd", public;
+SELECT count(*) FROM decision_tree_block_verdicts;
+```
 
-I did not find the cause. What is certain is the measurement: the store this
-whole screen reads is empty, and stays empty after each sweep.
+For scale, that tenant's sweep walks 72 blocks and 1728 trees and writes
+about 4,750 traces per run, of which roughly 1,730 reach a leaf. Expect a
+verdict row per leaf reached, so on the order of 1,700 rows on the first
+sweep and far fewer on later ones, because a verdict that has not changed is
+confirmed rather than re-inserted.
 
-Caution: until this is resolved, the Farm Health View will render correctly
-and show nothing. Do not read an empty map as a defect in the screen. Two
-things to chase first, in this order:
+The write itself is proven against the live schema. I ran the exact
+`insert_new` statement from `VERDICT_SQL` on the production database inside a
+transaction that rolled back: `INSERT 0 1`.
 
-1. Whether `verdicts.rows` is empty when `_write_verdicts` runs, or whether
-   `sync_verdicts` writes zero rows from a non-empty list. The sweep summary
-   does not accumulate `verdicts_written`, so nothing logs the difference —
-   adding that to `tasks.py` costs one line and answers it on the next run.
-2. Why one tenant schema is missing migration 0091.
+**The archived tenant has no verdict table, and that is also correct.**
+`tenant_019ecf24bb59752f8b24762ceb5af639` is `agrosina-demo`, status
+`archived`. Archived schemas do not take new migrations, so 0091 was never
+applied there. The two active tenants, `agrosina` and `valley-farms`, both
+have the table.
+
+Note: I first read both of these as production defects and said so. Neither
+is. What was true is that nothing in the sweep log could tell an empty write
+from a sweep that had not run, which is why
+`fix/sweep-log-verdicts-written` adds the counter.
 
 ## 9. Traps in this codebase
 
