@@ -14,7 +14,7 @@
 // polygons keeps clicks and hover exact — the picture is smoothed, the
 // geometry is not.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl, {
   type GeoJSONSource,
   type ImageSource,
@@ -38,6 +38,7 @@ import {
 
 const BLOCK_SOURCE = "fh-blocks";
 const CELL_IMAGE_SOURCE = "fh-cell-image";
+const CELL_IMAGE_LAYER = "fh-cell-image";
 const CELL_HIT_SOURCE = "fh-cell-hit";
 const OUTLINE_SOURCE = "fh-outline";
 
@@ -185,7 +186,10 @@ export function HealthMap({
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
-  const readyRef = useRef(false);
+  // State, not a ref. A ref change does not re-run an effect, so gating the
+  // data effects on one meant that whenever the queries resolved before the
+  // map's load event they ran once against an unready map and never again.
+  const [ready, setReady] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   // Handlers change on every render; the map keeps one reference and reads
   // the current one through this, so listeners are attached once.
@@ -249,9 +253,12 @@ export function HealthMap({
         ],
       });
       map.addLayer({
-        id: "fh-cell-image",
+        id: CELL_IMAGE_LAYER,
         type: "raster",
         source: CELL_IMAGE_SOURCE,
+        // Hidden until a block with cell verdicts is chosen. The placeholder
+        // image is 1x1 over a zero-area footprint, which must never be drawn.
+        layout: { visibility: "none" },
         paint: { "raster-opacity": 0.85, "raster-resampling": "linear" },
       });
 
@@ -295,12 +302,12 @@ export function HealthMap({
           map.getCanvas().style.cursor = "";
         });
       }
-      readyRef.current = true;
+      setReady(true);
       map.resize();
     });
 
     return () => {
-      readyRef.current = false;
+      setReady(false);
       map.remove();
       mapRef.current = null;
     };
@@ -309,16 +316,16 @@ export function HealthMap({
   // Blocks
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !readyRef.current) return;
+    if (!map || !ready) return;
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- tsc types getSource as the Source base, which has no setData/setCoordinates
     const source = map.getSource(BLOCK_SOURCE) as GeoJSONSource | undefined;
     source?.setData(blockFeatures(blocks, fitMode === "farm"));
-  }, [blocks, fitMode]);
+  }, [blocks, fitMode, ready]);
 
   // Cells: the blurred image, and the invisible polygons under it
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !readyRef.current) return;
+    if (!map || !ready) return;
 
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- tsc types getSource as the Source base, which has no setData/setCoordinates
     const hit = map.getSource(CELL_HIT_SOURCE) as GeoJSONSource | undefined;
@@ -335,14 +342,12 @@ export function HealthMap({
     }));
     const box = cellsBbox(paintable);
     if (box === null) {
-      // No cells: collapse the image rather than leave the last block's
-      // colours pinned over a block that has none.
-      image.setCoordinates([
-        [0, 0],
-        [0, 0],
-        [0, 0],
-        [0, 0],
-      ]);
+      // No cells: hide the layer. Collapsing the coordinates instead gives
+      // MapLibre a zero-area quad, it divides by zero working out the tile
+      // coordinates, and the page dies with "x=Infinity, y=Infinity,
+      // z=Infinity outside of bounds". Every verdict on the reference farm
+      // is block-scoped, so this is the normal path, not an edge case.
+      map.setLayoutProperty(CELL_IMAGE_LAYER, "visibility", "none");
       return;
     }
 
@@ -359,22 +364,23 @@ export function HealthMap({
     // because the block changes as often as the colours do.
     image.updateImage({ url: canvas.toDataURL() });
     image.setCoordinates(bboxToImageCoordinates(box));
-  }, [cells, colorOf]);
+    map.setLayoutProperty(CELL_IMAGE_LAYER, "visibility", "visible");
+  }, [cells, colorOf, ready]);
 
   // The selected area's outline
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !readyRef.current) return;
+    if (!map || !ready) return;
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- tsc types getSource as the Source base, which has no setData/setCoordinates
     const source = map.getSource(OUTLINE_SOURCE) as GeoJSONSource | undefined;
     source?.setData(outlineFeatures(cells, highlighted));
-  }, [cells, highlighted]);
+  }, [cells, highlighted, ready]);
 
   // Framing. Three answers, one effect, so they cannot disagree about
   // padding or duration.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !readyRef.current) return;
+    if (!map || !ready) return;
 
     let box = null;
     if (fitMode === "farm") {
@@ -393,7 +399,7 @@ export function HealthMap({
     // `highlighted` is deliberately not a dependency: hovering a chip
     // previews an area on the map and must not fly the camera to it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fitKey, fitMode, blocks, cells]);
+  }, [fitKey, fitMode, blocks, cells, ready]);
 
   return <div ref={containerRef} className="h-full w-full" data-testid="health-map" />;
 }
