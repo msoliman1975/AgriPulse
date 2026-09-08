@@ -172,3 +172,37 @@ export async function getVerdictReasoning(
   );
   return data;
 }
+
+export interface FarmVerdictHistory {
+  farm_id: string;
+  from_at: string;
+  to_at: string;
+  tree_code: string | null;
+  /**
+   * True when the guard cut the list. The caller has more history than a
+   * replay can draw and should narrow the window or name a tree, rather than
+   * draw a map that is quietly missing rows.
+   */
+  truncated: boolean;
+  verdicts: Verdict[];
+}
+
+/**
+ * Every verdict that stood at any point in a window, as intervals.
+ *
+ * One request for a whole replay. One row per change, not per day: a block
+ * holding the same verdict for a month is a single row, and the client
+ * rebuilds each day's frame from the intervals.
+ */
+export async function getFarmVerdictHistory(
+  farmId: string,
+  from: string,
+  to: string,
+  treeCode?: string | null,
+): Promise<FarmVerdictHistory> {
+  const { data } = await apiClient.get<FarmVerdictHistory>(
+    `/farms/${farmId}/verdict-history`,
+    { params: { from, to, ...(treeCode ? { tree_code: treeCode } : {}) } },
+  );
+  return data;
+}
