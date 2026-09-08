@@ -1,24 +1,34 @@
 # Farm Health View — specification for implementation
 
-Status: pull requests 1, 2 and 3 are written on branches and not pushed.
-Pull requests 4 to 8 are not started. This document is the single input for
-the session that continues it.
+Status: all eight pull requests are written on branches and not pushed. No
+integration test has run: Docker does not start on the development machine,
+so CI is the first place the backend tests execute.
 
-Written on 2026-09-07, each off `origin/main`, in the worktree
-`C:/Users/mosoliman/projects/ma-fhvspec`:
+Written on 2026-09-07 and 2026-09-08, in the worktree
+`C:/Users/mosoliman/projects/ma-fhvspec`. PRs 1 and 2 branch off
+`origin/main`; PRs 3 to 8 stack, each on the one before.
 
 | Branch | Commit | What |
 | --- | --- | --- |
-| `feat/verdict-last-run-id` | `dced9af2` | PR 1 |
-| `feat/verdict-history-read` | `a31251ef` | PR 2 |
-| `feat/farm-health-view-shell` | `935a1414` | PR 3 |
+| `feat/verdict-last-run-id` | `dced9af2` | PR 1 — a verdict reaches its walk |
+| `feat/verdict-history-read` | `a31251ef` | PR 2 — one read for a window |
+| `feat/farm-health-view-shell` | `935a1414` | PR 3 — route, shell, block rail |
+| `feat/farm-health-map` | `23b57641` | PR 4 — the map, smoothed |
+| `feat/farm-health-areas` | `0a9524d6` | PR 5 — areas and block summary |
+| `feat/farm-health-reasoning` | `02442394` | PR 6 — why this colour |
+| `feat/farm-health-replay` | `694a4fa6` | PR 7 — the date range and replay |
+| `feat/farm-health-map` (fit) | `efe1f501` | PR 8 — frame block, area, farm |
+| `fix/sweep-log-verdicts-written` | `cb33fdcb` | the sweep's verdict tally |
 
-Prototype: https://claude.ai/code/artifact/2d6cac8c-6c5c-4dd6-997c-3ec00b46c9e6
+Two things the work found that changed the plan, both recorded in place:
+the trace endpoints are gated on a capability five of the eight roles do not
+hold (section 2.4), and production holds no verdicts because no sweep has yet
+run with the write in it (section 8b).
 
-The prototype is a single HTML page with invented data. It is the reference for
-layout and behaviour. Every rule in this document was decided with Mohamed on
-2026-09-07, one question at a time. Where the prototype and this document
-disagree, this document wins.
+One part of the specification is not built. Section 5.6, the display for a
+verdict reached by more than one route, needs the API to say which route a
+cell took; nothing does. `sharedPrefix()` in `lib/walk.ts` is written and
+tested for the day it can.
 
 ## 1. What the screen is
 
