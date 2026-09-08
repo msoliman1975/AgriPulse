@@ -54,6 +54,7 @@ from app.modules.recommendations.schemas import (
     FarmTreeSelectionResponse,
     FarmTreeToggleRequest,
     FarmTreeToggleResponse,
+    FarmVerdictHistoryResponse,
     FarmVerdictsResponse,
     RecommendationResponse,
     RecommendationScheduleRequest,
@@ -1191,6 +1192,59 @@ async def get_block_verdicts(
     """
     _ensure_tenant(context)
     return await service.block_verdicts(block_id=block_id, at=at)
+
+
+@router.get(
+    "/farms/{farm_id}/verdict-history",
+    response_model=FarmVerdictHistoryResponse,
+    summary="Every verdict that stood at any point in a date window.",
+)
+async def get_farm_verdict_history(
+    farm_id: UUID,
+    from_at: datetime = Query(
+        ...,
+        alias="from",
+        description="Start of the window, inclusive.",
+    ),
+    to_at: datetime = Query(
+        ...,
+        alias="to",
+        description="End of the window, exclusive.",
+    ),
+    tree_code: str | None = Query(
+        default=None,
+        description=(
+            "One tree. The map shows one tree at a time, and filtering here "
+            "rather than in the client is what keeps a year inside one "
+            "response."
+        ),
+    ),
+    context: RequestContext = Depends(
+        requires_capability("recommendation.read", farm_id_param="farm_id")
+    ),
+    service: RecommendationsServiceImpl = Depends(_service),
+) -> dict[str, Any]:
+    """The replay, in one request.
+
+    `/farms/{farm_id}/verdicts?at=` answers one instant. A day-by-day replay
+    over a year would call it 365 times for a farm whose answers change a
+    handful of times. This returns the intervals themselves, once.
+
+    `from` and `to` are query aliases because `from` is a Python keyword.
+    """
+    from app.core.errors import APIError
+
+    _ensure_tenant(context)
+    if to_at <= from_at:
+        raise APIError(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            title="Empty window",
+            detail="`to` must be after `from`.",
+            type_="https://agripulse.cloud/problems/verdict-history-empty-window",
+        )
+    return await service.farm_verdict_history(
+        farm_id=farm_id, from_at=from_at, to_at=to_at, tree_code=tree_code
+    )
 
 
 @router.get(

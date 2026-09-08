@@ -157,6 +157,25 @@ class FarmVerdictsResponse(BaseModel):
     blocks: list[BlockVerdictsResponse] = Field(default_factory=list)
 
 
+class FarmVerdictHistoryResponse(BaseModel):
+    """Every verdict that stood at any point in a window, as intervals.
+
+    One row per change, not per day. The client rebuilds a frame for a given
+    day with the same test the SQL uses:
+    `valid_from <= day AND (valid_to IS NULL OR valid_to > day)`.
+    """
+
+    farm_id: UUID
+    from_at: datetime
+    to_at: datetime
+    tree_code: str | None = None
+    # True when the guard cut the list. The caller has more history than a
+    # replay can draw, and should narrow the window or name a tree rather
+    # than draw a map that is quietly missing rows.
+    truncated: bool = False
+    verdicts: list[VerdictResponse] = Field(default_factory=list)
+
+
 ActionHorizon = Literal["immediate", "short_term", "long_term", "monitoring"]
 
 

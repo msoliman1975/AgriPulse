@@ -132,6 +132,11 @@ class _BlockEvaluation:
 # at all — see migration 0062 for why the grain is uneven.
 _FULL_PAYLOAD_STATUSES = frozenset({"fired", "error"})
 
+# The guard on one window read. Not a page size: a farm past this has more
+# history than a day-by-day replay can draw, and the caller is told so
+# rather than handed a short list it cannot tell from a complete one.
+_HISTORY_ROW_LIMIT = 50_000
+
 
 @dataclass(slots=True)
 class _VerdictBuffer:
@@ -1184,6 +1189,46 @@ class RecommendationsServiceImpl:
                 _block_group(block_id=block_id, rows=block_rows, as_of=at)
                 for block_id, block_rows in by_block.items()
             ],
+        }
+
+    async def farm_verdict_history(
+        self,
+        *,
+        farm_id: UUID,
+        from_at: datetime,
+        to_at: datetime,
+        tree_code: str | None = None,
+    ) -> dict[str, Any]:
+        """Every verdict that stood at any point in the window, in one read.
+
+        The map replays a range one calendar day at a time. Reading per day
+        would be 30 requests for a month and 365 for a year, on a farm whose
+        answer changes a handful of times in that period. This returns the
+        intervals instead, and the client rebuilds each frame with the same
+        test the SQL uses: `valid_from <= day AND (valid_to IS NULL OR
+        valid_to > day)`.
+
+        `truncated` is true when the guard cut the list. A caller that gets
+        it has more history than a replay can draw and should narrow the
+        window or name a tree, rather than draw a map that is quietly
+        missing rows.
+        """
+        limit = _HISTORY_ROW_LIMIT
+        rows = await self._repo.list_verdict_history(
+            farm_id=farm_id,
+            from_at=_as_utc(from_at) or from_at,
+            to_at=_as_utc(to_at) or to_at,
+            tree_code=tree_code,
+            limit=limit + 1,
+        )
+        truncated = len(rows) > limit
+        return {
+            "farm_id": farm_id,
+            "from_at": from_at,
+            "to_at": to_at,
+            "tree_code": tree_code,
+            "truncated": truncated,
+            "verdicts": rows[:limit],
         }
 
     async def verdict_reasoning(self, *, block_id: UUID, verdict_id: UUID) -> dict[str, Any] | None:
