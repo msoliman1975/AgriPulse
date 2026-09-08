@@ -3455,9 +3455,9 @@ global:
     #   code does not read the verdict table, and tenant 0090's columns are
     #   nullable.
     api:
-      tag: "0af9a38"
+      tag: "890e158"
     workers:
-      tag: "0af9a38"
+      tag: "890e158"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3908,7 +3908,7 @@ global:
       #   traces page learns the 'farm' skip axis. The API half must move in
       #   the same sync — the new section calls two routes that do not exist
       #   on 76a6411.
-      tag: "0af9a38"
+      tag: "890e158"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
