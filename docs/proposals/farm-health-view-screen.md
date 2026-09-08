@@ -1,7 +1,17 @@
 # Farm Health View — specification for implementation
 
-Status: designed, not built. This document is written to be handed to another
-session as the single input for building the screen.
+Status: pull requests 1, 2 and 3 are written on branches and not pushed.
+Pull requests 4 to 8 are not started. This document is the single input for
+the session that continues it.
+
+Written on 2026-09-07, each off `origin/main`, in the worktree
+`C:/Users/mosoliman/projects/ma-fhvspec`:
+
+| Branch | Commit | What |
+| --- | --- | --- |
+| `feat/verdict-last-run-id` | `dced9af2` | PR 1 |
+| `feat/verdict-history-read` | `a31251ef` | PR 2 |
+| `feat/farm-health-view-shell` | `935a1414` | PR 3 |
 
 Prototype: https://claude.ai/code/artifact/2d6cac8c-6c5c-4dd6-997c-3ec00b46c9e6
 
@@ -105,6 +115,12 @@ farm-scoped routes. `/verdict-statuses` uses `any_farm=True`. Keep both. A
 `node_path` and `resolved_values`, because 200 full walks is several megabytes
 of JSONB.
 
+Warning: both trace endpoints are gated on `decision_tree.read`. I checked
+`role_capabilities.yaml` on 2026-09-07: five roles hold `recommendation.read`
+and not that one — FarmManager, Agronomist, FieldOperator, Scout and Viewer.
+Those are the readers this screen is for, so pointing the reasoning panel at
+these endpoints returns 403 for all of them. PR 1 adds a second door instead.
+
 ### 2.5 The feature flag
 
 `health_definition_enabled` in `backend/app/core/settings.py`, default `False`.
@@ -119,20 +135,29 @@ either state.
 These are the parts that do not exist yet. Each one is verified absent, not
 assumed.
 
-### 3.1 A verdict row cannot reach its trace
+### 3.1 A verdict row cannot reach its trace — closed by PR 1
 
-`VerdictResponse` ends at `alert_id` and `recommendation_id`. It carries no
-`run_id`, no `last_run_id` and no trace id, although the table has `run_id` and
-`last_run_id` columns.
+`VerdictResponse` ended at `alert_id` and `recommendation_id`. It carried no
+`run_id`, no `last_run_id` and no trace id, although the table has had both
+columns since migration 0091. The column was simply missing from the SELECT.
 
-Effect: the frontend cannot ask for the walk behind a verdict. It would have to
-list traces by block and tree and match on time, which is a guess.
+PR 1 adds `last_run_id` to the read and to the response. `confirm()` re-points
+it on every sweep that reaches the same leaf, so it names the newest walk
+rather than the one that opened the interval.
 
-Fix: add `last_run_id` to `VerdictResponse`, then let
-`GET /decision-tree-traces?run_id=&block_id=&tree_code=` find the one trace.
-Adding a nullable field to a response model breaks nothing.
+PR 1 also adds the second door the capability gap in section 2.4 forces:
 
-Do this first. Section 5.5 cannot be built without it.
+    GET /blocks/{block_id}/verdicts/{verdict_id}/reasoning?farm_id=
+
+Gated on `recommendation.read` with `farm_id_param`, the way the verdict reads
+are. It returns the verdict plus `node_path`, `resolved_values` and
+`param_overrides` from the trace of `last_run_id`.
+
+The join to the trace is a LEFT JOIN. Retention prunes eval runs and their
+traces, so a verdict that is still the current answer can outlive its walk.
+That case returns `reasoning_available: false` with the verdict intact, not a
+404, because "the reasoning is no longer kept" and "no such verdict" are
+different sentences.
 
 ### 3.2 There is no cell geometry in the verdict read
 
@@ -149,13 +174,20 @@ Two options. Pick one before writing code:
 Recommendation: option 1. The geometry is stable across the whole replay, so
 fetching it once per block beats sending it 30 to 365 times.
 
-### 3.3 There is no range read
+### 3.3 There is no range read — closed by PR 2
 
-Every endpoint takes a single `at`. A 365-day replay would be 365 requests.
+Every endpoint took a single `at`. A 365-day replay would have been 365
+requests.
 
-Fix: add `GET /farms/{farm_id}/verdict-history?from=&to=`, returning the
-interval rows that overlap the window, once. The frontend then builds each
-frame in memory with the same predicate as section 2.1.
+PR 2 adds `GET /farms/{farm_id}/verdict-history?from=&to=&tree_code=`,
+returning the interval rows that overlap the window, once. The frontend then
+builds each frame in memory with the same predicate as section 2.1.
+
+`from` and `to` are query aliases because `from` is a Python keyword. A window
+whose end is not after its start returns 422 rather than an empty list,
+because an empty list reads the same as a farm with no history. The row guard
+is 50,000 and the response reports `truncated` rather than returning a short
+list the caller cannot tell from a complete one.
 
 Size: one row per block or cell per tree per change, not per day. A block that
 holds one verdict for a month is one row.
@@ -274,8 +306,13 @@ The section lists the steps the tree took, root to leaf. One step shows:
 The leaf closes the list, with its `leaf_node_id`, `kind` and `status_code`.
 
 Source: `node_path` and `resolved_values` from
-`GET /decision-tree-traces/{trace_id}`, reached through the `last_run_id` added
-in section 3.1.
+`GET /blocks/{block_id}/verdicts/{verdict_id}/reasoning?farm_id=`, added in
+PR 1. Do not call `/decision-tree-traces/{trace_id}` from this screen: it is
+gated on `decision_tree.read`, which five of the eight roles do not hold.
+
+When `reasoning_available` is false the run has been pruned by retention. Say
+that the reasoning is no longer kept. Do not render an empty step list, which
+reads as "the tree did nothing".
 
 ### 5.6 More than one route to the same verdict
 
@@ -404,16 +441,53 @@ asking him.
 
 ## 8. Open questions
 
-1. Which trees appear in the picker? Every published tree, or only trees that
-   have at least one verdict row on this farm in the window? The second is
-   shorter and truer, and costs one more query.
+1. ~~Which trees appear in the picker?~~ Answered in PR 3: only trees with a
+   verdict on this farm. It costs no extra query — the farm read already
+   carries `tree_code` on every verdict. A tree with no verdict here would
+   paint an entirely blank screen, and a reader cannot tell that from a
+   broken one.
 2. Should the screen be farm-scoped only, or should there be a tenant-level
    entry that asks for a farm first?
 3. Does a Scout see this screen? A Scout holds `recommendation.read` on their
    farms, so the endpoints allow it today.
 4. Arabic. Every string has an Arabic side in the data. The area names in
    section 5.3 are generated, so they need Arabic templates.
-5. What does `health_definition_enabled` read as in production right now?
+5. What does `health_definition_enabled` read as in production right now? It
+   is `False` by default in `settings.py`; I did not read the running value.
+
+## 8b. What production holds today
+
+Measured on 2026-09-07 against the production database, over SSH.
+
+**The verdict table is empty on every tenant.** Two tenant schemas have
+`decision_tree_block_verdicts` and both hold 0 rows. The third,
+`tenant_019ecf24bb59752f8b24762ceb5af639`, does not have the table at all:
+tenant migration 0091 has not been applied to it.
+
+The sweep is running. On `tenant_019eafdc242c7320948e13490efc67dd` the run of
+2026-09-07 evaluated 72 blocks and 1728 trees, and
+`decision_tree_eval_traces` holds 379,946 rows, 4,752 of them from the last two
+days: 3,056 `clear`, 1,296 `skipped`, 400 `fired`. So trees are being walked
+and their traces stored, while no verdict row is written.
+
+The write is not behind the feature flag. `evaluate_block` creates the verdict
+buffer unconditionally at `service.py:493`, the sweep task calls
+`evaluate_block`, and I confirmed that exact line is present inside the running
+worker image. Both API and workers run `0af9a38`, which is the commit that
+added verdicts.
+
+I did not find the cause. What is certain is the measurement: the store this
+whole screen reads is empty, and stays empty after each sweep.
+
+Caution: until this is resolved, the Farm Health View will render correctly
+and show nothing. Do not read an empty map as a defect in the screen. Two
+things to chase first, in this order:
+
+1. Whether `verdicts.rows` is empty when `_write_verdicts` runs, or whether
+   `sync_verdicts` writes zero rows from a non-empty list. The sweep summary
+   does not accumulate `verdicts_written`, so nothing logs the difference —
+   adding that to `tasks.py` costs one line and answers it on the next run.
+2. Why one tenant schema is missing migration 0091.
 
 ## 9. Traps in this codebase
 
@@ -482,30 +556,41 @@ is a new route, so an unfinished route is reached by nobody.
 4. `backend-integration` in CI is `continue-on-error`. A green tick means the
    job ran. Read the summary line.
 
-### PR 1 — Backend: let a verdict reach its trace
+### PR 1 — Backend: let a verdict reach its walk — WRITTEN
 
-Problem: section 3.1.
+Branch `feat/verdict-last-run-id`, commit `dced9af2`. Not pushed.
 
-Changes:
+Problem: sections 2.4 and 3.1.
 
-- `backend/app/modules/recommendations/schemas.py` — add `last_run_id: UUID |
-  None = None` to `VerdictResponse`, as the last field.
-- `backend/app/modules/recommendations/repository.py` — select `last_run_id`
-  in `list_verdicts`.
+What it changed:
 
-Tests:
+- `schemas.py` — `last_run_id` on `VerdictResponse`; new
+  `VerdictReasoningResponse`.
+- `repository.py` — `last_run_id` in the read; new `VERDICT_SQL.REASONING`
+  and `get_verdict_reasoning`.
+- `service.py` — `verdict_reasoning`, which sets `reasoning_available`.
+- `router.py` — `GET /blocks/{block_id}/verdicts/{verdict_id}/reasoning`.
+- `tests/integration/recommendations/test_verdict_reasoning.py` — four tests:
+  the run id round trips through both verdict reads, the walk comes back in
+  order with its values, a pruned run leaves the verdict readable, and a
+  verdict id from another block returns 404.
 
-- Integration: write a verdict, read it back through
-  `GET /blocks/{block_id}/verdicts`, assert `last_run_id` matches the run that
-  wrote it.
-- Integration: assert `GET /decision-tree-traces?run_id=<that id>` returns the
-  matching trace.
+Checked: `pytest tests/unit` passed 1735. ruff, black and mypy clean. The
+reasoning SQL was run against the production schema inside a transaction that
+rolled back, and planned as three index scans. The integration tests did not
+run: Docker does not start on the development machine, so CI is the first
+place they execute.
 
-Acceptance: from one verdict row you can fetch its node walk in two requests.
+### PR 2 — Backend: one read for a date range — WRITTEN
 
-Risk: low. A nullable field added to a response model breaks no caller.
+Branch `feat/verdict-history-read`, commit `a31251ef`. Not pushed.
 
-### PR 2 — Backend: one read for a date range
+Checked: `pytest tests/unit` passed 1735. ruff, black and mypy clean. The
+history SQL was run against the production schema inside a transaction that
+rolled back, and planned as an index scan on `ix_dt_verdicts_tree_time`. Five
+integration tests written, not run, for the same reason as PR 1.
+
+Not measured on production data, because there is none. See section 8b.
 
 Problem: section 3.3. A 365-day replay must not be 365 requests.
 
@@ -544,7 +629,14 @@ pull request rather than later.
 
 Risk: medium, because of size. Measure first.
 
-### PR 3 — Frontend: route, shell and block list
+### PR 3 — Frontend: route, shell and block list — WRITTEN
+
+Branch `feat/farm-health-view-shell`, commit `935a1414`. Not pushed.
+
+Checked: `tsc -b --force` clean, eslint clean, and the full frontend suite
+passed 1522 tests in 174 files, 16 of them new. I removed the AppShell pin
+and confirmed `viewportPinned.test.ts` fails, then restored it, so the guard
+is proven rather than assumed.
 
 Changes:
 
