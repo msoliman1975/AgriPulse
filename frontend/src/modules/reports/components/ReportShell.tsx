@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { DateRange } from "../dateRange";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { trackFeature } from "@/telemetry";
 
 interface Props {
   /** Localised report title, shown as the printout header. */
@@ -31,6 +32,19 @@ function formatDay(iso: string): string {
 export function ReportShell({ title, farmName, period, onExportCsv, children }: Props): ReactNode {
   const { t } = useTranslation("reports");
 
+  // Every report renders through this shell, so one call site here covers all
+  // of them — and keeps covering a report added later. `title` is a localised
+  // string and would be high-cardinality and untranslatable back, so it is not
+  // sent; the route already says which report this is.
+  const exportCsv = (): void => {
+    trackFeature("report_export", { props: { action: "csv" } });
+    onExportCsv?.();
+  };
+  const print = (): void => {
+    trackFeature("report_export", { props: { action: "print" } });
+    window.print();
+  };
+
   return (
     <Card noPadding className="report-print-area p-4">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-ap-line pb-3">
@@ -44,11 +58,11 @@ export function ReportShell({ title, farmName, period, onExportCsv, children }: 
         </div>
         <div className="print-hide flex items-center gap-2">
           {onExportCsv ? (
-            <Button variant="ghost" className="text-xs" onClick={onExportCsv}>
+            <Button variant="ghost" className="text-xs" onClick={exportCsv}>
               {t("shell.exportCsv")}
             </Button>
           ) : null}
-          <Button variant="ghost" className="text-xs" onClick={() => window.print()}>
+          <Button variant="ghost" className="text-xs" onClick={print}>
             {t("shell.print")}
           </Button>
         </div>

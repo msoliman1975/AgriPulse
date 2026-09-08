@@ -18,6 +18,7 @@ import { useDateLocale } from "@/hooks/useDateLocale";
 import { localizedField } from "@/lib/localizedField";
 import { useCapability } from "@/rbac/useCapability";
 import { useAlerts, useTransitionAlert } from "@/queries/alerts";
+import { trackFeature } from "@/telemetry";
 
 const STATUS_TAB_VALUES: ReadonlyArray<AlertStatus | "all"> = [
   "open",
@@ -52,7 +53,18 @@ export function AlertsPage(): ReactNode {
       ? { farm_id: farmId ?? undefined }
       : { farm_id: farmId ?? undefined, status: tab },
   );
-  const transition = useTransitionAlert();
+  const transitionMut = useTransitionAlert();
+  // Wrapped once rather than at each button: acting on an alert is the whole
+  // point of the page, and two call sites would drift the moment a third
+  // action is added.
+  const transition = {
+    ...transitionMut,
+    mutate: (vars: Parameters<typeof transitionMut.mutate>[0]) => {
+      const action = Object.keys(vars.payload)[0] ?? "unknown";
+      trackFeature("alerts", { props: { action } });
+      transitionMut.mutate(vars);
+    },
+  };
 
   if (!farmId) {
     return <Navigate to="/" replace />;

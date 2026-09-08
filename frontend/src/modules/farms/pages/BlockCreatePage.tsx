@@ -7,6 +7,7 @@ import { isApiError } from "@/api/errors";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
+import { trackFeature } from "@/telemetry";
 import { BlockForm, type BlockFormValues } from "../components/BlockForm";
 
 export function BlockCreatePage(): JSX.Element {
@@ -21,6 +22,7 @@ export function BlockCreatePage(): JSX.Element {
     setError(null);
     try {
       const block = await createBlock(farmId, values);
+      trackFeature("block_create", { farm_id: farmId, props: { action: "created" } });
       navigate(`/farms/${farmId}/blocks/${block.id}`);
     } catch (err) {
       setError(isApiError(err) ? (err.problem.detail ?? err.problem.title) : String(err));

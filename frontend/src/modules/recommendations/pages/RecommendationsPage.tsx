@@ -25,6 +25,7 @@ import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
 import { useRecommendations, useTransitionRecommendation } from "@/queries/recommendations";
+import { trackFeature } from "@/telemetry";
 
 const STATE_TAB_VALUES: ReadonlyArray<RecommendationState | "all"> = [
   "open",
@@ -56,7 +57,17 @@ export function RecommendationsPage(): ReactNode {
 
   const params = tab === "all" ? { farm_id: farmId } : { farm_id: farmId, state: tab };
   const recommendations = useRecommendations(params);
-  const transition = useTransitionRecommendation();
+  const transitionMut = useTransitionRecommendation();
+  // Same shape as AlertsPage: one wrapper so every action on a recommendation
+  // is counted, including ones added later.
+  const transition = {
+    ...transitionMut,
+    mutate: (vars: Parameters<typeof transitionMut.mutate>[0]) => {
+      const action = Object.keys(vars.payload)[0] ?? "unknown";
+      trackFeature("recommendations", { props: { action } });
+      transitionMut.mutate(vars);
+    },
+  };
 
   if (!farmId) {
     return <Navigate to="/" replace />;

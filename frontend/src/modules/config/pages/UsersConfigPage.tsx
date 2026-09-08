@@ -29,6 +29,7 @@ import {
   useUpdateTenantUser,
 } from "@/queries/users";
 import { ASSIGNABLE_ROLES, needsFarms, roleTier } from "@/rbac/assignableRoles";
+import { trackFeature } from "@/telemetry";
 
 /**
  * The farms a farm-tier role can be granted on.
@@ -441,6 +442,10 @@ function InviteForm({
     event.preventDefault();
     setSuccessMsg(null);
     const invitedEmail = email.trim();
+    // The role is a closed enum, so it is safe as a prop. The email is not
+    // sent and must never be: the allow-list would drop it, but the rule is
+    // that customer data does not get written in the first place.
+    trackFeature("users_admin", { props: { action: "invite" } });
     invite.mutate(
       {
         email: invitedEmail,

@@ -20,6 +20,7 @@ import {
   useRetryPlatformAdminProvisioning,
   type PlatformAdminRow,
 } from "@/queries/platformAdminsRoles";
+import { trackFeature } from "@/telemetry";
 
 const ROLES = ["PlatformAdmin", "PlatformSupport"] as const;
 
@@ -134,6 +135,10 @@ export function PlatformAdminsPage(): ReactNode {
                 { email: email.trim(), full_name: fullName.trim(), role },
                 {
                   onSuccess: () => {
+                    // On success only. A failed invite is an api_error, and
+                    // counting it as use would inflate adoption with attempts
+                    // that achieved nothing.
+                    trackFeature("platform_admin", { props: { action: "invite" } });
                     setOpenInvite(false);
                     setEmail("");
                     setFullName("");
