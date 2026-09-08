@@ -3469,9 +3469,9 @@ global:
     #   Rollback is these three tags back to 890e158, which also takes #654
     #   back out.
     api:
-      tag: "f26355e"
+      tag: "f308198"
     workers:
-      tag: "f26355e"
+      tag: "f308198"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3922,7 +3922,7 @@ global:
       #   traces page learns the 'farm' skip axis. The API half must move in
       #   the same sync — the new section calls two routes that do not exist
       #   on 76a6411.
-      tag: "f26355e"
+      tag: "f308198"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
