@@ -101,7 +101,9 @@ async def _refresh_all(around: datetime) -> None:
         async with engine.connect() as conn:
             for view, _src in PUBLIC_CAGGS:
                 await conn.execute(
-                    text(f"CALL refresh_continuous_aggregate('public.\"{view}\"', :s, :e)"),
+                    text(
+                        f"CALL refresh_continuous_aggregate('public.\"{view}\"', CAST(:s AS timestamptz), CAST(:e AS timestamptz))"
+                    ),
                     {"s": around - timedelta(days=2), "e": around + timedelta(days=2)},
                 )
     finally:

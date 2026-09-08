@@ -92,7 +92,9 @@ async def _refresh(session: AsyncSession) -> None:
         async with engine.connect() as conn:
             for view in ("usage_daily", "usage_flow_daily"):
                 await conn.execute(
-                    text(f"CALL refresh_continuous_aggregate('public.\"{view}\"', :s, :e)"),
+                    text(
+                        f"CALL refresh_continuous_aggregate('public.\"{view}\"', CAST(:s AS timestamptz), CAST(:e AS timestamptz))"
+                    ),
                     {"s": start, "e": end},
                 )
     finally:

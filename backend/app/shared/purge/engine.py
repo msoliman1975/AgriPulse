@@ -471,6 +471,15 @@ async def refresh_caggs(
     ``window`` bounds the work to the purged block's data span. Passing None
     skips the refresh entirely — correct when the purge deleted no aggregate
     rows, which is the common case for a block that never had imagery.
+
+    The ``CAST(... AS timestamptz)`` on both bounds is required, not stylistic.
+    ``refresh_continuous_aggregate`` declares its window arguments as ``"any"``,
+    so Postgres cannot infer a type for a bare parameter and asyncpg raises
+    ``IndeterminateDatatypeError: could not determine data type of parameter``.
+    Without the casts this call had never once succeeded — and because the
+    ``except`` below swallowed the error without logging it, every purge since
+    reported an empty ``caggs_refreshed`` list, which is indistinguishable from
+    having had nothing to refresh.
     """
     if window is None:
         return []
@@ -484,17 +493,23 @@ async def refresh_caggs(
                     await conn.execute(
                         text(
                             f'CALL refresh_continuous_aggregate(\'"{tenant_schema}"."{view}"\', '
-                            ":start, :end)"
+                            "CAST(:start AS timestamptz), CAST(:end AS timestamptz))"
                         ),
                         {"start": start, "end": end},
                     )
                     refreshed.append(view)
-                except Exception:
+                except Exception as exc:
                     # A failed refresh leaves stale aggregate rows, not lost
                     # data. Surface it on the receipt rather than failing a
                     # purge whose DB work has already committed.
+                    #
+                    # The error text is logged because it was missing: without
+                    # it this branch swallowed the missing-CAST bug in silence,
+                    # and a receipt reading `caggs_refreshed: []` looks exactly
+                    # like a purge that had no aggregate rows to refresh.
                     logger.warning(
-                        "cagg_refresh_failed", extra={"view": view, "schema": tenant_schema}
+                        "cagg_refresh_failed",
+                        extra={"view": view, "schema": tenant_schema, "error": str(exc)},
                     )
     finally:
         await engine.dispose()
@@ -540,13 +555,16 @@ async def refresh_public_caggs(
                 try:
                     await conn.execute(
                         text(
-                            f"CALL refresh_continuous_aggregate('public.\"{view}\"', :start, :end)"
+                            f"CALL refresh_continuous_aggregate('public.\"{view}\"', "
+                            "CAST(:start AS timestamptz), CAST(:end AS timestamptz))"
                         ),
                         {"start": start, "end": end},
                     )
                     refreshed.append(view)
-                except Exception:
-                    logger.warning("public_cagg_refresh_failed", extra={"view": view})
+                except Exception as exc:
+                    logger.warning(
+                        "public_cagg_refresh_failed", extra={"view": view, "error": str(exc)}
+                    )
     finally:
         await engine.dispose()
     return refreshed
