@@ -33,7 +33,7 @@ import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useCapability } from "@/rbac/useCapability";
 import { BlockList } from "../components/BlockList";
 import { AreaChips, AreaDetail, BlockSummary } from "../components/AreaPanel";
-import { HealthMap, type MapBlock, type MapCell } from "../components/HealthMap";
+import { HealthMap, type FitMode, type MapBlock, type MapCell } from "../components/HealthMap";
 import { Transport } from "../components/Transport";
 import { buildAreas, pickArea, type AreaCell } from "../lib/areas";
 import {
@@ -72,6 +72,7 @@ export function FarmHealthViewPage(): ReactNode {
   // One flag for the screen, not per area: opening the reasoning is a mode a
   // reader stays in while stepping through areas.
   const [reasoningOpen, setReasoningOpen] = useState(false);
+  const [fitMode, setFitMode] = useState<FitMode>("block");
 
   // The clock is read once per mount. Reading it per render would move the
   // window under a replay that is running across midnight.
@@ -350,12 +351,37 @@ export function FarmHealthViewPage(): ReactNode {
                       onSelect={(id) => {
                         setBlockId(id);
                         setAreaKey(null);
+                        setFitMode("block");
                       }}
                     />
                   </aside>
 
                   <section className="grid min-h-0 grid-rows-[minmax(240px,46%)_minmax(0,1fr)]">
-                    <div className="min-h-0 border-b border-ap-line">
+                    <div className="relative min-h-0 border-b border-ap-line">
+                      <div className="absolute inset-inline-start-3 top-3 z-10 flex flex-col items-start gap-1.5">
+                        {(
+                          [
+                            ["block", "farmHealth:map.fitBlock"],
+                            ["area", "farmHealth:map.fitArea"],
+                            ["farm", "farmHealth:map.fitFarm"],
+                          ] as [FitMode, string][]
+                        ).map(([mode, key]) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            aria-pressed={fitMode === mode}
+                            onClick={() => setFitMode(mode)}
+                            className={[
+                              "rounded border px-2.5 py-1 text-meta shadow-sm",
+                              fitMode === mode
+                                ? "border-ap-primary bg-ap-primary text-white"
+                                : "border-ap-line bg-ap-panel text-ap-ink",
+                            ].join(" ")}
+                          >
+                            {t(key)}
+                          </button>
+                        ))}
+                      </div>
                       <HealthMap
                         blocks={mapBlocks}
                         cells={mapCells}
@@ -364,6 +390,9 @@ export function FarmHealthViewPage(): ReactNode {
                         onSelectBlock={(id) => {
                           setBlockId(id);
                           setAreaKey(null);
+                          // Clicking a block in the whole-farm view is a
+                          // request to look at that block.
+                          setFitMode("block");
                         }}
                         onSelectCell={(cellId) => {
                           const found = areas.find((area) =>
@@ -371,7 +400,8 @@ export function FarmHealthViewPage(): ReactNode {
                           );
                           if (found) setAreaKey(found.key);
                         }}
-                        fitKey={selectedBlockId ?? ""}
+                        fitMode={fitMode}
+                        fitKey={`${selectedBlockId ?? ""}|${activeArea?.key ?? ""}`}
                       />
                     </div>
                     <div className="grid min-h-0 gap-4 overflow-y-auto p-4">

@@ -662,6 +662,78 @@ describe("FarmHealthViewPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("frames the selected block by default", async () => {
+    renderPage();
+
+    await screen.findByTestId("health-map");
+    expect(mapProps.current?.fitMode).toBe("block");
+    expect(screen.getByRole("button", { name: "Fit block" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("frames the whole farm when asked, and stops greying the other blocks", async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Whole farm" }));
+
+    await waitFor(() => {
+      expect(mapProps.current?.fitMode).toBe("farm");
+    });
+    expect(screen.getByRole("button", { name: "Whole farm" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("frames the open area when asked", async () => {
+    withCells();
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Fit selected area" }));
+
+    await waitFor(() => {
+      expect(mapProps.current?.fitMode).toBe("area");
+    });
+  });
+
+  it("returns to the block when one is picked from the rail", async () => {
+    // Clicking a block while looking at the whole farm is a request to look
+    // at that block, not to stay zoomed out.
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Whole farm" }));
+    await waitFor(() => {
+      expect(mapProps.current?.fitMode).toBe("farm");
+    });
+
+    const rail = await screen.findByRole("list");
+    const target = within(rail)
+      .getAllByRole("button")
+      .find((button) => button.textContent?.includes("AG-R02-C01"));
+    fireEvent.click(target as HTMLElement);
+
+    await waitFor(() => {
+      expect(mapProps.current?.fitMode).toBe("block");
+    });
+  });
+
+  it("refits when the open area changes, not when one is merely hovered", async () => {
+    // The fit key carries the chosen area. Hovering a chip previews it on
+    // the map, and flying the camera on hover would make the map unusable.
+    withCells();
+    renderPage();
+
+    await screen.findByTestId("health-map");
+    const before = mapProps.current?.fitKey;
+    const chip = screen.getAllByRole("button", { name: /cells/ })[0];
+    fireEvent.mouseEnter(chip);
+
+    await waitFor(() => {
+      expect(mapProps.current?.fitKey).toBe(before);
+    });
+  });
+
   it("says so when no tree has run on the farm at all", async () => {
     farmVerdicts.current = { farm_id: FARM_ID, as_of: null, blocks: [] };
     renderPage();

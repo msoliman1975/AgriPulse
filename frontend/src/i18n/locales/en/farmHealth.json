@@ -93,5 +93,12 @@
     "latest": "Latest",
     "date": "Date",
     "speed": "Replay speed"
+  },
+  "map": {
+    "fitBlock": "Fit block",
+    "fitArea": "Fit selected area",
+    "fitFarm": "Whole farm",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out"
   }
 }
