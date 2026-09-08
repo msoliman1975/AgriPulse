@@ -13,7 +13,8 @@
   "block": {
     "verdictSummary_one": "{{count}} verdict from {{tree}}.",
     "verdictSummary_other": "{{count}} verdicts from {{tree}}.",
-    "didNotRun": "{{tree}} did not run on this block. No verdict row exists, which is not the same as a verdict of \"not assessed\"."
+    "didNotRun": "{{tree}} did not run on this block. No verdict row exists, which is not the same as a verdict of \"not assessed\".",
+    "noGrid": "This block has no grid, so the tree answered for the whole block."
   },
   "empty": {
     "noTrees": "No decision tree has recorded a verdict on this farm yet.",
