@@ -59,5 +59,18 @@
     "grid": "{{rows}}×{{cols}} grid, {{count}} cells",
     "reads": "Block reads",
     "didNotRun": "Tree did not run"
+  },
+  "reasoning": {
+    "show": "Show how this was decided",
+    "hide": "Hide how this was decided",
+    "steps": "Steps the tree took, root to leaf",
+    "read": "read {{read}}",
+    "test": "test {{test}}",
+    "yes": "yes",
+    "no": "no",
+    "leaf": "{{leaf}} · kind {{kind}} · status {{status}}",
+    "loading": "Reading the walk behind this verdict…",
+    "failed": "The reasoning could not be loaded. Try again in a moment.",
+    "pruned": "The walk behind this verdict is no longer kept. The verdict still stands; only the record of how the tree reached it has been cleared by retention."
   }
 }

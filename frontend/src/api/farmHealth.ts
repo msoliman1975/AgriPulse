@@ -111,3 +111,64 @@ export async function getBlockVerdicts(
   });
   return data;
 }
+
+/** One step of the walk a tree took, as the trace records it. */
+export interface WalkStep {
+  node_id: string;
+  matched: boolean;
+  label_en?: string | null;
+  label_ar?: string | null;
+  /** The comparison, as the compiled tree holds it. Shape varies by operator. */
+  condition?: Record<string, unknown> | null;
+  /** The refs this node read, already resolved. */
+  values?: Record<string, unknown> | null;
+}
+
+export interface VerdictReasoning {
+  verdict_id: string;
+  block_id: string;
+  cell_id: string | null;
+  cell_row: number | null;
+  cell_col: number | null;
+  scope: string;
+  tree_id: string;
+  tree_code: string;
+  tree_version: number;
+  leaf_node_id: string;
+  kind: LeafKind;
+  status_code: StatusCode;
+  severity: string | null;
+  valid_from: string;
+  last_evaluated_at: string;
+  /**
+   * False when retention has pruned the run behind this verdict. The verdict
+   * still stands and its status is still correct; only the walk is gone, and
+   * the screen says so rather than showing an empty step list.
+   */
+  reasoning_available: boolean;
+  trace_id: string | null;
+  evaluated_at: string | null;
+  node_path: WalkStep[];
+  resolved_values: Record<string, unknown>;
+  param_overrides: Record<string, unknown>;
+}
+
+/**
+ * The walk behind one verdict.
+ *
+ * Not `/decision-tree-traces/{id}`: that endpoint is gated on
+ * `decision_tree.read`, which FarmManager, Agronomist, FieldOperator, Scout
+ * and Viewer do not hold. Every reader of this screen would get a 403 on the
+ * one request that explains the colour they are looking at.
+ */
+export async function getVerdictReasoning(
+  blockId: string,
+  verdictId: string,
+  farmId: string,
+): Promise<VerdictReasoning> {
+  const { data } = await apiClient.get<VerdictReasoning>(
+    `/blocks/${blockId}/verdicts/${verdictId}/reasoning`,
+    { params: { farm_id: farmId } },
+  );
+  return data;
+}
