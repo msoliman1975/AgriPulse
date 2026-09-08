@@ -200,9 +200,10 @@ describe("FarmHealthViewPage", () => {
   it("names the status in words, not a code", async () => {
     renderPage();
 
+    const rail = await screen.findByRole("list");
     // The block holding one alert cell and one good cell reads as Alert.
-    expect(await screen.findByText("Alert")).toBeInTheDocument();
-    expect(screen.getByText("Good")).toBeInTheDocument();
+    expect(within(rail).getByText("Alert")).toBeInTheDocument();
+    expect(within(rail).getByText("Good")).toBeInTheDocument();
     expect(screen.queryByText("very_good")).not.toBeInTheDocument();
   });
 
@@ -219,7 +220,10 @@ describe("FarmHealthViewPage", () => {
 
     const heading = await screen.findByRole("heading", { level: 2 });
     expect(heading).toHaveTextContent("AG-R01-C02");
-    expect(screen.getByText(/2 verdicts from t_cwsi\./)).toBeInTheDocument();
+    // The summary counts what the block holds, by status, in words.
+    expect(screen.getByText("Block reads")).toBeInTheDocument();
+    const counts = screen.getByText("Block reads").closest("div")?.parentElement;
+    expect(counts).toHaveTextContent("1");
   });
 
   it("lets a reader open a block that the tree never ran on", async () => {
@@ -320,6 +324,129 @@ describe("FarmHealthViewPage", () => {
     await screen.findByTestId("health-map");
     const blocks = mapProps.current?.blocks as { blockId: string; selected: boolean }[];
     expect(blocks.filter((b) => b.selected).map((b) => b.blockId)).toEqual(["b2"]);
+  });
+
+  it("groups the block into named areas instead of listing every cell", async () => {
+    // Six cells: three alert in the north row, three good in the south.
+    // The screen must offer two areas, not six rows.
+    grid.current = {
+      farm_id: FARM_ID,
+      index_code: "ndvi",
+      blocks: [
+        {
+          block_id: "b2",
+          product_id: "p1",
+          at: null,
+          cells: [
+            gridCell("c00", 0, 0),
+            gridCell("c01", 0, 1),
+            gridCell("c02", 0, 2),
+            gridCell("c10", 1, 0),
+            gridCell("c11", 1, 1),
+            gridCell("c12", 1, 2),
+          ],
+        },
+      ],
+    };
+    farmVerdicts.current = {
+      farm_id: FARM_ID,
+      as_of: null,
+      blocks: [
+        farmBlock("b2", [
+          { ...verdict("b2", "t_cwsi", "alert", 0), cell_id: "c00", leaf_node_id: "leaf_dry" },
+          { ...verdict("b2", "t_cwsi", "alert", 1), cell_id: "c01", leaf_node_id: "leaf_dry" },
+          { ...verdict("b2", "t_cwsi", "alert", 2), cell_id: "c02", leaf_node_id: "leaf_dry" },
+          { ...verdict("b2", "t_cwsi", "good", 3), cell_id: "c10", leaf_node_id: "leaf_ok" },
+          { ...verdict("b2", "t_cwsi", "good", 4), cell_id: "c11", leaf_node_id: "leaf_ok" },
+          { ...verdict("b2", "t_cwsi", "good", 5), cell_id: "c12", leaf_node_id: "leaf_ok" },
+        ]),
+      ],
+    };
+    renderPage();
+
+    expect(await screen.findByText("Selected area")).toBeInTheDocument();
+    // Each half is 50% of the block, so both are named as most of it, with
+    // the direction inside the sentence.
+    expect(
+      screen.getByRole("button", { name: /Most of the block, toward the north/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Most of the block, toward the south/ }),
+    ).toBeInTheDocument();
+    // Two areas offered for six cells, not six rows.
+    expect(screen.getByText("2 areas.", { exact: false })).toBeInTheDocument();
+  });
+
+  it("opens the worst area and says how much of the block it is", async () => {
+    grid.current = {
+      farm_id: FARM_ID,
+      index_code: "ndvi",
+      blocks: [
+        {
+          block_id: "b2",
+          product_id: "p1",
+          at: null,
+          cells: [gridCell("c00", 0, 0), gridCell("c01", 0, 1), gridCell("c02", 0, 2)],
+        },
+      ],
+    };
+    farmVerdicts.current = {
+      farm_id: FARM_ID,
+      as_of: null,
+      blocks: [
+        farmBlock("b2", [
+          { ...verdict("b2", "t_cwsi", "alert", 0), cell_id: "c00", leaf_node_id: "leaf_dry" },
+          { ...verdict("b2", "t_cwsi", "alert", 1), cell_id: "c01", leaf_node_id: "leaf_dry" },
+          { ...verdict("b2", "t_cwsi", "alert", 2), cell_id: "c02", leaf_node_id: "leaf_dry" },
+        ]),
+      ],
+    };
+    renderPage();
+
+    const heading = await screen.findByRole("heading", { level: 3 });
+    expect(heading).toHaveTextContent("The whole block");
+    expect(screen.getByText(/3 cells · 100% of the block/)).toBeInTheDocument();
+  });
+
+  it("outlines the area it has open on the map", async () => {
+    grid.current = {
+      farm_id: FARM_ID,
+      index_code: "ndvi",
+      blocks: [
+        {
+          block_id: "b2",
+          product_id: "p1",
+          at: null,
+          cells: [gridCell("c00", 0, 0), gridCell("c01", 0, 1), gridCell("c02", 0, 2)],
+        },
+      ],
+    };
+    farmVerdicts.current = {
+      farm_id: FARM_ID,
+      as_of: null,
+      blocks: [
+        farmBlock("b2", [
+          { ...verdict("b2", "t_cwsi", "alert", 0), cell_id: "c00", leaf_node_id: "leaf_dry" },
+          { ...verdict("b2", "t_cwsi", "alert", 1), cell_id: "c01", leaf_node_id: "leaf_dry" },
+          { ...verdict("b2", "t_cwsi", "alert", 2), cell_id: "c02", leaf_node_id: "leaf_dry" },
+        ]),
+      ],
+    };
+    renderPage();
+
+    await screen.findByTestId("health-map");
+    const highlighted = mapProps.current?.highlighted as Set<string>;
+    expect([...highlighted].sort()).toEqual(["c00", "c01", "c02"]);
+  });
+
+  it("says a block has no cell verdicts rather than showing an empty list", async () => {
+    // The tree ran and answered for the whole block, so there are verdicts
+    // but no cells. An empty area list with no words reads as a broken page.
+    renderPage();
+
+    expect(
+      await screen.findByText("This block has no cell verdicts for this tree."),
+    ).toBeInTheDocument();
   });
 
   it("says so when no tree has run on the farm at all", async () => {

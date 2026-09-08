@@ -19,5 +19,45 @@
   "empty": {
     "noTrees": "No decision tree has recorded a verdict on this farm yet.",
     "noBlock": "Pick a block to see what the tree said about it."
+  },
+  "area": {
+    "whole": "The whole block",
+    "most": "Most of the block, toward the {{direction}}",
+    "mostPlain": "Most of the block",
+    "centre": "Centre",
+    "scattered_one": "Scattered · 1 spot",
+    "scattered_other": "Scattered · {{count}} spots",
+    "cellCount_one": "{{count}} cell",
+    "cellCount_other": "{{count}} cells",
+    "share": "{{share}}% of the block",
+    "heading": "Selected area",
+    "hint_one": "1 area. Neighbouring cells with the same verdict are one area; one- and two-cell spots are merged into a scattered entry.",
+    "hint_other": "{{count}} areas. Neighbouring cells with the same verdict are one area; one- and two-cell spots are merged into a scattered entry.",
+    "none": "This block has no cell verdicts for this tree."
+  },
+  "direction": {
+    "north-west": "north-west",
+    "north": "north",
+    "north-east": "north-east",
+    "west": "west",
+    "east": "east",
+    "south-west": "south-west",
+    "south": "south",
+    "south-east": "south-east"
+  },
+  "directionTitle": {
+    "north-west": "North-west",
+    "north": "North",
+    "north-east": "North-east",
+    "west": "West",
+    "east": "East",
+    "south-west": "South-west",
+    "south": "South",
+    "south-east": "South-east"
+  },
+  "summary": {
+    "grid": "{{rows}}×{{cols}} grid, {{count}} cells",
+    "reads": "Block reads",
+    "didNotRun": "Tree did not run"
   }
 }

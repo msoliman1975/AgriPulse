@@ -23,7 +23,6 @@ import {
   type StatusDefinition,
 } from "@/api/farmHealth";
 import { AsyncBoundary } from "@/components/AsyncBoundary";
-import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
@@ -32,7 +31,9 @@ import type { Polygon } from "geojson";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useCapability } from "@/rbac/useCapability";
 import { BlockList } from "../components/BlockList";
+import { AreaChips, AreaDetail, BlockSummary } from "../components/AreaPanel";
 import { HealthMap, type MapBlock, type MapCell } from "../components/HealthMap";
+import { buildAreas, pickArea, type AreaCell } from "../lib/areas";
 import { buildBlockRows, treeOptions, type BlockMeta } from "../lib/blockRows";
 
 interface HealthData {
@@ -49,6 +50,8 @@ export function FarmHealthViewPage(): ReactNode {
   const canRead = useCapability("recommendation.read", { farmId });
   const [treeCode, setTreeCode] = useState<string | null>(null);
   const [blockId, setBlockId] = useState<string | null>(null);
+  const [areaKey, setAreaKey] = useState<string | null>(null);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
   const farmQuery = useQuery({
     queryKey: ["farm", farmId],
@@ -177,9 +180,36 @@ export function FarmHealthViewPage(): ReactNode {
                 ring: (cell.geometry.coordinates[0] ?? []) as [number, number][],
                 status: statusByCell.get(cell.cell_id) as StatusCode,
               }));
-            // The area picker arrives in the next change; until then nothing
-            // is outlined.
-            const highlighted = new Set<string>();
+            const geometryByCell = new Map(
+              (gridBlock?.cells ?? []).map((cell) => [cell.cell_id, cell]),
+            );
+            const areaCells: AreaCell[] = [];
+            if (selected) {
+              for (const verdict of selected.verdicts) {
+                const geometry = verdict.cell_id ? geometryByCell.get(verdict.cell_id) : undefined;
+                if (!verdict.cell_id || !geometry) continue;
+                areaCells.push({
+                  cellId: verdict.cell_id,
+                  row: geometry.row_idx,
+                  col: geometry.col_idx,
+                  status: verdict.status_code,
+                  leafNodeId: verdict.leaf_node_id,
+                  verdict,
+                });
+              }
+            }
+            const gridRows =
+              areaCells.length > 0 ? Math.max(...areaCells.map((c) => c.row)) + 1 : 0;
+            const gridCols =
+              areaCells.length > 0 ? Math.max(...areaCells.map((c) => c.col)) + 1 : 0;
+            const areas = buildAreas(areaCells, gridRows, gridCols);
+            const activeArea = pickArea(areas, areaKey);
+            // Hover wins over selection, so pointing at a chip previews it on
+            // the map without committing to it.
+            const shownArea = hoveredKey
+              ? (areas.find((area) => area.key === hoveredKey) ?? activeArea)
+              : activeArea;
+            const highlighted = new Set((shownArea?.cells ?? []).map((cell) => cell.cellId));
 
             return (
               <div className="flex min-h-0 flex-1 flex-col">
@@ -194,8 +224,10 @@ export function FarmHealthViewPage(): ReactNode {
                       onChange={(event) => {
                         setTreeCode(event.target.value);
                         // The rail re-sorts for the new tree, so a block held
-                        // from the old one may no longer be near the top.
+                        // from the old one may no longer be near the top, and
+                        // its areas belong to a different tree entirely.
                         setBlockId(null);
+                        setAreaKey(null);
                       }}
                       className="rounded border border-ap-line bg-ap-panel px-2 py-1.5 text-sm"
                     >
@@ -219,7 +251,10 @@ export function FarmHealthViewPage(): ReactNode {
                       rows={rows}
                       statuses={data.statuses}
                       selectedBlockId={selectedBlockId}
-                      onSelect={setBlockId}
+                      onSelect={(id) => {
+                        setBlockId(id);
+                        setAreaKey(null);
+                      }}
                     />
                   </aside>
 
@@ -230,37 +265,62 @@ export function FarmHealthViewPage(): ReactNode {
                         cells={mapCells}
                         highlighted={highlighted}
                         colorOf={colorOf}
-                        onSelectBlock={setBlockId}
-                        onSelectCell={() => {
-                          /* The area picker lands in a later change; a cell
-                             click already moves the block through the map's
-                             own block handler. */
+                        onSelectBlock={(id) => {
+                          setBlockId(id);
+                          setAreaKey(null);
+                        }}
+                        onSelectCell={(cellId) => {
+                          const found = areas.find((area) =>
+                            area.cells.some((cell) => cell.cellId === cellId),
+                          );
+                          if (found) setAreaKey(found.key);
                         }}
                         fitKey={selectedBlockId ?? ""}
                       />
                     </div>
-                    <div className="min-h-0 overflow-y-auto p-4">
+                    <div className="grid min-h-0 gap-4 overflow-y-auto p-4">
                       {selected === null ? (
                         <p className="text-sm text-ap-muted">{t("farmHealth:empty.noBlock")}</p>
                       ) : (
-                        <Card>
-                          <h2 className="text-section-title font-semibold text-ap-ink">
-                            {selected.code}
-                          </h2>
-                          <p className="mt-1 text-sm text-ap-muted">
-                            {selected.didNotRun
-                              ? t("farmHealth:block.didNotRun", { tree: activeTree })
-                              : t("farmHealth:block.verdictSummary", {
-                                  count: selected.verdicts.length,
-                                  tree: activeTree,
-                                })}
-                          </p>
-                          {mapCells.length === 0 && !selected.didNotRun ? (
-                            <p className="mt-2 text-meta text-ap-muted">
-                              {t("farmHealth:block.noGrid")}
-                            </p>
-                          ) : null}
-                        </Card>
+                        <>
+                          <BlockSummary
+                            row={selected}
+                            statuses={data.statuses}
+                            rows={gridRows}
+                            cols={gridCols}
+                            treeCode={activeTree}
+                          />
+
+                          {areas.length === 0 ? (
+                            // The summary above already says it when the tree
+                            // did not run; saying it twice reads as two
+                            // different facts.
+                            selected.didNotRun ? null : (
+                              <p className="text-sm text-ap-muted">
+                                {t("farmHealth:area.none")}
+                              </p>
+                            )
+                          ) : (
+                            <div className="grid gap-2">
+                              <div className="flex flex-wrap items-baseline gap-3">
+                                <span className="text-meta font-semibold uppercase tracking-wide text-ap-muted">
+                                  {t("farmHealth:area.heading")}
+                                </span>
+                                <span className="text-meta text-ap-muted">
+                                  {t("farmHealth:area.hint", { count: areas.length })}
+                                </span>
+                              </div>
+                              <AreaChips
+                                areas={areas}
+                                statuses={data.statuses}
+                                selectedKey={activeArea?.key ?? null}
+                                onSelect={setAreaKey}
+                                onHover={setHoveredKey}
+                              />
+                              {activeArea ? <AreaDetail area={activeArea} /> : null}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </section>
