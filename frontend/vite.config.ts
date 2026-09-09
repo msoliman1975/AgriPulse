@@ -8,14 +8,27 @@ import react from "@vitejs/plugin-react";
 // /reports tripled on Tuesday" is only actionable once you know which build
 // Tuesday was running.
 //
-// CI sets GITHUB_SHA. A local `git rev-parse` is the fallback, and a failure
-// there (a tarball with no .git) yields "dev" rather than breaking the build.
+// SEVEN characters, deliberately: that is exactly the GHCR tag the cluster
+// runs, so `app_version` can be compared to a deployed image by eye and by
+// equality. Twelve was the original length and it matched nothing.
+//
+// The first production build of this recorded "dev" for every event. The
+// value came from GITHUB_SHA or a local `git rev-parse`, and inside the
+// frontend image build there is neither: the Dockerfile copies source, not
+// `.git`, and container builds do not inherit workflow env. So the column was
+// populated with a useless constant. The image now takes APP_VERSION as a
+// build arg and exposes it as APP_VERSION, which is why that is read first —
+// it is the only one of the three that is true in the image. The name has no
+// VITE_ prefix on purpose: that would also inline it into `import.meta.env`,
+// untruncated, giving the bundle a second copy that disagrees with this one.
 function buildVersion(): string {
-  const fromCi = process.env.GITHUB_SHA ?? process.env.VITE_APP_VERSION;
-  if (fromCi) return fromCi.slice(0, 12);
+  const provided = process.env.APP_VERSION ?? process.env.GITHUB_SHA;
+  if (provided) return provided.slice(0, 7);
   try {
-    return execSync("git rev-parse --short=12 HEAD", { encoding: "utf-8" }).trim();
+    return execSync("git rev-parse --short=7 HEAD", { encoding: "utf-8" }).trim();
   } catch {
+    // A tarball with no .git, which is the local-dev case. Never a released
+    // image: the build arg is always set by CI.
     return "dev";
   }
 }
