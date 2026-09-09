@@ -730,7 +730,7 @@ REGISTRY: tuple[RiskModelSpec, ...] = (
     <tr>
       <td class="num">B1</td>
       <td><strong>Portuguese as a third language</strong></td>
-      <td>The platform is bilingual by column, not by locale table: 37 <code>*_ar</code> columns across module models, 122 backend files that reference an <code>_ar</code> name, two frontend locale folders (<code>en</code>, <code>ar</code>), and 33 decision-tree seeds each carrying <code>name_en</code> and <code>name_ar</code>, <code>text_en</code> and <code>text_ar</code>. Adding a third <code>*_pt</code> column set would be the wrong answer twice over, because a fourth language would then need a third migration.</td>
+      <td>The platform is bilingual by column, not by locale table: 37 <code>*_ar</code> columns across module models, 123 backend files that reference an <code>_ar</code> name, two frontend locale folders (<code>en</code>, <code>ar</code>), and 33 decision-tree seeds each carrying <code>name_en</code> and <code>name_ar</code>, <code>text_en</code> and <code>text_ar</code>. Adding a third <code>*_pt</code> column set would be the wrong answer twice over, because a fourth language would then need a third migration.</td>
       <td>Large. A data-model change, not a translation job.</td>
     </tr>
     <tr>
@@ -844,7 +844,7 @@ REGISTRY: tuple[RiskModelSpec, ...] = (
 </ol>
 
 <div class="footer">
-  <p><strong>Scope note.</strong> The agronomic content is general sector knowledge and was not verified against a live data source while writing this. The platform findings are different: each one names a file or a behaviour, and was read directly from this repository on 2026-09-07. Where a figure carries no citation, treat it as a starting point for research, not as an answer.</p>
+  <p><strong>Scope note.</strong> The agronomic content is general sector knowledge and was not verified against a live data source while writing this. The platform findings are different: each one names a file or a behaviour, and was read directly from this repository on 2026-09-09. Counts drift: the <code>_ar</code> file count rose by one in the two days between drafting and merging. Where a figure carries no citation, treat it as a starting point for research, not as an answer.</p>
 </div>
 </section>
 
