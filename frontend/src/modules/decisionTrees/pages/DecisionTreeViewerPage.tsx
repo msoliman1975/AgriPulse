@@ -53,6 +53,8 @@ import {
   useRunDecisionTreeOnFarm,
   useUpdateDecisionTree,
 } from "@/queries/decisionTrees";
+import { trackFeature } from "@/telemetry";
+import { useFlow } from "@/telemetry/useFlow";
 
 import { AddChildDialog } from "../components/AddChildDialog";
 import { CanvasDryRunPanel } from "../components/CanvasDryRunPanel";
@@ -125,6 +127,20 @@ export function DecisionTreeViewerPage(): ReactNode {
   const detail = useDecisionTree(code);
   const append = useAppendDecisionTreeVersion();
   const publish = usePublishDecisionTreeVersion();
+  // The `decision_tree_authoring` funnel: open -> edit -> dry_run -> publish.
+  // Authoring is where we most suspect friction, and the step people stop at
+  // is the whole question. `open` fires on mount below, not here.
+  const authoring = useFlow("decision_tree_authoring");
+  // Opening the editor is the funnel entry. Fired on mount so a session that
+  // opens a tree and leaves without touching anything still counts as an
+  // attempt — those are the sessions the funnel most needs to see.
+  useEffect(() => {
+    authoring.start("viewer");
+    authoring.step("open");
+    // Once per mount. `authoring` is stable (useCallback refs), and re-running
+    // this would emit a second flow_start for one visit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const dryRun = useDryRunDecisionTree();
   const candidateBlocks = useDecisionTreeCandidateBlocks(code);
   const treeRun = useRunDecisionTreeOnFarm();
@@ -437,6 +453,8 @@ export function DecisionTreeViewerPage(): ReactNode {
   // before-vs-after comparisons.
   const onDryRun = (): void => {
     if (!dryRunBlockId.trim()) return;
+    authoring.step("dry_run");
+    trackFeature("decision_tree_dryrun", { props: { action: dryRunMode } });
     const payload =
       dryRunMode === "draft"
         ? { block_id: dryRunBlockId.trim(), tree_yaml: draftYaml ?? "" }
@@ -553,6 +571,7 @@ export function DecisionTreeViewerPage(): ReactNode {
 
   const onSave = async (): Promise<void> => {
     if (!draftYaml) return;
+    authoring.step("edit");
     // Structural + name/description edits land as a new draft version.
     if (yamlDirty) {
       let nextYaml = applyEditsToYaml(draftYaml, editBuffer);
@@ -591,7 +610,12 @@ export function DecisionTreeViewerPage(): ReactNode {
   };
   const onPublishLatest = async (): Promise<void> => {
     if (!latestVersion) return;
+    authoring.step("publish");
     await publish.mutateAsync({ code, version: latestVersion.version });
+    // Completion is the published version, not the click: a publish that
+    // throws must not count towards the funnel's conversion rate.
+    trackFeature("decision_tree_authoring", { props: { action: "published" } });
+    authoring.complete();
   };
   const onParameterChange = (name: string, decl: ParameterDeclaration | null): void => {
     setParamsBuffer((buf) => ({ ...buf, [name]: decl }));

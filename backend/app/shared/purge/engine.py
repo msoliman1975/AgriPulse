@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -38,6 +38,7 @@ from app.shared.purge.registry import (
     BLOCK_CAGGS,
     BLOCK_OWNED,
     FARM_OWNED,
+    PUBLIC_CAGGS,
     TENANT_PUBLIC_OWNED,
     OwnedTable,
     ordered,
@@ -60,6 +61,12 @@ class PurgeReport:
     # Time span of deleted block_index_aggregates rows, bounding the CAGG
     # refresh so it does not recompute the tenant's entire history.
     cagg_range: tuple[datetime, datetime] | None = None
+    # Same idea for the public-schema aggregates over usage_events (TEL-6b).
+    # Kept separate from `cagg_range` because the two are measured over
+    # different source tables, in different schemas, and a purge can produce
+    # one without the other — a tenant with telemetry but no imagery, or the
+    # reverse.
+    public_cagg_range: tuple[datetime, datetime] | None = None
 
     @property
     def total_rows(self) -> int:
@@ -69,14 +76,8 @@ class PurgeReport:
         for table, n in other.rows.items():
             self.rows[table] = self.rows.get(table, 0) + n
         self.storage_keys.extend(other.storage_keys)
-        if other.cagg_range is not None:
-            if self.cagg_range is None:
-                self.cagg_range = other.cagg_range
-            else:
-                self.cagg_range = (
-                    min(self.cagg_range[0], other.cagg_range[0]),
-                    max(self.cagg_range[1], other.cagg_range[1]),
-                )
+        self.cagg_range = _widen(self.cagg_range, other.cagg_range)
+        self.public_cagg_range = _widen(self.public_cagg_range, other.public_cagg_range)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -84,6 +85,18 @@ class PurgeReport:
             "total_rows": self.total_rows,
             "storage_objects": len(self.storage_keys),
         }
+
+
+def _widen(
+    current: tuple[datetime, datetime] | None,
+    other: tuple[datetime, datetime] | None,
+) -> tuple[datetime, datetime] | None:
+    """Union of two time windows, either of which may be absent."""
+    if other is None:
+        return current
+    if current is None:
+        return other
+    return (min(current[0], other[0]), max(current[1], other[1]))
 
 
 class PurgeEngine:
@@ -257,7 +270,10 @@ class PurgeEngine:
         # Captured before the manifest empties tenant_memberships — afterwards
         # there is nothing left to say who belonged to this tenant.
         members = await self._tenant_member_ids(tenant_ids)
-        report = await self._delete(TENANT_PUBLIC_OWNED, tenant_ids)
+        # Same reason, different table: once usage_events is empty for this
+        # tenant there is no span left to bound the aggregate refresh with.
+        report = await self._capture_public_cagg_range(tenant_ids)
+        report.merge(await self._delete(TENANT_PUBLIC_OWNED, tenant_ids))
         report.rows["tenants"] = await self._rowcount(
             text("DELETE FROM public.tenants WHERE id = ANY(:ids)").bindparams(_IDS),
             {"ids": tenant_ids},
@@ -344,6 +360,31 @@ class PurgeEngine:
     def cagg_names() -> tuple[str, ...]:
         return tuple(view for view, _ in BLOCK_CAGGS)
 
+    @staticmethod
+    def public_cagg_names() -> tuple[str, ...]:
+        return tuple(view for view, _ in PUBLIC_CAGGS)
+
+    async def _capture_public_cagg_range(self, tenant_ids: list[UUID]) -> PurgeReport:
+        """Bound the public CAGG refresh to the tenant's telemetry span.
+
+        Must run BEFORE the delete. Afterwards there are no rows left to
+        measure, and an unbounded refresh over 24 months of buckets on every
+        tenant purge is not an acceptable substitute.
+        """
+        report = PurgeReport()
+        row = (
+            await self._s.execute(
+                text(
+                    "SELECT min(time), max(time) FROM public.usage_events "
+                    "WHERE tenant_id = ANY(:ids)"
+                ).bindparams(_IDS),
+                {"ids": tenant_ids},
+            )
+        ).one_or_none()
+        if row is not None and row[0] is not None:
+            report.public_cagg_range = (row[0], row[1])
+        return report
+
     async def _capture_cagg_range(self, block_ids: list[UUID]) -> PurgeReport:
         """Bound the post-commit CAGG refresh to the deleted block's data span."""
         report = PurgeReport()
@@ -413,6 +454,37 @@ class PurgeEngine:
         return int(getattr(result, "rowcount", 0) or 0)
 
 
+# The widest bucket any registered continuous aggregate uses is 7 days
+# (block_index_weekly). See `_bucket_aligned` for why the margin exists.
+_WIDEST_BUCKET = timedelta(days=7)
+
+
+def _bucket_aligned(window: tuple[datetime, datetime]) -> tuple[datetime, datetime]:
+    """Widen a refresh window outward so it covers WHOLE buckets.
+
+    `refresh_continuous_aggregate` only recomputes buckets that fall entirely
+    inside the window. A window taken from real data almost never does: the
+    purged rows' `min(time)`/`max(time)` land mid-bucket, so the first and last
+    buckets are skipped — and when the whole span is shorter than one bucket,
+    nothing is refreshed at all and the call reports success.
+
+    That is not theoretical. TEL-6b's test purges a tenant whose two events are
+    a minute apart; the captured window was one minute wide, no whole day-bucket
+    fitted inside it, and the purged tenant stayed in `usage_daily` while the
+    call returned normally.
+
+    Flooring to midnight and padding by the widest registered bucket on each
+    side is deliberately generous. The cost of over-refreshing is recomputing a
+    few extra buckets from a source table that has just had rows removed; the
+    cost of under-refreshing is a purged tenant still showing on the dashboard
+    with the orphan scanner reporting clean.
+    """
+    start, end = window
+    start = start.replace(hour=0, minute=0, second=0, microsecond=0) - _WIDEST_BUCKET
+    end = end.replace(hour=0, minute=0, second=0, microsecond=0) + _WIDEST_BUCKET
+    return start, end
+
+
 async def refresh_caggs(
     *,
     engine_url: str,
@@ -430,10 +502,19 @@ async def refresh_caggs(
     ``window`` bounds the work to the purged block's data span. Passing None
     skips the refresh entirely — correct when the purge deleted no aggregate
     rows, which is the common case for a block that never had imagery.
+
+    The ``CAST(... AS timestamptz)`` on both bounds is required, not stylistic.
+    ``refresh_continuous_aggregate`` declares its window arguments as ``"any"``,
+    so Postgres cannot infer a type for a bare parameter and asyncpg raises
+    ``IndeterminateDatatypeError: could not determine data type of parameter``.
+    Without the casts this call had never once succeeded — and because the
+    ``except`` below swallowed the error without logging it, every purge since
+    reported an empty ``caggs_refreshed`` list, which is indistinguishable from
+    having had nothing to refresh.
     """
     if window is None:
         return []
-    start, end = window
+    start, end = _bucket_aligned(window)
     refreshed: list[str] = []
     engine = create_async_engine(engine_url, isolation_level="AUTOCOMMIT")
     try:
@@ -443,17 +524,77 @@ async def refresh_caggs(
                     await conn.execute(
                         text(
                             f'CALL refresh_continuous_aggregate(\'"{tenant_schema}"."{view}"\', '
-                            ":start, :end)"
+                            "CAST(:start AS timestamptz), CAST(:end AS timestamptz))"
                         ),
                         {"start": start, "end": end},
                     )
                     refreshed.append(view)
-                except Exception:
+                except Exception as exc:
                     # A failed refresh leaves stale aggregate rows, not lost
                     # data. Surface it on the receipt rather than failing a
                     # purge whose DB work has already committed.
+                    #
+                    # The error text is logged because it was missing: without
+                    # it this branch swallowed the missing-CAST bug in silence,
+                    # and a receipt reading `caggs_refreshed: []` looks exactly
+                    # like a purge that had no aggregate rows to refresh.
                     logger.warning(
-                        "cagg_refresh_failed", extra={"view": view, "schema": tenant_schema}
+                        "cagg_refresh_failed",
+                        extra={"view": view, "schema": tenant_schema, "error": str(exc)},
+                    )
+    finally:
+        await engine.dispose()
+    return refreshed
+
+
+async def refresh_public_caggs(
+    *,
+    engine_url: str,
+    window: tuple[datetime, datetime] | None,
+) -> list[str]:
+    """Re-materialise the public usage aggregates after a tenant purge (TEL-6b).
+
+    The sibling of :func:`refresh_caggs`, and it exists because that one cannot
+    do this job: it qualifies every view with the tenant schema, and these views
+    live in ``public``. Before this the tenant-purge path refreshed nothing at
+    all in ``public``.
+
+    Why it is required rather than tidy: ``usage_daily`` and ``usage_flow_daily``
+    both GROUP BY ``tenant_id`` and run with real-time aggregation on. Deleting
+    the raw rows leaves the already-materialised buckets serving the purged
+    tenant's numbers to every chart, and the orphan scanner will not catch it —
+    it inspects tables, not aggregates. The purge would report success and the
+    tenant would still be visible.
+
+    ``window`` is captured before the delete and bounds the work. None means the
+    tenant produced no telemetry at all, in which case there is nothing to
+    recompute; refreshing 24 months of buckets "just in case" on every purge is
+    not a safe default.
+
+    Failure is logged, not raised, matching :func:`refresh_caggs`: by the time
+    this runs the database work has committed, and a stale aggregate bucket is a
+    smaller problem than a purge marked failed that in fact deleted everything.
+    """
+    if window is None:
+        return []
+    start, end = _bucket_aligned(window)
+    refreshed: list[str] = []
+    engine = create_async_engine(engine_url, isolation_level="AUTOCOMMIT")
+    try:
+        async with engine.connect() as conn:
+            for view, _source in PUBLIC_CAGGS:
+                try:
+                    await conn.execute(
+                        text(
+                            f"CALL refresh_continuous_aggregate('public.\"{view}\"', "
+                            "CAST(:start AS timestamptz), CAST(:end AS timestamptz))"
+                        ),
+                        {"start": start, "end": end},
+                    )
+                    refreshed.append(view)
+                except Exception as exc:
+                    logger.warning(
+                        "public_cagg_refresh_failed", extra={"view": view, "error": str(exc)}
                     )
     finally:
         await engine.dispose()

@@ -21,6 +21,7 @@ import { KPICards } from "../components/KPICards";
 import { blocksForCrops, SeasonContextBar } from "../components/SeasonContextBar";
 import { TimeRangeBar } from "../components/TimeRangeBar";
 import { WeatherSection } from "../components/WeatherSection";
+import { trackFeature } from "@/telemetry";
 
 // Track B.1 — Insights as "Farm health overview".
 //
@@ -119,7 +120,16 @@ export function InsightsPage(): ReactNode {
 
       {/* One control, every graph below it. KPI tiles stay current-state and
           deliberately do not follow the range. */}
-      <TimeRangeBar value={range} onChange={setRange} />
+      <TimeRangeBar
+        value={range}
+        onChange={(next) => {
+          // Changing the range is the signal that someone is reading the
+          // charts rather than passing through. A page_view alone cannot tell
+          // those two apart.
+          trackFeature("insights", { farm_id: farmId, props: { action: "range_change" } });
+          setRange(next);
+        }}
+      />
 
       <FarmTrendChart farmId={farmId} range={range} blockIds={blockIds} />
 

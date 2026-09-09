@@ -1,12 +1,33 @@
+import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+
+// Build identity, stamped onto every telemetry event as `app_version`.
+// Without it a behaviour change cannot be attributed to a deploy: "errors on
+// /reports tripled on Tuesday" is only actionable once you know which build
+// Tuesday was running.
+//
+// CI sets GITHUB_SHA. A local `git rev-parse` is the fallback, and a failure
+// there (a tarball with no .git) yields "dev" rather than breaking the build.
+function buildVersion(): string {
+  const fromCi = process.env.GITHUB_SHA ?? process.env.VITE_APP_VERSION;
+  if (fromCi) return fromCi.slice(0, 12);
+  try {
+    return execSync("git rev-parse --short=12 HEAD", { encoding: "utf-8" }).trim();
+  } catch {
+    return "dev";
+  }
+}
 
 // AgriPulse dev server.
 // 5173 matches the Keycloak realm's redirectUris (infra/dev/compose.yaml)
 // and the backend's CORS_ALLOWED_ORIGINS default.
 export default defineConfig({
   plugins: [react()],
+  define: {
+    __APP_VERSION__: JSON.stringify(buildVersion()),
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

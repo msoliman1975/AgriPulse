@@ -654,6 +654,13 @@ class Settings(BaseSettings):
             return [d.strip().lower() for d in value.split(",") if d.strip()]
         return value
 
+    # --- Product telemetry (TEL-2) ----------------------------------------
+    # Server-side half of the kill switch; the client half is
+    # VITE_TELEMETRY_ENABLED. Either off => nothing is collected and the app is
+    # unaffected. The endpoint still answers 202 when disabled so a client
+    # running ahead of a rollback does not start logging errors.
+    telemetry_ingest_enabled: bool = True
+
     # --- CORS -------------------------------------------------------------
     cors_allowed_origins: list[str] = Field(default_factory=list)
 

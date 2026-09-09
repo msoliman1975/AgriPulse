@@ -729,6 +729,45 @@ forbidden_modules = [
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
+# Telemetry is a LEAF. Nothing in the domain should ever import it: the client
+# posts to its router and the platform dashboard reads from its repository, so
+# there is no legitimate inbound edge. Listing every domain module as a source
+# makes an accidental `from app.modules.telemetry...` in a feature module a CI
+# failure rather than a slow coupling.
+#
+# Deliberately separate from "analytics internals are private" — data_model.md
+# § 14 reserves `analytics` for agronomic aggregates, so that contract does not
+# cover this module.
+name = "telemetry internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.tenancy",
+  "app.modules.iam",
+  "app.modules.audit",
+  "app.modules.farms",
+  "app.modules.imagery",
+  "app.modules.indices",
+  "app.modules.weather",
+  "app.modules.signals",
+  "app.modules.alerts",
+  "app.modules.recommendations",
+  "app.modules.notifications",
+  "app.modules.forecasting",
+  "app.modules.analytics",
+]
+forbidden_modules = [
+  "app.modules.telemetry.repository",
+  "app.modules.telemetry.models",
+  "app.modules.telemetry.router",
+  "app.modules.telemetry.schemas",
+  "app.modules.telemetry.service",
+  "app.modules.telemetry.taxonomy",
+  "app.modules.telemetry.usage_router",
+  "app.modules.telemetry.read_schemas",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
 name = "forecasting internals are private"
 type = "forbidden"
 source_modules = [

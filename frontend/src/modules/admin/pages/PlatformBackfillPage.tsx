@@ -8,6 +8,8 @@ import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
+import { trackFeature } from "@/telemetry";
+import { useFlow } from "@/telemetry/useFlow";
 import {
   useBackfillFarms,
   useBackfillRuns,
@@ -90,12 +92,16 @@ function TenantFarmFields({
   patch,
   label,
   idPrefix,
+  onFarmPicked,
 }: {
   form: FormState;
   patch: (p: Partial<FormState>) => void;
   label: { tenant: string; farm: string; pick: string; busy: string; blocks: string };
   // Both composers mount the same fields; unique ids keep htmlFor honest.
   idPrefix: string;
+  // Telemetry: picking a farm is the first real commitment in the funnel, and
+  // the first point at which "someone started a backfill" is true.
+  onFarmPicked?: () => void;
 }): ReactNode {
   const tenantsQ = useBackfillTenants();
   const farmsQ = useBackfillFarms(form.tenantId || null);
@@ -136,7 +142,10 @@ function TenantFarmFields({
           className="rounded-md border border-ap-line bg-ap-panel px-2 py-1.5 text-sm disabled:opacity-50"
           value={form.farmId}
           disabled={!form.tenantId || farmsQ.isLoading}
-          onChange={(e) => patch({ farmId: e.target.value })}
+          onChange={(e) => {
+            patch({ farmId: e.target.value });
+            if (e.target.value) onFarmPicked?.();
+          }}
         >
           <option value="">{label.pick}</option>
           {(farmsQ.data ?? []).map((f) => (
@@ -157,10 +166,14 @@ function WindowFields({
   form,
   patch,
   label,
+  onRangeChanged,
 }: {
   form: FormState;
   patch: (p: Partial<FormState>) => void;
   label: { from: string; to: string };
+  // Telemetry: the second funnel step. Both dates default, so only an actual
+  // edit counts as the operator having chosen a range.
+  onRangeChanged?: () => void;
 }): ReactNode {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -172,7 +185,10 @@ function WindowFields({
           type="date"
           className="rounded-md border border-ap-line bg-ap-panel px-2 py-1.5 text-sm"
           value={form.from}
-          onChange={(e) => patch({ from: e.target.value })}
+          onChange={(e) => {
+            patch({ from: e.target.value });
+            onRangeChanged?.();
+          }}
         />
       </label>
       <label className="flex flex-col gap-1">
@@ -183,7 +199,10 @@ function WindowFields({
           type="date"
           className="rounded-md border border-ap-line bg-ap-panel px-2 py-1.5 text-sm"
           value={form.to}
-          onChange={(e) => patch({ to: e.target.value })}
+          onChange={(e) => {
+            patch({ to: e.target.value });
+            onRangeChanged?.();
+          }}
         />
       </label>
     </div>
@@ -361,6 +380,10 @@ function RunComposer({ kind }: { kind: RunKind }): ReactNode {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const createRun = useCreateBackfillRun();
+  // The `backfill_run` funnel. Its steps are the four decision points an
+  // operator actually passes through; where they stop is the question the
+  // funnel exists to answer.
+  const flow = useFlow("backfill_run");
 
   const ready = Boolean(
     form.tenantId && form.farmId && (form.imagery || form.weather || form.thermal),
@@ -369,6 +392,7 @@ function RunComposer({ kind }: { kind: RunKind }): ReactNode {
   const runEstimate = async (): Promise<void> => {
     setError(null);
     setEstimating(true);
+    flow.step("preview");
     try {
       setEstimate(
         await estimateBackfill(form.tenantId, {
@@ -390,6 +414,7 @@ function RunComposer({ kind }: { kind: RunKind }): ReactNode {
   const submit = async (): Promise<void> => {
     setError(null);
     setDone(null);
+    flow.step("submit");
     try {
       const run = await createRun.mutateAsync({
         tenantId: form.tenantId,
@@ -405,6 +430,8 @@ function RunComposer({ kind }: { kind: RunKind }): ReactNode {
       });
       setDone(run.id);
       setEstimate(null);
+      trackFeature("backfill_console", { props: { action: "run_created", source: kind } });
+      flow.complete();
     } catch (err) {
       setError(apiMsg(err));
     }
@@ -420,11 +447,21 @@ function RunComposer({ kind }: { kind: RunKind }): ReactNode {
 
   return (
     <div className="flex max-w-3xl flex-col gap-4 rounded-md border border-ap-line bg-ap-panel p-4">
-      <TenantFarmFields form={form} patch={patch} label={labels} idPrefix={kind} />
+      <TenantFarmFields
+        form={form}
+        patch={patch}
+        label={labels}
+        idPrefix={kind}
+        onFarmPicked={() => {
+          flow.start(kind);
+          flow.step("select_farm");
+        }}
+      />
       <WindowFields
         form={form}
         patch={patch}
         label={{ from: t("backfill.form.from"), to: t("backfill.form.to") }}
+        onRangeChanged={() => flow.step("select_range")}
       />
 
       <div className="flex flex-col gap-2">

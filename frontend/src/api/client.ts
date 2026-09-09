@@ -1,6 +1,7 @@
 import axios, { type AxiosError, type AxiosInstance } from "axios";
 
 import { getAccessToken, triggerSignInRedirect } from "@/auth/token";
+import { reportApiError } from "@/telemetry/capture";
 import { ApiError, type ProblemDetails } from "./errors";
 
 const baseURL: string = import.meta.env.VITE_API_BASE_URL ?? "/api";
@@ -58,6 +59,19 @@ apiClient.interceptors.response.use(
     // problem+json (network failure, opaque proxy error), construct a
     // synthetic problem so callers always see the same shape.
     const data: unknown = error.response?.data;
+
+    // Telemetry: this interceptor is the only place in the app that sees every
+    // failed call, and it already holds the status and the correlation id. The
+    // call cannot throw (track() swallows its own errors) and must not change
+    // what the caller receives, so it sits before the rejects rather than
+    // wrapping them.
+    reportApiError({
+      status: error.response?.status ?? 0,
+      method: error.config?.method,
+      problemType: isProblemDetails(data) ? data.type : undefined,
+      correlationId,
+    });
+
     if (isProblemDetails(data)) {
       return Promise.reject(new ApiError(data, correlationId));
     }

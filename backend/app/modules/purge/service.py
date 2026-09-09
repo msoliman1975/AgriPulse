@@ -34,7 +34,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.settings import get_settings
 from app.modules.purge.repository import PurgeConflictError, PurgeRepository
 from app.shared.db.session import AsyncSessionLocal, sanitize_tenant_schema
-from app.shared.purge.engine import PurgeEngine, PurgeReport, refresh_caggs
+from app.shared.purge.engine import (
+    PurgeEngine,
+    PurgeReport,
+    refresh_caggs,
+    refresh_public_caggs,
+)
 from app.shared.purge.imagery import ImageryReclaimer, ReclaimPlan
 from app.shared.purge.scanner import scan_tenant_schema
 
@@ -387,6 +392,33 @@ async def _target_ids(
     return farm_ids, await engine.farm_block_ids(farm_ids)
 
 
+async def _refresh_all_caggs(schema: str, report: PurgeReport) -> list[str]:
+    """Re-materialise every continuous aggregate the purge invalidated.
+
+    Two calls, not one, and the split is structural: `refresh_caggs` qualifies
+    each view with the tenant schema, while the usage aggregates live in
+    `public`. Before TEL-6b the second call did not exist and the tenant-purge
+    path refreshed nothing in `public` — so a purged tenant kept its numbers in
+    the usage dashboard. The raw rows were gone, the materialised daily buckets
+    were not, and the orphan scanner cannot see an aggregate, so the purge
+    reported success.
+
+    Both windows were captured before the delete; None means that source had no
+    rows for this tenant and there is nothing to recompute.
+    """
+    engine_url = str(get_settings().database_url)
+    tenant_views = await refresh_caggs(
+        engine_url=engine_url,
+        tenant_schema=schema,
+        window=report.cagg_range,
+    )
+    public_views = await refresh_public_caggs(
+        engine_url=engine_url,
+        window=report.public_cagg_range,
+    )
+    return [*tenant_views, *public_views]
+
+
 # --- execution --------------------------------------------------------------
 
 
@@ -438,11 +470,7 @@ async def run_job(job_id: UUID) -> dict[str, Any]:
             deleted["stac_collections"] = reclaim.stac_collections_deleted
             await _record(job_id, "storage", {"objects": deleted["storage_objects"]})
 
-            refreshed = await refresh_caggs(
-                engine_url=str(get_settings().database_url),
-                tenant_schema=schema,
-                window=report.cagg_range,
-            )
+            refreshed = await _refresh_all_caggs(schema, report)
             deleted["caggs_refreshed"] = refreshed
             await _record(job_id, "cagg_refresh", {"views": refreshed})
 

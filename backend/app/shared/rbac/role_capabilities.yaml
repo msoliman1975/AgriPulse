@@ -48,6 +48,9 @@ roles:
       # workspace". Acting on a row needs platform.trial.manage, which
       # support does not have.
       - platform.trial.read
+      # "Is this customer still using the product" is a support question
+      # before it is a product one. Read-only; no capability here writes.
+      - platform.read_usage
 
   # ---- Tenant-scoped --------------------------------------------------
 

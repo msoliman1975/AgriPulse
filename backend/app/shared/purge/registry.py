@@ -257,6 +257,28 @@ BLOCK_CAGGS: tuple[tuple[str, str], ...] = (
     ("block_index_weekly", "block_index_aggregates"),
 )
 
+# Continuous aggregates in the PUBLIC schema, keyed by tenant_id (TEL-6b).
+#
+# BLOCK_CAGGS above is not enough and the difference is easy to miss: it is
+# block-scoped AND tenant-schema-scoped. `Engine.cagg_names()` returns only
+# those, `_capture_cagg_range` bounds its window by querying
+# `block_index_aggregates`, and the refresh is qualified
+# `"{tenant_schema}"."{view}"`. Before this tuple existed the tenant-purge path
+# had no CAGG phase at all.
+#
+# That matters because both usage aggregates GROUP BY tenant_id and run with
+# real-time aggregation on. Deleting the raw `usage_events` rows leaves the
+# already-materialised daily buckets intact, so a purged tenant keeps its
+# numbers in every chart — and the orphan scanner cannot see it, because it
+# only looks at tables. Silent, and it looks like the purge worked.
+#
+# (view, source table). The source is what the pre-delete window is measured
+# over; there is nothing left to measure afterwards.
+PUBLIC_CAGGS: tuple[tuple[str, str], ...] = (
+    ("usage_daily", "usage_events"),
+    ("usage_flow_daily", "usage_events"),
+)
+
 
 # --- Farm ------------------------------------------------------------------
 #
@@ -415,6 +437,15 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
     # NULL farm_id are platform-wide (a failing background task) and are left
     # alone by construction, because the delete is keyed on the column.
     OwnedTable("platform_alerts", owner_column="farm_id", schema="public", order=10, fk=False),
+    OwnedTable(
+        "usage_events",
+        owner_column="farm_id",
+        schema="public",
+        order=10,
+        fk=False,
+        hypertable=True,
+        note="product telemetry; farm-scoped events die with the farm",
+    ),
 )
 
 
@@ -434,6 +465,18 @@ TENANT_PUBLIC_OWNED: tuple[OwnedTable, ...] = (
         note="tenant-authored trees; decision_tree_versions cascades off this",
     ),
     OwnedTable("backfill_runs", owner_column="tenant_id", schema="public", order=10, fk=False),
+    OwnedTable(
+        "usage_events",
+        owner_column="tenant_id",
+        schema="public",
+        order=10,
+        fk=False,
+        hypertable=True,
+        note="product telemetry does NOT survive a purge — decided, not deferred. "
+        "Deleting these rows is necessary but NOT sufficient: the TEL-6 continuous "
+        "aggregates group by tenant_id and keep serving a purged tenant until they "
+        "are refreshed. TEL-6b adds that phase.",
+    ),
     # The trial signup that created this tenant (public migration 0078). It
     # holds the person's name, work address and phone, so a purge that leaves
     # it behind leaves their personal data behind. Rows with tenant_id NULL —
@@ -542,9 +585,23 @@ EXEMPT_PAIRS: dict[tuple[str, str], str] = {
     # `activity_resources` history on *other* farms with them.
     ("resources", "farm_id"): "tenant-level since W2-A; archived, not deleted, by delete_farms",
     # Views and continuous aggregates are not independently deletable; they
-    # follow their source tables (CAGGs via BLOCK_CAGGS refresh).
+    # follow their source tables (CAGGs via BLOCK_CAGGS / PUBLIC_CAGGS refresh).
     ("block_index_daily", "block_id"): "continuous aggregate over block_index_aggregates",
     ("block_index_weekly", "block_id"): "continuous aggregate over block_index_aggregates",
+    # Exempt from the DELETE, NOT from the purge. You cannot DELETE from a
+    # continuous aggregate, but these two do have to be emptied of a purged
+    # tenant — they group by tenant_id and run with real-time aggregation, so
+    # stale buckets would keep serving it. PUBLIC_CAGGS + refresh_public_caggs
+    # is what actually clears them (TEL-6b); this entry only tells the guard
+    # that a DELETE is the wrong mechanism.
+    (
+        "usage_daily",
+        "tenant_id",
+    ): "continuous aggregate over usage_events; cleared by PUBLIC_CAGGS refresh",
+    (
+        "usage_flow_daily",
+        "tenant_id",
+    ): "continuous aggregate over usage_events; cleared by PUBLIC_CAGGS refresh",
     ("v_block_own_integration_health", "block_id"): "view",
     ("v_block_own_integration_health", "farm_id"): "view",
     ("v_block_integration_health", "block_id"): "view",

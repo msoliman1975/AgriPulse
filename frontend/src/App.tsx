@@ -63,6 +63,7 @@ import { PlatformCropAttributesPage } from "@/modules/admin/pages/PlatformCropAt
 import { PlatformCatalogPage } from "@/modules/admin/pages/PlatformCatalogPage";
 import { PlatformCropsPage } from "@/modules/admin/pages/PlatformCropsPage";
 import { PlatformRolesPage } from "@/modules/admin/pages/PlatformRolesPage";
+import { PlatformUsagePage } from "@/modules/admin/pages/PlatformUsagePage";
 import { PlatformSignalsPage } from "@/modules/admin/pages/PlatformSignalsPage";
 import { PlatformDefaultsPage } from "@/modules/admin/pages/PlatformDefaultsPage";
 import { PlatformBackfillPage } from "@/modules/admin/pages/PlatformBackfillPage";
@@ -338,6 +339,7 @@ export function App(): ReactNode {
                 <Route path="plan-templates/:id" element={<PlanTemplateEditorPage />} />
                 <Route path="admins" element={<PlatformAdminsPage />} />
                 <Route path="roles" element={<PlatformRolesPage />} />
+                <Route path="usage" element={<PlatformUsagePage />} />
                 <Route path="integrations/health" element={<PlatformHealthPage />} />
                 <Route path="alerts" element={<PlatformAlertsPage />} />
                 <Route

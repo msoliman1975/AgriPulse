@@ -12,7 +12,8 @@
     "observer": "Observer",
     "roles": "Roles & permissions",
     "platformSignals": "Signal catalog",
-    "platformAlerts": "Platform alerts"
+    "platformAlerts": "Platform alerts",
+    "usage": "Product usage"
   },
   "crops": {
     "title": "Crop catalog",
@@ -1217,6 +1218,94 @@
       "alsoWarnings_one": "and {{count}} warning",
       "alsoWarnings_other": "and {{count}} warnings",
       "review": "Review"
+    }
+  },
+  "usage": {
+    "title": "Product usage",
+    "subtitle": "How the product is actually used: where people spend time, which capabilities matter, and where they struggle. Platform staff are excluded unless you include them.",
+    "spanLabel": "Date range",
+    "span_one": "{{count}} day",
+    "span_other": "{{count}} days",
+    "includeStaff": "Include platform staff",
+    "unit": {
+      "seconds": "s",
+      "minutes": "m",
+      "hours": "h"
+    },
+    "empty": {
+      "body": "No usage recorded in this window. Either nobody used the product, or telemetry is switched off."
+    },
+    "kpi": {
+      "dau": "Daily active",
+      "dauHint": "Distinct people who used the product in the last 24 hours.",
+      "wau": "Weekly active",
+      "wauHint": "Distinct people in the last 7 days.",
+      "stickiness": "Stickiness",
+      "stickinessHint": "Of the people who used it this week, the share who used it today.",
+      "session": "Median session",
+      "sessionHint": "{{count}} sessions per person in this window."
+    },
+    "time": {
+      "title": "Where time goes",
+      "hint": "Visible time only — a backgrounded tab is not counted, and a single visit over 30 minutes is discarded rather than clamped.",
+      "route": "Route",
+      "total": "Total time",
+      "visits": "Visits",
+      "median": "Median visit",
+      "empty": "No dwell recorded yet."
+    },
+    "adoption": {
+      "title": "Capability adoption",
+      "hint": "Reach matters more than volume: one tenant clicking a hundred times is not adoption.",
+      "feature": "Capability",
+      "users": "People",
+      "tenants": "Tenants",
+      "events": "Uses",
+      "lastUsed": "Last used",
+      "empty": "Nothing recorded yet."
+    },
+    "cold": {
+      "title": "Cold capabilities",
+      "hint": "In the vocabulary, used by nobody in this window. This is the \"should we delete it?\" list — but check it is instrumented before concluding it is unused.",
+      "none": "Every capability was used at least once."
+    },
+    "funnel": {
+      "title": "Funnels",
+      "hint": "Abandonment is derived, not reported: a start with no completion. The client cannot tell us about the person who closed the laptop.",
+      "counts": "{{entries}} entered · {{completions}} finished · {{abandoned}} did not",
+      "diedAt": "Most gave up at: {{step}}",
+      "diedAtEntry": "Most gave up before the first step — they bounced at entry.",
+      "empty": "No tracked flow was entered in this window."
+    },
+    "struggle": {
+      "title": "Where people struggle",
+      "hint": "Derived from failed calls and repeated actions. No session replay and no rage-click capture — everything here comes from events the app already had.",
+      "dense": "Error-dense routes",
+      "recent": "Recent failures",
+      "stormsTitle": "Repeated actions",
+      "slowTitle": "Slow actions",
+      "views": "Views",
+      "errors": "Errors",
+      "rate": "Per view",
+      "when": "When",
+      "code": "What failed",
+      "correlation": "Correlation ID",
+      "action": "Action",
+      "storms": "Bursts",
+      "p95": "p95",
+      "samples": "Samples",
+      "noneDense": "No route is failing often enough to flag.",
+      "noneRecent": "No failures recorded in this window.",
+      "noneStorms": "Nobody repeated the same action three times in a minute.",
+      "noneSlow": "No action is slower than 3 seconds at p95."
+    },
+    "tenant": {
+      "title": "Tenant health",
+      "hint": "Breadth is the retention signal: a tenant using two capabilities is a different risk from one using twelve, at the same event count.",
+      "tenant": "Tenant",
+      "lastSeen": "Last seen",
+      "breadth": "Capabilities used",
+      "empty": "No tenant activity in this window."
     }
   }
 }
