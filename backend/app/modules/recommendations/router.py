@@ -81,6 +81,7 @@ from app.modules.recommendations.service import (
     _DecisionTreeVersionNotFoundError,
     _ParamNameUnknownError,
     _ParamValueCoercionError,
+    _PlatformTreeNotEditableError,
     get_decision_trees_author_service,
     get_recommendations_service,
 )
@@ -628,6 +629,17 @@ def _map_authoring_error(exc: Exception) -> Exception | None:  # noqa: PLR0911 -
             detail=str(exc),
             type_="https://agripulse.cloud/problems/recommendations/decision-tree-code-mismatch",
             extras={"expected": exc.expected, "got": exc.got},
+        )
+    if isinstance(exc, _PlatformTreeNotEditableError):
+        # 403, not 404. The tree is there and the caller can read it; what
+        # they cannot do is change it. Reporting it as missing sent an author
+        # looking for a data problem that did not exist.
+        return APIError(
+            status_code=status.HTTP_403_FORBIDDEN,
+            title="Platform tree is read-only",
+            detail=str(exc),
+            type_="https://agripulse.cloud/problems/recommendations/platform-tree-read-only",
+            extras={"code": exc.code},
         )
     if isinstance(exc, _DecisionTreeNoPublishedVersionError):
         return APIError(

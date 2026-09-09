@@ -2780,6 +2780,30 @@ class DecisionTreesAuthorService:
         del DecisionTreeNotFoundError
         return tree
 
+    async def _own_tree_or_raise(self, code: str) -> dict[str, Any]:
+        """The caller's own tree with this code, or the reason there is none.
+
+        Every authoring write scopes to the caller's own tenant, because a
+        platform tree is owned by its YAML file: `sync_from_disk` rewrites it
+        at the next startup whose compiled hash differs, so a tenant's edit
+        would live until the next restart and then disappear without a word.
+
+        The scoped lookup cannot tell "no such tree" from "not yours", and it
+        used to report both as missing. A 404 saying "No decision tree with
+        code 'mango_canopy_vigour_by_size_v1'" about a tree the author has
+        open on screen sends somebody hunting a data problem that is not
+        there. So the second lookup runs only on the failure path, and only
+        to name what actually happened.
+        """
+        tree = await self._repo.get_tree_by_code(code, scope_tenant_id=self._tenant_id)
+        if tree is not None:
+            return tree
+        if self._tenant_id is not None:
+            platform = await self._repo.get_tree_by_code(code, scope_tenant_id=None)
+            if platform is not None:
+                raise _PlatformTreeNotEditableError(code)
+        raise _DecisionTreeNotFoundError(code)
+
     async def append_version(
         self,
         *,
@@ -2799,9 +2823,7 @@ class DecisionTreesAuthorService:
         # cannot author a new version of a platform tree (those are
         # YAML-managed). Platform-tree customization in PR-C goes
         # through a separate override path, not version-append.
-        tree = await self._repo.get_tree_by_code(code, scope_tenant_id=self._tenant_id)
-        if tree is None:
-            raise _DecisionTreeNotFoundError(code)
+        tree = await self._own_tree_or_raise(code)
         spec = _yaml.safe_load(tree_yaml)
         compiled = compile_tree(spec, source_path=f"<api:{code}>")
         if compiled.get("code") != code:
@@ -2868,12 +2890,9 @@ class DecisionTreesAuthorService:
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
         # Writes scope strictly to the caller's own tenant — a tenant
-        # cannot author a new version of a platform tree (those are
-        # YAML-managed). Platform-tree customization in PR-C goes
-        # through a separate override path, not version-append.
-        tree = await self._repo.get_tree_by_code(code, scope_tenant_id=self._tenant_id)
-        if tree is None:
-            raise _DecisionTreeNotFoundError(code)
+        # cannot publish a version of a platform tree (those are
+        # YAML-managed).
+        tree = await self._own_tree_or_raise(code)
         version_row = await self._repo.get_version_by_number(tree_id=tree["id"], version=version)
         if version_row is None:
             raise _DecisionTreeVersionNotFoundError(code=code, version=version)
@@ -2938,9 +2957,7 @@ class DecisionTreesAuthorService:
         metadata panel. Scoped strictly to the caller's own tenant — a
         tenant cannot edit a platform tree's metadata (those are
         YAML-managed)."""
-        tree = await self._repo.get_tree_by_code(code, scope_tenant_id=self._tenant_id)
-        if tree is None:
-            raise _DecisionTreeNotFoundError(code)
+        tree = await self._own_tree_or_raise(code)
         # Retargeting is the other way a crop-attribute ref goes dead: the
         # YAML never changes, but narrowing the crop set can leave the body
         # branching on an attribute the new crops don't define.
@@ -2991,9 +3008,7 @@ class DecisionTreesAuthorService:
         """Soft-archive one of the caller's own trees. Idempotent-ish:
         the tree must currently be visible (non-archived) — restoring an
         already-archived tree goes through ``restore_tree``."""
-        tree = await self._repo.get_tree_by_code(code, scope_tenant_id=self._tenant_id)
-        if tree is None:
-            raise _DecisionTreeNotFoundError(code)
+        tree = await self._own_tree_or_raise(code)
         await self._repo.set_tree_archived(
             tree_id=tree["id"], archived=True, actor_user_id=actor_user_id
         )
@@ -3423,6 +3438,27 @@ class _DecisionTreeCodeMismatchError(_DecisionTreeAuthoringError):
         super().__init__(f"YAML body has code {got!r} but the URL says {expected!r}")
         self.expected = expected
         self.got = got
+
+
+class _PlatformTreeNotEditableError(_DecisionTreeAuthoringError):
+    """The tree exists, and it is not the caller's to change.
+
+    A platform tree is owned by the YAML on disk: `sync_from_disk` rewrites
+    it at every startup whose compiled hash differs, so a tenant's edit would
+    survive until the next restart and then vanish with no message.
+
+    This is its own error because the lookup that refuses it — scoped to the
+    caller's own tenant — used to report the tree as missing. "No decision
+    tree with code 'x'" about a tree the author has open on screen sends
+    somebody hunting for a data problem that does not exist.
+    """
+
+    def __init__(self, code: str) -> None:
+        super().__init__(
+            f"Decision tree {code!r} is a platform tree. Platform trees are managed "
+            f"by the platform and cannot be edited here."
+        )
+        self.code = code
 
 
 class _DecisionTreeNoPublishedVersionError(_DecisionTreeAuthoringError):

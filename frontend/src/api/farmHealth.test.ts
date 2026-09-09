@@ -22,7 +22,10 @@ const get = vi.spyOn(apiClient, "get");
 /** The path the client asked for, and the params it sent with it. */
 function lastCall(): { url: string; params: Record<string, unknown> | undefined } {
   const call = get.mock.calls[get.mock.calls.length - 1];
-  const config = call[1];
+  // Axios types `params` as `any`, which reaches this signature as
+  // `unknown`. Naming the shape here keeps `tsc -b` quiet without loosening
+  // what the assertions below are allowed to read.
+  const config = call[1] as { params?: Record<string, unknown> } | undefined;
   return { url: call[0], params: config?.params };
 }
 

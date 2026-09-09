@@ -352,6 +352,14 @@ export function DecisionTreeViewerPage(): ReactNode {
   }
 
   const tree = detail.data;
+  // A platform tree is owned by its YAML file: `sync_from_disk` rewrites it
+  // at the next startup whose compiled hash differs, so a tenant's edit would
+  // live until the next restart and then vanish. The API has always refused
+  // the write; this page offered the buttons anyway, and the refusal came
+  // back as "No decision tree with code ..." about a tree open on screen.
+  // The list page already hides its own actions on the same rule.
+  const isPlatformTree = tree.tenant_id == null;
+  const canEdit = canManage && !isPlatformTree;
   const isDraftOnly = tree.current_version == null;
   const structuralDirty = draftYaml !== null && sourceYaml !== null && draftYaml !== sourceYaml;
 
@@ -647,11 +655,19 @@ export function DecisionTreeViewerPage(): ReactNode {
                 {isAr && tree.description_ar ? tree.description_ar : tree.description_en}
               </span>
             ) : null}
+            {/* Say why the buttons are absent. An editor that is simply inert
+                reads as broken, and the API's refusal used to arrive as "no
+                such tree" about a tree open on screen. */}
+            {isPlatformTree && canManage ? (
+              <span className="mt-2 block max-w-prose text-xs text-ap-muted">
+                {t("viewer.platformReadOnly")}
+              </span>
+            ) : null}
           </>
         }
         actions={
           <div className="flex items-center gap-2">
-            {canManage ? (
+            {canEdit ? (
               <div className="flex items-center gap-1">
                 <button
                   type="button"
@@ -673,7 +689,7 @@ export function DecisionTreeViewerPage(): ReactNode {
                 </button>
               </div>
             ) : null}
-            {canManage && dirty ? (
+            {canEdit && dirty ? (
               <>
                 <button
                   type="button"
@@ -696,7 +712,7 @@ export function DecisionTreeViewerPage(): ReactNode {
                 </button>
               </>
             ) : null}
-            {canManage && !dirty && hasUnpublishedDraft && latestVersion ? (
+            {canEdit && !dirty && hasUnpublishedDraft && latestVersion ? (
               <button
                 type="button"
                 onClick={() => {
@@ -767,14 +783,14 @@ export function DecisionTreeViewerPage(): ReactNode {
           setTargetingBuffer((b) => ({ ...(b ?? targeting), soil_textures: n }))
         }
         onScopeChange={(s) => setTargetingBuffer((b) => ({ ...(b ?? targeting), scope: s }))}
-        canEdit={canManage}
+        canEdit={canEdit}
       />
 
       {viewMode === "yaml" ? (
         <YamlMode
           draftYaml={draftYaml ?? ""}
           onChange={setDraftYaml}
-          canManage={canManage}
+          canManage={canEdit}
           signalDefs={signalDefsQ.data ?? []}
           signalDefsLoading={signalDefsQ.isLoading}
           signalDefsError={signalDefsQ.isError}
@@ -828,8 +844,8 @@ export function DecisionTreeViewerPage(): ReactNode {
                 selectedNodeId={selectedNodeId}
                 onSelectNode={setSelectedNodeId}
                 dirtyNodeIds={dirtyIds}
-                onAddChild={canManage ? onRequestAddChild : undefined}
-                onRewire={canManage ? onRewire : undefined}
+                onAddChild={canEdit ? onRequestAddChild : undefined}
+                onRewire={canEdit ? onRewire : undefined}
                 pathNodeIds={highlight?.nodes}
                 pathEdgeKeys={highlight?.edges}
                 terminalNodeId={highlight?.terminalNodeId ?? null}
@@ -851,7 +867,7 @@ export function DecisionTreeViewerPage(): ReactNode {
                       {unreachableNodes.join(", ")}
                     </p>
                   </div>
-                  {canManage ? (
+                  {canEdit ? (
                     <button
                       type="button"
                       onClick={onCleanupUnreachable}
@@ -880,7 +896,7 @@ export function DecisionTreeViewerPage(): ReactNode {
               <ParametersPanel
                 declared={declaredParams}
                 buffer={paramsBuffer}
-                canEdit={canManage}
+                canEdit={canEdit}
                 onChange={onParameterChange}
               />
               {Object.keys(declaredParams).length > 0 ? (
@@ -891,20 +907,20 @@ export function DecisionTreeViewerPage(): ReactNode {
               <NodeDetailsPanel
                 node={selectedNode}
                 pendingPatch={editBuffer[selectedNode.id]}
-                canEdit={canManage}
+                canEdit={canEdit}
                 isRoot={rootId === selectedNode.id}
                 onPatch={onPatch}
                 onClearPatch={onClearNodePatch}
-                onDelete={canManage ? onRequestDelete : undefined}
-                onAddChild={canManage ? onRequestAddChild : undefined}
-                onConditionChange={canManage ? onConditionChange : undefined}
+                onDelete={canEdit ? onRequestDelete : undefined}
+                onAddChild={canEdit ? onRequestAddChild : undefined}
+                onConditionChange={canEdit ? onConditionChange : undefined}
                 cropPaths={targeting.crop_paths}
                 paramNames={Object.keys(declaredParams)}
               />
             ) : (
               <aside className="flex h-fit flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ap-line bg-ap-panel p-6 text-center text-sm text-ap-muted">
                 <p>{t("editor.panel.selectHint")}</p>
-                {canManage ? (
+                {canEdit ? (
                   <p className="text-xs">{t("editor.panel.selectHintActions")}</p>
                 ) : null}
               </aside>
@@ -920,7 +936,7 @@ export function DecisionTreeViewerPage(): ReactNode {
       <VersionHistorySection
         versions={tree.versions}
         currentVersion={tree.current_version}
-        canManage={canManage}
+        canManage={canEdit}
         publishing={publish.isPending}
         dateLocale={dateLocale}
         onLoad={onLoadVersionIntoDraft}

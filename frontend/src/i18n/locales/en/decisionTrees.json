@@ -245,7 +245,8 @@
         "remote_sensing": "Remote sensing",
         "government": "Government"
       }
-    }
+    },
+    "platformReadOnly": "This is a platform tree. The platform manages it, so it is read-only here — its own YAML file is republished on every deploy. To run it with different thresholds, set parameter overrides below."
   },
   "editor": {
     "header": {
