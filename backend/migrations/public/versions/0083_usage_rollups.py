@@ -27,9 +27,14 @@ which mean is exact — and the p95 query in `telemetry/repository.py` runs
 `percentile_cont` over the raw hypertable instead. Raw is 180 days, which is
 longer than any latency question is asked about.
 
-Real-time aggregation is left ON (`materialized_only = false`, the default) so
-today's partial data appears without waiting for a refresh. That is also
-exactly why a tenant purge has to refresh these views — see TEL-6b.
+Real-time aggregation is required here, so today's partial data appears without
+waiting for a refresh. It is turned on by **migration 0084**, not here: this
+migration assumed `materialized_only` still defaulted to false, and that default
+flipped in TimescaleDB 2.13. Both views shipped with it OFF and the dashboard
+read empty against 74 real rows. Do not trust the default — set it explicitly.
+
+Real-time aggregation is also exactly why a tenant purge has to refresh these
+views — see TEL-6b.
 """
 
 from __future__ import annotations
