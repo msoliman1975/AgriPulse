@@ -6,7 +6,7 @@
 
 import { useTranslation } from "react-i18next";
 
-import type { StatusCode, StatusDefinition } from "@/api/farmHealth";
+import type { StatusCode, StatusDefinition, Verdict } from "@/api/farmHealth";
 import { Card } from "@/components/Card";
 import { Pill } from "@/components/Pill";
 import type { Area } from "../lib/areas";
@@ -191,6 +191,87 @@ export function AreaDetail({ area, farmId, blockId, open, onToggle }: DetailProp
             leafNodeId={area.leafNodeId}
             kind={area.sample.kind}
             statusCode={area.status}
+          />
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+interface BlockDetailProps {
+  verdict: Verdict;
+  statuses: StatusDefinition[];
+  farmId: string;
+  blockId: string;
+  open: boolean;
+  onToggle: () => void;
+}
+
+/**
+ * A whole-block verdict, said in full.
+ *
+ * A block tree writes one verdict with no cell, so it produced no areas and
+ * this card had no counterpart: the panel showed the colour bar, the words
+ * "1 Good", and nothing else. The tree's own sentence and the walk behind it
+ * were both in the payload already — the screen just never asked for them,
+ * so "why is this block good" had no answer on the page that exists to say
+ * why.
+ */
+export function BlockVerdictDetail({
+  verdict,
+  statuses,
+  farmId,
+  blockId,
+  open,
+  onToggle,
+}: BlockDetailProps) {
+  const { t, i18n } = useTranslation(["farmHealth"]);
+  const arabic = i18n.language.startsWith("ar");
+  const status = statuses.find((s) => s.code === verdict.status_code);
+  // The verdict text is the tree author's own sentence, so it is chosen
+  // rather than translated.
+  const text = arabic ? (verdict.text_ar ?? verdict.text_en) : verdict.text_en;
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-baseline gap-3">
+        <h3 className="text-section-title font-semibold text-ap-ink">
+          {t("farmHealth:block.wholeBlock")}
+        </h3>
+        <span className="inline-flex items-center gap-1.5 text-sm text-ap-muted">
+          <i
+            className="inline-block h-2.5 w-2.5 rounded-sm"
+            style={{ background: status?.color ?? "#9AA0A6" }}
+          />
+          {status ? (arabic ? (status.label_ar ?? status.label_en) : status.label_en) : ""}
+        </span>
+        <span className="ms-auto font-mono text-meta text-ap-muted">
+          {verdict.tree_code} · v{verdict.tree_version}
+        </span>
+      </div>
+
+      <p className="mt-2 text-sm text-ap-ink">{text}</p>
+
+      <div className="mt-2">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={onToggle}
+          className="text-sm font-medium text-ap-accent underline underline-offset-4"
+        >
+          {open ? t("farmHealth:reasoning.hide") : t("farmHealth:reasoning.show")}
+        </button>
+      </div>
+
+      {open ? (
+        <div className="mt-3 border-t border-ap-line pt-3">
+          <Reasoning
+            blockId={blockId}
+            verdictId={verdict.id}
+            farmId={farmId}
+            leafNodeId={verdict.leaf_node_id}
+            kind={verdict.kind}
+            statusCode={verdict.status_code}
           />
         </div>
       ) : null}
