@@ -145,10 +145,11 @@ beforeAll(() => {
     closePath: () => {},
     fill: () => {},
   } as unknown as CanvasRenderingContext2D;
-   
-  // an overload set; matching it exactly here would be noise, and the stub is
-  // only ever asked for a 2d context.
-  HTMLCanvasElement.prototype.getContext = ((): any => ctx) as HTMLCanvasElement["getContext"];
+
+  // `getContext` is an overload set; matching it exactly here would be noise,
+  // and this stub is only ever asked for a 2d context.
+  HTMLCanvasElement.prototype.getContext = (() =>
+    ctx) as unknown as HTMLCanvasElement["getContext"];
   HTMLCanvasElement.prototype.toDataURL = () => "data:image/png;base64,AA==";
 });
 
@@ -230,8 +231,10 @@ describe("HealthMap", () => {
     await waitFor(() => {
       expect(fake.sources.get("fh-cell-image")?.setCoordinates).toHaveBeenCalled();
     });
-    const corners = fake.sources.get("fh-cell-image")?.setCoordinates.mock
-      .calls[0][0] as [number, number][];
+    const corners = fake.sources.get("fh-cell-image")?.setCoordinates.mock.calls[0][0] as [
+      number,
+      number,
+    ][];
     const lons = corners.map((c) => c[0]);
     const lats = corners.map((c) => c[1]);
     expect(Math.max(...lons)).toBeGreaterThan(Math.min(...lons));
