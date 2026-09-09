@@ -209,6 +209,10 @@ export function FarmHealthViewPage(): ReactNode {
             const colorOf = (status: StatusCode): string =>
               colorFor.get(status) ?? "#9AA0A6";
 
+            // Every block's worst verdict for the chosen tree, which is what
+            // the map paints. `rows` already holds it, and a block-scoped
+            // tree has no cells, so this is the only colour it can show.
+            const worstByBlock = new Map(rows.map((row) => [row.blockId, row.worst]));
             const mapBlocks: MapBlock[] = data.blocks
               .filter((block): block is BlockListItem & { boundary: Polygon } =>
                 Boolean(block.boundary),
@@ -218,6 +222,7 @@ export function FarmHealthViewPage(): ReactNode {
                 code: block.code,
                 boundary: block.boundary,
                 selected: block.id === selectedBlockId,
+                status: worstByBlock.get(block.id) ?? null,
               }));
 
             // Geometry from the grid read, verdict from the farm read, joined
