@@ -1,0 +1,852 @@
+<title>Brazil Coffee Playbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+:root{
+  --ground:#FBFAF6;
+  --surface:#F1F0E7;
+  --surface-2:#E6E5D8;
+  --ink:#151811;
+  --muted:#5D6353;
+  --rule:#DBD9C9;
+  --accent:#2C5C3D;
+  --accent-soft:#E2EBE1;
+  --cherry:#A63A2B;
+  --cherry-soft:#F4E7E3;
+  --amber:#8C6A0D;
+  --amber-soft:#F5EEDC;
+  --conilon:#2A5566;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#111310;
+    --surface:#1A1D17;
+    --surface-2:#242820;
+    --ink:#E8EADF;
+    --muted:#9BA18F;
+    --rule:#2E3329;
+    --accent:#8CC29A;
+    --accent-soft:#1C2820;
+    --cherry:#E39182;
+    --cherry-soft:#2C1E1A;
+    --amber:#D3A742;
+    --amber-soft:#2A2416;
+    --conilon:#7FB2C6;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#111310;
+  --surface:#1A1D17;
+  --surface-2:#242820;
+  --ink:#E8EADF;
+  --muted:#9BA18F;
+  --rule:#2E3329;
+  --accent:#8CC29A;
+  --accent-soft:#1C2820;
+  --cherry:#E39182;
+  --cherry-soft:#2C1E1A;
+  --amber:#D3A742;
+  --amber-soft:#2A2416;
+  --conilon:#7FB2C6;
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:"Source Serif 4","Iowan Old Style",Georgia,serif;
+  font-size:17px;
+  line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif}
+code,pre{font-family:"IBM Plex Mono",ui-monospace,"SF Mono",Consolas,monospace}
+
+.shell{max-width:1400px;margin:0 auto;padding:0 24px}
+@media (min-width:1120px){
+  .shell{display:grid;grid-template-columns:250px minmax(0,1fr);gap:56px;padding:0 40px}
+}
+.rail{display:none}
+@media (min-width:1120px){
+  .rail{display:block;position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto;padding:44px 0}
+}
+.rail-title{
+  font-family:"Bricolage Grotesque",sans-serif;font-size:11px;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 14px;
+}
+.rail ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.rail a{
+  display:grid;grid-template-columns:26px 1fr;gap:8px;align-items:baseline;
+  font-family:"Bricolage Grotesque",sans-serif;font-size:13.5px;line-height:1.35;
+  color:var(--ink);text-decoration:none;padding:6px 6px 6px 0;border-radius:3px;
+}
+.rail a:hover{color:var(--accent)}
+.rail a .n{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+main{min-width:0;padding:0 0 88px}
+
+.masthead{padding:56px 0 40px;border-bottom:2px solid var(--ink)}
+.eyebrow{
+  font-family:"Bricolage Grotesque",sans-serif;font-size:11.5px;font-weight:600;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 18px;
+}
+h1{
+  font-size:clamp(38px,5.6vw,60px);line-height:1.03;font-weight:800;
+  letter-spacing:-.022em;margin:0 0 18px;text-wrap:balance;max-width:20ch;
+}
+.standfirst{font-size:20px;line-height:1.5;color:var(--muted);max-width:78ch;margin:0}
+.meta{
+  display:flex;flex-wrap:wrap;gap:6px 28px;margin-top:28px;
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--muted);
+}
+.meta b{font-weight:500;color:var(--ink)}
+
+section{padding:52px 0;border-bottom:1px solid var(--rule)}
+section:last-of-type{border-bottom:0}
+.part{
+  display:flex;align-items:center;gap:14px;margin:0 0 10px;
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:500;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--accent);
+}
+.part::after{content:"";flex:1;height:1px;background:var(--rule)}
+h2{font-size:clamp(26px,3.2vw,34px);line-height:1.12;font-weight:700;letter-spacing:-.018em;margin:0 0 16px;text-wrap:balance;max-width:34ch}
+h3{font-size:20px;line-height:1.25;font-weight:600;letter-spacing:-.01em;margin:34px 0 10px}
+p{margin:0 0 16px}
+ul,ol{margin:0 0 18px;padding-left:22px}
+li{margin:0 0 8px}
+li::marker{color:var(--muted)}
+a{color:var(--accent);text-underline-offset:2px}
+strong{font-weight:600}
+code{font-size:.85em;background:var(--surface-2);padding:1px 5px;border-radius:3px;word-break:break-word}
+
+.tablewrap{overflow-x:auto;margin:0 0 24px;border:1px solid var(--rule);border-radius:4px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:620px;font-size:14.5px}
+caption{
+  text-align:left;padding:13px 14px 3px;font-family:"Bricolage Grotesque",sans-serif;
+  font-size:11.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+}
+th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--rule);vertical-align:top;line-height:1.42}
+thead th{
+  font-family:"Bricolage Grotesque",sans-serif;font-size:11.5px;font-weight:600;
+  letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+  border-bottom:1px solid var(--ink);white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:0}
+td.num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+td code{background:transparent;padding:0;color:var(--accent)}
+
+.note{
+  border-left:3px solid var(--accent);background:var(--accent-soft);
+  padding:18px 22px;margin:0 0 24px;border-radius:0 4px 4px 0;
+}
+.note.gap{border-left-color:var(--cherry);background:var(--cherry-soft)}
+.note.watch{border-left-color:var(--amber);background:var(--amber-soft)}
+.note p:last-child{margin-bottom:0}
+.note .tag{
+  display:block;font-family:"Bricolage Grotesque",sans-serif;font-size:11px;font-weight:600;
+  letter-spacing:.12em;text-transform:uppercase;margin-bottom:7px;color:var(--accent);
+}
+.note.gap .tag{color:var(--cherry)}
+.note.watch .tag{color:var(--amber)}
+
+.pill{
+  display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:500;
+  letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:99px;
+  border:1px solid currentColor;white-space:nowrap;
+}
+.pill.build{color:var(--cherry)}
+.pill.reuse{color:var(--accent)}
+.pill.config{color:var(--conilon)}
+
+pre{
+  background:var(--surface);border:1px solid var(--rule);border-radius:4px;
+  padding:16px 18px;overflow-x:auto;font-size:13px;line-height:1.55;margin:0 0 24px;
+  color:var(--ink);
+}
+pre code{background:transparent;padding:0;font-size:13px}
+.k{color:var(--accent)}
+.s{color:var(--cherry)}
+.c{color:var(--muted);font-style:italic}
+
+.kv{
+  display:grid;grid-template-columns:1fr;border:1px solid var(--rule);
+  border-radius:4px;overflow:hidden;margin:0 0 24px;background:var(--surface);
+}
+@media (min-width:700px){.kv{grid-template-columns:repeat(2,1fr)}}
+.kv > div{padding:14px 16px;border-bottom:1px solid var(--rule)}
+@media (min-width:700px){.kv > div:nth-child(odd){border-right:1px solid var(--rule)}}
+.kv dt{font-family:"Bricolage Grotesque",sans-serif;font-size:11.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0 0 5px}
+.kv dd{margin:0;font-size:15px;line-height:1.45}
+
+.footer{padding:36px 0 0;color:var(--muted);font-size:14.5px}
+.langswitch{
+  display:inline-block;margin-top:22px;font-size:13.5px;padding:6px 14px;
+  font-family:"Bricolage Grotesque",sans-serif;
+  border:1px solid var(--rule);border-radius:99px;text-decoration:none;color:var(--muted);
+}
+.langswitch:hover{border-color:var(--accent);color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+</style>
+
+<div class="shell">
+
+<nav class="rail" aria-label="Contents">
+  <p class="rail-title">Contents</p>
+  <ol>
+    <li><a href="#p1"><span class="n">01</span><span>The Brazilian coffee sector</span></a></li>
+    <li><a href="#p2"><span class="n">02</span><span>Who we would sell to</span></a></li>
+    <li><a href="#p3"><span class="n">03</span><span>Coffee agronomy</span></a></li>
+    <li><a href="#p4"><span class="n">04</span><span>The coffee year</span></a></li>
+    <li><a href="#p5"><span class="n">05</span><span>Pests, diseases, climate</span></a></li>
+    <li><a href="#p6"><span class="n">06</span><span>Mapping onto AgriPulse</span></a></li>
+    <li><a href="#p7"><span class="n">07</span><span>Imagery and indices</span></a></li>
+    <li><a href="#p8"><span class="n">08</span><span>Decision trees to author</span></a></li>
+    <li><a href="#p9"><span class="n">09</span><span>What must be built</span></a></li>
+    <li><a href="#p10"><span class="n">10</span><span>Rollout and open questions</span></a></li>
+  </ol>
+</nav>
+
+<main>
+
+<header class="masthead">
+  <p class="eyebrow">Market entry study &middot; AgriPulse</p>
+  <h1>Brazil Coffee Playbook</h1>
+  <p class="standfirst">How Brazilian coffee production works, and exactly which parts of AgriPulse serve it today, which parts need only configuration, and which parts do not exist yet.</p>
+  <div class="meta">
+    <span><b>Date</b> 2026-09-07</span>
+    <span><b>Crop</b> <i>Coffea arabica</i> &middot; <i>C. canephora</i></span>
+    <span><b>Status</b> Draft for review</span>
+    <span><b>Audience</b> Product, agronomy, engineering</span>
+  </div>
+  <a class="langswitch" href="https://claude.ai/code/artifact/8e9e0ba1-7056-4c12-8d5f-415c59fad890" lang="ar" dir="rtl">النسخة العربية</a>
+</header>
+
+<section id="p1">
+<p class="part">Part 01</p>
+<h2>The Brazilian coffee sector</h2>
+
+<p>Brazil is the largest coffee producer in the world and has been for over a century. It grows both commercial species: <i>Coffea arabica</i> (ar&aacute;bica) on the highland plateaus of the south-east, and <i>Coffea canephora</i>, called <i>conilon</i> in Brazil and robusta elsewhere, in the warmer lowlands.</p>
+
+<div class="note watch">
+  <span class="tag">Read the numbers as orders of magnitude</span>
+  <p>The figures in this part come from general sector knowledge, not from a live data source. Before any of them goes into a customer deck, check them against CONAB (the government crop survey), the Ministry of Agriculture, and CECAF&Eacute; (the exporters' council). Treat them as a shape, not as facts.</p>
+</div>
+
+<h3>Scale</h3>
+<div class="kv">
+  <div><dt>National output</dt><dd>Roughly 55&ndash;65 million bags a year, where a bag (<i>saca</i>) is 60 kg of green coffee.</dd></div>
+  <div><dt>Split by species</dt><dd>Roughly two thirds ar&aacute;bica, one third conilon. The conilon share has been rising.</dd></div>
+  <div><dt>Planted area</dt><dd>Roughly 2.2&ndash;2.3 million hectares in production.</dd></div>
+  <div><dt>Producing farms</dt><dd>Roughly 300,000. Most are under 20 ha. A small number of estates run 1,000&ndash;10,000 ha.</dd></div>
+</div>
+
+<h3>Where it grows</h3>
+<p>Production concentrates in a handful of states, and each one implies a different customer and a different agronomic problem.</p>
+
+<div class="tablewrap">
+<table>
+  <caption>Producing regions and what they mean for us</caption>
+  <thead>
+    <tr><th>Region</th><th>State</th><th>Species</th><th>Typical operation</th><th>Dominant risk</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Sul de Minas</td><td>Minas Gerais</td><td>Ar&aacute;bica</td><td>Hills, 10&ndash;100 ha, family farms and cooperative members, partly manual harvest</td><td>Frost, rust, uneven ripening</td></tr>
+    <tr><td>Cerrado Mineiro</td><td>Minas Gerais</td><td>Ar&aacute;bica</td><td>Flat, mechanised, 200&ndash;3,000 ha, centre-pivot irrigation, denomination of origin</td><td>Dry spells, heat at flowering</td></tr>
+    <tr><td>Matas de Minas</td><td>Minas Gerais</td><td>Ar&aacute;bica</td><td>Steep slopes, small farms, manual harvest, specialty focus</td><td>Rust, leaf miner, erosion</td></tr>
+    <tr><td>Mogiana</td><td>S&atilde;o Paulo</td><td>Ar&aacute;bica</td><td>Rolling ground, medium to large, mechanised where slope allows</td><td>Drought, frost at the margin</td></tr>
+    <tr><td>Oeste da Bahia and Chapada</td><td>Bahia</td><td>Ar&aacute;bica and conilon</td><td>Large irrigated estates, pivot and drip, heavily instrumented</td><td>Water allocation, heat</td></tr>
+    <tr><td>Esp&iacute;rito Santo</td><td>Esp&iacute;rito Santo</td><td>Conilon, plus mountain ar&aacute;bica</td><td>Small and medium farms, drip irrigation, clonal plantings</td><td>Drought, water rationing</td></tr>
+    <tr><td>Rond&ocirc;nia</td><td>Rond&ocirc;nia</td><td>Conilon amaz&ocirc;nico</td><td>Smallholders, clonal, fast-growing area</td><td>Deforestation compliance, humidity diseases</td></tr>
+    <tr><td>Norte do Paran&aacute;</td><td>Paran&aacute;</td><td>Ar&aacute;bica</td><td>Reduced area since historic frosts, dense plantings</td><td>Frost</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>The two structural forces to sell against</h3>
+
+<p><strong>Biennial bearing.</strong> An arabica field alternates a heavy year and a light year. A heavy crop drains the plant's reserves, so the next year sets fewer nodes. Whole regions swing together, so national output swings too. Every yield conversation, every fertiliser plan and every baseline comparison in Brazil has to know which half of the cycle a block is in. This is not a detail. It is the organising fact of Brazilian coffee management.</p>
+
+<p><strong>Traceability to the plot.</strong> The European Union's deforestation regulation puts coffee in scope and requires operators to hold geolocation data for the plots of land where the coffee was produced, with polygons for larger plots, plus a due diligence statement. Brazil separately runs the <i>Cadastro Ambiental Rural</i> (CAR), a mandatory environmental registry of rural property boundaries. Both are polygon problems.</p>
+
+<div class="note">
+  <span class="tag">This is the wedge</span>
+  <p>AgriPulse already stores farms and blocks as real geometry, with per-block imagery and a full activity history. The compliance requirement gives a Brazilian exporter or cooperative a reason to draw every plot as a polygon in <em>some</em> system this year. Being that system is a cheaper first sale than "better agronomy", and it puts our blocks under their feet before we sell a single decision tree. Check the current application dates before quoting them; they have moved more than once.</p>
+</div>
+</section>
+
+<section id="p2">
+<p class="part">Part 02</p>
+<h2>Who we would sell to</h2>
+
+<p>Brazilian coffee does not have one buyer type. It has four, and only two of them look like our existing customers.</p>
+
+<div class="tablewrap">
+<table>
+  <caption>Buyer types, ranked by fit with the platform as it stands</caption>
+  <thead>
+    <tr><th>Buyer</th><th>Shape</th><th>What they want</th><th>Fit today</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Large mechanised estate</strong></td>
+      <td>500&ndash;5,000 ha, own agronomist, already uses machinery telemetry</td>
+      <td>Block-level yield and quality uniformity, irrigation decisions, harvest sequencing</td>
+      <td><span class="pill reuse">Strong</span> The Bashayer shape with a different crop</td>
+    </tr>
+    <tr>
+      <td><strong>Cooperative</strong></td>
+      <td>Thousands of member farms, a team of field agronomists, own warehouses and cupping lab</td>
+      <td>One console over many small farms, field-agent scheduling, member reporting, compliance evidence</td>
+      <td><span class="pill config">Partial</span> Multi-farm tenancy exists; the field-agent workload is what Scout does</td>
+    </tr>
+    <tr>
+      <td><strong>Exporter or trader</strong></td>
+      <td>Buys from thousands of farms, carries the compliance obligation</td>
+      <td>Plot polygons, deforestation evidence, origin traceability, supplier risk</td>
+      <td><span class="pill build">Weak</span> We have the geometry and none of the compliance reporting</td>
+    </tr>
+    <tr>
+      <td><strong>Independent agronomy consultancy</strong></td>
+      <td>A few agronomists serving 20&ndash;80 farms on retainer</td>
+      <td>A tool that makes each visit count, and evidence that justifies the fee</td>
+      <td><span class="pill reuse">Strong</span> Action Center plus Scout is exactly this product</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>The cooperative is the highest-leverage entry, because one contract brings thousands of farms and a field team already on the payroll. The estate is the fastest technical proof, because it looks most like what we already run. A sensible plan wins one estate to prove the agronomy, then uses it to open a cooperative.</p>
+</section>
+
+<section id="p3">
+<p class="part">Part 03</p>
+<h2>Coffee agronomy, in the terms the platform needs</h2>
+
+<h3>The plant</h3>
+<p>Coffee is a perennial evergreen shrub, kept at 2&ndash;3.5 m and grown in rows. It starts producing in year 3 or 4, peaks around years 6 to 12, and is renewed by pruning rather than replanting. A block therefore has an <strong>age</strong> and a <strong>position in a pruning cycle</strong>, and both change what any measurement means. A first-year field after a stumping cut has almost no canopy and is perfectly healthy.</p>
+
+<h3>Cultivars</h3>
+<p>Cultivar choice drives disease resistance, ripening date, plant height and spacing. It is not cosmetic metadata. It is a targeting key.</p>
+
+<div class="tablewrap">
+<table>
+  <caption>Common cultivars and clone groups</caption>
+  <thead><tr><th>Species</th><th>Cultivar or group</th><th>Note</th></tr></thead>
+  <tbody>
+    <tr><td>Ar&aacute;bica</td><td>Catua&iacute; Vermelho and Amarelo (144, 62, 99)</td><td>The workhorse. Short stature, suits dense and mechanised planting.</td></tr>
+    <tr><td>Ar&aacute;bica</td><td>Mundo Novo</td><td>Tall, vigorous, high yielding, susceptible to rust.</td></tr>
+    <tr><td>Ar&aacute;bica</td><td>Catuca&iacute;, Arara, Sarchimor and Catimor lines</td><td>Carry rust resistance from <i>C. canephora</i>. Resistance can break down over time.</td></tr>
+    <tr><td>Ar&aacute;bica</td><td>IPR and IAC series, Top&aacute;zio, Bourbon Amarelo</td><td>Regional and specialty selections. Bourbon is quality-driven and low yielding.</td></tr>
+    <tr><td>Conilon</td><td>Clonal varieties such as Vit&oacute;ria INCAPER 8142, Diamante, Maril&acirc;ndia</td><td>A field is a mosaic of clones planted together for cross-pollination. Clones in one block ripen on different dates.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note gap">
+  <span class="tag">Modelling problem: the mixed-clone block</span>
+  <p>A conilon block is deliberately planted with several clones that flower and ripen at different times. Our crop taxonomy assigns one crop path per block. A conilon field cannot honestly be <code>coffee.conilon.vitoria</code>, because it is six clones at once. Either the clone group becomes the variety (<code>coffee.conilon.vitoria_group</code>), or the block carries an attribute listing its clones. Decide this before the first conilon customer, because the choice reaches phenology, harvest planning and every decision tree.</p>
+</div>
+
+<h3>Planting geometry</h3>
+<p>Spacing determines how much soil a satellite pixel sees, how much fertiliser a hectare needs, and whether a harvester can enter the row.</p>
+
+<div class="tablewrap">
+<table>
+  <caption>Typical planting systems</caption>
+  <thead><tr><th>System</th><th>Row &times; plant</th><th>Plants per ha</th><th>Harvest</th></tr></thead>
+  <tbody>
+    <tr><td>Tradicional and mecanizado</td><td class="num">3.5&ndash;4.0 m &times; 0.5&ndash;0.8 m</td><td class="num">3,000&ndash;5,500</td><td>Self-propelled harvester</td></tr>
+    <tr><td>Adensado (dense)</td><td class="num">2.0&ndash;2.5 m &times; 0.5&ndash;0.7 m</td><td class="num">6,000&ndash;10,000</td><td>Manual or portable stripper</td></tr>
+    <tr><td>Conilon irrigated</td><td class="num">3.0&ndash;3.5 m &times; 1.0&ndash;1.5 m</td><td class="num">2,000&ndash;3,300</td><td>Manual, several passes</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note gap">
+  <span class="tag">A known defect that will bite here</span>
+  <p>Plant density does not exist anywhere today, for any tenant. Migration <code>0061_drop_unused_block_crop_agronomy_columns</code> removed <code>plant_density_per_ha</code>, <code>row_spacing_m</code> and <code>plant_spacing_m</code> from <code>block_crops</code> platform-wide, because nothing ever wrote them: every crop-assignment row in production was read first, and all five dropped columns held zero non-null values. The same migration released those codes from <code>RESERVED_ATTRIBUTE_CODES</code>, so they are now free to author in the crop-attribute system. Coffee makes that urgent, because per-plant rates are the normal way Brazilian recommendations are written: grams per plant, not kilograms per hectare. Density must be a required, validated crop attribute before the first Brazilian block is created.</p>
+</div>
+
+<h3>Renewal pruning</h3>
+<p>Instead of replanting, growers cut the plant back and let it rebuild. This is a scheduled, capital-scale decision, and it produces a block that looks dead from orbit for a year.</p>
+<ul>
+  <li><strong>Esqueletamento</strong> &mdash; lateral branches cut back to short stubs, main stem kept.</li>
+  <li><strong>Decote</strong> &mdash; the top removed at a set height, often combined with skeletonisation.</li>
+  <li><strong>Recepa</strong> &mdash; the whole plant cut near the ground. The most drastic renewal.</li>
+  <li><strong>Safra zero</strong> &mdash; a deliberate no-crop year, usually the year after a heavy pruning.</li>
+</ul>
+
+<div class="note gap">
+  <span class="tag">Modelling problem: a healthy block with no canopy</span>
+  <p>A recently stumped block reads very low on every vegetation index for a full season. If the platform treats that as a health failure, we flood a Brazilian customer's Action Center with false criticals in their first month, which is the fastest way to lose the account. The pruning state has to suppress index-based health, not merely annotate it.</p>
+</div>
+
+<h3>Harvest and post-harvest</h3>
+<p>Harvest quality is where Brazilian growers make or lose their margin, and it is decided by ripeness uniformity at the moment of picking.</p>
+<ul>
+  <li><strong>Derri&ccedil;a</strong> &mdash; stripping all fruit off the branch at once, by hand or by machine. Because it takes everything, the block must be as uniformly ripe as possible before entry.</li>
+  <li><strong>Colheita seletiva</strong> &mdash; picking only ripe cherries, over several passes. Used for specialty lots and on slopes.</li>
+  <li><strong>Natural</strong> &mdash; whole cherry dried. The traditional Brazilian method.</li>
+  <li><strong>Cereja descascado</strong> &mdash; pulped natural: skin removed, mucilage kept, then dried.</li>
+  <li><strong>Despolpado and fermentado</strong> &mdash; fully washed or controlled fermentation, for specialty lots.</li>
+  <li><strong>Secagem</strong> &mdash; dried on a patio (<i>terreiro</i>), on raised beds, or in a mechanical drier, down to about 11&ndash;12% moisture.</li>
+</ul>
+<p>The commercial unit throughout is the <strong>saca of 60 kg</strong> of green coffee, and yields are quoted in <strong>sacas per hectare</strong>. Typical figures run about 25&ndash;45 sacas per hectare for well-managed rainfed arabica, higher under irrigation, and 40&ndash;80 for irrigated conilon.</p>
+</section>
+
+<section id="p4">
+<p class="part">Part 04</p>
+<h2>The coffee year, and why our calendar breaks</h2>
+
+<p>Brazil is in the southern hemisphere, so its season crosses the calendar-year boundary. Worse, an arabica crop takes about two years from bud initiation to harvest, so two crops sit on the same plant at all times. The standard Brazilian description, following Camargo and Camargo, uses six phenological phases across 24 months.</p>
+
+<div class="tablewrap">
+<table>
+  <caption>Arabica phenology in Brazil, with proposed stage codes</caption>
+  <thead><tr><th>Months, approximate</th><th>Phase</th><th>Proposed <code>stage_code</code></th><th>What management does</th></tr></thead>
+  <tbody>
+    <tr><td class="num">Sep&ndash;Mar</td><td>Vegetative growth of buds and new nodes</td><td><code>veg_growth</code></td><td>Nitrogen and potassium, weed control, leaf-miner watch</td></tr>
+    <tr><td class="num">Apr&ndash;Aug</td><td>Floral bud induction and dormancy</td><td><code>bud_induction</code></td><td>Harvest happens here. Buds wait for a rain or irrigation trigger.</td></tr>
+    <tr><td class="num">Sep&ndash;Oct</td><td>Flowering, triggered by rain after dry stress</td><td><code>flowering</code></td><td>The single most important date of the year</td></tr>
+    <tr><td class="num">Oct&ndash;Dec</td><td>Pinhead and fruit expansion (<i>chumbinho</i>)</td><td><code>fruit_expansion</code></td><td>Water is critical. Boron and calcium.</td></tr>
+    <tr><td class="num">Jan&ndash;Mar</td><td>Grain filling (<i>grana&ccedil;&atilde;o</i>)</td><td><code>grain_filling</code></td><td>Peak nutrient demand, peak rust pressure</td></tr>
+    <tr><td class="num">Apr&ndash;Jun</td><td>Ripening (<i>matura&ccedil;&atilde;o</i>)</td><td><code>ripening</code></td><td>Ripeness monitoring, harvest sequencing</td></tr>
+    <tr><td class="num">May&ndash;Sep</td><td>Harvest and post-harvest rest</td><td><code>harvest</code>, <code>post_harvest_rest</code></td><td>Picking, drying, renewal pruning, reserve-rebuilding fertiliser</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note gap">
+  <span class="tag">Engineering gap: stages are anchored on growing degree days</span>
+  <p>Our phenology catalog stores stages as <code>{stage, start_gdd, end_gdd}</code> rows resolved through the crop taxonomy in <code>backend/app/modules/farms/crop_thresholds.py</code>. Coffee flowering is not a thermal-accumulation event. It is triggered by a rainfall or irrigation pulse of roughly 10&ndash;20 mm after a dry, cool induction period. A degree-day spine puts <code>flowering</code> on the wrong day, and everything anchored to it in a plan template is then wrong too.</p>
+  <p>Coffee needs an <strong>event-anchored stage</strong>: the flowering date is observed or detected, and the rest of the season is offset from it. Plan templates already support a <code>milestone</code> anchor alongside <code>stage</code>, which is the closest existing mechanism.</p>
+</div>
+
+<div class="note gap">
+  <span class="tag">Engineering gap: several flowerings in one block</span>
+  <p>If the spring rains arrive in two or three separate pulses, the block flowers two or three times and carries several fruit cohorts at once. That is the classic Brazilian uneven-ripening problem, and it is why irrigated growers apply a deliberate controlled water stress and then one heavy irrigation, to force a single synchronised flowering. A model that assumes one flowering date per block per year cannot represent the problem the customer is paying to solve.</p>
+</div>
+</section>
+
+<section id="p5">
+<p class="part">Part 05</p>
+<h2>Pests, diseases and climate risk</h2>
+
+<h3>The five that matter</h3>
+<div class="tablewrap">
+<table>
+  <caption>Main biotic problems and the conditions that drive them</caption>
+  <thead><tr><th>Problem</th><th>Organism</th><th>Favoured by</th><th>Action threshold in practice</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Ferrugem</strong>, leaf rust</td>
+      <td><i>Hemileia vastatrix</i></td>
+      <td>Mean temperature around 21&ndash;25 &deg;C, long leaf wetness, dense canopy, and above all a <strong>heavy fruit load</strong>, which weakens the plant</td>
+      <td>A preventive programme from about December. Scouting incidence above roughly 5&ndash;10% of leaves triggers curative action.</td>
+    </tr>
+    <tr>
+      <td><strong>Bicho-mineiro</strong>, leaf miner</td>
+      <td><i>Leucoptera coffeella</i></td>
+      <td>Hot, <strong>dry</strong> weather. Rain knocks larvae back, so it is the mirror image of rust.</td>
+      <td>Roughly 20&ndash;30% of leaves mined</td>
+    </tr>
+    <tr>
+      <td><strong>Broca-do-caf&eacute;</strong>, berry borer</td>
+      <td><i>Hypothenemus hampei</i></td>
+      <td>Fruit present at the right moisture. Carry-over in fruit left on the plant and ground after harvest.</td>
+      <td>Roughly 3&ndash;5% of fruit bored</td>
+    </tr>
+    <tr>
+      <td><strong>Cercosporiose</strong>, brown eye spot</td>
+      <td><i>Cercospora coffeicola</i></td>
+      <td>Nutritional deficiency, water stress, high light exposure, poor soil</td>
+      <td>Treated as a nutrition signal as much as a disease</td>
+    </tr>
+    <tr>
+      <td><strong>Nematoides</strong></td>
+      <td><i>Meloidogyne</i> spp., <i>Pratylenchus</i></td>
+      <td>Infested soil and seedlings. Spreads outward from a focus.</td>
+      <td>No spray fixes it. The response is resistant rootstock and containment.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+  <span class="tag">Two good fits for what we already do</span>
+  <p><strong>Nematodes show up as patches.</strong> They spread as expanding foci, not uniformly. That is precisely the shape our per-cell grid anomaly detection finds: a persistent low-index cluster inside an otherwise normal block. A Brazilian agronomist will recognise that picture immediately.</p>
+  <p><strong>Rust and leaf miner move in opposite directions on the same weather.</strong> A wet fortnight raises rust and suppresses leaf miner. A dry hot fortnight does the reverse. Running both risk models side by side gives a two-sided reading from one data source.</p>
+</div>
+
+<h3>Climate risk</h3>
+<ul>
+  <li><strong>Geada, frost.</strong> The defining catastrophic risk of Sul de Minas, Mogiana and Paran&aacute;, from June to August. Radiative frost forms on clear, calm nights, and cold air drains downhill, so <strong>the bottom of a valley freezes while the ridge above it does not</strong>. Damage runs from leaf scorch to losing the plant to the ground.</li>
+  <li><strong>Veranico, a dry spell.</strong> A rain-free hot period inside the wet season, most damaging during fruit expansion.</li>
+  <li><strong>Heat at flowering.</strong> Temperatures above roughly 34 &deg;C during flowering abort flowers and produce hollow beans (<i>gr&atilde;os-chochos</i>).</li>
+  <li><strong>Granizo, hail.</strong> Local and abrupt. A satellite pass after the event is the cheapest damage assessment available.</li>
+  <li><strong>Water allocation.</strong> In Esp&iacute;rito Santo and parts of Bahia, irrigation abstraction is regulated and has been restricted in drought years, which turns water efficiency from an economy into a compliance question.</li>
+</ul>
+
+<div class="note gap">
+  <span class="tag">Engineering gap: frost is a terrain problem</span>
+  <p>A block-mean minimum temperature from a weather grid cannot represent cold-air drainage. Frost risk needs elevation, and ideally terrain position within the block. Both <code>farms</code> and <code>blocks</code> carry an <code>elevation_m</code> column, but that is one number per polygon, not a terrain surface, and neither is exposed to a decision tree: <code>BLOCK_FIELDS</code> holds only <code>growth_stage</code>, <code>soil_texture</code> and <code>salinity_class</code>. So a tree cannot read elevation at all today, and nothing we store describes cold-air drainage inside a block. A first version can be honest about that: use the forecast minimum temperature at the block, band it, and say plainly that low ground inside the block will be colder than the figure shown. Do not present one number as if it applied uniformly.</p>
+</div>
+</section>
+
+<section id="p6">
+<p class="part">Part 06</p>
+<h2>Mapping coffee onto AgriPulse</h2>
+
+<p>This part is the point of the document. Each row says whether the concept exists, needs configuration only, or needs building.</p>
+
+<h3>The hierarchy</h3>
+<div class="tablewrap">
+<table>
+  <caption>Platform objects and their Brazilian equivalents</caption>
+  <thead><tr><th>AgriPulse</th><th>Brazil calls it</th><th>What it holds for coffee</th><th>State</th></tr></thead>
+  <tbody>
+    <tr><td>Tenant</td><td>Grupo, cooperativa, exportadora</td><td>The contracting organisation</td><td><span class="pill reuse">Exists</span></td></tr>
+    <tr><td>Farm</td><td>Fazenda, s&iacute;tio, propriedade</td><td>One property, one CAR registration, one weather context</td><td><span class="pill reuse">Exists</span></td></tr>
+    <tr><td>Block</td><td>Talh&atilde;o, gleba, lavoura</td><td>One cultivar, one planting year, one spacing, one pruning cycle</td><td><span class="pill reuse">Exists</span></td></tr>
+    <tr><td>Grid cell</td><td>&mdash;</td><td>Within-block variation: nematode foci, fertiliser misses, harvester damage</td><td><span class="pill reuse">Exists</span></td></tr>
+    <tr><td>Crop taxonomy path</td><td>Esp&eacute;cie, cultivar, clone</td><td><code>coffee.arabica.catuai_144</code>, <code>coffee.conilon.vitoria</code></td><td><span class="pill config">Configure</span></td></tr>
+    <tr><td>Land unit</td><td>Reserva legal, APP, estrada, terreiro</td><td>Non-productive areas that must still be mapped for CAR and for the EU filing</td><td><span class="pill config">Configure</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+  <span class="tag">Targeting is by path prefix</span>
+  <p>The taxonomy matches on segment boundaries. A tree written for <code>coffee</code> fires on every coffee block; one written for <code>coffee.arabica</code> fires on every arabica cultivar. Rust matters far more on arabica than on conilon, so the species level is the right home for most disease trees, and the cultivar level is where a resistance override belongs.</p>
+</div>
+
+<h3>Crop custom attributes for a coffee block</h3>
+<p>These are the fields a Brazilian agronomist expects to fill in when assigning coffee to a block. They are also the inputs the decision trees read through the crop-field condition source.</p>
+
+<div class="tablewrap">
+<table>
+  <caption>Proposed coffee attribute set</caption>
+  <thead><tr><th>Code</th><th>Type</th><th>Why a decision tree needs it</th></tr></thead>
+  <tbody>
+    <tr><td><code>planting_year</code></td><td>integer</td><td>Separates a young field from a declining one. Gates every yield expectation.</td></tr>
+    <tr><td><code>plant_density_per_ha</code></td><td>integer</td><td>Converts per-plant rates into per-hectare quantities. Must be required.</td></tr>
+    <tr><td><code>row_spacing_m</code>, <code>plant_spacing_m</code></td><td>decimal</td><td>Drives how much bare soil a 10 m satellite pixel contains</td></tr>
+    <tr><td><code>bearing_year</code></td><td>single select: <code>high</code>, <code>low</code></td><td>Biennial position. Rust risk, fertiliser rate and yield expectation all key on it.</td></tr>
+    <tr><td><code>last_pruning_type</code></td><td>single select: <code>none</code>, <code>decote</code>, <code>esqueletamento</code>, <code>recepa</code></td><td>Suppresses index-based health while the canopy rebuilds</td></tr>
+    <tr><td><code>last_pruning_date</code></td><td>date</td><td>Says how far through the rebuild the block is</td></tr>
+    <tr><td><code>irrigation_method</code></td><td>single select: <code>rainfed</code>, <code>pivot</code>, <code>drip</code>, <code>sprinkler</code></td><td>Decides whether a water recommendation is actionable at all</td></tr>
+    <tr><td><code>rust_resistance</code></td><td>single select: <code>susceptible</code>, <code>partial</code>, <code>resistant</code></td><td>Raises the rust action threshold for resistant cultivars</td></tr>
+    <tr><td><code>altitude_m</code></td><td>integer</td><td>Drives ripening date and quality potential. Also a frost proxy.</td></tr>
+    <tr><td><code>harvest_method</code></td><td>single select: <code>manual</code>, <code>derricadeira</code>, <code>colhedora</code></td><td>Decides whether uniform ripeness is critical or merely useful</td></tr>
+    <tr><td><code>expected_yield_sacas_ha</code></td><td>decimal</td><td>The number every Brazilian recommendation is normalised against</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note watch">
+  <span class="tag">Attribute editing is a whole-form replace</span>
+  <p>The crop-attribute update endpoint replaces the whole set and re-runs every <code>required_when</code> gate over everything submitted. An earlier bulk migration copied values in without validating them, and the result was blocks whose attributes can no longer be edited at all. Any Brazilian seeding must pass through the same validation the form uses, or we ship an unfixable field on day one.</p>
+</div>
+
+<h3>Scouting signals for coffee</h3>
+<p>Brazilian coffee scouting is quantitative and standardised, which suits our signal model. A field agent counts on a fixed number of plants and reports a percentage.</p>
+
+<div class="tablewrap">
+<table>
+  <caption>Signal definitions to seed</caption>
+  <thead><tr><th>Signal</th><th>Value kind</th><th>Unit or options</th><th>Aggregation</th></tr></thead>
+  <tbody>
+    <tr><td>Rust incidence</td><td>numeric</td><td>% of leaves with pustules</td><td>Mean over the visit</td></tr>
+    <tr><td>Leaf-miner incidence</td><td>numeric</td><td>% of leaves mined</td><td>Mean</td></tr>
+    <tr><td>Berry-borer infestation</td><td>numeric</td><td>% of fruit bored</td><td>Mean</td></tr>
+    <tr><td>Defoliation</td><td>numeric</td><td>% of leaves lost</td><td>Mean</td></tr>
+    <tr><td>Ripeness composition</td><td>numeric set</td><td>% green, <i>verde-cana</i>, cherry, <i>passa</i>, dry</td><td>Latest per block</td></tr>
+    <tr><td>Flowering event</td><td>date and intensity</td><td>Date observed, % of nodes flowering</td><td>Latest. This anchors the season.</td></tr>
+    <tr><td>Nematode symptom</td><td>lookup</td><td>None, suspected, confirmed</td><td>Latest</td></tr>
+    <tr><td>Frost damage class</td><td>lookup</td><td>None, leaf scorch, branch dieback, plant loss</td><td>Latest</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note watch">
+  <span class="tag">The mobile app reads <code>value_kind</code></span>
+  <p>Scout had a live defect where the app read <code>value_type</code> while the API sent <code>value_kind</code>, so every lookup list arrived empty and TypeScript did not catch it, because the field was optional. The ripeness, nematode and frost signals above are lookup-typed, which is exactly the shape that failed before. Check that the lookup lists render on a real device before any Brazilian pilot.</p>
+</div>
+</section>
+
+<section id="p7">
+<p class="part">Part 07</p>
+<h2>Imagery and indices over coffee</h2>
+
+<p>Coffee is harder to read from orbit than a broadacre crop, for three reasons that are all geometric.</p>
+
+<ol>
+  <li><strong>Rows of bushes with bare soil between them.</strong> A Sentinel-2 pixel is 10 m; coffee rows sit 3.5&ndash;4 m apart. Every pixel mixes canopy and inter-row soil, so a healthy mechanised block reads much lower than a healthy closed-canopy field, and a dense planting reads much higher than a wide one. <strong>Absolute index thresholds are meaningless across blocks of different spacing.</strong></li>
+  <li><strong>An evergreen canopy.</strong> There is no bare-soil-to-full-canopy curve to anchor a season against. The signal is a slow drift with a seasonal wobble.</li>
+  <li><strong>Fruit is invisible.</strong> Yield sits under the canopy. No optical index sees cherries. Anything we say about yield is inferred from canopy vigour, weather and the biennial cycle, and we have to say so.</li>
+</ol>
+
+<div class="tablewrap">
+<table>
+  <caption>Index behaviour on coffee</caption>
+  <thead><tr><th>Index</th><th>Bands</th><th>Use on coffee</th></tr></thead>
+  <tbody>
+    <tr><td><code>ndvi</code></td><td>Red, NIR</td><td>Saturates on a closed coffee canopy. Useful for relative change, poor for absolute condition.</td></tr>
+    <tr><td><code>ndre</code></td><td>Red edge 1, NIR</td><td>The better vigour index here. Saturates later, and responds to chlorophyll and nitrogen status.</td></tr>
+    <tr><td><code>ndmi</code></td><td>NIR, SWIR</td><td>Canopy water content. The right index for drought and <i>veranico</i>. <strong>Sentinel-2 only</strong>, because PlanetScope carries no SWIR band.</td></tr>
+    <tr><td><code>savi</code>, <code>msavi</code></td><td>Red, NIR</td><td>Soil-adjusted, which is exactly the row-crop mixing problem. Preferable to NDVI on wide-spaced blocks.</td></tr>
+    <tr><td><code>gndvi</code>, <code>evi</code></td><td>Green or blue, Red, NIR</td><td>Secondary. EVI resists saturation better than NDVI on a dense canopy.</td></tr>
+    <tr><td><code>ndwi</code></td><td>Green, NIR</td><td><strong>Do not use for plant water.</strong> Our NDWI is the McFeeters surface-water form. Moisture is <code>ndmi</code>.</td></tr>
+    <tr><td>Thermal: <code>lst</code>, <code>cwsi</code>, <code>smi</code></td><td>Thermal</td><td>Canopy temperature and water stress. The strongest fit for irrigated Cerrado and Bahia, and for the controlled-stress flowering trigger.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note gap">
+  <span class="tag">Engineering gap: health is off NDVI already, but behind a flag that is off</span>
+  <p>Health no longer has to come from an index. <code>backend/app/shared/health_definition.py</code> resolves a block's class from decision-tree alert output through five bounded values: <code>severity_map</code>, <code>snoozed_as</code>, <code>cell_critical_share</code>, <code>recommendation_floor</code> and <code>stale_after_hours</code>. No index appears in it. The chain is the platform default, then a per-crop row in <code>public.crop_health_definitions</code> targeted by crop path, then a per-farm override in <code>farms.health_definition</code>. The frontend copy of the old rule is deleted; <code>frontend/src/modules/labs/map/health.ts</code> now carries the palette only.</p>
+  <p>The setting <code>health_definition_enabled</code> defaults to false. While it is off, the old rule in <code>backend/app/shared/health.py</code> is what runs: below 0.40 critical, below 0.55 watch, for every crop. A wide-spaced mechanised coffee block sits under 0.55 while perfectly healthy, and a recently stumped block sits under 0.40. So the coffee work here is to turn the flag on and add a <code>coffee.yaml</code> seed to <code>backend/app/modules/health/seeds/</code>, not to build a per-crop threshold system.</p>
+  <p>One route from an index to health survives the switch. An index-driven tree still opens an alert, and the alert's severity still sets the class through <code>severity_map</code>. A stumped coffee block therefore still reads critical if an NDVI or NDRE tree fires on it. That is tree authoring, not a platform change.</p>
+</div>
+
+<div class="note gap">
+  <span class="tag">Engineering gap: baselines and biennial bearing</span>
+  <p>The index baseline needs at least three samples within seven days either side of a day of year before it produces a deviation score for that day, so a new farm carries null z-scores until the history builds. With coffee that is worse than slow. The alternating heavy and light years mean a two-year sample compares a heavy year against a light year, and the deviation is real but meaningless. A coffee baseline should compare like with like, heavy year against heavy years, which needs either four years of history or a baseline that keys on the <code>bearing_year</code> attribute.</p>
+</div>
+</section>
+
+<section id="p8">
+<p class="part">Part 08</p>
+<h2>Decision trees to author</h2>
+
+<p>A tree reads from ten condition sources: imagery index, block attribute, weather, weather index anomaly, disease and pest risk, block water balance, custom signal, grid anomaly, crop field, and tree parameter. The candidate coffee set below is ordered by how much of it we can build from sources that already work.</p>
+
+<div class="tablewrap">
+<table>
+  <caption>Candidate coffee decision trees</caption>
+  <thead><tr><th>Tree</th><th>Reads</th><th>Verdict it produces</th><th>Blocked on</th></tr></thead>
+  <tbody>
+    <tr><td><code>coffee_rust_risk_v1</code></td><td><code>weather_risk</code> (new model), <code>crop_attribute</code> bearing year and resistance</td><td>Scout, then a protective spray decision</td><td>A rust model in the registry</td></tr>
+    <tr><td><code>coffee_leaf_miner_risk_v1</code></td><td><code>weather_risk</code> (new model), <code>signals</code> mined-leaf %</td><td>Scout, then treat above threshold</td><td>A leaf-miner model</td></tr>
+    <tr><td><code>coffee_berry_borer_v1</code></td><td><code>signals</code> bored-fruit %, <code>block</code> growth stage</td><td>Trap and treat decision, plus a post-harvest sanitation task</td><td>Nothing. Signals already work.</td></tr>
+    <tr><td><code>coffee_water_stress_v1</code></td><td><code>indices</code> <code>ndmi</code>, thermal <code>cwsi</code>, <code>water_balance</code>, <code>weather</code> ET0 and rainfall</td><td>Irrigation quantity and timing</td><td>Nothing, where thermal is subscribed</td></tr>
+    <tr><td><code>coffee_flowering_trigger_v1</code></td><td><code>weather</code> rain total, <code>crop_attribute</code> irrigation method, <code>block</code> stage</td><td>Apply the flowering irrigation now, or hold the stress</td><td>Event-anchored stages</td></tr>
+    <tr><td><code>coffee_frost_alert_v1</code></td><td><code>weather</code> scope <code>forecast_72h</code>, field <code>air_temp_c_min</code></td><td>Frost warning with mitigation actions</td><td>Nothing. <code>potato_frost_risk_v1</code> already reads exactly this.</td></tr>
+    <tr><td><code>coffee_patch_anomaly_v1</code></td><td><code>grid</code> flagged-cell count on <code>ndre</code></td><td>Scout the flagged cells. Suspect nematodes or a fertiliser miss.</td><td>Nothing. Grid anomalies already work.</td></tr>
+    <tr><td><code>coffee_post_harvest_recovery_v1</code></td><td><code>indices</code> <code>ndre</code> trend, <code>crop_attribute</code> pruning date</td><td>Reserve-rebuilding fertiliser after harvest</td><td>Nothing</td></tr>
+    <tr><td><code>coffee_uneven_ripening_v1</code></td><td><code>signals</code> ripeness composition, <code>block</code> stage</td><td>Delay or split the harvest pass</td><td>Nothing</td></tr>
+    <tr><td><code>coffee_hail_damage_v1</code></td><td><code>indices</code> abrupt <code>ndre</code> drop, <code>weather</code> event</td><td>Damage assessment visit</td><td>Nothing</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Seven of the ten need no new platform capability. That is a real first release. Frost is the cheapest of the seven: <code>backend/app/modules/recommendations/seeds/potato_frost_risk_v1.yaml</code> already reads the forecast minimum, so the coffee tree is that seed with a coffee crop path and coffee temperature parameters.</p>
+
+<h3>Adding a rust risk model</h3>
+<p>The weather risk registry in <code>backend/app/modules/weather/risk/registry.py</code> is deliberately append-only. It holds three mango models today. A new pathogen is one <code>RiskModelSpec</code> entry plus one pure function: no schema change, no task change, no endpoint change. Crop applicability is a taxonomy path prefix, so one entry covers every arabica cultivar.</p>
+
+<pre><code><span class="c"># backend/app/modules/weather/risk/registry.py</span>
+REGISTRY: tuple[RiskModelSpec, ...] = (
+    RiskModelSpec(<span class="s">"powdery_mildew"</span>, <span class="s">"mango"</span>, <span class="s">"disease"</span>, models.powdery_mildew),
+    RiskModelSpec(<span class="s">"anthracnose"</span>,    <span class="s">"mango"</span>, <span class="s">"disease"</span>, models.anthracnose),
+    RiskModelSpec(<span class="s">"fruit_fly"</span>,      <span class="s">"mango"</span>, <span class="s">"pest"</span>,    models.fruit_fly),
+    <span class="c"># --- proposed, Brazil coffee ---</span>
+    RiskModelSpec(<span class="s">"coffee_rust"</span>, <span class="s">"coffee.arabica"</span>, <span class="s">"disease"</span>,
+                  models.coffee_rust, window_days=<span class="k">30</span>),
+    RiskModelSpec(<span class="s">"leaf_miner"</span>,  <span class="s">"coffee"</span>,         <span class="s">"pest"</span>,
+                  models.leaf_miner),
+)</code></pre>
+
+<p>The model function integrates favourable conditions over a trailing window into a score from 0 to 100, banded low, moderate and high at cutoffs of 40 and 70. For rust, the favourable-condition count is warm and wet days, and the fruit load pushes the score upward. That last term is what makes it a coffee model rather than a generic wet-weather model.</p>
+
+<div class="note watch">
+  <span class="tag">The score is 0 to 100, not 0 to 1</span>
+  <p>Every threshold written into a coffee tree's parameters must be on the 0 to 100 scale. A tree that compares a risk score against 0.7 will never fire, and will never report an error.</p>
+</div>
+
+<h3>A worked tree, in the real seed format</h3>
+<pre><code><span class="k">code</span>: coffee_rust_risk_v1
+<span class="k">name_en</span>: Coffee — leaf rust risk
+<span class="k">crop_path</span>: coffee.arabica
+
+<span class="k">evidence</span>:
+  <span class="k">confidence</span>: medium
+  <span class="k">notes</span>: >-
+    Hemileia vastatrix needs warm temperatures with prolonged leaf
+    wetness, and pressure rises sharply on plants carrying a heavy
+    fruit load. The score accumulates favourable days; it is not a
+    validated infection model, so the tree recommends scouting and a
+    protective decision rather than a blind application.
+
+<span class="k">parameters</span>:
+  <span class="k">warn_score</span>: { type: number, default: <span class="k">40</span>, min: 0, max: 100 }
+  <span class="k">high_score</span>: { type: number, default: <span class="k">70</span>, min: 0, max: 100 }
+
+<span class="k">root</span>: root
+<span class="k">nodes</span>:
+  <span class="k">root</span>:
+    <span class="k">label_en</span>: Is rust pressure elevated?
+    <span class="k">condition</span>:
+      <span class="k">tree</span>:
+        <span class="k">op</span>: ge
+        <span class="k">left</span>:  { source: weather_risk, risk_code: coffee_rust, field: score }
+        <span class="k">right</span>: { source: params, name: warn_score }
+    <span class="k">on_match</span>: bearing_check
+    <span class="k">on_miss</span>:  leaf_no_action
+
+  <span class="k">bearing_check</span>:
+    <span class="k">label_en</span>: Is this a high-bearing year?
+    <span class="k">condition</span>:
+      <span class="k">tree</span>:
+        <span class="k">op</span>: eq
+        <span class="k">left</span>:  { source: crop_attribute, code: bearing_year, key: value }
+        <span class="k">right</span>: <span class="s">"high"</span>
+    <span class="k">on_match</span>: leaf_critical
+    <span class="k">on_miss</span>:  leaf_warning</code></pre>
+
+<p>The comparison operators the evaluator accepts are <code>lt</code>, <code>le</code>, <code>gt</code>, <code>ge</code>, <code>eq</code>, <code>ne</code>, plus <code>in</code> and <code>between</code>. The right-hand side is either a plain literal, as above, or a <code>params</code> reference. Note that <code>between</code> does not take <code>right</code>: it takes <code>low</code> and <code>high</code>.</p>
+
+<div class="note gap">
+  <span class="tag">Two traps this codebase has already fallen into</span>
+  <p><strong>An unknown operator raises, but an unresolved reference does not.</strong> Writing <code>gte</code> where the evaluator expects <code>ge</code> raises <code>ConditionParseError</code> at <code>backend/app/shared/conditions/evaluator.py:140</code>, so that mistake is caught. The quiet failure is the other one: when a reference resolves to nothing, the comparison returns "did not match" with no error at all. A misspelled <code>crop_attribute</code> code, a risk row the model never wrote, and a missing parameter all take <code>on_miss</code> for ever. Check every attribute code and risk code in a coffee seed against the data, not only the operators against the evaluator's list.</p>
+  <p><strong>A tree that is never selected reports success.</strong> The mango index-guide sweep evaluated no tree at all in production, because the package selection named the wrong thing, and nothing reported a failure. After seeding the coffee trees, confirm that evaluation traces exist for real blocks. A run that reports "0 opened" is not by itself evidence that the trees ran.</p>
+</div>
+</section>
+
+<section id="p9">
+<p class="part">Part 09</p>
+<h2>What must be built</h2>
+
+<p>Ordered by whether Brazil is possible without it.</p>
+
+<h3>Blocking</h3>
+<div class="tablewrap">
+<table>
+  <caption>Work without which a Brazilian pilot cannot start</caption>
+  <thead><tr><th>Ref</th><th>Item</th><th>Why</th><th>Rough size</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="num">B1</td>
+      <td><strong>Portuguese as a third language</strong></td>
+      <td>The platform is bilingual by column, not by locale table: 37 <code>*_ar</code> columns across module models, 123 backend files that reference an <code>_ar</code> name, two frontend locale folders (<code>en</code>, <code>ar</code>), and 33 decision-tree seeds each carrying <code>name_en</code> and <code>name_ar</code>, <code>text_en</code> and <code>text_ar</code>. Adding a third <code>*_pt</code> column set would be the wrong answer twice over, because a fourth language would then need a third migration.</td>
+      <td>Large. A data-model change, not a translation job.</td>
+    </tr>
+    <tr>
+      <td class="num">B2</td>
+      <td><strong>Turn on the health definition and seed coffee</strong></td>
+      <td>While <code>health_definition_enabled</code> is off, the fixed NDVI cutoffs mislabel wide-spaced and recently pruned coffee. The replacement is already merged, so this is enabling a setting and adding a coffee row to the crop health catalog, not building a threshold system. Warn first: a tenant whose sweep does not reach every block will see Unknown where it saw Healthy.</td>
+      <td>Small. A setting and one seed file.</td>
+    </tr>
+    <tr>
+      <td class="num">B3</td>
+      <td><strong>Southern-hemisphere season handling</strong></td>
+      <td>A season that crosses the calendar year must not be split at 31 December in plans, reports or baselines. The platform has no formal season entity today, and four parts of the system pick a season start independently.</td>
+      <td>Medium. Needs the season question settled first.</td>
+    </tr>
+    <tr>
+      <td class="num">B4</td>
+      <td><strong>Brazilian units and formats</strong></td>
+      <td>Saca of 60 kg, sacas per hectare, comma decimal separator, BRL, CPF and CNPJ identifiers, and CAR property codes.</td>
+      <td>Small to medium</td>
+    </tr>
+    <tr>
+      <td class="num">B5</td>
+      <td><strong>Pruning state gates the index trees</strong></td>
+      <td>A stumped block reads low on every index for a season. Health itself stops reading NDVI once B2 lands, but an index tree that fires still opens an alert, and the alert still sets the class. The index trees must gate on <code>last_pruning_date</code>.</td>
+      <td>Small. Tree authoring, not platform work.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>High value, not blocking</h3>
+<ul>
+  <li><strong>Rust and leaf-miner risk models</strong> in the weather risk registry. Two registry entries and two pure functions. The best return on effort in the whole list.</li>
+  <li><strong>Event-anchored phenology</strong>, so the flowering date can be observed or detected and the rest of the season offset from it.</li>
+  <li><strong>Bearing-year-aware baselines</strong>, comparing a heavy year against heavy years.</li>
+  <li><strong>A coffee cultivar catalogue</strong>, seeded with the common Catua&iacute;, Mundo Novo, Catuca&iacute;, Arara and IPR lines and the main conilon clone groups, each carrying rust resistance and ripening class.</li>
+</ul>
+
+<h3>Commercially strategic</h3>
+<ul>
+  <li><strong>Plot polygon export for compliance.</strong> Geometry per plot, area, farm identifier and a stable plot code, in the shape the customer's due-diligence filing needs. We hold the data already. This is a report, not a platform change.</li>
+  <li><strong>Attachment upload.</strong> Photographs of rust lesions, borer damage and frost injury are how a Brazilian field agent communicates. Browser uploads to our object storage have never worked in production, for want of a CORS policy, and there are zero attachment rows in any production tenant. On a photo-driven crop that stops being a latent bug and becomes a blocker.</li>
+  <li><strong>LGPD review.</strong> Brazil's data protection law covers the personal data of members and workers, which a cooperative deployment holds a great deal of.</li>
+</ul>
+</section>
+
+<section id="p10">
+<p class="part">Part 10</p>
+<h2>Rollout and open questions</h2>
+
+<h3>A staged plan</h3>
+<div class="tablewrap">
+<table>
+  <caption>Proposed stages</caption>
+  <thead><tr><th>Stage</th><th>Goal</th><th>Contains</th><th>Done when</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>0. Desk work</strong></td>
+      <td>Replace this document's estimates with sourced figures</td>
+      <td>CONAB and CECAF&Eacute; data, current compliance dates, a named target region, a named first prospect</td>
+      <td>Every number in Part 01 carries a citation</td>
+    </tr>
+    <tr>
+      <td><strong>1. Catalogue</strong></td>
+      <td>Coffee exists as a first-class crop</td>
+      <td>Taxonomy paths, cultivars, the attribute set from Part 06, per-crop thresholds, phenology stages</td>
+      <td>A coffee block can be created and its attributes edited without error</td>
+    </tr>
+    <tr>
+      <td><strong>2. One real farm</strong></td>
+      <td>Imagery and weather run end to end on Brazilian ground</td>
+      <td>One estate, real polygons, Sentinel-2 ingestion, indices, grid cells, weather history</td>
+      <td>Indices computed for every block, and a timeline replay an agronomist recognises</td>
+    </tr>
+    <tr>
+      <td><strong>3. Six trees</strong></td>
+      <td>Advice appears without any new platform capability</td>
+      <td>The seven unblocked trees from Part 08, plus the coffee signal definitions</td>
+      <td>Evaluation traces exist for real blocks, and the Action Center holds cards an agronomist agrees with</td>
+    </tr>
+    <tr>
+      <td><strong>4. Language and units</strong></td>
+      <td>A Brazilian can use it</td>
+      <td>B1 and B4</td>
+      <td>A native speaker completes a scouting round in Portuguese without switching language</td>
+    </tr>
+    <tr>
+      <td><strong>5. Risk models</strong></td>
+      <td>The weather earns its keep</td>
+      <td>Rust and leaf miner</td>
+      <td>Scores checked against a season of the customer's own scouting records</td>
+    </tr>
+    <tr>
+      <td><strong>6. Compliance</strong></td>
+      <td>The commercial wedge</td>
+      <td>Plot export, attachments, LGPD</td>
+      <td>An exporter files from our export</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Open questions</h3>
+<ol>
+  <li><strong>Mixed-clone conilon blocks.</strong> Does the clone group become the variety, or does the block carry a list attribute? This decision sits upstream of phenology and harvest planning.</li>
+  <li><strong>How is Portuguese added?</strong> A third column set is quick and wrong. A locale table is right and large. Which one, and does the same decision unblock Spanish for the rest of Latin America?</li>
+  <li><strong>Do we take on frost properly?</strong> Doing it well needs terrain data we do not have. Doing it badly, on a crop where frost is the catastrophic risk, damages trust.</li>
+  <li><strong>What does the platform promise about yield?</strong> Brazilian growers expect a forecast in sacas per hectare, and no optical index sees fruit. Either we build a forecast that combines vigour, weather and bearing year and state its uncertainty, or we say clearly that we do not forecast yield.</li>
+  <li><strong>Is the season entity now unavoidable?</strong> A crop whose cycle crosses the calendar year, with a two-year overlap between successive crops, is a harder case than anything the platform carries today.</li>
+  <li><strong>Who is the agronomic authority?</strong> Every threshold in this document is a rule of thumb from extension literature. Brazil has a strong public research base: Embrapa, IAC, INCAPER, IAPAR, Funda&ccedil;&atilde;o Procaf&eacute; and the Cerrado cooperatives. One named Brazilian agronomist reviewing the seeds is worth more than any amount of tuning.</li>
+</ol>
+
+<div class="footer">
+  <p><strong>Scope note.</strong> The agronomic content is general sector knowledge and was not verified against a live data source while writing this. The platform findings are different: each one names a file or a behaviour, and was read directly from this repository on 2026-09-09. Counts drift: the <code>_ar</code> file count rose by one in the two days between drafting and merging. Where a figure carries no citation, treat it as a starting point for research, not as an answer.</p>
+</div>
+</section>
+
+</main>
+</div>
