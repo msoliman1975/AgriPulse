@@ -3539,10 +3539,36 @@ global:
     #   halves of #663 and #664, both merged and already on the api side.
     #
     #   Rollback is api and workers to 4bcd2e2 and frontend to e19972a.
+    # ecbe645 = #667 + #668, both telemetry follow-ups. api + workers +
+    #   frontend move together, and they MUST: #668's two halves are a backend
+    #   CORS header and the frontend that reads it, so a split promote leaves
+    #   correlation_id NULL against an old api.
+    #
+    #   NO MIGRATION. Nothing here touches the schema.
+    #
+    #   #667 — app_version recorded the literal string "dev" on every event
+    #   from a released image. The frontend build had neither GITHUB_SHA nor a
+    #   .git dir, so nothing inside it could derive the SHA. CI now passes
+    #   APP_VERSION as a build arg. AFTER THE SYNC: new usage_events rows
+    #   should carry a 7-char SHA equal to this tag. Existing rows keep "dev"
+    #   and that is correct — they were written by a build that could not know.
+    #
+    #   #668 — every api_error row had a NULL correlation_id. CORSMiddleware
+    #   set allow_headers but never expose_headers, and a browser hides
+    #   response headers from cross-origin JS; app. and api.agripulse.cloud are
+    #   different origins. Dev never showed it because the vite proxy makes the
+    #   call same-origin. Also adds an `api_route` prop so a failure names the
+    #   endpoint without needing a log join.
+    #
+    #   The 18 recorded 403 tenant-required rows are NOT explained by this —
+    #   they are a PlatformAdmin poll on a 15-minute cadence whose endpoint was
+    #   never captured. The next occurrence will name itself.
+    #
+    #   Rollback is these three tags back to f41e005.
     api:
-      tag: "f41e005"
+      tag: "ecbe645"
     workers:
-      tag: "f41e005"
+      tag: "ecbe645"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3993,7 +4019,7 @@ global:
       #   traces page learns the 'farm' skip axis. The API half must move in
       #   the same sync — the new section calls two routes that do not exist
       #   on 76a6411.
-      tag: "f41e005"
+      tag: "ecbe645"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
