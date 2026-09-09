@@ -29,6 +29,26 @@ COPY public ./public
 # it. e2e only lives in the discarded builder stage, so no runtime cost.
 COPY e2e ./e2e
 
+# Build identity for telemetry's `app_version`. vite.config.ts reads this from
+# the process env at config time.
+#
+# NOT named VITE_APP_VERSION: vite inlines every VITE_* var into
+# `import.meta.env`, so that name puts a SECOND copy of the value in the bundle
+# — untruncated, and therefore disagreeing with the 7-character `app_version`
+# that events actually carry. Two values with one meaning is a trap; there is
+# one here.
+#
+# This has to be passed in: the builder stage copies source, not `.git`, so
+# the `git rev-parse` fallback in vite.config.ts cannot work here, and
+# GITHUB_SHA is workflow env that a container build does not inherit. Without
+# the arg every event from a released image recorded "dev", which is how it
+# shipped the first time.
+#
+# The default keeps a bare `docker build` working; CI always passes the real
+# short SHA, which is also the image tag.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+
 RUN pnpm build
 
 # --- Runtime ----------------------------------------------------------------

@@ -375,6 +375,17 @@ jobs:
           # workers/ hatch packaging, celery `:app`) was the original
           # driver.
           platforms: ${{ matrix.platforms }}
+          # Build identity for telemetry's `app_version`. Only the frontend
+          # Dockerfile declares this ARG; the others ignore an unused build-arg,
+          # so it is passed unconditionally rather than per-matrix-entry.
+          #
+          # A container build inherits no workflow env and the build context
+          # carries no `.git`, so nothing inside the image can work this out on
+          # its own — the first release recorded "dev" for every event because
+          # of exactly that. vite.config.ts truncates to 7 characters, which is
+          # the GHCR tag this same job pushes.
+          build-args: |
+            APP_VERSION=${{ github.sha }}
           # Push only on merge to main; PR runs build-only to keep
           # turn-around fast and avoid polluting GHCR with PR images.
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}

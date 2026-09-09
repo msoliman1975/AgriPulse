@@ -154,7 +154,7 @@ booleans. Never free text, never a name, never a geometry.
 | `status_code`, `error_code` | client | |
 | `correlation_id` | client | The `x-correlation-id` off the failed response. Joins to the server log line and the trace. |
 | `locale` | **server** | From `RequestContext.preferred_language`. |
-| `app_version` | client | Build SHA, injected by the vite `define`. |
+| `app_version` | client | The **7-character git SHA**, which is exactly the GHCR image tag the cluster runs — so a row joins to a deployed image by equality. Passed to the frontend image as the `APP_VERSION` build arg; a container build inherits no workflow env and the context has no `.git`, so nothing inside the image can derive it. Reads `dev` only for a local build. |
 | `device_kind`, `viewport_w` | client | Derived from viewport width, not the UA string. |
 | `props` | client, allow-listed | See §5.1. |
 
