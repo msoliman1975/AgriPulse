@@ -70,6 +70,7 @@ apiClient.interceptors.response.use(
       method: error.config?.method,
       problemType: isProblemDetails(data) ? data.type : undefined,
       correlationId,
+      url: error.config?.url,
     });
 
     if (isProblemDetails(data)) {

@@ -45,11 +45,32 @@ export function errorCodeFrom(problemType: string | undefined, status: number): 
  * logs, and the `correlation_id` joins the two for free — that header is the
  * single most valuable thing this event carries.
  */
+/**
+ * The failing endpoint, with every id replaced by a placeholder.
+ *
+ * Same rule as page routes: a template groups, a resolved path does not — and
+ * a resolved path smuggles farm and block ids into a text column that the
+ * props allow-list exists to keep clean. `/api/v1/farms/8f3a.../blocks/12`
+ * becomes `/api/v1/farms/:id/blocks/:n`.
+ *
+ * Query strings are dropped whole. They carry filter values, which are user
+ * input, and no grouping question needs them.
+ */
+export function apiRouteTemplate(url: string | undefined): string {
+  if (!url) return "unknown";
+  const path = url.split("?")[0].split("#")[0];
+  return path
+    .replace(/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "/:id")
+    .replace(/\/\d+/g, "/:n")
+    .slice(0, 128);
+}
+
 export function reportApiError(args: {
   status: number;
   method?: string;
   problemType?: string;
   correlationId?: string;
+  url?: string;
 }): void {
   const correlation =
     args.correlationId && UUID_RE.test(args.correlationId) ? args.correlationId : undefined;
@@ -62,6 +83,7 @@ export function reportApiError(args: {
     props: {
       method: (args.method ?? "").toUpperCase().slice(0, 8) || "UNKNOWN",
       problem_type: (args.problemType ?? "about:blank").slice(0, 128),
+      api_route: apiRouteTemplate(args.url),
     },
   });
 }

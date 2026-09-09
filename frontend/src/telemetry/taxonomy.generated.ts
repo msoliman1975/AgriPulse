@@ -55,7 +55,7 @@ export type TelemetryFlow =
 
 /** Props keys the server keeps per event. Anything else is dropped on ingest. */
 export const ALLOWED_PROPS: Record<TelemetryEventName, readonly string[]> = {
-  api_error: ["method", "problem_type", "retry_count"],
+  api_error: ["method", "problem_type", "retry_count", "api_route"],
   client_error: ["component", "digest"],
   feature_used: ["action", "index_code", "count", "source"],
   flow_complete: ["steps_taken"],
