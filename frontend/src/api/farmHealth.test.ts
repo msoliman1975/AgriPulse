@@ -19,14 +19,17 @@ import {
 
 const get = vi.spyOn(apiClient, "get");
 
-/** The path the client asked for, and the params it sent with it. */
-function lastCall(): { url: string; params: Record<string, unknown> | undefined } {
+/** The path the client asked for, and the params it sent with it.
+ *
+ * The return type is inferred on purpose. Declaring
+ * `params: Record<string, unknown> | undefined` made `tsc -b` reject the
+ * axios config's own `params` type, and casting it to match made eslint
+ * call the cast unnecessary — the two disagree about that type, and every
+ * assertion below only ever compares the value with `toEqual`.
+ */
+function lastCall() {
   const call = get.mock.calls[get.mock.calls.length - 1];
-  // Axios types `params` as `any`, which reaches this signature as
-  // `unknown`. Naming the shape here keeps `tsc -b` quiet without loosening
-  // what the assertions below are allowed to read.
-  const config = call[1] as { params?: Record<string, unknown> } | undefined;
-  return { url: call[0], params: config?.params };
+  return { url: call[0], params: call[1]?.params };
 }
 
 describe("farmHealth api paths", () => {
