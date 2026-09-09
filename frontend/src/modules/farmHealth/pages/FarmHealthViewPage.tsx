@@ -32,7 +32,7 @@ import type { Polygon } from "geojson";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useCapability } from "@/rbac/useCapability";
 import { BlockList } from "../components/BlockList";
-import { AreaChips, AreaDetail, BlockSummary } from "../components/AreaPanel";
+import { AreaChips, AreaDetail, BlockSummary, BlockVerdictDetail } from "../components/AreaPanel";
 import { HealthMap, type FitMode, type MapBlock, type MapCell } from "../components/HealthMap";
 import { Transport } from "../components/Transport";
 import { buildAreas, pickArea, type AreaCell } from "../lib/areas";
@@ -72,6 +72,10 @@ export function FarmHealthViewPage(): ReactNode {
   // One flag for the screen, not per area: opening the reasoning is a mode a
   // reader stays in while stepping through areas.
   const [reasoningOpen, setReasoningOpen] = useState(false);
+  // Which whole-block verdict has its reasoning open. An id rather than a
+  // boolean because a block can hold one verdict per tree, and two cards open
+  // at once would push the map off screen.
+  const [openVerdictId, setOpenVerdictId] = useState<string | null>(null);
   const [fitMode, setFitMode] = useState<FitMode>("block");
 
   // The clock is read once per mount. Reading it per render would move the
@@ -266,6 +270,12 @@ export function FarmHealthViewPage(): ReactNode {
               areaCells.length > 0 ? Math.max(...areaCells.map((c) => c.row)) + 1 : 0;
             const gridCols =
               areaCells.length > 0 ? Math.max(...areaCells.map((c) => c.col)) + 1 : 0;
+            // Whole-block verdicts: the ones with no cell. A block tree
+            // writes exactly one, and it is the only thing on this screen
+            // that can say what the tree concluded about the block itself.
+            const blockVerdicts = (selected?.verdicts ?? []).filter(
+              (verdict) => verdict.cell_id === null,
+            );
             const areas = buildAreas(areaCells, gridRows, gridCols);
             const activeArea = pickArea(areas, areaKey);
             // Hover wins over selection, so pointing at a chip previews it on
@@ -420,6 +430,25 @@ export function FarmHealthViewPage(): ReactNode {
                             cols={gridCols}
                             treeCode={activeTree}
                           />
+
+                          {/* A block tree writes one verdict with no cell, so
+                              it makes no areas. Without this the panel showed
+                              a colour and a count and never the sentence the
+                              tree wrote, on the screen whose whole job is to
+                              say why. */}
+                          {blockVerdicts.map((verdict) => (
+                            <BlockVerdictDetail
+                              key={verdict.id}
+                              verdict={verdict}
+                              statuses={data.statuses}
+                              farmId={farmId}
+                              blockId={selected.blockId}
+                              open={openVerdictId === verdict.id}
+                              onToggle={() =>
+                                setOpenVerdictId((was) => (was === verdict.id ? null : verdict.id))
+                              }
+                            />
+                          ))}
 
                           {areas.length === 0 ? (
                             // The summary above already says it when the tree
