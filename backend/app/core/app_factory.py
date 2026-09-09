@@ -130,6 +130,17 @@ def create_app() -> FastAPI:
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
+            # Without this the SPA cannot READ the correlation id, only send
+            # one. `allow_headers` governs the request; a browser hides every
+            # response header from cross-origin JS unless it is named here.
+            #
+            # app.agripulse.cloud and api.agripulse.cloud are different
+            # origins, so `x-correlation-id` was invisible to the axios
+            # interceptor in production — 20 telemetry api_error rows, every
+            # one with a NULL correlation_id, and no way to reach the server
+            # log line for any of them. It works in dev only because the vite
+            # proxy makes the call same-origin, which is why nobody saw it.
+            expose_headers=["X-Correlation-ID"],
         )
 
     _register_module_routers(app)

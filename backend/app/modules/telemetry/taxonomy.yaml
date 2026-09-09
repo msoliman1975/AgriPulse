@@ -44,7 +44,15 @@ events:
   api_error:
     # `method` + `problem_type` (the RFC-7807 `type`) are enough to group
     # failures without capturing a response body.
-    props: [method, problem_type, retry_count]
+    #
+    # `api_route` is the failing endpoint, with ids stripped — "which call
+    # broke", where `route` answers "which page the user was on". It was
+    # deliberately left out at first, on the reasoning that `correlation_id`
+    # would join to the server log. That reasoning failed twice in one day:
+    # the browser hid the header cross-origin so every correlation_id was
+    # NULL, and by the time anyone looked the pod logs had rotated. A route
+    # template costs nothing and answers the question on its own.
+    props: [method, problem_type, retry_count, api_route]
   client_error:
     # `component` is a React component name, `digest` a stack fingerprint —
     # never the message, which can interpolate user data.

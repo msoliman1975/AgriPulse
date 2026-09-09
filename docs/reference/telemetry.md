@@ -127,7 +127,7 @@ single control that keeps agronomic and customer content out of the store.
 | `flow_start` | `entry_point` |
 | `flow_step` | `attempt` |
 | `flow_complete` | `steps_taken` |
-| `api_error` | `method`, `problem_type`, `retry_count` |
+| `api_error` | `method`, `problem_type`, `retry_count`, `api_route` |
 | `client_error` | `component`, `digest` |
 
 Values must stay low-cardinality and non-identifying: enum-ish strings, counts,
@@ -152,7 +152,7 @@ booleans. Never free text, never a name, never a geometry.
 | `outcome` | client | `ok` \| `error` \| `abandoned` \| `cancelled` (CHECK constraint). |
 | `duration_ms` | client | Visible dwell for `page_leave`; perceived latency for an action. |
 | `status_code`, `error_code` | client | |
-| `correlation_id` | client | The `x-correlation-id` off the failed response. Joins to the server log line and the trace. |
+| `correlation_id` | client | The `x-correlation-id` off the failed response. Joins to the server log line and the trace. Requires the API to name it in `Access-Control-Expose-Headers` — the SPA and the API are different origins, and a browser hides every response header from cross-origin JS otherwise. Without that it is silently NULL, which is how the first 20 rows landed. |
 | `locale` | **server** | From `RequestContext.preferred_language`. |
 | `app_version` | client | The **7-character git SHA**, which is exactly the GHCR image tag the cluster runs — so a row joins to a deployed image by equality. Passed to the frontend image as the `APP_VERSION` build arg; a container build inherits no workflow env and the context has no `.git`, so nothing inside the image can derive it. Reads `dev` only for a local build. |
 | `device_kind`, `viewport_w` | client | Derived from viewport width, not the UA string. |
