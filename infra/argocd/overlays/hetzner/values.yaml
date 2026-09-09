@@ -3468,10 +3468,40 @@ global:
     #
     #   Rollback is these three tags back to 890e158, which also takes #654
     #   back out.
+    # e19972a = #657, product & engagement telemetry Phase A (TEL-1..TEL-8).
+    #   api + workers + frontend move together. New surface: /platform/usage,
+    #   gated by a NEW capability `platform.read_usage` — PlatformAdmin picks it
+    #   up through its "*" wildcard, PlatformSupport is granted it explicitly.
+    #   Nobody else can open the page.
+    #
+    #   CARRIES TWO PUBLIC MIGRATIONS, 0082 + 0083. 0082 creates the
+    #   public.usage_events hypertable (compress at 14d, retention 180d); 0083
+    #   creates the usage_daily and usage_flow_daily continuous aggregates
+    #   (retention 730d). The api's PreSync migrate-Job runs them and GATES the
+    #   api sync — if it fails the api keeps serving the old pods while the
+    #   frontend rolls anyway, which is the partial-rollout trap. Check
+    #   alembic_version reads 0083 before believing this promote.
+    #
+    #   Collection is off until the client half is built with
+    #   VITE_TELEMETRY_ENABLED (defaults on) AND TELEMETRY_INGEST_ENABLED
+    #   (defaults true). Either switch off means nothing is written and the app
+    #   is unaffected — so an empty dashboard on day one is expected, not a bug.
+    #   The page reads 30 days by default and excludes platform staff.
+    #
+    #   ALSO CHANGES PURGE, outside the telemetry module. Two silent defects in
+    #   `refresh_caggs` are fixed: a missing CAST that meant the call had never
+    #   once succeeded, and an unaligned refresh window that skipped whole
+    #   buckets. Block and farm purges are affected too — after this, purging a
+    #   block actually clears block_index_daily/_weekly, which it never did.
+    #
+    #   Rollback is these three tags back to 4cc3df9. The migrations do NOT
+    #   roll back with them: usage_events and the two aggregates stay, unread
+    #   and unwritten, which is harmless. Do not downgrade them to "clean up" —
+    #   0083 drops materialised aggregates.
     api:
-      tag: "4cc3df9"
+      tag: "e19972a"
     workers:
-      tag: "4cc3df9"
+      tag: "e19972a"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3922,7 +3952,7 @@ global:
       #   traces page learns the 'farm' skip axis. The API half must move in
       #   the same sync — the new section calls two routes that do not exist
       #   on 76a6411.
-      tag: "4cc3df9"
+      tag: "e19972a"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
