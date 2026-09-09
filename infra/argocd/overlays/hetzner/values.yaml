@@ -3498,10 +3498,30 @@ global:
     #   roll back with them: usage_events and the two aggregates stay, unread
     #   and unwritten, which is harmless. Do not downgrade them to "clean up" —
     #   0083 drops materialised aggregates.
+    # 4bcd2e2 = #663, the usage aggregates were returning nothing.
+    #   api + workers ONLY. The frontend is untouched by this PR and stays on
+    #   e19972a — bumping it would roll a pod for an identical bundle.
+    #
+    #   /platform/usage shipped empty: 74 raw rows in usage_events, zero out of
+    #   usage_daily. 0083 created both aggregates assuming
+    #   `timescaledb.materialized_only` still defaults to false. That default
+    #   flipped in TimescaleDB 2.13 and this cluster runs 2.26.4, so real-time
+    #   aggregation was OFF and the views served only materialised buckets.
+    #
+    #   CARRIES PUBLIC MIGRATION 0084 — two ALTER MATERIALIZED VIEW statements,
+    #   no data movement, seconds to run. As always the api's PreSync migrate-Job
+    #   gates only the api Application; check alembic_version reads 0084.
+    #
+    #   Prod was refreshed by hand before this, so the page already has data.
+    #   This is what stops it going stale again. After the sync, confirm
+    #   materialized_only = false on both views — that is the whole payload.
+    #
+    #   Rollback is api+workers back to e19972a. Do NOT downgrade 0084 as part
+    #   of that: leaving real-time aggregation on is harmless with old code.
     api:
-      tag: "e19972a"
+      tag: "4bcd2e2"
     workers:
-      tag: "e19972a"
+      tag: "4bcd2e2"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
