@@ -42,12 +42,20 @@ const CELL_IMAGE_LAYER = "fh-cell-image";
 const CELL_HIT_SOURCE = "fh-cell-hit";
 const OUTLINE_SOURCE = "fh-outline";
 
-/** A block outline, and whether it is the one in focus. */
+/** A block outline, its verdict, and whether it is the one in focus. */
 export interface MapBlock {
   blockId: string;
   code: string;
   boundary: Polygon;
   selected: boolean;
+  /**
+   * The worst verdict on this block for the chosen tree, or null when the
+   * tree did not run here.
+   *
+   * A block-scoped tree writes one verdict for the whole block and no cells
+   * at all, so this is the only colour such a tree can put on the map.
+   */
+  status: StatusCode | null;
 }
 
 /** A cell of the selected block: geometry, grid position and verdict. */
@@ -124,7 +132,11 @@ function buildStyle(): StyleSpecification {
   };
 }
 
-function blockFeatures(blocks: MapBlock[], showAll: boolean): FeatureCollection {
+function blockFeatures(
+  blocks: MapBlock[],
+  showAll: boolean,
+  colorOf: (status: StatusCode) => string,
+): FeatureCollection {
   return {
     type: "FeatureCollection",
     features: blocks.map(
@@ -136,7 +148,14 @@ function blockFeatures(blocks: MapBlock[], showAll: boolean): FeatureCollection 
           block_id: block.blockId,
           code: block.code,
           selected: block.selected,
-          // In the whole-farm view nothing is greyed: the point of that view
+          // Resolved here rather than in a paint expression: the colours are
+          // the platform's own list, served by the API, and a `match` on
+          // status codes in the style would be a second copy of it.
+          color: block.status === null ? "#9aa0a6" : colorOf(block.status),
+          // A block the tree never ran on is not grey-because-unassessed, it
+          // is absent. It draws hollow so the two cannot be confused.
+          didNotRun: block.status === null,
+          // In the whole-farm view nothing is dimmed: the point of that view
           // is to compare the blocks, not to focus one.
           showAll: showAll,
         },
@@ -216,14 +235,17 @@ export function HealthMap({
         type: "fill",
         source: BLOCK_SOURCE,
         paint: {
-          // The unselected blocks are greyed so the eye stays on the one in
-          // focus. Mohamed asked for that on 2026-09-07.
-          "fill-color": "#5f675c",
+          "fill-color": ["get", "color"],
+          // The block in focus reads at full strength and the rest are
+          // dimmed, so the eye stays on it without losing the farm's shape.
+          // A block the tree never ran on carries no fill at all.
           "fill-opacity": [
             "case",
-            ["any", ["get", "selected"], ["get", "showAll"]],
+            ["get", "didNotRun"],
             0,
-            0.45,
+            ["any", ["get", "selected"], ["get", "showAll"]],
+            0.62,
+            0.28,
           ],
         },
       });
@@ -319,8 +341,8 @@ export function HealthMap({
     if (!map || !ready) return;
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- tsc types getSource as the Source base, which has no setData/setCoordinates
     const source = map.getSource(BLOCK_SOURCE) as GeoJSONSource | undefined;
-    source?.setData(blockFeatures(blocks, fitMode === "farm"));
-  }, [blocks, fitMode, ready]);
+    source?.setData(blockFeatures(blocks, fitMode === "farm", colorOf));
+  }, [blocks, fitMode, ready, colorOf]);
 
   // Cells: the blurred image, and the invisible polygons under it
   useEffect(() => {

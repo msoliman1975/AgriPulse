@@ -80,11 +80,12 @@ vi.mock("maplibre-gl", () => {
   };
 });
 
-function block(id: string, selected: boolean): MapBlock {
+function block(id: string, selected: boolean, status: StatusCode | null = "good"): MapBlock {
   return {
     blockId: id,
     code: id,
     selected,
+    status,
     boundary: {
       type: "Polygon",
       coordinates: [
@@ -119,7 +120,14 @@ function cell(row: number, col: number, status: StatusCode = "good"): MapCell {
   };
 }
 
-const colorOf = () => "#6FBF4B";
+const COLOURS: Record<string, string> = {
+  na: "#9AA0A6",
+  very_good: "#1B873F",
+  good: "#6FBF4B",
+  issue: "#E8A33D",
+  alert: "#D64545",
+};
+const colorOf = (status: StatusCode) => COLOURS[status];
 
 beforeAll(() => {
   // jsdom's canvas has no 2D context, so the paint step would bail before
@@ -137,10 +145,11 @@ beforeAll(() => {
     closePath: () => {},
     fill: () => {},
   } as unknown as CanvasRenderingContext2D;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- getContext is
-  // an overload set; matching it exactly here would be noise, and the stub is
-  // only ever asked for a 2d context.
-  HTMLCanvasElement.prototype.getContext = ((): any => ctx) as HTMLCanvasElement["getContext"];
+
+  // `getContext` is an overload set; matching it exactly here would be noise,
+  // and this stub is only ever asked for a 2d context.
+  HTMLCanvasElement.prototype.getContext = (() =>
+    ctx) as unknown as HTMLCanvasElement["getContext"];
   HTMLCanvasElement.prototype.toDataURL = () => "data:image/png;base64,AA==";
 });
 
@@ -222,13 +231,62 @@ describe("HealthMap", () => {
     await waitFor(() => {
       expect(fake.sources.get("fh-cell-image")?.setCoordinates).toHaveBeenCalled();
     });
-    const corners = fake.sources.get("fh-cell-image")?.setCoordinates.mock
-      .calls[0][0] as [number, number][];
+    const corners = fake.sources.get("fh-cell-image")?.setCoordinates.mock.calls[0][0] as [
+      number,
+      number,
+    ][];
     const lons = corners.map((c) => c[0]);
     const lats = corners.map((c) => c[1]);
     expect(Math.max(...lons)).toBeGreaterThan(Math.min(...lons));
     expect(Math.max(...lats)).toBeGreaterThan(Math.min(...lats));
     expect(corners.flat().every((n) => Number.isFinite(n))).toBe(true);
+  });
+
+  it("paints a block in its own verdict colour", async () => {
+    // A block-scoped tree writes one verdict for the whole block and no
+    // cells at all. Before this the fill was a hardcoded grey, so a farm
+    // whose verdicts are all block-scoped showed no colour anywhere — which
+    // is every verdict on the reference farm.
+    draw({ blocks: [block("b1", true, "issue"), block("b2", false, "good")] });
+    fake.loadHandler?.();
+
+    await waitFor(() => {
+      expect(fake.sources.get("fh-blocks")?.setData).toHaveBeenCalled();
+    });
+    const data = fake.sources.get("fh-blocks")?.setData.mock.calls.at(-1)?.[0] as {
+      features: { properties: Record<string, unknown> }[];
+    };
+    expect(data.features.map((f) => f.properties.color)).toEqual(["#E8A33D", "#6FBF4B"]);
+  });
+
+  it("draws a block the tree never ran on with no fill", async () => {
+    // Absent is not the same as assessed-and-unknown. A grey fill would say
+    // the tree looked and had nothing to report.
+    draw({ blocks: [block("b1", true, null)] });
+    fake.loadHandler?.();
+
+    await waitFor(() => {
+      expect(fake.sources.get("fh-blocks")?.setData).toHaveBeenCalled();
+    });
+    const data = fake.sources.get("fh-blocks")?.setData.mock.calls.at(-1)?.[0] as {
+      features: { properties: Record<string, unknown> }[];
+    };
+    expect(data.features[0].properties.didNotRun).toBe(true);
+  });
+
+  it("tells the style which block is in focus, and when to show them all", async () => {
+    draw({ blocks: [block("b1", true), block("b2", false)], fitMode: "farm" });
+    fake.loadHandler?.();
+
+    await waitFor(() => {
+      expect(fake.sources.get("fh-blocks")?.setData).toHaveBeenCalled();
+    });
+    const data = fake.sources.get("fh-blocks")?.setData.mock.calls.at(-1)?.[0] as {
+      features: { properties: Record<string, unknown> }[];
+    };
+    // In the whole-farm view nothing is dimmed: the point is to compare.
+    expect(data.features.every((f) => f.properties.showAll === true)).toBe(true);
+    expect(data.features.map((f) => f.properties.selected)).toEqual([true, false]);
   });
 
   it("starts with the cell image hidden", () => {

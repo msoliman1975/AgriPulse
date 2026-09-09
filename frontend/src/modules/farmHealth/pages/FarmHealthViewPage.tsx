@@ -206,9 +206,12 @@ export function FarmHealthViewPage(): ReactNode {
             const selected = rows.find((row) => row.blockId === selectedBlockId) ?? null;
 
             const colorFor = new Map(data.statuses.map((s) => [s.code, s.color]));
-            const colorOf = (status: StatusCode): string =>
-              colorFor.get(status) ?? "#9AA0A6";
+            const colorOf = (status: StatusCode): string => colorFor.get(status) ?? "#9AA0A6";
 
+            // Every block's worst verdict for the chosen tree, which is what
+            // the map paints. `rows` already holds it, and a block-scoped
+            // tree has no cells, so this is the only colour it can show.
+            const worstByBlock = new Map(rows.map((row) => [row.blockId, row.worst]));
             const mapBlocks: MapBlock[] = data.blocks
               .filter((block): block is BlockListItem & { boundary: Polygon } =>
                 Boolean(block.boundary),
@@ -218,6 +221,7 @@ export function FarmHealthViewPage(): ReactNode {
                 code: block.code,
                 boundary: block.boundary,
                 selected: block.id === selectedBlockId,
+                status: worstByBlock.get(block.id) ?? null,
               }));
 
             // Geometry from the grid read, verdict from the farm read, joined
@@ -422,9 +426,7 @@ export function FarmHealthViewPage(): ReactNode {
                             // did not run; saying it twice reads as two
                             // different facts.
                             selected.didNotRun ? null : (
-                              <p className="text-sm text-ap-muted">
-                                {t("farmHealth:area.none")}
-                              </p>
+                              <p className="text-sm text-ap-muted">{t("farmHealth:area.none")}</p>
                             )
                           ) : (
                             <div className="grid gap-2">
