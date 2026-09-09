@@ -3518,10 +3518,31 @@ global:
     #
     #   Rollback is api+workers back to e19972a. Do NOT downgrade 0084 as part
     #   of that: leaving real-time aggregation on is harmless with old code.
+    # f41e005 = #665 and #666, both about the same thing: a screen that knew
+    #   something and did not say it.
+    #
+    #   #665 — saving ANY of the 33 shipped trees answered "No decision tree
+    #   with code 'x'" about a tree the author had open. A platform tree is
+    #   owned by its YAML file, so the API has always refused a tenant's
+    #   write; it now says so as a 403 with a sentence, and the editor stops
+    #   offering buttons it will refuse. Parameter overrides stay enabled —
+    #   that is the sanctioned way a tenant changes how a platform tree runs.
+    #
+    #   #666 — the Farm Health block panel showed a colour bar and "1 Good"
+    #   and nothing else. A block tree writes one verdict with no cell, so it
+    #   made no areas, and the area card was the only thing that rendered the
+    #   tree's own sentence and the "how this was decided" walk. Both were in
+    #   the payload the page had already loaded.
+    #
+    #   No migration. The frontend moves TWO steps here: it was on e19972a
+    #   while api/workers were on 4bcd2e2, so this also ships the frontend
+    #   halves of #663 and #664, both merged and already on the api side.
+    #
+    #   Rollback is api and workers to 4bcd2e2 and frontend to e19972a.
     api:
-      tag: "4bcd2e2"
+      tag: "f41e005"
     workers:
-      tag: "4bcd2e2"
+      tag: "f41e005"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -3972,7 +3993,7 @@ global:
       #   traces page learns the 'farm' skip axis. The API half must move in
       #   the same sync — the new section calls two routes that do not exist
       #   on 76a6411.
-      tag: "e19972a"
+      tag: "f41e005"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
