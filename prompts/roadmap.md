@@ -1094,13 +1094,31 @@ locked scope now would lock in a guess. An item leaves this section in one of
 two directions: it becomes a numbered prompt once the open questions are
 answered, or it is dropped with the reason recorded.
 
-### T-1 — A formal definition of a season
+An item may carry a priority line while it waits. **High priority** means it
+should become the next numbered prompt, and that a design document already
+exists, so the remaining discussion is narrow rather than open-ended.
+
+### T-1 — Season as an entity
+
+**Priority: high.** This should become the next numbered prompt. Discussion is
+to be continued, but it is narrow: eight of the ten scope decisions are taken,
+and the two left are listed at the end of this topic.
 
 **Question asked:** do we have a formal definition of a season, something like a
-season master record, and is one needed?
+season master record, and is one needed? Answer: yes, and two records are
+needed, not one.
 
-**Source analysis:** the 2026-08-21 session, read against the working tree at
-`fd8cc89b`. No proposal document covers this. Do not go looking for one.
+**Design document:** `docs/proposals/season-as-an-entity.md`. It holds ten
+recorded decisions and six implementation prompts. Committed as `43be65f0` on
+branch `docs/season-as-an-entity`, cut from `origin/main` at `0e4c66da`. Not
+pushed, no pull request. Read that document before writing any code. Do not
+re-derive the shape from this topic; the sections that follow are the reading
+that led to it.
+
+**Source analysis:** the 2026-08-21 session read the working tree at `fd8cc89b`.
+The 2026-09-09 session re-read the same code plus the plan template, plan,
+apply, weather, and purge modules, and researched the industry references named
+in section 2 of the design document.
 
 #### What the reading found
 
@@ -1152,26 +1170,63 @@ onto a single `season_year`, so the January half lands in the wrong year.
 | **S-5** | The season-context endpoint carries no dates | `insights/schemas.py:130` names the missing pieces as planting and expected-harvest dates per block. | A progress reading of the form day 42 of 150 |
 | **S-6** | Board activities carry no season | `plan_activities.plan_id` is nullable, and the board creates rows with no plan. | Grouping the board by season |
 | **S-7** | No season-over-season comparison is possible | No two records agree on a window. | Comparing this season against last season for any measure |
+| **S-8** | The block start date apply uses is typed and then thrown away | `plan_templates/schemas.py:125` has it on the request body, not in any table. Re-applying the same template gives different dates. | A plan that can be regenerated; any activity anchored on `start` or a milestone |
+| **S-9** | Nothing can hold two open seasons on one block | Coffee arabica runs a 24-month cycle whose cycles overlap by 12 months (Camargo and Camargo, 2001). `block_crops` has a partial unique index on `is_current`, so it cannot carry two. | Any coffee tenant; any perennial whose cycle is longer than a year |
 
-#### The shape being proposed
+#### The shape that was decided
 
-A thin season table holding only the window and the name: `id`, `code`,
-`name_en`, `name_ar`, `start_date`, `end_date` as a half-open range,
-`season_year`, `status`. `block_crops` and `vegetation_plans` both reference it
-by id.
+Two entities, not one. Full detail in sections 3 and 4 of the design document.
+
+- **The window.** `public.season_definitions`, platform-owned, tenants read
+  only. Keyed on `crop_path`, `country_code`, an `agro_zone_code` from a new
+  `public.agro_zones` catalog, and `season_type`. It holds month-and-day
+  windows and a typical duration, never a year. Most specific match wins,
+  reusing `app.shared.crop_taxonomy.path_matches`.
+- **The instance.** `block_crop_cycles` in the tenant schema, one row per
+  growing cycle under a `block_crops` assignment. An annual gets exactly one
+  row. A perennial gets one row per bearing cycle. Overlapping rows on one
+  assignment are allowed on purpose.
 
 **The crop dates stay where they are.** `planting_date`, `actual_harvest_date`,
 `effective_from` and `effective_to` remain on `block_crops`. A season row that
 also claimed to know when a crop started would give one fact two sources, and
-the two would drift.
+the two would drift. This part of the original shape survived unchanged.
+
+The growing degree day cumulative moves to per cycle, computed on read. The
+stored column goes. The condition key name stays, because
+`shared/conditions/context.py:224` says removing a field breaks every persisted
+rule that reads it.
+
+The current cycle is derived, never stored: the open cycle whose `end_date` is
+nearest in the future. A stored flag written by both a job and a user drifts.
+
+#### Three findings that changed the shape after 2026-08-21
+
+1. **`start_date` is not stored anywhere.** `plan_templates/schemas.py:125` has
+   it as a field on the apply request body. The user types a block start date on
+   every apply call and nothing keeps it, so re-applying the same template gives
+   different dates. This is gap **S-8**, and fixing it is the largest single
+   gain of the work.
+2. **Coffee arabica runs a 24-month cycle whose cycles overlap by 12 months.**
+   Camargo and Camargo (2001): two vegetative phases in year one, four fruiting
+   phases in year two. While year two of one cycle fruits, year one of the next
+   runs on the same tree. One block has two open seasons at once, always. This
+   is gap **S-9**.
+3. **A season cannot be a `block_crops` row.** That table is valid-time
+   occupancy. Its own comment at `farms/models.py:505` says a perennial has no
+   `effective_to` until it is grubbed up, so one row covers 20 years and 20
+   seasons, and the partial unique index on `is_current` blocks any overlap.
+
+Findings 2 and 3 together rule out the single thin season table this topic first
+proposed. That is why the decided shape has a cycle table.
 
 #### Areas a change would touch
 
 | Area | What changes | Where |
 |---|---|---|
 | Crop assignment | The text box becomes a picker. Existing labels need a backfill. | `farms/models.py:502`, six fields in `farms/schemas.py`, `farms/service.py`, `CropAssignmentPanel.tsx`, `bulkCropAssignment.ts` |
-| Plans | The unique index `uq_vegetation_plans_farm_season_active` moves from `(farm_id, season_label)` to `(farm_id, season_id)`. The 409 message text changes. | `plans/models.py`, `plans/errors.py:37`, `plan_templates/repository.py:390` |
-| Weather | The season cumulative can reset on the real season start. This is the hardest part; see open question 4. | `weather/derivations.py`, `observer/weather.py:252`, `reports/service.py:1085` |
+| Plans | The unique index `uq_vegetation_plans_farm_season_active` moves from `(farm_id, season_label)` to `(farm_id, season_definition_id, season_year)`. Nulls do not collide in a PostgreSQL unique index, so this needs `NULLS NOT DISTINCT`, and that needs a server on version 15 or later. The 409 message text changes. | `plans/models.py`, `plans/errors.py:37`, `plan_templates/repository.py:390` |
+| Weather | The cumulative moves to per cycle, computed on read, and the stored column is dropped. This is the hardest part of the work; see section 6 of the design document and prompt 5. | `weather/derivations.py`, `observer/weather.py:252`, `reports/service.py:1085` |
 | Decision trees | `gdd_cumulative_base10_season` is a condition source, so changing its reset changes which trees fire. A parity test pins the condition list. Read the test before touching the picker. | `shared/conditions/context.py:208` |
 | Reports | A report could be scoped to a season instead of a date range. | `reports/schemas.py:234`, `:257`, `:277` |
 | Insights | The season-context bar becomes a real progress reading. | `insights/service.py:268` |
@@ -1180,15 +1235,13 @@ the two would drift.
 | Platform catalog | Seeded Egyptian seasons would follow the crop catalog pattern. Use a logical UUID, not a foreign key from a tenant schema into `public`. | new |
 | Purge manifest | A new tenant table must join the manifest, or CI fails. | purge manifest |
 
-#### Arguments against, recorded so they are not lost
+#### Arguments against, and what became of each
 
-- Seasons overlap. One block can still be in winter while its neighbour is in
-  summer. A single current season per farm would be wrong for that farm.
-- Perennials have no season in the annual sense. The `Y3` example in the data
-  model shows the field is already used to mean orchard age. A start date and an
-  end date do not describe a mango orchard.
-- The size of the backfill depends on how varied the existing labels are, and
-  production has not been read yet.
+| Argument | Outcome |
+|---|---|
+| Seasons overlap. One block can be in winter while its neighbour is in summer. A single current season per farm would be wrong. | **Accepted, and it drove the design.** The instance is per crop assignment, never per farm. Coffee made the case stronger: overlap happens on one block, not only between neighbours. |
+| Perennials have no season in the annual sense. `Y3` shows the field already means orchard age. A start and an end date do not describe a mango orchard. | **Half accepted.** A perennial has no planting-to-harvest season, but it does have a bearing cycle anchored on flowering, and that cycle has real dates. `Y3` is tree age, so it is not migrated into a season. Section 7 of the design document copies it into the cycle name and leaves the window null. |
+| The size of the backfill depends on how varied the existing labels are, and production has not been read yet. | **Still true.** Production has still not been read. The migration in section 7 sidesteps the risk by copying the label verbatim and parsing nothing, so a varied set costs no more than a tidy one. The count is still worth running. |
 
 #### The cheap first step
 
@@ -1196,17 +1249,32 @@ Before any schema work, count the distinct `season_label` values per tenant on
 production. It is a read-only query. Three tidy values means a small mapping.
 Forty values means a manual mapping, which changes the size of this work.
 
-#### Open questions (answer before this becomes a prompt)
+#### The four original open questions, now answered
 
-1. Is a season tenant-wide, or per farm? A tenant with farms in the Delta and in
-   Upper Egypt has different windows.
-2. Can one block sit in two seasons at once? If it can, no screen can say "this
-   season" without first asking which one.
-3. Do perennials get a season, or is it empty for them, with `Y3`-style labels
-   moving to a separate field?
-4. Is the growing degree day cumulative per farm or per crop assignment? Per farm
-   keeps the weather table shape. Per crop assignment turns the stored column
-   into a computed value, which is a much larger change.
+1. *Tenant-wide or per farm?* Neither. The window is platform-wide, keyed on
+   country plus agro-zone. The instance is per crop assignment.
+2. *Can one block sit in two seasons at once?* Yes, and coffee always does.
+   Overlapping cycles are allowed. A screen that needs one takes the current
+   cycle: the open cycle whose `end_date` is nearest in the future.
+3. *Do perennials get a season?* Yes, a bearing cycle. `Y3`-style labels are not
+   a season and are not migrated into one.
+4. *Growing degree days per farm or per crop assignment?* Per cycle, computed on
+   read. The stored column is dropped. This is the largest and most careful part
+   of the work, because it changes what live decision trees see.
+
+#### What is left to discuss
+
+Two points. Everything else in the design document is decided.
+
+1. **The seed numbers.** Section 8 of the design document gives a starting shape
+   for potato, wheat, mango, dates, and coffee, not confirmed values. Prompt 2
+   tells the implementer to confirm each row against the FAO crop calendar and
+   to record the source per row. Decide whether that is acceptable, or whether
+   the numbers should be settled before the work starts.
+2. **The gate on the growing degree day change.** Prompt 5 puts the new
+   behaviour behind a feature flag, default off, and requires a before-and-after
+   verdict count across every published decision tree before the flag is turned
+   on, in a separate pull request. Confirm that gate.
 ---
 
 ## How to use this roadmap
