@@ -1,9 +1,14 @@
 """A platform tree that a tenant cannot edit must say so, not read as missing.
 
-Every authoring write scopes its lookup to the caller's own tenant, because a
-platform tree is owned by its YAML file: `sync_from_disk` rewrites it at the
-next startup whose compiled hash differs, so a tenant's edit would live until
-the next restart and then vanish with no message.
+Every authoring write scopes its lookup to the caller's own scope. A tenant
+writes rows carrying its own `tenant_id`; a platform admin writes rows with
+`tenant_id IS NULL`. Neither reaches the other's, and this is the tenant half.
+
+The reason used to be that a platform tree was owned by its YAML file, which
+`sync_from_disk` rewrote at the next restart. That is no longer the reason —
+public migration 0085 moved the definitions into the database and a platform
+admin edits them there. The refusal to a tenant is unchanged, and so is why it
+must name itself rather than read as missing.
 
 The scoped lookup cannot tell "no such tree" from "not yours", and it reported
 both as missing. "No decision tree with code 'mango_canopy_vigour_by_size_v1'"

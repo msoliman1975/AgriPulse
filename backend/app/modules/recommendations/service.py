@@ -3322,7 +3322,7 @@ class DecisionTreesAuthorService:
             raise _DecisionTreeNotFoundError(code)
         row = await self._repo.get_version_by_number(tree_id=tree["id"], version=version)
         if row is None:
-            raise _DecisionTreeVersionNotFoundError(code, version)
+            raise _DecisionTreeVersionNotFoundError(code=code, version=version)
         if row.get("published_at") is None:
             raise _DecisionTreeNoPublishedVersionError(code)
         await self._repo.set_tree_version_pin(
