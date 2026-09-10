@@ -331,6 +331,13 @@ export function App(): ReactNode {
                 <Route path="catalog" element={<PlatformCatalogPage />} />
                 <Route path="signals" element={<PlatformSignalsPage />} />
                 <Route path="crops/:cropId/attributes" element={<PlatformCropAttributesPage />} />
+                {/* The platform catalogue, edited by a platform admin. Same
+                    three pages the tenant surface mounts at /decision-trees —
+                    they read their scope from the caller's own claims, so
+                    neither prefix can edit the other's trees. */}
+                <Route path="decision-trees" element={<DecisionTreeListPage />} />
+                <Route path="decision-trees/new" element={<DecisionTreeCreatePage />} />
+                <Route path="decision-trees/:code" element={<DecisionTreeViewerPage />} />
                 <Route path="plan-templates" element={<PlatformPlanTemplatesPage />} />
                 <Route path="backfill" element={<PlatformBackfillPage />} />
                 <Route path="observer" element={<PlatformObserverPage />} />

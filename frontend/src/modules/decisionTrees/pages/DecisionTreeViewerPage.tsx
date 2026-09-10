@@ -22,7 +22,7 @@ import clsx from "clsx";
 import type { ComponentProps, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow, parseISO, type Locale } from "date-fns";
 
@@ -35,6 +35,12 @@ import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
+
+import {
+  isEditableInScope,
+  treesBasePath,
+  useAuthoringScope,
+} from "../lib/authoringScope";
 import { listSignalDefinitions } from "@/api/signals";
 import { SignalRefPicker } from "@/modules/signals/components/SignalRefPicker";
 import {
@@ -61,7 +67,9 @@ import { CanvasDryRunPanel } from "../components/CanvasDryRunPanel";
 import { CanvasTreeRunPanel } from "../components/CanvasTreeRunPanel";
 import { MutationErrorBanner } from "../components/MutationErrorBanner";
 import { NodeDetailsPanel } from "../components/NodeDetailsPanel";
+import { CopyTreeDialog } from "../components/CopyTreeDialog";
 import { ParameterOverridesPanel } from "../components/ParameterOverridesPanel";
+import { TreeRolloutPanel } from "../components/TreeRolloutPanel";
 import { ParametersPanel } from "../components/ParametersPanel";
 import { ProvenancePanel } from "../components/ProvenancePanel";
 import { TreeCanvas } from "../components/TreeCanvas";
@@ -124,6 +132,10 @@ export function DecisionTreeViewerPage(): ReactNode {
   const { t, i18n } = useTranslation("decisionTrees");
   const isAr = i18n.language === "ar";
   const canManage = useCapability("decision_tree.manage");
+  const scope = useAuthoringScope();
+  const base = treesBasePath(scope);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const navigate = useNavigate();
   const detail = useDecisionTree(code);
   const append = useAppendDecisionTreeVersion();
   const publish = usePublishDecisionTreeVersion();
@@ -368,14 +380,17 @@ export function DecisionTreeViewerPage(): ReactNode {
   }
 
   const tree = detail.data;
-  // A platform tree is owned by its YAML file: `sync_from_disk` rewrites it
-  // at the next startup whose compiled hash differs, so a tenant's edit would
-  // live until the next restart and then vanish. The API has always refused
-  // the write; this page offered the buttons anyway, and the refusal came
-  // back as "No decision tree with code ..." about a tree open on screen.
-  // The list page already hides its own actions on the same rule.
+  // Who may edit which tree is a scope question, not a "platform trees are
+  // frozen" one. A platform tree used to be owned by its YAML file, so an edit
+  // would live until the next restart and then vanish, and the API refused
+  // every write to one. Public migration 0085 moved the definitions into the
+  // database and the startup sync is gone, so a platform admin can now edit
+  // them — and only they can. A tenant admin still cannot, and gets the same
+  // read-only notice, because the API still refuses that write.
   const isPlatformTree = tree.tenant_id == null;
-  const canEdit = canManage && !isPlatformTree;
+  const canEdit = canManage && isEditableInScope(scope, tree);
+  // Out of the tenant's reach, so the page says so instead of going inert.
+  const showReadOnlyNotice = canManage && !canEdit;
   const isDraftOnly = tree.current_version == null;
   const structuralDirty = draftYaml !== null && sourceYaml !== null && draftYaml !== sourceYaml;
 
@@ -682,7 +697,7 @@ export function DecisionTreeViewerPage(): ReactNode {
             {/* Say why the buttons are absent. An editor that is simply inert
                 reads as broken, and the API's refusal used to arrive as "no
                 such tree" about a tree open on screen. */}
-            {isPlatformTree && canManage ? (
+            {showReadOnlyNotice ? (
               <span className="mt-2 block max-w-prose text-xs text-ap-muted">
                 {t("viewer.platformReadOnly")}
               </span>
@@ -926,6 +941,16 @@ export function DecisionTreeViewerPage(): ReactNode {
               {Object.keys(declaredParams).length > 0 ? (
                 <ParameterOverridesPanel code={tree.code} canManage={canManage} />
               ) : null}
+              {/* Tenant-only. A platform caller has no farms to enable this on
+                  and no pin to hold, and the API refuses all three. */}
+              {scope === "tenant" ? (
+                <TreeRolloutPanel
+                  code={tree.code}
+                  canManage={canManage}
+                  versions={tree.versions}
+                  onCopy={isPlatformTree ? () => setCopyOpen(true) : undefined}
+                />
+              ) : null}
             </div>
             {selectedNode ? (
               <NodeDetailsPanel
@@ -987,6 +1012,17 @@ export function DecisionTreeViewerPage(): ReactNode {
           subtreeSize={deleteSubtreeSize}
           onCancel={() => setDeletePending(null)}
           onConfirm={onConfirmDelete}
+        />
+      ) : null}
+
+      {copyOpen ? (
+        <CopyTreeDialog
+          code={tree.code}
+          onClose={() => setCopyOpen(false)}
+          onCopied={(newCode) => {
+            setCopyOpen(false);
+            navigate(`${base}/${newCode}`);
+          }}
         />
       ) : null}
     </Page>

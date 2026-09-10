@@ -12,6 +12,7 @@
     "observer": "المراقب",
     "roles": "الأدوار والأذونات",
     "platformSignals": "كتالوج المؤشرات",
+    "platformDecisionTrees": "أشجار القرار",
     "platformAlerts": "تنبيهات المنصة",
     "usage": "استخدام المنتج"
   },

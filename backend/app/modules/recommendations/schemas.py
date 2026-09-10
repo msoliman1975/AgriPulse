@@ -843,3 +843,59 @@ class FarmTreeToggleResponse(BaseModel):
     #: False when the tree was already in the requested state. The call still
     #: succeeds; nothing was written and nothing was audited.
     changed: bool
+
+
+class DecisionTreeCopyRequest(BaseModel):
+    """Copy a platform tree into the caller's tenant."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: Leave unset to take the derived `<original>__<tenant slug>`. The copy
+    #: cannot keep the original's code: a tenant code that collides with a
+    #: platform code makes every lookup by code ambiguous, and `create_tree`
+    #: refuses it.
+    new_code: str | None = Field(default=None, min_length=1, max_length=120)
+    #: Ticked by default in the dialog. A copy is usually made to replace the
+    #: original, and leaving both on means every block gets two cards.
+    disable_original: bool = True
+
+
+class DecisionTreeAvailabilityResponse(BaseModel):
+    """How this tenant runs one tree."""
+
+    code: str
+    #: Farms with no exclusion row, out of the farms that exist today.
+    farms_running: int
+    farms_total: int
+    #: True only when every farm runs it. A tenant with no farms reads False.
+    enabled_everywhere: bool
+    #: The tree's current published version, `null` while it is draft-only.
+    current_version: int | None = None
+    #: Set when this tenant holds the tree at a version. `null` means the
+    #: tenant follows whatever is published, which is the default.
+    pinned_version: int | None = None
+
+
+class DecisionTreeEnabledRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+
+
+class DecisionTreeEnabledResponse(DecisionTreeAvailabilityResponse):
+    #: How many farms actually changed. Zero means every farm was already in
+    #: the requested state.
+    farms_changed: int = 0
+
+
+class DecisionTreeVersionPinRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    #: Must be a published version. Pinning to a draft would drop the tree out
+    #: of the sweep, which is a silent way to turn it off.
+    version: int = Field(ge=1)
+
+
+class DecisionTreeVersionPinResponse(BaseModel):
+    code: str
+    pinned_version: int | None = None

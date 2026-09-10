@@ -4,6 +4,8 @@ import { Navigate, useNavigate } from "react-router-dom";
 
 import { useCreateDecisionTree } from "@/queries/decisionTrees";
 import { useCapability } from "@/rbac/useCapability";
+
+import { treesBasePath, useAuthoringScope } from "../lib/authoringScope";
 import { STARTER_TREE_YAML, applyCodeToYaml } from "../lib/treeStructure";
 import { TREE_TEMPLATES, getTemplate } from "../lib/treeTemplates";
 import { MutationErrorBanner } from "../components/MutationErrorBanner";
@@ -80,6 +82,10 @@ export function DecisionTreeCreatePage(): ReactNode {
   const navigate = useNavigate();
   const { t } = useTranslation("decisionTrees");
   const canManage = useCapability("decision_tree.manage");
+  // Named apart from the tree's block/cell `scope`, which is a different
+  // thing entirely and already owns that word on this page.
+  const authoringScope = useAuthoringScope();
+  const base = treesBasePath(authoringScope);
 
   const [code, setCode] = useState("");
   const [cropPaths, setCropPaths] = useState<string[]>([]);
@@ -95,7 +101,7 @@ export function DecisionTreeCreatePage(): ReactNode {
   const create = useCreateDecisionTree();
 
   if (!canManage) {
-    return <Navigate to="/decision-trees" replace />;
+    return <Navigate to={base} replace />;
   }
 
   // The code field is the source of truth for `code:` in the body, so
@@ -145,7 +151,7 @@ export function DecisionTreeCreatePage(): ReactNode {
       },
       {
         onSuccess: (tree) => {
-          navigate(`/decision-trees/${tree.code}`);
+          navigate(`${base}/${tree.code}`);
         },
       },
     );
@@ -166,7 +172,7 @@ export function DecisionTreeCreatePage(): ReactNode {
       },
       {
         onSuccess: (tree) => {
-          navigate(`/decision-trees/${tree.code}`);
+          navigate(`${base}/${tree.code}`);
         },
       },
     );
@@ -284,7 +290,7 @@ export function DecisionTreeCreatePage(): ReactNode {
         <footer className="flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
-            onClick={() => navigate("/decision-trees")}
+            onClick={() => navigate(base)}
             className="rounded-md border border-ap-line bg-ap-panel px-3 py-1.5 text-sm font-medium text-ap-ink hover:bg-ap-line/40"
           >
             {t("create.cancel")}

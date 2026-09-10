@@ -2,7 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   type DecisionTree,
+  type DecisionTreeAvailability,
+  type DecisionTreeCopyPayload,
   type DecisionTreeCreatePayload,
+  type DecisionTreeEnabledResult,
   type DecisionTreeDetail,
   type DecisionTreeListStatus,
   type DecisionTreeUpdatePayload,
@@ -15,18 +18,23 @@ import {
   type TreeRunResponse,
   appendDecisionTreeVersion,
   archiveDecisionTree,
+  clearDecisionTreeVersionPin,
+  copyDecisionTree,
   createDecisionTree,
   dryRunDecisionTree,
   getDecisionTree,
+  getDecisionTreeAvailability,
   getDecisionTreeCandidateBlocks,
   getDecisionTreeCandidateFarms,
   getEvalTrace,
   listDecisionTrees,
   listEvalRuns,
   listEvalTraces,
+  pinDecisionTreeVersion,
   publishDecisionTreeVersion,
   restoreDecisionTree,
   runDecisionTreeOnFarm,
+  setDecisionTreeEnabled,
   updateDecisionTree,
 } from "@/api/decisionTrees";
 
@@ -203,3 +211,54 @@ export function useRunDecisionTreeOnFarm() {
 
 // Re-exports so callers can grab the type from one place.
 export type { DecisionTree, DecisionTreeDetail, TreeRunCandidateFarm, TreeRunResponse };
+
+// --- Copy, tenant-wide enable/disable, version pins ------------------------
+
+export function useDecisionTreeAvailability(code: string | undefined, enabled = true) {
+  return useQuery<DecisionTreeAvailability>({
+    queryKey: ["decision_trees", "availability", code] as const,
+    queryFn: () => getDecisionTreeAvailability(code!),
+    enabled: Boolean(code) && enabled,
+  });
+}
+
+export function useCopyDecisionTree() {
+  const qc = useQueryClient();
+  return useMutation<
+    DecisionTreeDetail,
+    Error,
+    { code: string; payload: DecisionTreeCopyPayload }
+  >({
+    mutationFn: ({ code, payload }) => copyDecisionTree(code, payload),
+    // The copy is a new tree and the original may have just been turned off on
+    // every farm, so both the list and the original's availability are stale.
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["decision_trees"] });
+    },
+  });
+}
+
+export function useSetDecisionTreeEnabled() {
+  const qc = useQueryClient();
+  return useMutation<DecisionTreeEnabledResult, Error, { code: string; enabled: boolean }>({
+    mutationFn: ({ code, enabled }) => setDecisionTreeEnabled(code, enabled),
+    onSuccess: (data) => {
+      qc.setQueryData(["decision_trees", "availability", data.code], data);
+    },
+  });
+}
+
+export function useSetDecisionTreeVersionPin() {
+  const qc = useQueryClient();
+  return useMutation<
+    { code: string; pinned_version: number | null },
+    Error,
+    { code: string; version: number | null }
+  >({
+    mutationFn: ({ code, version }) =>
+      version === null ? clearDecisionTreeVersionPin(code) : pinDecisionTreeVersion(code, version),
+    onSuccess: (_, vars) => {
+      void qc.invalidateQueries({ queryKey: ["decision_trees", "availability", vars.code] });
+    },
+  });
+}

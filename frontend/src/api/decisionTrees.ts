@@ -560,3 +560,81 @@ export async function getFarmVerdicts(farmId: string, at?: string): Promise<Farm
   });
   return data;
 }
+
+// --- Copy, tenant-wide enable/disable, version pins ------------------------
+//
+// All three act on the caller's own tenant. A platform caller has no farms to
+// enable a tree on and no pin to hold, and the API refuses them.
+
+export interface DecisionTreeCopyPayload {
+  /** Unset takes the derived `<original>__<tenant slug>`. */
+  new_code?: string | null;
+  /** Ticked by default: a copy is usually made to replace the original. */
+  disable_original: boolean;
+}
+
+export interface DecisionTreeAvailability {
+  code: string;
+  /** Farms with no exclusion row, out of the farms that exist today. */
+  farms_running: number;
+  farms_total: number;
+  enabled_everywhere: boolean;
+  current_version: number | null;
+  /** Set when this tenant holds the tree at a version. */
+  pinned_version: number | null;
+}
+
+export interface DecisionTreeEnabledResult extends DecisionTreeAvailability {
+  farms_changed: number;
+}
+
+export async function copyDecisionTree(
+  code: string,
+  payload: DecisionTreeCopyPayload,
+): Promise<DecisionTreeDetail> {
+  const { data } = await apiClient.post<DecisionTreeDetail>(
+    `/v1/decision-trees/${code}:copy`,
+    payload,
+  );
+  return data;
+}
+
+export async function getDecisionTreeAvailability(
+  code: string,
+): Promise<DecisionTreeAvailability> {
+  const { data } = await apiClient.get<DecisionTreeAvailability>(
+    `/v1/decision-trees/${code}/availability`,
+  );
+  return data;
+}
+
+export async function setDecisionTreeEnabled(
+  code: string,
+  enabled: boolean,
+): Promise<DecisionTreeEnabledResult> {
+  const { data } = await apiClient.put<DecisionTreeEnabledResult>(
+    `/v1/decision-trees/${code}/enabled`,
+    { enabled },
+  );
+  return data;
+}
+
+export async function pinDecisionTreeVersion(
+  code: string,
+  version: number,
+): Promise<{ code: string; pinned_version: number | null }> {
+  const { data } = await apiClient.put<{ code: string; pinned_version: number | null }>(
+    `/v1/decision-trees/${code}/version-pin`,
+    { version },
+  );
+  return data;
+}
+
+export async function clearDecisionTreeVersionPin(
+  code: string,
+): Promise<{ code: string; pinned_version: number | null }> {
+  const { data } = await apiClient.delete<{ code: string; pinned_version: number | null }>(
+    `/v1/decision-trees/${code}/version-pin`,
+  );
+  return data;
+}
