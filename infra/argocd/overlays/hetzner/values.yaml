@@ -3632,10 +3632,38 @@ global:
     #
     #   Rollback is these three tags back to c1ecde3. The migrations stay —
     #   0085 wrote nothing here and 0086's table is unread by the old image.
+    # b91b2a3 = #676, the Farm Health View UX pass. api + workers + frontend.
+    #
+    #   The backend half is one join and three fields. The verdict reads join
+    #   `public.decision_trees` so every verdict carries `tree_name_en` and
+    #   `tree_name_ar`, and the reasoning read also carries `leaf_label_en` /
+    #   `leaf_label_ar`, lifted off the leaf step of the walk. The narrative's
+    #   closing sentence now names the tree instead of its code.
+    #
+    #   The join is a LEFT one and must stay one. A tenant schema holds no
+    #   foreign key into public by design, so the catalog row can be gone
+    #   while the verdict it produced still stands; an inner join would drop
+    #   that row and a block that had been checked would read as never
+    #   checked. Covered by a test.
+    #
+    #   No migration. Every new field is nullable and every reader falls back
+    #   to the code, so the three tags are independent: a frontend that
+    #   reaches prod before the api shows codes, and an api that lands first
+    #   sends fields nothing reads. They move together only because the
+    #   change is one piece of work.
+    #
+    #   Watch for this: the tree picker on /farm-health/:farmId should read
+    #   "Mango canopy health", not `mango_canopy_health_v1`, and the last line
+    #   of an opened reasoning card should name the leaf in words. If either
+    #   still shows a code, the api is serving an older image — the frontend
+    #   cannot tell that apart from a tree whose catalog row is missing.
+    #
+    #   Rollback is these three tags back to e0ea9c7 (api, workers) and
+    #   8d2d866 (frontend). Nothing to undo in the database.
     api:
-      tag: "e0ea9c7"
+      tag: "b91b2a3"
     workers:
-      tag: "e0ea9c7"
+      tag: "b91b2a3"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4111,7 +4139,33 @@ global:
       #   traces page learns the 'farm' skip axis. The API half must move in
       #   the same sync — the new section calls two routes that do not exist
       #   on 76a6411.
-      tag: "8d2d866"
+      #
+      # b91b2a3 = the frontend half of #676, the Farm Health View UX pass.
+      #   Nine changes Mohamed listed on 2026-09-10, and ten defects found
+      #   reviewing them.
+      #
+      #   The map opens already framed on the farm rather than animating onto
+      #   it; the range picker, transport and a progress bar moved under the
+      #   map and the day moved onto it, top right; the block summary, the
+      #   whole-block verdict and the selected area became one card; and the
+      #   block list and the map height are draggable, remembered per browser.
+      #
+      #   Trees, leaves, kinds and statuses are named rather than coded. Every
+      #   one falls back to the code, so this tag is safe on an older api —
+      #   it shows what shipped before.
+      #
+      #   The screen now waits on three reads instead of five. The grid read
+      #   is skipped entirely unless some verdict carries a cell_id, and the
+      #   history read no longer blocks the first paint: the replay controls
+      #   stay off, and say why, until it lands or fails.
+      #
+      #   After the sync, watch: opening the screen does not zoom, the date
+      #   sits in the map's top-right corner, and the replay controls are
+      #   briefly disabled and then usable. A replay that stays disabled with
+      #   "could not be read" means the verdict-history endpoint is failing.
+      #
+      #   Rollback is this tag alone back to 8d2d866.
+      tag: "b91b2a3"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
