@@ -48,11 +48,13 @@ const VERSION = {
   notes: null,
 };
 
+const TENANT = "01a041ef-e184-723b-b1cb-9d6e656fe00d";
+
 const state = vi.hoisted(() => ({
   // Who owns the tree on screen.
   tenantId: null as string | null,
   // Who is looking at it. Null means a platform admin, who has no tenant.
-  callerTenantId: "01a041ef-e184-723b-b1cb-9d6e656fe00d" as string | null,
+  callerTenantId: null as string | null,
 }));
 
 function tree() {
@@ -126,7 +128,7 @@ describe("a platform tree", () => {
   beforeEach(async () => {
     await setupTestI18n("en");
     state.tenantId = null;
-    state.callerTenantId = "01a041ef-e184-723b-b1cb-9d6e656fe00d";
+    state.callerTenantId = TENANT;
   });
 
   it("offers no save or publish", async () => {
@@ -157,8 +159,8 @@ describe("a platform tree", () => {
 describe("a tenant's own tree", () => {
   beforeEach(async () => {
     await setupTestI18n("en");
-    state.tenantId = "01a041ef-e184-723b-b1cb-9d6e656fe00d";
-    state.callerTenantId = "01a041ef-e184-723b-b1cb-9d6e656fe00d";
+    state.tenantId = TENANT;
+    state.callerTenantId = TENANT;
   });
 
   it("is editable, and says nothing about being read-only", async () => {
@@ -191,7 +193,7 @@ describe("a platform tree in Arabic", () => {
   beforeEach(async () => {
     await setupTestI18n("ar");
     state.tenantId = null;
-    state.callerTenantId = "01a041ef-e184-723b-b1cb-9d6e656fe00d";
+    state.callerTenantId = TENANT;
   });
 
   it("says why in Arabic", async () => {
