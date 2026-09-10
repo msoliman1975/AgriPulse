@@ -445,6 +445,10 @@ class RecommendationsRepository:
             "id": row.id,
             "tree_id": row.tree_id,
             "version": row.version,
+            # The YAML costs nothing to include: `select(DecisionTreeVersion)`
+            # already loads the whole row, so leaving it out only hid it from
+            # callers. The copy path needs it as its starting body.
+            "tree_yaml": row.tree_yaml,
             "tree_compiled": row.tree_compiled,
             "compiled_hash": row.compiled_hash,
             "published_at": row.published_at,

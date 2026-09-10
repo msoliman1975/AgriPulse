@@ -3187,7 +3187,10 @@ class DecisionTreesAuthorService:
             description_en=compiled.get("description_en"),
             description_ar=compiled.get("description_ar"),
             crop_id=source.get("crop_id"),
-            crop_path=source.get("crop_path"),
+            # From the compiled body, not the source row: `get_tree_by_code`
+            # does not carry `crop_path`, so reading it there returns None on
+            # every copy and the targeting quietly narrows.
+            crop_path=compiled.get("crop_path"),
             crop_paths=list(source.get("crop_paths") or []),
             country_codes=list(source.get("country_codes") or []),
             soil_textures=list(source.get("soil_textures") or []),

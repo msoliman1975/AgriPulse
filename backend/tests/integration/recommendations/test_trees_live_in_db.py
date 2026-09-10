@@ -46,6 +46,8 @@ TREE_YAML = """
 code: {code}
 name_en: Platform catalogue fixture
 name_ar: قاعدة اختبار كتالوج المنصة
+crop_path: mango
+country_codes: [EG]
 root: root
 nodes:
   root:
@@ -134,6 +136,20 @@ async def _resolved_version(tenant_id: UUID, code: str) -> int | None:
             visible_to_tenant_id=tenant_id, only_code=code
         )
     return None if not rows else int(rows[0]["version"])
+
+
+async def _resolved_tree(tenant_id: UUID, code: str) -> dict:
+    """The row the evaluator would target with, not the row the API echoed."""
+    factory = AsyncSessionLocal()
+    async with factory() as public_session:
+        repo = RecommendationsRepository(
+            tenant_session=public_session, public_session=public_session
+        )
+        rows = await repo.list_active_trees_with_current_version(
+            visible_to_tenant_id=tenant_id, only_code=code
+        )
+    assert rows, f"no active tree {code!r} for this tenant"
+    return dict(rows[0])
 
 
 # ---- Platform authoring ---------------------------------------------------
@@ -271,6 +287,14 @@ async def test_a_copy_is_a_separate_published_row(admin_session: AsyncSession) -
     # the tenant running neither.
     assert copy["current_version"] == 1
     assert await _resolved_version(tenant_id, copy["code"]) == 1
+
+    # Targeting comes across whole. A copy that quietly lost an axis would
+    # reach blocks the original never did, or none at all, and the only
+    # symptom would be cards appearing or stopping for no stated reason.
+    resolved = await _resolved_tree(tenant_id, copy["code"])
+    assert resolved["crop_path"] == "mango"
+    assert list(resolved["crop_paths"]) == ["mango"]
+    assert list(resolved["country_codes"]) == ["EG"]
 
 
 async def test_a_copy_does_not_move_when_the_original_is_republished(
