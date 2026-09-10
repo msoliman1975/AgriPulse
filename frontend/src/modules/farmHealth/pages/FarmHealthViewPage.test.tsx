@@ -36,7 +36,13 @@ vi.mock("../components/HealthMap", () => ({
 const grid = vi.hoisted((): { current: unknown } => ({ current: null }));
 // Which reads are still in flight. The screen must draw without the grid and
 // without the history, so a test has to be able to hold them open.
-const held = vi.hoisted(() => ({ grid: false, history: false, historyFails: false }));
+const held = vi.hoisted(() => ({
+  grid: false,
+  history: false,
+  historyFails: false,
+  emptyAfterFirstRead: false,
+}));
+const historyReads = vi.hoisted(() => ({ n: 0 }));
 const gridCalls = vi.hoisted(() => vi.fn());
 
 vi.mock("@/api/grid", () => ({
@@ -170,6 +176,11 @@ vi.mock("@/api/farmHealth", async (importOriginal) => {
     getFarmVerdictHistory: vi.fn(async () => {
       if (held.history) await new Promise(() => {});
       if (held.historyFails) throw new Error("history read failed");
+      historyReads.n += 1;
+      // A later range is a different window, and may hold nothing at all.
+      if (held.emptyAfterFirstRead && historyReads.n > 1) {
+        return { ...(history.current as Record<string, unknown>), verdicts: [] };
+      }
       return history.current;
     }),
   };
@@ -221,6 +232,8 @@ describe("FarmHealthViewPage", () => {
     held.grid = false;
     held.history = false;
     held.historyFails = false;
+    held.emptyAfterFirstRead = false;
+    historyReads.n = 0;
     gridCalls.mockClear();
     grid.current = { farm_id: FARM_ID, index_code: "ndvi", blocks: [] };
     history.current = { farm_id: FARM_ID, from_at: "", to_at: "", tree_code: null, truncated: false, verdicts: [] };
@@ -995,6 +1008,132 @@ describe("FarmHealthViewPage", () => {
     ).toBeInTheDocument();
     // Today's answers are unaffected, and the screen still shows them.
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("AG-R01-C02");
+  });
+
+  it("reads the grid for a per-cell tree that only ran earlier in the window", async () => {
+    // A farm turns a per-cell tree off. Its verdicts all close, so the live
+    // read has none — but the replay still paints its cells on the days it
+    // ran, and without the grid there is no geometry to paint them on.
+    const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    history.current = {
+      farm_id: FARM_ID,
+      from_at: "",
+      to_at: "",
+      tree_code: null,
+      truncated: false,
+      verdicts: [
+        {
+          ...verdict("b2", "t_retired", "alert", 0),
+          id: "old",
+          cell_id: "cell-1",
+          valid_from: weekAgo,
+          valid_to: twoDaysAgo,
+        },
+      ],
+    };
+    farmVerdicts.current = {
+      farm_id: FARM_ID,
+      as_of: null,
+      blocks: [farmBlock("b1", [verdict("b1", "t_cwsi", "good")])],
+    };
+    renderPage();
+
+    await screen.findByTestId("health-map");
+    await waitFor(() => {
+      expect(gridCalls).toHaveBeenCalled();
+    });
+  });
+
+  it("does not move the chosen tree when the history lands", async () => {
+    // The history arrives after the first paint. A history-only tree whose
+    // name sorts first must not take the selection: the screen opens on the
+    // newest day, where it has nothing to say, so every block would suddenly
+    // read "tree did not run".
+    history.current = {
+      farm_id: FARM_ID,
+      from_at: "",
+      to_at: "",
+      tree_code: null,
+      truncated: false,
+      verdicts: [
+        {
+          ...verdict("b1", "t_alpha", "alert"),
+          id: "old",
+          tree_name_en: "Alpha retired",
+          valid_from: new Date(Date.now() - 7 * 86_400_000).toISOString(),
+          valid_to: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+        },
+      ],
+    };
+    farmVerdicts.current = {
+      farm_id: FARM_ID,
+      as_of: null,
+      blocks: [
+        farmBlock("b1", [{ ...verdict("b1", "t_zulu", "good"), tree_name_en: "Zulu live" }]),
+      ],
+    };
+    renderPage();
+
+    const picker = await screen.findByRole("combobox", { name: "Decision tree" });
+    // Both are offered, Alpha first by name...
+    await waitFor(() => {
+      expect(within(picker).getAllByRole("option")).toHaveLength(2);
+    });
+    // ...and the live one is still the one selected.
+    expect(picker).toHaveValue("t_zulu");
+  });
+
+  it("keeps an option for the chosen tree when its window stops holding it", async () => {
+    // Changing the range re-reads the history. A controlled select whose
+    // value matches no option renders as an empty box.
+    held.emptyAfterFirstRead = true;
+    history.current = {
+      farm_id: FARM_ID,
+      from_at: "",
+      to_at: "",
+      tree_code: null,
+      truncated: false,
+      verdicts: [
+        {
+          ...verdict("b1", "t_retired", "alert"),
+          id: "old",
+          tree_name_en: "Retired tree",
+          valid_from: new Date(Date.now() - 7 * 86_400_000).toISOString(),
+          valid_to: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+        },
+      ],
+    };
+    farmVerdicts.current = {
+      farm_id: FARM_ID,
+      as_of: null,
+      blocks: [
+        farmBlock("b1", [{ ...verdict("b1", "t_cwsi", "good"), tree_name_en: "Water stress" }]),
+      ],
+    };
+    renderPage();
+
+    const picker = await screen.findByRole("combobox", { name: "Decision tree" });
+    await waitFor(() => {
+      expect(within(picker).getAllByRole("option")).toHaveLength(2);
+    });
+    fireEvent.change(picker, { target: { value: "t_retired" } });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Range" }), {
+      target: { value: "365" },
+    });
+
+    // The new window holds nothing from that tree, and the picker still
+    // offers it rather than showing a blank box.
+    await waitFor(() => {
+      expect(screen.getByRole("slider", { name: "Date" })).toHaveAttribute("max", "364");
+    });
+    expect(picker).toHaveValue("t_retired");
+    expect(
+      within(picker)
+        .getAllByRole("option")
+        .map((option) => (option as HTMLOptionElement).value),
+    ).toContain("t_retired");
   });
 
   it("says so when no tree has run on the farm at all", async () => {

@@ -15,7 +15,7 @@
 //
 // See docs/proposals/farm-health-view-screen.md.
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Navigate } from "react-router-dom";
@@ -114,8 +114,8 @@ export function FarmHealthViewPage(): ReactNode {
   // The panels a reader can resize. Remembered per browser, because the
   // reason someone widened the rail — long block names — is still true on
   // their next visit.
-  const [railWidth, setRailWidth] = usePanelSize("rail", RAIL_DEFAULT);
-  const [mapHeight, setMapHeight] = usePanelSize("map", MAP_DEFAULT);
+  const [railWidth, setRailWidth] = usePanelSize("rail", RAIL_DEFAULT, RAIL_MIN, RAIL_MAX);
+  const [mapHeight, setMapHeight] = usePanelSize("map", MAP_DEFAULT, MAP_MIN, MAP_MAX);
 
   // The clock is read once per mount. Reading it per render would move the
   // window under a replay that is running across midnight.
@@ -154,26 +154,6 @@ export function FarmHealthViewPage(): ReactNode {
     enabled: Boolean(farmId),
   });
 
-  // Does any tree on this farm answer per cell? Only then is the grid worth
-  // reading. It is the heaviest call on the screen — every cell of every
-  // block, with geometry — and on a farm whose trees are all block-scoped it
-  // was fetched, waited for, and then thrown away.
-  const needsCells = useMemo(
-    () =>
-      (verdictsQuery.data?.blocks ?? []).some((block) =>
-        block.verdicts.some((verdict) => verdict.cell_id !== null),
-      ),
-    [verdictsQuery.data],
-  );
-  // Cell geometry. It is the same on every replay frame and for every tree,
-  // so it is fetched once per farm and joined on cell_id, rather than
-  // travelling with each verdict.
-  const gridQuery = useQuery({
-    queryKey: ["farm-grid-cells", farmId],
-    queryFn: () => getFarmGridCells(farmId as string, "ndvi"),
-    enabled: Boolean(farmId) && needsCells,
-    staleTime: 60 * 60 * 1000,
-  });
   // The whole window in one read. Asking per day would be 365 requests for a
   // farm whose answers change a handful of times, and the client rebuilds
   // each frame from the intervals with the same test the SQL uses.
@@ -183,6 +163,33 @@ export function FarmHealthViewPage(): ReactNode {
       getFarmVerdictHistory(farmId as string, isoOf(win.fromDay), isoOf(win.toDay + 1)),
     enabled: Boolean(farmId),
     staleTime: 5 * 60 * 1000,
+  });
+
+  // Does any tree on this farm answer per cell? Only then is the grid worth
+  // reading. It is the heaviest call on the screen — every cell of every
+  // block, with geometry — and on a farm whose trees are all block-scoped it
+  // was fetched, waited for, and then thrown away.
+  //
+  // The HISTORY counts as well as the live read. A replay frame is built from
+  // the intervals, so a per-cell tree whose verdicts have all closed — the
+  // farm turned it off last month — still paints cells on the days it ran.
+  // Asking the live read alone left the grid unread on exactly those days,
+  // and the panel then said "no cell verdicts" over a frame that held them.
+  const needsCells = useMemo(() => {
+    const perCell = (verdict: { cell_id: string | null }) => verdict.cell_id !== null;
+    if ((verdictsQuery.data?.blocks ?? []).some((block) => block.verdicts.some(perCell))) {
+      return true;
+    }
+    return (historyQuery.data?.verdicts ?? []).some(perCell);
+  }, [verdictsQuery.data, historyQuery.data]);
+  // Cell geometry. It is the same on every replay frame and for every tree,
+  // so it is fetched once per farm and joined on cell_id, rather than
+  // travelling with each verdict.
+  const gridQuery = useQuery({
+    queryKey: ["farm-grid-cells", farmId],
+    queryFn: () => getFarmGridCells(farmId as string, "ndvi"),
+    enabled: Boolean(farmId) && needsCells,
+    staleTime: 60 * 60 * 1000,
   });
 
   // Three reads, one ladder, and only three. `queryState` takes a single
@@ -230,6 +237,16 @@ export function FarmHealthViewPage(): ReactNode {
     };
   }, [blocksQuery, statusesQuery, verdictsQuery, gridQuery, historyQuery, needsCells]);
 
+  // The palette, as one stable function. Rebuilt inline it was a new
+  // identity on every render, and `HealthMap`'s cell effect depends on it —
+  // so every render repainted the cell canvas and re-encoded it as a data
+  // URL, including the sixty renders a second a panel drag produces.
+  const colorOf = useCallback(
+    (status: StatusCode): string =>
+      statusesQuery.data?.find((entry) => entry.code === status)?.color ?? "#9AA0A6",
+    [statusesQuery.data],
+  );
+
   if (!farmId) return <Navigate to="/farms" replace />;
   if (!canRead) return <Navigate to="/" replace />;
 
@@ -270,6 +287,7 @@ export function FarmHealthViewPage(): ReactNode {
             // since stopped — which is exactly the tree someone opens a
             // replay to look at. The history covers the window, so this list
             // is the same on every frame of it.
+            const liveTrees = treeOptions(data.verdicts.blocks, arabic);
             const trees = treeOptions(
               [
                 ...data.verdicts.blocks,
@@ -283,12 +301,26 @@ export function FarmHealthViewPage(): ReactNode {
               ],
               arabic,
             );
-            // The picker defaults to the first tree that has said anything
-            // here. A tree with no verdict on this farm paints an entirely
+            // The picker defaults to the first tree that is saying something
+            // TODAY. A tree with no verdict on this farm paints an entirely
             // blank screen, which a reader cannot tell from a broken one.
-            const activeTree = treeCode ?? trees[0]?.code ?? null;
+            //
+            // Defaulting to `trees[0]` instead would move the selection under
+            // the reader: the history lands a second after the first paint,
+            // and a history-only tree whose name sorts earlier would take the
+            // slot — on the newest day, where it has nothing to say, so every
+            // block would suddenly read "tree did not run".
+            const activeTree = treeCode ?? liveTrees[0]?.code ?? trees[0]?.code ?? null;
+            // Changing the range re-reads the history, and the old window's
+            // trees go with it. A controlled `select` whose value matches no
+            // option renders as a blank box, so the chosen tree always has
+            // one, named by its code until its verdicts come back.
+            const treeChoices =
+              activeTree !== null && !trees.some((tree) => tree.code === activeTree)
+                ? [{ code: activeTree, count: 0, label: activeTree }, ...trees]
+                : trees;
             const activeTreeName =
-              trees.find((tree) => tree.code === activeTree)?.label ?? activeTree;
+              treeChoices.find((tree) => tree.code === activeTree)?.label ?? activeTree;
             const blocks: BlockMeta[] = data.blocks.map((block) => ({
               id: block.id,
               code: block.code,
@@ -297,9 +329,6 @@ export function FarmHealthViewPage(): ReactNode {
             const rows = buildBlockRows(blocks, frameBlocks, activeTree, data.statuses);
             const selectedBlockId = blockId ?? rows[0]?.blockId ?? null;
             const selected = rows.find((row) => row.blockId === selectedBlockId) ?? null;
-
-            const colorFor = new Map(data.statuses.map((s) => [s.code, s.color]));
-            const colorOf = (status: StatusCode): string => colorFor.get(status) ?? "#9AA0A6";
 
             // Every block's worst verdict for the chosen tree, which is what
             // the map paints. `rows` already holds it, and a block-scoped
@@ -415,7 +444,7 @@ export function FarmHealthViewPage(): ReactNode {
                       {/* The tree's name, in the reader's language. The value
                           stays the code, because that is what a verdict row
                           carries and what the rail filters on. */}
-                      {trees.map((tree) => (
+                      {treeChoices.map((tree) => (
                         <option key={tree.code} value={tree.code}>
                           {tree.label}
                         </option>
@@ -469,7 +498,12 @@ export function FarmHealthViewPage(): ReactNode {
                       className="relative shrink-0 border-b border-ap-line"
                       style={{ height: `${mapHeight}px` }}
                     >
-                      <div className="absolute inset-inline-start-3 top-3 z-10 flex flex-col items-start gap-1.5">
+                      {/* Physical `left`, not logical `start`. MapLibre's own
+                          controls do not mirror, and neither does the date
+                          caption in the opposite corner — so a logical inset
+                          here put these three buttons underneath the date
+                          under Arabic. */}
+                      <div className="absolute left-3 top-3 z-10 flex flex-col items-start gap-1.5">
                         {(
                           [
                             ["block", "farmHealth:map.fitBlock"],

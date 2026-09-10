@@ -210,6 +210,12 @@ export function HealthMap({
   // map's load event they ran once against an unready map and never again.
   const [ready, setReady] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // What the cell canvas currently shows. Painting it means rasterising the
+  // cells, blurring them and encoding a PNG data URL, and the effect below
+  // depends on arrays this component's parent rebuilds on every render — so
+  // without this the whole pipeline ran again on renders that changed
+  // nothing, sixty times a second while a panel is being dragged.
+  const painted = useRef<string | null>(null);
   // Handlers change on every render; the map keeps one reference and reads
   // the current one through this, so listeners are attached once.
   const handlers = useRef({ onSelectBlock, onSelectCell });
@@ -408,8 +414,20 @@ export function HealthMap({
       // z=Infinity outside of bounds". Every verdict on the reference farm
       // is block-scoped, so this is the normal path, not an edge case.
       map.setLayoutProperty(CELL_IMAGE_LAYER, "visibility", "none");
+      painted.current = "";
       return;
     }
+
+    // Which cells, in which colours, over which footprint. Two frames of a
+    // replay that reach the same answer produce the same string and no
+    // repaint. The box is in it because it is what `setCoordinates` is
+    // given, so nothing can move without the picture being redrawn.
+    const signature = [
+      `${box.west},${box.south},${box.east},${box.north}`,
+      ...paintable.map((cell) => `${cell.cellId}:${cell.status}:${colorOf(cell.status)}`),
+    ].join("|");
+    if (painted.current === signature) return;
+    painted.current = signature;
 
     const size = canvasSize(box);
     const canvas = canvasRef.current ?? document.createElement("canvas");
