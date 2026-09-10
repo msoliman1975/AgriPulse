@@ -3636,6 +3636,21 @@ global:
       tag: "e0ea9c7"
     workers:
       tag: "e0ea9c7"
+    # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
+    #   by #673, all found by using the deployed build:
+    #
+    #   - a pinned tenant could not unpin: one value meant both "untouched"
+    #     and "follow the current version", so Apply re-sent the same pin;
+    #   - the dry-run and run-on-farm panels printed "No blocks match this
+    #     tree's targeting" at a platform admin. That is a claim about the
+    #     tree. The real cause was a 403, because a platform admin has no
+    #     farms. Both panels, and the overrides panel, are now tenant-only;
+    #   - the country picker read /v1/countries, which needs a tenant;
+    #   - the crop picker read /v1/crops, same problem, so the Crop select
+    #     held only "All crops" and Add stayed disabled.
+    #
+    #   No backend code and no migration, so api and workers stay on e0ea9c7.
+    #   Rollback is this one tag back to e0ea9c7.
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -4086,7 +4101,7 @@ global:
       #   traces page learns the 'farm' skip axis. The API half must move in
       #   the same sync — the new section calls two routes that do not exist
       #   on 76a6411.
-      tag: "e0ea9c7"
+      tag: "9e6753e"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
