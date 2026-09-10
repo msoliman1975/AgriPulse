@@ -244,6 +244,10 @@ class VERDICT_SQL:  # named after REC_SQL / ALERT_SQL in shared.action_items
         SELECT v.id AS verdict_id, v.block_id, v.cell_id, v.scope,
                v.tree_id, v.tree_code, v.tree_version, v.leaf_node_id,
                v.kind, v.status_code, v.severity,
+               -- The leaf's own sentence, in both languages. The narrative
+               -- ends by quoting it, and a paragraph that stopped at the
+               -- status would drop the one line an agronomist wrote.
+               v.text_en, v.text_ar,
                v.valid_from, v.last_evaluated_at, v.last_run_id,
                t.id AS trace_id, t.evaluated_at, t.status AS trace_status,
                t.node_path, t.resolved_values, t.param_overrides,

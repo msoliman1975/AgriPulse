@@ -225,6 +225,12 @@ describe("FarmHealthViewPage", () => {
       reasoning_available: true,
       trace_id: "trace-1",
       evaluated_at: "2026-09-07T00:00:00Z",
+      narrative_en:
+        "Checked on 2026-09-07. The tree checked 2 things, in this order. " +
+        "Is CWSI clipped at the index ceiling? No. So t_cwsi reports Alert.",
+      narrative_ar: "تم الفحص في 2026-09-07.",
+      text_en: null,
+      text_ar: null,
       node_path: [
         {
           node_id: "saturation",
@@ -537,6 +543,13 @@ describe("FarmHealthViewPage", () => {
     renderPage();
 
     fireEvent.click(await screen.findByRole("button", { name: "Show how this was decided" }));
+
+    // The paragraph is what the card leads with now; the grid moved behind
+    // its own toggle, for the reader auditing a threshold.
+    expect(
+      await screen.findByText(/The tree checked 2 things, in this order/),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show the checks as a table" }));
 
     expect(await screen.findByText("Steps the tree took, root to leaf")).toBeInTheDocument();
     // The question, the value it read, and what it was compared with — the

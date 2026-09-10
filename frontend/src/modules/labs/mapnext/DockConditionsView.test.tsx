@@ -45,6 +45,8 @@ function tree(over: Partial<ExplainBlockResponse["trees"][number]>) {
     status: "clear" as const,
     steps: [],
     status_code: null,
+    narrative_en: "",
+    narrative_ar: "",
     kind: null,
     action_type: null,
     severity: null,

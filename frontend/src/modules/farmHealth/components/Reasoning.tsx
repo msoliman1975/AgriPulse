@@ -11,6 +11,7 @@
 // every reader the screen is for.
 
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getVerdictReasoning } from "@/api/farmHealth";
@@ -28,6 +29,9 @@ interface Props {
 export function Reasoning({ blockId, verdictId, farmId, leafNodeId, kind, statusCode }: Props) {
   const { t, i18n } = useTranslation(["farmHealth"]);
   const arabic = i18n.language.startsWith("ar");
+  // Closed by default: the paragraph above answers the question, and the
+  // grid is for the reader who wants to check a number in it.
+  const [stepsOpen, setStepsOpen] = useState(false);
 
   const query = useQuery({
     queryKey: ["verdict-reasoning", blockId, verdictId],
@@ -57,9 +61,31 @@ export function Reasoning({ blockId, verdictId, farmId, leafNodeId, kind, status
   }
 
   const rows = walkRows(data.node_path, arabic);
+  const narrative = arabic ? data.narrative_ar : data.narrative_en;
 
   return (
     <div className="grid gap-3">
+      {/* The paragraph is what a reader reads. The grid below it is the same
+          facts as a table, kept for whoever is auditing a threshold — it was
+          the only thing here, and it made "why is this block green" a puzzle
+          the reader had to assemble. */}
+      {narrative ? (
+        <p className="max-w-prose text-sm leading-relaxed text-ap-ink">{narrative}</p>
+      ) : null}
+
+      <div>
+        <button
+          type="button"
+          aria-expanded={stepsOpen}
+          onClick={() => setStepsOpen((was) => !was)}
+          className="text-meta font-medium text-ap-accent underline underline-offset-4"
+        >
+          {stepsOpen ? t("farmHealth:reasoning.hideSteps") : t("farmHealth:reasoning.showSteps")}
+        </button>
+      </div>
+
+      {stepsOpen ? (
+      <>
       <span className="text-meta font-semibold uppercase tracking-wide text-ap-muted">
         {t("farmHealth:reasoning.steps")}
       </span>
@@ -91,6 +117,8 @@ export function Reasoning({ blockId, verdictId, farmId, leafNodeId, kind, status
           </li>
         ))}
       </ol>
+      </>
+      ) : null}
 
       <div className="grid gap-1 rounded border border-ap-primary bg-ap-primary-soft px-3 py-2">
         <span className="text-sm font-semibold text-ap-primary">

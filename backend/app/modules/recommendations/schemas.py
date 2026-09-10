@@ -138,6 +138,16 @@ class VerdictReasoningResponse(BaseModel):
     # verdict still stands; only the walk is gone.
     reasoning_available: bool = False
     trace_id: UUID | None = None
+    # The walk as prose, both languages, composed by
+    # `recommendations.narrative`. The step list below stays for the reader
+    # auditing a threshold; this is what the screen leads with, and what a
+    # report or an email quotes so one block is never described two ways.
+    narrative_en: str = ""
+    narrative_ar: str = ""
+    # The leaf's own sentence, which the narrative ends by quoting. Sent
+    # separately so a caller can show it alone.
+    text_en: str | None = None
+    text_ar: str | None = None
     evaluated_at: datetime | None = None
     # The ordered walk: [{node_id, matched, label_en, label_ar, condition,
     # values}]. Empty when `reasoning_available` is false.
@@ -373,6 +383,12 @@ class ExplainTree(BaseModel):
     # `clear` used to be the whole answer for a tree that found nothing,
     # which read the same as a tree nobody had run.
     status_code: StatusCode | None = None
+    # The walk as prose, composed by `recommendations.narrative` — the same
+    # module the Farm Health card reads, so the dock and that card cannot
+    # describe one block two ways. Empty for a skipped tree and for a walk
+    # that errored before reaching a leaf.
+    narrative_en: str = ""
+    narrative_ar: str = ""
     kind: str | None = None
     action_type: str | None = None
     severity: str | None = None
