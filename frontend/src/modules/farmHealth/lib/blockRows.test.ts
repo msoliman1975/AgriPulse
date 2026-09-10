@@ -22,6 +22,8 @@ function verdict(blockId: string, treeCode: string, status: StatusCode, cell?: n
     scope: cell === undefined ? "block" : "cell",
     tree_id: `tree-${treeCode}`,
     tree_code: treeCode,
+    tree_name_en: null,
+    tree_name_ar: null,
     tree_version: 1,
     leaf_node_id: "leaf_ok",
     kind: "status",
@@ -155,12 +157,57 @@ describe("treeOptions", () => {
     ]);
 
     expect(options).toEqual([
-      { code: "cwsi", count: 2 },
-      { code: "ndvi", count: 1 },
+      { code: "cwsi", count: 2, label: "cwsi" },
+      { code: "ndvi", count: 1, label: "ndvi" },
     ]);
   });
 
   it("is empty when no tree has run on the farm", () => {
     expect(treeOptions([])).toEqual([]);
+  });
+
+  it("labels a tree by its name, and sorts by the name a reader sees", () => {
+    // The picker showed `t_cwsi` and `t_ndvi`. Sorting by code then reads as
+    // unsorted once the codes are hidden, so the order follows the label.
+    const named = (code: string, nameEn: string, nameAr: string | null) => ({
+      ...verdict("b1", code, "good"),
+      tree_name_en: nameEn,
+      tree_name_ar: nameAr,
+    });
+    const options = treeOptions([
+      farmBlock("b1", [
+        named("z_water", "Almond water stress", "إجهاد مائي للوز"),
+        named("a_canopy", "Mango canopy health", "صحة مجموع المانجو"),
+      ]),
+    ]);
+
+    expect(options.map((option) => option.label)).toEqual([
+      "Almond water stress",
+      "Mango canopy health",
+    ]);
+    // The value the rail filters on is still the code.
+    expect(options.map((option) => option.code)).toEqual(["z_water", "a_canopy"]);
+  });
+
+  it("chooses the Arabic name, and falls back rather than showing nothing", () => {
+    const options = treeOptions(
+      [
+        farmBlock("b1", [
+          {
+            ...verdict("b1", "cwsi", "good"),
+            tree_name_en: "Water stress",
+            tree_name_ar: "إجهاد مائي",
+          },
+          { ...verdict("b1", "ndvi", "good"), tree_name_en: "Canopy", tree_name_ar: null },
+          // An older API sends no name at all. The code is what is left.
+          verdict("b1", "smi", "good"),
+        ]),
+      ],
+      true,
+    );
+
+    expect(options.map((option) => option.label).sort()).toEqual(
+      ["Canopy", "smi", "إجهاد مائي"].sort(),
+    );
   });
 });

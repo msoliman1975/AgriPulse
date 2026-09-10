@@ -50,6 +50,16 @@ NODE_PATH = [
         "condition": {"op": "gt", "left": "indices.cwsi.mean", "right": "0.30"},
         "values": {"indices.cwsi.mean": "0.47"},
     },
+    # The leaf. `matched` is None because it is the answer, not a check —
+    # that is how a real serialized walk ends, and it is where the leaf's own
+    # label lives. The reasoning read lifts it into `leaf_label_en`, so the
+    # card can name the answer instead of printing `leaf_above`.
+    {
+        "node_id": "leaf_above",
+        "matched": None,
+        "label_en": "Add one irrigation set",
+        "label_ar": "أضف ريّة واحدة",
+    },
 ]
 RESOLVED = {"indices.cwsi.mean": "0.47"}
 
@@ -238,9 +248,65 @@ async def test_the_reasoning_read_returns_the_node_walk(admin_session: AsyncSess
     assert body["status_code"] == "issue"
     # The walk arrives in order, and the values with it. Both are what the
     # screen renders as the steps.
-    assert [step["node_id"] for step in body["node_path"]] == ["saturation", "medium_check"]
-    assert [step["matched"] for step in body["node_path"]] == [False, True]
+    assert [step["node_id"] for step in body["node_path"]] == [
+        "saturation",
+        "medium_check",
+        "leaf_above",
+    ]
+    assert [step["matched"] for step in body["node_path"]] == [False, True, None]
     assert body["resolved_values"] == RESOLVED
+
+
+@pytest.mark.asyncio
+async def test_the_reasoning_read_names_the_leaf_it_reached(
+    admin_session: AsyncSession,
+) -> None:
+    """`leaf_above` is an authoring handle, and the card printed it on the
+    one line that states the answer. The label was in the walk already."""
+    tenant, context, farm_id, block_id = await _bootstrap(admin_session, f"rl-{uuid4().hex[:8]}")
+    verdict_id = await _seed(
+        admin_session,
+        schema=str(tenant.schema_name),
+        farm_id=farm_id,
+        block_id=block_id,
+        with_trace=True,
+    )
+    app = _build_app(context)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get(
+            f"/api/v1/blocks/{block_id}/verdicts/{verdict_id}/reasoning",
+            params={"farm_id": farm_id},
+        )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["leaf_label_en"] == "Add one irrigation set"
+    assert body["leaf_label_ar"] == "أضف ريّة واحدة"
+    # The node id stays, because it is the fallback when a walk is pruned.
+    assert body["leaf_node_id"] == "leaf_above"
+
+
+@pytest.mark.asyncio
+async def test_a_pruned_walk_names_no_leaf(admin_session: AsyncSession) -> None:
+    tenant, context, farm_id, block_id = await _bootstrap(admin_session, f"rp-{uuid4().hex[:8]}")
+    verdict_id = await _seed(
+        admin_session,
+        schema=str(tenant.schema_name),
+        farm_id=farm_id,
+        block_id=block_id,
+        with_trace=False,
+    )
+    app = _build_app(context)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get(
+            f"/api/v1/blocks/{block_id}/verdicts/{verdict_id}/reasoning",
+            params={"farm_id": farm_id},
+        )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["leaf_label_en"] is None
 
 
 @pytest.mark.asyncio

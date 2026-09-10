@@ -68,6 +68,12 @@ class VerdictResponse(BaseModel):
     scope: str
     tree_id: UUID
     tree_code: str
+    # The tree's own name, joined from `public.decision_trees`. Null when the
+    # catalog row is gone — a tenant schema holds no foreign key into public,
+    # so a verdict outlives the tree that wrote it. The caller falls back to
+    # the code, which is what a reader saw before the name was sent at all.
+    tree_name_en: str | None = None
+    tree_name_ar: str | None = None
     tree_version: int
     leaf_node_id: str
     kind: LeafKind
@@ -127,8 +133,16 @@ class VerdictReasoningResponse(BaseModel):
     scope: str
     tree_id: UUID
     tree_code: str
+    tree_name_en: str | None = None
+    tree_name_ar: str | None = None
     tree_version: int
     leaf_node_id: str
+    # The leaf's own label, read off the last step of the walk. `leaf_node_id`
+    # is an authoring handle — `leaf_dry_medium` — and printing it was the
+    # screen showing its own plumbing on the line that names the answer.
+    # Null when the walk was pruned, or when the leaf carries no label.
+    leaf_label_en: str | None = None
+    leaf_label_ar: str | None = None
     kind: LeafKind
     status_code: StatusCode
     severity: Severity | None = None

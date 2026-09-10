@@ -14,6 +14,8 @@ function verdictFor(cellId: string, status: StatusCode, leaf: string): Verdict {
     scope: "cell",
     tree_id: "tree-1",
     tree_code: "t_cwsi",
+    tree_name_en: null,
+    tree_name_ar: null,
     tree_version: 1,
     leaf_node_id: leaf,
     kind: "status",

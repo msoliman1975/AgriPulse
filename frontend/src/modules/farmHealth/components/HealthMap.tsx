@@ -210,23 +210,65 @@ export function HealthMap({
   // map's load event they ran once against an unready map and never again.
   const [ready, setReady] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // What the cell canvas currently shows. Painting it means rasterising the
+  // cells, blurring them and encoding a PNG data URL, and the effect below
+  // depends on arrays this component's parent rebuilds on every render — so
+  // without this the whole pipeline ran again on renders that changed
+  // nothing, sixty times a second while a panel is being dragged.
+  const painted = useRef<string | null>(null);
   // Handlers change on every render; the map keeps one reference and reads
   // the current one through this, so listeners are attached once.
   const handlers = useRef({ onSelectBlock, onSelectCell });
   handlers.current = { onSelectBlock, onSelectCell };
+  // What the camera is already framing, as `mode|key`. Null means it has
+  // never been framed, and that first framing is the one that must not
+  // animate.
+  const lastFit = useRef<string | null>(null);
+  // The mount effect has `[]` deps, so it reads the FIRST render's blocks
+  // through a ref. The page does not mount this until the block read has
+  // landed, so the selected block's shape is already known here.
+  const initialBlocks = useRef(blocks);
+  const fitModeRef = useRef(fitMode);
+  fitModeRef.current = fitMode;
+  const fitKeyRef = useRef(fitKey);
+  fitKeyRef.current = fitKey;
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+    // Framed at construction rather than flown to once the data effect runs.
+    // Otherwise the first paint is the default view below and the reader
+    // watches the map zoom into the farm every time they open the screen —
+    // which is what Mohamed asked to stop on 2026-09-10, and what the Farm
+    // Console fixed the same way. MapLibre applies `bounds` after
+    // center/zoom, with the duration forced to 0.
+    const first = initialBlocks.current;
+    const initialBox =
+      boundsOfPolygon(first.find((block) => block.selected)?.boundary) ??
+      farmBounds(first.map((block) => block.boundary));
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: buildStyle(),
       center: [31.0, 30.5],
       zoom: 13,
+      bounds: initialBox ? toLngLatBounds(padBounds(initialBox, 0.08)) : undefined,
+      fitBoundsOptions: { padding: 40 },
       attributionControl: false,
     });
+    // Already framed — record it, so the framing effect below does not
+    // animate a second fit over an already-correct view.
+    if (initialBox) lastFit.current = `${fitModeRef.current}|${fitKeyRef.current}`;
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
+
+    // MapLibre's own `trackResize` listens to WINDOW resizes only. The map's
+    // height is a panel the reader drags, and the window does not change when
+    // they do — so without this the canvas keeps the size it had when the
+    // screen opened and the picture stretches inside the new box.
+    const resizeObserver = new ResizeObserver(() => {
+      mapRef.current?.resize();
+    });
+    resizeObserver.observe(containerRef.current);
 
     map.on("load", () => {
       map.addSource(BLOCK_SOURCE, { type: "geojson", data: emptyCollection() });
@@ -330,6 +372,8 @@ export function HealthMap({
 
     return () => {
       setReady(false);
+      lastFit.current = null;
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
     };
@@ -370,8 +414,20 @@ export function HealthMap({
       // z=Infinity outside of bounds". Every verdict on the reference farm
       // is block-scoped, so this is the normal path, not an edge case.
       map.setLayoutProperty(CELL_IMAGE_LAYER, "visibility", "none");
+      painted.current = "";
       return;
     }
+
+    // Which cells, in which colours, over which footprint. Two frames of a
+    // replay that reach the same answer produce the same string and no
+    // repaint. The box is in it because it is what `setCoordinates` is
+    // given, so nothing can move without the picture being redrawn.
+    const signature = [
+      `${box.west},${box.south},${box.east},${box.north}`,
+      ...paintable.map((cell) => `${cell.cellId}:${cell.status}:${colorOf(cell.status)}`),
+    ].join("|");
+    if (painted.current === signature) return;
+    painted.current = signature;
 
     const size = canvasSize(box);
     const canvas = canvasRef.current ?? document.createElement("canvas");
@@ -417,7 +473,14 @@ export function HealthMap({
     }
     if (box === null) return;
 
-    map.fitBounds(toLngLatBounds(padBounds(box, 0.08)), { padding: 40, duration: 450 });
+    const want = `${fitMode}|${fitKey}`;
+    if (lastFit.current === want) return;
+    // Animate only when the framing CHANGES — the motion is what tells the
+    // reader the map followed their click. The first fit is the screen
+    // opening, and animating that is the zoom flash.
+    const duration = lastFit.current === null ? 0 : 450;
+    lastFit.current = want;
+    map.fitBounds(toLngLatBounds(padBounds(box, 0.08)), { padding: 40, duration });
     // `highlighted` is deliberately not a dependency: hovering a chip
     // previews an area on the map and must not fly the camera to it.
     // eslint-disable-next-line react-hooks/exhaustive-deps

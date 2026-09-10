@@ -30,13 +30,15 @@ const fake = vi.hoisted(() => {
     layout: [] as { layer: string; prop: string; value: unknown }[],
     fitBounds: vi.fn(),
     layers: [] as Record<string, unknown>[],
+    options: null as Record<string, unknown> | null,
   };
   return state;
 });
 
 vi.mock("maplibre-gl", () => {
   class FakeMap {
-    constructor() {
+    constructor(options: Record<string, unknown>) {
+      fake.options = options;
       fake.sources.clear();
       fake.layout.length = 0;
       fake.layers.length = 0;
@@ -172,6 +174,7 @@ function draw(props: Partial<Parameters<typeof HealthMap>[0]> = {}) {
 describe("HealthMap", () => {
   beforeEach(() => {
     fake.loadHandler = null;
+    fake.options = null;
     fake.fitBounds.mockReset();
   });
 
@@ -194,17 +197,49 @@ describe("HealthMap", () => {
     expect(arg.features).toHaveLength(1);
   });
 
-  it("frames the selected block once loaded", async () => {
+  it("opens already framed on the selected block, without flying to it", async () => {
+    // The defect this replaced: the map was constructed on a default view of
+    // Egypt and then animated onto the farm once the data effect ran, so
+    // opening the screen was watching it zoom in. MapLibre applies `bounds`
+    // at construction with the duration forced to 0.
     draw();
+
+    const bounds = fake.options?.bounds as number[][];
+    // South-west corner first, and every number finite.
+    expect(bounds[0][0]).toBeLessThan(bounds[1][0]);
+    expect(bounds.flat().every((n) => Number.isFinite(n))).toBe(true);
+
     fake.loadHandler?.();
+    // Nothing follows it. A second fit over an already-correct view is the
+    // flash, whether or not it lands in the same place.
+    await waitFor(() => {
+      expect(fake.sources.get("fh-blocks")?.setData).toHaveBeenCalled();
+    });
+    expect(fake.fitBounds).not.toHaveBeenCalled();
+  });
+
+  it("animates when the framing changes, which is what follows a click", async () => {
+    const view = draw();
+    fake.loadHandler?.();
+
+    view.rerender(
+      <HealthMap
+        blocks={[block("b1", true, "good")]}
+        cells={[]}
+        highlighted={new Set()}
+        colorOf={colorOf}
+        onSelectBlock={() => {}}
+        onSelectCell={() => {}}
+        fitMode="farm"
+        fitKey="b1"
+      />,
+    );
 
     await waitFor(() => {
       expect(fake.fitBounds).toHaveBeenCalled();
     });
-    const [bounds] = fake.fitBounds.mock.calls[0] as [number[][]];
-    // South-west corner first, and every number finite.
-    expect(bounds[0][0]).toBeLessThan(bounds[1][0]);
-    expect(bounds.flat().every((n) => Number.isFinite(n))).toBe(true);
+    const [, options] = fake.fitBounds.mock.calls[0] as [number[][], { duration: number }];
+    expect(options.duration).toBeGreaterThan(0);
   });
 
   it("hides the cell image when the block has no cell verdicts", async () => {

@@ -19,7 +19,7 @@ through this service.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -1254,6 +1254,13 @@ class RecommendationsServiceImpl:
         row["node_path"] = row.get("node_path") or []
         row["resolved_values"] = row.get("resolved_values") or {}
         row["param_overrides"] = row.get("param_overrides") or {}
+        # The leaf's own label, so the card can name the answer instead of
+        # printing `leaf_dry_medium`. It is already in the walk — the leaf is
+        # the step that carries no match, because it is the answer rather
+        # than a check — and nothing was reading it.
+        leaf_en, leaf_ar = _leaf_labels(row["node_path"])
+        row["leaf_label_en"] = leaf_en
+        row["leaf_label_ar"] = leaf_ar
         # The walk as prose, in both languages. Composed here rather than in
         # the browser so a report and a notification quote the same wording
         # as the screen; the step list rides along for the reader who wants
@@ -1261,6 +1268,8 @@ class RecommendationsServiceImpl:
         narrative = compose_both(
             status_code=str(row.get("status_code") or ""),
             tree_code=str(row.get("tree_code") or ""),
+            tree_name_en=row.get("tree_name_en"),
+            tree_name_ar=row.get("tree_name_ar"),
             text_en=row.get("text_en"),
             text_ar=row.get("text_ar"),
             node_path=row["node_path"],
@@ -1349,6 +1358,8 @@ class RecommendationsServiceImpl:
                 narrative = compose_both(
                     status_code=outcome.status_code,
                     tree_code=str(tree["tree_code"]),
+                    tree_name_en=tree.get("name_en"),
+                    tree_name_ar=tree.get("name_ar"),
                     text_en=outcome.text_en,
                     text_ar=outcome.text_ar,
                     node_path=entry.get("steps") or [],
@@ -2269,6 +2280,29 @@ class RecommendationsServiceImpl:
                 )
             )
         return after
+
+
+def _leaf_labels(node_path: Sequence[Any]) -> tuple[str | None, str | None]:
+    """The label of the leaf a walk ended on, in both languages.
+
+    A step carries ``matched`` True or False; the leaf carries None, because
+    it is the answer rather than a check. Read from the end, so a malformed
+    walk with an unmatched step in the middle cannot be mistaken for the
+    conclusion.
+
+    Returns ``(None, None)`` for a pruned or empty walk, and the caller keeps
+    showing the node id — which is worse to read but is never wrong.
+    """
+    for step in reversed(list(node_path)):
+        if not isinstance(step, Mapping) or step.get("matched") is not None:
+            continue
+        label_en = step.get("label_en")
+        label_ar = step.get("label_ar")
+        return (
+            str(label_en) if label_en else None,
+            str(label_ar) if label_ar else None,
+        )
+    return None, None
 
 
 def _serialize_path(steps: list[TreePathStep]) -> list[dict[str, Any]]:

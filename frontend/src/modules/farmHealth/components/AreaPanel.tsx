@@ -3,7 +3,16 @@
 // Mohamed set this shape on 2026-09-07 — a block summary on top, and
 // everything below it scoped to one selected area rather than a stack of
 // every area at once.
+//
+// On 2026-09-10 he asked for one section rather than three. The block's
+// colour bar, the whole-block sentence and the selected area were three
+// separate cards, each with its own border and its own padding, and on a
+// half-height panel that was three frames around about eight lines of text.
+// So the parts below render as SECTIONS with no frame of their own, and
+// `PanelSections` puts the single frame around them and rules a line between
+// each.
 
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { StatusCode, StatusDefinition, Verdict } from "@/api/farmHealth";
@@ -12,17 +21,34 @@ import { Pill } from "@/components/Pill";
 import type { Area } from "../lib/areas";
 import { areaLabel } from "../lib/areaLabel";
 import { Reasoning } from "./Reasoning";
-import { STATUS_ORDER, type BlockRow } from "../lib/blockRows";
+import { STATUS_ORDER, treeLabel, type BlockRow } from "../lib/blockRows";
+
+/**
+ * The one frame around the block panel.
+ *
+ * `divide-y` rules the lines, so a section never has to know whether it is
+ * first, last, or the only one on screen — which it cannot know: a block
+ * tree writes one whole-block verdict and no areas, and a cell tree the
+ * reverse.
+ */
+export function PanelSections({ children }: { children: ReactNode }) {
+  return (
+    <Card noPadding>
+      <div className="divide-y divide-ap-line px-4 [&>*]:py-4">{children}</div>
+    </Card>
+  );
+}
 
 interface SummaryProps {
   row: BlockRow;
   statuses: StatusDefinition[];
   rows: number;
   cols: number;
-  treeCode: string | null;
+  /** The tree's name, as the picker shows it. Never its code. */
+  treeName: string | null;
 }
 
-export function BlockSummary({ row, statuses, rows, cols, treeCode }: SummaryProps) {
+export function BlockSummary({ row, statuses, rows, cols, treeName }: SummaryProps) {
   const { t, i18n } = useTranslation(["farmHealth"]);
   const arabic = i18n.language.startsWith("ar");
   const lookup = new Map(statuses.map((s) => [s.code, s]));
@@ -34,11 +60,9 @@ export function BlockSummary({ row, statuses, rows, cols, treeCode }: SummaryPro
   const total = row.verdicts.length;
 
   return (
-    <Card>
+    <section>
       <div className="flex flex-wrap items-baseline gap-3">
-        <h2 className="text-section-title font-semibold tabular-nums text-ap-ink">
-          {row.code}
-        </h2>
+        <h2 className="text-section-title font-semibold tabular-nums text-ap-ink">{row.code}</h2>
         {rows > 0 && cols > 0 ? (
           <span className="text-sm text-ap-muted">
             {t("farmHealth:summary.grid", { rows, cols, count: total })}
@@ -60,7 +84,7 @@ export function BlockSummary({ row, statuses, rows, cols, treeCode }: SummaryPro
 
       {row.didNotRun ? (
         <p className="mt-2 text-sm text-ap-muted">
-          {t("farmHealth:block.didNotRun", { tree: treeCode })}
+          {t("farmHealth:block.didNotRun", { tree: treeName })}
         </p>
       ) : (
         <>
@@ -90,7 +114,7 @@ export function BlockSummary({ row, statuses, rows, cols, treeCode }: SummaryPro
           </div>
         </>
       )}
-    </Card>
+    </section>
   );
 }
 
@@ -141,6 +165,7 @@ export function AreaChips({ areas, statuses, selectedKey, onSelect, onHover }: C
 
 interface DetailProps {
   area: Area;
+  statuses: StatusDefinition[];
   farmId: string;
   blockId: string;
   /** Open by default is wrong: the reasoning is a follow-up question. */
@@ -148,7 +173,7 @@ interface DetailProps {
   onToggle: () => void;
 }
 
-export function AreaDetail({ area, farmId, blockId, open, onToggle }: DetailProps) {
+export function AreaDetail({ area, statuses, farmId, blockId, open, onToggle }: DetailProps) {
   const { t, i18n } = useTranslation(["farmHealth"]);
   const arabic = i18n.language.startsWith("ar");
   // The verdict text is the tree author's own sentence, so it is chosen
@@ -156,7 +181,7 @@ export function AreaDetail({ area, farmId, blockId, open, onToggle }: DetailProp
   const text = arabic ? (area.sample.text_ar ?? area.sample.text_en) : area.sample.text_en;
 
   return (
-    <Card>
+    <div className="mt-3">
       <div className="flex flex-wrap items-baseline gap-3">
         <h3 className="text-section-title font-semibold text-ap-ink">
           {areaLabel(t, area.name, area.spots)}
@@ -191,10 +216,11 @@ export function AreaDetail({ area, farmId, blockId, open, onToggle }: DetailProp
             leafNodeId={area.leafNodeId}
             kind={area.sample.kind}
             statusCode={area.status}
+            statuses={statuses}
           />
         </div>
       ) : null}
-    </Card>
+    </div>
   );
 }
 
@@ -233,7 +259,7 @@ export function BlockVerdictDetail({
   const text = arabic ? (verdict.text_ar ?? verdict.text_en) : verdict.text_en;
 
   return (
-    <Card>
+    <section>
       <div className="flex flex-wrap items-baseline gap-3">
         <h3 className="text-section-title font-semibold text-ap-ink">
           {t("farmHealth:block.wholeBlock")}
@@ -245,8 +271,10 @@ export function BlockVerdictDetail({
           />
           {status ? (arabic ? (status.label_ar ?? status.label_en) : status.label_en) : ""}
         </span>
-        <span className="ms-auto font-mono text-meta text-ap-muted">
-          {verdict.tree_code} · v{verdict.tree_version}
+        {/* The tree's name, not its code. `t_mango_cwsi` put the plumbing on
+            the line that names the author of the sentence below it. */}
+        <span className="ms-auto text-meta text-ap-muted">
+          {treeLabel(verdict, arabic)} · v{verdict.tree_version}
         </span>
       </div>
 
@@ -272,9 +300,10 @@ export function BlockVerdictDetail({
             leafNodeId={verdict.leaf_node_id}
             kind={verdict.kind}
             statusCode={verdict.status_code}
+            statuses={statuses}
           />
         </div>
       ) : null}
-    </Card>
+    </section>
   );
 }

@@ -14,7 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { getVerdictReasoning } from "@/api/farmHealth";
+import { getVerdictReasoning, type StatusDefinition } from "@/api/farmHealth";
 import { walkRows } from "../lib/walk";
 
 interface Props {
@@ -24,9 +24,22 @@ interface Props {
   leafNodeId: string;
   kind: string;
   statusCode: string;
+  /**
+   * The platform status list, so the last line can name the status in words.
+   * An empty list is allowed and falls back to the code.
+   */
+  statuses: StatusDefinition[];
 }
 
-export function Reasoning({ blockId, verdictId, farmId, leafNodeId, kind, statusCode }: Props) {
+export function Reasoning({
+  blockId,
+  verdictId,
+  farmId,
+  leafNodeId,
+  kind,
+  statusCode,
+  statuses,
+}: Props) {
   const { t, i18n } = useTranslation(["farmHealth"]);
   const arabic = i18n.language.startsWith("ar");
   // Closed by default: the paragraph above answers the question, and the
@@ -62,6 +75,21 @@ export function Reasoning({ blockId, verdictId, farmId, leafNodeId, kind, status
 
   const rows = walkRows(data.node_path, arabic);
   const narrative = arabic ? data.narrative_ar : data.narrative_en;
+  // The last line named the leaf by its authoring handle — `leaf_dry_medium`
+  // — and its kind and status by their database codes. Three codes on the
+  // one line that states the answer, on the screen whose job is to say why.
+  // The leaf's own label rides the walk; the status list names the status;
+  // the kind is one of four and has a word in the locale file.
+  //
+  // Each falls back to the code it replaces. A pruned walk carries no leaf
+  // label, and a code a reader cannot parse still beats a blank.
+  const leafName =
+    (arabic ? (data.leaf_label_ar ?? data.leaf_label_en) : data.leaf_label_en) ?? leafNodeId;
+  const statusEntry = statuses.find((entry) => entry.code === statusCode);
+  const statusName = statusEntry
+    ? (arabic ? (statusEntry.label_ar ?? statusEntry.label_en) : statusEntry.label_en)
+    : statusCode;
+  const kindName = t(`farmHealth:reasoning.kind.${kind}`, { defaultValue: kind });
 
   return (
     <div className="grid gap-3">
@@ -122,7 +150,11 @@ export function Reasoning({ blockId, verdictId, farmId, leafNodeId, kind, status
 
       <div className="grid gap-1 rounded border border-ap-primary bg-ap-primary-soft px-3 py-2">
         <span className="text-sm font-semibold text-ap-primary">
-          {t("farmHealth:reasoning.leaf", { leaf: leafNodeId, kind, status: statusCode })}
+          {t("farmHealth:reasoning.leaf", {
+            leaf: leafName,
+            kind: kindName,
+            status: statusName,
+          })}
         </span>
       </div>
     </div>

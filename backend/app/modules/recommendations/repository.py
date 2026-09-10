@@ -160,6 +160,18 @@ class VERDICT_SQL:  # named after REC_SQL / ALERT_SQL in shared.action_items
         "AND (v.valid_to IS NULL OR v.valid_to > CAST(:at AS timestamptz))"
     )
 
+    # The tree's own name, so a screen can say "Mango water stress" where it
+    # used to print `t_mango_cwsi`. A verdict row stores the code and the id
+    # and never the name: the name is editable and a verdict is a record of
+    # what was decided, not of what the tree was called that day.
+    #
+    # LEFT JOIN, and never an inner one. A tenant schema holds no foreign key
+    # into public by design, so the catalog row can be gone while the verdict
+    # it produced still stands. That reads as a null name and the caller
+    # falls back to the code, which is what shipped before this join existed.
+    TREE_NAME_COLUMNS = "dt.name_en AS tree_name_en, dt.name_ar AS tree_name_ar"
+    TREE_NAME_JOIN = "LEFT JOIN public.decision_trees dt ON dt.id = v.tree_id"
+
     @classmethod
     def read(cls, *, scope: str, window: str) -> str:
         """One farm's or one block's verdicts.
@@ -179,8 +191,10 @@ class VERDICT_SQL:  # named after REC_SQL / ALERT_SQL in shared.action_items
                    v.text_en, v.text_ar,
                    v.valid_from, v.valid_to, v.last_evaluated_at,
                    v.alert_id, v.recommendation_id, v.last_run_id,
+                   {cls.TREE_NAME_COLUMNS},
                    c.row_idx AS cell_row, c.col_idx AS cell_col
               FROM decision_tree_block_verdicts v
+              {cls.TREE_NAME_JOIN}
               LEFT JOIN grid_cells c ON c.id = v.cell_id
              WHERE {scope} AND {window}
              ORDER BY v.block_id, v.tree_code,
@@ -219,8 +233,10 @@ class VERDICT_SQL:  # named after REC_SQL / ALERT_SQL in shared.action_items
                    v.text_en, v.text_ar,
                    v.valid_from, v.valid_to, v.last_evaluated_at,
                    v.alert_id, v.recommendation_id, v.last_run_id,
+                   {cls.TREE_NAME_COLUMNS},
                    c.row_idx AS cell_row, c.col_idx AS cell_col
               FROM decision_tree_block_verdicts v
+              {cls.TREE_NAME_JOIN}
               LEFT JOIN grid_cells c ON c.id = v.cell_id
              WHERE v.farm_id = :farm_id
                AND {cls.HISTORY_WINDOW}
@@ -251,8 +267,10 @@ class VERDICT_SQL:  # named after REC_SQL / ALERT_SQL in shared.action_items
                v.valid_from, v.last_evaluated_at, v.last_run_id,
                t.id AS trace_id, t.evaluated_at, t.status AS trace_status,
                t.node_path, t.resolved_values, t.param_overrides,
+               dt.name_en AS tree_name_en, dt.name_ar AS tree_name_ar,
                c.row_idx AS cell_row, c.col_idx AS cell_col
           FROM decision_tree_block_verdicts v
+          LEFT JOIN public.decision_trees dt ON dt.id = v.tree_id
           LEFT JOIN decision_tree_eval_traces t
                  ON t.run_id = v.last_run_id
                 AND t.block_id = v.block_id

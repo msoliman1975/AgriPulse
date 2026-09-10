@@ -45,6 +45,15 @@ export interface Verdict {
   scope: string;
   tree_id: string;
   tree_code: string;
+  /**
+   * The tree's own name, joined from the platform catalog.
+   *
+   * Null when the catalog row is gone — a verdict outlives the tree that
+   * wrote it — and null on any API older than this field. Every reader falls
+   * back to `tree_code`, so a picker never renders an empty option.
+   */
+  tree_name_en: string | null;
+  tree_name_ar: string | null;
   tree_version: number;
   leaf_node_id: string;
   kind: LeafKind;
@@ -115,7 +124,13 @@ export async function getBlockVerdicts(
 /** One step of the walk a tree took, as the trace records it. */
 export interface WalkStep {
   node_id: string;
-  matched: boolean;
+  /**
+   * Whether this node's test matched.
+   *
+   * Null on the LEAF, which carries no test: it is the answer, not a check.
+   * Every serialized walk ends with one.
+   */
+  matched: boolean | null;
   label_en?: string | null;
   label_ar?: string | null;
   /** The comparison, as the compiled tree holds it. Shape varies by operator. */
@@ -133,8 +148,18 @@ export interface VerdictReasoning {
   scope: string;
   tree_id: string;
   tree_code: string;
+  tree_name_en: string | null;
+  tree_name_ar: string | null;
   tree_version: number;
   leaf_node_id: string;
+  /**
+   * The leaf's own label, read off the last step of the walk.
+   *
+   * `leaf_node_id` is an authoring handle. Printing it put the tree's
+   * plumbing on the one line that names the answer.
+   */
+  leaf_label_en: string | null;
+  leaf_label_ar: string | null;
   kind: LeafKind;
   status_code: StatusCode;
   severity: string | null;
