@@ -3588,10 +3588,31 @@ global:
     #   to print a bare uuid.
     #
     #   Rollback is these three tags back to ecbe645.
+    # c1ecde3 = #672, the reasoning behind a verdict reads as a paragraph.
+    #
+    #   The walk was a four-column grid and a reader asking "why is this block
+    #   green" had to assemble the answer. `recommendations.narrative` now
+    #   composes one paragraph per walk, both languages, on the BACKEND — so a
+    #   report or an email can later quote the same wording the screen shows.
+    #
+    #   Two screens read it: the Farm Health card leads with the paragraph and
+    #   keeps the grid behind a toggle, and the Farm Console dock shows the
+    #   same text. The dock's thresholds are the tree's own, because its steps
+    #   carry the raw condition; the stored trace does not, so a Farm Health
+    #   paragraph infers the threshold from the tree's resolved parameters.
+    #
+    #   No migration. The reasoning query now also selects the leaf's own
+    #   sentence (`text_en` / `text_ar`), which the paragraph ends by quoting.
+    #
+    #   Watch for this: nothing else on either screen moves. If a paragraph
+    #   reads oddly it is composition, not evaluation — the verdict and its
+    #   status are unchanged.
+    #
+    #   Rollback is these three tags back to 8c782c1.
     api:
-      tag: "8c782c1"
+      tag: "c1ecde3"
     workers:
-      tag: "8c782c1"
+      tag: "c1ecde3"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -4042,7 +4063,7 @@ global:
       #   traces page learns the 'farm' skip axis. The API half must move in
       #   the same sync — the new section calls two routes that do not exist
       #   on 76a6411.
-      tag: "8c782c1"
+      tag: "c1ecde3"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
