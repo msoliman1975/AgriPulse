@@ -21,10 +21,20 @@ import {
   useRestoreDecisionTree,
 } from "@/queries/decisionTrees";
 
+import {
+  isEditableInScope,
+  treesBasePath,
+  useAuthoringScope,
+} from "../lib/authoringScope";
+
 export function DecisionTreeListPage(): ReactNode {
   const { t, i18n } = useTranslation("decisionTrees");
   const isAr = i18n.language === "ar";
   const canManage = useCapability("decision_tree.manage");
+  // A platform caller authors the platform catalogue; a tenant caller authors
+  // their own trees. The same page serves both, under two route prefixes.
+  const scope = useAuthoringScope();
+  const base = treesBasePath(scope);
 
   const [status, setStatus] = useState<DecisionTreeListStatus>("active");
   const [search, setSearch] = useState("");
@@ -105,7 +115,7 @@ export function DecisionTreeListPage(): ReactNode {
               {t("list.tracesButton")}
             </LinkButton>
             {canManage ? (
-              <LinkButton to="/decision-trees/new">{t("list.newButton")}</LinkButton>
+              <LinkButton to={`${base}/new`}>{t("list.newButton")}</LinkButton>
             ) : null}
           </span>
         }
@@ -234,7 +244,7 @@ export function DecisionTreeListPage(): ReactNode {
             header: t("list.table.actions"),
             align: "end",
             cell: (tree) =>
-              canManage && tree.tenant_id != null ? (
+              canManage && isEditableInScope(scope, tree) ? (
                 <RowActions>
                   {tree.archived ? (
                     <Button
@@ -257,7 +267,7 @@ export function DecisionTreeListPage(): ReactNode {
         rowKey={(tree) => tree.id}
         state={mapAsyncState(queryState(trees), () => filtered)}
         filtered={isFiltered}
-        rowHref={(tree) => `/decision-trees/${tree.code}`}
+        rowHref={(tree) => `${base}/${tree.code}`}
         caption={t("list.title")}
         errorMessage={t("list.loadFailed")}
         empty={
@@ -265,7 +275,7 @@ export function DecisionTreeListPage(): ReactNode {
             message={t("list.empty")}
             action={
               canManage ? (
-                <LinkButton to="/decision-trees/new">{t("list.newButton")}</LinkButton>
+                <LinkButton to={`${base}/new`}>{t("list.newButton")}</LinkButton>
               ) : null
             }
           />

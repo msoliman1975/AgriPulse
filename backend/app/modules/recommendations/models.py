@@ -109,6 +109,29 @@ class DecisionTreeVersion(Base):
     )
 
 
+class TenantTreeVersionPin(Base):
+    """`public.tenant_tree_version_pins` — a tenant holds one tree at one version.
+
+    A publish reaches every tenant at their next sweep unless they have pinned
+    that tree. Absent a row, the tenant follows `current_version_id`.
+    """
+
+    __tablename__ = "tenant_tree_version_pins"
+    __table_args__ = {"schema": "public"}
+
+    tenant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    tree_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("public.decision_trees.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    pinned_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    pinned_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+
+
 class Recommendation(Base, TimestampedMixin, GroupingMixin):
     """`tenant_<id>.recommendations` — generated decision-tree outcomes."""
 

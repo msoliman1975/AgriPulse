@@ -219,6 +219,17 @@ export function SideNav(): ReactNode {
           activePathPrefix="/platform/signals"
           collapsed={collapsed}
         />
+        {/* The 33 platform trees are database rows now (public migration
+            0085), so this is where they are edited. A tenant admin sees the
+            same pages at /decision-trees for their own trees and cannot edit
+            these; the API enforces both halves. */}
+        <SideNavItem
+          to="/platform/decision-trees"
+          label={t("nav.platformDecisionTrees")}
+          icon={<RulesIcon className="h-4 w-4" />}
+          activePathPrefix="/platform/decision-trees"
+          collapsed={collapsed}
+        />
         <SideNavItem
           to="/platform/plan-templates"
           label={t("nav.planTemplates")}

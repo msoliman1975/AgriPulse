@@ -35,15 +35,21 @@ from app.modules.recommendations.errors import (
 )
 from app.modules.recommendations.schemas import (
     BlockVerdictsResponse,
+    DecisionTreeAvailabilityResponse,
+    DecisionTreeCopyRequest,
     DecisionTreeCreateRequest,
     DecisionTreeDetailResponse,
     DecisionTreeDryRunRequest,
     DecisionTreeDryRunResponse,
+    DecisionTreeEnabledRequest,
+    DecisionTreeEnabledResponse,
     DecisionTreeResponse,
     DecisionTreeRunRequest,
     DecisionTreeRunResponse,
     DecisionTreeUpdateRequest,
     DecisionTreeVersionCreateRequest,
+    DecisionTreeVersionPinRequest,
+    DecisionTreeVersionPinResponse,
     DecisionTreeVersionPublishResponse,
     DecisionTreeVersionResponse,
     DryRunCandidateBlock,
@@ -83,6 +89,7 @@ from app.modules.recommendations.service import (
     _ParamNameUnknownError,
     _ParamValueCoercionError,
     _PlatformTreeNotEditableError,
+    _TenantScopeRequiredError,
     get_decision_trees_author_service,
     get_recommendations_service,
 )
@@ -667,6 +674,16 @@ def _map_authoring_error(exc: Exception) -> Exception | None:  # noqa: PLR0911 -
             type_="https://agripulse.cloud/problems/recommendations/platform-tree-read-only",
             extras={"code": exc.code},
         )
+    if isinstance(exc, _TenantScopeRequiredError):
+        return APIError(
+            status_code=status.HTTP_403_FORBIDDEN,
+            title="Tenant context required",
+            detail=(
+                "Copying, enabling and pinning act on a tenant's own farms. "
+                "A platform caller has none."
+            ),
+            type_="https://agripulse.cloud/problems/tenant-required",
+        )
     if isinstance(exc, _DecisionTreeNoPublishedVersionError):
         return APIError(
             status_code=status.HTTP_409_CONFLICT,
@@ -996,6 +1013,153 @@ async def run_decision_tree_on_farm(
         tenant_schema=schema,
         tenant_id=context.tenant_id,
     )
+
+
+# =====================================================================
+# Copy, tenant-wide enable/disable, version pins
+#
+# All four are things a tenant does to its own farms, so all four take a
+# tenant session and refuse a platform caller. A platform admin has no farm
+# to enable a tree on and no pin to hold.
+# =====================================================================
+
+
+@router.post(
+    "/decision-trees/{code}:copy",
+    response_model=DecisionTreeDetailResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Copy a platform tree into this tenant.",
+)
+async def copy_decision_tree(
+    code: str,
+    payload: DecisionTreeCopyRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: DecisionTreesAuthorService = Depends(_author_service),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Take a platform tree's current published version and make it this
+    tenant's own, so the thresholds can be changed.
+
+    The copy is frozen from the moment it exists: republishing the platform
+    original never moves it and nothing tells the tenant it moved. Over a
+    season the two drift and no screen shows it. That is the cost of a copy
+    and it is the reason the version pin exists as a lighter alternative.
+    """
+    _ensure_tenant(context)
+    try:
+        return await service.copy_tree_to_tenant(
+            code=code,
+            new_code=payload.new_code,
+            disable_original=payload.disable_original,
+            tenant_session=tenant_session,
+            actor_user_id=context.user_id,
+        )
+    except DecisionTreeParseError:
+        raise
+    except Exception as exc:
+        mapped = _map_authoring_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.get(
+    "/decision-trees/{code}/availability",
+    response_model=DecisionTreeAvailabilityResponse,
+    summary="How this tenant runs one tree: farms, version, pin.",
+)
+async def get_decision_tree_availability(
+    code: str,
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    service: DecisionTreesAuthorService = Depends(_author_service),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    try:
+        return await service.get_tree_availability(code=code, tenant_session=tenant_session)
+    except Exception as exc:
+        mapped = _map_authoring_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.put(
+    "/decision-trees/{code}/enabled",
+    response_model=DecisionTreeEnabledResponse,
+    summary="Turn a tree on or off across every farm this tenant has today.",
+)
+async def set_decision_tree_enabled(
+    code: str,
+    payload: DecisionTreeEnabledRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: DecisionTreesAuthorService = Depends(_author_service),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Enable and disable are farm rows, so this writes one row per farm.
+
+    A farm created after this call inherits nothing and runs the tree. "Off
+    everywhere" means "off on the farms that existed when you said so", and
+    the response's farm counts are what the screen uses to say that.
+    """
+    _ensure_tenant(context)
+    try:
+        return await service.set_tree_enabled_everywhere(
+            code=code,
+            enabled=payload.enabled,
+            tenant_session=tenant_session,
+            actor_user_id=context.user_id,
+        )
+    except Exception as exc:
+        mapped = _map_authoring_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.put(
+    "/decision-trees/{code}/version-pin",
+    response_model=DecisionTreeVersionPinResponse,
+    summary="Hold this tree at one version for this tenant.",
+)
+async def pin_decision_tree_version(
+    code: str,
+    payload: DecisionTreeVersionPinRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: DecisionTreesAuthorService = Depends(_author_service),
+) -> dict[str, Any]:
+    """A publish otherwise reaches every tenant at their next sweep. A pin is
+    the only thing that stops this tenant following the current version."""
+    _ensure_tenant(context)
+    try:
+        return await service.pin_tree_version(
+            code=code, version=payload.version, actor_user_id=context.user_id
+        )
+    except Exception as exc:
+        mapped = _map_authoring_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.delete(
+    "/decision-trees/{code}/version-pin",
+    response_model=DecisionTreeVersionPinResponse,
+    summary="Follow the current version again.",
+)
+async def clear_decision_tree_version_pin(
+    code: str,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: DecisionTreesAuthorService = Depends(_author_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    try:
+        return await service.clear_tree_version_pin(code=code, actor_user_id=context.user_id)
+    except Exception as exc:
+        mapped = _map_authoring_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
 
 
 # =====================================================================

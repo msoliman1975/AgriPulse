@@ -308,6 +308,13 @@ class RecommendationsRepository:
         trees are excluded. Trees without a published version yet are
         skipped (PR-A).
 
+        The version is resolved per tenant: a tenant that has pinned this
+        tree runs the pinned version, everyone else runs the current one.
+        The tree must still have a current version — a pin does not keep a
+        tree alive past its author unpublishing it — and the resolved version
+        must still be published, so a pin to a draft yields no row and the
+        tree is skipped rather than run from unpublished work.
+
         ``only_code`` narrows the result to one tree. That is the whole
         mechanism behind the authoring "run this tree now" path: the
         evaluation walks the *same* code the sweep does, with the tree set
@@ -334,10 +341,16 @@ class RecommendationsRepository:
                            t.applicable_regions,
                            v.id    AS version_id,
                            v.version,
-                           v.tree_compiled
+                           v.tree_compiled,
+                           (p.version IS NOT NULL) AS pinned
                     FROM public.decision_trees t
+                    JOIN public.decision_tree_versions cur
+                      ON cur.id = t.current_version_id
+                    LEFT JOIN public.tenant_tree_version_pins p
+                      ON p.tree_id = t.id AND p.tenant_id = :tid
                     JOIN public.decision_tree_versions v
-                      ON v.id = t.current_version_id
+                      ON v.tree_id = t.id
+                     AND v.version = COALESCE(p.version, cur.version)
                     WHERE t.is_active = TRUE
                       AND t.deleted_at IS NULL
                       AND v.published_at IS NOT NULL
@@ -826,6 +839,18 @@ class RecommendationsRepository:
         ).first()
         return cast(UUID, row.id) if row is not None else None
 
+    async def get_tenant_slug(self, tenant_id: UUID) -> str | None:
+        """The tenant's slug, used to derive a copied tree's code."""
+        row = (
+            await self._public.execute(
+                text("SELECT slug FROM public.tenants WHERE id = :t").bindparams(
+                    bindparam("t", type_=PG_UUID(as_uuid=True))
+                ),
+                {"t": tenant_id},
+            )
+        ).first()
+        return None if row is None else str(row.slug)
+
     async def resolve_crop_id(self, crop_code: str | None) -> UUID | None:
         """Lookup `crops.id` by code. Returns None when crop_code is
         None/empty or unknown — same permissive behaviour as the YAML
@@ -947,6 +972,130 @@ class RecommendationsRepository:
                 bindparam("tid", type_=PG_UUID(as_uuid=True)),
             ),
             {"fid": farm_id, "tid": tree_id},
+        )
+        return deleted.first() is not None
+
+    async def set_tree_excluded_on_every_farm(
+        self, *, tree_id: UUID, excluded: bool, actor_user_id: UUID | None
+    ) -> int:
+        """Turn a tree off, or back on, for every farm in the tenant.
+
+        Enable and disable are stored as farm rows and nothing else, so a
+        tenant-level toggle is a row per farm. That is deliberate and it has a
+        consequence worth naming: a farm created after this runs has no row,
+        and a farm with no row runs the tree. "Off everywhere" means "off on
+        the farms that existed when you said so".
+
+        Returns how many farms actually changed.
+        """
+        if excluded:
+            result = await self._tenant.execute(
+                text(
+                    """
+                    INSERT INTO farm_tree_exclusions (farm_id, tree_id, disabled_by)
+                    SELECT f.id, :tid, :actor
+                      FROM farms f
+                     WHERE f.deleted_at IS NULL
+                    ON CONFLICT (farm_id, tree_id) DO NOTHING
+                    RETURNING farm_id
+                    """
+                ).bindparams(
+                    bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                    bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                ),
+                {"tid": tree_id, "actor": actor_user_id},
+            )
+        else:
+            result = await self._tenant.execute(
+                text(
+                    "DELETE FROM farm_tree_exclusions WHERE tree_id = :tid RETURNING farm_id"
+                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                {"tid": tree_id},
+            )
+        return len(result.all())
+
+    async def count_farms_running_tree(self, *, tree_id: UUID) -> tuple[int, int]:
+        """``(farms_running, farms_total)`` for one tree in this tenant.
+
+        A farm runs a tree unless it has an exclusion row, so this is
+        "how many farms have no row" against "how many farms there are".
+        """
+        row = (
+            await self._tenant.execute(
+                text(
+                    """
+                    SELECT count(*) AS total,
+                           count(*) FILTER (
+                             WHERE NOT EXISTS (
+                               SELECT 1 FROM farm_tree_exclusions x
+                                WHERE x.farm_id = f.id AND x.tree_id = :tid
+                             )
+                           ) AS running
+                      FROM farms f
+                     WHERE f.deleted_at IS NULL
+                    """
+                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                {"tid": tree_id},
+            )
+        ).one()
+        return int(row.running), int(row.total)
+
+    # ---- Version pins (public 0086) -----------------------------------
+
+    async def get_tree_version_pin(self, *, tenant_id: UUID, tree_id: UUID) -> int | None:
+        """The version this tenant has pinned for this tree, or None.
+
+        A pin is the only thing that stops a tenant following the tree's
+        current version. Absent, the tenant runs whatever is published now,
+        which is the behaviour every tenant has always had.
+        """
+        row = (
+            await self._public.execute(
+                text(
+                    "SELECT version FROM public.tenant_tree_version_pins "
+                    "WHERE tenant_id = :tid AND tree_id = :tree"
+                ).bindparams(
+                    bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                    bindparam("tree", type_=PG_UUID(as_uuid=True)),
+                ),
+                {"tid": tenant_id, "tree": tree_id},
+            )
+        ).first()
+        return None if row is None else int(row.version)
+
+    async def set_tree_version_pin(
+        self, *, tenant_id: UUID, tree_id: UUID, version: int, actor_user_id: UUID | None
+    ) -> None:
+        await self._public.execute(
+            text(
+                """
+                INSERT INTO public.tenant_tree_version_pins
+                    (tenant_id, tree_id, version, pinned_at, pinned_by)
+                VALUES (:tid, :tree, :ver, now(), :actor)
+                ON CONFLICT (tenant_id, tree_id) DO UPDATE
+                   SET version = EXCLUDED.version,
+                       pinned_at = EXCLUDED.pinned_at,
+                       pinned_by = EXCLUDED.pinned_by
+                """
+            ).bindparams(
+                bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                bindparam("tree", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"tid": tenant_id, "tree": tree_id, "ver": version, "actor": actor_user_id},
+        )
+
+    async def clear_tree_version_pin(self, *, tenant_id: UUID, tree_id: UUID) -> bool:
+        """Follow the current version again. False when there was no pin."""
+        deleted = await self._public.execute(
+            text(
+                "DELETE FROM public.tenant_tree_version_pins "
+                "WHERE tenant_id = :tid AND tree_id = :tree RETURNING tree_id"
+            ).bindparams(
+                bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                bindparam("tree", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"tid": tenant_id, "tree": tree_id},
         )
         return deleted.first() is not None
 

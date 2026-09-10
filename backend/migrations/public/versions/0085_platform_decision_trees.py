@@ -54,8 +54,7 @@ def upgrade() -> None:
         code = tree["code"]
         existing = conn.execute(
             sa.text(
-                "SELECT id FROM public.decision_trees "
-                "WHERE code = :code AND tenant_id IS NULL"
+                "SELECT id FROM public.decision_trees " "WHERE code = :code AND tenant_id IS NULL"
             ),
             {"code": code},
         ).first()
@@ -131,9 +130,7 @@ def upgrade() -> None:
         ).scalar_one()
 
         conn.execute(
-            sa.text(
-                "UPDATE public.decision_trees SET current_version_id = :v WHERE id = :t"
-            ),
+            sa.text("UPDATE public.decision_trees SET current_version_id = :v WHERE id = :t"),
             {"v": version_id, "t": tree_id},
         )
         inserted += 1

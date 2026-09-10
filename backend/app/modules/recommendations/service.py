@@ -3090,6 +3090,283 @@ class DecisionTreesAuthorService:
             raise _DecisionTreeNotFoundError(code)
         return detail
 
+    # ---- Copy, availability, pins -------------------------------------
+
+    def _require_tenant_scope(self) -> UUID:
+        """These four operations belong to a tenant and only to a tenant.
+
+        A platform caller has no farms to enable a tree on and no pin to hold,
+        so there is nothing here for them to do. The router refuses them first;
+        this is the second door.
+        """
+        if self._tenant_id is None:
+            raise _TenantScopeRequiredError()
+        return self._tenant_id
+
+    @staticmethod
+    def derived_copy_code(code: str, slug: str) -> str:
+        """``<original>__<tenant slug>``.
+
+        A tenant copy cannot keep the original's code. ``create_tree`` refuses
+        a tenant code that collides with a platform one, and the collision is
+        real: ``get_tree_by_code(..., include_platform=True)`` would match two
+        rows. The dialog shows this and lets the author change it first.
+        """
+        cleaned = "".join(ch if (ch.isalnum() or ch == "_") else "_" for ch in slug.lower())
+        return f"{code}__{cleaned}"
+
+    async def copy_tree_to_tenant(
+        self,
+        *,
+        code: str,
+        new_code: str | None,
+        disable_original: bool,
+        tenant_session: AsyncSession,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Copy a platform tree into this tenant, optionally turning the
+        original off for every farm.
+
+        Two things the copy cannot inherit:
+
+        **Its code.** See ``derived_copy_code``.
+
+        **Its open work.** Recommendations and alerts carry ``tree_code``, and
+        the copy's code is different, so open items from the original stay
+        open under the original's code. They are real findings somebody may be
+        acting on; closing another person's queue is not this operation's
+        business. Migration 0079 left the retired mango trees the same way.
+
+        And one thing it does not keep: **later fixes**. A copy never moves
+        when the platform republishes the original, and nothing tells the
+        tenant it moved. That is the trade the copy makes.
+
+        The copy is published immediately rather than left as a draft. A draft
+        plus "disable the original" would leave the tenant running neither.
+        """
+        import yaml as _yaml
+
+        from app.modules.recommendations.loader import _hash_compiled, compile_tree
+
+        tenant_id = self._require_tenant_scope()
+        source = await self._repo.get_tree_by_code(code, scope_tenant_id=None)
+        if source is None:
+            raise _DecisionTreeNotFoundError(code)
+        version_id = source.get("current_version_id")
+        if version_id is None:
+            raise _DecisionTreeNoPublishedVersionError(code)
+        version = await self._repo.get_version(version_id)
+        if version is None:
+            raise _DecisionTreeNoPublishedVersionError(code)
+
+        slug = await self._repo.get_tenant_slug(tenant_id) or tenant_id.hex[:8]
+        target_code = (new_code or self.derived_copy_code(code, slug)).strip()
+        collision = await self._repo.get_tree_by_code(
+            target_code, scope_tenant_id=tenant_id, include_platform=True
+        )
+        if collision is not None:
+            raise _DecisionTreeCodeAlreadyExistsError(target_code)
+
+        # The body carries the original's `code:`, and compile checks that the
+        # body's code matches the row's. Rewrite it through YAML rather than
+        # by string replacement, so a tree whose text mentions its own code
+        # elsewhere is not silently corrupted.
+        spec = _yaml.safe_load(version["tree_yaml"])
+        if not isinstance(spec, dict):
+            raise _DecisionTreeNotFoundError(code)
+        spec["code"] = target_code
+        tree_yaml = _yaml.safe_dump(spec, allow_unicode=True, sort_keys=False)
+        compiled = compile_tree(spec, source_path=f"<copy:{target_code}>")
+        compiled_hash = _hash_compiled(compiled)
+
+        new_tree_id = await self._repo.insert_tree(
+            code=target_code,
+            tenant_id=tenant_id,
+            name_en=compiled["name_en"],
+            name_ar=compiled.get("name_ar"),
+            description_en=compiled.get("description_en"),
+            description_ar=compiled.get("description_ar"),
+            crop_id=source.get("crop_id"),
+            crop_path=source.get("crop_path"),
+            crop_paths=list(source.get("crop_paths") or []),
+            country_codes=list(source.get("country_codes") or []),
+            soil_textures=list(source.get("soil_textures") or []),
+            scope=source.get("scope") or "block",
+            applicable_regions=list(source.get("applicable_regions") or []),
+            actor_user_id=actor_user_id,
+        )
+        new_version_id = await self._repo.insert_version(
+            tree_id=new_tree_id,
+            version=1,
+            tree_yaml=tree_yaml,
+            tree_compiled=compiled,
+            compiled_hash=compiled_hash,
+            notes=f"Copied from the platform tree {code} at version {version['version']}.",
+            published_at=datetime.now(UTC),
+            published_by=actor_user_id,
+        )
+        await self._repo.set_current_version(tree_id=new_tree_id, version_id=new_version_id)
+
+        farms_disabled = 0
+        if disable_original:
+            repo = RecommendationsRepository(
+                tenant_session=tenant_session, public_session=self._public
+            )
+            farms_disabled = await repo.set_tree_excluded_on_every_farm(
+                tree_id=source["id"], excluded=True, actor_user_id=actor_user_id
+            )
+
+        await self._audit.record(
+            tenant_schema=None,
+            event_type="recommendations.decision_tree_copied",
+            actor_user_id=actor_user_id,
+            actor_kind="user" if actor_user_id else "system",
+            subject_kind="decision_tree",
+            subject_id=new_tree_id,
+            farm_id=None,
+            details={
+                "source_code": code,
+                "code": target_code,
+                "source_version": version["version"],
+                "disabled_original_on_farms": farms_disabled,
+            },
+        )
+        detail = await self.get_tree_detail(code=target_code)
+        if detail is None:
+            raise _DecisionTreeNotFoundError(target_code)
+        detail["disabled_original_on_farms"] = farms_disabled
+        return detail
+
+    async def get_tree_availability(
+        self, *, code: str, tenant_session: AsyncSession
+    ) -> dict[str, Any]:
+        """How this tenant runs one tree: on how many farms, at which version,
+        and whether that version is held by a pin."""
+        tenant_id = self._require_tenant_scope()
+        tree = await self._repo.get_tree_by_code(
+            code, scope_tenant_id=tenant_id, include_platform=True
+        )
+        if tree is None:
+            raise _DecisionTreeNotFoundError(code)
+        repo = RecommendationsRepository(tenant_session=tenant_session, public_session=self._public)
+        running, total = await repo.count_farms_running_tree(tree_id=tree["id"])
+        pinned = await self._repo.get_tree_version_pin(tenant_id=tenant_id, tree_id=tree["id"])
+        current: int | None = None
+        if tree["current_version_id"] is not None:
+            row = await self._repo.get_version(tree["current_version_id"])
+            current = None if row is None else row["version"]
+        return {
+            "code": code,
+            "farms_running": running,
+            "farms_total": total,
+            "enabled_everywhere": total > 0 and running == total,
+            "current_version": current,
+            "pinned_version": pinned,
+        }
+
+    async def set_tree_enabled_everywhere(
+        self,
+        *,
+        code: str,
+        enabled: bool,
+        tenant_session: AsyncSession,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Turn a tree on or off across every farm this tenant has today.
+
+        Every farm that exists **now**. A farm created later inherits nothing
+        and runs the tree, so cards can appear from a tree the tenant turned
+        off everywhere. The screen says so; there is no state that would make
+        it otherwise, because enablement is farm rows and a farm that does not
+        exist yet has no row.
+        """
+        tenant_id = self._require_tenant_scope()
+        tree = await self._repo.get_tree_by_code(
+            code, scope_tenant_id=tenant_id, include_platform=True
+        )
+        if tree is None:
+            raise _DecisionTreeNotFoundError(code)
+        repo = RecommendationsRepository(tenant_session=tenant_session, public_session=self._public)
+        changed = await repo.set_tree_excluded_on_every_farm(
+            tree_id=tree["id"], excluded=not enabled, actor_user_id=actor_user_id
+        )
+        await self._audit.record(
+            tenant_schema=None,
+            event_type="recommendations.decision_tree_enabled_set",
+            actor_user_id=actor_user_id,
+            actor_kind="user" if actor_user_id else "system",
+            subject_kind="decision_tree",
+            subject_id=tree["id"],
+            farm_id=None,
+            details={"code": code, "enabled": enabled, "farms_changed": changed},
+        )
+        out = await self.get_tree_availability(code=code, tenant_session=tenant_session)
+        out["farms_changed"] = changed
+        return out
+
+    async def pin_tree_version(
+        self, *, code: str, version: int, actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        """Hold this tree at one version for this tenant.
+
+        Only a published version can be pinned. Pinning to a draft would take
+        the tree out of the sweep entirely — the resolution join requires
+        ``published_at IS NOT NULL`` — which is a silent way to turn a tree
+        off, and turning a tree off has its own control.
+        """
+        tenant_id = self._require_tenant_scope()
+        tree = await self._repo.get_tree_by_code(
+            code, scope_tenant_id=tenant_id, include_platform=True
+        )
+        if tree is None:
+            raise _DecisionTreeNotFoundError(code)
+        row = await self._repo.get_version_by_number(tree_id=tree["id"], version=version)
+        if row is None:
+            raise _DecisionTreeVersionNotFoundError(code, version)
+        if row.get("published_at") is None:
+            raise _DecisionTreeNoPublishedVersionError(code)
+        await self._repo.set_tree_version_pin(
+            tenant_id=tenant_id,
+            tree_id=tree["id"],
+            version=version,
+            actor_user_id=actor_user_id,
+        )
+        await self._audit.record(
+            tenant_schema=None,
+            event_type="recommendations.decision_tree_version_pinned",
+            actor_user_id=actor_user_id,
+            actor_kind="user" if actor_user_id else "system",
+            subject_kind="decision_tree",
+            subject_id=tree["id"],
+            farm_id=None,
+            details={"code": code, "version": version},
+        )
+        return {"code": code, "pinned_version": version}
+
+    async def clear_tree_version_pin(
+        self, *, code: str, actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        """Follow the current version again."""
+        tenant_id = self._require_tenant_scope()
+        tree = await self._repo.get_tree_by_code(
+            code, scope_tenant_id=tenant_id, include_platform=True
+        )
+        if tree is None:
+            raise _DecisionTreeNotFoundError(code)
+        removed = await self._repo.clear_tree_version_pin(tenant_id=tenant_id, tree_id=tree["id"])
+        if removed:
+            await self._audit.record(
+                tenant_schema=None,
+                event_type="recommendations.decision_tree_version_unpinned",
+                actor_user_id=actor_user_id,
+                actor_kind="user" if actor_user_id else "system",
+                subject_kind="decision_tree",
+                subject_id=tree["id"],
+                farm_id=None,
+                details={"code": code},
+            )
+        return {"code": code, "pinned_version": None}
+
     # ---- Dry-run ------------------------------------------------------
 
     async def dry_run(
@@ -3499,6 +3776,14 @@ class _PlatformTreeNotEditableError(_DecisionTreeAuthoringError):
             f"by the platform and cannot be edited here."
         )
         self.code = code
+
+
+class _TenantScopeRequiredError(_DecisionTreeAuthoringError):
+    """A tenant-only authoring operation reached without a tenant.
+
+    Copying, enabling and pinning are things a tenant does to its own farms.
+    A platform caller has no farms and no pins, so there is nothing to do.
+    """
 
 
 class _DecisionTreeNoPublishedVersionError(_DecisionTreeAuthoringError):

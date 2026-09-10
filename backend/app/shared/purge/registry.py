@@ -521,6 +521,17 @@ TENANT_PUBLIC_OWNED: tuple[OwnedTable, ...] = (
         note="tenant-authored templates; signal_template_definitions cascades off this",
     ),
     OwnedTable("tenant_settings_overrides", owner_column="tenant_id", schema="public", order=10),
+    # A tenant's decision-tree version pins (public migration 0086). The FK
+    # is to `decision_trees`, not to `tenants`, so dropping the tenant leaves
+    # these behind unless the manifest names them.
+    OwnedTable(
+        "tenant_tree_version_pins",
+        owner_column="tenant_id",
+        schema="public",
+        order=10,
+        fk=False,
+        note="which tree version this tenant holds; nothing else reads it",
+    ),
     OwnedTable(
         "tenant_dt_dispatch",
         owner_column="tenant_id",

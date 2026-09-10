@@ -12,6 +12,7 @@
     "observer": "Observer",
     "roles": "Roles & permissions",
     "platformSignals": "Signal catalog",
+    "platformDecisionTrees": "Decision trees",
     "platformAlerts": "Platform alerts",
     "usage": "Product usage"
   },
