@@ -162,7 +162,7 @@ def _fmt_number(value: Any) -> str:
 def _fmt_value(value: Any) -> str:
     if value is None:
         return "—"
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         return ", ".join(_fmt_number(v) for v in value)
     return _fmt_number(value)
 
@@ -205,8 +205,11 @@ def _ref_text(operand: Any) -> str | None:
     return ".".join(parts)
 
 
-def _test_text(condition: Any) -> str | None:
+def _test_text(condition: Any) -> str | None:  # noqa: PLR0911
     """What the node compared against: `> 0.50`, `between 3 and 7`.
+
+    One return per shape a condition can take, which is why PLR0911 is
+    silenced: each is a different reason there is nothing to compare.
 
     None when the node's condition is a group (`all_of` / `any_of`): a group
     has no single threshold, and summarising several would be a number the
@@ -325,10 +328,9 @@ def compose(
     words = _WORDS.get(language, _WORDS["en"])
     arabic = language == "ar"
     status = STATUS_BY_CODE.get(status_code)
-    if status is None:
-        status_label = status_code
-    else:
-        status_label = status.label_ar if arabic else status.label_en
+    status_label = (
+        status_code if status is None else (status.label_ar if arabic else status.label_en)
+    )
 
     parts: list[str] = []
     when = _when(evaluated_at)
@@ -361,7 +363,9 @@ def compose(
     return words["sep"].join(parts)
 
 
-def compose_both(*, text_en: str | None = None, text_ar: str | None = None, **kwargs: Any) -> dict[str, str]:
+def compose_both(
+    *, text_en: str | None = None, text_ar: str | None = None, **kwargs: Any
+) -> dict[str, str]:
     """The paragraph in both languages, which is what every caller wants.
 
     ``text_en`` and ``text_ar`` are separate because the leaf's own sentence
