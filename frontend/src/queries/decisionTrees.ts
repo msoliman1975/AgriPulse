@@ -217,7 +217,7 @@ export type { DecisionTree, DecisionTreeDetail, TreeRunCandidateFarm, TreeRunRes
 export function useDecisionTreeAvailability(code: string | undefined, enabled = true) {
   return useQuery<DecisionTreeAvailability>({
     queryKey: ["decision_trees", "availability", code] as const,
-    queryFn: () => getDecisionTreeAvailability(code as string),
+    queryFn: () => getDecisionTreeAvailability(code!),
     enabled: Boolean(code) && enabled,
   });
 }

@@ -3205,7 +3205,9 @@ class DecisionTreesAuthorService:
             published_at=datetime.now(UTC),
             published_by=actor_user_id,
         )
-        await self._repo.set_current_version(tree_id=new_tree_id, version_id=new_version_id)
+        await self._repo.set_current_version(
+            tree_id=new_tree_id, version_id=new_version_id, actor_user_id=actor_user_id
+        )
 
         farms_disabled = 0
         if disable_original:
@@ -3460,11 +3462,16 @@ class DecisionTreesAuthorService:
         # Same grid anomaly snapshot the production evaluator sees, so an
         # author can dry-run a `{source: grid}` predicate against a real
         # block.
+        # Keyed by tenant, and a platform caller has no tenant — nor any block
+        # to dry-run against, since the routes that reach here all take a
+        # tenant session. Skip the snapshot rather than invent a tenant: a
+        # `{source: grid}` predicate then fails closed, which is what every
+        # other missing source does here.
         grid = (
             await load_grid_snapshot(
                 tenant_session, self._public, block_id=block_id, tenant_id=self._tenant_id
             )
-            if farm_id is not None
+            if farm_id is not None and self._tenant_id is not None
             else None
         )
         ctx = ConditionContext.from_block_signals(
