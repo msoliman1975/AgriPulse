@@ -18,7 +18,12 @@ vi.mock("@/queries/decisionTrees", () => ({
     error: null,
   }),
 }));
-vi.mock("@/rbac/useCapability", () => ({ useCapability: () => true }));
+vi.mock("@/rbac/useCapability", () => ({
+  useCapability: () => true,
+  // The authoring scope reads the caller's claims. A tenant_id means the
+  // tenant catalogue, which is the scope every one of these cases assumes.
+  useClaims: () => ({ tenant_id: "tenant-1" }),
+}));
 // The targeting picker fetches the country list + the whole crop catalog;
 // the code/YAML sync is what's under test, so stand in a button that reports
 // one crop path — the minimum that enables the create buttons.

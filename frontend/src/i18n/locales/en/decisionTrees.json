@@ -246,7 +246,7 @@
         "government": "Government"
       }
     },
-    "platformReadOnly": "This is a platform tree. The platform manages it, so it is read-only here — its own YAML file is republished on every deploy. To run it with different thresholds, set parameter overrides below."
+    "platformReadOnly": "This tree comes from the platform. Your tenant cannot edit it here — a platform admin owns it. To run it with different thresholds, set parameter overrides below, or copy it to your tenant and change the copy."
   },
   "editor": {
     "header": {
@@ -608,6 +608,37 @@
     "errors": {
       "nameTaken": "A parameter with that name already exists."
     }
+  },
+  "rollout": {
+    "heading": "How your farms run this",
+    "loadFailed": "Could not read how your farms run this tree.",
+    "copyButton": "Copy to my tenant",
+    "farmsRunning": "Running on {{running}} of {{total}} farms",
+    "enableAll": "Turn on everywhere",
+    "disableAll": "Turn off everywhere",
+    "enableFailed": "Could not change this. Nothing was written.",
+    "newFarmsNote": "A farm you add later will run this tree. Turning it off writes one row per farm, and a farm that does not exist yet has no row.",
+    "pinnedAt": "Held at version {{version}}. New platform versions will not reach you.",
+    "followingCurrent": "Following the current version ({{version}}). A new version reaches you at the next sweep.",
+    "pinLabel": "Version to hold",
+    "followCurrent": "Follow the current version",
+    "versionOption": "Hold at version {{version}}",
+    "applyPin": "Apply",
+    "pinFailed": "Could not change the version. Nothing was written."
+  },
+  "copy": {
+    "title": "Copy this tree to your tenant",
+    "body": "You get your own copy of {{code}} at its current published version, and you can change it.",
+    "codeLabel": "Code for your copy",
+    "codePlaceholder": "Leave empty to use the suggested code",
+    "codeHint": "The copy cannot keep the original code. Left empty, it becomes the original code plus your tenant name.",
+    "disableOriginal": "Turn the original off on my farms",
+    "disableOriginalHint": "Leave both on and every block gets two cards.",
+    "frozenNote": "Two things to know. Open recommendations from the original stay open under the original's code. And your copy does not move when the platform publishes a new version of the original.",
+    "failed": "Could not copy this tree.",
+    "cancel": "Cancel",
+    "confirm": "Copy",
+    "copying": "Copying…"
   },
   "overrides": {
     "heading": "Your overrides",

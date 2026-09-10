@@ -82,8 +82,10 @@ export function DecisionTreeCreatePage(): ReactNode {
   const navigate = useNavigate();
   const { t } = useTranslation("decisionTrees");
   const canManage = useCapability("decision_tree.manage");
-  const scope = useAuthoringScope();
-  const base = treesBasePath(scope);
+  // Named apart from the tree's block/cell `scope`, which is a different
+  // thing entirely and already owns that word on this page.
+  const authoringScope = useAuthoringScope();
+  const base = treesBasePath(authoringScope);
 
   const [code, setCode] = useState("");
   const [cropPaths, setCropPaths] = useState<string[]>([]);

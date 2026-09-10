@@ -22,7 +22,7 @@ import clsx from "clsx";
 import type { ComponentProps, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow, parseISO, type Locale } from "date-fns";
 
@@ -67,7 +67,9 @@ import { CanvasDryRunPanel } from "../components/CanvasDryRunPanel";
 import { CanvasTreeRunPanel } from "../components/CanvasTreeRunPanel";
 import { MutationErrorBanner } from "../components/MutationErrorBanner";
 import { NodeDetailsPanel } from "../components/NodeDetailsPanel";
+import { CopyTreeDialog } from "../components/CopyTreeDialog";
 import { ParameterOverridesPanel } from "../components/ParameterOverridesPanel";
+import { TreeRolloutPanel } from "../components/TreeRolloutPanel";
 import { ParametersPanel } from "../components/ParametersPanel";
 import { ProvenancePanel } from "../components/ProvenancePanel";
 import { TreeCanvas } from "../components/TreeCanvas";
@@ -132,6 +134,8 @@ export function DecisionTreeViewerPage(): ReactNode {
   const canManage = useCapability("decision_tree.manage");
   const scope = useAuthoringScope();
   const base = treesBasePath(scope);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const navigate = useNavigate();
   const detail = useDecisionTree(code);
   const append = useAppendDecisionTreeVersion();
   const publish = usePublishDecisionTreeVersion();
@@ -937,6 +941,16 @@ export function DecisionTreeViewerPage(): ReactNode {
               {Object.keys(declaredParams).length > 0 ? (
                 <ParameterOverridesPanel code={tree.code} canManage={canManage} />
               ) : null}
+              {/* Tenant-only. A platform caller has no farms to enable this on
+                  and no pin to hold, and the API refuses all three. */}
+              {scope === "tenant" ? (
+                <TreeRolloutPanel
+                  code={tree.code}
+                  canManage={canManage}
+                  versions={tree.versions}
+                  onCopy={isPlatformTree ? () => setCopyOpen(true) : undefined}
+                />
+              ) : null}
             </div>
             {selectedNode ? (
               <NodeDetailsPanel
@@ -998,6 +1012,17 @@ export function DecisionTreeViewerPage(): ReactNode {
           subtreeSize={deleteSubtreeSize}
           onCancel={() => setDeletePending(null)}
           onConfirm={onConfirmDelete}
+        />
+      ) : null}
+
+      {copyOpen ? (
+        <CopyTreeDialog
+          code={tree.code}
+          onClose={() => setCopyOpen(false)}
+          onCopied={(newCode) => {
+            setCopyOpen(false);
+            navigate(`${base}/${newCode}`);
+          }}
         />
       ) : null}
     </Page>

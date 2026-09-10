@@ -108,10 +108,20 @@ vi.mock("@/queries/decisionTrees", () => ({
   useDecisionTreeCandidateFarms: () => ({ data: [], isLoading: false, isError: false }),
   useRunDecisionTreeOnFarm: () => noopMutation,
 }));
-vi.mock("@/rbac/useCapability", () => ({ useCapability: () => true }));
+vi.mock("@/rbac/useCapability", () => ({
+  useCapability: () => true,
+  // The authoring scope reads the caller's claims. A tenant_id means the
+  // tenant catalogue, which is the scope every one of these cases assumes.
+  useClaims: () => ({ tenant_id: "tenant-1" }),
+}));
 vi.mock("@/api/signals", () => ({ listSignalDefinitions: () => Promise.resolve([]) }));
 vi.mock("../components/TreeTargetingPicker", () => ({
   TreeTargetingPicker: () => null,
+}));
+// The rollout panel fetches its own availability. These suites are about the
+// editor, so stand it in; its own behaviour is covered separately.
+vi.mock("../components/TreeRolloutPanel", () => ({
+  TreeRolloutPanel: () => <div data-testid="rollout" />,
 }));
 vi.mock("../components/ParameterOverridesPanel", () => ({
   ParameterOverridesPanel: () => null,
