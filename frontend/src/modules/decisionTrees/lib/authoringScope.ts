@@ -1,4 +1,9 @@
 import { listCountries, listCountriesAdmin, type Country } from "@/api/countries";
+import {
+  listPlatformSignalDefinitions,
+  listSignalDefinitions,
+  type SignalDefinition,
+} from "@/api/signals";
 import { useClaims } from "@/rbac/useCapability";
 
 /**
@@ -48,4 +53,15 @@ export function treesBasePath(scope: AuthoringScope): string {
  */
 export function countriesForScope(scope: AuthoringScope): Promise<Country[]> {
   return scope === "platform" ? listCountriesAdmin() : listCountries();
+}
+
+/**
+ * Signal definitions, from whichever route this caller may read.
+ *
+ * `/v1/signals/definitions` is tenant-scoped, so a platform admin got 403 and
+ * the condition editor's signal picker came back empty — a `{source: signals}`
+ * predicate could be read but not authored.
+ */
+export function signalDefinitionsForScope(scope: AuthoringScope): Promise<SignalDefinition[]> {
+  return scope === "platform" ? listPlatformSignalDefinitions() : listSignalDefinitions();
 }

@@ -36,8 +36,12 @@ import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
 
-import { isEditableInScope, treesBasePath, useAuthoringScope } from "../lib/authoringScope";
-import { listSignalDefinitions } from "@/api/signals";
+import {
+  isEditableInScope,
+  signalDefinitionsForScope,
+  treesBasePath,
+  useAuthoringScope,
+} from "../lib/authoringScope";
 import { SignalRefPicker } from "@/modules/signals/components/SignalRefPicker";
 import {
   readTreeProvenance,
@@ -151,9 +155,9 @@ export function DecisionTreeViewerPage(): ReactNode {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const dryRun = useDryRunDecisionTree();
-  const candidateBlocks = useDecisionTreeCandidateBlocks(code);
+  const candidateBlocks = useDecisionTreeCandidateBlocks(code, isTenantScope);
   const treeRun = useRunDecisionTreeOnFarm();
-  const candidateFarms = useDecisionTreeCandidateFarms(code);
+  const candidateFarms = useDecisionTreeCandidateFarms(code, isTenantScope);
   const update = useUpdateDecisionTree();
   const dateLocale = useDateLocale();
 
@@ -167,8 +171,8 @@ export function DecisionTreeViewerPage(): ReactNode {
   const [targetingHydratedId, setTargetingHydratedId] = useState<string | null>(null);
   // Signal definitions power the YAML-mode SignalRefPicker helper.
   const signalDefsQ = useQuery({
-    queryKey: ["dtree-workspace/signalDefinitions"],
-    queryFn: () => listSignalDefinitions(),
+    queryKey: ["dtree-workspace/signalDefinitions", scope],
+    queryFn: () => signalDefinitionsForScope(scope),
     staleTime: 5 * 60_000,
   });
 
