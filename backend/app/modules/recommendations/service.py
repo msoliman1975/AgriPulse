@@ -2964,23 +2964,17 @@ class DecisionTreesAuthorService:
             published_at=None,
             published_by=None,
         )
-        # Sync the human-friendly metadata on the tree row even before
-        # publish so the catalog list reflects what the author last saved.
-        crop_path = compiled.get("crop_path")
-        crop_id = await self._repo.resolve_crop_id(
-            compiled.get("crop_code") or (crop_path.split(".")[0] if crop_path else None)
-        )
-        await self._repo.update_tree_metadata(
-            tree_id=tree["id"],
-            name_en=compiled["name_en"],
-            name_ar=compiled.get("name_ar"),
-            description_en=compiled.get("description_en"),
-            description_ar=compiled.get("description_ar"),
-            crop_id=crop_id,
-            crop_path=crop_path,
-            applicable_regions=compiled.get("applicable_regions") or [],
-            actor_user_id=actor_user_id,
-        )
+        # The tree row's name and description are NOT touched here.
+        #
+        # They used to be, so the catalogue would "reflect what the author
+        # last saved". But a draft is meant to be invisible until published —
+        # that is the whole point of the draft state, and the evaluator
+        # honours it. The name and description did not: saving a draft
+        # renamed the tree in the catalogue and in every reader's page header
+        # while the engine still walked the published version.
+        #
+        # They are stamped at publish instead, from the version being
+        # published. See `publish_version`.
         await self._audit.record(
             tenant_schema=None,
             event_type="recommendations.decision_tree_version_appended",
@@ -3035,6 +3029,28 @@ class DecisionTreesAuthorService:
             version_id=version_row["id"],
             actor_user_id=actor_user_id,
         )
+        # The tree row's display metadata follows whichever version is
+        # current. That is what makes "republish an earlier version" a real
+        # rollback: without this, publishing v5 after v8 moved the engine
+        # back to v5 and left v8's name and description on every screen, so
+        # the catalogue described a version nothing was running.
+        published = version_row.get("tree_compiled") or {}
+        if published:
+            crop_path = published.get("crop_path")
+            crop_id = await self._repo.resolve_crop_id(
+                published.get("crop_code") or (crop_path.split(".")[0] if crop_path else None)
+            )
+            await self._repo.update_tree_metadata(
+                tree_id=tree["id"],
+                name_en=published.get("name_en") or tree["name_en"],
+                name_ar=published.get("name_ar"),
+                description_en=published.get("description_en"),
+                description_ar=published.get("description_ar"),
+                crop_id=crop_id,
+                crop_path=crop_path,
+                applicable_regions=published.get("applicable_regions") or [],
+                actor_user_id=actor_user_id,
+            )
         await self._audit.record(
             tenant_schema=None,
             event_type="recommendations.decision_tree_version_published",
