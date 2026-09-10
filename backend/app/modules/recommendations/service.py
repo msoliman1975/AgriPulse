@@ -2581,14 +2581,20 @@ class DecisionTreesAuthorService:
         no-op if the on-disk YAML matches.
     """
 
-    def __init__(self, *, public_session: AsyncSession, tenant_id: UUID) -> None:
-        """``tenant_id`` is the caller's tenant (from ``RequestContext``).
+    def __init__(self, *, public_session: AsyncSession, tenant_id: UUID | None) -> None:
+        """``tenant_id`` is the caller's scope (from ``RequestContext``).
 
-        It scopes every read to platform PLUS this tenant, and stamps
+        A UUID scopes every read to platform PLUS this tenant, and stamps
         every authoring write with this tenant's UUID, so tenant-A's
-        trees are never visible to or writable by tenant-B. The YAML
-        seed loader is the only writer that produces platform rows
-        (``tenant_id IS NULL``) — there is no API path to that.
+        trees are never visible to or writable by tenant-B.
+
+        ``None`` is the platform scope, held by a caller with a platform
+        role and no tenant. It reads and writes only ``tenant_id IS NULL``
+        rows — the platform catalogue. That used to have no writer at all:
+        the YAML seed loader produced those rows and rewrote them at the
+        next startup, so an edit made in the app did not survive a restart.
+        Public migration 0085 moved the definitions into the database and
+        the startup sync is gone, which is what makes this scope real.
         """
         self._public = public_session
         self._tenant_id = tenant_id
@@ -3616,6 +3622,6 @@ def _enforce_min_max(num: float, declared: dict[str, Any]) -> float:
 
 
 def get_decision_trees_author_service(
-    *, public_session: AsyncSession, tenant_id: UUID
+    *, public_session: AsyncSession, tenant_id: UUID | None
 ) -> DecisionTreesAuthorService:
     return DecisionTreesAuthorService(public_session=public_session, tenant_id=tenant_id)

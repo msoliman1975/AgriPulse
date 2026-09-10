@@ -439,14 +439,19 @@ class RecommendationsRepository:
 
     # ---- Decision-tree authoring (PlatformAdmin) ----------------------
 
-    async def list_all_trees(self, *, visible_to_tenant_id: UUID) -> tuple[dict[str, Any], ...]:
-        """Every non-deleted tree visible to the given tenant + the
+    async def list_all_trees(
+        self, *, visible_to_tenant_id: UUID | None
+    ) -> tuple[dict[str, Any], ...]:
+        """Every non-deleted tree visible to the given scope + the
         version number of its current published version (if any).
         Drives the authoring tree list.
 
         Visibility mirrors `list_active_trees_with_current_version`:
         platform trees plus the tenant's own. Platform trees sort first
         so the authoring UI naturally groups them at the top (PR-A).
+
+        ``None`` is the platform scope: the `= :tid` half never matches,
+        so the caller sees the platform catalogue and no tenant's trees.
         """
         rows = (
             (
