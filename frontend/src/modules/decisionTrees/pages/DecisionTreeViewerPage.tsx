@@ -36,11 +36,7 @@ import { Skeleton } from "@/components/Skeleton";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
 
-import {
-  isEditableInScope,
-  treesBasePath,
-  useAuthoringScope,
-} from "../lib/authoringScope";
+import { isEditableInScope, treesBasePath, useAuthoringScope } from "../lib/authoringScope";
 import { listSignalDefinitions } from "@/api/signals";
 import { SignalRefPicker } from "@/modules/signals/components/SignalRefPicker";
 import {
@@ -134,6 +130,7 @@ export function DecisionTreeViewerPage(): ReactNode {
   const canManage = useCapability("decision_tree.manage");
   const scope = useAuthoringScope();
   const base = treesBasePath(scope);
+  const isTenantScope = scope === "tenant";
   const [copyOpen, setCopyOpen] = useState(false);
   const navigate = useNavigate();
   const detail = useDecisionTree(code);
@@ -847,23 +844,31 @@ export function DecisionTreeViewerPage(): ReactNode {
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
             <div className="flex flex-col gap-4">
-              <CanvasDryRunPanel
-                blockId={dryRunBlockId}
-                onBlockIdChange={setDryRunBlockId}
-                candidateBlocks={candidateBlocks.data ?? []}
-                candidatesLoading={candidateBlocks.isLoading}
-                mode={dryRunMode}
-                onModeChange={setDryRunMode}
-                canUseCurrent={tree.current_version != null}
-                isRunning={dryRun.isPending}
-                result={dryRunResult}
-                errorMessage={dryRun.isError ? (dryRun.error?.message ?? "") : undefined}
-                onRun={onDryRun}
-                onClear={onClearDryRun}
-              />
+              {/* Dry-run and run-on-farm walk a real block on a real farm, so
+                  both are tenant-only and both 403 for a platform caller. Left
+                  mounted they did something worse than fail: their empty
+                  candidate lists rendered as "No blocks match this tree's
+                  targeting", which is a statement about the tree and was not
+                  true. A platform admin has no farms, not no matches. */}
+              {isTenantScope ? (
+                <CanvasDryRunPanel
+                  blockId={dryRunBlockId}
+                  onBlockIdChange={setDryRunBlockId}
+                  candidateBlocks={candidateBlocks.data ?? []}
+                  candidatesLoading={candidateBlocks.isLoading}
+                  mode={dryRunMode}
+                  onModeChange={setDryRunMode}
+                  canUseCurrent={tree.current_version != null}
+                  isRunning={dryRun.isPending}
+                  result={dryRunResult}
+                  errorMessage={dryRun.isError ? (dryRun.error?.message ?? "") : undefined}
+                  onRun={onDryRun}
+                  onClear={onClearDryRun}
+                />
+              ) : null}
               {/* Authoring-only: the endpoint is gated on decision_tree.manage
                   because it dispatches work to the whole farm team. */}
-              {canManage ? (
+              {canManage && isTenantScope ? (
                 <CanvasTreeRunPanel
                   farmId={runFarmId}
                   onFarmIdChange={setRunFarmId}
@@ -938,12 +943,15 @@ export function DecisionTreeViewerPage(): ReactNode {
                 canEdit={canEdit}
                 onChange={onParameterChange}
               />
-              {Object.keys(declaredParams).length > 0 ? (
+              {/* Overrides are per-(tenant, tree) rows. A platform caller has
+                  no tenant, so the panel could only ever say "Failed to load
+                  overrides" at them. */}
+              {Object.keys(declaredParams).length > 0 && isTenantScope ? (
                 <ParameterOverridesPanel code={tree.code} canManage={canManage} />
               ) : null}
               {/* Tenant-only. A platform caller has no farms to enable this on
                   and no pin to hold, and the API refuses all three. */}
-              {scope === "tenant" ? (
+              {isTenantScope ? (
                 <TreeRolloutPanel
                   code={tree.code}
                   canManage={canManage}
@@ -969,9 +977,7 @@ export function DecisionTreeViewerPage(): ReactNode {
             ) : (
               <aside className="flex h-fit flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ap-line bg-ap-panel p-6 text-center text-sm text-ap-muted">
                 <p>{t("editor.panel.selectHint")}</p>
-                {canEdit ? (
-                  <p className="text-xs">{t("editor.panel.selectHintActions")}</p>
-                ) : null}
+                {canEdit ? <p className="text-xs">{t("editor.panel.selectHintActions")}</p> : null}
               </aside>
             )}
           </div>

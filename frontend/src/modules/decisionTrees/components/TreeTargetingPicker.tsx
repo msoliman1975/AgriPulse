@@ -8,7 +8,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { listCountries, type Country } from "@/api/countries";
+import { type Country } from "@/api/countries";
+
+import { countriesForScope, useAuthoringScope } from "../lib/authoringScope";
 import { CropPathFilter } from "@/modules/reports/components/CropPathFilter";
 
 // Mirrors backend farms.schemas.SoilTexture / the blocks.soil_texture CHECK.
@@ -73,10 +75,11 @@ export function TreeTargetingPicker({
   const isAr = i18n.language === "ar";
   const [pendingCrop, setPendingCrop] = useState<string | null>(null);
   const [countries, setCountries] = useState<Country[]>([]);
+  const scope = useAuthoringScope();
 
   useEffect(() => {
     let active = true;
-    listCountries()
+    countriesForScope(scope)
       .then((rows) => {
         if (active) setCountries(rows);
       })
@@ -84,7 +87,7 @@ export function TreeTargetingPicker({
     return () => {
       active = false;
     };
-  }, []);
+  }, [scope]);
 
   const addCrop = (): void => {
     if (pendingCrop && !cropPaths.includes(pendingCrop)) {
@@ -115,7 +118,10 @@ export function TreeTargetingPicker({
             {t("targeting.add")}
           </button>
         </div>
-        <Chips values={cropPaths} onRemove={(v) => onCropPathsChange(cropPaths.filter((c) => c !== v))} />
+        <Chips
+          values={cropPaths}
+          onRemove={(v) => onCropPathsChange(cropPaths.filter((c) => c !== v))}
+        />
         {cropPaths.length === 0 ? (
           <span className="text-[11px] text-ap-muted">{t("targeting.cropRequired")}</span>
         ) : null}

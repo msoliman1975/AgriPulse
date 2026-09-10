@@ -1,3 +1,4 @@
+import { listCountries, listCountriesAdmin, type Country } from "@/api/countries";
 import { useClaims } from "@/rbac/useCapability";
 
 /**
@@ -36,4 +37,15 @@ export function isEditableInScope(
 /** The route prefix the two scopes live under. */
 export function treesBasePath(scope: AuthoringScope): string {
   return scope === "platform" ? "/platform/decision-trees" : "/decision-trees";
+}
+
+/**
+ * The country list, from whichever route this caller may read.
+ *
+ * `/v1/countries` asserts a tenant context, so a platform admin gets 403 and
+ * the picker offers nothing — which is the one thing the picker exists for.
+ * `/v1/admin/countries` is the same catalogue behind `platform.read`.
+ */
+export function countriesForScope(scope: AuthoringScope): Promise<Country[]> {
+  return scope === "platform" ? listCountriesAdmin() : listCountries();
 }
