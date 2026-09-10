@@ -214,6 +214,10 @@ export interface ExplainTree {
   /** The status code the leaf resolved to, for every walk that reached one.
    *  Null on a skipped tree, and on a walk that errored before a leaf. */
   status_code: VerdictStatusCode | null;
+  /** The walk as prose, from `recommendations.narrative`. Empty for a
+   *  skipped tree and for a walk that errored before reaching a leaf. */
+  narrative_en: string;
+  narrative_ar: string;
   kind: string | null;
   action_type: RecommendationActionType | null;
   severity: RecommendationSeverity | null;

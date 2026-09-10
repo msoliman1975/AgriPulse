@@ -147,6 +147,12 @@ export interface VerdictReasoning {
    */
   reasoning_available: boolean;
   trace_id: string | null;
+  /** The walk as prose, composed on the backend so a report and an email
+   *  quote the same wording this screen shows. */
+  narrative_en: string;
+  narrative_ar: string;
+  text_en: string | null;
+  text_ar: string | null;
   evaluated_at: string | null;
   node_path: WalkStep[];
   resolved_values: Record<string, unknown>;

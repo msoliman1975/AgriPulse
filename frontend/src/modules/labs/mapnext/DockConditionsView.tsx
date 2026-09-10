@@ -223,6 +223,14 @@ export function DockConditionsView({
                 <StepRow key={s.node_id} step={s} fired={active.status === "fired"} />
               ))}
             </div>
+            {/* The same paragraph the Farm Health card shows, composed by the
+                same backend module so the two screens cannot describe one
+                block two ways. */}
+            {(i18n.language.startsWith("ar") ? active.narrative_ar : active.narrative_en) ? (
+              <p className="mt-2.5 max-w-prose text-sm leading-relaxed text-ap-ink">
+                {i18n.language.startsWith("ar") ? active.narrative_ar : active.narrative_en}
+              </p>
+            ) : null}
             {activeStatus ? (
               /* The status the tree declared, in its own colour. Without it
                  a tree that checked and approved reads exactly like a tree

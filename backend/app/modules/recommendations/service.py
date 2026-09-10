@@ -55,6 +55,7 @@ from app.modules.recommendations.events import (
     RecommendationDismissedV1,
     RecommendationOpenedV1,
 )
+from app.modules.recommendations.narrative import compose_both
 from app.modules.recommendations.repository import RecommendationsRepository
 from app.modules.recommendations.status_codes import STATUS_DEFINITIONS, worst
 from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
@@ -1253,6 +1254,22 @@ class RecommendationsServiceImpl:
         row["node_path"] = row.get("node_path") or []
         row["resolved_values"] = row.get("resolved_values") or {}
         row["param_overrides"] = row.get("param_overrides") or {}
+        # The walk as prose, in both languages. Composed here rather than in
+        # the browser so a report and a notification quote the same wording
+        # as the screen; the step list rides along for the reader who wants
+        # to audit a threshold.
+        narrative = compose_both(
+            status_code=str(row.get("status_code") or ""),
+            tree_code=str(row.get("tree_code") or ""),
+            text_en=row.get("text_en"),
+            text_ar=row.get("text_ar"),
+            node_path=row["node_path"],
+            resolved_values=row["resolved_values"],
+            evaluated_at=row.get("evaluated_at") or row.get("last_evaluated_at"),
+            reasoning_available=bool(row["reasoning_available"]),
+        )
+        row["narrative_en"] = narrative["en"]
+        row["narrative_ar"] = narrative["ar"]
         return row
 
     # ---- Read-only explain -------------------------------------------
@@ -1323,6 +1340,23 @@ class RecommendationsServiceImpl:
                     text_en=outcome.text_en,
                     text_ar=outcome.text_ar,
                 )
+            if outcome is not None:
+                # The same paragraph the Farm Health card shows, composed by
+                # the same module, so the two screens cannot describe one
+                # block two ways. These steps carry the raw condition, which
+                # the stored trace does not, so the thresholds here are the
+                # tree's own rather than inferred from its parameters.
+                narrative = compose_both(
+                    status_code=outcome.status_code,
+                    tree_code=str(tree["tree_code"]),
+                    text_en=outcome.text_en,
+                    text_ar=outcome.text_ar,
+                    node_path=entry.get("steps") or [],
+                    resolved_values=result.evaluation_snapshot,
+                    evaluated_at=datetime.now(UTC),
+                )
+                entry["narrative_en"] = narrative["en"]
+                entry["narrative_ar"] = narrative["ar"]
             trees.append(entry)
 
         for tree in setup.cell_trees:

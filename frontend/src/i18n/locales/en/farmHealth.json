@@ -72,7 +72,9 @@
     "leaf": "{{leaf}} · kind {{kind}} · status {{status}}",
     "loading": "Reading the walk behind this verdict…",
     "failed": "The reasoning could not be loaded. Try again in a moment.",
-    "pruned": "The walk behind this verdict is no longer kept. The verdict still stands; only the record of how the tree reached it has been cleared by retention."
+    "pruned": "The walk behind this verdict is no longer kept. The verdict still stands; only the record of how the tree reached it has been cleared by retention.",
+    "showSteps": "Show the checks as a table",
+    "hideSteps": "Hide the table"
   },
   "range": {
     "label": "Range",
