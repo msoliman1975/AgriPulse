@@ -1,9 +1,17 @@
 // Farm Health View — a farm coloured by what one decision tree says.
 //
-// This is the shell: the tree picker, the block rail, and a summary of
-// whichever block is selected. The map, the areas, the reasoning panel and
-// the date replay land on top of it in later changes; the rail and the
-// picker come first, because everything else reads its selection from them.
+// The shell: a tree picker, a block rail, a map, the replay under it, and a
+// panel that says what the tree concluded about the selected block.
+//
+// Two rules govern how it loads, both from Mohamed's 2026-09-10 pass:
+//
+//   * Nothing is blocked on a read it does not need. The blocks, the legend
+//     and the current verdicts are the screen; the grid's cell geometry and
+//     the replay's history are extras that arrive later and light up the
+//     parts that need them. Waiting for all five was most of the wait, and
+//     on the reference farm — every verdict block-scoped — the grid read was
+//     paid for and never used.
+//   * The map opens already framed on the farm. See `HealthMap`.
 //
 // See docs/proposals/farm-health-view-screen.md.
 
@@ -27,19 +35,29 @@ import { AsyncBoundary } from "@/components/AsyncBoundary";
 import { EmptyState } from "@/components/EmptyState";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
+import { Resizer } from "@/components/Resizer";
 import type { AsyncState } from "@/components/asyncState";
 import type { Polygon } from "geojson";
 import { useActiveFarmId } from "@/hooks/useActiveFarm";
 import { useCapability } from "@/rbac/useCapability";
 import { BlockList } from "../components/BlockList";
-import { AreaChips, AreaDetail, BlockSummary, BlockVerdictDetail } from "../components/AreaPanel";
+import {
+  AreaChips,
+  AreaDetail,
+  BlockSummary,
+  BlockVerdictDetail,
+  PanelSections,
+} from "../components/AreaPanel";
 import { HealthMap, type FitMode, type MapBlock, type MapCell } from "../components/HealthMap";
+import { MapDate } from "../components/MapDate";
 import { Transport } from "../components/Transport";
 import { buildAreas, pickArea, type AreaCell } from "../lib/areas";
+import { usePanelSize } from "../lib/panelSize";
 import {
   DEFAULT_RANGE,
   byBlock,
   customWindow,
+  dateOf,
   dayOf,
   isoOf,
   rangeWindow,
@@ -54,15 +72,28 @@ interface HealthData {
   blocks: BlockListItem[];
   statuses: StatusDefinition[];
   verdicts: FarmVerdicts;
-  /** Null when the farm has no grid. The map then draws blocks only. */
+  /** Null until the grid read lands, and for ever on an ungridded farm. */
   grid: FarmGridCellsResponse | null;
+  /** True while a needed grid read is still in flight. */
+  gridPending: boolean;
   /** Every verdict that stood at any point in the window, as intervals. */
   history: FarmVerdicts["blocks"][number]["verdicts"];
+  /** False while the history is still being read. The replay waits on it. */
+  historyReady: boolean;
   truncated: boolean;
 }
 
+/** The rail's width and the map's height, in pixels, before anyone drags. */
+const RAIL_DEFAULT = 308;
+const RAIL_MIN = 200;
+const RAIL_MAX = 560;
+const MAP_DEFAULT = 380;
+const MAP_MIN = 180;
+const MAP_MAX = 900;
+
 export function FarmHealthViewPage(): ReactNode {
-  const { t } = useTranslation(["farmHealth", "common"]);
+  const { t, i18n } = useTranslation(["farmHealth", "common"]);
+  const arabic = i18n.language.startsWith("ar");
   const farmId = useActiveFarmId();
   const canRead = useCapability("recommendation.read", { farmId });
   const [treeCode, setTreeCode] = useState<string | null>(null);
@@ -77,6 +108,12 @@ export function FarmHealthViewPage(): ReactNode {
   // at once would push the map off screen.
   const [openVerdictId, setOpenVerdictId] = useState<string | null>(null);
   const [fitMode, setFitMode] = useState<FitMode>("block");
+
+  // The panels a reader can resize. Remembered per browser, because the
+  // reason someone widened the rail — long block names — is still true on
+  // their next visit.
+  const [railWidth, setRailWidth] = usePanelSize("rail", RAIL_DEFAULT);
+  const [mapHeight, setMapHeight] = usePanelSize("map", MAP_DEFAULT);
 
   // The clock is read once per mount. Reading it per render would move the
   // window under a replay that is running across midnight.
@@ -102,15 +139,6 @@ export function FarmHealthViewPage(): ReactNode {
     queryFn: () => listBlocks(farmId as string, { include_boundary: true }),
     enabled: Boolean(farmId),
   });
-  // Cell geometry. It is the same on every replay frame and for every tree,
-  // so it is fetched once per farm and joined on cell_id, rather than
-  // travelling with each verdict.
-  const gridQuery = useQuery({
-    queryKey: ["farm-grid-cells", farmId],
-    queryFn: () => getFarmGridCells(farmId as string, "ndvi"),
-    enabled: Boolean(farmId),
-    staleTime: 60 * 60 * 1000,
-  });
   // The legend. Served rather than shipped in the bundle, so the colours the
   // map paints and the ranks the backend sorts by cannot drift apart.
   const statusesQuery = useQuery({
@@ -123,6 +151,27 @@ export function FarmHealthViewPage(): ReactNode {
     queryFn: () => getFarmVerdicts(farmId as string),
     enabled: Boolean(farmId),
   });
+
+  // Does any tree on this farm answer per cell? Only then is the grid worth
+  // reading. It is the heaviest call on the screen — every cell of every
+  // block, with geometry — and on a farm whose trees are all block-scoped it
+  // was fetched, waited for, and then thrown away.
+  const needsCells = useMemo(
+    () =>
+      (verdictsQuery.data?.blocks ?? []).some((block) =>
+        block.verdicts.some((verdict) => verdict.cell_id !== null),
+      ),
+    [verdictsQuery.data],
+  );
+  // Cell geometry. It is the same on every replay frame and for every tree,
+  // so it is fetched once per farm and joined on cell_id, rather than
+  // travelling with each verdict.
+  const gridQuery = useQuery({
+    queryKey: ["farm-grid-cells", farmId],
+    queryFn: () => getFarmGridCells(farmId as string, "ndvi"),
+    enabled: Boolean(farmId) && needsCells,
+    staleTime: 60 * 60 * 1000,
+  });
   // The whole window in one read. Asking per day would be 365 requests for a
   // farm whose answers change a handful of times, and the client rebuilds
   // each frame from the intervals with the same test the SQL uses.
@@ -134,10 +183,19 @@ export function FarmHealthViewPage(): ReactNode {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Three reads, one ladder. `queryState` takes a single query, so the
-  // combination is written out: the first failure wins, and nothing renders
-  // until all three have data — a rail built from blocks without verdicts
-  // would show every block as "tree did not run".
+  // Three reads, one ladder, and only three. `queryState` takes a single
+  // query, so the combination is written out: the first failure wins, and
+  // nothing renders until all three have data — a rail built from blocks
+  // without verdicts would show every block as "tree did not run".
+  //
+  // The grid and the history are NOT in the ladder. Neither is needed to
+  // draw the newest day, which is the day the screen opens on, and blocking
+  // on them made the wait the slowest of five reads instead of the slowest
+  // of three. What each one gates instead:
+  //   * the grid — the cell layer and the area list, which have nothing to
+  //     draw until it lands anyway;
+  //   * the history — the replay controls, which are disabled and say so
+  //     rather than drawing today's verdicts under an older date.
   const state: AsyncState<HealthData> = useMemo(() => {
     for (const query of [blocksQuery, statusesQuery, verdictsQuery]) {
       if (query.isError) {
@@ -147,11 +205,6 @@ export function FarmHealthViewPage(): ReactNode {
     if (!blocksQuery.data || !statusesQuery.data || !verdictsQuery.data) {
       return { status: "loading" };
     }
-    // The grid is allowed to be absent — an ungridded farm still has blocks
-    // and block-scoped verdicts — but not still loading, or the map would
-    // draw once without cells and again with them.
-    if (gridQuery.isPending) return { status: "loading" };
-    if (historyQuery.isPending) return { status: "loading" };
     return {
       status: "success",
       data: {
@@ -159,11 +212,13 @@ export function FarmHealthViewPage(): ReactNode {
         statuses: statusesQuery.data,
         verdicts: verdictsQuery.data,
         grid: gridQuery.data ?? null,
+        gridPending: needsCells && !gridQuery.data && !gridQuery.isError,
         history: historyQuery.data?.verdicts ?? [],
+        historyReady: !historyQuery.isPending,
         truncated: historyQuery.data?.truncated ?? false,
       },
     };
-  }, [blocksQuery, statusesQuery, verdictsQuery, gridQuery, historyQuery]);
+  }, [blocksQuery, statusesQuery, verdictsQuery, gridQuery, historyQuery, needsCells]);
 
   if (!farmId) return <Navigate to="/farms" replace />;
   if (!canRead) return <Navigate to="/" replace />;
@@ -195,11 +250,17 @@ export function FarmHealthViewPage(): ReactNode {
                     verdicts,
                   }),
                 );
-            const trees = treeOptions(frameBlocks);
+            // The picker is built from the LIVE read, not from the frame.
+            // Built from the frame it rewrote itself during a replay — a
+            // tree that said nothing on 12 August vanished from the list on
+            // that frame and came back on the next one.
+            const trees = treeOptions(data.verdicts.blocks, arabic);
             // The picker defaults to the first tree that has said anything
             // here. A tree with no verdict on this farm paints an entirely
             // blank screen, which a reader cannot tell from a broken one.
             const activeTree = treeCode ?? trees[0]?.code ?? null;
+            const activeTreeName =
+              trees.find((tree) => tree.code === activeTree)?.label ?? activeTree;
             const blocks: BlockMeta[] = data.blocks.map((block) => ({
               id: block.id,
               code: block.code,
@@ -285,6 +346,24 @@ export function FarmHealthViewPage(): ReactNode {
               : activeArea;
             const highlighted = new Set((shownArea?.cells ?? []).map((cell) => cell.cellId));
 
+            // The block holds cell verdicts and the geometry that turns them
+            // into areas is still in flight. Saying "no cell verdicts" here
+            // would be false, and saying nothing reads as a broken panel.
+            //
+            // Gated on the READ, not on the result: a grid that has landed
+            // and holds nothing for this block is an answer, and the sentence
+            // for it is the one below.
+            const cellsPending = data.gridPending && statusByCell.size > 0;
+
+            const currentDay = win.fromDay + dayIndex;
+            const dateText = new Intl.DateTimeFormat(i18n.language, {
+              weekday: "short",
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+              timeZone: "UTC",
+            }).format(dateOf(currentDay));
+
             return (
               <div className="flex min-h-0 flex-1 flex-col">
                 <div className="flex items-end gap-3 border-b border-ap-line bg-ap-panel px-4 py-2">
@@ -303,47 +382,19 @@ export function FarmHealthViewPage(): ReactNode {
                         setBlockId(null);
                         setAreaKey(null);
                       }}
-                      className="rounded border border-ap-line bg-ap-panel px-2 py-1.5 text-sm"
+                      className="min-w-[16rem] rounded border border-ap-line bg-ap-panel px-2 py-1.5 text-sm"
                     >
+                      {/* The tree's name, in the reader's language. The value
+                          stays the code, because that is what a verdict row
+                          carries and what the rail filters on. */}
                       {trees.map((tree) => (
                         <option key={tree.code} value={tree.code}>
-                          {tree.code}
+                          {tree.label}
                         </option>
                       ))}
                     </select>
                   </label>
                 </div>
-
-                <Transport
-                  win={win}
-                  dayIndex={dayIndex}
-                  rangeId={rangeId}
-                  today={today}
-                  playing={playing}
-                  speed={speed}
-                  onDayIndex={setDayIndex}
-                  onRange={(next) => {
-                    setPlaying(false);
-                    setRangeId(next);
-                    if (next !== "custom") {
-                      const w = rangeWindow(next, today);
-                      setWin(w);
-                      // A new window always opens on its newest day.
-                      setDayIndex(windowLength(w) - 1);
-                    }
-                  }}
-                  onCustom={(fromIso, toIso) => {
-                    const w = customWindow(fromIso, toIso, today);
-                    if (!w) return;
-                    setPlaying(false);
-                    setRangeId("custom");
-                    setWin(w);
-                    setDayIndex(windowLength(w) - 1);
-                  }}
-                  onPlay={() => setPlaying(true)}
-                  onStop={() => setPlaying(false)}
-                  onSpeed={setSpeed}
-                />
 
                 {data.truncated ? (
                   <p className="border-b border-ap-line bg-ap-warn-soft px-4 py-2 text-sm text-ap-warn">
@@ -351,8 +402,11 @@ export function FarmHealthViewPage(): ReactNode {
                   </p>
                 ) : null}
 
-                <div className="grid min-h-0 flex-1 grid-cols-[308px_minmax(0,1fr)]">
-                  <aside className="min-h-0 overflow-y-auto border-e border-ap-line bg-ap-panel">
+                <div className="flex min-h-0 flex-1">
+                  <aside
+                    className="flex min-h-0 shrink-0 flex-col overflow-y-auto bg-ap-panel"
+                    style={{ width: `${railWidth}px` }}
+                  >
                     <div className="border-b border-ap-line px-3 py-2.5">
                       <span className="text-meta font-semibold uppercase tracking-wide text-ap-muted">
                         {t("farmHealth:rail.heading")}
@@ -370,8 +424,23 @@ export function FarmHealthViewPage(): ReactNode {
                     />
                   </aside>
 
-                  <section className="grid min-h-0 grid-rows-[minmax(240px,46%)_minmax(0,1fr)]">
-                    <div className="relative min-h-0 border-b border-ap-line">
+                  <Resizer
+                    orientation="vertical"
+                    value={railWidth}
+                    min={RAIL_MIN}
+                    max={RAIL_MAX}
+                    onChange={setRailWidth}
+                    label={t("farmHealth:resize.rail")}
+                    // Under RTL the rail sits on the right, so the drag that
+                    // widens it is the one going left.
+                    reversed={arabic}
+                  />
+
+                  <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+                    <div
+                      className="relative shrink-0 border-b border-ap-line"
+                      style={{ height: `${mapHeight}px` }}
+                    >
                       <div className="absolute inset-inline-start-3 top-3 z-10 flex flex-col items-start gap-1.5">
                         {(
                           [
@@ -396,6 +465,7 @@ export function FarmHealthViewPage(): ReactNode {
                           </button>
                         ))}
                       </div>
+                      <MapDate text={dateText} dayKey={currentDay} />
                       <HealthMap
                         blocks={mapBlocks}
                         cells={mapCells}
@@ -418,17 +488,64 @@ export function FarmHealthViewPage(): ReactNode {
                         fitKey={`${selectedBlockId ?? ""}|${activeArea?.key ?? ""}`}
                       />
                     </div>
-                    <div className="grid min-h-0 gap-4 overflow-y-auto p-4">
+
+                    {/* Directly under the map, so the control and the picture
+                        it moves are next to each other. */}
+                    <Transport
+                      win={win}
+                      dayIndex={dayIndex}
+                      rangeId={rangeId}
+                      today={today}
+                      playing={playing}
+                      speed={speed}
+                      ready={data.historyReady}
+                      onDayIndex={setDayIndex}
+                      onRange={(next) => {
+                        setPlaying(false);
+                        setRangeId(next);
+                        if (next !== "custom") {
+                          const w = rangeWindow(next, today);
+                          setWin(w);
+                          // A new window always opens on its newest day.
+                          setDayIndex(windowLength(w) - 1);
+                        }
+                      }}
+                      onCustom={(fromIso, toIso) => {
+                        const w = customWindow(fromIso, toIso, today);
+                        if (!w) return;
+                        setPlaying(false);
+                        setRangeId("custom");
+                        setWin(w);
+                        setDayIndex(windowLength(w) - 1);
+                      }}
+                      onPlay={() => setPlaying(true)}
+                      onStop={() => setPlaying(false)}
+                      onSpeed={setSpeed}
+                    />
+
+                    <Resizer
+                      orientation="horizontal"
+                      value={mapHeight}
+                      min={MAP_MIN}
+                      max={MAP_MAX}
+                      onChange={setMapHeight}
+                      label={t("farmHealth:resize.map")}
+                    />
+
+                    <div className="min-h-0 flex-1 overflow-y-auto p-4">
                       {selected === null ? (
                         <p className="text-sm text-ap-muted">{t("farmHealth:empty.noBlock")}</p>
                       ) : (
-                        <>
+                        // One frame around the whole answer: what the block
+                        // reads as, what the tree said about it, and the area
+                        // in focus. They were three cards until 2026-09-10.
+                        <PanelSections>
                           <BlockSummary
                             row={selected}
                             statuses={data.statuses}
                             rows={gridRows}
                             cols={gridCols}
-                            treeCode={activeTree}
+                            treeName={activeTreeName}
                           />
 
                           {/* A block tree writes one verdict with no cell, so
@@ -451,14 +568,22 @@ export function FarmHealthViewPage(): ReactNode {
                           ))}
 
                           {areas.length === 0 ? (
-                            // The summary above already says it when the tree
-                            // did not run; saying it twice reads as two
+                            cellsPending ? (
+                              <section>
+                                <p className="text-sm text-ap-muted">
+                                  {t("farmHealth:area.loading")}
+                                </p>
+                              </section>
+                            ) : // The summary above already says it when the
+                            // tree did not run; saying it twice reads as two
                             // different facts.
                             selected.didNotRun ? null : (
-                              <p className="text-sm text-ap-muted">{t("farmHealth:area.none")}</p>
+                              <section>
+                                <p className="text-sm text-ap-muted">{t("farmHealth:area.none")}</p>
+                              </section>
                             )
                           ) : (
-                            <div className="grid gap-2">
+                            <section>
                               <div className="flex flex-wrap items-baseline gap-3">
                                 <span className="text-meta font-semibold uppercase tracking-wide text-ap-muted">
                                   {t("farmHealth:area.heading")}
@@ -467,25 +592,28 @@ export function FarmHealthViewPage(): ReactNode {
                                   {t("farmHealth:area.hint", { count: areas.length })}
                                 </span>
                               </div>
-                              <AreaChips
-                                areas={areas}
-                                statuses={data.statuses}
-                                selectedKey={activeArea?.key ?? null}
-                                onSelect={setAreaKey}
-                                onHover={setHoveredKey}
-                              />
+                              <div className="mt-2">
+                                <AreaChips
+                                  areas={areas}
+                                  statuses={data.statuses}
+                                  selectedKey={activeArea?.key ?? null}
+                                  onSelect={setAreaKey}
+                                  onHover={setHoveredKey}
+                                />
+                              </div>
                               {activeArea ? (
                                 <AreaDetail
                                   area={activeArea}
+                                  statuses={data.statuses}
                                   farmId={farmId}
                                   blockId={selected.blockId}
                                   open={reasoningOpen}
                                   onToggle={() => setReasoningOpen((was) => !was)}
                                 />
                               ) : null}
-                            </div>
+                            </section>
                           )}
-                        </>
+                        </PanelSections>
                       )}
                     </div>
                   </section>

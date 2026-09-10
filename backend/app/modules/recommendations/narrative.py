@@ -310,6 +310,7 @@ def compose(
     *,
     status_code: str,
     tree_code: str,
+    tree_name: str | None = None,
     text: str | None,
     node_path: Sequence[Mapping[str, Any]],
     resolved_values: Mapping[str, Any] | None = None,
@@ -324,8 +325,14 @@ def compose(
     and the leaf's own sentence are repeated there even though the card shows
     them above: this paragraph is quoted into reports and emails, where
     nothing else is on the page.
+
+    ``tree_name`` is the tree's own name, and is what the last sentence uses.
+    Without it the paragraph ended "So t_mango_cwsi reports Alert", which put
+    an authoring handle in the one sentence a grower reads. The code stays
+    the fallback, because a verdict outlives its catalog row.
     """
     words = _WORDS.get(language, _WORDS["en"])
+    tree_label = (tree_name or "").strip() or tree_code
     arabic = language == "ar"
     status = STATUS_BY_CODE.get(status_code)
     status_label = (
@@ -356,15 +363,20 @@ def compose(
 
     if text:
         parts.append(
-            words["concludes"].format(tree=tree_code, status=status_label, text=text.strip())
+            words["concludes"].format(tree=tree_label, status=status_label, text=text.strip())
         )
     else:
-        parts.append(words["concludes_no_text"].format(tree=tree_code, status=status_label))
+        parts.append(words["concludes_no_text"].format(tree=tree_label, status=status_label))
     return words["sep"].join(parts)
 
 
 def compose_both(
-    *, text_en: str | None = None, text_ar: str | None = None, **kwargs: Any
+    *,
+    text_en: str | None = None,
+    text_ar: str | None = None,
+    tree_name_en: str | None = None,
+    tree_name_ar: str | None = None,
+    **kwargs: Any,
 ) -> dict[str, str]:
     """The paragraph in both languages, which is what every caller wants.
 
@@ -372,8 +384,18 @@ def compose_both(
     is the author's, not a translation: passing one text for both languages
     put an English conclusion at the end of an Arabic paragraph, which is
     what a real production walk showed on 2026-09-09.
+
+    The tree's name is chosen per language the same way, and for the same
+    reason: the Arabic name is the author's, not a translation of the English
+    one. An Arabic reader with no Arabic name falls back to the English name
+    before falling back to the code.
     """
     return {
-        "en": compose(**kwargs, text=text_en, language="en"),
-        "ar": compose(**kwargs, text=text_ar or text_en, language="ar"),
+        "en": compose(**kwargs, text=text_en, tree_name=tree_name_en, language="en"),
+        "ar": compose(
+            **kwargs,
+            text=text_ar or text_en,
+            tree_name=tree_name_ar or tree_name_en,
+            language="ar",
+        ),
     }

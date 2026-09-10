@@ -15,6 +15,7 @@ from app.modules.recommendations.service import (
     RecommendationsServiceImpl,
     _as_utc,
     _block_group,
+    _leaf_labels,
 )
 from app.modules.recommendations.status_codes import STATUS_CODES
 
@@ -117,3 +118,59 @@ def test_the_catalog_serves_every_code_with_both_labels() -> None:
         assert entry["label_en"]
         assert entry["label_ar"]
         assert entry["label_en"] != entry["label_ar"]
+
+
+# ---- the leaf is named, not coded -----------------------------------------
+#
+# The reasoning card's last line printed `leaf_dry_medium` — the tree
+# author's handle for the leaf — on the one line that states the answer. The
+# label is already in the walk, on the step that carries no match, because a
+# leaf is the answer rather than a check.
+
+
+def _step(node_id: str, matched: bool | None, label: str | None) -> dict[str, Any]:
+    return {"node_id": node_id, "matched": matched, "label_en": label, "label_ar": None}
+
+
+def test_the_leaf_is_the_step_that_carries_no_match() -> None:
+    labels = _leaf_labels(
+        [
+            _step("root", False, "Is it saturated?"),
+            _step("medium", True, "Is it above the bound?"),
+            _step("leaf_dry_medium", None, "Irrigate within 24 hours"),
+        ]
+    )
+
+    assert labels == ("Irrigate within 24 hours", None)
+
+
+def test_the_leaf_is_read_from_the_end() -> None:
+    """A malformed walk with an unmatched step in the middle must not be
+    mistaken for the conclusion."""
+    labels = _leaf_labels(
+        [
+            _step("odd", None, "Not the answer"),
+            _step("check", True, "A real check"),
+            _step("leaf", None, "The answer"),
+        ]
+    )
+
+    assert labels[0] == "The answer"
+
+
+def test_a_pruned_walk_names_no_leaf() -> None:
+    """Retention prunes the run behind a verdict. The caller then keeps
+    showing the node id, which is worse to read but never wrong."""
+    assert _leaf_labels([]) == (None, None)
+
+
+def test_a_leaf_with_a_blank_label_names_no_leaf() -> None:
+    assert _leaf_labels([_step("leaf", None, "")]) == (None, None)
+
+
+def test_both_languages_come_back_when_the_leaf_carries_both() -> None:
+    labels = _leaf_labels(
+        [{"node_id": "leaf", "matched": None, "label_en": "Irrigate", "label_ar": "اسقِ"}]
+    )
+
+    assert labels == ("Irrigate", "اسقِ")

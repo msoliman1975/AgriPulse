@@ -34,7 +34,8 @@
     "heading": "Selected area",
     "hint_one": "1 area. Neighbouring cells with the same verdict are one area; one- and two-cell spots are merged into a scattered entry.",
     "hint_other": "{{count}} areas. Neighbouring cells with the same verdict are one area; one- and two-cell spots are merged into a scattered entry.",
-    "none": "This block has no cell verdicts for this tree."
+    "none": "This block has no cell verdicts for this tree.",
+    "loading": "Reading the block's cell grid…"
   },
   "direction": {
     "north-west": "north-west",
@@ -74,7 +75,13 @@
     "failed": "The reasoning could not be loaded. Try again in a moment.",
     "pruned": "The walk behind this verdict is no longer kept. The verdict still stands; only the record of how the tree reached it has been cleared by retention.",
     "showSteps": "Show the checks as a table",
-    "hideSteps": "Hide the table"
+    "hideSteps": "Hide the table",
+    "kind": {
+      "alert": "alert",
+      "recommendation": "recommendation",
+      "status": "status",
+      "no_action": "no action needed"
+    }
   },
   "range": {
     "label": "Range",
@@ -95,7 +102,8 @@
     "pause": "Pause the replay",
     "latest": "Latest",
     "date": "Date",
-    "speed": "Replay speed"
+    "speed": "Replay speed",
+    "loadingHistory": "Loading the history for this range…"
   },
   "map": {
     "fitBlock": "Fit block",
@@ -103,5 +111,9 @@
     "fitFarm": "Whole farm",
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out"
+  },
+  "resize": {
+    "rail": "Block list width",
+    "map": "Map height"
   }
 }

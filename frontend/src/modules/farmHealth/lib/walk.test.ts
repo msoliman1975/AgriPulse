@@ -124,3 +124,20 @@ describe("sharedPrefix", () => {
     expect(sharedPrefix([a, b])).toBe(0);
   });
 });
+
+describe("the leaf", () => {
+  it("is not listed as a step", () => {
+    // A serialized walk ends with the leaf, whose `matched` is null because
+    // it is the answer rather than a check. Left in the table it drew a
+    // final row headed by the leaf's own words and marked "no".
+    const rows = walkRows(
+      [
+        { node_id: "check", matched: true, label_en: "Is CWSI above the bound?" },
+        { node_id: "leaf_above", matched: null, label_en: "Add one irrigation set" },
+      ],
+      false,
+    );
+
+    expect(rows.map((row) => row.nodeId)).toEqual(["check"]);
+  });
+});

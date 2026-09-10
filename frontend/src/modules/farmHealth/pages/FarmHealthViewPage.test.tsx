@@ -34,9 +34,17 @@ vi.mock("../components/HealthMap", () => ({
 }));
 
 const grid = vi.hoisted((): { current: unknown } => ({ current: null }));
+// Which reads are still in flight. The screen must draw without the grid and
+// without the history, so a test has to be able to hold them open.
+const held = vi.hoisted(() => ({ grid: false, history: false }));
+const gridCalls = vi.hoisted(() => vi.fn());
 
 vi.mock("@/api/grid", () => ({
-  getFarmGridCells: vi.fn(async () => grid.current),
+  getFarmGridCells: vi.fn(async () => {
+    gridCalls();
+    if (held.grid) await new Promise(() => {});
+    return grid.current;
+  }),
 }));
 
 /** A square cell polygon at (row, col). Geometry only; no verdict. */
@@ -82,6 +90,8 @@ function verdict(blockId: string, treeCode: string, status: StatusCode, cell?: n
     scope: cell === undefined ? "block" : "cell",
     tree_id: `tree-${treeCode}`,
     tree_code: treeCode,
+    tree_name_en: null,
+    tree_name_ar: null,
     tree_version: 1,
     leaf_node_id: "leaf_ok",
     kind: "status",
@@ -157,7 +167,10 @@ vi.mock("@/api/farmHealth", async (importOriginal) => {
     ]),
     getFarmVerdicts: vi.fn(async () => farmVerdicts.current),
     getVerdictReasoning: vi.fn(async () => reasoning.current),
-    getFarmVerdictHistory: vi.fn(async () => history.current),
+    getFarmVerdictHistory: vi.fn(async () => {
+      if (held.history) await new Promise(() => {});
+      return history.current;
+    }),
   };
 });
 
@@ -204,6 +217,9 @@ function renderPage() {
 describe("FarmHealthViewPage", () => {
   beforeEach(async () => {
     await setupTestI18n("en");
+    held.grid = false;
+    held.history = false;
+    gridCalls.mockClear();
     grid.current = { farm_id: FARM_ID, index_code: "ndvi", blocks: [] };
     history.current = { farm_id: FARM_ID, from_at: "", to_at: "", tree_code: null, truncated: false, verdicts: [] };
     reasoning.current = {
@@ -215,8 +231,12 @@ describe("FarmHealthViewPage", () => {
       scope: "cell",
       tree_id: "tree-1",
       tree_code: "t_cwsi",
+      tree_name_en: null,
+      tree_name_ar: null,
       tree_version: 1,
       leaf_node_id: "leaf_dry",
+      leaf_label_en: "Irrigate within 24 hours",
+      leaf_label_ar: "اسقِ خلال 24 ساعة",
       kind: "recommendation",
       status_code: "alert",
       severity: "medium",
@@ -602,6 +622,8 @@ describe("FarmHealthViewPage", () => {
       from_at: "",
       to_at: "",
       tree_code: null,
+      tree_name_en: null,
+      tree_name_ar: null,
       truncated: false,
       verdicts: [
         {
@@ -665,6 +687,8 @@ describe("FarmHealthViewPage", () => {
       from_at: "",
       to_at: "",
       tree_code: null,
+      tree_name_en: null,
+      tree_name_ar: null,
       truncated: true,
       verdicts: [],
     };
@@ -745,6 +769,149 @@ describe("FarmHealthViewPage", () => {
     await waitFor(() => {
       expect(mapProps.current?.fitKey).toBe(before);
     });
+  });
+
+  it("names the tree in the picker, and keeps the code as the value", async () => {
+    // The picker listed `t_cwsi` and `t_ndvi`. Those are authoring handles.
+    farmVerdicts.current = {
+      farm_id: FARM_ID,
+      as_of: null,
+      blocks: [
+        farmBlock("b1", [
+          { ...verdict("b1", "t_cwsi", "alert"), tree_name_en: "Mango water stress" },
+          { ...verdict("b1", "t_ndvi", "good"), tree_name_en: "Canopy vigour" },
+        ]),
+      ],
+    };
+    renderPage();
+
+    const picker = await screen.findByRole("combobox", { name: "Decision tree" });
+    const options = within(picker).getAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual([
+      "Canopy vigour",
+      "Mango water stress",
+    ]);
+    // The value is still the code: it is what a verdict row carries.
+    expect(options.map((option) => (option as HTMLOptionElement).value)).toEqual([
+      "t_ndvi",
+      "t_cwsi",
+    ]);
+  });
+
+  it("names the tree when saying it did not run, not its code", async () => {
+    farmVerdicts.current = {
+      farm_id: FARM_ID,
+      as_of: null,
+      blocks: [
+        farmBlock("b1", [
+          { ...verdict("b1", "t_cwsi", "good"), tree_name_en: "Mango water stress" },
+        ]),
+      ],
+    };
+    renderPage();
+
+    const rail = await screen.findByRole("list");
+    const target = within(rail)
+      .getAllByRole("button")
+      .find((button) => button.textContent?.includes("AG-R02-C01"));
+    fireEvent.click(target as HTMLElement);
+
+    expect(
+      await screen.findByText(/Mango water stress did not run on this block\./),
+    ).toBeInTheDocument();
+  });
+
+  it("names the leaf the tree reached, not its node id", async () => {
+    // `leaf_dry` is an authoring handle, printed on the one line that states
+    // the answer. So were the kind and the status, as database codes.
+    withCells();
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Show how this was decided" }));
+
+    expect(await screen.findByText(/Irrigate within 24 hours/)).toBeInTheDocument();
+    expect(screen.queryByText(/leaf_dry/)).not.toBeInTheDocument();
+    // The kind and the status are words on the same line.
+    // The kind and the status ride the same line, and were codes too. This
+    // verdict is a status leaf, so "kind status" is the honest reading.
+    expect(screen.getByText(/kind status · status Alert/)).toBeInTheDocument();
+  });
+
+  it("shows the day on the map rather than beside the controls", async () => {
+    renderPage();
+
+    const caption = await screen.findByTestId("farm-health-map-date");
+    // A real date, formatted, not an ISO string or a day number.
+    expect(caption.textContent).toMatch(/\d{4}/);
+  });
+
+  it("puts the replay controls under the map, not above it", async () => {
+    renderPage();
+
+    const map = await screen.findByTestId("health-map");
+    const range = screen.getByRole("combobox", { name: "Range" });
+    // DOCUMENT_POSITION_FOLLOWING: the range control comes after the map.
+    expect(map.compareDocumentPosition(range) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("offers a handle for the block list and one for the map", async () => {
+    renderPage();
+
+    expect(await screen.findByRole("separator", { name: "Block list width" })).toBeInTheDocument();
+    expect(screen.getByRole("separator", { name: "Map height" })).toBeInTheDocument();
+  });
+
+  it("resizes the block list from the keyboard", async () => {
+    renderPage();
+
+    const handle = await screen.findByRole("separator", { name: "Block list width" });
+    const before = Number(handle.getAttribute("aria-valuenow"));
+    fireEvent.keyDown(handle, { key: "ArrowRight" });
+
+    await waitFor(() => {
+      expect(Number(handle.getAttribute("aria-valuenow"))).toBeGreaterThan(before);
+    });
+  });
+
+  it("draws the farm without waiting for the grid or the history", async () => {
+    // Both reads were in the loading gate. On a farm whose trees all answer
+    // per block the grid was fetched, waited for, and never used.
+    held.grid = true;
+    held.history = true;
+    withCells();
+    renderPage();
+
+    const rail = await screen.findByRole("list");
+    expect(within(rail).getAllByRole("button").length).toBeGreaterThan(0);
+    expect(await screen.findByTestId("health-map")).toBeInTheDocument();
+  });
+
+  it("does not read the grid at all when every verdict is block-scoped", async () => {
+    // The heaviest call on the screen, for geometry nothing would join to.
+    farmVerdicts.current = {
+      farm_id: FARM_ID,
+      as_of: null,
+      blocks: [farmBlock("b1", [verdict("b1", "t_cwsi", "good")])],
+    };
+    renderPage();
+
+    await screen.findByTestId("health-map");
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 2 })).toBeInTheDocument();
+    });
+    expect(gridCalls).not.toHaveBeenCalled();
+  });
+
+  it("holds the replay until the history it would draw has landed", async () => {
+    // Scrubbing without the intervals would draw today's verdicts under an
+    // older date — a wrong map that looks entirely plausible.
+    held.history = true;
+    renderPage();
+
+    const scrubber = await screen.findByRole("slider", { name: "Date" });
+    expect(scrubber).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Play the replay" })).toBeDisabled();
+    expect(screen.getByText(/Loading the history for this range/)).toBeInTheDocument();
   });
 
   it("says so when no tree has run on the farm at all", async () => {

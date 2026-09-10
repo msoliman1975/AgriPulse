@@ -244,3 +244,58 @@ def test_a_threshold_is_not_reported_as_a_reading() -> None:
     text = _compose(node_path=[step, LEAF_STEP])
 
     assert "the reading was SMI (mean) 0.7643, against medium smi normal floor 0.4" in text
+
+
+# ---- the tree is named, not coded ----------------------------------------
+
+
+def test_the_conclusion_names_the_tree_rather_than_its_code() -> None:
+    """The paragraph ended "So t_mango_cwsi reports Alert".
+
+    That is an authoring handle in the one sentence a grower reads, and the
+    same sentence is quoted into reports and emails.
+    """
+    both = compose_both(
+        status_code="alert",
+        tree_code="t_mango_cwsi",
+        tree_name_en="Mango water stress",
+        tree_name_ar="إجهاد الماء في المانجو",
+        text_en="Irrigate within 24 hours.",
+        text_ar="اسقِ خلال 24 ساعة.",
+        node_path=[LEAF_STEP],
+    )
+
+    assert "Mango water stress reports" in both["en"]
+    assert "t_mango_cwsi" not in both["en"]
+    assert "إجهاد الماء في المانجو" in both["ar"]
+    assert "t_mango_cwsi" not in both["ar"]
+
+
+def test_the_code_is_the_fallback_when_no_name_was_sent() -> None:
+    """A verdict outlives the catalog row that holds its name, and an older
+    API sends no name at all. The code is worse to read and never wrong."""
+    both = compose_both(
+        status_code="good",
+        tree_code="qa_v1",
+        text_en="All clear.",
+        node_path=[LEAF_STEP],
+    )
+
+    assert "qa_v1 reports" in both["en"]
+    assert "qa_v1" in both["ar"]
+
+
+def test_arabic_falls_back_to_the_english_name_before_the_code() -> None:
+    """The name belongs to the tree's author. A tenant-authored tree may
+    carry only English, and an English name reads better than a code."""
+    both = compose_both(
+        status_code="good",
+        tree_code="qa_v1",
+        tree_name_en="Canopy vigour",
+        tree_name_ar=None,
+        text_en="All clear.",
+        node_path=[LEAF_STEP],
+    )
+
+    assert "Canopy vigour" in both["ar"]
+    assert "qa_v1" not in both["ar"]

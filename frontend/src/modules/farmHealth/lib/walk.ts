@@ -114,14 +114,21 @@ export function readText(step: WalkStep): string | null {
  * translated here — only chosen.
  */
 export function walkRows(steps: WalkStep[], arabic: boolean): StepRow[] {
-  return steps.map((step) => ({
-    nodeId: step.node_id,
-    question:
-      (arabic ? (step.label_ar ?? step.label_en) : step.label_en) ?? step.node_id,
-    read: readText(step),
-    test: testText(step.condition),
-    matched: step.matched,
-  }));
+  return (
+    steps
+      // The leaf carries no match, because it is the answer rather than a
+      // check. Left in, it drew a final row headed by the leaf's own words
+      // and marked "no" — the conclusion, listed as a test that failed. The
+      // answer has its own line under the table.
+      .filter((step) => typeof step.matched === "boolean")
+      .map((step) => ({
+        nodeId: step.node_id,
+        question: (arabic ? (step.label_ar ?? step.label_en) : step.label_en) ?? step.node_id,
+        read: readText(step),
+        test: testText(step.condition),
+        matched: step.matched === true,
+      }))
+  );
 }
 
 /**

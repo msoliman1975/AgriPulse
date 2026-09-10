@@ -106,22 +106,55 @@ export function buildBlockRows(
   });
 }
 
+/** One entry of the tree picker: the code it selects by, the name it shows. */
+export interface TreeOption {
+  code: string;
+  count: number;
+  /** The tree's own name in the reader's language, or the code when it has none. */
+  label: string;
+}
+
+/**
+ * The tree's name for a reader, chosen and never translated.
+ *
+ * The name belongs to the tree's author, so Arabic falls back to the English
+ * name rather than to a translation of it, and both fall back to the code:
+ * an older API sends no name at all, and a verdict outlives the catalog row
+ * that holds one.
+ */
+export function treeLabel(
+  verdict: { tree_code: string; tree_name_en?: string | null; tree_name_ar?: string | null },
+  arabic: boolean,
+): string {
+  const chosen = arabic ? (verdict.tree_name_ar ?? verdict.tree_name_en) : verdict.tree_name_en;
+  return (chosen ?? "").trim() || verdict.tree_code;
+}
+
 /**
  * Every tree that has said something about this farm.
  *
  * The picker lists these rather than every published tree: a tree with no
  * verdict on this farm would paint an entirely blank map, and the reader
- * cannot tell that from a broken screen. Sorted by code so the list is
- * stable.
+ * cannot tell that from a broken screen.
+ *
+ * Sorted by the name a reader sees, not by the code behind it. A list sorted
+ * by code reads as unsorted once the codes are hidden, and it would reorder
+ * itself when the language changes.
  */
-export function treeOptions(farmBlocks: BlockVerdicts[]): { code: string; count: number }[] {
+export function treeOptions(farmBlocks: BlockVerdicts[], arabic = false): TreeOption[] {
   const counts = new Map<string, number>();
+  const labels = new Map<string, string>();
   for (const block of farmBlocks) {
     for (const verdict of block.verdicts) {
       counts.set(verdict.tree_code, (counts.get(verdict.tree_code) ?? 0) + 1);
+      // First writer wins, and every verdict of one tree carries the same
+      // name, so this is a lookup rather than a choice.
+      if (!labels.has(verdict.tree_code)) {
+        labels.set(verdict.tree_code, treeLabel(verdict, arabic));
+      }
     }
   }
   return [...counts.entries()]
-    .map(([code, count]) => ({ code, count }))
-    .sort((a, z) => a.code.localeCompare(z.code));
+    .map(([code, count]) => ({ code, count, label: labels.get(code) ?? code }))
+    .sort((a, z) => a.label.localeCompare(z.label) || a.code.localeCompare(z.code));
 }

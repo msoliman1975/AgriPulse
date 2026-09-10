@@ -285,3 +285,124 @@ async def test_the_farm_read_groups_every_block(admin_session: AsyncSession) -> 
     body = response.json()
     by_block = {b["block_id"]: b["worst_status"] for b in body["blocks"]}
     assert by_block == {block_ids[0]: "very_good", block_ids[1]: "alert"}
+
+
+async def _insert_tree(
+    session: AsyncSession, *, tree_id: str, code: str, name_en: str, name_ar: str | None
+) -> None:
+    """A catalog row for the verdict to be named by."""
+    await session.execute(text("SET search_path TO public"))
+    await session.execute(
+        text(
+            """
+            INSERT INTO public.decision_trees (id, code, tenant_id, name_en, name_ar)
+            VALUES (CAST(:id AS uuid), :code, NULL, :name_en, :name_ar)
+            """
+        ),
+        {"id": tree_id, "code": code, "name_en": name_en, "name_ar": name_ar},
+    )
+    await session.commit()
+
+
+async def _insert_verdict_for_tree(
+    session: AsyncSession,
+    *,
+    schema: str,
+    farm_id: str,
+    block_id: str,
+    tree_id: str,
+    tree_code: str,
+) -> None:
+    await session.execute(text(f'SET search_path TO "{schema}", public'))
+    await session.execute(
+        text(
+            """
+            INSERT INTO decision_tree_block_verdicts (
+                farm_id, block_id, cell_id, scope, tree_id, tree_code,
+                tree_version, leaf_node_id, kind, status_code, severity,
+                text_en, valid_from, valid_to, last_evaluated_at
+            ) VALUES (
+                :farm_id, :block_id, NULL, 'block', CAST(:tree_id AS uuid), :tree_code,
+                1, 'leaf_ok', 'status', 'good', NULL,
+                'Checked and fine.', :at, NULL, :at
+            )
+            """
+        ),
+        {
+            "farm_id": farm_id,
+            "block_id": block_id,
+            "tree_id": tree_id,
+            "tree_code": tree_code,
+            "at": datetime.now(UTC) - timedelta(days=1),
+        },
+    )
+    await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_a_verdict_carries_the_tree_s_name_in_both_languages(
+    admin_session: AsyncSession,
+) -> None:
+    """The picker showed `t_mango_cwsi`. That is an authoring handle.
+
+    A verdict row stores the code and the tree id and never the name — the
+    name is editable and a verdict is a record of what was decided — so the
+    read joins `public.decision_trees` for it.
+    """
+    tenant, context, farm_id, block_ids = await _bootstrap(admin_session, f"vt-{uuid4().hex[:8]}")
+    tree_id = str(uuid4())
+    await _insert_tree(
+        admin_session,
+        tree_id=tree_id,
+        code=f"t_named_{uuid4().hex[:8]}",
+        name_en="Mango water stress",
+        name_ar="إجهاد الماء في المانجو",
+    )
+    await _insert_verdict_for_tree(
+        admin_session,
+        schema=str(tenant.schema_name),
+        farm_id=farm_id,
+        block_id=block_ids[0],
+        tree_id=tree_id,
+        tree_code="t_named",
+    )
+    app = _build_app(context)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get(f"/api/v1/farms/{farm_id}/verdicts")
+
+    assert response.status_code == 200, response.text
+    verdicts = [v for block in response.json()["blocks"] for v in block["verdicts"]]
+    assert [v["tree_name_en"] for v in verdicts] == ["Mango water stress"]
+    assert [v["tree_name_ar"] for v in verdicts] == ["إجهاد الماء في المانجو"]
+
+
+@pytest.mark.asyncio
+async def test_a_verdict_whose_tree_is_gone_still_reads(
+    admin_session: AsyncSession,
+) -> None:
+    """A tenant schema holds no foreign key into public by design, so the
+    catalog row can be gone while the verdict it produced still stands.
+
+    The join must be a LEFT one. An inner join would drop the row entirely,
+    and a block that had been checked would read as never checked.
+    """
+    tenant, context, farm_id, block_ids = await _bootstrap(admin_session, f"vg-{uuid4().hex[:8]}")
+    await _insert_verdict(
+        admin_session,
+        schema=str(tenant.schema_name),
+        farm_id=farm_id,
+        block_id=block_ids[0],
+        tree_code="orphan_v1",
+        status_code="good",
+        valid_from=datetime.now(UTC) - timedelta(days=1),
+    )
+    app = _build_app(context)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get(f"/api/v1/farms/{farm_id}/verdicts")
+
+    assert response.status_code == 200, response.text
+    verdicts = [v for block in response.json()["blocks"] for v in block["verdicts"]]
+    assert [v["tree_code"] for v in verdicts] == ["orphan_v1"]
+    assert verdicts[0]["tree_name_en"] is None
