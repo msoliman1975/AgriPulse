@@ -171,22 +171,28 @@ export function useDryRunDecisionTree() {
 // Blocks the tree's targeting admits — populates the dry-run picker. Keyed
 // off the published targeting (not the live draft), so it refetches when the
 // detail is invalidated after a publish.
-export function useDecisionTreeCandidateBlocks(code: string | undefined) {
+export function useDecisionTreeCandidateBlocks(code: string | undefined, enabled = true) {
   return useQuery({
     queryKey: ["decision_trees", "candidate_blocks", code] as const,
     queryFn: () => getDecisionTreeCandidateBlocks(code!),
-    enabled: Boolean(code),
+    // Both routes walk the caller's own farms, so both refuse a platform
+    // caller. Firing them anyway put a 403 in the console on every page load
+    // and bought nothing, because the panels that read them are tenant-only.
+    enabled: Boolean(code) && enabled,
     staleTime: 30_000,
   });
 }
 
 // Farms the tree's targeting admits, with how many blocks of each are in
 // scope — populates the "run on a farm" picker.
-export function useDecisionTreeCandidateFarms(code: string | undefined) {
+export function useDecisionTreeCandidateFarms(code: string | undefined, enabled = true) {
   return useQuery({
     queryKey: ["decision_trees", "candidate_farms", code] as const,
     queryFn: () => getDecisionTreeCandidateFarms(code!),
-    enabled: Boolean(code),
+    // Both routes walk the caller's own farms, so both refuse a platform
+    // caller. Firing them anyway put a 403 in the console on every page load
+    // and bought nothing, because the panels that read them are tenant-only.
+    enabled: Boolean(code) && enabled,
     staleTime: 30_000,
   });
 }

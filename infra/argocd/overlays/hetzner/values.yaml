@@ -3651,6 +3651,16 @@ global:
     #
     #   No backend code and no migration, so api and workers stay on e0ea9c7.
     #   Rollback is this one tag back to e0ea9c7.
+    # 8d2d866 = #675, frontend only. The platform editor stopped making three
+    #   requests a caller with no tenant cannot make. Two were candidate-block
+    #   and candidate-farm lookups whose panels #674 had already hidden — the
+    #   queries ran anyway. The third was the signal catalogue, and that one
+    #   was not cosmetic: the condition editor's signal picker came back
+    #   empty, so a platform admin could read a {source: signals} predicate
+    #   but not author one. It now reads the platform route.
+    #
+    #   No backend code and no migration, so api and workers stay on e0ea9c7.
+    #   Rollback is this one tag back to 9e6753e.
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -4101,7 +4111,7 @@ global:
       #   traces page learns the 'farm' skip axis. The API half must move in
       #   the same sync — the new section calls two routes that do not exist
       #   on 76a6411.
-      tag: "9e6753e"
+      tag: "8d2d866"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
