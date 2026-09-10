@@ -3609,10 +3609,33 @@ global:
     #   status are unchanged.
     #
     #   Rollback is these three tags back to 8c782c1.
+    # e0ea9c7 = #673, decision trees live in the database.
+    #
+    #   The 33 platform trees were defined by YAML files, and `sync_from_disk`
+    #   republished any whose compiled hash differed at every startup. That is
+    #   gone. From this image the database is the only definition, and a
+    #   platform admin edits them at /platform/decision-trees — nobody could
+    #   before: a tenant admin is out of scope, a platform admin was refused
+    #   for having no tenant.
+    #
+    #   Two migrations, both additive. 0085 inserts platform trees where a row
+    #   with that code and tenant_id IS NULL does not exist; on this database
+    #   all 33 already do, so it inserts nothing (checked before promoting).
+    #   0086 creates tenant_tree_version_pins, empty.
+    #
+    #   api, workers and frontend must move together: the viewer's new panel
+    #   calls four routes that do not exist on c1ecde3.
+    #
+    #   Watch for this: the sweep now resolves each tree's version per tenant
+    #   as COALESCE(pin, current). No tenant has a pin, so every tenant
+    #   resolves exactly what it resolved before.
+    #
+    #   Rollback is these three tags back to c1ecde3. The migrations stay —
+    #   0085 wrote nothing here and 0086's table is unread by the old image.
     api:
-      tag: "c1ecde3"
+      tag: "e0ea9c7"
     workers:
-      tag: "c1ecde3"
+      tag: "e0ea9c7"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -4063,7 +4086,7 @@ global:
       #   traces page learns the 'farm' skip axis. The API half must move in
       #   the same sync — the new section calls two routes that do not exist
       #   on 76a6411.
-      tag: "c1ecde3"
+      tag: "e0ea9c7"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
