@@ -14,14 +14,24 @@ vi.mock("react-oidc-context", () => ({
 }));
 
 const overviewMock = vi.hoisted(() => vi.fn());
+const filtersMock = vi.hoisted(() => vi.fn());
 vi.mock("@/api/usage", async () => {
   const actual = await vi.importActual<object>("@/api/usage");
-  return { ...actual, getUsageOverview: overviewMock };
+  return { ...actual, getUsageOverview: overviewMock, getUsageFilterOptions: filtersMock };
 });
+
+const TENANT_A = "22222222-2222-2222-2222-222222222222";
+const USER_A = "33333333-3333-3333-3333-333333333333";
 
 function buildOverview(overrides: Partial<UsageOverview> = {}): UsageOverview {
   return {
-    filters: { start: "2026-08-10", end: "2026-09-08", tenant_id: null, include_staff: false },
+    filters: {
+      start: "2026-08-10",
+      end: "2026-09-08",
+      tenant_id: null,
+      user_id: null,
+      include_staff: false,
+    },
     kpis: {
       dau: 4,
       wau: 12,
@@ -64,6 +74,7 @@ function buildOverview(overrides: Partial<UsageOverview> = {}): UsageOverview {
     tenants: [
       {
         tenant_id: "22222222-2222-2222-2222-222222222222",
+        label: "acme-farms",
         last_seen: "2026-09-08",
         wau: 6,
         features_used: 4,
@@ -90,6 +101,11 @@ describe("PlatformUsagePage", () => {
     await setupTestI18n("en");
     overviewMock.mockReset();
     overviewMock.mockResolvedValue(buildOverview());
+    filtersMock.mockReset();
+    filtersMock.mockResolvedValue({
+      tenants: [{ tenant_id: TENANT_A, label: "acme-farms", events: 900 }],
+      users: [{ user_id: USER_A, label: "sara@acme.test", actor_role: "TenantOwner", events: 120 }],
+    });
   });
 
   it("excludes platform staff by default", async () => {
@@ -148,6 +164,65 @@ describe("PlatformUsagePage", () => {
     renderPage();
     expect(await screen.findByText("reports")).toBeInTheDocument();
     expect(screen.getByText("signals")).toBeInTheDocument();
+  });
+
+  it("breaks usage down by tenant", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => {
+      expect(filtersMock).toHaveBeenCalled();
+    });
+    await user.selectOptions(await screen.findByLabelText(/tenant/i), TENANT_A);
+    await waitFor(() => {
+      expect(overviewMock.mock.calls.some((c) => c[0].tenantId === TENANT_A)).toBe(true);
+    });
+  });
+
+  it("breaks usage down by person", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => {
+      expect(filtersMock).toHaveBeenCalled();
+    });
+    await user.selectOptions(await screen.findByLabelText(/person/i), USER_A);
+    await waitFor(() => {
+      expect(overviewMock.mock.calls.some((c) => c[0].userId === USER_A)).toBe(true);
+    });
+  });
+
+  it("clears the person when the tenant changes", async () => {
+    // A person belongs to one tenant, so keeping the pick would query a pair
+    // that cannot match and show an empty page with two filters set.
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => {
+      expect(filtersMock).toHaveBeenCalled();
+    });
+    await user.selectOptions(await screen.findByLabelText(/person/i), USER_A);
+    await waitFor(() => {
+      expect(overviewMock.mock.calls.some((c) => c[0].userId === USER_A)).toBe(true);
+    });
+    await user.selectOptions(await screen.findByLabelText(/tenant/i), TENANT_A);
+    await waitFor(() => {
+      const last = overviewMock.mock.calls[overviewMock.mock.calls.length - 1][0];
+      expect(last.tenantId).toBe(TENANT_A);
+      expect(last.userId).toBe("");
+    });
+  });
+
+  it("says the cold list is scoped once a filter is on", async () => {
+    // Unfiltered it means "nobody uses this, consider deleting". Filtered it
+    // means "they do not use it" — a different conclusion entirely.
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText(/across the whole platform/i)).toBeInTheDocument();
+    await user.selectOptions(await screen.findByLabelText(/tenant/i), TENANT_A);
+    expect(await screen.findByText(/this is not the delete list/i)).toBeInTheDocument();
+  });
+
+  it("shows a readable tenant label rather than a bare uuid", async () => {
+    renderPage();
+    expect(await screen.findByText("acme-farms")).toBeInTheDocument();
   });
 
   it("renders in Arabic without falling back to the key", async () => {

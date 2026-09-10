@@ -24,7 +24,7 @@ import { Pill } from "@/components/Pill";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { Sparkline } from "@/components/Sparkline";
 import { queryState } from "@/components/asyncState";
-import { useUsageOverview } from "@/queries/usage";
+import { useUsageFilterOptions, useUsageOverview } from "@/queries/usage";
 
 /**
  * `/platform/usage` — how the product is actually used (TEL-7).
@@ -74,13 +74,27 @@ export function PlatformUsagePage(): ReactNode {
   const { t } = useTranslation("admin");
   const [span, setSpan] = useState<Span>(30);
   const [includeStaff, setIncludeStaff] = useState(false);
+  const [tenantId, setTenantId] = useState<string>("");
+  const [userId, setUserId] = useState<string>("");
 
+  const range = useMemo(() => ({ start: isoDaysAgo(span - 1), end: today() }), [span]);
+  // The option lists are fetched for the same window and narrowed by the tenant
+  // choice, so picking a tenant also shortens the people list to that tenant's
+  // users instead of offering everyone.
+  const options = useUsageFilterOptions({ ...range, tenantId, includeStaff });
   const query = useMemo(
-    () => ({ start: isoDaysAgo(span - 1), end: today(), includeStaff }),
-    [span, includeStaff],
+    () => ({ ...range, tenantId, userId, includeStaff }),
+    [range, tenantId, userId, includeStaff],
   );
   const overview = useUsageOverview(query);
   const state = queryState(overview);
+
+  // A person belongs to one tenant, so a selection from a wider list can stop
+  // being valid the moment a tenant is chosen. Clearing it is better than
+  // silently querying a combination that returns nothing.
+  const userOptions = options.data?.users ?? [];
+  const selectedUserStillValid = userId === "" || userOptions.some((u) => u.user_id === userId);
+  if (!selectedUserStillValid && options.data) setUserId("");
 
   const unit = {
     s: t("usage.unit.seconds"),
@@ -102,6 +116,33 @@ export function PlatformUsagePage(): ReactNode {
               items={SPANS.map((d) => ({
                 value: String(d),
                 label: t("usage.span", { count: d }),
+              }))}
+            />
+            <FilterSelect
+              label={t("usage.filter.tenant")}
+              value={tenantId}
+              allLabel={t("usage.filter.allTenants")}
+              onChange={(v) => {
+                setTenantId(v);
+                // A person belongs to one tenant; keeping a stale pick would
+                // query a pair that cannot match.
+                setUserId("");
+              }}
+              options={(options.data?.tenants ?? []).map((o) => ({
+                value: o.tenant_id,
+                label: `${o.label} (${String(o.events)})`,
+              }))}
+            />
+            <FilterSelect
+              label={t("usage.filter.user")}
+              value={userId}
+              allLabel={t("usage.filter.allUsers")}
+              onChange={setUserId}
+              options={userOptions.map((o) => ({
+                value: o.user_id,
+                label: o.actor_role
+                  ? `${o.label} · ${o.actor_role} (${String(o.events)})`
+                  : `${o.label} (${String(o.events)})`,
               }))}
             />
             <label className="flex items-center gap-2 text-xs text-ap-muted">
@@ -128,7 +169,11 @@ export function PlatformUsagePage(): ReactNode {
           <div className="flex flex-col gap-6">
             <Kpis data={data} unit={unit} />
             <TimeSection rows={data.routes} unit={unit} />
-            <AdoptionSection features={data.features} cold={data.cold_features} />
+            <AdoptionSection
+              features={data.features}
+              cold={data.cold_features}
+              scoped={userId !== "" || tenantId !== ""}
+            />
             <FunnelSection funnels={data.funnels} />
             <StruggleSection
               routes={data.error_routes}
@@ -137,7 +182,9 @@ export function PlatformUsagePage(): ReactNode {
               slow={data.slow_actions}
               unit={unit}
             />
-            <TenantSection rows={data.tenants} />
+            {/* Hidden under a person filter: it would always be exactly one
+                row, which says nothing the picker did not already say. */}
+            {userId === "" ? <TenantSection rows={data.tenants} /> : null}
           </div>
         )}
       </AsyncBoundary>
@@ -146,6 +193,45 @@ export function PlatformUsagePage(): ReactNode {
 }
 
 type Unit = { s: string; m: string; h: string };
+
+/**
+ * A labelled dropdown with an explicit "all" choice.
+ *
+ * A native `<select>` rather than a combobox: the lists are capped server-side
+ * at 200 tenants and 500 people, ordered by event count, and a native control
+ * gets keyboard access and type-ahead for free.
+ */
+function FilterSelect({
+  label,
+  value,
+  allLabel,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  allLabel: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+}): ReactNode {
+  return (
+    <label className="flex items-center gap-1.5 text-xs text-ap-muted">
+      <span>{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="max-w-[14rem] rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs text-ap-ink"
+      >
+        <option value="">{allLabel}</option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 function Section({
   title,
@@ -242,9 +328,14 @@ function TimeSection({ rows, unit }: { rows: RouteDwell[]; unit: Unit }): ReactN
 function AdoptionSection({
   features,
   cold,
+  scoped,
 }: {
   features: FeatureAdoption[];
   cold: string[];
+  /** True when a tenant or person filter is active. "Cold" then means "unused
+   *  by them", not "unused by anyone" — a very different conclusion, and one
+   *  nobody should have to infer from the filter bar. */
+  scoped: boolean;
 }): ReactNode {
   const { t } = useTranslation("admin");
   const columns: ReadonlyArray<Column<FeatureAdoption>> = [
@@ -271,7 +362,9 @@ function AdoptionSection({
         <h3 className="text-xs font-semibold uppercase tracking-wider text-ap-muted">
           {t("usage.cold.title")}
         </h3>
-        <p className="mt-1 text-xs text-ap-muted">{t("usage.cold.hint")}</p>
+        <p className="mt-1 text-xs text-ap-muted">
+          {scoped ? t("usage.cold.hintScoped") : t("usage.cold.hint")}
+        </p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {cold.length === 0 ? (
             <span className="text-xs text-ap-muted">{t("usage.cold.none")}</span>
@@ -453,7 +546,7 @@ function TenantSection({ rows }: { rows: TenantHealth[] }): ReactNode {
     {
       key: "tenant",
       header: t("usage.tenant.tenant"),
-      cell: (r) => <code className="text-[11px]">{r.tenant_id}</code>,
+      cell: (r) => <span className="font-medium">{r.label}</span>,
     },
     {
       key: "last",

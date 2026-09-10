@@ -12,6 +12,7 @@ export interface UsageFilters {
   start: string;
   end: string;
   tenant_id: string | null;
+  user_id: string | null;
   include_staff: boolean;
 }
 
@@ -94,6 +95,9 @@ export interface SlowAction {
 
 export interface TenantHealth {
   tenant_id: string;
+  /** Slug, then name, then a short id — joined server-side, since the
+   *  telemetry store deliberately holds no names. */
+  label: string;
   last_seen: string | null;
   wau: number;
   features_used: number;
@@ -120,7 +124,50 @@ export interface UsageQuery {
   start: string;
   end: string;
   tenantId?: string | null;
+  userId?: string | null;
   includeStaff?: boolean;
+}
+
+export interface TenantOption {
+  tenant_id: string;
+  label: string;
+  events: number;
+}
+
+export interface UserOption {
+  user_id: string;
+  label: string;
+  actor_role: string | null;
+  events: number;
+}
+
+export interface UsageFilterOptions {
+  tenants: TenantOption[];
+  users: UserOption[];
+}
+
+/**
+ * What the pickers may offer, derived from the events in the window.
+ *
+ * Deliberately a separate request from the overview: the lists change far more
+ * slowly than the numbers, so they cache on their own instead of being
+ * re-fetched every time the date range moves.
+ */
+export async function getUsageFilterOptions(query: {
+  start: string;
+  end: string;
+  tenantId?: string | null;
+  includeStaff?: boolean;
+}): Promise<UsageFilterOptions> {
+  const { data } = await apiClient.get<UsageFilterOptions>("/v1/platform/usage/filters", {
+    params: {
+      start: query.start,
+      end: query.end,
+      tenant_id: query.tenantId || undefined,
+      include_staff: query.includeStaff ?? false,
+    },
+  });
+  return data;
 }
 
 export async function getUsageOverview(query: UsageQuery): Promise<UsageOverview> {
@@ -129,6 +176,7 @@ export async function getUsageOverview(query: UsageQuery): Promise<UsageOverview
       start: query.start,
       end: query.end,
       tenant_id: query.tenantId || undefined,
+      user_id: query.userId || undefined,
       include_staff: query.includeStaff ?? false,
     },
   });
