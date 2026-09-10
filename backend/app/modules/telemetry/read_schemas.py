@@ -20,6 +20,7 @@ class UsageFilters(BaseModel):
     start: date
     end: date
     tenant_id: UUID | None = None
+    user_id: UUID | None = None
     include_staff: bool = False
 
 
@@ -106,12 +107,48 @@ class SlowAction(BaseModel):
 
 class TenantHealth(BaseModel):
     tenant_id: UUID
+    #: Slug, then name, then a short id. Joined from `public.tenants` at read
+    #: time — the telemetry store deliberately holds no names.
+    label: str
     last_seen: date | None = None
     wau: int = 0
     #: Breadth of use. Two capabilities is a different retention risk from
     #: twelve, at the same event count.
     features_used: int = 0
     events: int = 0
+
+
+class TenantOption(BaseModel):
+    """One choice in the tenant picker."""
+
+    tenant_id: UUID
+    label: str
+    #: Event count in the window, so the list can be ordered by who is actually
+    #: using the product rather than alphabetically.
+    events: int = 0
+
+
+class UserOption(BaseModel):
+    """One choice in the person picker."""
+
+    user_id: UUID
+    #: Email, then full name, then a short id.
+    label: str
+    actor_role: str | None = None
+    events: int = 0
+
+
+class UsageFilterOptions(BaseModel):
+    """What the pickers may offer.
+
+    Derived from the events in the window, not from the tenant and user tables:
+    a filter that returns an empty page is worse than an option that was never
+    shown. Honours `include_staff`, so with the default filter on, our own
+    accounts are not offered.
+    """
+
+    tenants: list[TenantOption] = Field(default_factory=list)
+    users: list[UserOption] = Field(default_factory=list)
 
 
 class UsageOverview(BaseModel):

@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.telemetry.read_schemas import (
     EngagementKpis,
+    UsageFilterOptions,
     UsageFilters,
     UsageOverview,
 )
@@ -48,6 +49,13 @@ async def usage_overview(
     start: date | None = Query(default=None, description="Inclusive. Defaults to end - 29 days."),
     end: date | None = Query(default=None, description="Inclusive. Defaults to today, UTC."),
     tenant_id: UUID | None = Query(default=None),
+    user_id: UUID | None = Query(
+        default=None,
+        description=(
+            "Narrow to one person. Every section honours it, so the page becomes "
+            "a per-user view rather than a filtered summary."
+        ),
+    ),
     include_staff: bool = Query(
         default=False,
         description=(
@@ -57,7 +65,13 @@ async def usage_overview(
     ),
     session: AsyncSession = Depends(get_admin_db_session),
 ) -> UsageOverview:
-    window = _window(start=start, end=end, tenant_id=tenant_id, include_staff=include_staff)
+    window = _window(
+        start=start,
+        end=end,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        include_staff=include_staff,
+    )
     repo = TelemetryRepository(session)
 
     actives = await repo.active_users(window)
@@ -69,6 +83,7 @@ async def usage_overview(
             start=window.start,
             end=window.end,
             tenant_id=window.tenant_id,
+            user_id=window.user_id,
             include_staff=window.include_staff,
         ),
         kpis=EngagementKpis(
@@ -96,8 +111,43 @@ async def usage_overview(
     )
 
 
+@router.get(
+    "/filters",
+    response_model=UsageFilterOptions,
+    dependencies=[_ReadUsage],
+    summary="Tenants and people that appear in this window, for the pickers",
+)
+async def usage_filters(
+    start: date | None = Query(default=None),
+    end: date | None = Query(default=None),
+    tenant_id: UUID | None = Query(
+        default=None,
+        description="Narrows the people list to that tenant's users.",
+    ),
+    include_staff: bool = Query(default=False),
+    session: AsyncSession = Depends(get_admin_db_session),
+) -> UsageFilterOptions:
+    """Separate from /overview on purpose.
+
+    The option lists change far more slowly than the numbers do, so they get
+    their own cache instead of being re-fetched every time someone moves the
+    date range. Folding them into the overview would also mean re-reading a
+    500-row user list to answer "how many people used it yesterday".
+    """
+    window = _window(
+        start=start, end=end, tenant_id=tenant_id, user_id=None, include_staff=include_staff
+    )
+    options = await TelemetryRepository(session).filter_options(window)
+    return UsageFilterOptions(**options)
+
+
 def _window(
-    *, start: date | None, end: date | None, tenant_id: UUID | None, include_staff: bool
+    *,
+    start: date | None,
+    end: date | None,
+    tenant_id: UUID | None,
+    user_id: UUID | None,
+    include_staff: bool,
 ) -> UsageWindow:
     """Resolve the date range, clamped to what the data can actually answer.
 
@@ -114,5 +164,6 @@ def _window(
         start=resolved_start,
         end=resolved_end,
         tenant_id=tenant_id,
+        user_id=user_id,
         include_staff=include_staff,
     )

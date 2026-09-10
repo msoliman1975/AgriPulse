@@ -415,3 +415,99 @@ async def test_tenant_health_reports_breadth_and_last_seen(
     assert rows[seeded]["last_seen"] == date.today()
     assert rows[seeded]["wau"] == 2
     assert rows[seeded]["features_used"] == 1
+
+
+# --- tenant and person filters ---------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_user_filter_narrows_to_one_person(admin_session: AsyncSession, seeded: UUID) -> None:
+    """The seeded tenant has two users. Filtering to one must halve the actives
+    and keep only that person's events — not merely re-label the same numbers."""
+    repo = TelemetryRepository(admin_session)
+    everyone = await repo.active_users(_window(seeded))
+    assert everyone["wau"] == 2
+
+    one_user = (
+        await admin_session.execute(
+            text(
+                "SELECT user_id FROM public.usage_events "
+                "WHERE tenant_id = :t AND user_id IS NOT NULL LIMIT 1"
+            ),
+            {"t": seeded},
+        )
+    ).scalar_one()
+
+    scoped = await repo.active_users(_window(seeded, user_id=one_user))
+    assert scoped["wau"] == 1
+
+
+@pytest.mark.asyncio
+async def test_user_filter_applies_to_raw_backed_queries_too(
+    admin_session: AsyncSession, seeded: UUID
+) -> None:
+    """Half the queries read raw rather than the aggregate. A filter that only
+    reached the aggregate-backed half would leave the funnels and the struggle
+    board describing everybody while the KPIs described one person."""
+    repo = TelemetryRepository(admin_session)
+    error_user = (
+        await admin_session.execute(
+            text(
+                "SELECT user_id FROM public.usage_events "
+                "WHERE tenant_id = :t AND event_name = 'api_error' LIMIT 1"
+            ),
+            {"t": seeded},
+        )
+    ).scalar_one()
+
+    theirs = await repo.recent_errors(_window(seeded, user_id=error_user))
+    assert len(theirs) == 1
+
+    other_user = (
+        await admin_session.execute(
+            text(
+                "SELECT user_id FROM public.usage_events "
+                "WHERE tenant_id = :t AND user_id <> :u AND user_id IS NOT NULL LIMIT 1"
+            ),
+            {"t": seeded, "u": error_user},
+        )
+    ).scalar_one()
+    assert await repo.recent_errors(_window(seeded, user_id=other_user)) == []
+
+
+@pytest.mark.asyncio
+async def test_filter_options_offer_only_what_the_window_contains(
+    admin_session: AsyncSession, seeded: UUID
+) -> None:
+    """The pickers are built from events, not from the tenant/user tables, so
+    they cannot offer a choice that returns an empty page."""
+    repo = TelemetryRepository(admin_session)
+    options = await repo.filter_options(_window(None))
+
+    tenant_ids = {t["tenant_id"] for t in options["tenants"]}
+    assert seeded in tenant_ids
+
+    # The staff row carries no tenant, and with the default filter its user is
+    # not offered either.
+    assert all(u["user_id"] is not None for u in options["users"])
+    scoped = await repo.filter_options(_window(seeded))
+    assert len(scoped["users"]) == 2, "the seeded tenant has exactly two users"
+
+
+@pytest.mark.asyncio
+async def test_filter_options_exclude_staff_unless_asked(
+    admin_session: AsyncSession, seeded: UUID
+) -> None:
+    default = await repo_users(admin_session, include_staff=False)
+    with_staff = await repo_users(admin_session, include_staff=True)
+    assert with_staff > default, (
+        "the staff row should appear only when include_staff is on — otherwise "
+        "our own accounts are offered as filter choices"
+    )
+
+
+async def repo_users(session: AsyncSession, *, include_staff: bool) -> int:
+    options = await TelemetryRepository(session).filter_options(
+        _window(None, include_staff=include_staff)
+    )
+    return len(options["users"])

@@ -1266,8 +1266,9 @@
     },
     "cold": {
       "title": "Cold capabilities",
-      "hint": "In the vocabulary, used by nobody in this window. This is the \"should we delete it?\" list — but check it is instrumented before concluding it is unused.",
-      "none": "Every capability was used at least once."
+      "hint": "Used by nobody in this window, across the whole platform. This is the \"should we delete it?\" list — but check it is instrumented before concluding it is unused.",
+      "none": "Every capability was used at least once.",
+      "hintScoped": "Not used by the current selection in this window. Other tenants or people may use it heavily, so this is not the delete list — clear the filters for that."
     },
     "funnel": {
       "title": "Funnels",
@@ -1306,6 +1307,12 @@
       "lastSeen": "Last seen",
       "breadth": "Capabilities used",
       "empty": "No tenant activity in this window."
+    },
+    "filter": {
+      "tenant": "Tenant",
+      "user": "Person",
+      "allTenants": "All tenants",
+      "allUsers": "All people"
     }
   }
 }

@@ -210,6 +210,27 @@ privacy control, and every key added widens what can land.
 toggle is visible, so nobody reads a number without knowing which population it
 describes.
 
+Three filters, and all of them narrow **every** section, including the ones
+that read raw rather than the aggregate:
+
+| Filter | Notes |
+|---|---|
+| Date range | 7 / 30 / 90 days. Capped at the 180-day raw retention. |
+| Tenant | Choices come from events in the window, so a tenant that has never used the product is never offered. |
+| Person | Named individual — the identity grain was locked as full identity for exactly this. Narrows to that tenant's users once a tenant is picked, and clears if the tenant changes. |
+
+Two things the filters change about how a section reads:
+
+- **Cold capabilities means something different when filtered.** Unfiltered it
+  is "nobody on the platform used this" — the delete list. Filtered it is "they
+  did not use it", which is not grounds for deleting anything. The page says
+  which one you are looking at.
+- **Tenant health is hidden under a person filter.** It would be exactly one
+  row, saying nothing the picker did not already say.
+
+Labels (tenant slug, user email) are **joined at read time** from `tenants` and
+`users`. The telemetry store still holds no names — see §2.
+
 **Ad-hoc SQL** — for questions the page does not answer. Read
 `public.usage_daily` when the aggregate can answer it (24 months, far smaller);
 read `public.usage_events` for distinct sessions, funnel pairing, and

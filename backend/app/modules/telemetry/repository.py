@@ -51,10 +51,20 @@ class UsageWindow:
     start: date
     end: date
     tenant_id: UUID | None = None
+    #: One named person. The plan locked full identity precisely so this is
+    #: possible — "retention curves, per-role funnels, per-user support
+    #: forensics". It narrows every query below, including the ones that read
+    #: raw rather than the aggregate.
+    user_id: UUID | None = None
     include_staff: bool = False
 
     def params(self) -> dict[str, Any]:
-        return {"start": self.start, "end": self.end, "tenant_id": self.tenant_id}
+        return {
+            "start": self.start,
+            "end": self.end,
+            "tenant_id": self.tenant_id,
+            "user_id": self.user_id,
+        }
 
 
 def _staff_clause(window: UsageWindow) -> str:
@@ -66,6 +76,16 @@ def _tenant_clause() -> str:
     # parameter set identical whether or not a tenant is selected, which is what
     # lets every query below share `UsageWindow.params()`.
     return "AND (CAST(:tenant_id AS uuid) IS NULL OR tenant_id = :tenant_id)"
+
+
+def _user_clause() -> str:
+    """Same always-bound shape as the tenant clause, for one person.
+
+    Written as a predicate rather than a conditional fragment for the same
+    reason: every query shares one parameter set, so a query cannot be given a
+    filter its SQL forgot to reference.
+    """
+    return "AND (CAST(:user_id AS uuid) IS NULL OR user_id = :user_id)"
 
 
 class TelemetryRepository:
@@ -99,6 +119,7 @@ class TelemetryRepository:
                       AND day <= :end
                       AND user_id IS NOT NULL
                       {_tenant_clause()}
+                      {_user_clause()}
                       {_staff_clause(window)}
                     """
                 ),
@@ -129,6 +150,7 @@ class TelemetryRepository:
                           FROM public.usage_events
                          WHERE time >= :start AND time < CAST(:end AS date) + 1
                            {_tenant_clause()}
+                      {_user_clause()}
                            {_staff_clause(window)}
                          GROUP BY session_id, user_id
                     )
@@ -172,6 +194,7 @@ class TelemetryRepository:
                        AND event_name = 'page_leave'
                        AND route IS NOT NULL
                        {_tenant_clause()}
+                      {_user_clause()}
                        {_staff_clause(window)}
                      GROUP BY route
                      ORDER BY sum(total_ms) DESC NULLS LAST
@@ -199,6 +222,7 @@ class TelemetryRepository:
                            AND duration_ms IS NOT NULL
                            AND route = ANY(:routes)
                            {_tenant_clause()}
+                      {_user_clause()}
                            {_staff_clause(window)}
                          GROUP BY route
                         """
@@ -235,6 +259,7 @@ class TelemetryRepository:
                        AND event_name = 'feature_used'
                        AND feature IS NOT NULL
                        {_tenant_clause()}
+                      {_user_clause()}
                        {_staff_clause(window)}
                      GROUP BY feature
                      ORDER BY sum(events) DESC
@@ -284,6 +309,7 @@ class TelemetryRepository:
                          WHERE time >= :start AND time < CAST(:end AS date) + 1
                            AND flow IS NOT NULL
                            {_tenant_clause()}
+                      {_user_clause()}
                            {_staff_clause(window)}
                     ),
                     starts AS (
@@ -342,6 +368,7 @@ class TelemetryRepository:
                        AND event_name = 'flow_step'
                        AND flow IS NOT NULL AND step IS NOT NULL
                        {_tenant_clause()}
+                      {_user_clause()}
                        {_staff_clause(window)}
                      GROUP BY flow, step
                      ORDER BY flow, count(DISTINCT session_id) DESC
@@ -374,6 +401,7 @@ class TelemetryRepository:
                      WHERE day >= :start AND day <= :end
                        AND route IS NOT NULL
                        {_tenant_clause()}
+                      {_user_clause()}
                        {_staff_clause(window)}
                      GROUP BY route
                     HAVING sum(events) FILTER (WHERE event_name = 'page_view') >= :min_views
@@ -420,6 +448,7 @@ class TelemetryRepository:
                        AND event_name IN ('api_error', 'client_error')
                        AND (CAST(:route AS text) IS NULL OR route = :route)
                        {_tenant_clause()}
+                      {_user_clause()}
                        {_staff_clause(window)}
                      ORDER BY time DESC
                      LIMIT :limit
@@ -461,6 +490,7 @@ class TelemetryRepository:
                            AND event_name = 'feature_used'
                            AND user_id IS NOT NULL
                            {_tenant_clause()}
+                      {_user_clause()}
                            {_staff_clause(window)}
                     )
                     SELECT feature, action, count(*) AS storms,
@@ -507,6 +537,7 @@ class TelemetryRepository:
                        AND duration_ms IS NOT NULL
                        AND feature IS NOT NULL
                        {_tenant_clause()}
+                      {_user_clause()}
                        {_staff_clause(window)}
                      GROUP BY feature
                     HAVING percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms)
@@ -538,19 +569,25 @@ class TelemetryRepository:
             await self._s.execute(
                 text(
                     """
-                    SELECT tenant_id,
-                           max(day)::date                          AS last_seen,
-                           count(DISTINCT user_id) FILTER (
-                             WHERE day > CAST(:end AS date) - 7)   AS wau,
-                           count(DISTINCT feature)                 AS features_used,
-                           sum(events)                             AS events
-                      FROM public.usage_daily
-                     WHERE day >= :start AND day <= :end
-                       AND tenant_id IS NOT NULL
-                       AND is_platform_staff = false
-                       AND (CAST(:tenant_id AS uuid) IS NULL OR tenant_id = :tenant_id)
-                     GROUP BY tenant_id
-                     ORDER BY max(day) DESC
+                    SELECT d.tenant_id,
+                           -- Joined at read time. usage_events stores no names
+                           -- by design, and a bare uuid is unreadable in a
+                           -- table a human is meant to scan.
+                           coalesce(t.slug, t.name, left(d.tenant_id::text, 8)) AS label,
+                           max(d.day)::date                          AS last_seen,
+                           count(DISTINCT d.user_id) FILTER (
+                             WHERE d.day > CAST(:end AS date) - 7)   AS wau,
+                           count(DISTINCT d.feature)                 AS features_used,
+                           sum(d.events)                             AS events
+                      FROM public.usage_daily d
+                      LEFT JOIN public.tenants t ON t.id = d.tenant_id
+                     WHERE d.day >= :start AND d.day <= :end
+                       AND d.tenant_id IS NOT NULL
+                       AND d.is_platform_staff = false
+                       AND (CAST(:tenant_id AS uuid) IS NULL OR d.tenant_id = :tenant_id)
+                       AND (CAST(:user_id AS uuid) IS NULL OR d.user_id = :user_id)
+                     GROUP BY d.tenant_id, 2
+                     ORDER BY max(d.day) DESC
                     """
                 ),
                 window.params(),
@@ -559,10 +596,11 @@ class TelemetryRepository:
         return [
             {
                 "tenant_id": r[0],
-                "last_seen": r[1],
-                "wau": int(r[2] or 0),
-                "features_used": int(r[3] or 0),
-                "events": int(r[4] or 0),
+                "label": r[1],
+                "last_seen": r[2],
+                "wau": int(r[3] or 0),
+                "features_used": int(r[4] or 0),
+                "events": int(r[5] or 0),
             }
             for r in rows
         ]
@@ -581,6 +619,7 @@ class TelemetryRepository:
                       FROM public.usage_daily
                      WHERE day >= :start AND day <= :end
                        {_tenant_clause()}
+                      {_user_clause()}
                        {_staff_clause(window)}
                      GROUP BY day
                      ORDER BY day
@@ -590,3 +629,94 @@ class TelemetryRepository:
             )
         ).all()
         return [{"day": r[0], "events": int(r[1] or 0), "users": int(r[2] or 0)} for r in rows]
+
+    # -- filter options -----------------------------------------------------
+
+    async def filter_options(self, window: UsageWindow) -> dict[str, list[dict[str, Any]]]:
+        """The tenants and people who actually appear in this window.
+
+        Two rules here, and both are the point of the method.
+
+        **Only what the data contains.** The lists come from `usage_events`, not
+        from `tenants`/`users`, so the pickers cannot offer a tenant that has
+        never used the product. A filter that returns an empty page is worse
+        than an option that was never shown.
+
+        **Labels are joined, never stored.** `usage_events` holds no names by
+        design, so the slug and the email are read from the owning tables at
+        read time. That keeps the taxonomy's promise — no customer content in
+        the telemetry store — while still giving a human a name to pick. This
+        surface is platform-only and already gated by `platform.read_usage`.
+
+        The window bounds both lists, so a 7-day view offers 7 days of people.
+        `include_staff` is honoured: with the default filter on, our own
+        accounts are not offered as choices.
+        """
+        tenants = (
+            await self._s.execute(
+                text(
+                    f"""
+                    SELECT e.tenant_id,
+                           t.slug,
+                           t.name,
+                           count(*) AS events
+                      FROM public.usage_events e
+                      LEFT JOIN public.tenants t ON t.id = e.tenant_id
+                     WHERE e.time >= :start AND e.time < CAST(:end AS date) + 1
+                       AND e.tenant_id IS NOT NULL
+                       {"" if window.include_staff else "AND e.is_platform_staff = false"}
+                     GROUP BY 1, 2, 3
+                     ORDER BY count(*) DESC
+                     LIMIT 200
+                    """
+                ),
+                {"start": window.start, "end": window.end},
+            )
+        ).all()
+
+        users = (
+            await self._s.execute(
+                text(
+                    f"""
+                    SELECT e.user_id,
+                           u.email,
+                           u.full_name,
+                           max(e.actor_role) AS actor_role,
+                           count(*) AS events
+                      FROM public.usage_events e
+                      LEFT JOIN public.users u ON u.id = e.user_id
+                     WHERE e.time >= :start AND e.time < CAST(:end AS date) + 1
+                       AND e.user_id IS NOT NULL
+                       {"" if window.include_staff else "AND e.is_platform_staff = false"}
+                       AND (CAST(:tenant_id AS uuid) IS NULL OR e.tenant_id = :tenant_id)
+                     GROUP BY 1, 2, 3
+                     ORDER BY count(*) DESC
+                     LIMIT 500
+                    """
+                ),
+                {"start": window.start, "end": window.end, "tenant_id": window.tenant_id},
+            )
+        ).all()
+
+        return {
+            "tenants": [
+                {
+                    "tenant_id": r[0],
+                    # A purged tenant leaves rows behind for the retention
+                    # window with no row to join, so the id is the fallback
+                    # label rather than a blank option.
+                    "label": r[1] or r[2] or str(r[0])[:8],
+                    "events": int(r[3] or 0),
+                }
+                for r in tenants
+            ],
+            "users": [
+                {
+                    "user_id": r[0],
+                    "label": r[1] or r[2] or str(r[0])[:8],
+                    "actor_role": r[3],
+                    "events": int(r[4] or 0),
+                }
+                for r in users
+            ],
+        }
