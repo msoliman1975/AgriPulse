@@ -42,6 +42,8 @@ interface Props {
    * say why instead.
    */
   ready: boolean;
+  /** True when the history read failed rather than being slow. */
+  failed: boolean;
   onDayIndex: (index: number) => void;
   onRange: (range: RangeId) => void;
   onCustom: (fromIso: string, toIso: string) => void;
@@ -65,6 +67,7 @@ export function Transport({
   playing,
   speed,
   ready,
+  failed,
   onDayIndex,
   onRange,
   onCustom,
@@ -220,7 +223,13 @@ export function Transport({
             <span>{shortDate(win.fromDay)}</span>
             {/* Says why the controls are off, in the gap where nothing else
                 is written. Silence would read as a broken slider. */}
-            {ready ? null : <span>{t("farmHealth:transport.loadingHistory")}</span>}
+            {ready ? null : (
+              <span className={failed ? "text-ap-crit" : undefined}>
+                {failed
+                  ? t("farmHealth:transport.historyFailed")
+                  : t("farmHealth:transport.loadingHistory")}
+              </span>
+            )}
             <span>{shortDate(win.toDay)}</span>
           </span>
         </div>

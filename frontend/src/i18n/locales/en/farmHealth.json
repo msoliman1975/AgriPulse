@@ -103,7 +103,8 @@
     "latest": "Latest",
     "date": "Date",
     "speed": "Replay speed",
-    "loadingHistory": "Loading the history for this range…"
+    "loadingHistory": "Loading the history for this range…",
+    "historyFailed": "The history for this range could not be read. The replay is off; today's answers are still correct."
   },
   "map": {
     "fitBlock": "Fit block",

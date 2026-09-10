@@ -36,7 +36,7 @@ vi.mock("../components/HealthMap", () => ({
 const grid = vi.hoisted((): { current: unknown } => ({ current: null }));
 // Which reads are still in flight. The screen must draw without the grid and
 // without the history, so a test has to be able to hold them open.
-const held = vi.hoisted(() => ({ grid: false, history: false }));
+const held = vi.hoisted(() => ({ grid: false, history: false, historyFails: false }));
 const gridCalls = vi.hoisted(() => vi.fn());
 
 vi.mock("@/api/grid", () => ({
@@ -169,6 +169,7 @@ vi.mock("@/api/farmHealth", async (importOriginal) => {
     getVerdictReasoning: vi.fn(async () => reasoning.current),
     getFarmVerdictHistory: vi.fn(async () => {
       if (held.history) await new Promise(() => {});
+      if (held.historyFails) throw new Error("history read failed");
       return history.current;
     }),
   };
@@ -219,6 +220,7 @@ describe("FarmHealthViewPage", () => {
     await setupTestI18n("en");
     held.grid = false;
     held.history = false;
+    held.historyFails = false;
     gridCalls.mockClear();
     grid.current = { farm_id: FARM_ID, index_code: "ndvi", blocks: [] };
     history.current = { farm_id: FARM_ID, from_at: "", to_at: "", tree_code: null, truncated: false, verdicts: [] };
@@ -912,6 +914,87 @@ describe("FarmHealthViewPage", () => {
     expect(scrubber).toBeDisabled();
     expect(screen.getByRole("button", { name: "Play the replay" })).toBeDisabled();
     expect(screen.getByText(/Loading the history for this range/)).toBeInTheDocument();
+  });
+
+  it("keeps a tree in the picker that only spoke earlier in the window", async () => {
+    // Built from the live read alone, the picker loses the tree that ran in
+    // June and stopped — which is the tree someone opens a replay to look
+    // at. Built from the frame on show, it rewrites itself mid-replay.
+    const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    history.current = {
+      farm_id: FARM_ID,
+      from_at: "",
+      to_at: "",
+      tree_code: null,
+      truncated: false,
+      verdicts: [
+        {
+          ...verdict("b1", "t_retired", "alert"),
+          id: "old",
+          tree_name_en: "Retired tree",
+          valid_from: weekAgo,
+          valid_to: twoDaysAgo,
+        },
+      ],
+    };
+    farmVerdicts.current = {
+      farm_id: FARM_ID,
+      as_of: null,
+      blocks: [
+        farmBlock("b1", [
+          { ...verdict("b1", "t_cwsi", "good"), tree_name_en: "Water stress" },
+        ]),
+      ],
+    };
+    renderPage();
+
+    const picker = await screen.findByRole("combobox", { name: "Decision tree" });
+    await waitFor(() => {
+      expect(
+        within(picker)
+          .getAllByRole("option")
+          .map((option) => option.textContent),
+      ).toEqual(["Retired tree", "Water stress"]);
+    });
+  });
+
+  it("stops saying it is reading the grid on a farm that has none", async () => {
+    // `getFarmGridCells` resolves to NULL on a 404. Gating the message on
+    // the absence of data rather than on the read would leave the panel
+    // under "reading the cell grid" for ever.
+    grid.current = null;
+    farmVerdicts.current = {
+      farm_id: FARM_ID,
+      as_of: null,
+      blocks: [
+        farmBlock("b2", [{ ...verdict("b2", "t_cwsi", "alert", 0), cell_id: "cell-1" }]),
+      ],
+    };
+    renderPage();
+
+    expect(
+      await screen.findByText("This block has no cell verdicts for this tree."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Reading the block's cell grid/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the replay off, and says why, when the history cannot be read", async () => {
+    // A failed read resolves to an empty list. A replay drawn from that
+    // paints every block "tree did not run" on every past day — a wrong map
+    // with nothing on screen to say that anything failed.
+    held.historyFails = true;
+    renderPage();
+
+    const scrubber = await screen.findByRole("slider", { name: "Date" });
+    await waitFor(() => {
+      expect(scrubber).toBeDisabled();
+    });
+    expect(
+      screen.getByText(/The history for this range could not be read/),
+    ).toBeInTheDocument();
+    // Today's answers are unaffected, and the screen still shows them.
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("AG-R01-C02");
   });
 
   it("says so when no tree has run on the farm at all", async () => {

@@ -80,6 +80,8 @@ interface HealthData {
   history: FarmVerdicts["blocks"][number]["verdicts"];
   /** False while the history is still being read. The replay waits on it. */
   historyReady: boolean;
+  /** True when the history read failed. The replay says so and stays off. */
+  historyFailed: boolean;
   truncated: boolean;
 }
 
@@ -212,9 +214,17 @@ export function FarmHealthViewPage(): ReactNode {
         statuses: statusesQuery.data,
         verdicts: verdictsQuery.data,
         grid: gridQuery.data ?? null,
-        gridPending: needsCells && !gridQuery.data && !gridQuery.isError,
+        // `isPending`, not `!data`: `getFarmGridCells` resolves to NULL on a
+        // 404, so a farm with no grid would sit under "reading the cell
+        // grid" for ever. A disabled query is also pending, which is why
+        // `needsCells` gates it.
+        gridPending: needsCells && gridQuery.isPending,
         history: historyQuery.data?.verdicts ?? [],
-        historyReady: !historyQuery.isPending,
+        // An errored history is NOT ready. It resolves to an empty list, and
+        // a replay drawn from that paints every block "tree did not run" on
+        // every past day — a wrong map with no sign that anything failed.
+        historyReady: !historyQuery.isPending && !historyQuery.isError,
+        historyFailed: historyQuery.isError,
         truncated: historyQuery.data?.truncated ?? false,
       },
     };
@@ -250,11 +260,29 @@ export function FarmHealthViewPage(): ReactNode {
                     verdicts,
                   }),
                 );
-            // The picker is built from the LIVE read, not from the frame.
-            // Built from the frame it rewrote itself during a replay — a
-            // tree that said nothing on 12 August vanished from the list on
-            // that frame and came back on the next one.
-            const trees = treeOptions(data.verdicts.blocks, arabic);
+            // The picker is built from the live read PLUS the whole window's
+            // history, never from the frame on show.
+            //
+            // Built from the frame it rewrote itself during a replay: a tree
+            // that said nothing on 12 August vanished from the list on that
+            // frame and came back on the next one. Built from the live read
+            // alone it loses a tree that ran earlier in the window and has
+            // since stopped — which is exactly the tree someone opens a
+            // replay to look at. The history covers the window, so this list
+            // is the same on every frame of it.
+            const trees = treeOptions(
+              [
+                ...data.verdicts.blocks,
+                {
+                  block_id: "__history",
+                  as_of: null,
+                  worst_status: null,
+                  last_evaluated_at: null,
+                  verdicts: data.history,
+                },
+              ],
+              arabic,
+            );
             // The picker defaults to the first tree that has said anything
             // here. A tree with no verdict on this farm paints an entirely
             // blank screen, which a reader cannot tell from a broken one.
@@ -499,6 +527,7 @@ export function FarmHealthViewPage(): ReactNode {
                       playing={playing}
                       speed={speed}
                       ready={data.historyReady}
+                      failed={data.historyFailed}
                       onDayIndex={setDayIndex}
                       onRange={(next) => {
                         setPlaying(false);
