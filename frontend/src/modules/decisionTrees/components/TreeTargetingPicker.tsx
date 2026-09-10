@@ -108,7 +108,11 @@ export function TreeTargetingPicker({
           {t("targeting.crop")} <span className="text-ap-crit">*</span>
         </span>
         <div className="flex flex-wrap items-center gap-2">
-          <CropPathFilter value={pendingCrop} onChange={setPendingCrop} />
+          {/* `/v1/crops` asserts a tenant context, so a platform admin got 403
+              and the select offered only "All crops" with Add disabled — the
+              picker could not add the crop it exists to add. CropPathFilter
+              already reads `/v1/admin/crops` when told the scope. */}
+          <CropPathFilter value={pendingCrop} onChange={setPendingCrop} scope={scope} />
           <button
             type="button"
             onClick={addCrop}
