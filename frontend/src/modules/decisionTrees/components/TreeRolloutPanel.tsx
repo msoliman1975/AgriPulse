@@ -42,7 +42,14 @@ export function TreeRolloutPanel({
   const q = useDecisionTreeAvailability(code);
   const setEnabled = useSetDecisionTreeEnabled();
   const setPin = useSetDecisionTreeVersionPin();
-  const [pinChoice, setPinChoice] = useState<string>("");
+  // `null` means the author has not touched the select, so it shows whatever
+  // is stored. `""` means they picked "follow the current version".
+  //
+  // These must be different values. When both were `""`, choosing "follow the
+  // current version" fell back to the stored pin, the select snapped back to
+  // it, and Apply re-pinned the same version — so a pinned tenant could never
+  // unpin from this page at all. The API was fine; the page could not say it.
+  const [pinChoice, setPinChoice] = useState<string | null>(null);
 
   if (q.isLoading) {
     return (
@@ -62,7 +69,7 @@ export function TreeRolloutPanel({
 
   const a = q.data;
   const publishable = versions.filter((v) => v.published_at != null);
-  const selectedPin = pinChoice !== "" ? pinChoice : (a.pinned_version?.toString() ?? "");
+  const selectedPin = pinChoice ?? (a.pinned_version?.toString() ?? "");
 
   return (
     <Card noPadding className="flex flex-col gap-3 p-4">

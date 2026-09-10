@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 
 import type { DecisionTree, DecisionTreeListStatus } from "@/api/decisionTrees";
-import { listCountries } from "@/api/countries";
 import { Button } from "@/components/Button";
 import { DataTable, RowActions } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
@@ -22,6 +21,7 @@ import {
 } from "@/queries/decisionTrees";
 
 import {
+  countriesForScope,
   isEditableInScope,
   treesBasePath,
   useAuthoringScope,
@@ -44,8 +44,8 @@ export function DecisionTreeListPage(): ReactNode {
   const trees = useDecisionTrees(status);
   const data = trees.data;
   const countriesQ = useQuery({
-    queryKey: ["decision_trees", "countries"],
-    queryFn: () => listCountries(),
+    queryKey: ["decision_trees", "countries", scope],
+    queryFn: () => countriesForScope(scope),
     staleTime: 5 * 60_000,
   });
   const archive = useArchiveDecisionTree();
