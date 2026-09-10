@@ -3565,10 +3565,33 @@ global:
     #   never captured. The next occurrence will name itself.
     #
     #   Rollback is these three tags back to f41e005.
+    # 8c782c1 = #670, /platform/usage gains tenant and person filters.
+    #   api + workers + frontend together, and they MUST be: the pickers call a
+    #   NEW endpoint, GET /api/v1/platform/usage/filters. A frontend that
+    #   reaches prod before the api renders two empty dropdowns and every
+    #   filtered view 404s.
+    #
+    #   NO MIGRATION. Read-path only.
+    #
+    #   Both filters narrow every section, including the six queries that read
+    #   raw rather than the aggregate — a filter that reached only the
+    #   aggregate-backed half would leave the funnels and struggle board
+    #   describing everybody while the KPI row described one person.
+    #
+    #   Picker options come from events, not from the tenants/users tables, so
+    #   a tenant that never used the product is never offered. Labels (slug,
+    #   email) are JOINED AT READ TIME — usage_events still stores no names.
+    #
+    #   AFTER THE SYNC: open the page, confirm the two dropdowns populate, and
+    #   that picking a tenant narrows the person list rather than offering
+    #   everyone. The tenant-health table should now show a slug where it used
+    #   to print a bare uuid.
+    #
+    #   Rollback is these three tags back to ecbe645.
     api:
-      tag: "ecbe645"
+      tag: "8c782c1"
     workers:
-      tag: "ecbe645"
+      tag: "8c782c1"
     frontend:
       # 822dea3 = #528, every index tile in the Block Dock gets a reading.
       #   Ten of the thirteen tiles rendered disabled and greyed, showing an
@@ -4019,7 +4042,7 @@ global:
       #   traces page learns the 'farm' skip axis. The API half must move in
       #   the same sync — the new section calls two routes that do not exist
       #   on 76a6411.
-      tag: "ecbe645"
+      tag: "8c782c1"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
