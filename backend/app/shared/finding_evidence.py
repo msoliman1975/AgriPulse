@@ -80,6 +80,14 @@ _WEATHER_LABELS: dict[str, dict[str, str]] = {
     "ar": {"mean": "متوسط {code}", "sum": "إجمالي {code}", "max": "أعلى {code}"},
 }
 
+# Keys with no dotted family. `crop_path` is the only one the engine
+# resolves today; it appears in most recommendation snapshots and read
+# as the bare word "crop_path" next to properly labelled rows.
+_BARE_LABELS: dict[str, dict[str, str]] = {
+    "en": {"crop_path": "Crop", "growth_stage": "Growth stage"},
+    "ar": {"crop_path": "المحصول", "growth_stage": "مرحلة النمو"},
+}
+
 _NO_DATA = {"en": "no data", "ar": "لا توجد بيانات"}
 _TRUE = {"en": "yes", "ar": "نعم"}
 _FALSE = {"en": "no", "ar": "لا"}
@@ -125,6 +133,11 @@ def evidence_label(key: str, locale: str = DEFAULT_LOCALE) -> str:
 
     if family == "params" and len(parts) >= 2:
         return _humanise(parts[1])
+
+    if len(parts) == 1:
+        known = _table(_BARE_LABELS, locale).get(key)
+        if known is not None:
+            return known
 
     return key
 

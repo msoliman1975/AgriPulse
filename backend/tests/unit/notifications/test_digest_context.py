@@ -11,6 +11,8 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from app.modules.notifications.subscribers import (
+    _DIGEST_TEMPLATE_CODES,
+    _anchor_columns,
     _block_count_label,
     _build_digest_ctx,
     _finding_blocks,
@@ -47,6 +49,7 @@ def _row(**over: object) -> dict:
         "first_created_at": WHEN,
         "alert_count": 23,
         "block_codes": [f"{n:03d}" for n in range(1, 24)],
+        "kind": "alert",
     }
     row.update(over)
     return row
@@ -206,3 +209,66 @@ def test_alert_family_variable_names_are_also_published() -> None:
     ctx = _build_digest_ctx(row=_row(), tree=TREE, farm=FARM_ROW, locale="en", tenant_id=TENANT)
     assert ctx["rule_name"] == ctx["tree_name"]
     assert ctx["rule_description"] == ctx["tree_description"]
+
+
+# --- recommendations use the same machinery -----------------------------
+# The alert half shipped first. Prod then showed recommendations flooding
+# six times harder through the same bug — 287 recommendations became 574
+# emails on one day — so the digest serves both kinds from one code path.
+
+
+def _rec_row(**over: object) -> dict:
+    row = _row(
+        kind="recommendation",
+        group_key="t_ndvi:leaf_low:fertilize:warning",
+        tree_code="t_ndvi",
+        action_type="fertilize",
+        diagnosis_en="Canopy vigour is below the band for this tree size.",
+        diagnosis_ar="قوة الغطاء أقل من النطاق.",
+        signal_snapshot={"indices.ndvi.mean": 0.214},
+    )
+    row.update(over)
+    return row
+
+
+def test_a_recommendation_digest_links_to_the_recommendation_tab() -> None:
+    """`?kind=alert` would open the alerts tab of a queue whose rows are
+    recommendations — the reader would find an empty list."""
+    ctx = _build_digest_ctx(row=_rec_row(), tree=TREE, farm=FARM_ROW, locale="en", tenant_id=TENANT)
+    assert ctx["link_url"] == f"/action-center/{FARM}?kind=recommendation"
+
+
+def test_an_alert_digest_still_links_to_the_alert_tab() -> None:
+    ctx = _build_digest_ctx(
+        row=_row(kind="alert"), tree=TREE, farm=FARM_ROW, locale="en", tenant_id=TENANT
+    )
+    assert ctx["link_url"] == f"/action-center/{FARM}?kind=alert"
+
+
+def test_a_row_with_no_kind_is_treated_as_an_alert() -> None:
+    """Back-compat: the alert half shipped before `kind` existed on the row."""
+    row = _row()
+    row.pop("kind", None)
+    ctx = _build_digest_ctx(row=row, tree=TREE, farm=FARM_ROW, locale="en", tenant_id=TENANT)
+    assert "kind=alert" in ctx["link_url"]
+
+
+def test_the_anchor_goes_in_the_column_its_kind_owns() -> None:
+    """Both `in_app_inbox` and `notification_dispatches` carry a CHECK that
+    exactly one of the two ids is set, so a hard-coded `alert_id=` would
+    fail on the constraint for every recommendation digest."""
+    assert _anchor_columns("alert", ALERT) == {"alert_id": ALERT}
+    assert _anchor_columns("recommendation", ALERT) == {"recommendation_id": ALERT}
+
+
+def test_each_kind_gets_its_own_template_family() -> None:
+    assert _DIGEST_TEMPLATE_CODES["alert"] == "alert_digest"
+    assert _DIGEST_TEMPLATE_CODES["recommendation"] == "recommendation_digest"
+
+
+def test_a_recommendations_action_verb_reaches_the_template() -> None:
+    """An alert says what is wrong; a recommendation says what to do. The
+    verb is the half a reader acts on, so it has to survive the digest."""
+    ctx = _build_digest_ctx(row=_rec_row(), tree=TREE, farm=FARM_ROW, locale="en", tenant_id=TENANT)
+    assert ctx["action_type_label"] == "Fertilize"
+    assert ctx["verdict"] == "Canopy vigour is below the band for this tree size."

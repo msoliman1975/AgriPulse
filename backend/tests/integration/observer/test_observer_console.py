@@ -337,8 +337,9 @@ async def test_cloud_skipped_scenes_leave_the_acquire_denominator(
             )
         ).json()
         s = _stages(body)
-        assert s["discovered"]["count"] - s["discovered"]["detail"]["skipped"] == (
-            s["acquired"]["expected"]
+        assert (
+            s["discovered"]["count"] - s["discovered"]["detail"]["skipped"]
+            == (s["acquired"]["expected"])
         )
 
 
@@ -840,8 +841,8 @@ async def test_lineage_records_the_pixel_split_the_aggregate_cannot(
         assert run["aoi_pixel_count"] == 3508
         assert run["masked_pixel_count"] == 239
         ndvi = run["per_index"]["ndvi"]
-        assert ndvi["valid"] + ndvi["nodata"] + run["masked_pixel_count"] == (
-            run["aoi_pixel_count"]
+        assert (
+            ndvi["valid"] + ndvi["nodata"] + run["masked_pixel_count"] == (run["aoi_pixel_count"])
         )
 
 
