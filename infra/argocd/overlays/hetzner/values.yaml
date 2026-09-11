@@ -3660,10 +3660,30 @@ global:
     #
     #   Rollback is these three tags back to e0ea9c7 (api, workers) and
     #   8d2d866 (frontend). Nothing to undo in the database.
+    # 431d7fa = #677, backend only. The decision-tree catalogue's name and
+    #   description now follow whichever version is current.
+    #
+    #   Saving a draft used to rewrite them, so a draft renamed the tree for
+    #   every reader while the engine still walked the published version — a
+    #   draft is invisible until published, and its name was not. And
+    #   publishing an earlier version left the newer version's name on
+    #   screen, so "republish the previous version" rolled the engine back
+    #   without rolling the words back.
+    #
+    #   `append_version` no longer writes that metadata; `publish_version`
+    #   stamps it from the version it makes current.
+    #
+    #   No migration, and no frontend change, so frontend stays on 9ccdff2.
+    #
+    #   Watch for this: after saving a draft the page header keeps the
+    #   published name. That is the fix, not a failed save — the new draft
+    #   row in the version history is the confirmation.
+    #
+    #   Rollback is these two tags back to 9ccdff2.
     api:
-      tag: "9ccdff2"
+      tag: "431d7fa"
     workers:
-      tag: "9ccdff2"
+      tag: "431d7fa"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
