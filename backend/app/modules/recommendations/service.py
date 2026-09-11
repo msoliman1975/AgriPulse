@@ -50,6 +50,7 @@ from app.modules.recommendations.errors import (
     RecommendationNotFoundError,
 )
 from app.modules.recommendations.events import (
+    EvaluationRunFinishedV1,
     RecommendationAppliedV1,
     RecommendationDeferredV1,
     RecommendationDismissedV1,
@@ -601,6 +602,21 @@ class RecommendationsServiceImpl:
         # pass that wrote recommendations but left no lineage would be the one
         # kind of run nobody could audit afterwards.
         run_id = await self._repo.open_eval_run(kind="on_demand", actor_user_id=actor_user_id)
+        # Every alert this run opens holds its per-user channels back until
+        # the run is announced finished, so the announcement has to happen
+        # on the failure path too or those messages are never sent.
+        announced = False
+
+        def _announce_run_finished() -> None:
+            nonlocal announced
+            if announced:
+                return
+            announced = True
+            self._bus.publish(
+                EvaluationRunFinishedV1(
+                    run_id=run_id, tenant_schema=tenant_schema, kind="on_demand"
+                )
+            )
 
         blocks: list[dict[str, Any]] = []
         totals = {
@@ -660,6 +676,7 @@ class RecommendationsServiceImpl:
             # the per-tree 'error' status lives.
             outcome="failed" if outcomes["error"] else "ok",
         )
+        _announce_run_finished()
 
         self._log.info(
             "decision_tree_farm_run",
@@ -1528,6 +1545,9 @@ class RecommendationsServiceImpl:
                 today=today,
                 actor_user_id=actor_user_id,
                 tenant_schema=tenant_schema,
+                # `trace` is created only when the caller opened a run
+                # (see evaluate_block), so it is the run marker itself.
+                run_id=trace.run_id if trace is not None else None,
             )
             if opened["item_id"] is None:
                 _trace("fired", outcome={**leaf_outcome, "deduped": True})
@@ -1810,6 +1830,7 @@ class RecommendationsServiceImpl:
         today: date,
         actor_user_id: UUID | None,
         tenant_schema: str,
+        run_id: UUID | None = None,
     ) -> dict[str, Any]:
         """Open (or re-fire) an alert produced by a tree-leaf with ``kind: alert``.
 
@@ -1994,6 +2015,12 @@ class RecommendationsServiceImpl:
                 prescription_en=None,
                 prescription_ar=None,
                 signal_snapshot=result.evaluation_snapshot,
+                # Inside a run the per-user channels wait for the run to
+                # finish so they can be consolidated; outside one they go
+                # out now, because nothing will flush them later.
+                run_id=run_id,
+                tree_code=tree["tree_code"],
+                group_key=group_key,
             )
         )
         return {"item_id": alert_id, "member_id": member_id, "created": True}

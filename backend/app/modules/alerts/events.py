@@ -37,6 +37,16 @@ class AlertOpenedV1(Event):
     prescription_en: str | None = None
     prescription_ar: str | None = None
     signal_snapshot: dict[str, Any] | None = None
+    # The evaluation run that opened this alert, when one was open.
+    # Present => the alert was opened by a decision-tree sweep or an
+    # on-demand run, and the notifications module holds its per-user
+    # channels back so the end of that run can send ONE consolidated
+    # message per (farm, tree, leaf, severity) instead of one per block.
+    # Absent => nothing will flush later, so the fan-out sends at once.
+    run_id: UUID | None = None
+    # Carried so the digest can name the tree without parsing rule_code.
+    tree_code: str | None = None
+    group_key: str | None = None
 
 
 class AlertAcknowledgedV1(Event):

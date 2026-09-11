@@ -29,12 +29,14 @@ from celery import shared_task
 from sqlalchemy import text
 
 from app.core.logging import get_logger
+from app.modules.recommendations.events import EvaluationRunFinishedV1
 from app.modules.recommendations.service import get_recommendations_service
 from app.shared.db.session import (
     AsyncSessionLocal,
     dispose_engine,
     sanitize_tenant_schema,
 )
+from app.shared.eventbus import get_default_bus
 
 _log = get_logger(__name__)
 
@@ -72,6 +74,40 @@ def evaluate_for_tenant(tenant_schema: str) -> dict[str, int]:
     return _run_task(_evaluate_for_tenant_async(tenant_schema))
 
 
+async def _close_run(
+    factory: Any,
+    *,
+    tenant_schema: str,
+    run_id: Any,
+    blocks_evaluated: int,
+    trees_evaluated: int,
+    trees_skipped: int,
+    recommendations_opened: int,
+    traces_written: int,
+) -> None:
+    """Settle the run row in its own transaction.
+
+    Lifted out of the sweep body only to keep that function under the
+    statement ceiling; it has no other caller and no behaviour of its own.
+    """
+    async with factory() as session, session.begin():
+        await _set_tenant_context(session, tenant_schema)
+        async with factory() as public_session:
+            svc = get_recommendations_service(tenant_session=session, public_session=public_session)
+            await svc._repo.close_eval_run(
+                run_id=run_id,
+                blocks_evaluated=blocks_evaluated,
+                trees_evaluated=trees_evaluated,
+                trees_skipped=trees_skipped,
+                recommendations_opened=recommendations_opened,
+                # Alerts opened by tree leaves are counted in the trace rows
+                # (status='fired' with an alert_id), not in the per-block
+                # summary, which only ever tallied recommendations.
+                alerts_opened=0,
+                traces_written=traces_written,
+            )
+
+
 async def _evaluate_for_tenant_async(tenant_schema: str) -> dict[str, int]:
     factory = AsyncSessionLocal()
     blocks: tuple[Any, ...] = ()
@@ -104,6 +140,22 @@ async def _evaluate_for_tenant_async(tenant_schema: str) -> dict[str, int]:
             svc = get_recommendations_service(tenant_session=session, public_session=public_session)
             run_id = await svc._repo.open_eval_run(kind="sweep", actor_user_id=None)
 
+    # Alerts opened inside a run keep their per-user channels back so the
+    # end of the run can consolidate them (one message per farm + tree +
+    # leaf + severity, instead of one per block). Nothing else will ever
+    # flush them, so the announcement below runs in a `finally`: a sweep
+    # that dies on block 40 of 200 still sends what the first 39 opened.
+    announced = False
+
+    def _announce_run_finished() -> None:
+        nonlocal announced
+        if announced:
+            return
+        announced = True
+        get_default_bus().publish(
+            EvaluationRunFinishedV1(run_id=run_id, tenant_schema=tenant_schema, kind="sweep")
+        )
+
     blocks_processed = 0
     recommendations_opened = 0
     trees_evaluated = 0
@@ -114,44 +166,41 @@ async def _evaluate_for_tenant_async(tenant_schema: str) -> dict[str, int]:
     # log to one that wrote thousands. That is the state production was in
     # on 2026-09-07 — 4,752 traces, zero verdicts — and nothing recorded it.
     verdicts_written = 0
-    for block_id in blocks:
-        async with factory() as session, session.begin():
-            await _set_tenant_context(session, tenant_schema)
-            async with factory() as public_session:
-                svc = get_recommendations_service(
-                    tenant_session=session, public_session=public_session
-                )
-                summary = await svc.evaluate_block(
-                    block_id=block_id,
-                    actor_user_id=None,
-                    tenant_schema=tenant_schema,
-                    tenant_id=tenant_id,
-                    run_id=run_id,
-                    excluded_by_farm=excluded_by_farm,
-                )
-        blocks_processed += 1
-        recommendations_opened += summary.get("recommendations_opened", 0)
-        trees_evaluated += summary.get("trees_evaluated", 0)
-        trees_skipped += summary.get("trees_skipped_crop", 0)
-        traces_written += summary.get("traces_written", 0)
-        verdicts_written += summary.get("verdicts_written", 0)
+    try:
+        for block_id in blocks:
+            async with factory() as session, session.begin():
+                await _set_tenant_context(session, tenant_schema)
+                async with factory() as public_session:
+                    svc = get_recommendations_service(
+                        tenant_session=session, public_session=public_session
+                    )
+                    summary = await svc.evaluate_block(
+                        block_id=block_id,
+                        actor_user_id=None,
+                        tenant_schema=tenant_schema,
+                        tenant_id=tenant_id,
+                        run_id=run_id,
+                        excluded_by_farm=excluded_by_farm,
+                    )
+            blocks_processed += 1
+            recommendations_opened += summary.get("recommendations_opened", 0)
+            trees_evaluated += summary.get("trees_evaluated", 0)
+            trees_skipped += summary.get("trees_skipped_crop", 0)
+            traces_written += summary.get("traces_written", 0)
+            verdicts_written += summary.get("verdicts_written", 0)
 
-    async with factory() as session, session.begin():
-        await _set_tenant_context(session, tenant_schema)
-        async with factory() as public_session:
-            svc = get_recommendations_service(tenant_session=session, public_session=public_session)
-            await svc._repo.close_eval_run(
-                run_id=run_id,
-                blocks_evaluated=blocks_processed,
-                trees_evaluated=trees_evaluated,
-                trees_skipped=trees_skipped,
-                recommendations_opened=recommendations_opened,
-                # Alerts opened by tree leaves are counted in the trace rows
-                # (status='fired' with an alert_id), not in the per-block
-                # summary, which only ever tallied recommendations.
-                alerts_opened=0,
-                traces_written=traces_written,
-            )
+        await _close_run(
+            factory,
+            tenant_schema=tenant_schema,
+            run_id=run_id,
+            blocks_evaluated=blocks_processed,
+            trees_evaluated=trees_evaluated,
+            trees_skipped=trees_skipped,
+            recommendations_opened=recommendations_opened,
+            traces_written=traces_written,
+        )
+    finally:
+        _announce_run_finished()
 
     _log.info(
         "recommendations_tenant_sweep_done",

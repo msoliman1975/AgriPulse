@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from html import escape
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -36,10 +37,14 @@ from app.modules.notifications.events import InboxItemCreatedV1
 from app.modules.notifications.presentation import (
     absolute_url,
     action_type_label,
+    callout_html,
     format_timestamp,
     preferences_url,
     severity_colours,
     severity_label,
+    titled_block_html,
+    titled_block_text,
+    titled_paragraph_html,
 )
 from app.modules.notifications.push import PushSendError, send_push
 from app.modules.notifications.sink import (
@@ -49,12 +54,16 @@ from app.modules.notifications.sink import (
     resets_outbound,
 )
 from app.modules.notifications.smtp import SmtpSendError, send_email
-from app.modules.notifications.templates import render
+from app.modules.notifications.templates import SafeMarkup, render
 from app.modules.notifications.webhook import WebhookSendError, send_webhook
-from app.modules.recommendations.events import RecommendationOpenedV1
+from app.modules.recommendations.events import (
+    EvaluationRunFinishedV1,
+    RecommendationOpenedV1,
+)
 from app.modules.scouting.events import ScoutingVisitAssignedV1
 from app.shared.db.session import sanitize_tenant_schema
 from app.shared.eventbus import EventBus, get_default_bus
+from app.shared.finding_evidence import evidence_rows, evidence_text
 from app.shared.realtime import publish_to_user
 
 _log = get_logger(__name__)
@@ -159,7 +168,8 @@ def _load_default_rule(session: Session, rule_code: str) -> dict[str, Any] | Non
             row = (
                 session.execute(
                     text(
-                        "SELECT name_en, name_ar FROM public.decision_trees "
+                        "SELECT name_en, name_ar, description_en, description_ar "
+                        "FROM public.decision_trees "
                         "WHERE code = :c AND deleted_at IS NULL"
                     ),
                     {"c": tree_code},
@@ -262,6 +272,109 @@ def _load_template(
     return None
 
 
+# Values a template can drop straight in. The renderer is a flat
+# substituter with no loops (templates.py), so a variable-length list has
+# to arrive already marked up. Both forms are built from the same rows so
+# the HTML and the plain-text part of one email cannot disagree.
+_EVIDENCE_LINE = (
+    "<tr>"
+    '<td style="padding:6px 0;border-bottom:1px solid #f0eee7;'
+    'font-size:12px;color:#5e7669;">{label}</td>'
+    '<td style="padding:6px 0;border-bottom:1px solid #f0eee7;'
+    'font-size:14px;color:#2e4a3d;">{value}</td>'
+    "</tr>"
+)
+
+
+def _evidence_html(snapshot: dict[str, Any] | None, *, locale: str) -> str:
+    """The measured-values table, or "" when the walk resolved nothing.
+
+    Empty rather than an empty table: a template that always prints a
+    heading would show "What we measured" above nothing at all, which
+    reads as a bug rather than as an absence.
+    """
+    rows = evidence_rows(snapshot, locale=locale)
+    if not rows:
+        return ""
+    body = "".join(
+        _EVIDENCE_LINE.format(label=escape(label), value=escape(value)) for label, value in rows
+    )
+    return SafeMarkup(
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"'
+        f' border="0">{body}</table>'
+    )
+
+
+def _evidence_text_block(snapshot: dict[str, Any] | None, *, locale: str) -> str:
+    """The same rows as indented plain-text lines, for the text part."""
+    rows = evidence_rows(snapshot, locale=locale)
+    if not rows:
+        return ""
+    return "\n".join(f"  {label}: {value}" for label, value in rows)
+
+
+# Headings for the two sections the reader was missing. Kept here rather
+# than in the templates because the sections are built in Python (a flat
+# renderer cannot hide a heading whose body is empty) and a heading that
+# lived apart from the thing it heads would be free to drift from it.
+_WHY_TITLE = {"en": "Why this tree ran", "ar": "لماذا ظهر هذا"}
+_MEASURED_TITLE = {"en": "What we measured", "ar": "ما الذي قِيس"}
+_ACTION_TITLE = {"en": "What to do", "ar": "الإجراء المطلوب"}
+
+
+def _finding_blocks(
+    *,
+    description: str | None,
+    snapshot: dict[str, Any] | None,
+    locale: str,
+    prescription: str | None = None,
+) -> dict[str, Any]:
+    """The optional sections of a message body, each whole or absent.
+
+    Returns one HTML variable and one text variable that a template
+    places once. Building the concatenation here rather than in the
+    template is what keeps an absent section from leaving its heading, or
+    a blank gap, behind: a template that placed three separate variables
+    would print two empty lines whenever two of the three were empty.
+
+    ``prescription`` is separate from the other two because it is the
+    line a person acts on, so it is rendered as the tinted callout and
+    stays last. Tree-sourced alerts never set it — the leaf writes a
+    diagnosis and no prescription — which is why "WHAT TO DO" was
+    printing above nothing on every alert this platform has sent.
+    """
+    rtl = locale == "ar"
+    why_title = _WHY_TITLE.get(locale, _WHY_TITLE["en"])
+    measured_title = _MEASURED_TITLE.get(locale, _MEASURED_TITLE["en"])
+    action_title = _ACTION_TITLE.get(locale, _ACTION_TITLE["en"])
+    table = _evidence_html(snapshot, locale=locale)
+
+    html_parts = [
+        titled_paragraph_html(why_title, description or "", rtl=rtl),
+        titled_block_html(measured_title, table, rtl=rtl),
+    ]
+    text_parts = [
+        titled_block_text(why_title.upper(), description or ""),
+        titled_block_text(measured_title.upper(), _evidence_text_block(snapshot, locale=locale)),
+    ]
+    action_html = callout_html(action_title, prescription, rtl=rtl) if prescription else ""
+    action_text = titled_block_text(action_title.upper(), prescription or "")
+
+    # The spacing contract for the plain-text parts: a non-empty block
+    # ends with a blank line, an empty one is the empty string. So the
+    # template places these back to back with no newlines of its own and
+    # gets correct spacing whichever combination is present. Putting the
+    # separator in the template instead is what leaves a three-newline
+    # gap when the block between them turns out to be empty.
+    extras = "\n".join(part for part in text_parts if part)
+    return {
+        "extra_blocks_html": SafeMarkup("".join(part for part in html_parts if part)),
+        "extra_blocks_text": f"{extras}\n" if extras else "",
+        "action_block_html": SafeMarkup(action_html),
+        "action_block_text": f"{action_text}\n" if action_text else "",
+    }
+
+
 def _build_render_ctx(
     *,
     alert: dict[str, Any],
@@ -285,6 +398,11 @@ def _build_render_ctx(
         if rule is not None
         else alert["rule_code"]
     ) or alert["rule_code"]
+    rule_description = (
+        (rule.get("description_ar") if is_ar else rule.get("description_en"))
+        if rule is not None
+        else None
+    )
     link_url = f"/action-center/{alert['farm_id']}?kind=alert&item={alert['alert_id']}"
     return {
         "tenant_id": str(tenant_id),
@@ -305,6 +423,20 @@ def _build_render_ctx(
         "severity_border": border,
         "diagnosis": diagnosis or "",
         "prescription": prescription or "",
+        # The two fields the reader was missing. `rule_description` is the
+        # tree author's own paragraph on what this tree looks for, which
+        # until now was written at authoring time and shown on no surface
+        # at all. `evidence` is what the walk actually resolved.
+        "rule_description": rule_description or "",
+        "evidence": evidence_text(alert.get("signal_snapshot"), locale=locale),
+        "evidence_html": _evidence_html(alert.get("signal_snapshot"), locale=locale),
+        "evidence_text_block": _evidence_text_block(alert.get("signal_snapshot"), locale=locale),
+        **_finding_blocks(
+            description=rule_description,
+            snapshot=alert.get("signal_snapshot"),
+            locale=locale,
+            prescription=prescription,
+        ),
         "fired_at": alert["created_at"].isoformat() if alert.get("created_at") else "",
         "fired_at_display": format_timestamp(alert.get("created_at"), locale),
         "signal_snapshot_json": json.dumps(alert.get("signal_snapshot") or {}),
@@ -1013,24 +1145,42 @@ def _on_alert_opened(event: AlertOpenedV1) -> None:
             return
 
         inbox_events: list[InboxItemCreatedV1] = []
-        for user in recipients:
-            user_channels = list(user.get("notification_channels") or ["in_app"])
-            effective = [c for c in tenant_channels if c in user_channels and c in _KNOWN_CHANNELS]
-            locale = user.get("locale") or _DEFAULT_LOCALE
-            for channel in _PER_USER_CHANNELS:
-                inbox = _dispatch_channel_for_user(
-                    session,
-                    event=event,
-                    user=user,
-                    channel=channel,
-                    locale=locale,
-                    effective_channels=effective,
-                    tenant_id=tenant_id,
-                    alert=alert,
-                    rule=rule,
-                )
-                if inbox is not None:
-                    inbox_events.append(inbox)
+        # One sweep opens one alert per block. Sending each of those on its
+        # own is how a 23-block farm produced 23 identical emails with a
+        # different number in the subject. Inside a run, the per-user
+        # channels wait: `_on_evaluation_run_finished` below sends ONE
+        # message per (farm, tree, leaf, severity) when the run ends.
+        #
+        # The webhook is deliberately not held back. It is machine-read,
+        # one payload per alert is the contract receivers already parse,
+        # and nobody's inbox is the worse for it.
+        if event.run_id is None:
+            for user in recipients:
+                user_channels = list(user.get("notification_channels") or ["in_app"])
+                effective = [
+                    c for c in tenant_channels if c in user_channels and c in _KNOWN_CHANNELS
+                ]
+                locale = user.get("locale") or _DEFAULT_LOCALE
+                for channel in _PER_USER_CHANNELS:
+                    inbox = _dispatch_channel_for_user(
+                        session,
+                        event=event,
+                        user=user,
+                        channel=channel,
+                        locale=locale,
+                        effective_channels=effective,
+                        tenant_id=tenant_id,
+                        alert=alert,
+                        rule=rule,
+                    )
+                    if inbox is not None:
+                        inbox_events.append(inbox)
+        else:
+            _log.debug(
+                "alert_opened_deferred_to_run_digest",
+                alert_id=str(event.alert_id),
+                run_id=str(event.run_id),
+            )
 
         _dispatch_webhook_once(
             session,
@@ -1080,7 +1230,8 @@ def _load_decision_tree(
     row = (
         session.execute(
             text(
-                "SELECT name_en, name_ar FROM public.decision_trees "
+                "SELECT name_en, name_ar, description_en, description_ar "
+                "FROM public.decision_trees "
                 "WHERE code = :c AND deleted_at IS NULL "
                 "  AND (tenant_id IS NULL OR tenant_id = :tid)"
             ),
@@ -1109,6 +1260,11 @@ def _build_render_ctx_for_recommendation(
         if tree is not None
         else rec["tree_code"]
     ) or rec["tree_code"]
+    tree_description = (
+        (tree.get("description_ar") if is_ar else tree.get("description_en"))
+        if tree is not None
+        else None
+    )
     link_url = (
         f"/action-center/{rec['farm_id']}?kind=recommendation&item={rec['recommendation_id']}"
     )
@@ -1129,6 +1285,18 @@ def _build_render_ctx_for_recommendation(
         "severity_bg": bg,
         "severity_border": border,
         "text": text_localized or "",
+        # Same two additions as the alert context, from the same source of
+        # truth, so a recommendation and an alert describe themselves the
+        # same way on every channel.
+        "tree_description": tree_description or "",
+        "evidence": evidence_text(rec.get("evaluation_snapshot"), locale=locale),
+        "evidence_html": _evidence_html(rec.get("evaluation_snapshot"), locale=locale),
+        "evidence_text_block": _evidence_text_block(rec.get("evaluation_snapshot"), locale=locale),
+        **_finding_blocks(
+            description=tree_description,
+            snapshot=rec.get("evaluation_snapshot"),
+            locale=locale,
+        ),
         "fired_at": rec["created_at"].isoformat() if rec.get("created_at") else "",
         "fired_at_display": format_timestamp(rec.get("created_at"), locale),
         "evaluation_snapshot_json": json.dumps(rec.get("evaluation_snapshot") or {}),
@@ -1613,6 +1781,642 @@ def _on_recommendation_opened(event: RecommendationOpenedV1) -> None:
         )
 
 
+# =====================================================================
+# Run digest — one message per (farm, tree, leaf, severity) per run.
+#
+# A sweep walks every block of every farm and opens one alert per block
+# that matches. Fanned out one at a time, a 23-block farm produced 23
+# emails whose subjects differed only in the block number. The alerts
+# themselves are right and stay one-per-block: the Action Center needs a
+# row it can close per block. Only the *telling* is consolidated.
+#
+# The grouping identity is `alerts.group_key`
+# (``<tree>:<leaf>:<action>:<severity>``, built by shared/action_items.py)
+# paired with the farm. That is already "same tree, same verdict" — it is
+# the key the Action Center groups on — so the digest does not invent a
+# second, drifting definition of what counts as the same finding.
+# "Same day" comes free: a run happens on one day, and the shortest
+# tenant sweep cadence is four hours.
+# =====================================================================
+
+_DIGEST_TEMPLATE_CODE = "alert_digest"
+
+# How many block codes the subject names before falling back to a count.
+# Three fits an email subject at phone width; the full list is always in
+# the body underneath.
+_DIGEST_SUBJECT_BLOCKS = 3
+_DIGEST_BODY_BLOCKS = 40
+
+
+# Every alert this run opened, folded onto (farm, group_key).
+#
+# The join runs through `decision_tree_eval_traces` rather than through a
+# new column on `alerts`: the trace row already records which run fired
+# which alert, which is the exact question being asked, and a second
+# place to record it would be a second place for it to be wrong.
+#
+# `a.created_at >= r.started_at` is what restricts this to alerts the run
+# OPENED. A re-fired alert keeps its original created_at and was
+# announced when it first opened. Telling somebody again that a block
+# they have not closed is still open is not news, and it is what a plain
+# "every alert this run touched" query would do on every sweep.
+_DIGEST_ROWS = """
+SELECT t.farm_id                                          AS farm_id,
+       a.group_key                                        AS group_key,
+       min(t.tree_code)                                   AS tree_code,
+       min(a.severity)                                    AS severity,
+       min(a.rule_code)                                   AS rule_code,
+       min(a.action_type)                                 AS action_type,
+       min(a.diagnosis_en)                                AS diagnosis_en,
+       min(a.diagnosis_ar)                                AS diagnosis_ar,
+       (array_agg(a.signal_snapshot ORDER BY a.created_at, a.id))[1] AS signal_snapshot,
+       (array_agg(a.id ORDER BY a.created_at, a.id))[1]   AS anchor_alert_id,
+       min(a.created_at)                                  AS first_created_at,
+       count(DISTINCT a.id)                               AS alert_count,
+       array_agg(DISTINCT b.code)                         AS block_codes
+  FROM decision_tree_eval_traces t
+  JOIN decision_tree_eval_runs r ON r.id = t.run_id
+  JOIN alerts a  ON a.id = t.alert_id AND a.deleted_at IS NULL
+  JOIN blocks b  ON b.id = a.block_id AND b.deleted_at IS NULL
+ WHERE t.run_id = :run_id
+   AND t.alert_id IS NOT NULL
+   AND a.group_key IS NOT NULL
+   AND a.created_at >= r.started_at
+ GROUP BY t.farm_id, a.group_key
+ ORDER BY t.farm_id, a.group_key
+"""
+
+
+def _load_digest_rows(session: Session, run_id: UUID) -> list[dict[str, Any]]:
+    return [
+        dict(row)
+        for row in session.execute(text(_DIGEST_ROWS), {"run_id": run_id}).mappings().all()
+    ]
+
+
+def _load_farm_names(session: Session, farm_ids: list[UUID]) -> dict[UUID, dict[str, Any]]:
+    if not farm_ids:
+        return {}
+    rows = (
+        session.execute(
+            text(
+                "SELECT id, name, name_ar FROM farms " "WHERE id = ANY(:ids) AND deleted_at IS NULL"
+            ),
+            {"ids": farm_ids},
+        )
+        .mappings()
+        .all()
+    )
+    return {row["id"]: dict(row) for row in rows}
+
+
+def _format_block_list(codes: list[str], limit: int, locale: str) -> str:
+    """``011, 012, 013 and 20 more`` — never a bare truncation.
+
+    A list that stops at an ellipsis leaves the reader unable to tell
+    three blocks from thirty, which is the one number this message exists
+    to carry.
+    """
+    ordered = sorted(c for c in codes if c)
+    if not ordered:
+        return ""
+    joiner = "، " if locale == "ar" else ", "
+    if len(ordered) <= limit:
+        return joiner.join(ordered)
+    rest = len(ordered) - limit
+    tail = f" و{rest} غيرها" if locale == "ar" else f" and {rest} more"
+    return joiner.join(ordered[:limit]) + tail
+
+
+def _block_count_label(count: int, locale: str) -> str:
+    """``1 block`` / ``23 blocks`` — Arabic takes its own forms."""
+    if locale == "ar":
+        if count == 1:
+            return "قطعة واحدة"
+        if count == 2:
+            return "قطعتان"
+        if 3 <= count <= 10:
+            return f"{count} قطع"
+        return f"{count} قطعة"
+    return "1 block" if count == 1 else f"{count} blocks"
+
+
+def _build_digest_ctx(
+    *,
+    row: dict[str, Any],
+    tree: dict[str, Any] | None,
+    farm: dict[str, Any] | None,
+    locale: str,
+    tenant_id: UUID,
+) -> dict[str, Any]:
+    """Variables the digest templates render.
+
+    Deliberately a superset of the single-alert context's names
+    (``severity_label``, ``evidence``, ``link_url_abs`` ...). The two
+    template families then read the same variable for the same idea,
+    which is what stops one channel's wording drifting from another's.
+    """
+    is_ar = locale == "ar"
+    severity = str(row["severity"])
+    fg, bg, border = severity_colours(severity)
+    codes = [str(c) for c in (row.get("block_codes") or [])]
+    count = int(row["alert_count"])
+    tree_name = (
+        (tree.get("name_ar") if is_ar else tree.get("name_en")) if tree is not None else None
+    ) or str(row["tree_code"])
+    tree_description = (
+        (tree.get("description_ar") if is_ar else tree.get("description_en"))
+        if tree is not None
+        else None
+    )
+    farm_name = (
+        ((farm.get("name_ar") if is_ar else None) or farm.get("name")) if farm else None
+    ) or ""
+    verdict = (row.get("diagnosis_ar") if is_ar else row.get("diagnosis_en")) or ""
+    snapshot = row.get("signal_snapshot")
+    # The queue, filtered to this farm's alerts — every block named in the
+    # message is in that list. There is no per-group deep link to send
+    # them to; `?item=` opens exactly one row, which is the opposite of
+    # what the reader of a 23-block message needs.
+    link_url = f"/action-center/{row['farm_id']}?kind=alert"
+    action = row.get("action_type")
+    return {
+        "tenant_id": str(tenant_id),
+        "farm_id": str(row["farm_id"]),
+        "farm_name": farm_name,
+        "tree_code": str(row["tree_code"]),
+        "tree_name": tree_name,
+        "tree_description": tree_description or "",
+        # The alert family calls the same two things `rule_*`. Both names
+        # are published so one template family can be read against the
+        # other without a mental translation step.
+        "rule_name": tree_name,
+        "rule_description": tree_description or "",
+        "group_key": str(row["group_key"]),
+        "severity": severity,
+        "severity_label": severity_label(severity, locale),
+        "severity_color": fg,
+        "severity_bg": bg,
+        "severity_border": border,
+        "action_type": action or "",
+        "action_type_label": action_type_label(action, locale) if action else "",
+        "verdict": verdict,
+        "diagnosis": verdict,
+        "block_count": str(count),
+        "block_count_label": _block_count_label(count, locale),
+        "block_list": _format_block_list(codes, _DIGEST_SUBJECT_BLOCKS, locale),
+        "block_list_full": _format_block_list(codes, _DIGEST_BODY_BLOCKS, locale),
+        "evidence": evidence_text(snapshot, locale=locale),
+        "evidence_html": _evidence_html(snapshot, locale=locale),
+        "evidence_text_block": _evidence_text_block(snapshot, locale=locale),
+        **_finding_blocks(description=tree_description, snapshot=snapshot, locale=locale),
+        "fired_at": (row["first_created_at"].isoformat() if row.get("first_created_at") else ""),
+        "fired_at_display": format_timestamp(row.get("first_created_at"), locale),
+        "link_url": link_url,
+        "link_url_abs": absolute_url(link_url),
+        "preferences_url": preferences_url(),
+    }
+
+
+def _mark_dispatch(
+    session: Session,
+    *,
+    anchor_alert_id: UUID,
+    user_id: UUID,
+    address: str | None,
+    channel: str,
+    status: str,
+    error: str | None,
+) -> None:
+    """Settle a row this module claimed as 'pending'.
+
+    'failed' sits outside the partial UNIQUE's predicate, so a send that
+    failed frees the slot and a later run may retry it.
+    """
+    session.execute(
+        text(
+            """
+            UPDATE notification_dispatches
+               SET status = :st,
+                   error = :err,
+                   sent_at = CASE WHEN :st = 'sent' THEN now() ELSE sent_at END,
+                   updated_at = now()
+             WHERE alert_id = :aid
+               AND channel = :ch
+               AND recipient_user_id = :uid
+               AND recipient_address IS NOT DISTINCT FROM :addr
+               AND template_code = :tc
+               AND status = 'pending'
+            """
+        ),
+        {
+            "st": status,
+            "err": error,
+            "aid": anchor_alert_id,
+            "ch": channel,
+            "uid": user_id,
+            "addr": address,
+            "tc": _DIGEST_TEMPLATE_CODE,
+        },
+    )
+
+
+def _send_digest_email(
+    session: Session,
+    *,
+    anchor_alert_id: UUID,
+    user: dict[str, Any],
+    locale: str,
+    subject: str,
+    body: str,
+    body_html: str | None,
+) -> None:
+    """Deliver one consolidated email and record the dispatch.
+
+    The dispatch row is keyed on the anchor alert, so the partial UNIQUE
+    on ``(alert_id, channel, recipient_user_id, recipient_address)`` turns
+    a second flush of the same run into a no-op instead of a second
+    email. That is what lets the run-finished event be published from a
+    ``finally`` without anyone being told twice.
+    """
+    address = user.get("email")
+    if not address:
+        _insert_dispatch(
+            session,
+            alert_id=anchor_alert_id,
+            template_code=_DIGEST_TEMPLATE_CODE,
+            locale=locale,
+            channel="email",
+            recipient_user_id=user["user_id"],
+            recipient_address=None,
+            status="skipped",
+            rendered_subject=subject,
+            rendered_body=body,
+            error="user has no email address",
+        )
+        return
+
+    if is_suppressed():
+        _insert_dispatch(
+            session,
+            alert_id=anchor_alert_id,
+            template_code=_DIGEST_TEMPLATE_CODE,
+            locale=locale,
+            channel="email",
+            recipient_user_id=user["user_id"],
+            recipient_address=address,
+            status="skipped",
+            rendered_subject=subject,
+            rendered_body=body,
+            error=SUPPRESSED_REASON,
+        )
+        return
+
+    # Claim the dispatch row BEFORE the SMTP call. If the claim loses to a
+    # concurrent flush the message is already somebody else's to send, and
+    # sending it here would be the duplicate the claim exists to prevent.
+    if not _insert_dispatch(
+        session,
+        alert_id=anchor_alert_id,
+        template_code=_DIGEST_TEMPLATE_CODE,
+        locale=locale,
+        channel="email",
+        recipient_user_id=user["user_id"],
+        recipient_address=address,
+        status="pending",
+        rendered_subject=subject,
+        rendered_body=body,
+        error=None,
+    ):
+        return
+
+    try:
+        send_email(to_address=address, subject=subject, body_text=body, body_html=body_html)
+    except SmtpSendError as exc:
+        _log.warning(
+            "digest_email_send_failed",
+            alert_id=str(anchor_alert_id),
+            user_id=str(user["user_id"]),
+            error=str(exc),
+        )
+        _mark_dispatch(
+            session,
+            anchor_alert_id=anchor_alert_id,
+            user_id=user["user_id"],
+            address=address,
+            channel="email",
+            status="failed",
+            error=str(exc)[:1000],
+        )
+        return
+
+    _mark_dispatch(
+        session,
+        anchor_alert_id=anchor_alert_id,
+        user_id=user["user_id"],
+        address=address,
+        channel="email",
+        status="sent",
+        error=None,
+    )
+
+
+def _send_digest_push(
+    session: Session,
+    *,
+    anchor_alert_id: UUID,
+    farm_id: UUID,
+    user: dict[str, Any],
+    locale: str,
+    subject: str,
+    body: str,
+    severity: str,
+) -> None:
+    tokens = _live_device_tokens(session, user_id=user["user_id"])
+    if not tokens:
+        _insert_dispatch(
+            session,
+            alert_id=anchor_alert_id,
+            template_code=_DIGEST_TEMPLATE_CODE,
+            locale=locale,
+            channel="push",
+            recipient_user_id=user["user_id"],
+            recipient_address=None,
+            status="skipped",
+            rendered_subject=subject,
+            rendered_body=body,
+            error="no registered devices",
+        )
+        return
+
+    # The handset opens the farm's alert queue, not one alert: this push
+    # stands for every block in the group.
+    data = {
+        "type": "alert_digest",
+        "alert_id": str(anchor_alert_id),
+        "farm_id": str(farm_id),
+        "severity": severity,
+        "deep_link": f"agripulse://action-center/{farm_id}?kind=alert",
+    }
+    for token in tokens:
+        status_value, error = "sent", None
+        try:
+            if is_suppressed():
+                status_value, error = "skipped", SUPPRESSED_REASON
+            else:
+                result = send_push(token=token, title=subject, body=body, data=data)
+                if result.skipped:
+                    status_value, error = "skipped", "push channel disabled"
+        except PushSendError as exc:
+            status_value, error = "failed", str(exc)
+            if exc.unregistered:
+                session.execute(
+                    text(
+                        "UPDATE device_tokens SET revoked_at = now() "
+                        "WHERE token = :t AND revoked_at IS NULL"
+                    ),
+                    {"t": token},
+                )
+        _insert_dispatch(
+            session,
+            alert_id=anchor_alert_id,
+            template_code=_DIGEST_TEMPLATE_CODE,
+            locale=locale,
+            channel="push",
+            recipient_user_id=user["user_id"],
+            recipient_address=f"device:{token[-8:]}",
+            status=status_value,
+            rendered_subject=subject,
+            rendered_body=body,
+            error=error,
+        )
+
+
+def _dispatch_digest_for_user(
+    session: Session,
+    *,
+    row: dict[str, Any],
+    ctx_cache: dict[str, dict[str, Any]],
+    user: dict[str, Any],
+    channel: str,
+    locale: str,
+    effective_channels: list[str],
+    tenant_id: UUID,
+    tree: dict[str, Any] | None,
+    farm: dict[str, Any] | None,
+) -> InboxItemCreatedV1 | None:
+    """Per-(user, channel) leg of one group's consolidated message."""
+    anchor_alert_id = row["anchor_alert_id"]
+    if channel not in effective_channels:
+        _insert_dispatch(
+            session,
+            alert_id=anchor_alert_id,
+            template_code=_DIGEST_TEMPLATE_CODE,
+            locale=locale,
+            channel=channel,
+            recipient_user_id=user["user_id"],
+            recipient_address=user.get("email") if channel == "email" else None,
+            status="skipped",
+            rendered_subject=None,
+            rendered_body=None,
+            error="channel disabled by tenant or user",
+        )
+        return None
+
+    template = _load_template(
+        session, template_code=_DIGEST_TEMPLATE_CODE, locale=locale, channel=channel
+    )
+    if template is None:
+        _insert_dispatch(
+            session,
+            alert_id=anchor_alert_id,
+            template_code=_DIGEST_TEMPLATE_CODE,
+            locale=locale,
+            channel=channel,
+            recipient_user_id=user["user_id"],
+            recipient_address=None,
+            status="failed",
+            rendered_subject=None,
+            rendered_body=None,
+            error="template not found",
+        )
+        return None
+
+    # One context per locale, not per recipient: every value in it comes
+    # from the finding and the reader's language, so a farm with forty
+    # viewers would otherwise build the same strings forty times.
+    ctx = ctx_cache.get(locale)
+    if ctx is None:
+        ctx = _build_digest_ctx(row=row, tree=tree, farm=farm, locale=locale, tenant_id=tenant_id)
+        ctx_cache[locale] = ctx
+
+    subject = render(template["subject"], ctx)
+    body = render(template["body"], ctx)
+
+    if channel == "in_app":
+        if not _insert_dispatch(
+            session,
+            alert_id=anchor_alert_id,
+            template_code=_DIGEST_TEMPLATE_CODE,
+            locale=locale,
+            channel="in_app",
+            recipient_user_id=user["user_id"],
+            recipient_address=None,
+            status="sent",
+            rendered_subject=subject,
+            rendered_body=body,
+            error=None,
+        ):
+            # Already in this user's bell from an earlier flush of the
+            # same run. Inserting the inbox row anyway would put a second
+            # copy of a notification they have read in front of them.
+            return None
+        item_id = _insert_inbox_item(
+            session,
+            user_id=user["user_id"],
+            alert_id=anchor_alert_id,
+            severity=str(row["severity"]),
+            title=subject,
+            body=body,
+            link_url=ctx["link_url"],
+        )
+        return InboxItemCreatedV1(
+            inbox_item_id=item_id,
+            user_id=user["user_id"],
+            tenant_id=tenant_id,
+            alert_id=anchor_alert_id,
+            severity=str(row["severity"]),
+            title=subject,
+            body=body,
+            link_url=ctx["link_url"],
+            created_at=row["first_created_at"],
+        )
+
+    if channel == "push":
+        _send_digest_push(
+            session,
+            anchor_alert_id=anchor_alert_id,
+            farm_id=row["farm_id"],
+            user=user,
+            locale=locale,
+            subject=subject,
+            body=body,
+            severity=str(row["severity"]),
+        )
+        return None
+
+    _send_digest_email(
+        session,
+        anchor_alert_id=anchor_alert_id,
+        user=user,
+        locale=locale,
+        subject=subject,
+        body=body,
+        body_html=render(template.get("body_html"), ctx, escape=True) or None,
+    )
+    return None
+
+
+@resets_outbound
+def _on_evaluation_run_finished(event: EvaluationRunFinishedV1) -> None:
+    """Send the consolidated messages for every alert one run opened."""
+    schema = event.tenant_schema
+    try:
+        sanitize_tenant_schema(schema)
+    except ValueError:
+        _log.warning("run_finished_invalid_tenant_schema", schema=schema)
+        return
+
+    factory = _session_factory()
+    bus = get_default_bus()
+    inbox_events: list[InboxItemCreatedV1] = []
+    groups_sent = 0
+    with factory() as session:
+        session.execute(text(f"SET LOCAL search_path TO {schema}, public"))
+        _activate_sink_for_schema(session, schema)
+        tenant_id = _resolve_tenant_id(session, schema)
+        if tenant_id is None:
+            _log.warning("run_finished_tenant_not_found", schema=schema)
+            return
+
+        rows = _load_digest_rows(session, event.run_id)
+        if not rows:
+            session.commit()
+            return
+
+        tenant_channels = _load_tenant_channels(session, tenant_id)
+        farms = _load_farm_names(session, sorted({r["farm_id"] for r in rows}))
+        # Recipients are a per-farm answer and a run touches few farms, so
+        # they are resolved once per farm rather than once per group.
+        recipients_by_farm: dict[UUID, list[dict[str, Any]]] = {}
+        trees: dict[str, dict[str, Any] | None] = {}
+
+        for row in rows:
+            farm_id = row["farm_id"]
+            if farm_id not in recipients_by_farm:
+                recipients_by_farm[farm_id] = _load_recipients(
+                    session, farm_id=farm_id, tenant_id=tenant_id
+                )
+            recipients = recipients_by_farm[farm_id]
+            if not recipients:
+                continue
+
+            tree_code = str(row["tree_code"])
+            if tree_code not in trees:
+                trees[tree_code] = _load_decision_tree(session, tree_code, tenant_id=tenant_id)
+
+            ctx_cache: dict[str, dict[str, Any]] = {}
+            for user in recipients:
+                user_channels = list(user.get("notification_channels") or ["in_app"])
+                effective = [
+                    c for c in tenant_channels if c in user_channels and c in _KNOWN_CHANNELS
+                ]
+                locale = user.get("locale") or _DEFAULT_LOCALE
+                for channel in _PER_USER_CHANNELS:
+                    inbox = _dispatch_digest_for_user(
+                        session,
+                        row=row,
+                        ctx_cache=ctx_cache,
+                        user=user,
+                        channel=channel,
+                        locale=locale,
+                        effective_channels=effective,
+                        tenant_id=tenant_id,
+                        tree=trees[tree_code],
+                        farm=farms.get(farm_id),
+                    )
+                    if inbox is not None:
+                        inbox_events.append(inbox)
+            groups_sent += 1
+
+        session.commit()
+
+    _log.info(
+        "alert_run_digest_sent",
+        run_id=str(event.run_id),
+        tenant_schema=schema,
+        kind=event.kind,
+        groups=groups_sent,
+        inbox_items=len(inbox_events),
+    )
+
+    for ev in inbox_events:
+        bus.publish(ev)
+        publish_to_user(
+            tenant_id=ev.tenant_id,
+            user_id=ev.user_id,
+            payload={
+                "id": str(ev.inbox_item_id),
+                "alert_id": str(ev.alert_id) if ev.alert_id else None,
+                "severity": ev.severity,
+                "title": ev.title,
+                "body": ev.body,
+                "link_url": ev.link_url,
+                "created_at": ev.created_at.isoformat(),
+            },
+        )
+
+
 def register_subscribers(bus: EventBus) -> None:
     """Register notifications' cross-module event handlers.
 
@@ -1635,6 +2439,16 @@ def register_subscribers(bus: EventBus) -> None:
         for sub in bus.handlers_for(ScoutingVisitAssignedV1)
     ):
         bus.register(ScoutingVisitAssignedV1, _on_scouting_visit_assigned, mode="sync")
+
+    # The other half of the alert fan-out. `_on_alert_opened` holds the
+    # per-user channels back for any alert opened inside an evaluation
+    # run; this is what then sends them, consolidated. Without it those
+    # alerts reach the webhook and nothing else.
+    if not any(
+        sub.handler is _on_evaluation_run_finished
+        for sub in bus.handlers_for(EvaluationRunFinishedV1)
+    ):
+        bus.register(EvaluationRunFinishedV1, _on_evaluation_run_finished, mode="sync")
 
 
 # ---------- Scouting: announce an assigned visit ----------------------------

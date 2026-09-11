@@ -208,6 +208,13 @@ class ActionItem(BaseModel):
 
     tree_code: str | None
     tree_version: int | None
+    # The tree author's own paragraph on what this tree looks for
+    # (public.decision_trees.description_en/_ar). The same text the alert
+    # email and the push now carry, from the same row, so the queue and
+    # the message a person got about it cannot say different things.
+    # NULL for a legacy rule-sourced alert, which has no tree.
+    tree_description_en: str | None = None
+    tree_description_ar: str | None = None
     # 1.0 for alerts — they express certainty, not probability.
     confidence: Decimal | None
 

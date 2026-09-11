@@ -34,6 +34,7 @@ from app.shared.action_items import (
     derive_recurrence,
     derive_spread,
 )
+from app.shared.finding_evidence import evidence_text
 
 # Recommendation action_type -> board activity_type. Mirrors the map the
 # rec-schedule flow already uses; kept here rather than imported so a change to
@@ -154,13 +155,20 @@ def derive_why(row: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
 
     snapshot = row.get("signal_snapshot")
     if isinstance(snapshot, dict) and snapshot:
-        parts = [
-            f"{k} {v}"
-            for k, v in list(snapshot.items())[:3]
-            if not isinstance(v, dict | list) and v is not None
-        ]
-        if parts:
-            return " · ".join(parts), {"source": "signal_snapshot", "snapshot": snapshot}
+        # `evidence_text` is the same reading the alert email, the push and
+        # the bell use (shared/finding_evidence.py). Before it, this branch
+        # built its own line and disagreed with all three in two ways that
+        # mattered:
+        #
+        #   * it printed the raw resolved key — "indices.ndvi.mean 0.214" —
+        #     where every other surface says "NDVI mean: 0.214";
+        #   * it dropped values that were None, and a tree that fires
+        #     BECAUSE an index is missing has nothing but None in its
+        #     snapshot. Those alerts reached the queue with no "why" line at
+        #     all. That is the state every Mango Republic alert was in.
+        line = evidence_text(snapshot, limit=3)
+        if line:
+            return line, {"source": "signal_snapshot", "snapshot": snapshot}
 
     detail = row.get("detail_en")
     if detail:
@@ -470,6 +478,18 @@ class ActionCenterServiceImpl:
         )
         now = datetime.now(UTC)
         all_items = [to_item(r, now=now) for r in rows]
+
+        # Attach the tree author's description. One lookup for the page
+        # rather than one per row: a farm's queue is usually a handful of
+        # trees repeated across many blocks.
+        descriptions = await self._repo.tree_descriptions(
+            [i.tree_code for i in all_items if i.tree_code]
+        )
+        for item in all_items:
+            found = descriptions.get(item.tree_code or "")
+            if found is not None:
+                item.tree_description_en = found["en"]
+                item.tree_description_ar = found["ar"]
 
         # Tab counts are computed BEFORE the status filter, so a tab never
         # advertises rows the active date range and filters have excluded.

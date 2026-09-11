@@ -21,6 +21,8 @@ const item = (over: Partial<ActionItem> = {}): ActionItem => ({
   detail_en: null,
   detail_ar: null,
   tree_code: null,
+  tree_description_en: null,
+  tree_description_ar: null,
   tree_version: null,
   confidence: null,
   created_at: "2026-08-09T00:00:00Z",
