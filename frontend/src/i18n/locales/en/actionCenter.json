@@ -108,7 +108,9 @@
     "title": "Why this fired",
     "none": "No reasoning was recorded for this item.",
     "confidence": "{{percent}}% confidence",
-    "alertCertainty": "Alerts express certainty, not probability."
+    "alertCertainty": "Alerts express certainty, not probability.",
+    "treeDescription": "Why this tree ran",
+    "measured": "What we measured"
   },
   "actions": {
     "why": "Why",

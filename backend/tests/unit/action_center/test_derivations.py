@@ -171,16 +171,37 @@ def test_why_falls_back_to_a_step_label_when_the_snapshot_is_empty():
 def test_an_alert_gets_a_why_from_its_signal_snapshot():
     # Alerts have no tree_path at all — this is the whole reason the alert
     # reasoning section could not just reuse the recommendation code path.
+    #
+    # The line is built by `shared.finding_evidence.evidence_text`, the same
+    # function the alert email, the push and the bell use. Before that it was
+    # built here and read "indices.ndvi.mean 0.214" — a raw resolved key,
+    # where every other surface said "NDVI mean: 0.214".
     why, meta = derive_why(
-        {"reasoning_path": None, "signal_snapshot": {"soil_ec": 4.6, "readings": 3}}
+        {
+            "reasoning_path": None,
+            "signal_snapshot": {"indices.ndvi.mean": 0.214, "block.growth_stage": "flowering"},
+        }
     )
-    assert why == "soil_ec 4.6 · readings 3"
+    assert why == "Growth stage: flowering · NDVI mean: 0.214"
+    assert meta["source"] == "signal_snapshot"
+
+
+def test_an_alert_whose_reason_is_a_missing_value_still_says_so():
+    """The case this came from.
+
+    A tree can fire BECAUSE an index is missing — every Mango Republic
+    alert did. The old formatter dropped values that were None, so those
+    alerts reached the queue with no "why" line at all: a severity word
+    and nothing a person could check it against.
+    """
+    why, meta = derive_why({"reasoning_path": None, "signal_snapshot": {"indices.ndvi.mean": None}})
+    assert why == "NDVI mean: no data"
     assert meta["source"] == "signal_snapshot"
 
 
 def test_nested_snapshot_values_are_skipped_not_stringified():
-    why, _ = derive_why({"signal_snapshot": {"nested": {"a": 1}, "list": [1, 2], "soil_ec": 4.6}})
-    assert why == "soil_ec 4.6"
+    why, _ = derive_why({"signal_snapshot": {"nested": {"a": 1}, "indices.ndvi.mean": 4.6}})
+    assert why == "NDVI mean: 4.6"
 
 
 def test_why_is_none_when_there_is_nothing_to_say():

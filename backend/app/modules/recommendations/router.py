@@ -33,6 +33,7 @@ from app.modules.recommendations.errors import (
     InvalidTreeYamlError,
     RecommendationNotFoundError,
 )
+from app.modules.recommendations.events import EvaluationRunFinishedV1
 from app.modules.recommendations.schemas import (
     BlockVerdictsResponse,
     DecisionTreeAvailabilityResponse,
@@ -73,10 +74,6 @@ from app.modules.recommendations.schemas import (
     TreeRunCandidateFarm,
     VerdictReasoningResponse,
 )
-
-# Importing the private authoring errors to map them at the route layer is
-# OK â€” they live in the same module's service.py, not across a module
-# boundary.
 from app.modules.recommendations.service import (
     DecisionTreesAuthorService,
     RecommendationsServiceImpl,
@@ -96,6 +93,11 @@ from app.modules.recommendations.service import (
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
 from app.shared.db.session import get_admin_db_session, get_db_session
+
+# Importing the private authoring errors to map them at the route layer is
+# OK â€” they live in the same module's service.py, not across a module
+# boundary.
+from app.shared.eventbus import get_default_bus
 from app.shared.rbac.check import has_capability, requires_capability
 
 router = APIRouter(prefix="/api/v1", tags=["recommendations"])
@@ -461,6 +463,13 @@ async def evaluate_block(
         recommendations_opened=summary["recommendations_opened"],
         alerts_opened=0,
         traces_written=summary.get("traces_written", 0),
+    )
+    # Alerts opened under a run_id hold their email / push / bell back for
+    # the run to consolidate. One block can only ever produce one message
+    # per finding anyway, but the hold is unconditional, so this route has
+    # to release it or the debug run would notify nobody.
+    get_default_bus().publish(
+        EvaluationRunFinishedV1(run_id=run_id, tenant_schema=schema, kind="on_demand")
     )
     return {
         "block_id": str(block_id),

@@ -24,6 +24,7 @@ grouping exists to remove. `list_members` is how the drill-down asks for them.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date, datetime
 from typing import Any
 from uuid import UUID
@@ -388,6 +389,41 @@ class ActionCenterRepository:
             bindparam("a", type_=PG_UUID(as_uuid=True)),
         )
         await self._tenant.execute(stmt, {"act": activity_id, "a": alert_id})
+
+    async def tree_descriptions(self, codes: Sequence[str]) -> dict[str, dict[str, str | None]]:
+        """``{tree_code: {en, ar}}`` for the trees behind these items.
+
+        Read from ``public.decision_trees`` through the tenant session,
+        which already has ``public`` on its search_path. Deliberately not a
+        join inside the queue's UNION: the queue is tenant data, the
+        catalog is platform data, and one query per page beats widening
+        both halves of a union that is read on every filter change.
+
+        Scoped by nothing, because ``code`` is what the alert's rule_code
+        carries and a tenant tree shadowing a platform code resolves to
+        whichever row exists — the same resolution the notifications
+        fan-out does.
+        """
+        wanted = sorted({c for c in codes if c})
+        if not wanted:
+            return {}
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        "SELECT code, description_en, description_ar "
+                        "FROM public.decision_trees "
+                        "WHERE code = ANY(:codes) AND deleted_at IS NULL"
+                    ),
+                    {"codes": wanted},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return {
+            row["code"]: {"en": row["description_en"], "ar": row["description_ar"]} for row in rows
+        }
 
 
 __all__ = ["ActionCenterRepository", "unified_status", "date"]

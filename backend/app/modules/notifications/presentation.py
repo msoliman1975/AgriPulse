@@ -155,3 +155,96 @@ def preferences_url() -> str:
     and carries no gate.
     """
     return absolute_url("/account/notifications")
+
+
+# --- optional titled blocks -------------------------------------------------
+# The renderer has no conditionals (templates.py), so a section that is
+# present only sometimes cannot be expressed in the template: a template
+# that hard-codes "WHY THIS TREE RAN" above {{rule_description}} prints
+# the heading over nothing whenever the author left the description
+# empty, which reads as a bug rather than as an absence. So the heading
+# and its content are built together here, and the template places one
+# variable that is either the whole section or the empty string.
+
+_BLOCK_INK_SOFT = "#2e4a3d"
+_BLOCK_MUTED = "#5e7669"
+
+
+def titled_block_html(title: str, body_html: str, *, rtl: bool) -> str:
+    """A titled section of an email body, or "" when there is no body.
+
+    ``body_html`` must already be markup — either escaped text or a table
+    this codebase built. Nothing here escapes it.
+    """
+    if not body_html:
+        return ""
+    align = ' align="right"' if rtl else ""
+    title_style = f"margin:0 0 7px 0;font-size:12px;color:{_BLOCK_MUTED};font-weight:700;"
+    if not rtl:
+        title_style = (
+            f"margin:0 0 7px 0;font-size:11px;letter-spacing:1.3px;"
+            f"text-transform:uppercase;color:{_BLOCK_MUTED};font-weight:700;"
+        )
+    return (
+        f'<tr><td{align} style="padding:26px 36px 0 36px;">'
+        f'<p style="{title_style}">{title}</p>'
+        f"{body_html}</td></tr>"
+    )
+
+
+def titled_paragraph_html(title: str, body_text: str, *, rtl: bool) -> str:
+    """:func:`titled_block_html` whose body is one escaped paragraph."""
+    if not body_text:
+        return ""
+    from html import escape as _escape
+
+    leading = "1.8" if rtl else "1.62"
+    para = (
+        f'<p style="margin:0;font-size:15px;line-height:{leading};'
+        f'color:{_BLOCK_INK_SOFT};">{_escape(body_text)}</p>'
+    )
+    return titled_block_html(title, para, rtl=rtl)
+
+
+def titled_block_text(title: str, body: str) -> str:
+    """The plain-text twin: a heading and its body, or "" when empty."""
+    if not body:
+        return ""
+    return f"{title}\n{body}\n"
+
+
+_CALLOUT_BRAND = "#0f6e56"
+_CALLOUT_TINT = "#f7f6f1"
+
+
+def callout_html(title: str, body_text: str | None, *, rtl: bool) -> str:
+    """The tinted block that carries the sentence a person has to act on.
+
+    Same markup as the one migration 0070 built, reproduced here so the
+    conditional version and the frozen one look identical. Returns "" for
+    an empty body: a tree-sourced alert has no prescription, and its
+    heading over blank space is what this exists to stop.
+    """
+    if not body_text:
+        return ""
+    from html import escape as _escape
+
+    side = "border-right" if rtl else "border-left"
+    align = ' align="right"' if rtl else ""
+    leading = "1.8" if rtl else "1.62"
+    title_style = f"margin:0 0 7px 0;font-size:12px;color:{_CALLOUT_BRAND};font-weight:700;"
+    if not rtl:
+        title_style = (
+            f"margin:0 0 7px 0;font-size:11px;letter-spacing:1.3px;"
+            f"text-transform:uppercase;color:{_CALLOUT_BRAND};font-weight:700;"
+        )
+    return (
+        f'<tr><td style="padding:22px 36px 0 36px;">'
+        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
+        f' style="background-color:{_CALLOUT_TINT};{side}:3px solid {_CALLOUT_BRAND};">'
+        f'<tr><td{align} style="padding:16px 18px;">'
+        f'<p style="{title_style}">{title}</p>'
+        f'<p style="margin:0;font-size:15px;line-height:{leading};color:{_BLOCK_INK_SOFT};">'
+        f"{_escape(body_text)}</p>"
+        f"</td></tr></table></td></tr>"
+    )

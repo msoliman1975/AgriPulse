@@ -185,6 +185,12 @@ export interface ActionItem {
 
   tree_code: string | null;
   tree_version: number | null;
+  /** The tree author's own paragraph on what this tree looks for. The same
+   *  text the alert email and the push carry, read from the same row, so the
+   *  queue and the message a person got about it cannot say different things.
+   *  Null for a legacy rule-sourced alert, which has no tree. */
+  tree_description_en: string | null;
+  tree_description_ar: string | null;
   confidence: string | null;
 
   created_at: string;

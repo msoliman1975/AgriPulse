@@ -52,6 +52,30 @@ class RecommendationOpenedV1(Event):
     zone_count: int | None = None
 
 
+class EvaluationRunFinishedV1(Event):
+    """One decision-tree evaluation run has stopped writing.
+
+    Published by every site that closes an eval run — the tenant sweep,
+    the on-demand farm run, and the on-demand single-block run. The
+    notifications module listens for it and sends the consolidated
+    messages for every alert the run opened, which is why the run's
+    alerts hold their per-user channels back while it is still going.
+
+    It is published in a ``finally``, so a sweep that dies half way
+    still flushes what it had opened. A second publish for the same
+    run is harmless: the dispatch table's partial UNIQUE on
+    ``(alert_id, channel, recipient_user_id, recipient_address)``
+    turns the repeat into a no-op rather than a second email.
+    """
+
+    event_name: ClassVar[str] = "recommendations.evaluation_run_finished.v1"
+
+    run_id: UUID
+    tenant_schema: str
+    # sweep | on_demand — carried for the log line, not for behaviour.
+    kind: str = "sweep"
+
+
 class RecommendationAppliedV1(Event):
     event_name: ClassVar[str] = "recommendations.recommendation_applied.v1"
 

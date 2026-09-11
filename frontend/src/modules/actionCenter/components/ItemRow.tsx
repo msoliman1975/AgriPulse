@@ -107,6 +107,9 @@ export function ItemRow({
   const href = item.cell === null ? null : mapsUrl(item.cell);
   const confidence = confidencePercent(item.confidence);
   const ordinal = item.cell === null ? null : cellOrdinal(item.cell);
+  // Same _ar-or-_en choice the rest of this row makes.
+  const treeDescription =
+    (isAr ? item.tree_description_ar : item.tree_description_en) || null;
   const detail = itemDetail(item, isAr);
   const {
     is_group: isGroup,
@@ -284,6 +287,19 @@ export function ItemRow({
             </h4>
             <p className="text-sm">{item.why ?? t("why.none")}</p>
             {detail === null ? null : <p className="mt-1.5 text-sm text-ap-muted">{detail}</p>}
+            {/* The tree author's paragraph. Written in the authoring screen and,
+                until now, shown on no surface at all — not here and not in the
+                email, which is what made a Warning unanswerable. Rendered only
+                when there is one, so a tree with an empty description does not
+                leave a heading over blank space. */}
+            {treeDescription === null ? null : (
+              <>
+                <h4 className="mb-1 mt-2.5 text-meta font-bold uppercase tracking-wide text-ap-muted">
+                  {t("why.treeDescription")}
+                </h4>
+                <p className="text-sm text-ap-muted">{treeDescription}</p>
+              </>
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-2 text-meta text-ap-muted">
               {item.kind === "alert" ? (
                 <span>{t("why.alertCertainty")}</span>
