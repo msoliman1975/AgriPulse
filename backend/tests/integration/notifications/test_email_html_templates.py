@@ -54,14 +54,19 @@ PAIRS = [
 # The consolidated message (0087). Its own version line, because it was
 # seeded fresh rather than bumped, and it has no earlier version to fall
 # back to.
-DIGEST_PAIRS = [("alert_digest", "en"), ("alert_digest", "ar")]
+DIGEST_PAIRS = [
+    ("alert_digest", "en"),
+    ("alert_digest", "ar"),
+    ("recommendation_digest", "en"),
+    ("recommendation_digest", "ar"),
+]
 DIGEST_VERSION = 1
 
 ALL_PAIRS = PAIRS + DIGEST_PAIRS
 
 
 def _version_for(code: str) -> int:
-    return DIGEST_VERSION if code == "alert_digest" else CURRENT_VERSION
+    return DIGEST_VERSION if code.endswith("_digest") else CURRENT_VERSION
 
 
 # A context with every key the two `_build_render_ctx*` builders produce.

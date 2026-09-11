@@ -1093,6 +1093,11 @@ class RecommendationsServiceImpl:
                         )
                     ),
                     zone_count=count,
+                    run_id=trace.run_id if trace is not None else None,
+                    # No group_key here: `new_groups` records the tree and
+                    # the opened row, not the key. The digest reads it off
+                    # the recommendations row anyway, and a field that is
+                    # always None is worse than one that is absent.
                 )
             )
 
@@ -1667,6 +1672,11 @@ class RecommendationsServiceImpl:
                     text_ar=result.outcome.text_ar,
                     parameters=result.outcome.parameters,
                     evaluation_snapshot=result.evaluation_snapshot,
+                    # Inside a run the per-user channels wait for the run
+                    # to finish so they can be consolidated; outside one
+                    # they go out now.
+                    run_id=trace.run_id if trace is not None else None,
+                    group_key=group_key,
                 )
             )
         # A cell-scoped group announces itself once, at the end of the block's

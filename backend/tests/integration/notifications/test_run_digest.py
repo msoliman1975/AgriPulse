@@ -318,3 +318,80 @@ async def test_digest_carries_the_tree_description_and_what_was_measured(
     # surface labels it.
     assert "WHAT WE MEASURED" in body
     assert "NDVI" in body
+
+
+@pytest.mark.asyncio
+async def test_recommendations_consolidate_the_same_way(
+    admin_session: AsyncSession,
+) -> None:
+    """The larger half of the same flood.
+
+    On 2026-08-31 one production sweep opened 287 recommendations and sent
+    574 emails — six times the alert volume, through the same bug. The
+    seed catalogue fires recommendation leaves on these blocks alongside
+    the alert leaf, so one run produces both kinds and this asserts the
+    recommendation side lands as one message per group too.
+    """
+    codes = ["J-01", "J-02", "J-03"]
+    tenant, user_id, _farm_id, blocks = await _setup(admin_session, "digest-recs", codes)
+    run_id = await _run_sweep(tenant.schema_name, tenant.tenant_id, blocks)
+
+    assert await _dispatches(admin_session, tenant.schema_name, user_id, "email") == []
+
+    get_default_bus().publish(
+        EvaluationRunFinishedV1(run_id=run_id, tenant_schema=tenant.schema_name, kind="sweep")
+    )
+
+    emails = await _dispatches(admin_session, tenant.schema_name, user_id, "email")
+    per_code: dict[str, int] = {}
+    for e in emails:
+        if e["status"] == "sent":
+            per_code[e["template_code"]] = per_code.get(e["template_code"], 0) + 1
+
+    # Nothing may go out under the per-item template codes: those are the
+    # one-email-per-block path this change exists to stop.
+    assert per_code.get("alert_opened", 0) == 0
+    assert per_code.get("recommendation_opened", 0) == 0
+    # And every digest that did go out is one per group, never one per block.
+    for code, count in per_code.items():
+        assert count <= 3, f"{code} sent {count} emails for 3 blocks"
+
+
+@pytest.mark.asyncio
+async def test_a_recommendation_digest_uses_the_recommendation_id_column(
+    admin_session: AsyncSession,
+) -> None:
+    """`notification_dispatches` and `in_app_inbox` both CHECK that exactly
+    one of alert_id / recommendation_id is set. The digest served alerts
+    only at first and hard-coded `alert_id=`; left that way it would fail
+    the constraint on every recommendation."""
+    tenant, user_id, _farm_id, blocks = await _setup(
+        admin_session, "digest-reccol", ["K-01", "K-02"]
+    )
+    run_id = await _run_sweep(tenant.schema_name, tenant.tenant_id, blocks)
+    get_default_bus().publish(
+        EvaluationRunFinishedV1(run_id=run_id, tenant_schema=tenant.schema_name, kind="sweep")
+    )
+
+    rows = (
+        (
+            await admin_session.execute(
+                text(
+                    f"SELECT template_code, alert_id, recommendation_id "
+                    f'FROM "{tenant.schema_name}".notification_dispatches '
+                    f"WHERE recipient_user_id = :uid AND template_code LIKE '%_digest'"
+                ).bindparams(bindparam("uid", type_=PG_UUID(as_uuid=True))),
+                {"uid": user_id},
+            )
+        )
+        .mappings()
+        .all()
+    )
+    assert rows, "the run produced no digest dispatches at all"
+    for row in rows:
+        if row["template_code"] == "alert_digest":
+            assert row["alert_id"] is not None
+            assert row["recommendation_id"] is None
+        else:
+            assert row["recommendation_id"] is not None
+            assert row["alert_id"] is None

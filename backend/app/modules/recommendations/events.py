@@ -50,6 +50,16 @@ class RecommendationOpenedV1(Event):
     # synthetic block-level RecommendationOpenedV1 (cell_id=None) whose text_en/
     # text_ar summarise "N zones flagged"; ``zone_count`` marks it as a digest.
     zone_count: int | None = None
+    # The evaluation run that opened this recommendation, when one was
+    # open. Present => the notifications module holds the per-user
+    # channels back so the end of the run can send ONE consolidated
+    # message per (farm, tree, leaf, severity). Absent => nothing will
+    # flush them later, so the fan-out sends at once. Same contract as
+    # AlertOpenedV1.run_id.
+    run_id: UUID | None = None
+    # The aggregation identity the digest groups on. Carried so the
+    # digest does not have to re-derive it from the row.
+    group_key: str | None = None
 
 
 class EvaluationRunFinishedV1(Event):

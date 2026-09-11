@@ -1735,24 +1735,39 @@ def _on_recommendation_opened(event: RecommendationOpenedV1) -> None:
             return
 
         inbox_events: list[InboxItemCreatedV1] = []
-        for user in recipients:
-            user_channels = list(user.get("notification_channels") or ["in_app"])
-            effective = [c for c in tenant_channels if c in user_channels and c in _KNOWN_CHANNELS]
-            locale = user.get("locale") or _DEFAULT_LOCALE
-            for channel in _PER_USER_CHANNELS:
-                inbox = _dispatch_rec_channel_for_user(
-                    session,
-                    event=event,
-                    user=user,
-                    channel=channel,
-                    locale=locale,
-                    effective_channels=effective,
-                    tenant_id=tenant_id,
-                    rec=rec,
-                    tree=tree,
-                )
-                if inbox is not None:
-                    inbox_events.append(inbox)
+        # Same hold as the alert path, and for the larger flood: one sweep
+        # opened 287 recommendations on a single day, which went out as 574
+        # emails. Inside a run the per-user channels wait for
+        # `_on_evaluation_run_finished` to send one message per (farm, tree,
+        # leaf, severity). The webhook is not held back — one payload per
+        # recommendation is the contract receivers parse.
+        if event.run_id is None:
+            for user in recipients:
+                user_channels = list(user.get("notification_channels") or ["in_app"])
+                effective = [
+                    c for c in tenant_channels if c in user_channels and c in _KNOWN_CHANNELS
+                ]
+                locale = user.get("locale") or _DEFAULT_LOCALE
+                for channel in _PER_USER_CHANNELS:
+                    inbox = _dispatch_rec_channel_for_user(
+                        session,
+                        event=event,
+                        user=user,
+                        channel=channel,
+                        locale=locale,
+                        effective_channels=effective,
+                        tenant_id=tenant_id,
+                        rec=rec,
+                        tree=tree,
+                    )
+                    if inbox is not None:
+                        inbox_events.append(inbox)
+        else:
+            _log.debug(
+                "recommendation_opened_deferred_to_run_digest",
+                recommendation_id=str(event.recommendation_id),
+                run_id=str(event.run_id),
+            )
 
         _dispatch_rec_webhook_once(
             session,
@@ -1799,7 +1814,31 @@ def _on_recommendation_opened(event: RecommendationOpenedV1) -> None:
 # tenant sweep cadence is four hours.
 # =====================================================================
 
-_DIGEST_TEMPLATE_CODE = "alert_digest"
+# One template family per kind. They render from the same context and
+# say the same things; only the noun changes ("alert" / "recommendation")
+# and the recommendation's callout carries the leaf's advice rather than
+# a prescription the tree never wrote.
+_DIGEST_TEMPLATE_CODES = {
+    "alert": "alert_digest",
+    "recommendation": "recommendation_digest",
+}
+# Kept as its own name because the alert half shipped with it and the
+# dispatch rows already written carry this exact string.
+_DIGEST_TEMPLATE_CODE = _DIGEST_TEMPLATE_CODES["alert"]
+
+
+def _anchor_columns(kind: str, anchor_id: UUID) -> dict[str, UUID]:
+    """``{alert_id: ...}`` or ``{recommendation_id: ...}``.
+
+    Both `in_app_inbox` and `notification_dispatches` carry a CHECK that
+    exactly one of the two is set, so the digest cannot hard-code either
+    now that it serves both kinds. Returning the kwargs rather than a
+    column name keeps the call sites reading as ordinary keyword
+    arguments.
+    """
+    key = "alert_id" if kind == "alert" else "recommendation_id"
+    return {key: anchor_id}
+
 
 # How many block codes the subject names before falling back to a count.
 # Three fits an email subject at phone width; the full list is always in
@@ -1830,7 +1869,7 @@ SELECT t.farm_id                                          AS farm_id,
        min(a.diagnosis_en)                                AS diagnosis_en,
        min(a.diagnosis_ar)                                AS diagnosis_ar,
        (array_agg(a.signal_snapshot ORDER BY a.created_at, a.id))[1] AS signal_snapshot,
-       (array_agg(a.id ORDER BY a.created_at, a.id))[1]   AS anchor_alert_id,
+       (array_agg(a.id ORDER BY a.created_at, a.id))[1]   AS anchor_id,
        min(a.created_at)                                  AS first_created_at,
        count(DISTINCT a.id)                               AS alert_count,
        array_agg(DISTINCT b.code)                         AS block_codes
@@ -1847,11 +1886,56 @@ SELECT t.farm_id                                          AS farm_id,
 """
 
 
+# The recommendation half of the same question. Structurally identical
+# to `_DIGEST_ROWS`: the run's traces name the rows it opened, the row
+# supplies the grouping key and the words, and `created_at >=
+# started_at` keeps re-fired rows out.
+#
+# `r.text_en` rather than `a.diagnosis_en`, and `r.evaluation_snapshot`
+# rather than `a.signal_snapshot` — the two tables named the same two
+# things differently long before this code existed, and renaming them is
+# not this change's job.
+_DIGEST_REC_ROWS = """
+SELECT t.farm_id                                          AS farm_id,
+       r.group_key                                        AS group_key,
+       min(t.tree_code)                                   AS tree_code,
+       min(r.severity)                                    AS severity,
+       min(r.action_type)                                 AS action_type,
+       min(r.text_en)                                     AS diagnosis_en,
+       min(r.text_ar)                                     AS diagnosis_ar,
+       (array_agg(r.evaluation_snapshot ORDER BY r.created_at, r.id))[1]
+                                                          AS signal_snapshot,
+       (array_agg(r.id ORDER BY r.created_at, r.id))[1]   AS anchor_id,
+       min(r.created_at)                                  AS first_created_at,
+       count(DISTINCT r.id)                               AS alert_count,
+       array_agg(DISTINCT b.code)                         AS block_codes
+  FROM decision_tree_eval_traces t
+  JOIN decision_tree_eval_runs r2 ON r2.id = t.run_id
+  JOIN recommendations r ON r.id = t.recommendation_id AND r.deleted_at IS NULL
+  JOIN blocks b ON b.id = r.block_id AND b.deleted_at IS NULL
+ WHERE t.run_id = :run_id
+   AND t.recommendation_id IS NOT NULL
+   AND r.group_key IS NOT NULL
+   AND r.group_parent_id IS NULL
+   AND r.created_at >= r2.started_at
+ GROUP BY t.farm_id, r.group_key
+ ORDER BY t.farm_id, r.group_key
+"""
+
+
 def _load_digest_rows(session: Session, run_id: UUID) -> list[dict[str, Any]]:
-    return [
-        dict(row)
-        for row in session.execute(text(_DIGEST_ROWS), {"run_id": run_id}).mappings().all()
-    ]
+    """Every group this run opened, alerts and recommendations together.
+
+    Each row carries its own ``kind`` so the caller picks the template
+    family without having to remember which query it came from. The two
+    queries return the same column names on purpose — everything
+    downstream then has one shape to handle.
+    """
+    rows: list[dict[str, Any]] = []
+    for kind, query in (("alert", _DIGEST_ROWS), ("recommendation", _DIGEST_REC_ROWS)):
+        for row in session.execute(text(query), {"run_id": run_id}).mappings().all():
+            rows.append({**dict(row), "kind": kind})
+    return rows
 
 
 def _load_farm_names(session: Session, farm_ids: list[UUID]) -> dict[UUID, dict[str, Any]]:
@@ -1938,7 +2022,7 @@ def _build_digest_ctx(
     # message is in that list. There is no per-group deep link to send
     # them to; `?item=` opens exactly one row, which is the opposite of
     # what the reader of a 23-block message needs.
-    link_url = f"/action-center/{row['farm_id']}?kind=alert"
+    link_url = f"/action-center/{row['farm_id']}?kind={row.get('kind') or 'alert'}"
     action = row.get("action_type")
     return {
         "tenant_id": str(tenant_id),
@@ -1978,45 +2062,56 @@ def _build_digest_ctx(
     }
 
 
+# ``{column}`` is filled from a two-element literal map below, never from
+# anything a caller supplies — a column name cannot be a bind parameter,
+# and this is the only reason any SQL in this module is formatted at all.
+_MARK_DISPATCH_SQL = """
+    UPDATE notification_dispatches
+       SET status = :st,
+           error = :err,
+           sent_at = CASE WHEN :st = 'sent' THEN now() ELSE sent_at END,
+           updated_at = now()
+     WHERE {column} = :aid
+       AND channel = :ch
+       AND recipient_user_id = :uid
+       AND recipient_address IS NOT DISTINCT FROM :addr
+       AND template_code = :tc
+       AND status = 'pending'
+"""
+
+
 def _mark_dispatch(
     session: Session,
     *,
-    anchor_alert_id: UUID,
+    anchor_id: UUID,
+    kind: str,
     user_id: UUID,
     address: str | None,
     channel: str,
     status: str,
     error: str | None,
+    template_code: str = _DIGEST_TEMPLATE_CODE,
 ) -> None:
     """Settle a row this module claimed as 'pending'.
 
     'failed' sits outside the partial UNIQUE's predicate, so a send that
     failed frees the slot and a later run may retry it.
+
+    The anchor lives in ``alert_id`` or ``recommendation_id`` depending on
+    the kind — both tables carry a CHECK that exactly one is set — so the
+    predicate has to name the same column the claim wrote.
     """
+    column = "alert_id" if kind == "alert" else "recommendation_id"
     session.execute(
-        text(
-            """
-            UPDATE notification_dispatches
-               SET status = :st,
-                   error = :err,
-                   sent_at = CASE WHEN :st = 'sent' THEN now() ELSE sent_at END,
-                   updated_at = now()
-             WHERE alert_id = :aid
-               AND channel = :ch
-               AND recipient_user_id = :uid
-               AND recipient_address IS NOT DISTINCT FROM :addr
-               AND template_code = :tc
-               AND status = 'pending'
-            """
-        ),
+        text(_MARK_DISPATCH_SQL.format(column=column)),
         {
             "st": status,
             "err": error,
-            "aid": anchor_alert_id,
+            "aid": anchor_id,
             "ch": channel,
             "uid": user_id,
             "addr": address,
-            "tc": _DIGEST_TEMPLATE_CODE,
+            "tc": template_code,
         },
     )
 
@@ -2024,7 +2119,9 @@ def _mark_dispatch(
 def _send_digest_email(
     session: Session,
     *,
-    anchor_alert_id: UUID,
+    anchor_id: UUID,
+    kind: str,
+    template_code: str,
     user: dict[str, Any],
     locale: str,
     subject: str,
@@ -2043,8 +2140,8 @@ def _send_digest_email(
     if not address:
         _insert_dispatch(
             session,
-            alert_id=anchor_alert_id,
-            template_code=_DIGEST_TEMPLATE_CODE,
+            **_anchor_columns(kind, anchor_id),
+            template_code=template_code,
             locale=locale,
             channel="email",
             recipient_user_id=user["user_id"],
@@ -2059,8 +2156,8 @@ def _send_digest_email(
     if is_suppressed():
         _insert_dispatch(
             session,
-            alert_id=anchor_alert_id,
-            template_code=_DIGEST_TEMPLATE_CODE,
+            **_anchor_columns(kind, anchor_id),
+            template_code=template_code,
             locale=locale,
             channel="email",
             recipient_user_id=user["user_id"],
@@ -2077,8 +2174,8 @@ def _send_digest_email(
     # sending it here would be the duplicate the claim exists to prevent.
     if not _insert_dispatch(
         session,
-        alert_id=anchor_alert_id,
-        template_code=_DIGEST_TEMPLATE_CODE,
+        **_anchor_columns(kind, anchor_id),
+        template_code=template_code,
         locale=locale,
         channel="email",
         recipient_user_id=user["user_id"],
@@ -2095,36 +2192,42 @@ def _send_digest_email(
     except SmtpSendError as exc:
         _log.warning(
             "digest_email_send_failed",
-            alert_id=str(anchor_alert_id),
+            anchor_id=str(anchor_id),
             user_id=str(user["user_id"]),
             error=str(exc),
         )
         _mark_dispatch(
             session,
-            anchor_alert_id=anchor_alert_id,
+            anchor_id=anchor_id,
+            kind=kind,
             user_id=user["user_id"],
             address=address,
             channel="email",
             status="failed",
             error=str(exc)[:1000],
+            template_code=template_code,
         )
         return
 
     _mark_dispatch(
         session,
-        anchor_alert_id=anchor_alert_id,
+        anchor_id=anchor_id,
+        kind=kind,
         user_id=user["user_id"],
         address=address,
         channel="email",
         status="sent",
         error=None,
+        template_code=template_code,
     )
 
 
 def _send_digest_push(
     session: Session,
     *,
-    anchor_alert_id: UUID,
+    anchor_id: UUID,
+    kind: str,
+    template_code: str,
     farm_id: UUID,
     user: dict[str, Any],
     locale: str,
@@ -2136,8 +2239,8 @@ def _send_digest_push(
     if not tokens:
         _insert_dispatch(
             session,
-            alert_id=anchor_alert_id,
-            template_code=_DIGEST_TEMPLATE_CODE,
+            **_anchor_columns(kind, anchor_id),
+            template_code=template_code,
             locale=locale,
             channel="push",
             recipient_user_id=user["user_id"],
@@ -2152,8 +2255,8 @@ def _send_digest_push(
     # The handset opens the farm's alert queue, not one alert: this push
     # stands for every block in the group.
     data = {
-        "type": "alert_digest",
-        "alert_id": str(anchor_alert_id),
+        "type": template_code,
+        "item_id": str(anchor_id),
         "farm_id": str(farm_id),
         "severity": severity,
         "deep_link": f"agripulse://action-center/{farm_id}?kind=alert",
@@ -2179,8 +2282,8 @@ def _send_digest_push(
                 )
         _insert_dispatch(
             session,
-            alert_id=anchor_alert_id,
-            template_code=_DIGEST_TEMPLATE_CODE,
+            **_anchor_columns(kind, anchor_id),
+            template_code=template_code,
             locale=locale,
             channel="push",
             recipient_user_id=user["user_id"],
@@ -2206,12 +2309,14 @@ def _dispatch_digest_for_user(
     farm: dict[str, Any] | None,
 ) -> InboxItemCreatedV1 | None:
     """Per-(user, channel) leg of one group's consolidated message."""
-    anchor_alert_id = row["anchor_alert_id"]
+    anchor_id = row["anchor_id"]
+    kind = str(row["kind"])
+    template_code = _DIGEST_TEMPLATE_CODES[row["kind"]]
     if channel not in effective_channels:
         _insert_dispatch(
             session,
-            alert_id=anchor_alert_id,
-            template_code=_DIGEST_TEMPLATE_CODE,
+            **_anchor_columns(kind, anchor_id),
+            template_code=template_code,
             locale=locale,
             channel=channel,
             recipient_user_id=user["user_id"],
@@ -2223,14 +2328,12 @@ def _dispatch_digest_for_user(
         )
         return None
 
-    template = _load_template(
-        session, template_code=_DIGEST_TEMPLATE_CODE, locale=locale, channel=channel
-    )
+    template = _load_template(session, template_code=template_code, locale=locale, channel=channel)
     if template is None:
         _insert_dispatch(
             session,
-            alert_id=anchor_alert_id,
-            template_code=_DIGEST_TEMPLATE_CODE,
+            **_anchor_columns(kind, anchor_id),
+            template_code=template_code,
             locale=locale,
             channel=channel,
             recipient_user_id=user["user_id"],
@@ -2256,8 +2359,8 @@ def _dispatch_digest_for_user(
     if channel == "in_app":
         if not _insert_dispatch(
             session,
-            alert_id=anchor_alert_id,
-            template_code=_DIGEST_TEMPLATE_CODE,
+            **_anchor_columns(kind, anchor_id),
+            template_code=template_code,
             locale=locale,
             channel="in_app",
             recipient_user_id=user["user_id"],
@@ -2274,7 +2377,7 @@ def _dispatch_digest_for_user(
         item_id = _insert_inbox_item(
             session,
             user_id=user["user_id"],
-            alert_id=anchor_alert_id,
+            **_anchor_columns(kind, anchor_id),
             severity=str(row["severity"]),
             title=subject,
             body=body,
@@ -2284,7 +2387,7 @@ def _dispatch_digest_for_user(
             inbox_item_id=item_id,
             user_id=user["user_id"],
             tenant_id=tenant_id,
-            alert_id=anchor_alert_id,
+            **_anchor_columns(kind, anchor_id),
             severity=str(row["severity"]),
             title=subject,
             body=body,
@@ -2295,7 +2398,9 @@ def _dispatch_digest_for_user(
     if channel == "push":
         _send_digest_push(
             session,
-            anchor_alert_id=anchor_alert_id,
+            anchor_id=anchor_id,
+            kind=kind,
+            template_code=template_code,
             farm_id=row["farm_id"],
             user=user,
             locale=locale,
@@ -2307,7 +2412,9 @@ def _dispatch_digest_for_user(
 
     _send_digest_email(
         session,
-        anchor_alert_id=anchor_alert_id,
+        anchor_id=anchor_id,
+        kind=kind,
+        template_code=template_code,
         user=user,
         locale=locale,
         subject=subject,
