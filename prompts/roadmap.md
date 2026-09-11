@@ -1275,6 +1275,138 @@ Two points. Everything else in the design document is decided.
    behaviour behind a feature flag, default off, and requires a before-and-after
    verdict count across every published decision tree before the flag is turned
    on, in a separate pull request. Confirm that gate.
+### T-2 — Three user-facing names that describe the wrong thing
+
+**Priority: normal.** No design document exists. The discussion on 2026-09-10
+produced the proposal recorded here and nothing was changed in the code.
+
+**Question asked:** the names decision tree, timeline and farm management feel
+confusing and give the wrong impression. What would fit the function better?
+
+**Source analysis:** the 2026-09-10 session, read against `origin/main` at
+`b5232c0a`. The feature branch in the working tree is 200-plus commits behind
+and does not contain the timeline module, so it was not used.
+
+#### What the reading found
+
+Each of the three names describes either the internal shape of the feature or a
+category wider than the page. One name is used for two different features.
+
+| Term | Where it is set | What the feature does |
+|---|---|---|
+| Decision tree | `frontend/src/i18n/locales/en/decisionTrees.json`, `frontend/src/modules/decisionTrees/` | An agronomist writes a node graph in YAML. Each save is a draft version and one version is published. Targeting picks crops, countries and soil textures. Scope is per block or per grid cell. A run ends in a recommendation, an alert, a status verdict, or no action. There is a test run against one block and an evaluation trace. |
+| Timeline, meaning 1 | `frontend/src/modules/timeline/`, route `/timeline/:farmId` | A day-by-day replay of the past, with play, pause and a speed control. It draws index pixels and the datapoints of the day: plan stage, signal, activity, scout visit, field flag, alert. |
+| Timeline, meaning 2 | `frontend/src/modules/labs/console/SceneTimeline.tsx` | The strip of satellite pass dates inside the farm console. |
+| Farm management | `common.json` key `workspaceNav.farmManagement`, route `/labs/map/:farmId` | A map workspace. Farm boundary, blocks and pivots, the grid, index layers, recording a signal, farm settings, and farm creation. |
+
+What a reader expects from each name, and what the feature is:
+
+| Term | What a user expects | What it is |
+|---|---|---|
+| Decision tree | A machine-learning model or a prediction | Rules written by hand, with versions |
+| Timeline | A schedule of future work, like the Plan board | A replay of the past |
+| Farm management | Users, billing, settings, permissions | A map viewer and editor |
+
+#### Gap register
+
+| ID | Gap | Evidence — why it is a gap | Blocks |
+|---|---|---|---|
+| **N-1** | Decision tree names the data structure, not the job | The list page subtitle in `decisionTrees.json` has to explain the feature in 24 words | A new agronomist reading the nav and knowing what the page is for |
+| **N-2** | Timeline names two features | `modules/timeline/` and `modules/labs/console/SceneTimeline.tsx` | Saying "the timeline" in a support conversation without a second sentence |
+| **N-3** | Timeline reads as future work | The Plan board is the schedule of future work, and it is a separate nav item | Telling the replay page and the Plan board apart from the nav alone |
+| **N-4** | Farm management is wider than the page it opens | The nav item opens a map. Settings, members and subscriptions sit elsewhere | Finding the members page, which the name suggests is here |
+| **N-5** | The main farm surface sits under a `labs` path | `SideNav.tsx` links to `/labs/map/:farmId` | A user reading the URL and trusting the page |
+
+#### The shape being proposed
+
+Each row is a user-facing text change. Code identifiers, table names, API paths
+and capability codes such as `decision_tree.read` stay as they are.
+
+Decision tree becomes **agronomy rule**:
+
+| Today | Proposed |
+|---|---|
+| Decision tree | Agronomy rule |
+| Tree version, draft, publish | Rule version, draft, publish |
+| Tree YAML | Rule source |
+| Tree canvas, tree viewer | Rule logic view |
+| Node, decision node, leaf | Step, condition, outcome |
+| Dry run | Test on a block |
+| Evaluation trace | Decision log |
+| Targeting | Where it applies |
+
+Second choice: advisory rule. Pick it if agronomy reads too narrow for the
+irrigation and weather rules. Third choice: agronomy protocol. It reads well to
+an agronomist, but it suggests a fixed procedure, and these rules are
+conditional.
+
+Timeline splits into two names, because it is two features:
+
+| Today | Proposed |
+|---|---|
+| Timeline page, `/timeline/:farmId` | Farm replay. Nav label: Replay |
+| `SceneTimeline` strip in the console | Image dates |
+
+Second choice for the page: field history. Replay fits better because the page
+has play, pause and a speed control. Do not use history on its own. Reports,
+audit and the version list also mean history.
+
+Farm management becomes **farm map**, and the structure editing inside it gets
+its own name:
+
+| Today | Proposed |
+|---|---|
+| Nav label "Farm management" | Farm map. Nav label: Map |
+| Boundary, block and grid editing inside it | Farm setup |
+| `/labs/map/:farmId` | `/map/:farmId`, with a redirect from the old path |
+
+Second choice: fields. It is the common word in Climate FieldView and Cropwise.
+It does not fit here, because the unit in this product is a block, not a field.
+
+Keep the words farm management only if Map, Setup, Members and Subscriptions
+are later grouped under one nav section. Then it is a section name, not a page
+name.
+
+#### Areas a change would touch
+
+| Area | What changes | Where |
+|---|---|---|
+| Navigation | Three labels | `common.json` and its Arabic pair, keys `workspaceNav.farmManagement`, `workspaceNav.timeline` |
+| Agronomy rules | Page titles, field labels, help text | `decisionTrees.json` in English and Arabic |
+| Replay | Page title and subtitle | `timeline.json` in English and Arabic |
+| Farm map | Page and panel titles | `farmConsole.json` in English and Arabic |
+| Routes | `/labs/map` and `/timeline` if the paths change. A redirect from each old path is required | `frontend/src/App.tsx` |
+| Documentation | The six-step home page text and the documentation site | `common.json` key `home.setup`, `docs/` |
+| Scout app | The same terms where the mobile app names them | `mobile/` |
+
+No database migration is needed. No capability code changes.
+
+#### Arguments against, recorded so they are not lost
+
+- Decision tree is the word used in the design documents, the memory files and
+  the commit history. Renaming the user-facing text leaves the code and the
+  documents using the old word, so a reader has to hold both.
+- A rename has no gate. There is no test that fails when a label is wrong, so
+  the work has to be checked by reading every screen in two languages.
+- Arabic text has to be rewritten by a person, not translated by rule. Each
+  English change is two changes.
+
+#### The cheap first step
+
+Change only the three nav labels and the three page titles, in both languages.
+Leave the field labels, the routes and the documentation for later. That is one
+small pull request, and it answers whether the new words read better before the
+larger rename is paid for.
+
+#### Open questions (answer before this becomes a prompt)
+
+1. Which option per term: agronomy rule or advisory rule; farm replay or field
+   history; farm map or fields?
+2. Do the route paths change now, later, or not at all?
+3. Does the code follow the user-facing text, or does the code keep the words
+   tree and node for good?
+4. Who writes the Arabic wording, and who signs it off?
+
 ---
 
 ## How to use this roadmap
