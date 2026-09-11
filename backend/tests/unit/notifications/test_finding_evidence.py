@@ -91,3 +91,37 @@ def test_empty_snapshot_yields_nothing_not_an_empty_heading() -> None:
     assert evidence_rows(None) == []
     assert evidence_rows({}) == []
     assert evidence_text({}) == ""
+
+
+def test_identifiers_are_not_presented_as_measurements() -> None:
+    """A reader asked "what did you see?" is not answered by a UUID.
+
+    A real recommendation email went out carrying
+    `cell_id: 01a0443c-e0fc-72b8-acba-879ed58093c7` under the heading
+    "WHAT WE MEASURED".
+    """
+    snapshot = {
+        "cell_id": "01a0443c-e0fc-72b8-acba-879ed58093c7",
+        "indices.ndvi.mean": 0.2074,
+    }
+    assert evidence_rows(snapshot) == [("NDVI mean", "0.207")]
+
+
+def test_how_a_value_was_obtained_is_not_the_value() -> None:
+    """`source` and `index_code` say where the number came from. The label
+    beside the number already names the index."""
+    snapshot = {"source": "block_aggregate", "index_code": "ndvi", "indices.ndvi.mean": 0.2}
+    assert [label for label, _ in evidence_rows(snapshot)] == ["NDVI mean"]
+
+
+def test_any_id_suffix_is_dropped_even_if_nobody_listed_it() -> None:
+    """The engine may resolve new identifiers; none of them is ever an
+    observation, so the rule is the suffix rather than a fixed list."""
+    snapshot = {"some_new_id": "abc", "indices.ndvi.mean": 0.2}
+    assert [label for label, _ in evidence_rows(snapshot)] == ["NDVI mean"]
+
+
+def test_a_snapshot_of_only_identifiers_yields_nothing() -> None:
+    """And therefore no "WHAT WE MEASURED" heading at all, rather than a
+    heading above a UUID."""
+    assert evidence_rows({"cell_id": "x", "block_id": "y"}) == []
