@@ -1,0 +1,909 @@
+<title>Brazil Coffee Frost Readiness</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --ground:   #F1F4F6;
+    --surface:  #FFFFFF;
+    --sunken:   #E7ECEF;
+    --ink:      #14181D;
+    --muted:    #5C6672;
+    --faint:    #8792A0;
+    --line:     #D6DDE3;
+    --line-soft:#E4E9ED;
+    --accent:   #2B6C8F;
+    --accent-bg:#DCEAF1;
+    --crit:     #A6304C;
+    --crit-bg:  #F6DEE3;
+    --warn:     #96660F;
+    --warn-bg:  #F5E7CC;
+    --ok:       #3B7449;
+    --ok-bg:    #DCEBDF;
+
+    --serif: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+    --sans:  "IBM Plex Sans", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono:  "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:   #0C1014;
+      --surface:  #141A21;
+      --sunken:   #1B222B;
+      --ink:      #E3E8ED;
+      --muted:    #929DAA;
+      --faint:    #6E7986;
+      --line:     #263039;
+      --line-soft:#1E262E;
+      --accent:   #74B7D8;
+      --accent-bg:#16303D;
+      --crit:     #E4809A;
+      --crit-bg:  #3A1B25;
+      --warn:     #DBA648;
+      --warn-bg:  #38290F;
+      --ok:       #7CBB8C;
+      --ok-bg:    #17301E;
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:   #0C1014;
+    --surface:  #141A21;
+    --sunken:   #1B222B;
+    --ink:      #E3E8ED;
+    --muted:    #929DAA;
+    --faint:    #6E7986;
+    --line:     #263039;
+    --line-soft:#1E262E;
+    --accent:   #74B7D8;
+    --accent-bg:#16303D;
+    --crit:     #E4809A;
+    --crit-bg:  #3A1B25;
+    --warn:     #DBA648;
+    --warn-bg:  #38290F;
+    --ok:       #7CBB8C;
+    --ok-bg:    #17301E;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    margin: 0;
+    padding-inline: 20px;
+    padding-block: 0 72px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 960px; margin-inline: auto; }
+  .prose { max-width: 68ch; }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    border-bottom: 2px solid var(--ink);
+    padding-block: 44px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(30px, 5.2vw, 44px);
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .standfirst {
+    font-family: var(--serif);
+    font-size: clamp(16px, 2.4vw, 19px);
+    line-height: 1.5;
+    color: var(--muted);
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  /* ---------- verdict strip ---------- */
+
+  .verdict {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-top: 26px;
+  }
+  .verdict > div {
+    background: var(--surface);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .verdict dt {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .verdict dd {
+    margin: 0;
+    font-family: var(--serif);
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+  }
+  .verdict .sub {
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  /* ---------- sections ---------- */
+
+  section { margin-top: 52px; }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: 23px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    margin: 26px 0 8px;
+  }
+
+  .section-head {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 20px;
+  }
+
+  p { margin: 0 0 12px; }
+  p:last-child { margin-bottom: 0; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--sunken);
+    padding: 1px 5px;
+    border-radius: 2px;
+    color: var(--ink);
+    word-break: break-word;
+  }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+  /* ---------- have / lack columns ---------- */
+
+  .audit {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 22px;
+  }
+  .audit ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+  .audit li {
+    display: grid;
+    grid-template-columns: 14px 1fr;
+    gap: 9px;
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  .audit li::before {
+    content: "";
+    width: 8px; height: 8px;
+    margin-top: 7px;
+    border-radius: 50%;
+  }
+  .audit .has li::before { background: var(--ok); }
+  .audit .lacks li::before { background: var(--crit); }
+  .audit .ref {
+    display: block;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+    margin-top: 1px;
+  }
+
+  /* ---------- tables ---------- */
+
+  .scroll { overflow-x: auto; border: 1px solid var(--line); background: var(--surface); }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 640px;
+    font-size: 13.5px;
+  }
+  thead th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--faint);
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--sunken);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.gapname { font-weight: 600; }
+  td.gapname .file {
+    display: block;
+    font-family: var(--mono);
+    font-weight: 400;
+    font-size: 11px;
+    color: var(--faint);
+    margin-top: 3px;
+  }
+
+  /* severity stripe */
+  tr.sev-block td:first-child { box-shadow: inset 3px 0 0 var(--crit); }
+  tr.sev-improve td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+  tr.sev-decide td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+  tbody td:first-child { padding-left: 16px; }
+
+  .chip {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .chip.block   { background: var(--crit-bg);   color: var(--crit); }
+  .chip.improve { background: var(--warn-bg);   color: var(--warn); }
+  .chip.decide  { background: var(--accent-bg); color: var(--accent); }
+
+  /* ---------- accuracy ladder ---------- */
+
+  .chart {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    padding: 22px 20px 16px;
+  }
+
+  .barrow {
+    display: grid;
+    grid-template-columns: 190px 1fr 96px;
+    align-items: center;
+    gap: 14px;
+    padding-block: 9px;
+  }
+  .barrow + .barrow { border-top: 1px solid var(--line-soft); }
+
+  .barlabel { font-size: 13px; line-height: 1.35; }
+  .barlabel .stage {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-bottom: 2px;
+  }
+  .barlabel .grain {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    padding: 0 4px;
+    border-radius: 2px;
+    margin-top: 3px;
+  }
+
+  .track {
+    position: relative;
+    height: 26px;
+    background:
+      linear-gradient(to right, var(--line-soft) 1px, transparent 1px) 33.333% 0 / 33.333% 100% repeat-x;
+    border-left: 1px solid var(--line);
+  }
+  .bar {
+    position: absolute;
+    inset-block: 4px;
+    left: 0;
+    background: var(--accent);
+    opacity: 0.85;
+  }
+  .bar.now { background: var(--crit); }
+  .bar.best { background: var(--ok); }
+
+  .barval {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    text-align: right;
+    line-height: 1.3;
+  }
+  .barval .hit { display: block; font-size: 10.5px; color: var(--muted); }
+
+  .axis {
+    display: grid;
+    grid-template-columns: 190px 1fr 96px;
+    gap: 14px;
+    margin-top: 4px;
+  }
+  .axis .ticks {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--faint);
+  }
+  .axis .ticks span:first-child { margin-left: -2px; }
+
+  .caveat {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+    max-width: 76ch;
+  }
+
+  /* ---------- callout ---------- */
+
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    padding: 14px 16px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    margin-block: 18px;
+  }
+  .note.hard { border-left-color: var(--crit); }
+  .note .lbl {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-bottom: 4px;
+  }
+
+  /* ---------- method steps ---------- */
+
+  ol.method {
+    counter-reset: step;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  ol.method li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 26px 1fr;
+    gap: 12px;
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  ol.method li::before {
+    content: counter(step);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    border: 1px solid var(--line);
+    background: var(--surface);
+    height: 22px;
+    display: grid;
+    place-items: center;
+  }
+
+  /* ---------- references ---------- */
+
+  .refs { display: flex; flex-direction: column; gap: 0; }
+  .ref-item {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 16px;
+    padding-block: 13px;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .ref-item:last-child { border-bottom: none; }
+  .ref-kind {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--faint);
+    padding-top: 3px;
+  }
+  .ref-item .why { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+
+  footer {
+    margin-top: 52px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+    line-height: 1.7;
+  }
+
+  @media (max-width: 620px) {
+    .barrow, .axis { grid-template-columns: 1fr; gap: 6px; }
+    .barval { text-align: left; }
+    .barval .hit { display: inline; margin-left: 8px; }
+    .axis .ticks { margin-top: 2px; }
+    .ref-item { grid-template-columns: 1fr; gap: 3px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">AgriPulse &middot; gap analysis &middot; 10 September 2026</p>
+    <h1>Frost prediction at grid&#8209;cell level for Brazilian coffee</h1>
+    <p class="standfirst">A frost decision tree already runs on this platform. It is scoped to potato and it reads one farm&#8209;wide forecast minimum. Coffee at farm level is roughly one day of work on top of it. Coffee <em>per cell</em> is a different build, because the tree engine can evaluate a cell but the weather it reads is the same number for every cell on the farm. This page lists each gap, its cost, and the accuracy expected once it closes.</p>
+  </header>
+
+  <dl class="verdict">
+    <div>
+      <dt>Frost output today</dt>
+      <dd>Potato only</dd>
+      <span class="sub"><code>potato_frost_risk_v1</code> reads <code>weather.forecast_72h.air_temp_c_min</code> and raises an alert. No coffee tree exists.</span>
+    </div>
+    <div>
+      <dt>Coffee at farm level</dt>
+      <dd>~1 day</dd>
+      <span class="sub">One YAML seed. The engine, the forecast field and the alert path all already work.</span>
+    </div>
+    <div>
+      <dt>Coffee per cell</dt>
+      <dd>17&ndash;20 d</dd>
+      <span class="sub">13 gaps. 6 block the feature, 4 improve accuracy, 2 are decisions, 1 is a defect.</span>
+    </div>
+    <div>
+      <dt>Expected accuracy</dt>
+      <dd>&plusmn;0.9 &deg;C</dd>
+      <span class="sub">Per cell, after every gap closes and two seasons of calibration.</span>
+    </div>
+  </dl>
+
+  <!-- ================= AUDIT ================= -->
+  <section>
+    <div class="section-head">
+      <p class="eyebrow">1 &middot; Code audit</p>
+      <h2>What the platform holds now</h2>
+    </div>
+
+    <div class="audit">
+      <div>
+        <h3>Present and usable</h3>
+        <ul class="has">
+          <li><span>A working frost decision tree, with injury and kill thresholds, bilingual text and an action list<span class="ref">recommendations/seeds/potato_frost_risk_v1.yaml</span></span></li>
+          <li><span>Trees can evaluate <strong>per grid cell</strong>. <code>scope: cell</code> is supported and one demo tree uses it.<span class="ref">recommendations/loader.py:157 &middot; seeds/demo_cell_low_ndvi_v1.yaml:33</span></span></li>
+          <li><span>Trees raise alerts into the Action Center. The alert path is live.<span class="ref">recommendations/models.py:124</span></span></li>
+          <li><span>Forecast 72&#8209;hour minimum air temperature as a condition field<span class="ref">shared/conditions/context.py:182 &middot; weather/snapshot.py:278</span></span></li>
+          <li><span>Hourly temperature, humidity, wind, pressure, cloud cover, radiation, ET0 from Open&#8209;Meteo<span class="ref">weather/providers/open_meteo.py:40</span></span></li>
+          <li><span>Forecast horizon 120 hours, refetched every 3 hours<span class="ref">core/settings.py:181, :188</span></span></li>
+          <li><span>Grid cells with polygon, centroid and area, validated against the product pixel<span class="ref">grid/models.py:56 &middot; grid/geometry.py:47</span></span></li>
+          <li><span>Scout observations already carry an optional <code>cell_id</code><span class="ref">scouting/models.py:63</span></span></li>
+          <li><span>Planting date on the crop assignment, so plant age is derivable<span class="ref">farms/models.py:514</span></span></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Absent</h3>
+        <ul class="lacks">
+          <li><span>Any coffee frost tree</span></li>
+          <li><span>Any per&#8209;cell weather value. <code>WeatherSnapshot</code> is built once per block from farm&#8209;keyed rows, so a cell&#8209;scoped tree reads the same temperature for every cell.</span></li>
+          <li><span>Dew point &mdash; not requested, not stored</span></li>
+          <li><span>Any digital elevation model. Searched for SRTM, Copernicus DEM, NASADEM, terrain. No match.</span></li>
+          <li><span>Terrain columns on <code>grid_cells</code>. It has geometry, centroid, area, nothing else.</span></li>
+          <li><span>Soil temperature and soil moisture</span></li>
+          <li><span>Canopy height</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="note hard">
+      <span class="lbl">The one fact the whole build turns on</span>
+      The tree engine can already evaluate a tree once per grid cell. The weather it hands that tree cannot. <code>WeatherSnapshot</code> is documented as
+      &ldquo;all weather inputs needed for one <em>block</em> evaluation&rdquo; and every scope it carries is keyed on <code>farm_id</code>. Point a cell&#8209;scoped frost
+      tree at <code>forecast_72h.air_temp_c_min</code> today and all 4,000 cells return the same answer. The missing piece is a per&#8209;cell temperature, not a
+      per&#8209;cell evaluation.
+    </div>
+
+    <div class="note">
+      <span class="lbl">Why the weather feed cannot supply it</span>
+      Open&#8209;Meteo serves a 9&nbsp;km grid, one point per farm. A cell is 20&nbsp;m to 5000&nbsp;m. The forecast carries no information at that scale and no
+      provider has it. The per&#8209;cell number has to be derived from terrain.
+    </div>
+  </section>
+
+  <!-- ================= GAPS ================= -->
+  <section>
+    <div class="section-head">
+      <p class="eyebrow">2 &middot; Gap register</p>
+      <h2>Twelve gaps, ranked by what they block</h2>
+    </div>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Gap</th>
+            <th>Why frost needs it</th>
+            <th>Severity</th>
+            <th>Days</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="sev-block">
+            <td class="gapname">Weather is farm&#8209;keyed<span class="file">shared/conditions/context.py:189 &middot; weather/snapshot.py:69</span></td>
+            <td>The crux. Cell&#8209;scoped evaluation exists; cell&#8209;scoped weather does not. Needs a <code>terrain</code> condition source, or a cell&#8209;aware weather snapshot, so a tree leaf can read this cell&rsquo;s offset.</td>
+            <td><span class="chip block">Blocks</span></td>
+            <td class="num">3</td>
+          </tr>
+          <tr class="sev-block">
+            <td class="gapname">No digital elevation model<span class="file">new module</span></td>
+            <td>Cold air is heavy and flows downhill on calm nights. A valley&#8209;bottom cell runs 2&ndash;4&nbsp;&deg;C colder than a cell 20&nbsp;m higher. Without a DEM there is no basis for any per&#8209;cell number.</td>
+            <td><span class="chip block">Blocks</span></td>
+            <td class="num">5&ndash;8</td>
+          </tr>
+          <tr class="sev-block">
+            <td class="gapname">No terrain columns on cells<span class="file">grid/models.py:56</span></td>
+            <td>Elevation, slope, aspect, topographic position index and height above nearest drainage, reduced to one stored <code>frost_offset_c</code> per cell. None exist.</td>
+            <td><span class="chip block">Blocks</span></td>
+            <td class="num">2</td>
+          </tr>
+          <tr class="sev-block">
+            <td class="gapname">No dew point<span class="file">providers/open_meteo.py + 2 migrations</span></td>
+            <td>Dew point sets the floor a clear calm night can cool to, and separates white frost from dry frost. It is the second input to the FAO equation. Open&#8209;Meteo serves <code>dew_point_2m</code> on the request already in use.</td>
+            <td><span class="chip block">Blocks</span></td>
+            <td class="num">1</td>
+          </tr>
+          <tr class="sev-block">
+            <td class="gapname">No night window<span class="file">weather/derivations.py:77</span></td>
+            <td>Hourly rows bucket by local calendar date. A frost night runs 18:00 to 09:00 and crosses midnight, so the calendar minimum splits one night across two rows. The 72&#8209;hour scope hides this; a nightly scope will not.</td>
+            <td><span class="chip block">Blocks</span></td>
+            <td class="num">1</td>
+          </tr>
+          <tr class="sev-block">
+            <td class="gapname">No coffee frost tree<span class="file">recommendations/seeds/</span></td>
+            <td>The cheapest item on this page. Copy <code>potato_frost_risk_v1</code>, change the crop path, set Arabica thresholds near &minus;2&nbsp;&deg;C, add <code>scope: cell</code> once the offset exists. Farm&#8209;level coffee frost ships on this row alone.</td>
+            <td><span class="chip block">Blocks</span></td>
+            <td class="num">1</td>
+          </tr>
+          <tr class="sev-improve">
+            <td class="gapname">No radiative / advective branch</td>
+            <td>Cell offsets apply only to calm clear nights. A cold air mass with wind freezes the whole farm evenly. Branching on night wind speed and cloud cover, both already stored, is what keeps false alarms down.</td>
+            <td><span class="chip improve">Accuracy</span></td>
+            <td class="num">1</td>
+          </tr>
+          <tr class="sev-improve">
+            <td class="gapname">No soil temperature or moisture</td>
+            <td>Wet warm soil releases heat at night and can hold a cell 1&ndash;2&nbsp;&deg;C above dry soil. Open&#8209;Meteo serves <code>soil_temperature_0cm</code> and <code>soil_moisture_0_to_1cm</code>.</td>
+            <td><span class="chip improve">Accuracy</span></td>
+            <td class="num">1</td>
+          </tr>
+          <tr class="sev-improve">
+            <td class="gapname">Ingest cadence is 3 hours<span class="file">core/settings.py:181</span></td>
+            <td>The same&#8209;night forecast reads observed temperature and dew point two hours after sunset. At 3&#8209;hour cadence that reading can be 90 minutes stale. Hourly cadence on frost nights unlocks the most accurate tier.</td>
+            <td><span class="chip improve">Accuracy</span></td>
+            <td class="num">0.5</td>
+          </tr>
+          <tr class="sev-improve">
+            <td class="gapname">No frost ground truth</td>
+            <td>The offsets start as theory. A frost damage observation in Scout, per cell, calibrates them. The <code>cell_id</code> column is there; the signal is not.</td>
+            <td><span class="chip improve">Accuracy</span></td>
+            <td class="num">2</td>
+          </tr>
+          <tr class="sev-decide">
+            <td class="gapname"><code>frost_threshold_c</code> is dead<span class="file">farms/crop_thresholds.py:46</span></td>
+            <td>Every occurrence in the backend and frontend is a docstring example or a test fixture. No crop seeds it, no code reads it. Trees carry their own <code>parameters</code> block instead. Decide: seed it as the crop&#8209;level default a tree falls back to, or delete it.</td>
+            <td><span class="chip decide">Decision</span></td>
+            <td class="num">1</td>
+          </tr>
+          <tr class="sev-decide">
+            <td class="gapname">Grids belong to imagery<span class="file">grid/models.py:46</span></td>
+            <td><code>grid_configs</code> requires a <code>product_id</code> pointing at an imagery product. Frost is not an imagery product. Either reuse the block&rsquo;s imagery grid or change the model.</td>
+            <td><span class="chip decide">Decision</span></td>
+            <td class="num">1&ndash;2</td>
+          </tr>
+          <tr class="sev-improve">
+            <td class="gapname">Cell size checked too late<span class="file">farms/config_schemas.py:165</span></td>
+            <td>A defect found alongside this work. <code>validate_cell_size</code> enforces the pixel rules, but only on apply. The farm template validates <code>gt=0</code> and nothing else, so an illegal size is accepted at save and rejected after the user has typed the farm name to confirm a destructive rezone.</td>
+            <td><span class="chip improve">Defect</span></td>
+            <td class="num">1</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <span class="lbl">On cell size</span>
+      The pixel rule already exists and already runs. <code>grid/geometry.py:47</code> rejects a cell finer than the native pixel, a cell that is not a whole
+      multiple of it, and a cell holding fewer than four pixels. For a 10&nbsp;m product the smallest legal cell is 20&nbsp;m and the legal set is 20, 30, 40,
+      50&hellip; Do not mandate one size at farm creation: a farm with a 10&nbsp;m optical product and a 30&nbsp;m thermal product has no common size below
+      30&nbsp;m, and rezoning later is destructive. Pre&#8209;fill a default from the coarsest subscribed product, offer the legal set as a picker, and move the
+      check to the template save.
+    </div>
+  </section>
+
+  <!-- ================= ACCURACY ================= -->
+  <section>
+    <div class="section-head">
+      <p class="eyebrow">3 &middot; Expected accuracy</p>
+      <h2>What each stage buys</h2>
+    </div>
+
+    <p class="prose">Error is the root mean square error of predicted night minimum temperature, in degrees Celsius, at a 24&#8209;hour horizon. Hit rate is the share of nights where the frost or no&#8209;frost call is correct. Note that moving from the farm point to the cell first <em>costs</em> accuracy: the terrain step spreads one calibrated number across many cells, and only ground truth wins it back.</p>
+
+    <div class="chart">
+
+      <div class="barrow">
+        <div class="barlabel">
+          <span class="stage">Stage 0 &middot; today</span>
+          Today. <code>potato_frost_risk_v1</code> on the raw 9&nbsp;km 72&#8209;hour minimum
+          <span class="grain">farm point</span>
+        </div>
+        <div class="track"><div class="bar now" style="width: 83.3%;"></div></div>
+        <div class="barval">2.5 &deg;C<span class="hit">~70% hit</span></div>
+      </div>
+
+      <div class="barrow">
+        <div class="barlabel">
+          <span class="stage">Stage 1</span>
+          + night window, + local bias correction from farm history
+          <span class="grain">farm point</span>
+        </div>
+        <div class="track"><div class="bar" style="width: 53.3%;"></div></div>
+        <div class="barval">1.6 &deg;C<span class="hit">~80% hit</span></div>
+      </div>
+
+      <div class="barrow">
+        <div class="barlabel">
+          <span class="stage">Stage 2</span>
+          + dew point, soil, radiative / advective branch
+          <span class="grain">farm point</span>
+        </div>
+        <div class="track"><div class="bar" style="width: 36.7%;"></div></div>
+        <div class="barval">1.1 &deg;C<span class="hit">~87% hit</span></div>
+      </div>
+
+      <div class="barrow">
+        <div class="barlabel">
+          <span class="stage">Stage 3</span>
+          + DEM downscale to every cell
+          <span class="grain">per cell</span>
+        </div>
+        <div class="track"><div class="bar" style="width: 43.3%;"></div></div>
+        <div class="barval">1.3 &deg;C<span class="hit">~82% hit</span></div>
+      </div>
+
+      <div class="barrow">
+        <div class="barlabel">
+          <span class="stage">Stage 4</span>
+          + two seasons of Scout and thermal calibration
+          <span class="grain">per cell</span>
+        </div>
+        <div class="track"><div class="bar best" style="width: 30%;"></div></div>
+        <div class="barval">0.9 &deg;C<span class="hit">~88% hit</span></div>
+      </div>
+
+      <div class="axis">
+        <div></div>
+        <div class="ticks"><span>0</span><span>1</span><span>2</span><span>3 &deg;C</span></div>
+        <div></div>
+      </div>
+
+      <p class="caveat"><strong>These are expected values, not measured ones.</strong> They come from published frost studies in Korea, California and the western United States, scaled to a 9&nbsp;km driving forecast. Stage 0 is what the potato tree does on this platform now, but its error has never been measured against Brazilian observations. Treat every row as the size of the prize, not as a promise. The first honest number arrives after one Brazilian winter of forecast&#8209;versus&#8209;observed comparison, which <code>weather_forecasts</code> already stores every issuance for.</p>
+    </div>
+
+    <h3>Accuracy falls off with lead time</h3>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Lead time</th>
+            <th>What drives the number</th>
+            <th>Expected error</th>
+            <th>Hit rate</th>
+            <th>What the grower does with it</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="num">5 days</td>
+            <td>Forecast model only. This is the current 120&#8209;hour horizon.</td>
+            <td class="num">2.5&ndash;3.5 &deg;C</td>
+            <td class="num">60&ndash;70%</td>
+            <td>Watch. Do not spend money on this signal.</td>
+          </tr>
+          <tr>
+            <td class="num">48 hours</td>
+            <td>Forecast + local bias correction</td>
+            <td class="num">1.5&ndash;2.0 &deg;C</td>
+            <td class="num">78&ndash;85%</td>
+            <td>Book labour, fuel and water. Move equipment.</td>
+          </tr>
+          <tr>
+            <td class="num">12&ndash;24 hours</td>
+            <td>Forecast + bias + dew point + terrain</td>
+            <td class="num">1.0&ndash;1.5 &deg;C</td>
+            <td class="num">85&ndash;90%</td>
+            <td>Decide which cells to protect.</td>
+          </tr>
+          <tr>
+            <td class="num">2&ndash;6 hours</td>
+            <td>Observed temperature and dew point two hours after sunset, run through the FAO equation. Needs hourly ingest.</td>
+            <td class="num">0.65&ndash;1.0 &deg;C</td>
+            <td class="num">90&ndash;95%</td>
+            <td>Start irrigation or wind machines tonight.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="caveat" style="border-top: none; padding-top: 8px;">The 0.65&nbsp;&deg;C figure is the root mean square error FAO reports for its own worked example of the two&#8209;hours&#8209;after&#8209;sunset equation. It applies to a single instrumented point on radiative frost nights, not to a whole farm.</p>
+  </section>
+
+  <!-- ================= METHOD ================= -->
+  <section>
+    <div class="section-head">
+      <p class="eyebrow">4 &middot; Method</p>
+      <h2>How a cell gets its own number</h2>
+    </div>
+
+    <p class="prose">The offset is static. Terrain does not change, so it is computed once when the grid is created and stored on the cell. Runtime cost per night is one addition per cell.</p>
+
+    <ol class="method">
+      <li>Load a digital elevation model over the farm. Copernicus DEM GLO&#8209;30 is free, global, 30&nbsp;m, and covers Brazil.</li>
+      <li>Per cell, compute elevation, slope, aspect, topographic position index and height above the nearest drainage. Store them on <code>grid_cells</code>.</li>
+      <li>Reduce those to one signed number, <code>frost_offset_c</code>. A low sheltered cell gets a negative value, a mid&#8209;slope cell near zero. Seed the coefficients from published cold&#8209;air&#8209;pooling work, then calibrate.</li>
+      <li>Expose it to the condition language as a <code>terrain</code> source, so a tree leaf can compare <code>forecast_72h.air_temp_c_min</code> plus <code>terrain.frost_offset_c</code> against a threshold. This is the step that makes <code>scope: cell</code> mean something for weather.</li>
+      <li>Seed a coffee frost tree from the potato one, with Arabica thresholds and <code>scope: cell</code>.</li>
+      <li>Suppress the offsets when night wind is above about 2&nbsp;m&nbsp;s&#8209;&sup1; or cloud cover is high. That night is advective, and the whole farm freezes evenly.</li>
+      <li>Weight the damage text by plant age from <code>planting_date</code>. A young plant sits inside the coldest 50&nbsp;cm of air; a mature plant keeps its upper canopy above it.</li>
+    </ol>
+
+    <div class="note">
+      <span class="lbl">Resolution honesty</span>
+      A 30&nbsp;m elevation model cannot describe a 10&nbsp;m cell. At 30&nbsp;m cells and larger it works, and Brazilian coffee blocks are normally coarser than that. Say so in the interface rather than implying precision the data does not hold.
+    </div>
+
+    <div class="note">
+      <span class="lbl">Where the published evidence is strongest</span>
+      A 2024 drone study of frost&#8209;damaged Brazilian coffee split its plots exactly this way: plants on slopes were the low&#8209;risk group, plants in valley areas the high&#8209;risk group, and plant age changed the damage within each. That is the same two variables this design uses, measured on the same crop in the same country.
+    </div>
+  </section>
+
+  <!-- ================= REFERENCES ================= -->
+  <section>
+    <div class="section-head">
+      <p class="eyebrow">5 &middot; Sources</p>
+      <h2>Studies and artifacts behind the numbers</h2>
+    </div>
+
+    <div class="refs">
+      <div class="ref-item">
+        <span class="ref-kind">Handbook</span>
+        <span><a href="https://www.fao.org/4/y7223e/y7223e00.htm">Snyder &amp; de Melo&#8209;Abreu (2005), <em>Frost Protection: fundamentals, practice and economics</em>, FAO Environment and Natural Resources Series 10</a> &middot; <a href="https://www.fao.org/4/y7223e/y7223e0b.htm">Chapter 5, forecasting</a>
+        <span class="why">Source of the two&#8209;hours&#8209;after&#8209;sunset equation, the 0.65&nbsp;&deg;C worked&#8209;example RMSE, and the note that growers historically subtracted 0.5&nbsp;&deg;C by hand for low&#8209;lying ground.</span></span>
+      </div>
+
+      <div class="ref-item">
+        <span class="ref-kind">Study</span>
+        <span><a href="https://www.mdpi.com/2072-4292/16/18/3467">Remotely Piloted Aircraft for Evaluating the Impact of Frost in Coffee Plants: Interactions between Plant Age and Topography</a>, <em>Remote Sensing</em> 16(18), 2024
+        <span class="why">Brazilian coffee, measured. Splits risk by slope versus valley position and by plant age. The direct evidence for both the terrain offset and the age weighting.</span></span>
+      </div>
+
+      <div class="ref-item">
+        <span class="ref-kind">Study</span>
+        <span><a href="https://link.springer.com/article/10.1007/s11119-021-09815-w">Unmanned aerial vehicle to evaluate frost damage in coffee plants</a>, <em>Precision Agriculture</em> 23, 2021
+        <span class="why">Method for scoring frost damage per plot from imagery. A route to ground truth that does not depend on the grower reporting.</span></span>
+      </div>
+
+      <div class="ref-item">
+        <span class="ref-kind">Study</span>
+        <span><a href="https://doi.org/10.1016/j.agrformet.2005.12.011">Chung et al. (2006), Minimum temperature mapping over complex terrain by estimating cold air accumulation potential</a>, <em>Agricultural and Forest Meteorology</em> 137, 15&ndash;24
+        <span class="why">The closest published analogue to Stage 3. Interpolates night minimum temperature using a terrain&#8209;derived cold&#8209;air&#8209;accumulation term.</span></span>
+      </div>
+
+      <div class="ref-item">
+        <span class="ref-kind">Study</span>
+        <span><a href="https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2008JD009879">Lundquist et al. (2008), Automated algorithm for mapping regions of cold&#8209;air pooling in complex terrain</a>, <em>JGR Atmospheres</em> 113
+        <span class="why">A repeatable way to derive pooling zones from a DEM. Use this to define <code>frost_offset_c</code> rather than inventing a formula.</span></span>
+      </div>
+
+      <div class="ref-item">
+        <span class="ref-kind">Study</span>
+        <span><a href="https://doi.org/10.1016/j.rse.2008.03.018">Rennó et al. (2008), HAND, a new terrain descriptor using SRTM&#8209;DEM</a>, <em>Remote Sensing of Environment</em> 112, 3469&ndash;3481
+        <span class="why">Defines height above the nearest drainage. Brazilian authors, Brazilian terrain, and the descriptor that best separates a valley&#8209;bottom cell from a slope cell.</span></span>
+      </div>
+
+      <div class="ref-item">
+        <span class="ref-kind">Data</span>
+        <span><a href="https://spacedata.copernicus.eu/collections/copernicus-digital-elevation-model">Copernicus DEM GLO&#8209;30</a>
+        <span class="why">30&nbsp;m global elevation, free, covers Brazil. The proposed DEM source.</span></span>
+      </div>
+
+      <div class="ref-item">
+        <span class="ref-kind">Data</span>
+        <span><a href="https://open-meteo.com/en/docs">Open&#8209;Meteo forecast API</a>
+        <span class="why">Already the platform&rsquo;s provider. <code>dew_point_2m</code>, <code>soil_temperature_0cm</code> and <code>soil_moisture_0_to_1cm</code> are on the same endpoint already in use.</span></span>
+      </div>
+
+      <div class="ref-item">
+        <span class="ref-kind">Data</span>
+        <span><a href="https://ecostress.jpl.nasa.gov/">ECOSTRESS</a>
+        <span class="why">70&nbsp;m thermal from the space station, free, acquires at night over Brazil. Revisit is irregular, so it calibrates the offsets; it cannot warn.</span></span>
+      </div>
+
+      <div class="ref-item">
+        <span class="ref-kind">Code</span>
+        <span><a href="https://rdrr.io/cran/frost/man/buildFAO.html">The <code>frost</code> R package, <code>buildFAO</code></a>
+        <span class="why">A working implementation of the FAO equation with fitted coefficients. Useful as a reference to check our own port against.</span></span>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Audit read from branch feat/rbac-page-density on 10&ndash;11 September 2026.<br>
+    Corrected 11 September: an earlier draft said the platform produced no frost value. <code>potato_frost_risk_v1</code> exists and runs.<br>
+    Code line numbers are from that working tree and will move.<br>
+    Accuracy figures are expected from published work elsewhere. Not tested on AgriPulse data.
+  </footer>
+
+</div>
