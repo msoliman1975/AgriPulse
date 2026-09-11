@@ -3680,10 +3680,26 @@ global:
     #   row in the version history is the confirmation.
     #
     #   Rollback is these two tags back to 9ccdff2.
+    # fcf7b0e = #682, the 33 seed YAML files and the disk loader are deleted.
+    #
+    #   `sync_from_disk` read seeds/*.yaml at every startup and republished any
+    #   tree whose compiled hash differed, which is what made a platform tree
+    #   uneditable in the app. Migration 0085 carried the definitions into the
+    #   database and #673 stopped the sync, so this image only removes code
+    #   that has not run in production since e0ea9c7 rolled.
+    #
+    #   No migration and no behaviour change. The frontend is NOT moved: #682
+    #   touches two frontend files and both are inert — one comment and one
+    #   test file, neither of which reaches the bundle.
+    #
+    #   Watch for this: the api pod failing to start. A deleted symbol that
+    #   something still imported would show there and nowhere else.
+    #
+    #   Rollback is these two tags back to 431d7fa.
     api:
-      tag: "431d7fa"
+      tag: "fcf7b0e"
     workers:
-      tag: "431d7fa"
+      tag: "fcf7b0e"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
