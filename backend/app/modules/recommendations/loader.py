@@ -1,54 +1,33 @@
-"""Sync decision-tree YAML files on disk into the public catalog.
+"""Compile a decision-tree spec into the stored JSON body.
 
-The seed YAMLs live in ``app/modules/recommendations/seeds/*.yaml``.
-Each file authors one tree. ``sync_from_disk`` reads them, compiles
-them to JSON, and upserts ``public.decision_trees`` +
-``public.decision_tree_versions`` so the catalog matches what's on
-disk. Idempotent — re-running with no YAML changes is a no-op.
+`compile_tree` turns an authored YAML spec into the compiled form held in
+`public.decision_tree_versions.tree_compiled`, and validates the node graph
+on the way: the root exists, every `on_match` / `on_miss` resolves, every leaf
+has an outcome, and there are no unreachable nodes.
 
-Compilation is structural validation only: we check the node graph is
-walkable (root exists, every ``on_match``/``on_miss`` resolves, every
-leaf has an outcome, no obvious cycles via reachability). Predicate
-syntax inside ``condition.tree`` is left to the shared evaluator —
-malformed predicates simply never match at runtime, matching the
-"permissive on missing data" contract.
+Compilation is structural only. Predicate syntax inside `condition.tree` is
+left to the shared evaluator — a malformed predicate simply never matches at
+runtime, which matches the "permissive on missing data" contract.
 
-Crop FK resolution: YAML references crops by their stable ``crops.code``
-(e.g. ``citrus``); the loader resolves to ``crops.id`` at sync time.
-A null / missing ``crop_code`` means "applies to any crop".
-
-Called once at app startup from ``_lifespan``. Tests that need the
-catalog populated call it directly with a fixture session.
+This module used to load too. `sync_from_disk` read `seeds/*.yaml` at every
+startup and republished any tree whose compiled hash differed, which is what
+made a platform tree uneditable in the app: the file won, silently, at the
+next restart. Public migration 0085 carried the 33 definitions into the
+database, the startup sync stopped, and the files and the function are now
+gone. A tree is a row, and the app is the only way to change one.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterable
-from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
-
-import yaml
-from sqlalchemy import select, text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.modules.recommendations.errors import DecisionTreeParseError
-from app.modules.recommendations.models import DecisionTree
 from app.modules.recommendations.status_codes import LEAF_KINDS, STATUS_CODES, kind_of
 
 _log = get_logger(__name__)
-
-_SEEDS_DIR = Path(__file__).parent / "seeds"
-
-
-def _seed_files() -> Iterable[Path]:
-    if not _SEEDS_DIR.exists():
-        return ()
-    return sorted(_SEEDS_DIR.glob("*.yaml"))
-
 
 # The closed block soil-texture vocabulary (mirrors farms.schemas.SoilTexture
 # / the blocks.soil_texture CHECK). Tree targeting may only reference these.
@@ -763,262 +742,3 @@ def _validate_outcome_actions(outcome: dict[str, Any], nid: str, source_path: st
 def _hash_compiled(compiled: dict[str, Any]) -> str:
     payload = json.dumps(compiled, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
-
-
-async def _resolve_crop_id(public_session: AsyncSession, crop_code: str | None) -> Any:
-    if not crop_code:
-        return None
-    row = (
-        await public_session.execute(
-            text("SELECT id FROM public.crops WHERE code = :c AND deleted_at IS NULL"),
-            {"c": crop_code},
-        )
-    ).first()
-    if row is None:
-        _log.warning("decision_tree_unknown_crop_code", crop_code=crop_code)
-        return None
-    return row.id
-
-
-async def sync_from_disk(public_session: AsyncSession) -> dict[str, int]:
-    """Read every YAML in seeds/ and upsert the public catalog.
-
-    Idempotent. For each file:
-
-      * If no `decision_trees` row exists for the code, insert one.
-      * Compile + hash the YAML; compare hash to the latest version row
-        for the tree. If different (or no version exists), insert a new
-        version row, advance ``decision_trees.current_version_id``, and
-        stamp ``published_at = now()``.
-      * Otherwise leave both rows alone.
-
-    Returns counts so the lifespan startup can log a one-line summary.
-    """
-    files = list(_seed_files())
-    trees_seen = 0
-    versions_inserted = 0
-
-    for path in files:
-        trees_seen += 1
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-        compiled = compile_tree(raw, source_path=str(path))
-        compiled_hash = _hash_compiled(compiled)
-        crop_path = compiled.get("crop_path")
-        crop_paths = compiled.get("crop_paths") or []
-        country_codes = compiled.get("country_codes") or []
-        soil_textures = compiled.get("soil_textures") or []
-        scope = compiled.get("scope") or "block"
-        # When a tree targets by path, derive crop_code from the path's first
-        # segment so crop_id stays populated for display + crop-scoped reads.
-        crop_code = compiled.get("crop_code") or (crop_path.split(".")[0] if crop_path else None)
-        crop_id = await _resolve_crop_id(public_session, crop_code)
-
-        # Fetch existing platform tree by code. After PR-A, code uniqueness
-        # is partitioned by tenant_id; here we only want the platform row
-        # (tenant_id IS NULL) — a tenant could theoretically have authored
-        # a tree with the same code (create_tree forbids it, but defending
-        # in depth is cheap).
-        existing = (
-            (
-                await public_session.execute(
-                    select(DecisionTree).where(
-                        DecisionTree.code == compiled["code"],
-                        DecisionTree.tenant_id.is_(None),
-                        DecisionTree.deleted_at.is_(None),
-                    )
-                )
-            )
-            .scalars()
-            .one_or_none()
-        )
-
-        if existing is None:
-            tree_id = await _insert_tree(
-                public_session,
-                code=compiled["code"],
-                name_en=compiled["name_en"],
-                name_ar=compiled.get("name_ar"),
-                description_en=compiled.get("description_en"),
-                description_ar=compiled.get("description_ar"),
-                crop_id=crop_id,
-                crop_path=crop_path,
-                crop_paths=crop_paths,
-                country_codes=country_codes,
-                soil_textures=soil_textures,
-                scope=scope,
-                applicable_regions=compiled.get("applicable_regions") or [],
-            )
-            latest_version: int | None = None
-            latest_hash: str | None = None
-        else:
-            tree_id = existing.id
-            # Patch metadata that may have evolved on disk (name etc.).
-            await public_session.execute(
-                text(
-                    """
-                    UPDATE public.decision_trees
-                       SET name_en = :name_en,
-                           name_ar = :name_ar,
-                           description_en = :description_en,
-                           description_ar = :description_ar,
-                           crop_id = :crop_id,
-                           crop_path = :crop_path,
-                           crop_paths = :crop_paths,
-                           country_codes = :country_codes,
-                           soil_textures = :soil_textures,
-                           scope = :scope,
-                           applicable_regions = :applicable_regions,
-                           is_active = TRUE,
-                           updated_at = now()
-                     WHERE id = :id
-                    """
-                ),
-                {
-                    "name_en": compiled["name_en"],
-                    "name_ar": compiled.get("name_ar"),
-                    "description_en": compiled.get("description_en"),
-                    "description_ar": compiled.get("description_ar"),
-                    "crop_id": crop_id,
-                    "crop_path": crop_path,
-                    "crop_paths": crop_paths,
-                    "country_codes": country_codes,
-                    "soil_textures": soil_textures,
-                    "scope": scope,
-                    "applicable_regions": compiled.get("applicable_regions") or [],
-                    "id": tree_id,
-                },
-            )
-            latest = await _latest_version_for_tree(public_session, tree_id)
-            latest_version = latest[0] if latest else None
-            latest_hash = latest[1] if latest else None
-
-        if latest_hash == compiled_hash:
-            continue
-
-        next_version = (latest_version or 0) + 1
-        version_id = await _insert_version(
-            public_session,
-            tree_id=tree_id,
-            version=next_version,
-            tree_yaml=path.read_text(encoding="utf-8"),
-            tree_compiled=compiled,
-            compiled_hash=compiled_hash,
-            published_at=datetime.now(UTC),
-        )
-        await public_session.execute(
-            text(
-                "UPDATE public.decision_trees SET current_version_id = :vid, "
-                "updated_at = now() WHERE id = :tid"
-            ),
-            {"vid": version_id, "tid": tree_id},
-        )
-        versions_inserted += 1
-
-    await public_session.commit()
-    _log.info(
-        "decision_trees_sync_done",
-        trees_seen=trees_seen,
-        versions_inserted=versions_inserted,
-    )
-    return {"trees_seen": trees_seen, "versions_inserted": versions_inserted}
-
-
-async def _insert_tree(
-    session: AsyncSession,
-    *,
-    code: str,
-    name_en: str,
-    name_ar: str | None,
-    description_en: str | None,
-    description_ar: str | None,
-    crop_id: Any,
-    crop_path: str | None = None,
-    crop_paths: list[str] | None = None,
-    country_codes: list[str] | None = None,
-    soil_textures: list[str] | None = None,
-    scope: str = "block",
-    applicable_regions: list[str],
-) -> Any:
-    row = (
-        await session.execute(
-            text(
-                """
-                INSERT INTO public.decision_trees
-                    (code, name_en, name_ar, description_en, description_ar,
-                     crop_id, crop_path, crop_paths, country_codes, soil_textures,
-                     scope, applicable_regions, is_active)
-                VALUES (:code, :name_en, :name_ar, :description_en, :description_ar,
-                        :crop_id, :crop_path, :crop_paths, :country_codes, :soil_textures,
-                        :scope, :applicable_regions, TRUE)
-                RETURNING id
-                """
-            ),
-            {
-                "code": code,
-                "name_en": name_en,
-                "name_ar": name_ar,
-                "description_en": description_en,
-                "description_ar": description_ar,
-                "crop_id": crop_id,
-                "crop_path": crop_path,
-                "crop_paths": crop_paths or [],
-                "country_codes": country_codes or [],
-                "soil_textures": soil_textures or [],
-                "scope": scope,
-                "applicable_regions": applicable_regions,
-            },
-        )
-    ).first()
-    assert row is not None  # INSERT ... RETURNING always yields one row
-    return row.id
-
-
-async def _latest_version_for_tree(session: AsyncSession, tree_id: Any) -> tuple[int, str] | None:
-    row = (
-        await session.execute(
-            text(
-                "SELECT version, compiled_hash FROM public.decision_tree_versions "
-                "WHERE tree_id = :tid ORDER BY version DESC LIMIT 1"
-            ),
-            {"tid": tree_id},
-        )
-    ).first()
-    if row is None:
-        return None
-    return row.version, row.compiled_hash
-
-
-async def _insert_version(
-    session: AsyncSession,
-    *,
-    tree_id: Any,
-    version: int,
-    tree_yaml: str,
-    tree_compiled: dict[str, Any],
-    compiled_hash: str,
-    published_at: datetime,
-) -> Any:
-    row = (
-        await session.execute(
-            text(
-                """
-                INSERT INTO public.decision_tree_versions
-                    (tree_id, version, tree_yaml, tree_compiled,
-                     compiled_hash, published_at)
-                VALUES (:tid, :version, :yaml, CAST(:compiled AS jsonb),
-                        :hash, :published_at)
-                RETURNING id
-                """
-            ),
-            {
-                "tid": tree_id,
-                "version": version,
-                "yaml": tree_yaml,
-                "compiled": json.dumps(tree_compiled),
-                "hash": compiled_hash,
-                "published_at": published_at,
-            },
-        )
-    ).first()
-    assert row is not None  # INSERT ... RETURNING always yields one row
-    return row.id

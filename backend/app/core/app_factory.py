@@ -42,11 +42,10 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             app_env=settings.app_env,
             hint="set KEYCLOAK_PROVISIONING_ENABLED=true and the tenancy client secret",
         )
-    # Decision trees are no longer synced from disk. They live in
+    # Decision trees are not synced from disk. They live in
     # `public.decision_trees` and are edited in the app; public migration
-    # 0085 put the 33 platform trees there once. Syncing here would undo
-    # every edit a platform admin made, at the next restart, silently.
-    # The YAML files and `loader.sync_from_disk` are removed separately.
+    # 0085 put the 33 platform trees there once, and the seed files and
+    # `sync_from_disk` are gone. Nothing belongs here.
     # Sync the per-crop health definitions, same idea and same idempotence.
     #
     # Logged at ERROR, not WARNING, and named as the consequence: a failed

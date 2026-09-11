@@ -28,7 +28,6 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -38,8 +37,10 @@ from app.modules.recommendations.engine import EvaluationResult, TreeOutcome, ev
 from app.modules.recommendations.loader import DecisionTreeParseError, compile_tree
 from app.shared.conditions import ConditionContext
 from app.shared.conditions.context import IndicesEntry, WeatherRiskEntry
+from tests.support.shipped_trees import shipped_yaml
 
-_SEEDS = Path(__file__).resolve().parents[3] / "app" / "modules" / "recommendations" / "seeds"
+# The seed files are gone; migration 0085 carries these definitions now.
+# See tests/support/shipped_trees.py for what these cases still guard.
 
 # Every code in the catalogue, in the order the catalogue lists them: the
 # eleven index-band trees, the five that combine, the six from the plan.
@@ -71,7 +72,7 @@ CATALOGUE: tuple[str, ...] = (
 
 def _tree(code: str) -> dict[str, Any]:
     return compile_tree(
-        yaml.safe_load((_SEEDS / f"{code}.yaml").read_text(encoding="utf-8")),
+        yaml.safe_load(shipped_yaml(f"{code}.yaml")),
         source_path=code,
     )
 
@@ -187,7 +188,7 @@ def test_no_tree_reads_the_platform_ndwi(code: str) -> None:
     rule written on `ndwi` reads the wrong band with no error, and on Mango
     Republic the two average -0.079 and -0.328, so nothing about the number
     would look wrong either."""
-    raw = (_SEEDS / f"{code}.yaml").read_text(encoding="utf-8")
+    raw = shipped_yaml(f"{code}.yaml")
     assert "index_code: ndwi" not in raw
 
 
@@ -201,7 +202,7 @@ def test_unknown_operator_is_rejected_at_compile_time() -> None:
     evaluator catches the parse error and answers "did not match", so before
     this validator a typo'd operator produced a branch that silently took
     `on_miss` for ever, with no card, log line or trace saying why."""
-    spec = yaml.safe_load((_SEEDS / "t_ndvi_canopy_vigour.yaml").read_text(encoding="utf-8"))
+    spec = yaml.safe_load(shipped_yaml("t_ndvi_canopy_vigour.yaml"))
     spec["nodes"]["small_check"]["condition"]["tree"]["op"] = "gte"
     with pytest.raises(DecisionTreeParseError, match="operator"):
         compile_tree(spec, source_path="probe")
@@ -448,7 +449,7 @@ def test_water_confirm_never_reads_msi() -> None:
     """MSI is SWIR/NIR and NDMI is (NIR-SWIR)/(NIR+SWIR): ndmi == (1-msi)/(1+msi),
     a monotone transform, so they cannot disagree. Reading both would let one
     measurement cast two votes and reach `confirmed` on its own."""
-    raw = (_SEEDS / "t_water_stress_confirm.yaml").read_text(encoding="utf-8")
+    raw = shipped_yaml("t_water_stress_confirm.yaml")
     assert "index_code: msi" not in raw
 
 

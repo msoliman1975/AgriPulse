@@ -1,33 +1,29 @@
-"""Tests for the YAML decision-tree loader.
+"""Tests for the decision-tree compiler.
 
-Pure-fn tests of compile_tree validation; the DB-touching sync_from_disk
-flow is covered by the live-tenant smoke check during PR-A development
-and is exercised whenever app startup runs in tests.
+Pure-function tests of `compile_tree` validation, plus a check that every
+platform tree the migration ships still compiles.
+
+There is no longer a loader to test. `sync_from_disk` republished the YAML
+files at every startup, which is what stopped anyone editing a platform tree
+in the app; public migration 0085 carried the definitions into the database
+and both the function and the files are gone. The shipped bodies now come
+from `tests.support.shipped_trees`, which reads the migration's data file.
 """
 
 from __future__ import annotations
-
-from pathlib import Path
 
 import pytest
 import yaml
 
 from app.modules.recommendations.errors import DecisionTreeParseError
 from app.modules.recommendations.loader import compile_tree
+from tests.support.shipped_trees import iter_shipped_yaml, shipped_yaml
 
 pytestmark = [pytest.mark.integration]
 
 
 def _load_seed() -> dict[str, object]:
-    seed_path = (
-        Path(__file__).resolve().parents[3]
-        / "app"
-        / "modules"
-        / "recommendations"
-        / "seeds"
-        / "mango_canopy_health_v1.yaml"
-    )
-    return yaml.safe_load(seed_path.read_text(encoding="utf-8"))
+    return yaml.safe_load(shipped_yaml("mango_canopy_health_v1"))
 
 
 def _minimal_leaf_spec(**extra: object) -> dict[str, object]:
@@ -39,10 +35,6 @@ def _minimal_leaf_spec(**extra: object) -> dict[str, object]:
         "nodes": {"leaf": {"outcome": {"action_type": "no_action", "text_en": "x"}}},
         **extra,
     }
-
-
-def _seeds_dir() -> Path:
-    return Path(__file__).resolve().parents[3] / "app" / "modules" / "recommendations" / "seeds"
 
 
 def test_seed_yaml_compiles() -> None:
@@ -59,15 +51,17 @@ def test_seed_yaml_compiles() -> None:
     assert set(compiled["nodes"]) >= {"soil_check", "savi_check", "ndvi_check"}
 
 
-def test_all_seed_files_compile() -> None:
-    """Every shipped seed YAML must compile — guards new catalog entries
-    (e.g. the potato static-threshold trees) from shipping malformed."""
-    seeds = sorted(_seeds_dir().glob("*.yaml"))
-    assert seeds, "no seed YAML files found"
-    for path in seeds:
-        spec = yaml.safe_load(path.read_text(encoding="utf-8"))
-        compiled = compile_tree(spec, source_path=str(path))
-        assert compiled["code"], f"{path.name} compiled without a code"
+def test_every_shipped_tree_compiles() -> None:
+    """Every platform tree migration 0085 installs must still compile.
+
+    This is what stops a malformed body reaching a fresh database. It does
+    not guard the live trees: those are rows now, edited in the app.
+    """
+    shipped = iter_shipped_yaml()
+    assert len(shipped) == 33, f"expected 33 shipped trees, found {len(shipped)}"
+    for name, raw in shipped:
+        compiled = compile_tree(yaml.safe_load(raw), source_path=name)
+        assert compiled["code"], f"{name} compiled without a code"
 
 
 # --- crop_path targeting (crop taxonomy) -------------------------------

@@ -30,7 +30,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import get_settings
 from app.modules.notifications.subscribers import register_subscribers
-from app.modules.recommendations.loader import sync_from_disk
 from app.modules.recommendations.service import get_recommendations_service
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.db.session import AsyncSessionLocal
@@ -81,7 +80,8 @@ async def test_webhook_post_carries_valid_hmac_signature(
     admin_session: AsyncSession,
 ) -> None:
     register_subscribers(get_default_bus())
-    await sync_from_disk(admin_session)
+    # The platform catalogue is installed by public migration 0085,
+    # which the conftest applies when it upgrades to head.
     _CaptureHandler.captured.clear()
 
     server, port = _start_capture_server()
@@ -192,7 +192,8 @@ async def test_webhook_skipped_when_url_unset(admin_session: AsyncSession) -> No
     """A tenant with the webhook channel enabled but no URL gets a
     ``skipped`` dispatch with a clear reason."""
     register_subscribers(get_default_bus())
-    await sync_from_disk(admin_session)
+    # The platform catalogue is installed by public migration 0085,
+    # which the conftest applies when it upgrades to head.
 
     tenancy = get_tenant_service(admin_session)
     tenant = await tenancy.create_tenant(

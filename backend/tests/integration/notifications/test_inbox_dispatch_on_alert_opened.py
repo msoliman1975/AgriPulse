@@ -24,7 +24,6 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.notifications.subscribers import register_subscribers
-from app.modules.recommendations.loader import sync_from_disk
 from app.modules.recommendations.service import get_recommendations_service
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.db.session import AsyncSessionLocal
@@ -152,9 +151,8 @@ async def test_alert_open_creates_inbox_item_and_skipped_dispatches(
     admin_session: AsyncSession,
 ) -> None:
     register_subscribers(get_default_bus())
-    # Tests skip app-startup lifespan, so the seed YAMLs aren't synced
-    # into public.decision_trees. Call sync_from_disk ourselves.
-    await sync_from_disk(admin_session)
+    # The platform catalogue is installed by public migration 0085, which
+    # the conftest applies when it upgrades to head.
 
     tenancy = get_tenant_service(admin_session)
     tenant = await tenancy.create_tenant(
@@ -239,7 +237,8 @@ async def test_alert_open_with_no_recipients_emits_no_inbox(
     """A tenant with no users on the affected farm produces no inbox
     rows and no dispatches."""
     register_subscribers(get_default_bus())
-    await sync_from_disk(admin_session)
+    # The platform catalogue is installed by public migration 0085,
+    # which the conftest applies when it upgrades to head.
 
     tenancy = get_tenant_service(admin_session)
     tenant = await tenancy.create_tenant(

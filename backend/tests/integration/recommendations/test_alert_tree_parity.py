@@ -32,20 +32,11 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.recommendations.loader import sync_from_disk
 from app.modules.recommendations.service import get_recommendations_service
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.db.session import AsyncSessionLocal
 
 pytestmark = [pytest.mark.integration]
-
-
-async def _ensure_seed_trees_loaded(admin_session: AsyncSession) -> None:
-    """Tests skip app-startup lifespan so the seed YAMLs aren't synced
-    into `public.decision_trees`. Call `sync_from_disk` ourselves so the
-    `ndvi_baseline_alert_v1` tree is present for the sweep to pick up.
-    Idempotent: re-running with no YAML changes is a no-op."""
-    await sync_from_disk(admin_session)
 
 
 async def _seed_block_with_ndvi(
@@ -130,7 +121,6 @@ async def test_severe_ndvi_drop_opens_critical_alert_via_tree(
     admin_session: AsyncSession,
 ) -> None:
     tenancy = get_tenant_service(admin_session)
-    await _ensure_seed_trees_loaded(admin_session)
     tenant = await tenancy.create_tenant(
         slug=f"prf-critical-{uuid4().hex[:6]}",
         name="PR-F Critical",
@@ -173,7 +163,6 @@ async def test_moderate_ndvi_drop_opens_warning_alert_via_tree(
     admin_session: AsyncSession,
 ) -> None:
     tenancy = get_tenant_service(admin_session)
-    await _ensure_seed_trees_loaded(admin_session)
     tenant = await tenancy.create_tenant(
         slug=f"prf-warning-{uuid4().hex[:6]}",
         name="PR-F Warning",
@@ -215,7 +204,6 @@ async def test_tenant_param_override_changes_threshold(
     threshold gets a critical alert for a deviation the default
     threshold would have flagged as warning."""
     tenancy = get_tenant_service(admin_session)
-    await _ensure_seed_trees_loaded(admin_session)
     tenant = await tenancy.create_tenant(
         slug=f"prf-override-{uuid4().hex[:6]}",
         name="PR-F Override",

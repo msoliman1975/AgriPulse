@@ -25,7 +25,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.settings import get_settings
 from app.modules.notifications.sink import SUPPRESSED_REASON
 from app.modules.notifications.subscribers import register_subscribers
-from app.modules.recommendations.loader import sync_from_disk
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.eventbus import get_default_bus
 from tests.integration.farms.test_farms_crud import _create_user_in_tenant
@@ -50,7 +49,8 @@ def _sink_prefix(monkeypatch: pytest.MonkeyPatch) -> Any:
 async def _fire_alert_for(admin_session: AsyncSession, *, slug: str) -> tuple[Any, Any]:
     """Provision a tenant, wire a recipient, and drive one alert through."""
     register_subscribers(get_default_bus())
-    await sync_from_disk(admin_session)
+    # The platform catalogue is installed by public migration 0085,
+    # which the conftest applies when it upgrades to head.
 
     tenancy = get_tenant_service(admin_session)
     tenant = await tenancy.create_tenant(

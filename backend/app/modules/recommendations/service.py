@@ -2894,10 +2894,10 @@ class DecisionTreesAuthorService:
     async def _own_tree_or_raise(self, code: str) -> dict[str, Any]:
         """The caller's own tree with this code, or the reason there is none.
 
-        Every authoring write scopes to the caller's own tenant, because a
-        platform tree is owned by its YAML file: `sync_from_disk` rewrites it
-        at the next startup whose compiled hash differs, so a tenant's edit
-        would live until the next restart and then disappear without a word.
+        Every authoring write scopes to the caller's own rows. A tenant writes
+        rows carrying its own `tenant_id`; a platform admin writes rows with
+        `tenant_id IS NULL`. Neither reaches the other's, and this is the
+        tenant half of that.
 
         The scoped lookup cannot tell "no such tree" from "not yours", and it
         used to report both as missing. A 404 saying "No decision tree with
@@ -3857,9 +3857,11 @@ class _DecisionTreeCodeMismatchError(_DecisionTreeAuthoringError):
 class _PlatformTreeNotEditableError(_DecisionTreeAuthoringError):
     """The tree exists, and it is not the caller's to change.
 
-    A platform tree is owned by the YAML on disk: `sync_from_disk` rewrites
-    it at every startup whose compiled hash differs, so a tenant's edit would
-    survive until the next restart and then vanish with no message.
+    A platform tree belongs to the platform catalogue, which only a caller
+    holding a platform role and no tenant may author. The reason used to be
+    that the tree was owned by a YAML file a startup sync rewrote; public
+    migration 0085 moved the definitions into the database and the files are
+    gone. The refusal to a tenant is unchanged.
 
     This is its own error because the lookup that refuses it — scoped to the
     caller's own tenant — used to report the tree as missing. "No decision
