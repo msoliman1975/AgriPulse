@@ -360,6 +360,112 @@ Prompts 1–6 are delivered; they remain here as the record of what was built an
 
 ---
 
+## Next up — high priority
+
+Open after "decision trees live in the database" (#673, #674, #675, #677,
+#682, all deployed 2026-09-11). These are **not** housekeeping: the first two
+cost something today, which the rule below puts outside that backlog. Each
+carries enough context to start without re-deriving it.
+
+Production at the time of writing: api and workers `fcf7b0e`, frontend
+`9ccdff2`, public head 0088.
+
+### H-1 — A tree that targets any crop cannot have its targeting edited
+
+**Symptom.** `PATCH /api/v1/decision-trees/{code}` returns 422 for
+`ndvi_baseline_alert_v1`. The tree targets any crop, so its `crop_paths` is
+`[]`, and `DecisionTreeUpdateRequest.crop_paths` is declared
+`Field(min_length=1)`. The metadata form is a full-replace form, so it resends
+every field and is refused on the empty one.
+
+**Why it matters.** That form is the only way to change a tree's name,
+description, country, soil or execution scope. For every crop-agnostic tree in
+the catalogue it cannot be used at all. The editor shows "Pick at least one
+crop" and the save fails.
+
+**Where.** `backend/app/modules/recommendations/schemas.py`,
+`DecisionTreeUpdateRequest`. **10 of the 41 platform trees are affected**,
+counted on production 2026-09-11:
+
+```
+date_palm_pollination_rain_v1      potato_petiole_nitrogen_v1
+date_palm_ripening_rain_risk_v1    potato_petiole_phosphorus_v1
+date_palm_soil_salinity_v1         potato_petiole_potassium_v1
+ndvi_baseline_alert_v1             potato_soil_salinity_v1
+potato_frost_risk_v1               potato_heat_stress_v1
+```
+
+The list is `cardinality(crop_paths) = 0` on `public.decision_trees` where
+`tenant_id IS NULL`. Note these are the date-palm and potato trees: they
+target their crop through the older `crop_id` / `crop_path` columns rather
+than through `crop_paths`, which is why the newer array reads empty.
+
+**The decision to make first.** Is an empty `crop_paths` legal or not? The
+create path allows it and the evaluator treats an empty axis as "matches any",
+so the schema is the odd one out and dropping `min_length=1` is probably
+right. If instead every tree must name a crop, then those existing rows are
+invalid data and need a migration, not a schema change. **Do not change the
+schema without answering this**, because the two answers need different work.
+
+### H-2 — One click on Execution scope is 30 times the evaluations
+
+**Symptom.** The Execution scope radio in the tree metadata panel writes
+`decision_trees.scope` through the same full-replace PATCH. Nothing confirms
+the change and nothing states its cost.
+
+**Measured on production, 2026-09-11.** Both tenants together hold 108 active
+blocks and 3285 grid cells. A tree at `scope=block` evaluates 108 times per
+sweep; the same tree at `scope=cell` evaluates 3285 times. That is about 30
+times more work per tree, per sweep, for every tenant at once.
+
+**This already happened twice.** `t_ndvi_canopy_vigour` and
+`t_young_orchard_establishment` were both left on `cell` during testing and ran
+that way until someone noticed. Neither body reads a cell-level value, so the
+extra 3177 evaluations asked a block-level question over and over.
+
+**Two things to fix, and they are separate.**
+
+1. Show the cost in the control: the block count against the cell count for
+   the current tenant, read before the save. A number on screen is the whole
+   point — "Per grid cell" does not tell anyone it means 3285.
+2. The tree row and the compiled body can disagree about scope, because
+   `update_tree` writes the row and nothing rewrites the body. The sweep reads
+   the row, so the row wins and the body's `scope` is vestigial after create.
+   Decide whether that is intended and say so in one place. The query that
+   finds a disagreement is
+
+   ```sql
+   SELECT t.code, t.scope, v.tree_compiled->>'scope'
+   FROM public.decision_trees t
+   JOIN public.decision_tree_versions v ON v.id = t.current_version_id
+   WHERE t.scope IS DISTINCT FROM COALESCE(v.tree_compiled->>'scope', 'block');
+   ```
+
+### H-3 — Two questions the trees-in-database plan left open
+
+Both were deliberately deferred, both now have running code to decide against.
+
+**Archiving a platform tree that tenants have copied.** A copy is an
+independent row with its own code, so it keeps running after the original is
+archived. Nobody is told. Decide whether the archive dialog should say how
+many tenant copies exist, and whether a platform admin may see that at all.
+
+**A tenant seeing the platform's version history for a tree they copied.**
+Decision 7 of the plan says a copy never moves and nothing tells the tenant it
+moved, which answers this for now by saying nothing. The cost is drift that no
+screen shows: a tenant who copied to change one threshold keeps every later
+platform fix out, for a whole season, silently. The copy dialog warns before
+the copy; nothing warns after.
+
+### H-4 — One pod has been in Error since before this work
+
+`stat6-18892` in namespace `agripulse` reads `0/1 Error`. It has no owner
+references, so no Deployment, Job or operator created it — someone applied it
+by hand. It is not part of any chart. Confirm it is unwanted and delete it, or
+name it somewhere so the next person does not have to ask.
+
+---
+
 ## Housekeeping backlog
 
 Small, bounded cleanups that fall out of shipped work. Deliberately **not**
