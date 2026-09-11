@@ -4261,6 +4261,28 @@ env:
   # SIM_TENANT_PREFIX in scripts/sim/.sim.env; Act 3 asserts on the dispatch
   # rows to prove suppression actually happened.
   NOTIFICATION_SINK_TENANT_PREFIX: "sim-"
+  # A block's health comes from what its decision trees said, not from an NDVI
+  # threshold. The rule lives in `app/shared/health_definition.py` and is read
+  # by two endpoints: the map/dock block summary and the Insights scorecard.
+  #
+  # The break points it replaces (0.40 / 0.55 in `app/shared/health.py`) were
+  # never agronomy — they came from a prototype frontend. NDVI measures canopy
+  # greenness, so a healthy wide-spaced mango orchard on desert soil averages
+  # under 0.40 and reads Critical for its whole life.
+  #
+  # Measured on prod before turning this on (2026-09-11, api 431d7fa, 108
+  # active blocks over 3 farms): 74 blocks change class. 63 critical -> watch,
+  # 5 critical -> healthy, 6 watch -> critical. No block reads Unknown,
+  # because the nightly sweep reaches every block on both live tenants.
+  #
+  # A tenant whose sweep does NOT reach every block will see Unknown where it
+  # saw Healthy. That is the truth arriving late, not a regression, but warn
+  # the tenant before it appears.
+  #
+  # Rollback is this one key back to "false". Nothing else changes: the NDVI
+  # path stays compiled in until `app/shared/health.py` and the flag are
+  # deleted together.
+  HEALTH_DEFINITION_ENABLED: "true"
 # Plain Secrets loaded via envFrom (ESO is off; these are hand-seeded). The
 # single shared overlay applies to every service chart, so api/workers/tile
 # all load both — harmless (same R2 account creds; unused keys are ignored).
