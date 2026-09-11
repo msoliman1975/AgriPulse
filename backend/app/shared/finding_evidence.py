@@ -88,6 +88,15 @@ _BARE_LABELS: dict[str, dict[str, str]] = {
     "ar": {"crop_path": "المحصول", "growth_stage": "مرحلة النمو"},
 }
 
+# Keys that are plumbing, not measurement. A reader asked "what did you
+# see?" is not answered by a UUID, and a raw
+# `cell_id: 01a0443c-e0fc-72b8-acba-879ed58093c7` went out in a real
+# recommendation email before this list existed.
+#
+# `source` and `index_code` are how the value was obtained rather than
+# what it was; the label beside the value already says which index.
+_NOT_EVIDENCE = frozenset({"cell_id", "block_id", "farm_id", "tree_id", "source", "index_code"})
+
 _NO_DATA = {"en": "no data", "ar": "لا توجد بيانات"}
 _TRUE = {"en": "yes", "ar": "نعم"}
 _FALSE = {"en": "no", "ar": "لا"}
@@ -192,7 +201,10 @@ def evidence_rows(
         # A nested object has no one-line reading. Printing `{'a': 1}` in a
         # fact table tells the reader less than leaving the row out, and
         # tells them it in a shape that looks like a bug.
-        and not isinstance(v, dict)
+        and not isinstance(v, dict) and k not in _NOT_EVIDENCE
+        # Anything else that is plainly an identifier. The engine is free to
+        # resolve new ones and none of them are ever an observation.
+        and not k.endswith("_id")
     )
     return [(evidence_label(k, locale), evidence_value(snapshot[k], locale)) for k in keys[:limit]]
 
