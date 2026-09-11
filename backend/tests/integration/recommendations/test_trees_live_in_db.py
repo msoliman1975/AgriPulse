@@ -563,3 +563,117 @@ async def test_copying_with_disable_original_turns_the_original_off(
     assert original["farms_running"] == 0, "the original stopped on every farm"
     copied = await _availability(tenant_id, schema, copy["code"])
     assert copied["farms_running"] == 2, "and the copy runs in its place"
+
+
+# ---- The catalogue follows the published version, not the latest draft ----
+
+
+async def _row_metadata(code: str) -> dict:
+    """Read the tree row itself, not the detail the API composes.
+
+    The row is what the catalogue list and the page header show, and it is the
+    thing these cases are about.
+    """
+    factory = AsyncSessionLocal()
+    async with factory() as session:
+        row = (
+            await session.execute(
+                text(
+                    "SELECT name_en, description_en FROM public.decision_trees "
+                    "WHERE code = :c AND tenant_id IS NULL"
+                ),
+                {"c": code},
+            )
+        ).one()
+    return {"name_en": row.name_en, "description_en": row.description_en}
+
+
+NAMED_TREE_YAML = """
+code: {code}
+name_en: {name}
+description_en: {desc}
+root: root
+nodes:
+  root:
+    outcome:
+      kind: status
+      status: good
+      text_en: Checked and fine.
+"""
+
+
+async def _author(code: str, *, name: str, desc: str, publish: bool) -> None:
+    factory = AsyncSessionLocal()
+    async with factory() as public_session, public_session.begin():
+        author = get_decision_trees_author_service(public_session=public_session, tenant_id=None)
+        body = NAMED_TREE_YAML.format(code=code, name=name, desc=desc)
+        existing = await author.get_tree_detail(code=code)
+        if existing is None:
+            await author.create_tree(code=code, crop_code=None, tree_yaml=body, actor_user_id=None)
+            version = 1
+        else:
+            detail = await author.append_version(
+                code=code, tree_yaml=body, notes=None, actor_user_id=None
+            )
+            version = max(v["version"] for v in detail["versions"])
+        if publish:
+            await author.publish_version(code=code, version=version, actor_user_id=None)
+
+
+async def test_saving_a_draft_does_not_rename_the_tree_in_the_catalogue() -> None:
+    """A draft is invisible until published. Its name has to be too.
+
+    The evaluator already honoured that; the catalogue did not. Saving a draft
+    renamed the tree in the list and in every reader's page header while the
+    engine still walked the published version.
+    """
+    code = f"draft_name_{uuid4().hex[:8]}"
+    await _author(code, name="Published name", desc="Published description.", publish=True)
+    assert (await _row_metadata(code))["name_en"] == "Published name"
+
+    # A draft, deliberately not published.
+    await _author(code, name="Draft name", desc="Draft description.", publish=False)
+
+    after = await _row_metadata(code)
+    assert after["name_en"] == "Published name", "a draft must not rename the live tree"
+    assert after["description_en"] == "Published description."
+
+
+async def test_publishing_a_version_stamps_its_name_on_the_tree() -> None:
+    code = f"publish_name_{uuid4().hex[:8]}"
+    await _author(code, name="First name", desc="First description.", publish=True)
+    await _author(code, name="Second name", desc="Second description.", publish=False)
+
+    # Still on the first while the second is a draft.
+    assert (await _row_metadata(code))["name_en"] == "First name"
+
+    factory = AsyncSessionLocal()
+    async with factory() as public_session, public_session.begin():
+        author = get_decision_trees_author_service(public_session=public_session, tenant_id=None)
+        await author.publish_version(code=code, version=2, actor_user_id=None)
+
+    after = await _row_metadata(code)
+    assert after["name_en"] == "Second name"
+    assert after["description_en"] == "Second description."
+
+
+async def test_republishing_an_earlier_version_restores_its_name() -> None:
+    """This is what makes "republish the previous version" a real rollback.
+
+    Without it, publishing v1 after v2 moved the engine back to v1 and left
+    v2's name and description on every screen, so the catalogue described a
+    version nothing was running.
+    """
+    code = f"rollback_name_{uuid4().hex[:8]}"
+    await _author(code, name="Good name", desc="Good description.", publish=True)
+    await _author(code, name="Bad name", desc="Bad description.", publish=True)
+    assert (await _row_metadata(code))["name_en"] == "Bad name"
+
+    factory = AsyncSessionLocal()
+    async with factory() as public_session, public_session.begin():
+        author = get_decision_trees_author_service(public_session=public_session, tenant_id=None)
+        await author.publish_version(code=code, version=1, actor_user_id=None)
+
+    after = await _row_metadata(code)
+    assert after["name_en"] == "Good name", "the rollback must restore the displayed name"
+    assert after["description_en"] == "Good description."
