@@ -1,0 +1,1281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgriPulse Forward Work</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap">
+<style>
+:root {
+  --ground: #f3f4f0;
+  --surface: #ffffff;
+  --surface-2: #eceee8;
+  --ink: #191d18;
+  --ink-2: #4b554b;
+  --ink-3: #788276;
+  --line: #d7dbd3;
+  --line-soft: #e5e8e1;
+  --accent: #356b30;
+  --accent-ink: #2a5626;
+  --accent-soft: #e2ebdf;
+  --amber: #8a6212;
+  --amber-soft: #f2e9d5;
+  --red: #963232;
+  --red-soft: #f3dedd;
+  --blue: #2f5a72;
+  --blue-soft: #dde8ee;
+  --shadow: 0 1px 2px rgba(25, 29, 24, .06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #12160f;
+    --surface: #1a1f18;
+    --surface-2: #222820;
+    --ink: #e7ebe2;
+    --ink-2: #a9b3a5;
+    --ink-3: #7d8879;
+    --line: #333b30;
+    --line-soft: #272e25;
+    --accent: #8bbd7f;
+    --accent-ink: #a8d29d;
+    --accent-soft: #26331f;
+    --amber: #d9b268;
+    --amber-soft: #33290f;
+    --red: #d99490;
+    --red-soft: #351f1e;
+    --blue: #94bdd3;
+    --blue-soft: #1c2b33;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #12160f;
+  --surface: #1a1f18;
+  --surface-2: #222820;
+  --ink: #e7ebe2;
+  --ink-2: #a9b3a5;
+  --ink-3: #7d8879;
+  --line: #333b30;
+  --line-soft: #272e25;
+  --accent: #8bbd7f;
+  --accent-ink: #a8d29d;
+  --accent-soft: #26331f;
+  --amber: #d9b268;
+  --amber-soft: #33290f;
+  --red: #d99490;
+  --red-soft: #351f1e;
+  --blue: #94bdd3;
+  --blue-soft: #1c2b33;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "Newsreader", Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 24px 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 44px;
+}
+
+/* ---------- masthead ---------- */
+.mast { display: flex; flex-direction: column; gap: 18px; }
+.eyebrow {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+h1 {
+  font-family: "Archivo", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(30px, 4.6vw, 46px);
+  line-height: 1.05;
+  letter-spacing: -.022em;
+  margin: 0;
+  text-wrap: balance;
+}
+.standfirst {
+  max-width: 66ch;
+  font-size: 18px;
+  color: var(--ink-2);
+  margin: 0;
+}
+.meta {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--ink-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+/* ---------- counts ---------- */
+.counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.count { background: var(--surface); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.count b {
+  font-family: "Archivo", system-ui, sans-serif;
+  font-size: 26px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.count span {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* ---------- nav ---------- */
+nav.toc { display: flex; flex-wrap: wrap; gap: 8px; }
+nav.toc a {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  text-decoration: none;
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 6px 11px;
+}
+nav.toc a:hover { color: var(--accent-ink); border-color: var(--accent); }
+nav.toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- how to read ---------- */
+.legend {
+  border-left: 3px solid var(--accent);
+  padding: 4px 0 4px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 78ch;
+}
+.legend p { margin: 0; color: var(--ink-2); font-size: 16px; }
+.legend dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 14px;
+  font-size: 15px;
+}
+.legend dt {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--ink);
+  padding-top: 3px;
+}
+.legend dd { margin: 0; color: var(--ink-2); }
+
+/* ---------- sections ---------- */
+section { display: flex; flex-direction: column; gap: 14px; }
+h2 {
+  font-family: "Archivo", system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: -.012em;
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  text-wrap: balance;
+}
+h2 .tag {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .1em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+.lede { margin: 0; max-width: 74ch; color: var(--ink-2); font-size: 16px; }
+
+/* ---------- tables ---------- */
+.scroller {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+table { border-collapse: collapse; width: 100%; min-width: 940px; }
+thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-weight: 500;
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  text-align: left;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--surface-2); }
+td.name {
+  font-family: "Archivo", system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 14.5px;
+  color: var(--ink);
+  width: 20%;
+  min-width: 160px;
+}
+td.name .ref {
+  display: block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-top: 3px;
+}
+td.desc { width: 34%; min-width: 260px; }
+td.deps { width: 17%; min-width: 150px; font-size: 14px; }
+td.deps.none { color: var(--ink-3); }
+td.size, td.state { width: 1%; white-space: nowrap; }
+td.doc {
+  width: 20%;
+  min-width: 190px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  word-break: break-word;
+}
+
+/* ---------- badges ---------- */
+.size {
+  display: inline-block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: .06em;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+.size.s { border-color: var(--accent); color: var(--accent-ink); }
+.size.m { border-color: var(--amber); color: var(--amber); }
+.size.l { border-color: var(--red); color: var(--red); }
+
+.state {
+  display: inline-block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.state.notstarted { background: var(--surface-2); color: var(--ink-3); }
+.state.written { background: var(--blue-soft); color: var(--blue); }
+.state.review { background: var(--blue-soft); color: var(--blue); }
+.state.merged { background: var(--accent-soft); color: var(--accent-ink); }
+.state.blocked { background: var(--red-soft); color: var(--red); }
+.state.decision { background: var(--amber-soft); color: var(--amber); }
+
+.prio {
+  display: inline-block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  margin-right: 4px;
+}
+.prio.high { border-color: var(--red); color: var(--red); }
+.prio.med { border-color: var(--amber); color: var(--amber); }
+.prio.low { border-color: var(--line); color: var(--ink-3); }
+
+/* ---------- decision list ---------- */
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.decision { background: var(--surface); padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
+.decision h3 {
+  font-family: "Archivo", system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--ink);
+}
+.decision p { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+.decision .who {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--ink-3);
+  letter-spacing: .05em;
+}
+
+/* ---------- caution ---------- */
+.caution {
+  background: var(--amber-soft);
+  border: 1px solid var(--amber);
+  padding: 14px 18px;
+  font-size: 15.5px;
+  color: var(--ink);
+  max-width: 82ch;
+}
+.caution b { font-family: "Archivo", system-ui, sans-serif; font-weight: 600; }
+
+footer {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  line-height: 1.7;
+}
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .wrap { padding: 28px 16px 72px; gap: 34px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header class="mast">
+  <div class="eyebrow">AgriPulse · planning register</div>
+  <h1>Forward work: everything planned, designed, or awaiting a decision</h1>
+  <p class="standfirst">One table of every capability that is written down but not finished. It gathers the build roadmap prompts, the design proposals, the recorded backlogs, and the two newest pieces of work: Brazilian coffee and Portuguese as a third language.</p>
+  <div class="meta">
+    <span>Compiled 2026-09-08</span>
+    <span>Extended 2026-09-11 &mdash; frost and grid sizing</span>
+    <span>Extended 2026-09-11 &mdash; settings, navigation and console revision</span>
+    <span>Read against origin/main f26355e6</span>
+    <span>86 items</span>
+    <span>Status from the project notes, not re-checked on the server</span>
+  </div>
+</header>
+
+<div class="counts">
+  <div class="count"><b>86</b><span>Items</span></div>
+  <div class="count"><b>68</b><span>Not started</span></div>
+  <div class="count"><b>6</b><span>Started, unfinished</span></div>
+  <div class="count"><b>3</b><span>Merged, not running</span></div>
+  <div class="count"><b>4</b><span>Blocked</span></div>
+  <div class="count"><b>8</b><span>Open decisions</span></div>
+</div>
+
+<nav class="toc">
+  <a href="#brazil">1 · Brazil and coffee</a>
+  <a href="#lang">2 · Languages</a>
+  <a href="#prompts">3 · Roadmap prompts</a>
+  <a href="#agronomy">4 · Agronomy and planning</a>
+  <a href="#commercial">5 · Commercial</a>
+  <a href="#platform">6 · Platform and identity</a>
+  <a href="#ux">7 · Screens and polish</a>
+  <a href="#imagery">8 · Imagery and weather</a>
+  <a href="#console">9 · Settings and console</a>
+  <a href="#decisions">10 · Open decisions</a>
+</nav>
+
+<div class="legend">
+  <p>Each row names one capability, what it does, what must land first, how large it is, where it stands, and which document holds the detail.</p>
+  <dl>
+    <dt>S / M / L</dt>
+    <dd>Effort size. S is days, M is one to three weeks, L is more than three weeks or needs a data-model change. These are judgement, not measured estimates.</dd>
+    <dt>Status</dt>
+    <dd>Not started, Written (code exists on a branch only), In review, Merged, Blocked, or Decision needed.</dd>
+    <dt>Priority</dt>
+    <dd>Shown as a chip under the capability name, on the rows where a priority has been set. Most rows predate this and carry none. Priority is what to do next; size is how long it takes. They are different questions.</dd>
+    <dt>Doc</dt>
+    <dd>A path inside this repository, or a memory note. Paths are text, not links, because the files are local.</dd>
+  </dl>
+</div>
+
+<div class="caution"><b>Caution:</b> two different Prompt 8 documents exist. The working tree on <code>feat/rbac-page-density</code> holds "Prompt 8 — Subscription, billing and the self-serve trial". The branch <code>docs/roadmap-prompt-10</code> holds "Prompt 8 — Agronomic depth: the Egyptian organic mango ruleset", plus Prompts 9, 10 and 11. Neither set is on <code>origin/main</code>, which stops at Prompt 7. Merge PR #544 and renumber before anyone cites a prompt number.</div>
+
+<!-- ============ 1 ============ -->
+<section id="brazil">
+  <h2>Brazil and coffee <span class="tag">new work · 2026-09-07</span></h2>
+  <p class="lede">A market-entry study mapped Brazilian coffee onto the platform. Seven of the ten proposed decision trees need no new platform capability. The rows here are what a Brazilian pilot cannot start without, plus the items the study ranked as high value.</p>
+  <div class="scroller">
+  <table>
+    <thead><tr><th>Capability</th><th>What it is</th><th>Depends on</th><th>Size</th><th>Status</th><th>Doc</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="name">Coffee crop catalogue<span class="ref">Brazil stage 1</span></td>
+        <td class="desc">Coffee as a first-class crop: taxonomy paths, cultivars (Catuaí, Mundo Novo, Catucaí, Arara, IPR, conilon clone groups), the crop attribute set, per-crop thresholds and phenology stages. There is no <code>coffee</code> string anywhere in the backend or frontend today.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/brazil-coffee-market-guide.html</td>
+      </tr>
+      <tr>
+        <td class="name">Coffee decision trees<span class="ref">7 trees, no new platform work</span></td>
+        <td class="desc">Berry borer, water stress, frost, patch anomaly, post-harvest recovery, uneven ripening and hail. Each is an existing seed pattern with a new crop path and new numbers. Frost reuses <code>potato_frost_risk_v1</code> and the existing <code>forecast_72h.air_temp_c_min</code> field. That gives a farm&#8209;wide frost warning for about a day of work. It does not give a per&#8209;cell one: see the five frost rows in section 8.</td>
+        <td class="deps">Coffee crop catalogue; coffee signal definitions</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/brazil-coffee-market-guide.html, part 08</td>
+      </tr>
+      <tr>
+        <td class="name">Turn on the health definition<span class="ref">B2</span></td>
+        <td class="desc">While <code>health_definition_enabled</code> is false, the fixed NDVI cutoffs of 0.40 and 0.55 label wide-spaced and recently pruned coffee wrongly. The replacement resolver is already merged, so this is a setting plus one coffee row in the crop health catalog.</td>
+        <td class="deps">Coffee crop catalogue</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state merged">Merged, flag off</span></td>
+        <td class="doc">memory: project_block_health_from_decision_trees</td>
+      </tr>
+      <tr>
+        <td class="name">Pruning state gates the index trees<span class="ref">B5</span></td>
+        <td class="desc">A stumped coffee block reads low on every index for a season. Health stops reading NDVI once the health definition is on, but an index tree that fires still opens an alert, and the alert still sets the block class. The index trees must read <code>last_pruning_date</code>.</td>
+        <td class="deps">Turn on the health definition; a pruning-date crop attribute</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/brazil-coffee-market-guide.html, part 09</td>
+      </tr>
+      <tr>
+        <td class="name">Southern-hemisphere season<span class="ref">B3</span></td>
+        <td class="desc">A season that crosses 31 December must not be split in plans, reports or baselines. Four parts of the system pick a season start independently today, and one of them resets growing degree days on the calendar year.</td>
+        <td class="deps">T-1 season decision (section 9)</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state decision">Decision needed</span></td>
+        <td class="doc">prompts/roadmap.md, topic T-1 (branch docs/roadmap-prompt-10)</td>
+      </tr>
+      <tr>
+        <td class="name">Brazilian units and formats<span class="ref">B4</span></td>
+        <td class="desc">Saca of 60 kg, sacas per hectare, comma as decimal separator, BRL, CPF and CNPJ identifiers, and CAR property codes.</td>
+        <td class="deps">Language registry (P1)</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/brazil-coffee-market-guide.html, part 09</td>
+      </tr>
+      <tr>
+        <td class="name">Rust and leaf-miner risk models</td>
+        <td class="desc">Two entries in the weather risk registry and two pure functions, in the same shape as the three mango models already there. The study rated this the best return on effort in its whole list.</td>
+        <td class="deps">Coffee crop catalogue</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/brazil-coffee-market-guide.html, part 09</td>
+      </tr>
+      <tr>
+        <td class="name">Event-anchored phenology</td>
+        <td class="desc">Let the flowering date be observed or detected, then offset the rest of the season from it. Coffee flowering is rain-triggered, so a fixed calendar stage list is wrong for it.</td>
+        <td class="deps">Phenology spine (section 4)</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/phenology-spine-and-stage-aware-planning.md</td>
+      </tr>
+      <tr>
+        <td class="name">Bearing-year-aware baselines</td>
+        <td class="desc">Coffee alternates heavy and light years. A baseline that compares a heavy year against the mean of both reads as an anomaly every other season. Compare heavy years against heavy years.</td>
+        <td class="deps">Coffee crop catalogue</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/brazil-coffee-market-guide.html, part 09</td>
+      </tr>
+      <tr>
+        <td class="name">Elevation as a condition source</td>
+        <td class="desc"><code>farms.elevation_m</code> and <code>blocks.elevation_m</code> are real columns, but <code>BLOCK_FIELDS</code> holds only <code>growth_stage</code>, <code>soil_texture</code> and <code>salinity_class</code>, so no decision tree can read elevation. Frost risk on coffee needs it.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_brazil_coffee_market_guide</td>
+      </tr>
+      <tr>
+        <td class="name">Coffee signal definitions and scout templates</td>
+        <td class="desc">Pest count and fruit quality signal definitions at platform scope, plus scouting templates, so the seven trees have inputs a field agent can record.</td>
+        <td class="deps">Signals platform tier (already approved); coffee crop catalogue</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/signals-platform-tier-implementation.md</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="lang">
+  <h2>Languages: Portuguese and the ones after it <span class="tag">new work · 2026-09-07</span></h2>
+  <p class="lede">Adding Portuguese is four separate pieces of work that share one design. Phases P1 to P7 are the same work whatever the next language is; Portuguese appears only at P8. Each phase is one pull request and each is deployable on its own.</p>
+  <div class="scroller">
+  <table>
+    <thead><tr><th>Capability</th><th>What it is</th><th>Depends on</th><th>Size</th><th>Status</th><th>Doc</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="name">One language registry<span class="ref">P1</span></td>
+        <td class="desc">The supported-language list exists in four places that disagree. Adding <code>pt</code> to <code>shared/i18n.py</code> alone means the middleware rewrites the value back to <code>en</code> on every request, without showing any error. Delete the three duplicate lists and add the grep test.</td>
+        <td class="deps none">None. Nothing else in this section may start first.</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/portuguese-and-generic-localization.md</td>
+      </tr>
+      <tr>
+        <td class="name">Web app locale helper<span class="ref">P2</span></td>
+        <td class="desc">116 uses of <code>isAr = i18n.language === "ar"</code> across 39 files. Each returns English for any third language, without showing any error. Replace all of them with a <code>useLocalized</code> helper and add an ESLint rule that fails on the pattern.</td>
+        <td class="deps">P1</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/portuguese-and-generic-localization.md §7</td>
+      </tr>
+      <tr>
+        <td class="name">Request language resolution<span class="ref">P3</span></td>
+        <td class="desc">A <code>current_language()</code> dependency and a <code>resolve()</code> function, fed by <code>Accept-Language</code> from both the web app and Scout, with write-through to <code>user_preferences.language</code>.</td>
+        <td class="deps">P1</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state decision">Decision needed (Q1)</span></td>
+        <td class="doc">docs/proposals/portuguese-and-generic-localization.md §4</td>
+      </tr>
+      <tr>
+        <td class="name">Catalogue tables to JSONB<span class="ref">P4</span></td>
+        <td class="desc">Convert 8 public catalogue tables from <code>x_en</code> and <code>x_ar</code> column pairs to one JSONB map per field, with a CHECK that <code>en</code> is present. Split consumer and authoring schemas. Sort by the reader's language: six read paths order by the English column today.</td>
+        <td class="deps">P2, P3</td>
+        <td class="size"><span class="size l">L</span></td>
+        <td class="state"><span class="state decision">Decision needed (Q3)</span></td>
+        <td class="doc">docs/proposals/portuguese-and-generic-localization.md §2, §9</td>
+      </tr>
+      <tr>
+        <td class="name">Tenant text tables to JSONB<span class="ref">P5</span></td>
+        <td class="desc">The same conversion for four tenant tables: <code>recommendations</code>, <code>alerts</code>, <code>decision_tree_block_verdicts</code>, and the <code>actions</code> JSONB that copies leaf text at write time.</td>
+        <td class="deps">P4</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/portuguese-and-generic-localization.md §6</td>
+      </tr>
+      <tr>
+        <td class="name">Decision tree text map<span class="ref">P6</span></td>
+        <td class="desc">Node labels are <code>label_en</code> and <code>label_ar</code> inside compiled JSONB, and version rows are immutable, so the reader must accept both shapes for ever. Change the YAML shape, teach the loader both, convert 37 seed files.</td>
+        <td class="deps">P5</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/portuguese-and-generic-localization.md §5</td>
+      </tr>
+      <tr>
+        <td class="name">Per-tenant language list<span class="ref">P7</span></td>
+        <td class="desc"><code>tenants.available_locales</code>, a CHECK on it, and a language picker that reads it, so an Egyptian tenant is not offered Portuguese.</td>
+        <td class="deps">P1</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/portuguese-and-generic-localization.md §10</td>
+      </tr>
+      <tr>
+        <td class="name">Add Portuguese<span class="ref">P8</span></td>
+        <td class="desc">One registry entry, a <code>pt.ts</code> file for Scout, 30 Portuguese namespace files for the web app, and a coverage endpoint that shows which language a value fell back to.</td>
+        <td class="deps">P1 to P7</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state decision">Decision needed (Q2)</span></td>
+        <td class="doc">docs/proposals/portuguese-and-generic-localization.md §11</td>
+      </tr>
+      <tr>
+        <td class="name">Portuguese words<span class="ref">not an engineering task</span></td>
+        <td class="desc">5,684 known strings: 4,681 interface strings across 30 namespace files, 162 in the Scout catalogue, and 841 in decision tree and health seeds. The 841 are agronomic advice and need a reviewer who knows both the language and the crop. Database catalogue rows are not counted yet.</td>
+        <td class="deps">P8</td>
+        <td class="size"><span class="size l">L</span></td>
+        <td class="state"><span class="state blocked">Blocked: no named translator</span></td>
+        <td class="doc">docs/proposals/portuguese-and-generic-localization.md, Volume of translation</td>
+      </tr>
+      <tr>
+        <td class="name">Arabic gaps, PR-2 and PR-3</td>
+        <td class="desc">The English-Arabic dictionary is clean across 24 namespaces. The remaining gap is English text written straight into JSX in a few live components, including the shared grid cell popup. PR-1 is done.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/arabic-i18n-gap-worklist.md</td>
+      </tr>
+      <tr>
+        <td class="name">Arabic account email</td>
+        <td class="desc">The Keycloak realm has <code>internationalizationEnabled</code> unset and the email theme has <code>locales=en</code>, so every account email is English. Add <code>messages_ar.properties</code> to both themes and to the Dockerfile assertion list.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">prompts/roadmap.md, Prompt 10 track 2</td>
+      </tr>
+      <tr>
+        <td class="name">One date format source</td>
+        <td class="desc">57 date-formatting calls across 34 files read the locale from four different sources. Mohamed chose <code>navigator.languages[0]</code> as the single source on 2026-08-21.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">prompts/roadmap.md, Prompt 10 track 5</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="prompts">
+  <h2>Roadmap prompts <span class="tag">the discipline document</span></h2>
+  <p class="lede">Prompts 1 to 6 are finished. Prompt 7 is a merged plan with no code. Prompts 8 to 11 and the topics list live on the branch <code>docs/roadmap-prompt-10</code> (PR #544), which is not merged, so <code>origin/main</code> still stops at Prompt 7.</p>
+  <div class="scroller">
+  <table>
+    <thead><tr><th>Capability</th><th>What it is</th><th>Depends on</th><th>Size</th><th>Status</th><th>Doc</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="name">Merge the roadmap branch<span class="ref">PR #544</span></td>
+        <td class="desc">Prompts 8, 9, 10, 11 and the "Topics awaiting a decision" section exist only on that branch. Until it merges, anyone reading <code>origin/main</code> sees a roadmap that ends at Prompt 7 and will not find the work described here.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state review">In review</span></td>
+        <td class="doc">branch docs/roadmap-prompt-10</td>
+      </tr>
+      <tr>
+        <td class="name">Product and engagement telemetry<span class="ref">Prompt 7</span></td>
+        <td class="desc">Measure what people use. The plan is merged as PR #349 and the scope is locked, but no implementation code exists. The module is called <code>telemetry</code>, not <code>analytics</code>.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size l">L</span></td>
+        <td class="state"><span class="state merged">Plan merged, no code</span></td>
+        <td class="doc">docs/proposals/product-telemetry-plan.md</td>
+      </tr>
+      <tr>
+        <td class="name">Subscription, billing and self-serve trial<span class="ref">Prompt 8, working-tree version</span></td>
+        <td class="desc">A <code>billing</code> module over the existing <code>public.tenant_subscriptions</code> table. Tier enforcement is the real build: <code>feature_flags</code> on that table is read by nothing today. The self-serve trial API is deployed; the approval queue, the price list, the meter and the entitlement gate are not.</td>
+        <td class="deps">Platform billing admin role; approval queue screen</td>
+        <td class="size"><span class="size l">L</span></td>
+        <td class="state"><span class="state review">In progress</span></td>
+        <td class="doc">docs/proposals/subscription-billing-and-self-serve-trial.md</td>
+      </tr>
+      <tr>
+        <td class="name">Egyptian organic mango ruleset<span class="ref">Prompt 8, branch version</span></td>
+        <td class="desc">Make a 27-page agronomic manual expressible as configuration. Adds four action types (<code>thin</code>, <code>protect</code>, <code>pollinate</code>, <code>harvest</code>), two condition sources, six pest-count and five fruit-quality signal definitions, phenology overrides for four cultivars, and recalibrates the anthracnose model from 24-30 °C to the manual's 18-26 °C.</td>
+        <td class="deps">Signals platform tier; phenology stage authoring</td>
+        <td class="size"><span class="size l">L</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">prompts/roadmap.md, Prompt 8 (branch)</td>
+      </tr>
+      <tr>
+        <td class="name">Tenant and farm defaults<span class="ref">Prompt 9</span></td>
+        <td class="desc">Three settings keys are accepted by the admin screen and read by no runtime code. Seven new farm-default keys, then <code>create_farm</code> provisions an imagery subscription, a weather subscription and both grid columns in one transaction. Adds a CI test that fails when a default has no reader.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">prompts/roadmap.md, Prompt 9 (branch)</td>
+      </tr>
+      <tr>
+        <td class="name">Onboarding<span class="ref">Prompt 10</span></td>
+        <td class="desc">Five tracks: record why provisioning failed instead of one fixed sentence; make <code>retry_provisioning</code> use the single invite path, since today it can set a tenant active with no user row; Arabic account email; a first-run checklist in place of one empty card; and one date format source.</td>
+        <td class="deps">Prompt 9 for the first-run track only</td>
+        <td class="size"><span class="size l">L</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">prompts/roadmap.md, Prompt 10 (branch)</td>
+      </tr>
+      <tr>
+        <td class="name">Farms outside Egypt<span class="ref">Prompt 11</span></td>
+        <td class="desc">A country check blocks any farm outside Egypt, and it is also the only thing keeping a wrong area out of the database, because UTM zone 32636 is written as a literal. Add <code>farms.utm_srid</code>, derive the zone from the boundary, and replace both trigger functions. This is a prerequisite for Brazil.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state review">In review, PR #547</span></td>
+        <td class="doc">prompts/roadmap.md, Prompt 11 (branch)</td>
+      </tr>
+      <tr>
+        <td class="name">Housekeeping: orphan i18n keys</td>
+        <td class="desc">Delete <code>expectedHarvestStart</code> and <code>expectedHarvestEnd</code> from the English and Arabic farms namespace. No component reads either key. Rides along with the next frontend change in that area.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">prompts/roadmap.md, Housekeeping backlog</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="agronomy">
+  <h2>Agronomy, plans and decision trees <span class="tag">designed, not built</span></h2>
+  <p class="lede">These proposals are written and in several cases approved. None is finished. Two of them are held up by the same missing number: a plant count per block.</p>
+  <div class="scroller">
+  <table>
+    <thead><tr><th>Capability</th><th>What it is</th><th>Depends on</th><th>Size</th><th>Status</th><th>Doc</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="name">Phenology spine and stage-aware planning</td>
+        <td class="desc">Phenology stages become a validated model owned by the crop taxonomy, canopy size becomes a taxonomy lookup, growth stage advances daily with a per-block lock, and plan template activities anchor to stage codes instead of week numbers.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size l">L</span></td>
+        <td class="state"><span class="state notstarted">Approved, not started</span></td>
+        <td class="doc">docs/proposals/phenology-spine-and-stage-aware-planning.md</td>
+      </tr>
+      <tr>
+        <td class="name">Quantified plan procedures and work orders</td>
+        <td class="desc">The 17 live plan templates say what and when but never how much. Turn free-text dosage into a rate of <code>{value, unit, basis}</code> over five bases, and print a crew work order. The Egyptian pesticide register is extracted: 753 rows for our three crops.</td>
+        <td class="deps">Return <code>plant_count</code> and canopy diameter as block columns</td>
+        <td class="size"><span class="size l">L</span></td>
+        <td class="state"><span class="state blocked">Blocked</span></td>
+        <td class="doc">docs/proposals/quantified-plan-procedures-and-work-orders.md</td>
+      </tr>
+      <tr>
+        <td class="name">Return plant count and canopy diameter</td>
+        <td class="desc">Migration 0061 dropped <code>plant_density_per_ha</code>, <code>row_spacing_m</code> and <code>plant_spacing_m</code> as unused. A per-plant rate cannot resolve without a plant count, and the crop-attribute system that replaced them is tenant-authored, so a platform template cannot depend on it. The count must return as a column.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/quantified-plan-procedures-and-work-orders.md</td>
+      </tr>
+      <tr>
+        <td class="name">Decision tree status verdicts</td>
+        <td class="desc">A terminal node leaves a record even when nothing is wrong, so a user is told "everything is fine" instead of seeing the same blank as a tree that was skipped or never ran. Merged as PR #643 on main at <code>0af9a38</code>, not promoted to production.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state merged">Merged, not promoted</span></td>
+        <td class="doc">docs/proposals/decision-tree-status-verdicts.md</td>
+      </tr>
+      <tr>
+        <td class="name">Decision tree multi-axis targeting</td>
+        <td class="desc">A tree targets exactly one crop today, by free-text crop code, with no location or soil targeting. Add country targeting through a <code>public.countries</code> catalog and reuse the existing seven-value soil texture list.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Proposed</span></td>
+        <td class="doc">docs/proposals/decision-tree-targeting-and-authoring-improvements.md</td>
+      </tr>
+      <tr>
+        <td class="name">Decision tree visual editor</td>
+        <td class="desc">Compose a tree without writing YAML by hand: generate valid YAML, load existing trees from <code>public.decision_trees</code> for editing, and keep one source of truth. Mohamed deferred the coding deliberately.</td>
+        <td class="deps">Multi-axis targeting</td>
+        <td class="size"><span class="size l">L</span></td>
+        <td class="state"><span class="state notstarted">Deferred</span></td>
+        <td class="doc">memory: project_decision_tree_authoring_ux</td>
+      </tr>
+      <tr>
+        <td class="name">Leaf action type validated at authoring<span class="ref">finding F3</span></td>
+        <td class="desc">A leaf action type is free text in the loader and the editor, but a CHECK constraint with eight values at insert. A recommendation leaf authored <code>inspect</code> saves and publishes, then fails the first time it fires. Three seed leaves already use <code>inspect</code> and survive only because they are alert leaves.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_session_findings_backlog, F3</td>
+      </tr>
+      <tr>
+        <td class="name">Custom signals CS-15 and CS-16</td>
+        <td class="desc">The last two items of the Custom Signals V2 list. CS-9 to CS-14 are on main. CS-15 splits the <code>signal.define</code> capability.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/prompts/custom-signals/</td>
+      </tr>
+      <tr>
+        <td class="name">Recommendation and alert presentation gaps</td>
+        <td class="desc">A recorded list of defects in how recommendations and alerts are shown, audited against the code on 2026-08-09, to be fixed alongside the Action Center.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_rec_alert_presentation_gaps</td>
+      </tr>
+      <tr>
+        <td class="name">Mango index guide to trees</td>
+        <td class="desc">Turn the mango index guide into authored decision trees. Recorded as open work in the project notes.</td>
+        <td class="deps">Mango ruleset (Prompt 8, branch)</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_mango_index_guide_trees</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="commercial">
+  <h2>Commercial and go-to-market <span class="tag">sales-facing</span></h2>
+  <p class="lede">Work that exists to win or keep a customer rather than to run a farm. The Brazil study named plot export as the commercial opening for that market.</p>
+  <div class="scroller">
+  <table>
+    <thead><tr><th>Capability</th><th>What it is</th><th>Depends on</th><th>Size</th><th>Status</th><th>Doc</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="name">Plot polygon export for EU compliance</td>
+        <td class="desc">Geometry per plot, area, farm identifier and a stable plot code, in the shape an EU deforestation due-diligence filing needs. We already hold the geometry, so this is a report, not a platform change. The study called it the commercial opening for Brazil.</td>
+        <td class="deps">Reports module (built)</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/brazil-coffee-market-guide.html, part 09</td>
+      </tr>
+      <tr>
+        <td class="name">Demo farm with generated history</td>
+        <td class="desc">One farm whose activities, tree runs, recommendations and alerts read as months old, so a prospect or trial visitor does not open an empty product. Three commits exist on branch <code>feat/demo-farm-history</code> and are not pushed.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state written">Written, not pushed</span></td>
+        <td class="doc">docs/proposals/demo-farm-history-generation.md</td>
+      </tr>
+      <tr>
+        <td class="name">Trial approval queue screen</td>
+        <td class="desc">No tenant schema exists until a named platform admin approves. The screen needs capacity numbers, not only rows: approved today and this week against caps of 3 a day and 10 a week, live trials, farms and feddan under trial, queue depth, oldest wait, and failed provisioning.</td>
+        <td class="deps">Self-serve trial API (deployed)</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/self-serve-trial-flow.md</td>
+      </tr>
+      <tr>
+        <td class="name">Nine trial and billing emails</td>
+        <td class="desc">Approve, pause, reject, chase and the rest, all on the notifications SMTP path. That path has never sent an email to a person outside a tenant, and nobody has confirmed a welcome email arrived.</td>
+        <td class="deps">Prove the mail path (Prompt 10)</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/self-serve-trial-flow.md</td>
+      </tr>
+      <tr>
+        <td class="name">Pricing page on the marketing site</td>
+        <td class="desc">Parked at <code>marketing/src/pages/_pricing.astro.parked</code> on purpose, because selling is demo-led today. It becomes live work when the price list exists.</td>
+        <td class="deps">Billing price list</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Parked on purpose</span></td>
+        <td class="doc">marketing/README.md</td>
+      </tr>
+      <tr>
+        <td class="name">LGPD review</td>
+        <td class="desc">Brazil's data protection law covers the personal data of members and workers, which a cooperative deployment holds a lot of. This is a legal review with engineering follow-up, not a build.</td>
+        <td class="deps">A Brazilian pilot</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/brazil-coffee-market-guide.html, part 09</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="platform">
+  <h2>Platform, identity and access <span class="tag">plumbing</span></h2>
+  <div class="scroller">
+  <table>
+    <thead><tr><th>Capability</th><th>What it is</th><th>Depends on</th><th>Size</th><th>Status</th><th>Doc</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="name">Tenant-level workers and equipment</td>
+        <td class="desc">Promote workers and equipment from farm-locked to tenant-level with a farm-availability set. Five waves were planned. It sits upstream of the Scout mobile gaps, not beside them.</td>
+        <td class="deps">Change <code>uq_resources_farm_kind_active_name</code>, which is tenant-wide today</td>
+        <td class="size"><span class="size l">L</span></td>
+        <td class="state"><span class="state blocked">Blocked</span></td>
+        <td class="doc">docs/proposals/scout-identity-and-resource-promotion-plan.html</td>
+      </tr>
+      <tr>
+        <td class="name">Farm-scoped access, one writer</td>
+        <td class="desc">One fact about a Scout's farm access is stored in four tables and no writer sets all four, so farm-scoped requests return 403 for people who should have access. Recorded as a recurring problem, not a one-off bug.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_scout_access_control_review</td>
+      </tr>
+      <tr>
+        <td class="name">Decision tree read permission for all roles</td>
+        <td class="desc">Five of eight roles lack <code>decision_tree.read</code>, so the evaluation trace on the Farm Health View returns 403 for them.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_health_map_screen</td>
+      </tr>
+      <tr>
+        <td class="name">Keycloak login theme and email templates</td>
+        <td class="desc">A full custom login theme plus the invitation, forgot-password and notification templates. The visual design is locked and the mockup is the reference. Mohamed wants to co-design the login page.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/login-mockups/option-1-field.html</td>
+      </tr>
+      <tr>
+        <td class="name">Prove the account mail path</td>
+        <td class="desc">Add a test send to the promote job, or an admin endpoint that sends one email and reports the result. Nobody currently knows whether a welcome email arrives.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">prompts/roadmap.md, Prompt 10 track 2</td>
+      </tr>
+      <tr>
+        <td class="name">Platform billing admin role</td>
+        <td class="desc"><code>BillingAdmin</code> is already a tenant role, so the platform pricing role must be a separate <code>PlatformBillingAdmin</code>. Adding a platform role touches eight places, including two copies of an allow-list and five <code>Literal</code> annotations.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/subscription-billing-and-self-serve-trial.md</td>
+      </tr>
+      <tr>
+        <td class="name">Farm-block config model, PR-2 to PR-4</td>
+        <td class="desc">The three-bucket inheritance model (farm-only, block-only, shared with a lock). PR-1 landed the columns and the renames; the resolver, the screens and the apply path did not.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/farm-block-config-model.md</td>
+      </tr>
+      <tr>
+        <td class="name">Delete the legacy farms surface</td>
+        <td class="desc">Remove <code>/labs/map-legacy</code> and its components. They are the reason the Arabic worklist has to say which files not to translate.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_nuke_legacy_farms</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="ux">
+  <h2>Screens, mobile and polish <span class="tag">smaller items</span></h2>
+  <div class="scroller">
+  <table>
+    <thead><tr><th>Capability</th><th>What it is</th><th>Depends on</th><th>Size</th><th>Status</th><th>Doc</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="name">Scout v2, stages 2 and 4</td>
+        <td class="desc">Stages 1 and 3 are deployed. Field flags are designed only. Note that <code>mobile/</code> ships as an APK with no CI, so merging a change reaches nobody until a build is made and installed.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/mobile-scouting-app-spec.md</td>
+      </tr>
+      <tr>
+        <td class="name">Attachment upload in production</td>
+        <td class="desc">Browser uploads to object storage were blocked for the platform's whole life for want of a CORS policy. The policy is now applied, but there are zero attachment rows in any production tenant, so the path has never been used by a person. On a photo-driven crop such as coffee this becomes a blocker.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not tested end to end</span></td>
+        <td class="doc">memory: project_r2_bucket_cors_missing</td>
+      </tr>
+      <tr>
+        <td class="name">Edit a farm boundary in the app</td>
+        <td class="desc"><code>PATCH /farms/{id}</code> already accepts a new boundary. Nothing in the frontend links to the edit route, and the form never reads the existing boundary, so a farm drawn wrongly can only be fixed by redrawing the whole outline.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">prompts/roadmap.md, Prompt 10 track 4</td>
+      </tr>
+      <tr>
+        <td class="name">First-run checklist</td>
+        <td class="desc">A new owner sees one card that says "Welcome, features coming soon" and, without the farm create permission, no action at all. Replace it with a checklist that reads live state.</td>
+        <td class="deps">Prompt 9 defaults</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">prompts/roadmap.md, Prompt 10 track 3</td>
+      </tr>
+      <tr>
+        <td class="name">Map opens already framed<span class="ref">finding F2</span></td>
+        <td class="desc">The farm map starts wide, then animates into the farm over 600 ms on every load. Make the first fit instant and keep the animation only for later farm switches.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_session_findings_backlog, F2</td>
+      </tr>
+      <tr>
+        <td class="name">Bulk grid rezone<span class="ref">PR3</span></td>
+        <td class="desc">The third part of bulk grid configuration across a farm's blocks. The threshold change and the valid-time change are done.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/bulk-grid-config-and-valid-time.md</td>
+      </tr>
+      <tr>
+        <td class="name">Console legend and tile scale</td>
+        <td class="desc">The legend shows 0.0 where it should show a value, and the tile request passes the wrong parameter name. Written, not pushed.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state written">Written, not pushed</span></td>
+        <td class="doc">memory: project_console_tile_scale_and_legend_zero</td>
+      </tr>
+      <tr>
+        <td class="name">Farm Console load time fix</td>
+        <td class="desc">A fix that takes the Farm Console load from about 7 seconds exists in the worktree <code>../MissionAgre-perf</code> and was never pushed.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state written">Written, not pushed</span></td>
+        <td class="doc">memory: project_farm_console_load_latency</td>
+      </tr>
+      <tr>
+        <td class="name">Two Farm Consoles, one nav label</td>
+        <td class="desc">Two console implementations drifted apart under one navigation label. Pick one and delete the other.</td>
+        <td class="deps">Delete the legacy farms surface</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_two_farm_consoles_drift</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="imagery">
+  <h2>Imagery, weather and data <span class="tag">pipeline</span></h2>
+  <div class="scroller">
+  <table>
+    <thead><tr><th>Capability</th><th>What it is</th><th>Depends on</th><th>Size</th><th>Status</th><th>Doc</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="name">Weather indices as first-class indices</td>
+        <td class="desc">Raw weather becomes a farm-level temporal index family, and its spatial expression becomes per-block disease and pest risk indices. Risk is a derived index computed like ET₀, not a decision tree; the tree consumes <code>weather_risk:*</code> and decides the action.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size l">L</span></td>
+        <td class="state"><span class="state notstarted">Designed, not started</span></td>
+        <td class="doc">docs/proposals/weather-indices-first-class.md</td>
+      </tr>
+      <tr>
+        <td class="name">PlanetScope 3 m imagery</td>
+        <td class="desc">Add 3 m imagery beside the existing 10 m Sentinel-2. There is no download entitlement on the account, so NDMI is not possible. Sentinel-2 itself now runs on the free Copernicus Data Space service.</td>
+        <td class="deps">A commercial imagery contract</td>
+        <td class="size"><span class="size l">L</span></td>
+        <td class="state"><span class="state blocked">Blocked</span></td>
+        <td class="doc">memory: project_planetscope_3m_integration</td>
+      </tr>
+      <tr>
+        <td class="name">Weather index forecast window</td>
+        <td class="desc">Weather indices project ahead of the present. Four separate blocks of code must change together; fixing any subset changes nothing on screen.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_weather_index_forecast</td>
+      </tr>
+      <tr>
+        <td class="name">Cloud figure on the date bar</td>
+        <td class="desc"><code>cloud_cover_pct</code> describes the whole 110 km satellite tile, not the farm, so it ranks usable days in the wrong order on the date bar.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_cloud_on_the_date_bar</td>
+      </tr>
+      <tr>
+        <td class="name">Colour past the farm border</td>
+        <td class="desc">Index colour stops at the farm border because TiTiler's algorithm registry is frozen. A clip-and-grid approach is written up.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_farm_border_clip_and_grid</td>
+      </tr>
+      <tr>
+        <td class="name">Index baseline z-score</td>
+        <td class="desc">The baseline deviation is null for every tree. A baseline needs three samples inside a plus or minus seven-day window of the day of year.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_index_baseline_deviation_null</td>
+      </tr>
+      <tr>
+        <td class="name">Frost night inputs<span class="ref"><span class="prio med">Medium</span> F1</span></td>
+        <td class="desc">Add <code>dew_point_2m</code>, <code>soil_temperature_0cm</code> and <code>soil_moisture_0_to_1cm</code> to the Open-Meteo request and to both hypertables, and add an 18:00-09:00 night window to the daily aggregation. Dew point sets the floor a clear calm night can cool to and is the second input to the FAO minimum-temperature equation. The current aggregation buckets by local calendar date, so one frost night is split across two rows.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/cell-level-frost-brazil-coffee.html</td>
+      </tr>
+      <tr>
+        <td class="name">Terrain layer on grid cells<span class="ref"><span class="prio med">Medium</span> F2</span></td>
+        <td class="desc">Load Copernicus DEM GLO-30 over the farm, compute elevation, slope, aspect, topographic position index and height above nearest drainage per cell, and reduce them to one stored <code>frost_offset_c</code>. Cold air pools in the low cells; a valley-bottom cell runs 2-4 &deg;C colder than a cell 20 m higher on a calm night. There is no elevation model anywhere in the backend today.</td>
+        <td class="deps none">None. Useful beyond frost.</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/cell-level-frost-brazil-coffee.html</td>
+      </tr>
+      <tr>
+        <td class="name">Cell-scoped weather for trees<span class="ref"><span class="prio med">Medium</span> F3</span></td>
+        <td class="desc">The crux of per-cell frost. Trees already support <code>scope: cell</code>, but <code>WeatherSnapshot</code> is built once per block from farm-keyed rows, so a cell-scoped tree reads the same temperature for all 4,000 cells. Add a <code>terrain</code> condition source so a leaf can compare the forecast minimum plus this cell's offset against a threshold.</td>
+        <td class="deps">Terrain layer on grid cells (F2)</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/cell-level-frost-brazil-coffee.html</td>
+      </tr>
+      <tr>
+        <td class="name">Coffee frost tree<span class="ref"><span class="prio med">Medium</span> F4</span></td>
+        <td class="desc">One YAML seed copied from <code>potato_frost_risk_v1</code>, with the coffee crop path and Arabica thresholds near -2 &deg;C. Ships a farm-wide coffee frost alert on its own, because the engine, the forecast field and the alert path all already work. Add <code>scope: cell</code> once F3 lands. Also decide whether <code>frost_threshold_c</code> becomes the crop-level fallback or is deleted: it appears only in a docstring and in tests.</td>
+        <td class="deps">Coffee crop catalogue (section 1). Cell scope needs F3.</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/cell-level-frost-brazil-coffee.html</td>
+      </tr>
+      <tr>
+        <td class="name">Cell size checked at save<span class="ref"><span class="prio med">Medium</span> F5 &middot; defect</span></td>
+        <td class="desc"><code>validate_cell_size</code> enforces the pixel rules (not finer than the native pixel, a whole multiple of it, at least four pixels per cell) but runs only on apply. The farm template validates <code>gt=0</code> and nothing else, so an illegal size is accepted at save and rejected after the user has typed the farm name to confirm a destructive rezone. Move the check to the template save and offer the legal set as a picker rather than a free number field.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">docs/proposals/cell-level-frost-brazil-coffee.html</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 9 ============ -->
+<section id="console">
+  <h2>Settings, navigation and console revision <span class="tag">new work · 2026-09-11</span></h2>
+  <p class="lede">Screens that were written against an older shape of the system and now describe it wrongly, plus the settings tabs that are still placeholders. Each row is small on its own; together they are what a new user reads first.</p>
+  <div class="scroller">
+  <table>
+    <thead><tr><th>Capability</th><th>What it is</th><th>Depends on</th><th>Size</th><th>Status</th><th>Doc</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="name">Imagery &amp; weather page says the wrong thing</td>
+        <td class="desc"><code>/config/imagery/:farmId</code> still heads its main table "Per-block subscriptions" and its subtitle still sends the reader to each block's detail page. Tenant migration 0074 moved fetching to one farm-level raster, so the page describes a model the system no longer uses. Restate what the page is for, then rewrite the strings in <code>imageryWeatherConfig.json</code>.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_farm_level_subscriptions</td>
+      </tr>
+      <tr>
+        <td class="name">Left navigation names</td>
+        <td class="desc">Read every label in <code>common.json → workspaceNav</code> against what its screen now does: Insights, Farm management, Action Center, Alerts, Recommendations, Signals, Plan, Timeline, Farm health, Reports. Three renames are already written and not merged — decision tree to agronomy rule, timeline to farm replay, farm management to farm map.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state written">Written, not merged (PR #544)</span></td>
+        <td class="doc">memory: project_ui_terminology_rename</td>
+      </tr>
+      <tr>
+        <td class="name">Say what a custom-signal template is</td>
+        <td class="desc">Configuration → Custom signals shows a Templates list with a heading and no explanation. A template is a named group of signal definitions recorded as one multi-value field form: the rows share a template code, an observation time, a block and a location, and are stored as one grouped submission. Put that sentence on the page, and ship a starter set of templates so the list is not empty on day one.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_custom_signals_plan</td>
+      </tr>
+      <tr>
+        <td class="name">Organization settings</td>
+        <td class="desc"><code>/settings/org</code> is a placeholder card reading "Tenant profile, branding, and policy. Coming soon." Build the tenant profile, the branding fields the emails and the login page need, and the tenant-level policy settings.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">frontend/src/i18n/locales/en/settings.json, placeholder.org</td>
+      </tr>
+      <tr>
+        <td class="name">Notifications settings as one home</td>
+        <td class="desc"><code>/settings/notifications</code> is a placeholder, while a per-user page already exists at <code>/account/notifications</code>. Make the settings tab the single home: tenant-wide defaults for every notification type, and a link to the personal page for "your notifications". Note that scheduled sweeps currently notify nobody, so the defaults screen needs the worker fix behind it to mean anything.</td>
+        <td class="deps">Scheduled sweeps must register subscribers</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_notification_digest_and_description</td>
+      </tr>
+      <tr>
+        <td class="name">Consolidate integration configuration</td>
+        <td class="desc">Two jobs. First, Integration health reads provider state but not the farm-level subscription configuration, so a farm with no subscription and a farm with a broken one read alike. Second, the gear menu opens a separate per-farm Imagery &amp; weather page while Settings → Integrations already has Weather, Imagery and Detection tabs. Fold them into one place.</td>
+        <td class="deps">Imagery &amp; weather page rewrite</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_integration_health_block_view_farm_path</td>
+      </tr>
+      <tr>
+        <td class="name">Name the detection threshold in the UI</td>
+        <td class="desc">The tenant integrations panel shows the raw key <code>grid.anomaly_z_threshold</code> in a text box with no label or unit. It is the grid anomaly sensitivity: how many standard deviations below the block's own cell mean a cell must sit, within one scene, to be flagged. Default 1.5; a per-block value in <code>grid_configs.anomaly_z_threshold</code> overrides it. Give it a name, a range and one line of help text.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">backend/app/modules/grid/anomaly.py</td>
+      </tr>
+      <tr>
+        <td class="name">Simplify the access model</td>
+        <td class="desc">Team, Workers, Field access, users, farm responsible and block responsible are six surfaces over one question: who may see and act on which farm and block. One fact is written in four tables and no single writer sets all four, which is why farm-scoped 403s keep coming back. Settle one model, then reduce the screens to it.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size l">L</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_scout_access_control_review</td>
+      </tr>
+      <tr>
+        <td class="name">Bulk updates: the other three types</td>
+        <td class="desc">The page is already built as a hub and lists five data types. Crop assignment and crop removal are live; irrigation, grid and subscriptions are listed and disabled. Build them, and decide whether responsibilities, valid-time windows and signal assignments join the list.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">frontend/src/modules/settings/pages/BulkUpdatesPage.tsx</td>
+      </tr>
+      <tr>
+        <td class="name">Cell configuration moves to the background</td>
+        <td class="desc">Cell size and the anomaly threshold are editable in three places: the block grid card, the farm zones panel and bulk grid configuration. A wrong cell size produces a grid that looks right and measures nothing. Decide the values in the system from block size and pixel size, and take the controls away from users.</td>
+        <td class="deps">Name the detection threshold in the UI</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_bulk_grid_config_farm_level</td>
+      </tr>
+      <tr>
+        <td class="name">A default farm per user</td>
+        <td class="desc">The active farm comes only from the <code>:farmId</code> segment in the URL. There is no stored preference, so every sign-in starts with no farm and the workspace nav rows are disabled until one is picked. Let a user set a default farm, and use it on sign-in and on any route that has no farm.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">frontend/src/hooks/useActiveFarm.ts</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 10 ============ -->
+<section id="decisions">
+  <h2>Open decisions <span class="tag">answer these before the work starts</span></h2>
+  <p class="lede">Each of these blocks a specific item in the tables. They are questions for Mohamed, not engineering tasks.</p>
+  <div class="decisions">
+    <div class="decision">
+      <h3>T-1 · Is a season a formal thing?</h3>
+      <p>There is no season entity. <code>season_label</code> is free text in two tables that do not reference each other, and four parts of the system pick a season start differently. An Egyptian winter crop already has its growing degree days reset on 1 January, in the middle of the crop.</p>
+      <p class="who">Blocks: southern-hemisphere season, bearing-year baselines, plan template dates</p>
+    </div>
+    <div class="decision">
+      <h3>Q1 · Where does the request language come from?</h3>
+      <p>The design assumes the <code>Accept-Language</code> header with the token claim as fallback. The alternatives are the token claim alone, which does not take effect until the token refreshes, or a database read on every request.</p>
+      <p class="who">Blocks: P3</p>
+    </div>
+    <div class="decision">
+      <h3>Q2 · Portuguese of Portugal or of Brazil?</h3>
+      <p>The code <code>pt</code> covers both and the words differ. If both are needed the registry needs <code>pt-BR</code> and <code>pt-PT</code>, and the resolver needs a region fallback step it does not have. This changes the translation contract, not the code.</p>
+      <p class="who">Blocks: P8</p>
+    </div>
+    <div class="decision">
+      <h3>Q3 · One release per table conversion, or two?</h3>
+      <p>Dropping the old columns in the same migration that adds the new one means the running pods cannot read the table during the rollout. Two releases per table is safe and takes the migration count from 12 to 24.</p>
+      <p class="who">Blocks: P4</p>
+    </div>
+    <div class="decision">
+      <h3>Q4 · Who writes the 841 seed strings?</h3>
+      <p>They are agronomic advice and cannot be machine translated without review by someone who knows the language and the crop. Name the person or the service before P8 starts, because P8 cannot finish without them.</p>
+      <p class="who">Blocks: Portuguese words</p>
+    </div>
+    <div class="decision">
+      <h3>Q5 · Can a platform admin edit Portuguese in the catalogue console?</h3>
+      <p>If yes, the authoring screens in P4 need a language tab per field. That is design work nobody has done.</p>
+      <p class="who">Blocks: P4 authoring screens</p>
+    </div>
+    <div class="decision">
+      <h3>Mixed-clone conilon blocks</h3>
+      <p>Does the clone group become the variety, or does the block carry a list attribute? This sits upstream of coffee phenology and harvest planning.</p>
+      <p class="who">Blocks: coffee crop catalogue</p>
+    </div>
+    <div class="decision">
+      <h3>Do we take on frost properly?</h3>
+      <p>Doing it well needs terrain data we do not have. Doing it badly, on a crop where frost is the catastrophic risk, damages trust. The free frost tree uses forecast air temperature only.</p>
+      <p class="who">Blocks: coffee frost tree scope</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div>Sources: prompts/roadmap.md on origin/main and on branch docs/roadmap-prompt-10 · 42 files in docs/proposals/ · the project memory notes.</div>
+  <div>Status words follow the fixed list: Not started, In progress, Written, In review, Merged, Deployed, Checked, Blocked, Stopped. No row here is marked Deployed or Checked, because every row is unfinished work.</div>
+  <div>Effort sizes are judgement, not measured estimates. Statuses are copied from the notes and the branch listing; they were not re-checked on the production server.</div>
+</footer>
+
+</div>
+</body>
+</html>
