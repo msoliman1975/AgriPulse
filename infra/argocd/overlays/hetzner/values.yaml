@@ -3661,9 +3661,9 @@ global:
     #   Rollback is these three tags back to e0ea9c7 (api, workers) and
     #   8d2d866 (frontend). Nothing to undo in the database.
     api:
-      tag: "b91b2a3"
+      tag: "9ccdff2"
     workers:
-      tag: "b91b2a3"
+      tag: "9ccdff2"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4165,7 +4165,7 @@ global:
       #   "could not be read" means the verdict-history endpoint is failing.
       #
       #   Rollback is this tag alone back to 8d2d866.
-      tag: "b91b2a3"
+      tag: "9ccdff2"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
