@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
 import yaml
@@ -24,16 +23,15 @@ from app.modules.recommendations.engine import evaluate_tree
 from app.modules.recommendations.loader import compile_tree
 from app.shared.conditions import ConditionContext
 from app.shared.conditions.context import IndicesEntry
+from tests.support.shipped_trees import shipped_yaml
 
 pytestmark = [pytest.mark.integration]
 
-_SEEDS = Path(__file__).resolve().parents[3] / "app" / "modules" / "recommendations" / "seeds"
+# The seed files are gone; migration 0085 carries these definitions now.
 
 
 def _tree(name: str) -> dict:
-    return compile_tree(
-        yaml.safe_load((_SEEDS / name).read_text(encoding="utf-8")), source_path=name
-    )
+    return compile_tree(yaml.safe_load(shipped_yaml(name)), source_path=name)
 
 
 def _idx_dev(code: str, dev: float) -> dict[str, IndicesEntry]:

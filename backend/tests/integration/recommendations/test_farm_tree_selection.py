@@ -42,7 +42,6 @@ from app.modules.recommendations.errors import (
     DecisionTreeNotFoundError,
     FarmNotFoundError,
 )
-from app.modules.recommendations.loader import sync_from_disk
 from app.modules.recommendations.service import (
     get_decision_trees_author_service,
     get_recommendations_service,
@@ -106,7 +105,8 @@ class _Fixture:
 
 
 async def _make_tenant(admin: AsyncSession, slug: str) -> _Fixture:
-    await sync_from_disk(admin)
+    # The platform catalogue is installed by public migration 0085,
+    # which the conftest applies when it upgrades to head.
     tenancy = get_tenant_service(admin)
     tenant = await tenancy.create_tenant(
         slug=f"{slug}-{uuid4().hex[:6]}",

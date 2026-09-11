@@ -27,7 +27,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.notifications.subscribers import register_subscribers
 from app.modules.recommendations.events import EvaluationRunFinishedV1
-from app.modules.recommendations.loader import sync_from_disk
 from app.modules.recommendations.service import get_recommendations_service
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.db.session import AsyncSessionLocal
@@ -155,7 +154,8 @@ async def _dispatches(admin: AsyncSession, schema: str, user_id: UUID, channel: 
 
 async def _setup(admin: AsyncSession, slug: str, block_codes: list[str]):
     register_subscribers(get_default_bus())
-    await sync_from_disk(admin)
+    # The platform catalogue is installed by public migration 0085,
+    # which the conftest applies when it upgrades to head.
     tenancy = get_tenant_service(admin)
     tenant = await tenancy.create_tenant(
         slug=f"{slug}-{uuid4().hex[:6]}",

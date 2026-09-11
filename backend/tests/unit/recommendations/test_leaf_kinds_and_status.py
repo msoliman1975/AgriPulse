@@ -25,7 +25,6 @@ from typing import Any
 
 import pytest
 
-from app.modules.recommendations import loader as loader_module
 from app.modules.recommendations.engine import _parse_outcome, evaluate_tree
 from app.modules.recommendations.errors import DecisionTreeParseError
 from app.modules.recommendations.loader import compile_tree
@@ -39,6 +38,7 @@ from app.modules.recommendations.status_codes import (
     worst,
 )
 from app.shared.conditions import ConditionContext
+from tests.support.shipped_trees import iter_shipped_yaml
 
 
 def _spec(leaf: dict[str, Any]) -> dict[str, Any]:
@@ -254,29 +254,25 @@ def test_every_shipped_seed_leaf_resolves_to_a_known_status() -> None:
     the point: a branch that found nothing wrong now says so.
     """
     import collections
-    import pathlib
 
     import yaml
 
-    seeds = pathlib.Path(loader_module.__file__).parent / "seeds"
     counts: collections.Counter[str] = collections.Counter()
-    for path in sorted(seeds.glob("*.yaml")):
-        compiled = compile_tree(
-            yaml.safe_load(path.read_text(encoding="utf-8")), source_path=path.name
-        )
+    for name, raw in iter_shipped_yaml():
+        compiled = compile_tree(yaml.safe_load(raw), source_path=name)
         for nid, node in compiled["nodes"].items():
             if "outcome" not in node:
                 continue
             outcome = _parse_outcome(node["outcome"], leaf_node_id=nid, params={})
-            assert outcome is not None, f"{path.name}:{nid} did not parse"
+            assert outcome is not None, f"{name}:{nid} did not parse"
             assert outcome.status_code in STATUS_CODES
             counts[outcome.kind] += 1
             if outcome.kind == "status":
                 counts[f"status:{outcome.status_code}"] += 1
                 # A status leaf's whole job is to say something. One with no
                 # words is the blank row again, wearing a colour.
-                assert outcome.text_en, f"{path.name}:{nid} has no English text"
-                assert outcome.text_ar, f"{path.name}:{nid} has no Arabic text"
+                assert outcome.text_en, f"{name}:{nid} has no English text"
+                assert outcome.text_ar, f"{name}:{nid} has no Arabic text"
 
     assert counts["no_action"] == 0
     assert counts["alert"] == 5

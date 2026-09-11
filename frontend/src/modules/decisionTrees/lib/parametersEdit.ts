@@ -8,7 +8,7 @@
 // The backend's loader (`compile_tree` + `_validate_parameters_block`)
 // is the source of truth on schema; we mirror its validation here so
 // the editor catches bad declarations before sending — bad declarations
-// would otherwise crash the next sync_from_disk or fail the next
+// would otherwise fail the next compile or fail the next
 // authoring POST.
 //
 // Validation surface (mirrors backend):
