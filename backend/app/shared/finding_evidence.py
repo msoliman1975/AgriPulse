@@ -118,28 +118,24 @@ def evidence_label(key: str, locale: str = DEFAULT_LOCALE) -> str:
         code = parts[1].upper()
         table = _STAT_LABELS if family == "indices" else _WEATHER_LABELS
         pattern = _table(table, locale).get(parts[2])
-        if pattern is not None:
-            return pattern.format(code=code)
-        return f"{code} {_humanise(parts[2])}"
+        return pattern.format(code=code) if pattern else f"{code} {_humanise(parts[2])}"
 
-    if family == "block" and len(parts) >= 2:
-        known = _table(_BLOCK_FIELD_LABELS, locale).get(parts[1])
-        return known or _humanise(parts[1])
+    if len(parts) >= 2:
+        # `block.<field>` has a translated label where one was written;
+        # `crop_attribute.<name>.value` and `params.<name>` are named by
+        # whoever authored them, so the name itself is the label — the
+        # trailing `.value` on a crop attribute is storage shape, not
+        # something a reader should be shown.
+        if family == "block":
+            return _table(_BLOCK_FIELD_LABELS, locale).get(parts[1]) or _humanise(parts[1])
+        if family in {"crop_attribute", "params"}:
+            return _humanise(parts[1])
+        return key
 
-    if family == "crop_attribute" and len(parts) >= 2:
-        # `crop_attribute.<name>.value` — the trailing `.value` is the
-        # storage shape, not something a reader should be shown.
-        return _humanise(parts[1])
-
-    if family == "params" and len(parts) >= 2:
-        return _humanise(parts[1])
-
-    if len(parts) == 1:
-        known = _table(_BARE_LABELS, locale).get(key)
-        if known is not None:
-            return known
-
-    return key
+    # A key with no family at all. `crop_path` is the only one the engine
+    # resolves today, and it appeared in nearly every recommendation
+    # snapshot as the bare word beside properly labelled rows.
+    return _table(_BARE_LABELS, locale).get(key) or key
 
 
 def evidence_value(value: Any, locale: str = DEFAULT_LOCALE) -> str:
