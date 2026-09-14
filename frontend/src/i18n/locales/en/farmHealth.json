@@ -8,7 +8,9 @@
     "didNotRun": "Tree did not run",
     "verdictCount_one": "{{count}} verdict",
     "verdictCount_other": "{{count}} verdicts",
-    "noBlocks": "This farm has no blocks yet."
+    "noBlocks": "This farm has no blocks yet.",
+    "expand": "Show the block list",
+    "collapse": "Hide the block list"
   },
   "block": {
     "verdictSummary_one": "{{count}} verdict from {{tree}}.",
@@ -34,7 +36,6 @@
     "heading": "Selected area",
     "hint_one": "1 area. Neighbouring cells with the same verdict are one area; one- and two-cell spots are merged into a scattered entry.",
     "hint_other": "{{count}} areas. Neighbouring cells with the same verdict are one area; one- and two-cell spots are merged into a scattered entry.",
-    "none": "This block has no cell verdicts for this tree.",
     "loading": "Reading the block's cell grid…"
   },
   "direction": {

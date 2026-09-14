@@ -371,17 +371,18 @@ describe("FarmHealthViewPage", () => {
     expect(options).toEqual(["t_cwsi", "t_ndvi"]);
   });
 
-  it("puts the tree picker in the page title bar", async () => {
-    // Mohamed, 2026-09-14: it had a strip of its own under the header, which
-    // spent a band of the screen on one control.
+  it("puts the tree picker in the header, beside the farm name", async () => {
+    // Mohamed, 2026-09-14: the picker had a strip of its own, and then the
+    // header lost its page title. The nav says which screen this is, so the
+    // bar carries the farm and the tree and nothing else.
     renderPage();
 
     const picker = await screen.findByRole("combobox", { name: "Decision tree" });
     const bar = picker.closest("header");
     expect(bar).not.toBeNull();
-    expect(within(bar as HTMLElement).getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Farm Health View",
-    );
+    expect(bar).toHaveTextContent("Mango Republic");
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    expect(screen.queryByText("Farm Health View")).toBeNull();
   });
 
   it("switching tree re-reads the rail", async () => {
@@ -565,14 +566,17 @@ describe("FarmHealthViewPage", () => {
     expect([...highlighted].sort()).toEqual(["c00", "c01", "c02"]);
   });
 
-  it("says a block has no cell verdicts rather than showing an empty list", async () => {
+  it("says nothing when a block tree made no areas", async () => {
     // The tree ran and answered for the whole block, so there are verdicts
-    // but no cells. An empty area list with no words reads as a broken page.
+    // but no cells. That is the normal path for a block tree, and the
+    // sentence "This block has no cell verdicts for this tree" read as a
+    // fault on it. The whole-block card says what the tree concluded.
+    // Mohamed, 2026-09-14.
     renderPage();
 
-    expect(
-      await screen.findByText("This block has no cell verdicts for this tree."),
-    ).toBeInTheDocument();
+    // The summary is the panel; nothing else is claimed about the block.
+    expect(await screen.findByText("Block reads")).toBeInTheDocument();
+    expect(screen.queryByText(/no cell verdicts/)).toBeNull();
   });
 
   it("shows the reasoning without being asked, and the step table not at all", async () => {
@@ -879,6 +883,37 @@ describe("FarmHealthViewPage", () => {
     expect(map.compareDocumentPosition(range) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("collapses the block list and opens it again", async () => {
+    // Mohamed, 2026-09-14. The chevron stays when the list is hidden, so the
+    // way back is where the list was.
+    renderPage();
+
+    expect(await screen.findByRole("button", { name: "Hide the block list" })).toBeInTheDocument();
+    expect(screen.getByText("Blocks \u00b7 worst verdict first")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide the block list" }));
+
+    expect(screen.queryByText("Blocks \u00b7 worst verdict first")).toBeNull();
+    // The drag handle goes with it: a collapsed rail has no width to drag.
+    expect(screen.queryByRole("separator", { name: "Block list width" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show the block list" }));
+
+    expect(screen.getByText("Blocks \u00b7 worst verdict first")).toBeInTheDocument();
+    expect(screen.getByRole("separator", { name: "Block list width" })).toBeInTheDocument();
+  });
+
+  it("keeps the fit buttons clear of the map's zoom control", async () => {
+    // They were at top-3 left-3, on top of MapLibre's zoom stack. The stack
+    // is 70px tall from the map's top edge.
+    renderPage();
+
+    const fit = await screen.findByRole("button", { name: "Whole farm" });
+    const holder = fit.parentElement as HTMLElement;
+    expect(holder.className).toContain("top-[4.75rem]");
+    expect(holder.className).not.toContain("top-3");
+  });
+
   it("offers a handle for the block list and one for the map", async () => {
     renderPage();
 
@@ -996,9 +1031,10 @@ describe("FarmHealthViewPage", () => {
     };
     renderPage();
 
-    expect(
-      await screen.findByText("This block has no cell verdicts for this tree."),
-    ).toBeInTheDocument();
+    // The panel settles on the block summary rather than on the grid
+    // message. Waiting for the summary first makes the absence below a real
+    // assertion rather than one made before the read resolved.
+    await screen.findByText("Block reads");
     expect(screen.queryByText(/Reading the block's cell grid/)).not.toBeInTheDocument();
   });
 
