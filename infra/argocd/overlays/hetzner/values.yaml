@@ -4201,7 +4201,33 @@ global:
       #   "could not be read" means the verdict-history endpoint is failing.
       #
       #   Rollback is this tag alone back to 8d2d866.
-      tag: "9ccdff2"
+      #
+      # 20fd0ce = #686, the Farm Health View real-estate pass. Four changes
+      #   Mohamed listed on 2026-09-14, all about screen space.
+      #
+      #   The colour bar and per-status counts under the map are removed; the
+      #   block list on the left draws the same bar on every row. The
+      #   "Decision tree" caption and dropdown move into the page title bar,
+      #   and the strip that held them is gone. The reasoning text loses its
+      #   max-w-prose cap and fills the panel. The "Show how this was
+      #   decided" button is gone and the reasoning is always shown; the step
+      #   table keeps its own button.
+      #
+      #   FRONTEND ONLY. No endpoint, no migration. The reasoning read now
+      #   fires when a block or an area is selected rather than on a click,
+      #   so GET /blocks/{id}/verdicts/{vid}/reasoning sees one call per
+      #   selection. It is cached for the life of the page.
+      #
+      #   The only other frontend commit in 9ccdff2..20fd0ce is fcf7b0e, and
+      #   its frontend change is one comment line, so this tag ships exactly
+      #   #686. api and workers stay on fcf7b0e; tile-server stays 676746a.
+      #
+      #   After the sync, watch: the tree dropdown sits beside the page
+      #   title, there is no colour bar under the map, and the paragraph that
+      #   says why is on screen with no button to open it.
+      #
+      #   Rollback is this tag alone back to 9ccdff2.
+      tag: "20fd0ce"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
