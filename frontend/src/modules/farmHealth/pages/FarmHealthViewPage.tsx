@@ -34,7 +34,6 @@ import {
 import { AsyncBoundary } from "@/components/AsyncBoundary";
 import { EmptyState } from "@/components/EmptyState";
 import { Page } from "@/components/Page";
-import { PageHeader } from "@/components/PageHeader";
 import { Resizer } from "@/components/Resizer";
 import type { AsyncState } from "@/components/asyncState";
 import type { Polygon } from "geojson";
@@ -89,6 +88,8 @@ interface HealthData {
 const RAIL_DEFAULT = 308;
 const RAIL_MIN = 200;
 const RAIL_MAX = 560;
+/** The collapsed rail: wide enough for the chevron that opens it again. */
+const RAIL_COLLAPSED = 46;
 const MAP_DEFAULT = 380;
 const MAP_MIN = 180;
 const MAP_MAX = 900;
@@ -103,6 +104,10 @@ export function FarmHealthViewPage(): ReactNode {
   const [areaKey, setAreaKey] = useState<string | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [fitMode, setFitMode] = useState<FitMode>("block");
+  // The rail collapses to its chevron, so a reader working on the map can
+  // have the width. Not remembered between visits: it is a thing you do for
+  // the next minute, unlike the width, which is about the block names.
+  const [railCollapsed, setRailCollapsed] = useState(false);
 
   // The panels a reader can resize. Remembered per browser, because the
   // reason someone widened the rail — long block names — is still true on
@@ -301,46 +306,54 @@ export function FarmHealthViewPage(): ReactNode {
   return (
     <Page width="bleed">
       <div className="flex h-full flex-col">
-        <div className="border-b border-ap-line bg-ap-panel px-4 py-3">
-          {/* The tree picker rides the title bar. It had a strip of its own
-              under the header until 2026-09-14, which cost a band of the
-              screen to hold one control. */}
-          <PageHeader
-            title={t("farmHealth:title")}
-            subtitle={farmQuery.data?.name ?? undefined}
-            actions={
-              picker.choices.length > 0 ? (
-                <label className="flex items-center gap-2">
-                  <span className="text-meta font-semibold uppercase tracking-wide text-ap-muted">
-                    {t("farmHealth:treePicker.label")}
-                  </span>
-                  <select
-                    aria-label={t("farmHealth:treePicker.label")}
-                    value={picker.activeTree ?? ""}
-                    onChange={(event) => {
-                      setTreeCode(event.target.value);
-                      // The rail re-sorts for the new tree, so a block held
-                      // from the old one may no longer be near the top, and
-                      // its areas belong to a different tree entirely.
-                      setBlockId(null);
-                      setAreaKey(null);
-                    }}
-                    className="min-w-[16rem] rounded border border-ap-line bg-ap-panel px-2 py-1.5 text-sm"
-                  >
-                    {/* The tree's name, in the reader's language. The value
-                        stays the code, because that is what a verdict row
-                        carries and what the rail filters on. */}
-                    {picker.choices.map((tree) => (
-                      <option key={tree.code} value={tree.code}>
-                        {tree.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : undefined
-            }
-          />
-        </div>
+        {/* The header follows Farm Management's view bar, not the app's
+            standard page header. Mohamed, 2026-09-14: one 48px bar, the farm
+            name in it, and no page title — the nav already says which screen
+            this is, and a title plus a subtitle spent two lines saying it
+            again. See `labs/mapnext/ViewBar.tsx`, whose measurements these
+            are. */}
+        <header className="relative z-30 flex h-12 flex-none items-center gap-2.5 border-b border-ap-line bg-ap-panel px-3.5">
+          <div className="flex min-w-0 items-baseline gap-2 border-e border-ap-line pe-3">
+            <span
+              className="truncate text-card-title font-bold text-ap-ink"
+              title={farmQuery.data?.name ?? undefined}
+            >
+              {farmQuery.data?.name ?? ""}
+            </span>
+          </div>
+
+          {/* The tree is what the whole screen is about, so its caption is
+              drawn as an active chip rather than as a grey field label. */}
+          {picker.choices.length > 0 ? (
+            <label className="inline-flex h-9 items-center gap-2 rounded-lg border border-ap-primary bg-ap-primary-soft ps-3 pe-1.5">
+              <span className="whitespace-nowrap text-sm font-semibold text-ap-primary">
+                {t("farmHealth:treePicker.label")}
+              </span>
+              <select
+                aria-label={t("farmHealth:treePicker.label")}
+                value={picker.activeTree ?? ""}
+                onChange={(event) => {
+                  setTreeCode(event.target.value);
+                  // The rail re-sorts for the new tree, so a block held from
+                  // the old one may no longer be near the top, and its areas
+                  // belong to a different tree entirely.
+                  setBlockId(null);
+                  setAreaKey(null);
+                }}
+                className="min-w-[14rem] rounded-md border border-ap-primary/40 bg-ap-panel px-2 py-1 text-sm font-semibold text-ap-ink"
+              >
+                {/* The tree's name, in the reader's language. The value stays
+                    the code, because that is what a verdict row carries and
+                    what the rail filters on. */}
+                {picker.choices.map((tree) => (
+                  <option key={tree.code} value={tree.code}>
+                    {tree.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </header>
 
         <AsyncBoundary
           state={state}
@@ -472,38 +485,71 @@ export function FarmHealthViewPage(): ReactNode {
                 ) : null}
 
                 <div className="flex min-h-0 flex-1">
+                  {/* Collapsible, like Farm Management's land-unit rail. Its
+                      header keeps the chevron when collapsed, so the way back
+                      is in the place the rail was. */}
                   <aside
-                    className="flex min-h-0 shrink-0 flex-col overflow-y-auto bg-ap-panel"
-                    style={{ width: `${railWidth}px` }}
+                    className="flex min-h-0 shrink-0 flex-col overflow-y-auto border-e border-ap-line bg-ap-panel"
+                    style={{ width: railCollapsed ? `${RAIL_COLLAPSED}px` : `${railWidth}px` }}
                   >
-                    <div className="border-b border-ap-line px-3 py-2.5">
-                      <span className="text-meta font-semibold uppercase tracking-wide text-ap-muted">
-                        {t("farmHealth:rail.heading")}
-                      </span>
+                    <div className="flex flex-none items-center gap-2 border-b border-ap-line px-3 py-2.5">
+                      {railCollapsed ? null : (
+                        <span className="flex-1 truncate text-meta font-semibold uppercase tracking-wide text-ap-muted">
+                          {t("farmHealth:rail.heading")}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setRailCollapsed((was) => !was)}
+                        className="grid h-6 w-6 flex-none place-items-center rounded-md text-ap-muted hover:bg-ap-primary-soft"
+                        title={
+                          railCollapsed
+                            ? t("farmHealth:rail.expand")
+                            : t("farmHealth:rail.collapse")
+                        }
+                        aria-label={
+                          railCollapsed
+                            ? t("farmHealth:rail.expand")
+                            : t("farmHealth:rail.collapse")
+                        }
+                        aria-expanded={!railCollapsed}
+                      >
+                        {/* The rail sits on the inline-start edge, so the
+                            chevron points at that edge — which flips under
+                            Arabic. */}
+                        {railCollapsed ? (arabic ? "‹" : "›") : arabic ? "›" : "‹"}
+                      </button>
                     </div>
-                    <BlockList
-                      rows={rows}
-                      statuses={data.statuses}
-                      selectedBlockId={selectedBlockId}
-                      onSelect={(id) => {
-                        setBlockId(id);
-                        setAreaKey(null);
-                        setFitMode("block");
-                      }}
-                    />
+                    {railCollapsed ? null : (
+                      <BlockList
+                        rows={rows}
+                        statuses={data.statuses}
+                        selectedBlockId={selectedBlockId}
+                        onSelect={(id) => {
+                          setBlockId(id);
+                          setAreaKey(null);
+                          setFitMode("block");
+                        }}
+                      />
+                    )}
                   </aside>
 
-                  <Resizer
-                    orientation="vertical"
-                    value={railWidth}
-                    min={RAIL_MIN}
-                    max={RAIL_MAX}
-                    onChange={setRailWidth}
-                    label={t("farmHealth:resize.rail")}
-                    // Under RTL the rail sits on the right, so the drag that
-                    // widens it is the one going left.
-                    reversed={arabic}
-                  />
+                  {/* A collapsed rail has no width to drag. Leaving the
+                      handle would let a reader widen a list that is not
+                      there. */}
+                  {railCollapsed ? null : (
+                    <Resizer
+                      orientation="vertical"
+                      value={railWidth}
+                      min={RAIL_MIN}
+                      max={RAIL_MAX}
+                      onChange={setRailWidth}
+                      label={t("farmHealth:resize.rail")}
+                      // Under RTL the rail sits on the right, so the drag that
+                      // widens it is the one going left.
+                      reversed={arabic}
+                    />
+                  )}
 
                   <section className="flex min-h-0 min-w-0 flex-1 flex-col">
                     <div
@@ -514,8 +560,15 @@ export function FarmHealthViewPage(): ReactNode {
                           controls do not mirror, and neither does the date
                           caption in the opposite corner — so a logical inset
                           here put these three buttons underneath the date
-                          under Arabic. */}
-                      <div className="absolute left-3 top-3 z-10 flex flex-col items-start gap-1.5">
+                          under Arabic.
+
+                          `top-[4.75rem]` clears the zoom control, which these
+                          buttons sat on top of until 2026-09-14. MapLibre's
+                          top-left stack is a 10px margin plus a group of two
+                          29px buttons and its borders, 70px to its bottom
+                          edge. The row is horizontal, so three buttons cost
+                          one band of map rather than three. */}
+                      <div className="absolute left-[10px] top-[4.75rem] z-10 flex flex-wrap items-start gap-1.5">
                         {(
                           [
                             ["block", "farmHealth:map.fitBlock"],
@@ -645,14 +698,14 @@ export function FarmHealthViewPage(): ReactNode {
                                   {t("farmHealth:area.loading")}
                                 </p>
                               </section>
-                            ) : // The summary above already says it when the
-                            // tree did not run; saying it twice reads as two
-                            // different facts.
-                            selected.didNotRun ? null : (
-                              <section>
-                                <p className="text-sm text-ap-muted">{t("farmHealth:area.none")}</p>
-                              </section>
-                            )
+                            ) : // Nothing. A block tree answers for the whole
+                            // block and never makes areas, so "this block has
+                            // no cell verdicts" fired on the normal path and
+                            // read as a fault. The whole-block card above
+                            // already says what the tree concluded, and the
+                            // summary says it when the tree did not run.
+                            // Mohamed, 2026-09-14.
+                            null
                           ) : (
                             <section>
                               <div className="flex flex-wrap items-baseline gap-3">
