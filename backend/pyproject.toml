@@ -12,7 +12,7 @@ dependencies = [
     # account. The API has no static key — tokens live one hour.
     "google-auth>=2.35",
   # Web framework
-  "fastapi>=0.115,<0.137",
+  "fastapi>=0.115,<0.142",
   "uvicorn[standard]>=0.32,<0.33",
   "pydantic[email]>=2.9,<3",
   "pydantic-settings>=2.6,<3",
@@ -27,7 +27,7 @@ dependencies = [
   "sqlalchemy[asyncio]>=2.0.36,<2.1",
   "asyncpg>=0.30,<0.31",
   "psycopg[binary]>=3.2,<3.3",   # used by Alembic in sync mode
-  "alembic>=1.14,<1.19",
+  "alembic>=1.14,<1.20",
   "geoalchemy2>=0.16,<0.17",
 
   # STAC catalog. We bootstrap pgstac as plain SQL via pypgstac (no
@@ -46,7 +46,7 @@ dependencies = [
 
   # Background work
   "celery>=5.4,<5.7",
-  "redis>=5.2,<8.1",
+  "redis>=5.2,<8.2",
 
   # Auth
   "python-jose[cryptography]>=3.3,<3.4",
