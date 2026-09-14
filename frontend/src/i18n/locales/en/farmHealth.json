@@ -63,8 +63,6 @@
     "didNotRun": "Tree did not run"
   },
   "reasoning": {
-    "show": "Show how this was decided",
-    "hide": "Hide how this was decided",
     "steps": "Steps the tree took, root to leaf",
     "read": "read {{read}}",
     "test": "test {{test}}",

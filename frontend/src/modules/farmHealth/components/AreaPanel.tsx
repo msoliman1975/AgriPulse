@@ -21,7 +21,7 @@ import { Pill } from "@/components/Pill";
 import type { Area } from "../lib/areas";
 import { areaLabel } from "../lib/areaLabel";
 import { Reasoning } from "./Reasoning";
-import { STATUS_ORDER, treeLabel, type BlockRow } from "../lib/blockRows";
+import { treeLabel, type BlockRow } from "../lib/blockRows";
 
 /**
  * The one frame around the block panel.
@@ -82,38 +82,15 @@ export function BlockSummary({ row, statuses, rows, cols, treeName }: SummaryPro
         </span>
       </div>
 
+      {/* The colour bar and its per-status counts stood here until
+          2026-09-14. The rail on the left carries the same bar on every
+          block's row, so under the map it was a second copy of an answer the
+          reader already had, in the band the tree's own sentence needs. */}
       {row.didNotRun ? (
         <p className="mt-2 text-sm text-ap-muted">
           {t("farmHealth:block.didNotRun", { tree: treeName })}
         </p>
-      ) : (
-        <>
-          <div className="mt-3 flex h-2.5 overflow-hidden rounded-full bg-ap-line">
-            {STATUS_ORDER.filter((code) => row.counts[code] > 0).map((code) => (
-              <span
-                key={code}
-                className="block"
-                style={{
-                  width: `${(100 * row.counts[code]) / Math.max(1, total)}%`,
-                  background: lookup.get(code)?.color ?? "#9AA0A6",
-                }}
-              />
-            ))}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-4 text-meta text-ap-muted">
-            {STATUS_ORDER.filter((code) => row.counts[code] > 0).map((code) => (
-              <span key={code} className="inline-flex items-center gap-1.5">
-                <i
-                  className="inline-block h-2.5 w-2.5 rounded-sm"
-                  style={{ background: lookup.get(code)?.color ?? "#9AA0A6" }}
-                />
-                <b className="font-semibold tabular-nums text-ap-ink">{row.counts[code]}</b>
-                <span>{labelOf(code)}</span>
-              </span>
-            ))}
-          </div>
-        </>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -168,12 +145,16 @@ interface DetailProps {
   statuses: StatusDefinition[];
   farmId: string;
   blockId: string;
-  /** Open by default is wrong: the reasoning is a follow-up question. */
-  open: boolean;
-  onToggle: () => void;
 }
 
-export function AreaDetail({ area, statuses, farmId, blockId, open, onToggle }: DetailProps) {
+/**
+ * The selected area, its sentence, and why the tree said it.
+ *
+ * The reasoning sat behind a "Show how this was decided" button until
+ * 2026-09-14. Mohamed asked for it always on: it is the answer the screen
+ * exists to give, and a click stood between every reader and it.
+ */
+export function AreaDetail({ area, statuses, farmId, blockId }: DetailProps) {
   const { t, i18n } = useTranslation(["farmHealth"]);
   const arabic = i18n.language.startsWith("ar");
   // The verdict text is the tree author's own sentence, so it is chosen
@@ -196,30 +177,17 @@ export function AreaDetail({ area, statuses, farmId, blockId, open, onToggle }: 
           reasoning below needs — Mohamed, 2026-09-07. */}
       <p className="mt-2 text-sm text-ap-ink">{text}</p>
 
-      <div className="mt-2">
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={onToggle}
-          className="text-sm font-medium text-ap-accent underline underline-offset-4"
-        >
-          {open ? t("farmHealth:reasoning.hide") : t("farmHealth:reasoning.show")}
-        </button>
+      <div className="mt-3 border-t border-ap-line pt-3">
+        <Reasoning
+          blockId={blockId}
+          verdictId={area.sample.id}
+          farmId={farmId}
+          leafNodeId={area.leafNodeId}
+          kind={area.sample.kind}
+          statusCode={area.status}
+          statuses={statuses}
+        />
       </div>
-
-      {open ? (
-        <div className="mt-3 border-t border-ap-line pt-3">
-          <Reasoning
-            blockId={blockId}
-            verdictId={area.sample.id}
-            farmId={farmId}
-            leafNodeId={area.leafNodeId}
-            kind={area.sample.kind}
-            statusCode={area.status}
-            statuses={statuses}
-          />
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -229,8 +197,6 @@ interface BlockDetailProps {
   statuses: StatusDefinition[];
   farmId: string;
   blockId: string;
-  open: boolean;
-  onToggle: () => void;
 }
 
 /**
@@ -243,14 +209,7 @@ interface BlockDetailProps {
  * so "why is this block good" had no answer on the page that exists to say
  * why.
  */
-export function BlockVerdictDetail({
-  verdict,
-  statuses,
-  farmId,
-  blockId,
-  open,
-  onToggle,
-}: BlockDetailProps) {
+export function BlockVerdictDetail({ verdict, statuses, farmId, blockId }: BlockDetailProps) {
   const { t, i18n } = useTranslation(["farmHealth"]);
   const arabic = i18n.language.startsWith("ar");
   const status = statuses.find((s) => s.code === verdict.status_code);
@@ -280,30 +239,17 @@ export function BlockVerdictDetail({
 
       <p className="mt-2 text-sm text-ap-ink">{text}</p>
 
-      <div className="mt-2">
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={onToggle}
-          className="text-sm font-medium text-ap-accent underline underline-offset-4"
-        >
-          {open ? t("farmHealth:reasoning.hide") : t("farmHealth:reasoning.show")}
-        </button>
+      <div className="mt-3 border-t border-ap-line pt-3">
+        <Reasoning
+          blockId={blockId}
+          verdictId={verdict.id}
+          farmId={farmId}
+          leafNodeId={verdict.leaf_node_id}
+          kind={verdict.kind}
+          statusCode={verdict.status_code}
+          statuses={statuses}
+        />
       </div>
-
-      {open ? (
-        <div className="mt-3 border-t border-ap-line pt-3">
-          <Reasoning
-            blockId={blockId}
-            verdictId={verdict.id}
-            farmId={farmId}
-            leafNodeId={verdict.leaf_node_id}
-            kind={verdict.kind}
-            statusCode={verdict.status_code}
-            statuses={statuses}
-          />
-        </div>
-      ) : null}
     </section>
   );
 }
