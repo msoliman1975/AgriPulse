@@ -4227,7 +4227,37 @@ global:
       #   says why is on screen with no button to open it.
       #
       #   Rollback is this tag alone back to 9ccdff2.
-      tag: "20fd0ce"
+      #
+      # 02a0e59 = #688, the second half of the 2026-09-14 pass. Four more
+      #   changes Mohamed listed, all on the Farm Health View.
+      #
+      #   "This block has no cell verdicts for this tree" is removed. A block
+      #   tree answers for the whole block and never makes areas, so the
+      #   sentence fired on the normal path and read as a fault.
+      #
+      #   The three fit buttons move clear of MapLibre's zoom control, which
+      #   they sat on top of, and are a horizontal row rather than a column.
+      #
+      #   The block list collapses to a 46px rail holding its chevron, the
+      #   same pattern as Farm Management's land-unit rail. The drag handle
+      #   is hidden with it.
+      #
+      #   The header follows Farm Management's view bar: one 48px row with
+      #   the farm name and no page title. The decision tree caption is drawn
+      #   as an active chip rather than a grey field label.
+      #
+      #   FRONTEND ONLY. No endpoint, no migration. #688 is the ONLY commit
+      #   in 20fd0ce..02a0e59 touching frontend/, and the range touches no
+      #   backend file at all. api and workers stay on fcf7b0e; tile-server
+      #   stays 676746a.
+      #
+      #   After the sync, watch: the header is one row with the farm name and
+      #   a highlighted tree picker, the fit buttons sit below the zoom
+      #   control, and the chevron in the block list header hides and shows
+      #   the list.
+      #
+      #   Rollback is this tag alone back to 20fd0ce.
+      tag: "02a0e59"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
