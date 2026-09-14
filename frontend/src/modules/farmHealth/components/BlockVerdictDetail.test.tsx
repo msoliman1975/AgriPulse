@@ -1,14 +1,15 @@
-// A whole-block verdict says what the tree concluded, and offers the walk.
+// A whole-block verdict says what the tree concluded, and shows the walk.
 //
 // A block tree writes one verdict with no cell, so it produces no areas, and
-// the area card is where the sentence and the reasoning toggle lived. The
-// panel showed the colour bar, the words "1 Good", and "This block has no
-// cell verdicts for this tree" — no message, no way to ask why. Both were in
-// the payload the page already had.
+// the area card is where the sentence and the reasoning lived. The panel
+// showed the colour bar, the words "1 Good", and "This block has no cell
+// verdicts for this tree" — no message, no way to ask why. Both were in the
+// payload the page already had.
+//
+// Since 2026-09-14 the walk is not behind a button. It loads with the card.
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { StatusDefinition, Verdict } from "@/api/farmHealth";
@@ -57,7 +58,7 @@ const VERDICT: Verdict = {
   recommendation_id: null,
 };
 
-function renderCard(open = false, onToggle = vi.fn()) {
+function renderCard() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
@@ -66,12 +67,9 @@ function renderCard(open = false, onToggle = vi.fn()) {
         statuses={STATUSES}
         farmId="farm-1"
         blockId="block-10"
-        open={open}
-        onToggle={onToggle}
       />
     </QueryClientProvider>,
   );
-  return onToggle;
 }
 
 describe("a whole-block verdict", () => {
@@ -118,27 +116,21 @@ describe("a whole-block verdict", () => {
     expect(screen.getByText(/mango_canopy_health_v1 · v4/)).toBeTruthy();
   });
 
-  it("offers the walk behind it", async () => {
-    const onToggle = renderCard(false);
-    const user = userEvent.setup();
-
-    await user.click(await screen.findByRole("button", { name: /how this was decided/i }));
-
-    expect(onToggle).toHaveBeenCalled();
-  });
-
-  it("asks for the reasoning only once it is opened", () => {
-    renderCard(false);
-
-    expect(reasoning.fn).not.toHaveBeenCalled();
-  });
-
-  it("loads the walk when open", async () => {
-    renderCard(true);
+  it("reads the walk without being asked", async () => {
+    // Mohamed, 2026-09-14: the reasoning is the answer the screen exists to
+    // give, so nothing stands between the reader and it.
+    renderCard();
 
     await vi.waitFor(() =>
       expect(reasoning.fn).toHaveBeenCalledWith("block-10", "verdict-1", "farm-1"),
     );
+  });
+
+  it("offers no button to show or hide the walk", async () => {
+    renderCard();
+
+    await screen.findByText("Canopy greenness is within the seasonal baseline.");
+    expect(screen.queryByRole("button", { name: /how this was decided/i })).toBeNull();
   });
 });
 

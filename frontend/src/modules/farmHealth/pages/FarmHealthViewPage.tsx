@@ -102,13 +102,6 @@ export function FarmHealthViewPage(): ReactNode {
   const [blockId, setBlockId] = useState<string | null>(null);
   const [areaKey, setAreaKey] = useState<string | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
-  // One flag for the screen, not per area: opening the reasoning is a mode a
-  // reader stays in while stepping through areas.
-  const [reasoningOpen, setReasoningOpen] = useState(false);
-  // Which whole-block verdict has its reasoning open. An id rather than a
-  // boolean because a block can hold one verdict per tree, and two cards open
-  // at once would push the map off screen.
-  const [openVerdictId, setOpenVerdictId] = useState<string | null>(null);
   const [fitMode, setFitMode] = useState<FitMode>("block");
 
   // The panels a reader can resize. Remembered per browser, because the
@@ -237,6 +230,61 @@ export function FarmHealthViewPage(): ReactNode {
     };
   }, [blocksQuery, statusesQuery, verdictsQuery, gridQuery, historyQuery, needsCells]);
 
+  // The tree picker's options, and the tree in force.
+  //
+  // This sits above the `AsyncBoundary` because the picker itself does: on
+  // 2026-09-14 Mohamed moved it into the page title bar, which renders
+  // whether the reads have landed or not. The boundary's children need the
+  // same values, so they are computed once here and passed down.
+  //
+  // The list is built from the live read PLUS the whole window's history,
+  // never from the frame on show.
+  //
+  // Built from the frame it rewrote itself during a replay: a tree that said
+  // nothing on 12 August vanished from the list on that frame and came back
+  // on the next one. Built from the live read alone it loses a tree that ran
+  // earlier in the window and has since stopped — which is exactly the tree
+  // someone opens a replay to look at. The history covers the window, so
+  // this list is the same on every frame of it.
+  const picker = useMemo(() => {
+    const data = state.status === "success" ? state.data : null;
+    const liveBlocks = data?.verdicts.blocks ?? [];
+    const liveTrees = treeOptions(liveBlocks, arabic);
+    const trees = treeOptions(
+      [
+        ...liveBlocks,
+        {
+          block_id: "__history",
+          as_of: null,
+          worst_status: null,
+          last_evaluated_at: null,
+          verdicts: data?.history ?? [],
+        },
+      ],
+      arabic,
+    );
+    // The picker defaults to the first tree that is saying something TODAY.
+    // A tree with no verdict on this farm paints an entirely blank screen,
+    // which a reader cannot tell from a broken one.
+    //
+    // Defaulting to `trees[0]` instead would move the selection under the
+    // reader: the history lands a second after the first paint, and a
+    // history-only tree whose name sorts earlier would take the slot — on
+    // the newest day, where it has nothing to say, so every block would
+    // suddenly read "tree did not run".
+    const activeTree = treeCode ?? liveTrees[0]?.code ?? trees[0]?.code ?? null;
+    // Changing the range re-reads the history, and the old window's trees go
+    // with it. A controlled `select` whose value matches no option renders as
+    // a blank box, so the chosen tree always has one, named by its code until
+    // its verdicts come back.
+    const choices =
+      activeTree !== null && !trees.some((tree) => tree.code === activeTree)
+        ? [{ code: activeTree, count: 0, label: activeTree }, ...trees]
+        : trees;
+    const activeTreeName = choices.find((tree) => tree.code === activeTree)?.label ?? activeTree;
+    return { choices, activeTree, activeTreeName };
+  }, [state, arabic, treeCode]);
+
   // The palette, as one stable function. Rebuilt inline it was a new
   // identity on every render, and `HealthMap`'s cell effect depends on it —
   // so every render repainted the cell canvas and re-encoded it as a data
@@ -254,7 +302,44 @@ export function FarmHealthViewPage(): ReactNode {
     <Page width="bleed">
       <div className="flex h-full flex-col">
         <div className="border-b border-ap-line bg-ap-panel px-4 py-3">
-          <PageHeader title={t("farmHealth:title")} subtitle={farmQuery.data?.name ?? undefined} />
+          {/* The tree picker rides the title bar. It had a strip of its own
+              under the header until 2026-09-14, which cost a band of the
+              screen to hold one control. */}
+          <PageHeader
+            title={t("farmHealth:title")}
+            subtitle={farmQuery.data?.name ?? undefined}
+            actions={
+              picker.choices.length > 0 ? (
+                <label className="flex items-center gap-2">
+                  <span className="text-meta font-semibold uppercase tracking-wide text-ap-muted">
+                    {t("farmHealth:treePicker.label")}
+                  </span>
+                  <select
+                    aria-label={t("farmHealth:treePicker.label")}
+                    value={picker.activeTree ?? ""}
+                    onChange={(event) => {
+                      setTreeCode(event.target.value);
+                      // The rail re-sorts for the new tree, so a block held
+                      // from the old one may no longer be near the top, and
+                      // its areas belong to a different tree entirely.
+                      setBlockId(null);
+                      setAreaKey(null);
+                    }}
+                    className="min-w-[16rem] rounded border border-ap-line bg-ap-panel px-2 py-1.5 text-sm"
+                  >
+                    {/* The tree's name, in the reader's language. The value
+                        stays the code, because that is what a verdict row
+                        carries and what the rail filters on. */}
+                    {picker.choices.map((tree) => (
+                      <option key={tree.code} value={tree.code}>
+                        {tree.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : undefined
+            }
+          />
         </div>
 
         <AsyncBoundary
@@ -277,50 +362,7 @@ export function FarmHealthViewPage(): ReactNode {
                     verdicts,
                   }),
                 );
-            // The picker is built from the live read PLUS the whole window's
-            // history, never from the frame on show.
-            //
-            // Built from the frame it rewrote itself during a replay: a tree
-            // that said nothing on 12 August vanished from the list on that
-            // frame and came back on the next one. Built from the live read
-            // alone it loses a tree that ran earlier in the window and has
-            // since stopped — which is exactly the tree someone opens a
-            // replay to look at. The history covers the window, so this list
-            // is the same on every frame of it.
-            const liveTrees = treeOptions(data.verdicts.blocks, arabic);
-            const trees = treeOptions(
-              [
-                ...data.verdicts.blocks,
-                {
-                  block_id: "__history",
-                  as_of: null,
-                  worst_status: null,
-                  last_evaluated_at: null,
-                  verdicts: data.history,
-                },
-              ],
-              arabic,
-            );
-            // The picker defaults to the first tree that is saying something
-            // TODAY. A tree with no verdict on this farm paints an entirely
-            // blank screen, which a reader cannot tell from a broken one.
-            //
-            // Defaulting to `trees[0]` instead would move the selection under
-            // the reader: the history lands a second after the first paint,
-            // and a history-only tree whose name sorts earlier would take the
-            // slot — on the newest day, where it has nothing to say, so every
-            // block would suddenly read "tree did not run".
-            const activeTree = treeCode ?? liveTrees[0]?.code ?? trees[0]?.code ?? null;
-            // Changing the range re-reads the history, and the old window's
-            // trees go with it. A controlled `select` whose value matches no
-            // option renders as a blank box, so the chosen tree always has
-            // one, named by its code until its verdicts come back.
-            const treeChoices =
-              activeTree !== null && !trees.some((tree) => tree.code === activeTree)
-                ? [{ code: activeTree, count: 0, label: activeTree }, ...trees]
-                : trees;
-            const activeTreeName =
-              treeChoices.find((tree) => tree.code === activeTree)?.label ?? activeTree;
+            const { activeTree, activeTreeName } = picker;
             const blocks: BlockMeta[] = data.blocks.map((block) => ({
               id: block.id,
               code: block.code,
@@ -423,36 +465,6 @@ export function FarmHealthViewPage(): ReactNode {
 
             return (
               <div className="flex min-h-0 flex-1 flex-col">
-                <div className="flex items-end gap-3 border-b border-ap-line bg-ap-panel px-4 py-2">
-                  <label className="flex flex-col gap-1">
-                    <span className="text-meta font-semibold uppercase tracking-wide text-ap-muted">
-                      {t("farmHealth:treePicker.label")}
-                    </span>
-                    <select
-                      aria-label={t("farmHealth:treePicker.label")}
-                      value={activeTree ?? ""}
-                      onChange={(event) => {
-                        setTreeCode(event.target.value);
-                        // The rail re-sorts for the new tree, so a block held
-                        // from the old one may no longer be near the top, and
-                        // its areas belong to a different tree entirely.
-                        setBlockId(null);
-                        setAreaKey(null);
-                      }}
-                      className="min-w-[16rem] rounded border border-ap-line bg-ap-panel px-2 py-1.5 text-sm"
-                    >
-                      {/* The tree's name, in the reader's language. The value
-                          stays the code, because that is what a verdict row
-                          carries and what the rail filters on. */}
-                      {treeChoices.map((tree) => (
-                        <option key={tree.code} value={tree.code}>
-                          {tree.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
                 {data.truncated ? (
                   <p className="border-b border-ap-line bg-ap-warn-soft px-4 py-2 text-sm text-ap-warn">
                     {t("farmHealth:range.truncated")}
@@ -623,10 +635,6 @@ export function FarmHealthViewPage(): ReactNode {
                               statuses={data.statuses}
                               farmId={farmId}
                               blockId={selected.blockId}
-                              open={openVerdictId === verdict.id}
-                              onToggle={() =>
-                                setOpenVerdictId((was) => (was === verdict.id ? null : verdict.id))
-                              }
                             />
                           ))}
 
@@ -670,8 +678,6 @@ export function FarmHealthViewPage(): ReactNode {
                                   statuses={data.statuses}
                                   farmId={farmId}
                                   blockId={selected.blockId}
-                                  open={reasoningOpen}
-                                  onToggle={() => setReasoningOpen((was) => !was)}
                                 />
                               ) : null}
                             </section>

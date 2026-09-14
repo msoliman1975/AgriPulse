@@ -333,10 +333,10 @@ describe("FarmHealthViewPage", () => {
 
     const heading = await screen.findByRole("heading", { level: 2 });
     expect(heading).toHaveTextContent("AG-R01-C02");
-    // The summary counts what the block holds, by status, in words.
+    // The summary still names the block's worst status. The colour bar and
+    // its per-status counts went on 2026-09-14: the rail on the left carries
+    // the same bar on every row.
     expect(screen.getByText("Block reads")).toBeInTheDocument();
-    const counts = screen.getByText("Block reads").closest("div")?.parentElement;
-    expect(counts).toHaveTextContent("1");
   });
 
   it("lets a reader open a block that the tree never ran on", async () => {
@@ -369,6 +369,19 @@ describe("FarmHealthViewPage", () => {
     const picker = await screen.findByRole("combobox", { name: "Decision tree" });
     const options = within(picker).getAllByRole("option").map((o) => o.textContent);
     expect(options).toEqual(["t_cwsi", "t_ndvi"]);
+  });
+
+  it("puts the tree picker in the page title bar", async () => {
+    // Mohamed, 2026-09-14: it had a strip of its own under the header, which
+    // spent a band of the screen on one control.
+    renderPage();
+
+    const picker = await screen.findByRole("combobox", { name: "Decision tree" });
+    const bar = picker.closest("header");
+    expect(bar).not.toBeNull();
+    expect(within(bar as HTMLElement).getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Farm Health View",
+    );
   });
 
   it("switching tree re-reads the rail", async () => {
@@ -562,22 +575,23 @@ describe("FarmHealthViewPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps the reasoning closed until it is asked for", async () => {
-    // It is a follow-up question, not the answer. Opening by default would
-    // push the map off the screen on every block.
+  it("shows the reasoning without being asked, and the step table not at all", async () => {
+    // Mohamed, 2026-09-14: the reasoning is the answer, so it is always on.
+    // The step table stays behind its own button — it is for the reader
+    // auditing a threshold.
     withCells();
     renderPage();
 
-    const link = await screen.findByRole("button", { name: "Show how this was decided" });
-    expect(link).toHaveAttribute("aria-expanded", "false");
+    expect(
+      await screen.findByText(/The tree checked 2 things, in this order/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /how this was decided/i })).toBeNull();
     expect(screen.queryByText("Steps the tree took, root to leaf")).not.toBeInTheDocument();
   });
 
   it("shows the walk in place, with each step's reading and test", async () => {
     withCells();
     renderPage();
-
-    fireEvent.click(await screen.findByRole("button", { name: "Show how this was decided" }));
 
     // The paragraph is what the card leads with now; the grid moved behind
     // its own toggle, for the reader auditing a threshold.
@@ -608,8 +622,6 @@ describe("FarmHealthViewPage", () => {
     };
     withCells();
     renderPage();
-
-    fireEvent.click(await screen.findByRole("button", { name: "Show how this was decided" }));
 
     expect(
       await screen.findByText(/The walk behind this verdict is no longer kept/),
@@ -841,8 +853,6 @@ describe("FarmHealthViewPage", () => {
     // the answer. So were the kind and the status, as database codes.
     withCells();
     renderPage();
-
-    fireEvent.click(await screen.findByRole("button", { name: "Show how this was decided" }));
 
     expect(await screen.findByText(/Irrigate within 24 hours/)).toBeInTheDocument();
     expect(screen.queryByText(/leaf_dry/)).not.toBeInTheDocument();

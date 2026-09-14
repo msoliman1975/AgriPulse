@@ -98,7 +98,7 @@ export function Reasoning({
           the only thing here, and it made "why is this block green" a puzzle
           the reader had to assemble. */}
       {narrative ? (
-        <p className="max-w-prose text-sm leading-relaxed text-ap-ink">{narrative}</p>
+        <p className="text-sm leading-relaxed text-ap-ink">{narrative}</p>
       ) : null}
 
       <div>
