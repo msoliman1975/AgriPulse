@@ -3696,10 +3696,30 @@ global:
     #   something still imported would show there and nowhere else.
     #
     #   Rollback is these two tags back to 431d7fa.
+    # 7364473 = #691 + #685, api and workers.
+    #
+    #   #691 — a decision tree that targets every crop could not be edited.
+    #   `DecisionTreeUpdateRequest.crop_paths` required at least one entry,
+    #   so the editor's targeting form PATCHed the row's own stored value
+    #   back and got a 422. An empty crop set means "matches any", the same
+    #   as an empty country or soil set; `_validate_targeting` accepts it and
+    #   20 of the 41 platform trees store it. The frontend gate ran first, so
+    #   the visible symptom was a Save button that greyed out with no message.
+    #
+    #   #685 — attachment upload returned 500 at finalize on every call. A
+    #   geometry bind inside `CASE WHEN :geo IS NULL` could not be typed, so
+    #   the INSERT never compiled. This image is the first to carry it.
+    #
+    #   No migration in fcf7b0e..7364473.
+    #
+    #   Watch for this: a 422 from PATCH /v1/decision-trees/{code} would mean
+    #   the schema change did not roll.
+    #
+    #   Rollback is these two tags back to fcf7b0e.
     api:
-      tag: "fcf7b0e"
+      tag: "7364473"
     workers:
-      tag: "fcf7b0e"
+      tag: "7364473"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4257,7 +4277,17 @@ global:
       #   the list.
       #
       #   Rollback is this tag alone back to 20fd0ce.
-      tag: "02a0e59"
+      # 7364473 = #691, frontend half. The editor's Save gate no longer also
+      #   requires a crop, so on a tree that targets every crop a country, soil
+      #   or execution-scope change can be saved. Before this, the click did
+      #   nothing, no draft version was appended, and the header's "Publish vN"
+      #   button — which only shows when an unpublished draft exists — never
+      #   appeared. The crop axis stays required on the create form alone.
+      #
+      #   #691 is the only commit in 02a0e59..7364473 that touches frontend/.
+      #
+      #   Rollback is this tag alone back to 02a0e59.
+      tag: "7364473"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
