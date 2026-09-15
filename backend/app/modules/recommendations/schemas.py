@@ -514,10 +514,14 @@ class DecisionTreeUpdateRequest(BaseModel):
     name_ar: str | None = Field(default=None, max_length=200)
     description_en: str | None = Field(default=None, max_length=4000)
     description_ar: str | None = Field(default=None, max_length=4000)
-    # Crop targeting is required — every tree declares at least one crop
-    # path. Country + soil sets may be empty (empty = "matches any" on
-    # that axis), matching the create-time semantics.
-    crop_paths: list[str] = Field(min_length=1)
+    # All three targeting axes may be empty, and empty means "matches any"
+    # on that axis. That is what `_validate_targeting` accepts, what the
+    # engine matcher implements, and what 20 of the shipped platform trees
+    # actually store. This field used to require at least one crop path,
+    # which made every "any crop" tree impossible to edit: the form PATCHed
+    # its own stored value back and got a 422, so a country, soil or scope
+    # change could not be saved at all.
+    crop_paths: list[str] = Field(default_factory=list)
     country_codes: list[str] = Field(default_factory=list)
     soil_textures: list[str] = Field(default_factory=list)
     scope: Literal["block", "cell"] = "block"

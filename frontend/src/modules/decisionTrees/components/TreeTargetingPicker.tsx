@@ -1,9 +1,14 @@
 // Multi-axis targeting picker for decision-tree authoring (DT targeting PR-5).
 //
-// Three multi-selects — crop (required), country, soil — whose values feed the
-// create payload's crop_paths / country_codes / soil_textures. Crop reuses the
+// Three multi-selects — crop, country, soil — whose values feed the create
+// payload's crop_paths / country_codes / soil_textures. Crop reuses the
 // cascading CropPathFilter as an "adder" so an author can target several crop
-// slices (e.g. mango + citrus.valencia). Empty country/soil = "any".
+// slices (e.g. mango + citrus.valencia). An empty set on any axis = "any".
+//
+// `cropRequired` is a form rule, not a data rule. The create form asks for a
+// crop so a new tree states what it is for. The editor does not, because 20
+// of the shipped trees target every crop and the form has to be able to save
+// the value the row already holds.
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -31,6 +36,8 @@ interface Props {
   onCropPathsChange: (next: string[]) => void;
   onCountryCodesChange: (next: string[]) => void;
   onSoilTexturesChange: (next: string[]) => void;
+  /** Show the crop axis as required. Create asks for one; the editor does not. */
+  cropRequired?: boolean;
 }
 
 function Chips({
@@ -70,6 +77,7 @@ export function TreeTargetingPicker({
   onCropPathsChange,
   onCountryCodesChange,
   onSoilTexturesChange,
+  cropRequired = false,
 }: Props): ReactNode {
   const { t, i18n } = useTranslation("decisionTrees");
   const isAr = i18n.language === "ar";
@@ -102,10 +110,11 @@ export function TreeTargetingPicker({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Crop — required */}
+      {/* Crop — empty = any, unless the host form asks for one */}
       <div className="flex flex-col gap-2">
         <span className="text-xs font-medium text-ap-muted">
-          {t("targeting.crop")} <span className="text-ap-crit">*</span>
+          {t("targeting.crop")}
+          {cropRequired ? <span className="text-ap-crit"> *</span> : null}
         </span>
         <div className="flex flex-wrap items-center gap-2">
           {/* `/v1/crops` asserts a tenant context, so a platform admin got 403
@@ -127,7 +136,9 @@ export function TreeTargetingPicker({
           onRemove={(v) => onCropPathsChange(cropPaths.filter((c) => c !== v))}
         />
         {cropPaths.length === 0 ? (
-          <span className="text-[11px] text-ap-muted">{t("targeting.cropRequired")}</span>
+          <span className="text-[11px] text-ap-muted">
+            {cropRequired ? t("targeting.cropRequired") : t("targeting.anyHint")}
+          </span>
         ) : null}
       </div>
 

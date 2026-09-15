@@ -584,14 +584,13 @@ export function DecisionTreeViewerPage(): ReactNode {
     }
   };
 
-  // Saving targeting requires a crop (backend enforces min-1 crop_paths).
-  const metaBlocksSave = targetingDirty && targeting.crop_paths.length === 0;
-  const canSave =
-    dirty &&
-    structuralErrors.length === 0 &&
-    !append.isPending &&
-    !update.isPending &&
-    !metaBlocksSave;
+  // An empty crop set means "matches any crop" — the same as an empty
+  // country or soil set. This gate used to also require a crop, so on any
+  // tree that targets every crop the Save button went grey the moment the
+  // author touched a country, a soil texture or the execution scope, with
+  // no message on the button saying why. The edit looked lost and no draft
+  // was ever appended, so the header's Publish button never appeared either.
+  const canSave = dirty && structuralErrors.length === 0 && !append.isPending && !update.isPending;
 
   const onSave = async (): Promise<void> => {
     if (!draftYaml) return;

@@ -224,6 +224,7 @@ export function DecisionTreeCreatePage(): ReactNode {
             onCropPathsChange={setCropPaths}
             onCountryCodesChange={setCountryCodes}
             onSoilTexturesChange={setSoilTextures}
+            cropRequired
           />
           <div className="mt-2 flex flex-col gap-1.5 border-t border-ap-line pt-3">
             <span className="text-xs font-medium text-ap-muted">{t("targeting.scope")}</span>
