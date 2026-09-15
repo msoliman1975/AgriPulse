@@ -2071,7 +2071,12 @@ class FarmsRepository:
             ) VALUES (
                 :id, :farm_id, :kind, :s3_key, :filename, :content_type, :size,
                 :caption, :taken_at,
-                CASE WHEN :geo IS NULL THEN NULL ELSE ST_GeomFromEWKT(:geo) END,
+                -- ST_GeomFromEWKT is STRICT, so a NULL bind yields NULL.
+                -- Do not wrap this in a CASE that tests the bind for null:
+                -- Postgres cannot infer a type for a parameter used that way,
+                -- and the whole statement then fails to prepare with
+                -- "could not determine data type of parameter".
+                ST_GeomFromEWKT(:geo),
                 :actor, :actor
             )
             RETURNING id, created_at, updated_at
@@ -2139,7 +2144,12 @@ class FarmsRepository:
             ) VALUES (
                 :id, :block_id, :kind, :s3_key, :filename, :content_type, :size,
                 :caption, :taken_at,
-                CASE WHEN :geo IS NULL THEN NULL ELSE ST_GeomFromEWKT(:geo) END,
+                -- ST_GeomFromEWKT is STRICT, so a NULL bind yields NULL.
+                -- Do not wrap this in a CASE that tests the bind for null:
+                -- Postgres cannot infer a type for a parameter used that way,
+                -- and the whole statement then fails to prepare with
+                -- "could not determine data type of parameter".
+                ST_GeomFromEWKT(:geo),
                 :actor, :actor
             )
             RETURNING id, created_at, updated_at
