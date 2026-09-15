@@ -845,6 +845,11 @@ async def publish_decision_tree_version(
 @router.delete(
     "/decision-trees/{code}/versions/{version}",
     status_code=status.HTTP_204_NO_CONTENT,
+    # A 204 carries no body, and FastAPI builds a response field from the
+    # `-> None` annotation unless told not to. Without this every test that
+    # assembles the app fails at import with "Status code 204 must not have a
+    # response body". Same spelling as the other 204s in this codebase.
+    response_model=None,
     summary="Discard an unpublished draft version.",
 )
 async def discard_decision_tree_version(

@@ -612,14 +612,15 @@ class RecommendationsRepository:
         record `tree_version` as a bare integer, so removing one would strand
         every row that names it.
         """
-        result = await self._public.execute(
-            text(
-                "DELETE FROM public.decision_tree_versions "
-                "WHERE id = :vid AND published_at IS NULL"
-            ).bindparams(bindparam("vid", type_=PG_UUID(as_uuid=True))),
-            {"vid": version_id},
+        return _rowcount(
+            await self._public.execute(
+                text(
+                    "DELETE FROM public.decision_tree_versions "
+                    "WHERE id = :vid AND published_at IS NULL"
+                ).bindparams(bindparam("vid", type_=PG_UUID(as_uuid=True))),
+                {"vid": version_id},
+            )
         )
-        return int(result.rowcount or 0)
 
     async def insert_tree(
         self,
