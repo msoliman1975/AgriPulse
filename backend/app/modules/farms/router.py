@@ -1622,6 +1622,33 @@ async def list_crop_attribute_catalog(
 
 
 @router.get(
+    "/admin/crop-attribute-definitions",
+    response_model=list[CropAttributeDefinitionResponse],
+    summary="Flat catalog of crop attribute definitions (platform scope).",
+)
+async def admin_list_crop_attribute_catalog(
+    context: RequestContext = Depends(requires_capability("platform.read")),
+    service: FarmService = Depends(_service),
+) -> list[dict[str, Any]]:
+    """The same flat catalog as `/crops/attribute-definitions`, for a caller
+    with a platform role and no tenant.
+
+    The rows are platform-curated and the repository already reads them off
+    the public session — the tenant assertion on the sibling route was the
+    only thing in the way. Without this, the decision-tree condition builder
+    on `/platform/decision-trees` got a 403 and offered an empty list, so a
+    `{source: crop_attribute}` predicate could be read but not authored.
+
+    Named `/admin/crop-attribute-definitions` rather than
+    `/admin/crops/attribute-definitions` so it cannot be shadowed by
+    `/admin/crops/{crop_id}/attribute-definitions`. It is the sibling of
+    `/admin/crop-attribute-definitions/{definition_id}`, which already exists.
+    """
+    del context
+    return await service.list_crop_attribute_catalog()
+
+
+@router.get(
     "/crops/resolved-attributes",
     response_model=ResolvedCropAttributesResponse,
     summary="Resolve crop attribute definitions (deepest-wins) for a crop path.",

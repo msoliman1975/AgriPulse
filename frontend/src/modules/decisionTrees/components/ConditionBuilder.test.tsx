@@ -8,9 +8,31 @@ import { setupTestI18n } from "@/i18n/testing";
 import { parseConditionTree } from "../lib/conditionEdit";
 import { ConditionBuilder } from "./ConditionBuilder";
 
-// The signals-source dropdown loads the tenant signal catalog; the
-// builder itself is what's under test, so stub the network away.
+// Which catalogue route the builder reaches for is a property of the signed-in
+// caller: a tenant admin reads the tenant routes, a platform admin the
+// `/admin/` and `/platform/` twins. The three tenant routes 403 for a platform
+// admin, and an empty picker was all that reached the screen. Each mock below
+// answers on both routes with distinguishable payloads so a test can tell
+// which one ran.
+const state = vi.hoisted(() => ({ callerTenantId: null as string | null }));
+
+vi.mock("@/rbac/useCapability", () => ({
+  useCapability: () => true,
+  useClaims: () => ({ tenant_id: state.callerTenantId }),
+}));
+
+// The signals-source dropdown loads the signal catalog; the builder itself is
+// what's under test, so stub the network away.
 vi.mock("@/api/signals", () => ({
+  listPlatformSignalDefinitions: () =>
+    Promise.resolve([
+      {
+        code: "platform_leaf_colour",
+        value_kind: "categorical",
+        categorical_values: ["pale", "normal"],
+        description: "Platform-curated leaf colour.",
+      },
+    ]),
   listSignalDefinitions: () =>
     Promise.resolve([
       {
@@ -23,6 +45,15 @@ vi.mock("@/api/signals", () => ({
     ]),
 }));
 vi.mock("@/api/weatherIndices", () => ({
+  getPlatformWeatherIndexCatalog: () =>
+    Promise.resolve([
+      {
+        code: "rain_et_balance",
+        unit: "mm",
+        description_en: "Platform copy of the water balance.",
+        description_ar: "الميزان المائي اليومي",
+      },
+    ]),
   getWeatherIndexCatalog: () =>
     Promise.resolve([
       {
@@ -34,6 +65,16 @@ vi.mock("@/api/weatherIndices", () => ({
     ]),
 }));
 vi.mock("@/api/crops", () => ({
+  listPlatformCropAttributeCatalog: () =>
+    Promise.resolve([
+      {
+        code: "platform_transplant_date",
+        path: "mango",
+        name_en: "Platform transplant date",
+        value_type: "date",
+        description_en: "When the block was transplanted.",
+      },
+    ]),
   listCropAttributeCatalog: () =>
     Promise.resolve([
       {
@@ -73,6 +114,7 @@ const NDVI_LT_0 = {
 describe("<ConditionBuilder>", () => {
   beforeEach(async () => {
     await setupTestI18n("en");
+    state.callerTenantId = "01a041ef-e184-723b-b1cb-9d6e656fe00d";
   });
 
   it("renders a nested group instead of the YAML fallback", () => {
@@ -417,5 +459,57 @@ describe("<ConditionBuilder>", () => {
 
     // `undefined` clears the condition rather than leaving `all_of: []`.
     expect(onChange).toHaveBeenCalledWith(undefined);
+  });
+});
+
+// A platform admin has no tenant, and all three of these catalogues used to be
+// read off tenant-only routes. Each returned 403 and each picker rendered
+// empty, so on `/platform/decision-trees` a predicate over a signal, a crop
+// attribute or a weather index could be read but not authored. These assert
+// the platform payload reaches the screen, which the tenant payload cannot
+// fake: every code below exists only in the platform mock.
+describe("<ConditionBuilder> for a platform admin", () => {
+  beforeEach(async () => {
+    await setupTestI18n("en");
+    state.callerTenantId = null;
+  });
+
+  it("reads signal definitions from the platform catalogue", async () => {
+    renderBuilder({
+      op: "eq",
+      left: { source: "signals", code: "platform_leaf_colour", key: "value_categorical" },
+      right: "pale",
+    });
+
+    // The vocabulary only resolves if the platform route answered — the
+    // tenant mock has no `platform_leaf_colour`.
+    await waitFor(() => expect(screen.getByDisplayValue("pale").tagName).toBe("SELECT"));
+    expect(
+      within(screen.getByDisplayValue("pale"))
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["pale", "normal"]);
+  });
+
+  it("reads crop attribute definitions from the platform catalogue", async () => {
+    renderBuilder({
+      op: "eq",
+      left: { source: "crop_attribute", code: "platform_transplant_date" },
+      right: "2026-01-01",
+    });
+
+    await waitFor(() =>
+      expect(screen.getByDisplayValue("2026-01-01").getAttribute("type")).toBe("date"),
+    );
+  });
+
+  it("reads the weather index catalogue from the platform route", async () => {
+    renderBuilder({
+      op: "gt",
+      left: { source: "weather_index", index_code: "rain_et_balance", key: "value" },
+      right: 0,
+    });
+
+    expect(await screen.findByText(/Platform copy of the water balance/)).toBeInTheDocument();
   });
 });

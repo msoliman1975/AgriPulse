@@ -148,6 +148,20 @@ export async function listCropAttributeCatalog(): Promise<CropAttributeDefinitio
   return data;
 }
 
+/**
+ * The same flat catalog, for a caller with a platform role and no tenant.
+ *
+ * `/v1/crops/attribute-definitions` asserts a tenant context, so a platform
+ * admin got 403 and the decision-tree condition builder offered no crop
+ * attribute codes — the one condition source whose vocabulary is data.
+ */
+export async function listPlatformCropAttributeCatalog(): Promise<CropAttributeDefinition[]> {
+  const { data } = await apiClient.get<CropAttributeDefinition[]>(
+    "/v1/admin/crop-attribute-definitions",
+  );
+  return data;
+}
+
 /** Deepest-wins definitions for one crop path — the assignment form. */
 export async function resolveCropAttributes(cropPath: string): Promise<ResolvedCropAttributes> {
   const { data } = await apiClient.get<ResolvedCropAttributes>("/v1/crops/resolved-attributes", {

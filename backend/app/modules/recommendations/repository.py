@@ -572,6 +572,55 @@ class RecommendationsRepository:
         ).first()
         return int(row.v) if row is not None else 0
 
+    async def count_versions(self, *, tree_id: UUID) -> int:
+        row = (
+            await self._public.execute(
+                text(
+                    "SELECT count(*) AS n FROM public.decision_tree_versions "
+                    "WHERE tree_id = :tid"
+                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                {"tid": tree_id},
+            )
+        ).first()
+        return int(row.n) if row is not None else 0
+
+    async def count_pins_at_version(self, *, tree_id: UUID, version: int) -> int:
+        """Tenants holding this tree at this version number.
+
+        `tenant_tree_version_pins` stores the version as an integer with no
+        foreign key to `decision_tree_versions`, so deleting a pinned row
+        would leave the pin pointing at nothing and the sweep resolving a
+        version that is gone. Discard checks this first.
+        """
+        row = (
+            await self._public.execute(
+                text(
+                    "SELECT count(*) AS n FROM public.tenant_tree_version_pins "
+                    "WHERE tree_id = :tid AND version = :v"
+                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                {"tid": tree_id, "v": version},
+            )
+        ).first()
+        return int(row.n) if row is not None else 0
+
+    async def delete_unpublished_version(self, *, version_id: UUID) -> int:
+        """Delete one draft row. Returns the number of rows removed.
+
+        The `published_at IS NULL` predicate is repeated here on purpose. The
+        service checks it too, but this is the statement that actually runs,
+        and a published version is history: recommendations and block verdicts
+        record `tree_version` as a bare integer, so removing one would strand
+        every row that names it.
+        """
+        result = await self._public.execute(
+            text(
+                "DELETE FROM public.decision_tree_versions "
+                "WHERE id = :vid AND published_at IS NULL"
+            ).bindparams(bindparam("vid", type_=PG_UUID(as_uuid=True))),
+            {"vid": version_id},
+        )
+        return int(result.rowcount or 0)
+
     async def insert_tree(
         self,
         *,

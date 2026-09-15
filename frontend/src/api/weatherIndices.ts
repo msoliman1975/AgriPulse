@@ -31,6 +31,20 @@ export async function getWeatherIndexCatalog(): Promise<WeatherIndexCatalogItem[
   return data;
 }
 
+/**
+ * The same catalog, for a caller with a platform role and no tenant.
+ *
+ * `/v1/weather/indices/catalog` asserts a tenant context, so a platform admin
+ * got 403 and the decision-tree condition builder rendered the weather-index
+ * picker with no descriptions.
+ */
+export async function getPlatformWeatherIndexCatalog(): Promise<WeatherIndexCatalogItem[]> {
+  const { data } = await apiClient.get<WeatherIndexCatalogItem[]>(
+    "/v1/admin/weather/indices/catalog",
+  );
+  return data;
+}
+
 // --- Per-farm summary (latest value + anomaly + 7-day trend) --------------
 
 export interface WeatherIndexSummaryEntry {

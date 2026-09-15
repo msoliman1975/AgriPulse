@@ -1,5 +1,15 @@
 import { listCountries, listCountriesAdmin, type Country } from "@/api/countries";
 import {
+  listCropAttributeCatalog,
+  listPlatformCropAttributeCatalog,
+  type CropAttributeDefinition,
+} from "@/api/crops";
+import {
+  getPlatformWeatherIndexCatalog,
+  getWeatherIndexCatalog,
+  type WeatherIndexCatalogItem,
+} from "@/api/weatherIndices";
+import {
   listPlatformSignalDefinitions,
   listSignalDefinitions,
   type SignalDefinition,
@@ -64,4 +74,30 @@ export function countriesForScope(scope: AuthoringScope): Promise<Country[]> {
  */
 export function signalDefinitionsForScope(scope: AuthoringScope): Promise<SignalDefinition[]> {
   return scope === "platform" ? listPlatformSignalDefinitions() : listSignalDefinitions();
+}
+
+/**
+ * Crop attribute definitions, from whichever route this caller may read.
+ *
+ * `/v1/crops/attribute-definitions` is tenant-scoped, so a platform admin got
+ * 403 and the condition editor's crop-attribute codes came back empty. This is
+ * the one condition source whose vocabulary is data rather than a constant in
+ * the frontend, so an empty list is the whole picker.
+ */
+export function cropAttributeCatalogForScope(
+  scope: AuthoringScope,
+): Promise<CropAttributeDefinition[]> {
+  return scope === "platform" ? listPlatformCropAttributeCatalog() : listCropAttributeCatalog();
+}
+
+/**
+ * The weather-index catalog, from whichever route this caller may read.
+ *
+ * `/v1/weather/indices/catalog` is tenant-scoped, so a platform admin got 403
+ * and the weather-index picker rendered with no bilingual descriptions.
+ */
+export function weatherIndexCatalogForScope(
+  scope: AuthoringScope,
+): Promise<WeatherIndexCatalogItem[]> {
+  return scope === "platform" ? getPlatformWeatherIndexCatalog() : getWeatherIndexCatalog();
 }

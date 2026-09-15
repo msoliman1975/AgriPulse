@@ -2987,6 +2987,92 @@ class DecisionTreesAuthorService:
         )
         return await self._tree_with_version(code=code, version=next_version)
 
+    async def discard_version(
+        self,
+        *,
+        code: str,
+        version: int,
+        actor_user_id: UUID | None,
+    ) -> None:
+        """Delete one unpublished draft.
+
+        The editor hydrates from the newest version, and `append_version` is a
+        no-op when the compiled hash is unchanged. So an author who saved a
+        draft they did not want had no way back: re-saving the old body
+        returned the existing row, and every later author opened the unwanted
+        draft. This is the way back.
+
+        Four things are refused, each because something else is reading the
+        row:
+
+        * A published version. It is history. `recommendations.tree_version`
+          and `decision_tree_block_verdicts.tree_version` are bare integers
+          with no foreign key, so deleting one strands every row naming it.
+        * The current version. Covered by the rule above in practice, checked
+          on its own because `current_version_id` is what the engine reads.
+        * The tree's only version. The editor would have nothing to open, and
+          the tree is not deleted by this route — archive it instead.
+        * A version some tenant has pinned. `tenant_tree_version_pins.version`
+          is an integer with no foreign key either, so the sweep would resolve
+          a version that no longer exists.
+        """
+        tree = await self._own_tree_or_raise(code)
+        version_row = await self._repo.get_version_by_number(tree_id=tree["id"], version=version)
+        if version_row is None:
+            raise _DecisionTreeVersionNotFoundError(code=code, version=version)
+
+        def refuse(reason: str, detail: str) -> _DecisionTreeVersionNotDiscardableError:
+            return _DecisionTreeVersionNotDiscardableError(
+                code=code, version=version, reason=reason, detail=detail
+            )
+
+        if version_row["published_at"] is not None:
+            raise refuse(
+                "published",
+                f"Version {version} of {code!r} is published. A published version is "
+                "the record of what the engine ran, so it stays. Publish a different "
+                "version to move off it.",
+            )
+        if tree["current_version_id"] == version_row["id"]:
+            raise refuse(
+                "current",
+                f"Version {version} of {code!r} is the current version. Publish a "
+                "different version first.",
+            )
+        if await self._repo.count_versions(tree_id=tree["id"]) <= 1:
+            raise refuse(
+                "only_version",
+                f"Version {version} is the only version of {code!r}. Discarding it "
+                "would leave the editor nothing to open. Archive the tree instead.",
+            )
+        pins = await self._repo.count_pins_at_version(tree_id=tree["id"], version=version)
+        if pins > 0:
+            raise refuse(
+                "pinned",
+                f"Version {version} of {code!r} is pinned by {pins} tenant(s). "
+                "They would be left following a version that does not exist.",
+            )
+
+        removed = await self._repo.delete_unpublished_version(version_id=version_row["id"])
+        if removed == 0:
+            # The row was published between the read and the delete. The
+            # repository's own `published_at IS NULL` predicate caught it.
+            raise refuse(
+                "published",
+                f"Version {version} of {code!r} was published while this request was "
+                "in flight, so it was not discarded.",
+            )
+        await self._audit.record(
+            tenant_schema=None,
+            event_type="recommendations.decision_tree_version_discarded",
+            actor_user_id=actor_user_id,
+            actor_kind="user" if actor_user_id else "system",
+            subject_kind="decision_tree_version",
+            subject_id=version_row["id"],
+            farm_id=None,
+            details={"code": code, "version": version},
+        )
+
     async def publish_version(
         self,
         *,
@@ -3883,6 +3969,22 @@ class _TenantScopeRequiredError(_DecisionTreeAuthoringError):
     Copying, enabling and pinning are things a tenant does to its own farms.
     A platform caller has no farms and no pins, so there is nothing to do.
     """
+
+
+class _DecisionTreeVersionNotDiscardableError(_DecisionTreeAuthoringError):
+    """A version the author asked to discard has to stay.
+
+    Discard exists for one case: an unpublished draft the author no longer
+    wants. Everything else named here is either history someone may be
+    reading, or the last thing the editor has to open.
+    """
+
+    def __init__(self, *, code: str, version: int, reason: str, detail: str) -> None:
+        super().__init__(detail)
+        self.code = code
+        self.version = version
+        self.reason = reason
+        self.detail = detail
 
 
 class _DecisionTreeNoPublishedVersionError(_DecisionTreeAuthoringError):

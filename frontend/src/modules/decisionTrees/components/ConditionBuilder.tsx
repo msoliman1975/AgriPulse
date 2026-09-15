@@ -15,10 +15,12 @@ import { useTranslation } from "react-i18next";
 import { createContext, useContext, useId, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { listCropAttributeCatalog } from "@/api/crops";
-import { listSignalDefinitions } from "@/api/signals";
-import { getWeatherIndexCatalog } from "@/api/weatherIndices";
-
+import {
+  cropAttributeCatalogForScope,
+  signalDefinitionsForScope,
+  useAuthoringScope,
+  weatherIndexCatalogForScope,
+} from "../lib/authoringScope";
 import { FieldHint } from "./FieldHint";
 import {
   BLOCK_FIELDS,
@@ -368,15 +370,21 @@ function useHint(): (group: string, code: string | undefined) => string | undefi
 function useOperandSpec(left: ValueRef): OperandSpec | null {
   const isSignal = left.source === "signals";
   const isCropAttr = left.source === "crop_attribute";
+  // Both catalogs have a tenant route and a platform route. This component is
+  // mounted under both `/decision-trees` and `/platform/decision-trees`, and
+  // the tenant route 403s for a platform admin — which read as "this source
+  // has no codes" rather than as a permission problem. The scope is part of
+  // the query key so the two never share a cache entry.
+  const scope = useAuthoringScope();
   const signalDefs = useQuery({
-    queryKey: ["signal_definitions", "list"] as const,
-    queryFn: () => listSignalDefinitions(),
+    queryKey: ["signal_definitions", "list", scope] as const,
+    queryFn: () => signalDefinitionsForScope(scope),
     staleTime: 60_000,
     enabled: isSignal,
   });
   const cropAttrDefs = useQuery({
-    queryKey: ["crop_attribute_definitions", "catalog"] as const,
-    queryFn: () => listCropAttributeCatalog(),
+    queryKey: ["crop_attribute_definitions", "catalog", scope] as const,
+    queryFn: () => cropAttributeCatalogForScope(scope),
     staleTime: 60_000,
     enabled: isCropAttr,
   });
@@ -640,11 +648,15 @@ function SourceSpecificFields({
   const hint = useHint();
   const { i18n } = useTranslation();
   const arabic = i18n.language?.startsWith("ar") ?? false;
-  // Tenant signal definitions for the signals-source code dropdown. Loaded
-  // once and shared across every condition row via react-query dedupe.
+  // Three catalogs, each with a tenant route and a platform route. See
+  // `useOperandSpec` above for why the scope has to pick, and why it is part
+  // of every one of these query keys.
+  const scope = useAuthoringScope();
+  // Signal definitions for the signals-source code dropdown. Loaded once and
+  // shared across every condition row via react-query dedupe.
   const signalDefs = useQuery({
-    queryKey: ["signal_definitions", "list"] as const,
-    queryFn: () => listSignalDefinitions(),
+    queryKey: ["signal_definitions", "list", scope] as const,
+    queryFn: () => signalDefinitionsForScope(scope),
     staleTime: 60_000,
   });
   // Crop attribute codes are the one condition source whose vocabulary is
@@ -652,15 +664,15 @@ function SourceSpecificFields({
   // catalog and grow with it. Fetched once and shared across every condition
   // row by react-query dedupe, same as the signal definitions above.
   const cropAttrDefs = useQuery({
-    queryKey: ["crop_attribute_definitions", "catalog"] as const,
-    queryFn: () => listCropAttributeCatalog(),
+    queryKey: ["crop_attribute_definitions", "catalog", scope] as const,
+    queryFn: () => cropAttributeCatalogForScope(scope),
     staleTime: 60_000,
   });
   // Bilingual descriptions for the eight curated weather indices, straight
   // from the platform catalog rather than restated here.
   const weatherIndexCatalog = useQuery({
-    queryKey: ["weather_index_catalog"] as const,
-    queryFn: () => getWeatherIndexCatalog(),
+    queryKey: ["weather_index_catalog", scope] as const,
+    queryFn: () => weatherIndexCatalogForScope(scope),
     staleTime: 300_000,
   });
   const signalDef =

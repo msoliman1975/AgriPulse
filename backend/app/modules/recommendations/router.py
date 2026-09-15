@@ -82,6 +82,7 @@ from app.modules.recommendations.service import (
     _DecisionTreeNoPublishedVersionError,
     _DecisionTreeNotFoundError,
     _DecisionTreeUnknownCropAttributeError,
+    _DecisionTreeVersionNotDiscardableError,
     _DecisionTreeVersionNotFoundError,
     _ParamNameUnknownError,
     _ParamValueCoercionError,
@@ -693,6 +694,17 @@ def _map_authoring_error(exc: Exception) -> Exception | None:  # noqa: PLR0911 -
             ),
             type_="https://agripulse.cloud/problems/tenant-required",
         )
+    if isinstance(exc, _DecisionTreeVersionNotDiscardableError):
+        # 409, not 403. The caller may edit this tree; this particular version
+        # is the one thing they cannot remove, and `reason` says which rule
+        # held it so the UI can put that sentence next to the button.
+        return APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Version cannot be discarded",
+            detail=exc.detail,
+            type_="https://agripulse.cloud/problems/recommendations/version-not-discardable",
+            extras={"code": exc.code, "version": exc.version, "reason": exc.reason},
+        )
     if isinstance(exc, _DecisionTreeNoPublishedVersionError):
         return APIError(
             status_code=status.HTTP_409_CONFLICT,
@@ -819,6 +831,41 @@ async def publish_decision_tree_version(
     _ensure_authoring_scope(context)
     try:
         return await service.publish_version(
+            code=code,
+            version=version,
+            actor_user_id=context.user_id,
+        )
+    except Exception as exc:
+        mapped = _map_authoring_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.delete(
+    "/decision-trees/{code}/versions/{version}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Discard an unpublished draft version.",
+)
+async def discard_decision_tree_version(
+    code: str,
+    version: int,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: DecisionTreesAuthorService = Depends(_author_service),
+) -> None:
+    """Remove a draft the author does not want.
+
+    Without this there was no way back from a bad save. The editor hydrates
+    from the newest version and `append_version` returns the existing row when
+    the compiled hash is unchanged, so re-saving the old body did nothing and
+    the unwanted draft stayed in front of every later author.
+
+    Only an unpublished, unpinned, non-current draft goes, and never the last
+    version a tree has. `discard_version` says which rule refused.
+    """
+    _ensure_authoring_scope(context)
+    try:
+        await service.discard_version(
             code=code,
             version=version,
             actor_user_id=context.user_id,

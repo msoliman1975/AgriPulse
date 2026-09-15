@@ -54,6 +54,7 @@ import {
   useDecisionTree,
   useDecisionTreeCandidateBlocks,
   useDecisionTreeCandidateFarms,
+  useDiscardDecisionTreeVersion,
   useDryRunDecisionTree,
   usePublishDecisionTreeVersion,
   useRunDecisionTreeOnFarm,
@@ -140,6 +141,7 @@ export function DecisionTreeViewerPage(): ReactNode {
   const detail = useDecisionTree(code);
   const append = useAppendDecisionTreeVersion();
   const publish = usePublishDecisionTreeVersion();
+  const discard = useDiscardDecisionTreeVersion();
   // The `decision_tree_authoring` funnel: open -> edit -> dry_run -> publish.
   // Authoring is where we most suspect friction, and the step people stop at
   // is the whole question. `open` fires on mount below, not here.
@@ -199,6 +201,8 @@ export function DecisionTreeViewerPage(): ReactNode {
   const [addChildPending, setAddChildPending] = useState<PendingAddChild | null>(null);
   const [addChildError, setAddChildError] = useState<string | null>(null);
   const [deletePending, setDeletePending] = useState<string | null>(null);
+  // The draft version the author has asked to discard, awaiting confirmation.
+  const [discardPending, setDiscardPending] = useState<number | null>(null);
   const [structuralError, setStructuralError] = useState<string | null>(null);
 
   // PR-D7: dry-run state. `result` drives the canvas path highlight
@@ -640,6 +644,26 @@ export function DecisionTreeViewerPage(): ReactNode {
     trackFeature("decision_tree_authoring", { props: { action: "published" } });
     authoring.complete();
   };
+  const onConfirmDiscardVersion = async (): Promise<void> => {
+    if (discardPending == null) return;
+    const version = discardPending;
+    const row = tree.versions.find((v) => v.version === version);
+    setDiscardPending(null);
+    await discard.mutateAsync({ code, version });
+    // If the editor was showing the row that just went, it has nothing to
+    // show. Clearing both ids lets the hydrate effect pull whatever is newest
+    // now. Any unsaved edits on top of it go with it, which is the point.
+    if (row && (hydratedFromVersionId === row.id || pinnedVersionId === row.id)) {
+      setHydratedFromVersionId(null);
+      setPinnedVersionId(null);
+      setEditBuffer({});
+      setParamsBuffer({});
+      setMetaBuffer({});
+      setSelectedNodeId(null);
+      setDryRunResult(null);
+    }
+  };
+
   const onParameterChange = (name: string, decl: ParameterDeclaration | null): void => {
     setParamsBuffer((buf) => ({ ...buf, [name]: decl }));
   };
@@ -795,6 +819,9 @@ export function DecisionTreeViewerPage(): ReactNode {
       ) : null}
       {publish.isError ? (
         <MutationErrorBanner error={publish.error} fallback={t("editor.header.publishFailed")} />
+      ) : null}
+      {discard.isError ? (
+        <MutationErrorBanner error={discard.error} fallback={t("edit.versions.discardFailed")} />
       ) : null}
       {structuralError ? (
         <p className="rounded-md border border-ap-crit/40 bg-ap-crit/10 p-2 text-xs text-ap-crit">
@@ -999,6 +1026,8 @@ export function DecisionTreeViewerPage(): ReactNode {
         dateLocale={dateLocale}
         onLoad={onLoadVersionIntoDraft}
         onPublish={(v) => publish.mutate({ code, version: v })}
+        discarding={discard.isPending}
+        onDiscard={(v) => setDiscardPending(v)}
       />
 
       {addChildPending ? (
@@ -1023,6 +1052,15 @@ export function DecisionTreeViewerPage(): ReactNode {
           onConfirm={onConfirmDelete}
         />
       ) : null}
+      {discardPending != null ? (
+        <DiscardVersionConfirmDialog
+          version={discardPending}
+          onCancel={() => setDiscardPending(null)}
+          onConfirm={() => {
+            void onConfirmDiscardVersion();
+          }}
+        />
+      ) : null}
 
       {copyOpen ? (
         <CopyTreeDialog
@@ -1043,6 +1081,42 @@ interface DeleteConfirmDialogProps {
   subtreeSize: number;
   onCancel: () => void;
   onConfirm: () => void;
+}
+
+function DiscardVersionConfirmDialog({
+  version,
+  onCancel,
+  onConfirm,
+}: {
+  version: number;
+  onCancel: () => void;
+  onConfirm: () => void;
+}): JSX.Element {
+  const { t } = useTranslation("decisionTrees");
+  return (
+    <Modal open onClose={onCancel} labelledBy="discard-version-title" className="max-w-md">
+      <h2 id="discard-version-title" className="text-base font-semibold text-ap-ink">
+        {t("edit.versions.discardTitle", { n: version })}
+      </h2>
+      <p className="mt-2 text-sm text-ap-ink">{t("edit.versions.discardBody", { n: version })}</p>
+      <div className="mt-4 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-md px-3 py-1.5 text-sm text-ap-muted"
+        >
+          {t("editor.delete.cancel")}
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="rounded-md bg-ap-crit px-3 py-1.5 text-sm font-medium text-white hover:bg-ap-crit/90"
+        >
+          {t("edit.versions.discardConfirm")}
+        </button>
+      </div>
+    </Modal>
+  );
 }
 
 function DeleteConfirmDialog({
@@ -1167,17 +1241,21 @@ function VersionHistorySection({
   currentVersion,
   canManage,
   publishing,
+  discarding,
   dateLocale,
   onLoad,
   onPublish,
+  onDiscard,
 }: {
   versions: DecisionTreeVersion[];
   currentVersion: number | null;
   canManage: boolean;
   publishing: boolean;
+  discarding: boolean;
   dateLocale: Locale;
   onLoad: (v: DecisionTreeVersion) => void;
   onPublish: (version: number) => void;
+  onDiscard: (version: number) => void;
 }): JSX.Element {
   const { t } = useTranslation("decisionTrees");
   const [open, setOpen] = useState(false);
@@ -1247,6 +1325,19 @@ function VersionHistorySection({
                       className="rounded-md bg-ap-primary px-2 py-0.5 text-[11px] font-medium text-white hover:bg-ap-primary/90 disabled:opacity-60"
                     >
                       {publishing ? t("edit.versions.publishing") : t("edit.versions.publish")}
+                    </button>
+                  ) : null}
+                  {/* Only an unpublished draft. A published version is the
+                      record of what the engine ran, and the API refuses to
+                      delete one — offering the button would be a lie. */}
+                  {canManage && !isCurrent && !v.published_at && versions.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => onDiscard(v.version)}
+                      disabled={discarding}
+                      className="rounded-md border border-ap-crit/50 px-2 py-0.5 text-[11px] font-medium text-ap-crit hover:bg-ap-crit/10 disabled:opacity-60"
+                    >
+                      {discarding ? t("edit.versions.discarding") : t("edit.versions.discard")}
                     </button>
                   ) : null}
                 </div>
