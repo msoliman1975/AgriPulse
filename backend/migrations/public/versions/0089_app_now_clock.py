@@ -119,20 +119,44 @@ FROM_APP_NOW = "('app_now()', 'public.app_now()')"
 # the matching tenant migration, which runs once per tenant.
 UPGRADE_SCOPE = "n.nspname = 'public'"
 
-# The downgrade has to reach further. A column default that calls
-# `public.app_now()` is a recorded dependency on that function, so
-# `DROP FUNCTION` is refused while any of them survives — including the
-# ones in tenant schemas, which the public chain cannot downgrade. Measured
-# on the production database: "cannot drop function ... because other
-# objects depend on it ... default value for column".
+# The downgrade undoes exactly what the upgrade did: `public` and nothing
+# else. Reaching into every tenant schema was tried and rejected. A column
+# default that calls `public.app_now()` is a recorded dependency on that
+# function, so `DROP FUNCTION` is refused while one survives, and clearing
+# them all in one transaction takes ACCESS EXCLUSIVE on every table in
+# every schema. CI ran out of shared memory on the lock table.
 #
-# System schemas are excluded, and so is `_timescaledb_internal`: the
-# upgrade never wrote into a chunk, so there is nothing there to undo.
-DOWNGRADE_SCOPE = (
-    r"n.nspname NOT LIKE 'pg\_%' "
-    r"AND n.nspname NOT LIKE '\_timescaledb%' "
-    r"AND n.nspname <> 'information_schema'"
-)
+# So the function is dropped only when nothing depends on it any more. A
+# tenant still at 0092 keeps its defaults, and they keep working, because
+# `app_now()` returns `now()` whenever the setting is unset.
+DOWNGRADE_SCOPE = UPGRADE_SCOPE
+
+# `pg_depend` records one row per default expression that calls the
+# function. Anything left means a tenant schema is still on the clock.
+DROP_IF_UNUSED = """
+DO $do$
+DECLARE
+    dependents int;
+BEGIN
+    SELECT count(*) INTO dependents
+      FROM pg_depend d
+      JOIN pg_proc p ON p.oid = d.refobjid
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public'
+       AND p.proname = 'app_now'
+       AND d.deptype = 'n';
+
+    IF dependents = 0 THEN
+        DROP FUNCTION IF EXISTS public.app_now();
+    ELSE
+        RAISE NOTICE
+            'public.app_now() kept: % column defaults still call it. '
+            'Downgrade those tenant schemas past 0092 first.',
+            dependents;
+    END IF;
+END
+$do$;
+"""
 
 
 def _rewrite_defaults(match_exprs: str, to_expr: str, scope: str) -> str:
@@ -181,11 +205,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # `SET DEFAULT` takes ACCESS EXCLUSIVE on every table it touches, and
-    # the downgrade touches every schema. Without a timeout, one open read
-    # transaction anywhere makes this wait in silence; that is how a CI job
-    # reached its 35 minute cap with no error to read.
+    # `SET DEFAULT` takes ACCESS EXCLUSIVE on every table it touches.
+    # Without a timeout, one open read transaction makes this wait in
+    # silence; that is how a CI job reached its 35 minute cap with no
+    # error to read.
     op.execute("SET LOCAL lock_timeout = '30s'")
     op.execute(_rewrite_defaults(FROM_APP_NOW, "now()", DOWNGRADE_SCOPE))
     op.execute(TOUCH_FN_OLD)
-    op.execute("DROP FUNCTION IF EXISTS public.app_now()")
+    op.execute(DROP_IF_UNUSED)
