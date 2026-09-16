@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.modules.recommendations import status_codes
 
@@ -917,3 +917,113 @@ class DecisionTreeVersionPinRequest(BaseModel):
 class DecisionTreeVersionPinResponse(BaseModel):
     code: str
     pinned_version: int | None = None
+
+
+# ---------- Finding catalogue ----------------------------------------------
+#
+# The shared vocabulary a folding tree registers against. Two tables, one
+# shape: `public.decision_tree_findings` and each tenant's own. The
+# `source` field on the response is what tells them apart on screen.
+
+#: Lower snake case. The code reaches YAML, a JSONB array and a URL path,
+#: and a code with a space or a capital would work in some of those and not
+#: others. Same expression as the CHECK in both migrations.
+FINDING_CODE_PATTERN = r"^[a-z][a-z0-9_]*$"
+
+#: Which catalogue a resolved row came from.
+FindingSource = Literal["platform", "tenant"]
+
+
+class FindingResponse(BaseModel):
+    """One catalogue row.
+
+    `clause_en` / `clause_ar` are fragments, not sentences: the fold joins
+    several of them into one sentence, so "leaf water is low" and never
+    "Leaf water is low. Irrigate first."
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    clause_en: str
+    clause_ar: str
+    name_en: str
+    name_ar: str
+    #: One of the platform status codes. `app.shared.health_definition`
+    #: reads it to colour the block, so it is not free text.
+    default_status: StatusCode
+    description_en: str | None = None
+    description_ar: str | None = None
+    is_active: bool = True
+    source: FindingSource
+    #: True only on a tenant row whose code the platform catalogue also
+    #: defines. The platform row wins, so this row is never read by the
+    #: fold. Without this flag a tenant author edits a clause, sees no
+    #: change on the card, and has nothing to read that explains it.
+    shadowed: bool = False
+
+
+class FindingListResponse(BaseModel):
+    """GET .../findings — one catalogue, listed."""
+
+    findings: list[FindingResponse]
+
+
+def _clause_field(description: str) -> Any:
+    return Field(min_length=1, max_length=200, description=description)
+
+
+#: The ASCII comma and the Arabic one (U+060C). The fold joins clauses with
+#: whichever suits the language, so a clause must carry neither.
+_CLAUSE_COMMAS = (",", "،")
+
+
+class _FindingFields(BaseModel):
+    """The editable catalogue fields, and the one rule a form cannot see.
+
+    Both migrations CHECK the no-comma rule too. This copy exists so an
+    author is told at the form, with the field named, instead of getting a
+    500 out of a CHECK violation with the constraint name in it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    clause_en: str = _clause_field("One fragment, e.g. 'leaf water is low'. No comma.")
+    clause_ar: str = _clause_field("The same fragment in Arabic. No comma.")
+    name_en: str = Field(min_length=1, max_length=80)
+    name_ar: str = Field(min_length=1, max_length=80)
+    default_status: StatusCode
+    description_en: str | None = Field(default=None, max_length=4000)
+    description_ar: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("clause_en", "clause_ar")
+    @classmethod
+    def _no_comma(cls, value: str) -> str:
+        """A clause is one fragment the fold joins to others with commas.
+
+        A clause carrying its own comma makes the composed sentence
+        unreadable, and there is no way for the fold to tell one kind of
+        comma from the other. Split it into two findings instead.
+        """
+        if any(comma in value for comma in _CLAUSE_COMMAS):
+            raise ValueError(
+                "A clause must not contain a comma. It is one fragment that the "
+                "card joins to others, so write 'leaf water is low' rather than "
+                "a sentence. Two ideas mean two findings."
+            )
+        return value
+
+
+class FindingCreateRequest(_FindingFields):
+    """POST .../findings — add a code to a catalogue."""
+
+    code: str = Field(min_length=1, max_length=64, pattern=FINDING_CODE_PATTERN)
+
+
+class FindingUpdateRequest(_FindingFields):
+    """PATCH .../findings/{code} — full replace of the editable fields.
+
+    The code itself is not editable. It is stored in every
+    `recommendations.finding_set` that ever carried it and named by every
+    tree that registers it, so renaming one would orphan both.
+    """

@@ -132,6 +132,86 @@ class TenantTreeVersionPin(Base):
     pinned_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
 
 
+class _DecisionTreeFindingColumns:
+    """The finding catalogue's columns, shared by the two tables that have them.
+
+    `public.decision_tree_findings` and `tenant_<id>.decision_tree_findings`
+    are the same eight columns plus the same four audit columns; only the
+    schema differs. Declaring them once means the two cannot drift, which
+    matters more here than in most places: `resolve_findings` reads rows
+    from both tables through one code path and by attribute name, so a
+    column that existed on one table and not the other would be a
+    `KeyError` at fold time and nowhere earlier.
+
+    Not `TimestampedMixin`: that carries `deleted_at`, and these tables
+    deactivate with `is_active` instead. A finding code that has ever been
+    registered is referenced by every `recommendations.finding_set` that
+    carried it, so it is retired, never removed.
+    """
+
+    # The code is the primary key. It is what a tree's `registers` block
+    # names and what `finding_set` stores; a surrogate id would have to be
+    # resolved back to the code at both of those points.
+    code: Mapped[str] = mapped_column(Text, primary_key=True)
+    # One fragment, joined with other clauses into the composed sentence.
+    # "leaf water is low", not a whole sentence, and never with a comma.
+    clause_en: Mapped[str] = mapped_column(Text, nullable=False)
+    clause_ar: Mapped[str] = mapped_column(Text, nullable=False)
+    # Short label for the group header in Action Center.
+    name_en: Mapped[str] = mapped_column(Text, nullable=False)
+    name_ar: Mapped[str] = mapped_column(Text, nullable=False)
+    # One of `status_codes.STATUS_CODES`. CHECK constrained in both
+    # migrations; `app.shared.health_definition` reads it to colour a block.
+    default_status: Mapped[str] = mapped_column(Text, nullable=False)
+    # For the admin screen only. Never reaches a card.
+    description_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
+    created_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    updated_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
+    )
+
+
+class DecisionTreeFinding(Base, _DecisionTreeFindingColumns):
+    """`public.decision_tree_findings` — the shared finding vocabulary.
+
+    One row per code. A folding tree registers codes as it walks and the
+    fold turns the collected set into one card, so this is what decides the
+    words a farmer reads and the colour the block takes.
+
+    Platform rows win over a tenant's own on a duplicate code — see
+    `app.modules.recommendations.findings.resolve_findings`, which is the
+    only place that precedence is expressed.
+    """
+
+    __tablename__ = "decision_tree_findings"
+    __table_args__ = {"schema": "public"}
+
+
+class TenantDecisionTreeFinding(Base, _DecisionTreeFindingColumns):
+    """`tenant_<id>.decision_tree_findings` — a tenant's own finding codes.
+
+    For a tenant authoring a tree the platform has not shipped. Same
+    columns as the platform table. A row whose code is also a platform code
+    is *shadowed*: it is kept, so the admin screen can say why the tenant's
+    clause is not the one on the card, but it is never read by the fold.
+
+    No foreign key to `public` — a tenant schema must never hold one, and
+    there is nothing to point at: shadowing is matched by string in Python.
+    """
+
+    # No `schema` key, unlike its platform twin: a tenant table resolves
+    # through the session's search_path, which is set per request. That is
+    # also what keeps the two out of each other's way in the declarative
+    # registry, which keys a table on (schema, name).
+    __tablename__ = "decision_tree_findings"
+
+
 class Recommendation(Base, TimestampedMixin, GroupingMixin):
     """`tenant_<id>.recommendations` — generated decision-tree outcomes."""
 
