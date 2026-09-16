@@ -3716,10 +3716,38 @@ global:
     #   the schema change did not roll.
     #
     #   Rollback is these two tags back to fcf7b0e.
+    # ff468b7 = #693, api and workers. Two things the platform authoring
+    #   surface was missing.
+    #
+    #   The condition editor read three catalogues off tenant-only routes,
+    #   which 403 for a caller with a platform role and no tenant, so the
+    #   Index, Custom signal and Crop field pickers came back empty. Two new
+    #   reads answer the same rows behind `platform.read`:
+    #   GET /v1/admin/crop-attribute-definitions and
+    #   GET /v1/admin/weather/indices/catalog. The third route already had a
+    #   platform twin the frontend was not using.
+    #
+    #   DELETE /v1/decision-trees/{code}/versions/{version} discards an
+    #   unpublished draft. There was no way back from a bad save: the editor
+    #   hydrates from the newest version and append is a no-op on an unchanged
+    #   hash, so an unwanted draft sat in front of every later author. It
+    #   refuses a published, current, pinned or last-remaining version with a
+    #   409 naming the rule.
+    #
+    #   No migration in 7364473..ff468b7, and this range touches no other
+    #   backend file.
+    #
+    #   Watch for this: a 404 from either new /v1/admin/ read would mean the
+    #   api did not roll. A 204 that carries a body would mean the opposite of
+    #   what shipped — CI caught that spelling before merge.
+    #
+    #   Rollback is these two tags back to 7364473. Nothing to undo in the
+    #   database; a discarded draft is already gone and rolling back does not
+    #   bring one back.
     api:
-      tag: "7364473"
+      tag: "ff468b7"
     workers:
-      tag: "7364473"
+      tag: "ff468b7"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4287,7 +4315,17 @@ global:
       #   #691 is the only commit in 02a0e59..7364473 that touches frontend/.
       #
       #   Rollback is this tag alone back to 02a0e59.
-      tag: "7364473"
+      # ff468b7 = #693, frontend half. The condition editor picks its
+      #   catalogue route from the signed-in caller's scope, so the Index,
+      #   Custom signal and Crop field pickers fill in for a platform admin
+      #   instead of rendering empty. The version history panel gains a
+      #   "Discard draft" button on an unpublished, non-current version,
+      #   behind a confirm dialog that names the version.
+      #
+      #   #693 is the only commit in 7364473..ff468b7 that touches frontend/.
+      #
+      #   Rollback is this tag alone back to 7364473.
+      tag: "ff468b7"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
