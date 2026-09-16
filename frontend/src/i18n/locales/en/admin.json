@@ -13,6 +13,7 @@
     "roles": "Roles & permissions",
     "platformSignals": "Signal catalog",
     "platformDecisionTrees": "Decision trees",
+    "platformDecisionTreesBeta": "Beta designer",
     "platformAlerts": "Platform alerts",
     "usage": "Product usage"
   },

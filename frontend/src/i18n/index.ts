@@ -21,6 +21,7 @@ import enImageryWeatherConfig from "./locales/en/imageryWeatherConfig.json";
 import enUsers from "./locales/en/users.json";
 import enAdmin from "./locales/en/admin.json";
 import enDecisionTrees from "./locales/en/decisionTrees.json";
+import enDecisionTreesBeta from "./locales/en/decisionTreesBeta.json";
 import enSettings from "./locales/en/settings.json";
 import enIntegrationsHealth from "./locales/en/integrationsHealth.json";
 import enIntegrations from "./locales/en/integrations.json";
@@ -52,6 +53,7 @@ import arImageryWeatherConfig from "./locales/ar/imageryWeatherConfig.json";
 import arUsers from "./locales/ar/users.json";
 import arAdmin from "./locales/ar/admin.json";
 import arDecisionTrees from "./locales/ar/decisionTrees.json";
+import arDecisionTreesBeta from "./locales/ar/decisionTreesBeta.json";
 import arSettings from "./locales/ar/settings.json";
 import arIntegrationsHealth from "./locales/ar/integrationsHealth.json";
 import arIntegrations from "./locales/ar/integrations.json";
@@ -93,6 +95,7 @@ const resources = {
     imageryWeatherConfig: enImageryWeatherConfig,
     admin: enAdmin,
     decisionTrees: enDecisionTrees,
+    decisionTreesBeta: enDecisionTreesBeta,
     users: enUsers,
     settings: enSettings,
     integrationsHealth: enIntegrationsHealth,
@@ -126,6 +129,7 @@ const resources = {
     imageryWeatherConfig: arImageryWeatherConfig,
     admin: arAdmin,
     decisionTrees: arDecisionTrees,
+    decisionTreesBeta: arDecisionTreesBeta,
     users: arUsers,
     settings: arSettings,
     integrationsHealth: arIntegrationsHealth,
@@ -169,6 +173,7 @@ void i18n
       "imageryWeatherConfig",
       "admin",
       "decisionTrees",
+      "decisionTreesBeta",
       "users",
       "settings",
       "integrationsHealth",
