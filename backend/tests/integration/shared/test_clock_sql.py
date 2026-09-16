@@ -89,7 +89,7 @@ async def test_python_and_sql_agree_under_a_simulated_clock(
 async def test_no_public_column_still_defaults_to_the_fixed_clock(
     admin_session,  # type: ignore[no-untyped-def]
 ) -> None:
-    """Migration 0081 must have reached every column, not most of them.
+    """Migration 0089 must have reached every column, not most of them.
 
     A stored default is resolved when the column is created, so one that
     keeps calling `now()` writes today's date into a replayed row and

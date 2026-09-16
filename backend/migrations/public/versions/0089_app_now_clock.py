@@ -26,9 +26,16 @@ Three places then move onto it.
    Rewriting the default is the only way to reach it. The loop reads the
    catalog rather than naming tables, so a table added since this was
    written is covered too.
-3. Timescale chunks. A chunk copies the parent's defaults when it is
-   created, so existing chunks keep the old default until it is rewritten.
-   Chunks made after this migration inherit the new one.
+Timescale chunks are deliberately left alone. Two measurements on the
+production database, inside a rolled-back transaction, decided that:
+
+* `ALTER TABLE <chunk> ALTER COLUMN ... SET DEFAULT` is refused outright
+  with `operation not supported on chunk tables` (TimescaleDB 2.26.4).
+* A partition's own default is ignored when the row arrives through the
+  parent. Inserting into the parent used the parent's default; only a
+  direct insert into the partition used the partition's. Every write in
+  this application goes through the hypertable, so the chunk defaults are
+  never the ones that fire.
 
 The `search_path` alternative was measured and rejected. Shadowing `now()`
 with a function in a schema placed ahead of `pg_catalog` does redirect raw
@@ -111,9 +118,11 @@ FROM_APP_NOW = "('app_now()', 'public.app_now()')"
 def _rewrite_defaults(match_exprs: str, to_expr: str) -> str:
     """Build a DO block that swaps one default expression for another.
 
-    Scope is the `public` schema plus the Timescale chunk schemas. Tenant
-    schemas are handled by the matching tenant migration, which runs once
-    per tenant.
+    Scope is the `public` schema. Tenant schemas are handled by the
+    matching tenant migration, which runs once per tenant.
+    `_timescaledb_internal` is out of scope: its chunks refuse the ALTER,
+    and their defaults never fire for a write that arrives through the
+    hypertable.
 
     A column already carrying the target expression does not match, so the
     block is safe to run more than once.
@@ -133,7 +142,7 @@ BEGIN
           JOIN pg_attribute a
             ON a.attrelid = d.adrelid AND a.attnum = d.adnum
          WHERE pg_get_expr(d.adbin, d.adrelid) IN {match_exprs}
-           AND n.nspname IN ('public', '_timescaledb_internal')
+           AND n.nspname = 'public'
     LOOP
         EXECUTE format(
             'ALTER TABLE %I.%I ALTER COLUMN %I SET DEFAULT {to_expr}',

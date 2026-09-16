@@ -1,6 +1,6 @@
 """Move this tenant's `now()` column defaults onto `public.app_now()`.
 
-The tenant half of public migration 0081. That one creates
+The tenant half of public migration 0089. That one creates
 `public.app_now()`, rewrites `public.set_updated_at()` to call it, and
 rewrites the defaults in `public` and in the Timescale chunk schema. This
 one rewrites the defaults inside one tenant schema. It runs once per
@@ -10,9 +10,11 @@ A stored column DEFAULT is resolved when the column is created, so it
 keeps calling `pg_catalog.now()` whatever a session later does. Rewriting
 it is the only way a demo-history replay can reach it.
 
-Existing Timescale chunks are covered by migration 0081, which sweeps
-`_timescaledb_internal` for every tenant at once. Chunks created after
-this migration copy the parent table's default, so they arrive correct.
+Timescale chunks are left alone, here and in public 0089. A chunk
+refuses `ALTER TABLE ... SET DEFAULT` outright, and a partition's own
+default is ignored when the row arrives through the parent. Both were
+measured on the production database inside a rolled-back transaction.
+Every write in this application goes through the hypertable.
 
 Behaviour does not change for any tenant. With the `agripulse.now`
 setting unset, which is the case on every request and every scheduled

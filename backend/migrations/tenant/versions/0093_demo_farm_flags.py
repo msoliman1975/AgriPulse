@@ -76,7 +76,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint("ck_farms_demo_frozen_only_when_demo", "farms", type_="check")
+    # The suffix again, not the full name. `drop_constraint` renders its
+    # argument through the same naming convention `create_check_constraint`
+    # used, so passing the full name here asks Postgres to drop
+    # `ck_farms_ck_farms_demo_frozen_only_when_demo`, which does not exist.
+    op.drop_constraint("demo_frozen_only_when_demo", "farms", type_="check")
     op.drop_index("ix_farms_is_demo", table_name="farms")
     op.drop_column("farms", "demo_frozen_at")
     op.drop_column("farms", "is_demo")
