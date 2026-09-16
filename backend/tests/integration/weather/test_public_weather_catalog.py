@@ -174,6 +174,15 @@ async def test_seed_migration_idempotent(admin_session: AsyncSession) -> None:
         )
     ).scalar_one()
 
+    # Release this session's read transaction BEFORE running migrations on
+    # another connection. The SELECT above leaves an open transaction
+    # holding ACCESS SHARE on `weather_derived_signals_catalog`, and a
+    # downgrade that needs ACCESS EXCLUSIVE on it waits on that lock
+    # forever. `ALTER TABLE ... ALTER COLUMN ... SET DEFAULT` in public
+    # 0089 is one such statement. A lock wait looks exactly like a slow
+    # test: the job ran to its 35 minute cap with no error.
+    await admin_session.rollback()
+
     from pathlib import Path
 
     from alembic import command

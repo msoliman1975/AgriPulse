@@ -181,6 +181,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # `SET DEFAULT` takes ACCESS EXCLUSIVE on every table it touches, and
+    # the downgrade touches every schema. Without a timeout, one open read
+    # transaction anywhere makes this wait in silence; that is how a CI job
+    # reached its 35 minute cap with no error to read.
+    op.execute("SET LOCAL lock_timeout = '30s'")
     op.execute(_rewrite_defaults(FROM_APP_NOW, "now()", DOWNGRADE_SCOPE))
     op.execute(TOUCH_FN_OLD)
     op.execute("DROP FUNCTION IF EXISTS public.app_now()")
