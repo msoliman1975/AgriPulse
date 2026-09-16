@@ -198,6 +198,11 @@ $do$;
 
 
 def upgrade() -> None:
+    # Every rewritten default takes ACCESS EXCLUSIVE on its table for the
+    # moment of the catalog change. A deploy that cannot get one should
+    # fail the PreSync migration job, which leaves the running pods
+    # serving, rather than queue behind a long read and hold the table.
+    op.execute("SET LOCAL lock_timeout = '30s'")
     op.execute(APP_NOW_FN)
     op.execute(APP_NOW_COMMENT)
     op.execute(TOUCH_FN_NEW)
