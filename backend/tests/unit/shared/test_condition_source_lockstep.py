@@ -42,6 +42,20 @@ def _backend_sources() -> set[str]:
     return sources
 
 
+# Sources that exist in the backend union but not yet in the visual builder.
+#
+# `findings` and `vars` are read only by the folding engine
+# (`recommendations/folding_engine.py`), which is a beta running beside the
+# shipped engine. The builder learns them in the beta designer change, and no
+# published tree can reference them until then, so the silent-demotion failure
+# this test guards against cannot happen for these two yet.
+#
+# The exemption removes itself: `test_beta_sources_are_still_absent_from_the
+# _builder` below fails the moment the builder gains one, which is the moment
+# this set has to shrink.
+_BETA_ONLY_SOURCES: set[str] = {"findings", "vars"}
+
+
 def _frontend_sources(text: str) -> set[str]:
     """Members of the ``ValueRefSource`` union in conditionEdit.ts."""
     match = re.search(r"export type ValueRefSource\s*=([^;]+);", text)
@@ -56,7 +70,7 @@ def _frontend_sources(text: str) -> set[str]:
 def test_frontend_and_backend_condition_sources_match() -> None:
     text = _CONDITION_EDIT_TS.read_text(encoding="utf-8")
     frontend = _frontend_sources(text)
-    backend = _backend_sources()
+    backend = _backend_sources() - _BETA_ONLY_SOURCES
 
     assert frontend == backend, (
         "condition source drift — the visual builder degrades silently, it does "
@@ -77,3 +91,28 @@ def test_crop_attribute_source_is_wired_through_the_builder() -> None:
     text = _CONDITION_EDIT_TS.read_text(encoding="utf-8")
     assert 'source === "crop_attribute"' in text, "conditionEdit.ts cannot parse the source"
     assert 'case "crop_attribute":' in text, "conditionEdit.ts cannot serialise/default the source"
+
+
+@pytest.mark.skipif(
+    not _CONDITION_EDIT_TS.exists(),
+    reason="frontend tree not checked out (backend-only container build)",
+)
+def test_beta_sources_are_still_absent_from_the_builder() -> None:
+    """Every exempted source must still be missing from the builder, and must
+    still exist in the backend union.
+
+    Without this, `_BETA_ONLY_SOURCES` would be a permanent hole: a source
+    listed there would never be checked again, in either direction.
+    """
+    frontend = _frontend_sources(_CONDITION_EDIT_TS.read_text(encoding="utf-8"))
+    backend = _backend_sources()
+
+    for source in _BETA_ONLY_SOURCES:
+        assert source in backend, (
+            f"{source!r} is exempted from the lockstep check but is no longer a "
+            "backend source — drop it from _BETA_ONLY_SOURCES."
+        )
+        assert source not in frontend, (
+            f"{source!r} is now in conditionEdit.ts — drop it from "
+            "_BETA_ONLY_SOURCES so the lockstep check covers it again."
+        )
