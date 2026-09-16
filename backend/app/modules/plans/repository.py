@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, time
 from datetime import date as date_type
+from datetime import datetime, time
 from typing import Any
 from uuid import UUID
 
@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.plans.errors import PlanCodeConflictError
 from app.modules.plans.models import PlanActivity, VegetationPlan
+from app.shared import clock
 
 
 class PlansRepository:
@@ -113,7 +114,7 @@ class PlansRepository:
             .where(VegetationPlan.id == plan_id)
             .values(
                 status="archived",
-                deleted_at=text("now()"),
+                deleted_at=text("public.app_now()"),
                 updated_by=actor_user_id,
             )
         )
@@ -206,7 +207,7 @@ class PlansRepository:
                 PlanActivity.id == activity_id,
                 PlanActivity.deleted_at.is_(None),
             )
-            .values(deleted_at=datetime.now(UTC), updated_by=actor_user_id)
+            .values(deleted_at=clock.now(), updated_by=actor_user_id)
         )
         # session.execute() of a DML statement returns a CursorResult at
         # runtime, but the stubs type it as Result (no .rowcount).

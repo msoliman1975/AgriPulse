@@ -416,7 +416,7 @@ class PlatformAdminsRoleService:
             text(
                 """
                 UPDATE public.platform_role_assignments
-                SET revoked_at = now()
+                SET revoked_at = public.app_now()
                 WHERE user_id = :uid AND role = :role AND revoked_at IS NULL
                 """
             ).bindparams(bindparam("uid", type_=PG_UUID(as_uuid=True))),

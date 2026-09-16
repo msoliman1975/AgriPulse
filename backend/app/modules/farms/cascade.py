@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import date
 from typing import Any, cast
 from uuid import UUID
 
@@ -38,6 +38,8 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.shared import clock
 
 
 @dataclass(frozen=True)
@@ -88,7 +90,7 @@ async def preview_block_cascade(
     ids = list(block_ids)
     if not ids:
         return CascadeCounts()
-    cutoff_date = cutoff or datetime.now(UTC).date()
+    cutoff_date = cutoff or clock.now().date()
 
     alerts_n = await _scalar_count(
         session,
@@ -169,7 +171,7 @@ async def apply_block_cascade(
     ids = list(block_ids)
     if not ids:
         return CascadeCounts()
-    cutoff_date = cutoff or datetime.now(UTC).date()
+    cutoff_date = cutoff or clock.now().date()
 
     alerts_n = await _execute_rowcount(
         session,
@@ -177,7 +179,7 @@ async def apply_block_cascade(
             """
             UPDATE alerts
             SET status = 'resolved',
-                resolved_at = now(),
+                resolved_at = public.app_now(),
                 resolved_by = :actor,
                 snoozed_until = NULL,
                 updated_by = :actor
@@ -234,7 +236,7 @@ async def apply_block_cascade(
             UPDATE weather_subscriptions
             SET is_active = FALSE,
                 deactivated_by_cascade = TRUE,
-                updated_at = now()
+                updated_at = public.app_now()
             WHERE block_id = ANY(:block_ids) AND is_active = TRUE
             """
         ).bindparams(bindparam("block_ids", type_=ARRAY(PG_UUID(as_uuid=True)))),
@@ -247,7 +249,7 @@ async def apply_block_cascade(
             UPDATE imagery_aoi_subscriptions
             SET is_active = FALSE,
                 deactivated_by_cascade = TRUE,
-                updated_at = now()
+                updated_at = public.app_now()
             WHERE block_id = ANY(:block_ids) AND is_active = TRUE
             """
         ).bindparams(bindparam("block_ids", type_=ARRAY(PG_UUID(as_uuid=True)))),
@@ -297,7 +299,7 @@ async def restore_block_cascade(
             UPDATE weather_subscriptions
             SET is_active = TRUE,
                 deactivated_by_cascade = FALSE,
-                updated_at = now()
+                updated_at = public.app_now()
             WHERE block_id = ANY(:block_ids) AND deactivated_by_cascade = TRUE
             """
         ).bindparams(bindparam("block_ids", type_=ARRAY(PG_UUID(as_uuid=True)))),
@@ -310,7 +312,7 @@ async def restore_block_cascade(
             UPDATE imagery_aoi_subscriptions
             SET is_active = TRUE,
                 deactivated_by_cascade = FALSE,
-                updated_at = now()
+                updated_at = public.app_now()
             WHERE block_id = ANY(:block_ids) AND deactivated_by_cascade = TRUE
             """
         ).bindparams(bindparam("block_ids", type_=ARRAY(PG_UUID(as_uuid=True)))),

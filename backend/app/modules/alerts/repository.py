@@ -14,7 +14,7 @@ now owns signal loading + tree evaluation; tree leaves with
 from __future__ import annotations
 
 import json
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from typing import Any, cast
 from uuid import UUID
 
@@ -25,6 +25,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.alerts.models import Alert
+from app.shared import clock
 from app.shared.action_items import ALERT_SQL, TENANT_TODAY_SQL
 
 # Alert lifecycle values that still count as live. Kept as one SQL fragment
@@ -109,7 +110,7 @@ class AlertsRepository:
                         :prescription_activity_id,
                         CAST(:snapshot AS jsonb), :actor, :actor,
                         :group_key, :group_parent_id, :is_group,
-                        now(), now(), CAST(:today AS date)
+                        public.app_now(), public.app_now(), CAST(:today AS date)
                     )
                     """
                 ).bindparams(
@@ -169,7 +170,7 @@ class AlertsRepository:
         finding two different streak counts depending on which half you read.
         """
         row = await self._public.execute(text(TENANT_TODAY_SQL), {"s": tenant_schema})
-        return cast(date, row.scalar_one_or_none() or datetime.now(UTC).date())
+        return cast(date, row.scalar_one_or_none() or clock.now().date())
 
     async def find_open_group_parent(self, *, block_id: UUID, group_key: str) -> UUID | None:
         return (
@@ -231,7 +232,7 @@ class AlertsRepository:
                    SET severity = :severity,
                        group_key = :group_key,
                        action_type = COALESCE(:action_type, action_type),
-                       updated_at = now()
+                       updated_at = public.app_now()
                  WHERE id = :id
                    AND (severity IS DISTINCT FROM :severity
                         OR group_key IS DISTINCT FROM :group_key)
@@ -294,7 +295,7 @@ class AlertsRepository:
                        diagnosis_en = :diag_en, diagnosis_ar = :diag_ar,
                        signal_snapshot = CAST(:snapshot AS jsonb),
                        cleared_at = NULL,
-                       updated_at = now(), updated_by = :actor
+                       updated_at = public.app_now(), updated_by = :actor
                  WHERE id = :id
                 """
             ).bindparams(
@@ -434,11 +435,19 @@ class AlertsRepository:
         Children left open under a resolved parent would keep their per-cell
         dedup keys occupied and silently swallow the next real firing there.
         """
-        sets = ["status = :status", "updated_at = now()", "updated_by = :actor"]
+        sets = ["status = :status", "updated_at = public.app_now()", "updated_by = :actor"]
         if new_status == "acknowledged":
-            sets += ["acknowledged_at = now()", "acknowledged_by = :actor", "snoozed_until = NULL"]
+            sets += [
+                "acknowledged_at = public.app_now()",
+                "acknowledged_by = :actor",
+                "snoozed_until = NULL",
+            ]
         elif new_status == "resolved":
-            sets += ["resolved_at = now()", "resolved_by = :actor", "snoozed_until = NULL"]
+            sets += [
+                "resolved_at = public.app_now()",
+                "resolved_by = :actor",
+                "snoozed_until = NULL",
+            ]
         elif new_status == "snoozed":
             sets.append("snoozed_until = :snoozed_until")
         params: dict[str, Any] = {"p": parent_id, "status": new_status, "actor": actor_user_id}
@@ -540,18 +549,18 @@ class AlertsRepository:
         Caller validates the transition before calling — see
         `service.transition_alert` for the policy.
         """
-        sets = ["status = :status", "updated_at = now()", "updated_by = :actor"]
+        sets = ["status = :status", "updated_at = public.app_now()", "updated_by = :actor"]
         params: dict[str, Any] = {
             "id": alert_id,
             "status": new_status,
             "actor": actor_user_id,
         }
         if new_status == "acknowledged":
-            sets.append("acknowledged_at = now()")
+            sets.append("acknowledged_at = public.app_now()")
             sets.append("acknowledged_by = :actor")
             sets.append("snoozed_until = NULL")
         elif new_status == "resolved":
-            sets.append("resolved_at = now()")
+            sets.append("resolved_at = public.app_now()")
             sets.append("resolved_by = :actor")
             sets.append("snoozed_until = NULL")
         elif new_status == "snoozed":

@@ -13,7 +13,7 @@ seven round trips would each re-scan the same window for no benefit.
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -27,6 +27,7 @@ from app.modules.telemetry.read_schemas import (
 )
 from app.modules.telemetry.repository import TelemetryRepository, UsageWindow
 from app.modules.telemetry.taxonomy import get_taxonomy
+from app.shared import clock
 from app.shared.db.session import get_admin_db_session
 from app.shared.rbac.check import requires_capability
 
@@ -155,7 +156,7 @@ def _window(
     and a 422 on a range one day too wide is a worse experience than 180 days
     of data with the range echoed back in `filters`.
     """
-    resolved_end = end or datetime.now(UTC).date()
+    resolved_end = end or clock.now().date()
     resolved_start = start or (resolved_end - timedelta(days=29))
     resolved_start = min(resolved_start, resolved_end)
     if (resolved_end - resolved_start).days > MAX_WINDOW_DAYS:

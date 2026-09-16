@@ -11,8 +11,8 @@ Two layers:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, time
 from datetime import date as date_type
+from datetime import time
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -32,6 +32,7 @@ from app.modules.plans.events import (
     VegetationPlanCreatedV1,
 )
 from app.modules.plans.repository import PlansRepository
+from app.shared import clock
 from app.shared.db.ids import uuid7
 from app.shared.eventbus import EventBus, get_default_bus
 
@@ -528,7 +529,7 @@ class PlansServiceImpl:
                 if current not in ("scheduled", "in_progress"):
                     raise InvalidActivityTransitionError(current_status=current, action="complete")
                 new_status = "completed"
-                changes["completed_at"] = datetime.now(UTC)
+                changes["completed_at"] = clock.now()
                 changes["completed_by"] = actor_user_id
             elif state_action == "skip":
                 if current not in ("scheduled", "in_progress"):

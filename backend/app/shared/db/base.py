@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import DateTime, MetaData, func, text
+from sqlalchemy import DateTime, MetaData, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, registry
 
 if TYPE_CHECKING:
@@ -44,18 +44,22 @@ class TimestampedMixin:
     filter `WHERE deleted_at IS NULL`.
 
     A trigger maintains `updated_at` on UPDATE — see migrations.
+
+    The default is `public.app_now()`, not `now()`. It returns `now()`
+    unless a demo-history replay has set the `agripulse.now` setting on
+    the transaction. See `app.shared.clock` and migration 0081.
     """
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        server_default=func.now(),
+        server_default=text("public.app_now()"),
     )
     created_by: Mapped[UUID | None] = mapped_column(nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        server_default=func.now(),
+        server_default=text("public.app_now()"),
     )
     updated_by: Mapped[UUID | None] = mapped_column(nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(

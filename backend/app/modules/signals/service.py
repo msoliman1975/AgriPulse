@@ -20,7 +20,7 @@ Three responsibilities:
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Protocol
 from uuid import UUID, uuid4
@@ -69,6 +69,7 @@ from app.modules.signals.schemas import (
     SignalTemplateObservationMemberSubmission,
     _coerce_aggregation_for_value_kind,
 )
+from app.shared import clock
 from app.shared.db.ids import uuid7
 from app.shared.storage.client import (
     PresignedUpload,
@@ -776,7 +777,7 @@ class SignalsServiceImpl:
                 raise AttachmentMissingError(key=attachment_s3_key) from exc
 
         observation_id = uuid7()
-        observation_time = time or datetime.now(UTC)
+        observation_time = time or clock.now()
         wkt = (
             f"POINT({value_geopoint.longitude} {value_geopoint.latitude})"
             if value_geopoint is not None
@@ -1154,7 +1155,7 @@ class SignalsServiceImpl:
         # Lead row id is the shared template_observation_id (D8: the
         # lead row stores its own id, siblings carry it).
         lead_observation_id = uuid7()
-        observation_time = observed_at or datetime.now(UTC)
+        observation_time = observed_at or clock.now()
         location_point_wkt = (
             f"POINT({location_point.longitude} {location_point.latitude})"
             if location_point is not None

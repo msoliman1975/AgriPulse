@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Coroutine
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from typing import Any, cast
 from uuid import UUID
 
@@ -36,6 +36,7 @@ from app.modules.grid.anomaly import DEFAULT_K, AnomalyResult, effective_k
 from app.modules.grid.backfill import list_backfill_jobs
 from app.modules.grid.polar_label import ring_sector
 from app.modules.grid.service import get_grid_service
+from app.shared import clock
 from app.shared.action_items import (
     GRID_GROUP_RULE_CODE,
     build_grid_group_key,
@@ -368,7 +369,7 @@ async def _open_anomaly_alert(
             block_id=block_id,
             rule_code=rule_code,
             severity=result.severity,
-            created_at=datetime.now(UTC),
+            created_at=clock.now(),
             tenant_schema=tenant_schema,
             farm_id=farm_id,
             diagnosis_en=diag_en,
@@ -684,7 +685,7 @@ async def _cleanup_superseded_async(
                             WITH doomed AS (
                                 SELECT id FROM grid_configs
                                  WHERE superseded_at IS NOT NULL
-                                   AND superseded_at < now()
+                                   AND superseded_at < public.app_now()
                                        - make_interval(days => :days)
                                  ORDER BY superseded_at
                                  LIMIT :cap
@@ -955,7 +956,7 @@ async def _settle_rezones_async(tenant_schema: str) -> dict[str, int]:
                 # can legally expand over it. The reverse order trips the
                 # constraint mid-transaction.
                 await session.execute(
-                    text("UPDATE grid_configs SET superseded_at = now() WHERE id = :id"),
+                    text("UPDATE grid_configs SET superseded_at = public.app_now() WHERE id = :id"),
                     {"id": row["old_id"]},
                 )
                 await session.execute(

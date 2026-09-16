@@ -6,7 +6,7 @@ read endpoints in `router.py`. Pure read path (no audit events).
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -19,6 +19,7 @@ from app.modules.farms.errors import FarmNotFoundError
 from app.modules.farms.repository import FarmsRepository
 from app.modules.health.service import DefinitionSource, load_health_definitions
 from app.modules.indices.repository import IndicesRepository
+from app.shared import clock
 from app.shared.health import bucket_alert_severity, classify_health
 from app.shared.health_definition import HealthReason, resolve_health
 from app.shared.health_evidence import EMPTY_EVIDENCE, load_health_evidence
@@ -142,7 +143,7 @@ class InsightsService:
             farm_id=farm_id, after=None, limit=200, irrigation_system=None, include_inactive=False
         )
 
-        now = datetime.now(UTC)
+        now = clock.now()
         trend_anchor = now - _TREND_WINDOW
 
         use_definition = get_settings().health_definition_enabled
@@ -374,7 +375,7 @@ class InsightsService:
             rows = await self._alerts.list_alerts(block_id=block["id"], limit=500)
             all_alerts.extend(rows)
 
-        now = datetime.now(UTC)
+        now = clock.now()
         # Day-aligned end-of-day buckets, oldest first.
         points: list[AlertTrendPoint] = []
         for offset in range(days - 1, -1, -1):

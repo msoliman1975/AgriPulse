@@ -24,7 +24,7 @@ import asyncio
 import json
 import re
 from collections.abc import Coroutine
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -32,6 +32,7 @@ from celery import shared_task
 
 from app.core.logging import get_logger
 from app.core.settings import get_settings
+from app.shared import clock
 from app.shared.db.session import dispose_engine
 
 _log = get_logger(__name__)
@@ -245,7 +246,7 @@ async def _write_trial_term(
                    trial_end = :ends,
                    plan_type = 'trial',
                    feature_flags = feature_flags || CAST(:flags AS jsonb),
-                   updated_at = now()
+                   updated_at = public.app_now()
              WHERE tenant_id = :tenant_id
                AND is_current IS TRUE
             """
@@ -322,7 +323,7 @@ async def _chase() -> None:
     from app.modules.billing.repository import TrialRepository
     from app.shared.db.session import AsyncSessionLocal
 
-    cutoff = datetime.now(UTC) - timedelta(hours=24)
+    cutoff = clock.now() - timedelta(hours=24)
     factory = AsyncSessionLocal()
     to_send: list[tuple[str, str, str]] = []
 
@@ -334,7 +335,7 @@ async def _chase() -> None:
                 continue
             if signup.created_at is None or signup.created_at > cutoff:
                 continue
-            signup.chase_email_sent_at = datetime.now(UTC)
+            signup.chase_email_sent_at = clock.now()
             await repo.save(signup)
             to_send.append((signup.email, signup.full_name, signup.status_handle))
 

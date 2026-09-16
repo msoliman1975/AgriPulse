@@ -593,6 +593,14 @@ class Settings(BaseSettings):
     # every environment that does not host simulation runs.
     notification_sink_tenant_prefix: str = ""
 
+    # --- Demo history replay ----------------------------------------------
+    # Only a tenant whose schema starts with this prefix may be replayed
+    # under a moved clock. Empty, the default, means no tenant qualifies and
+    # `demo_history.runner.replay` refuses to start. Production runs on the
+    # default. The build environment that produces the demo snapshot is the
+    # one place this is set.
+    demo_history_build_schema_prefix: str = ""
+
     # --- Self-serve trial -------------------------------------------------
     # Every number here is configuration on purpose. A price, a cap or a
     # trial length compiled into the image cannot be changed without a

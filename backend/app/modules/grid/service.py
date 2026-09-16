@@ -15,7 +15,7 @@ import the impl.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Protocol
 from uuid import UUID
@@ -62,6 +62,7 @@ from app.modules.grid.schemas import (
     GridWorstCellsResponse,
 )
 from app.modules.grid.zonal import CellAggregates
+from app.shared import clock
 
 
 class GridService(Protocol):
@@ -309,7 +310,7 @@ class GridServiceImpl:
         # 2. Soft-retire any prior active config so the partial unique
         # index doesn't collide on insert.
         prior = await self._repo.get_active_config(block_id=block_id, product_id=product_id)
-        now = datetime.now(tz=UTC)
+        now = clock.now()
         if prior is not None:
             # Same cell size = no geometry change. Apply a threshold-only
             # update in place (no retire + regenerate) so tuning the

@@ -29,6 +29,7 @@ from app.modules.action_center.schemas import (
     Recurrence,
     TreePathStep,
 )
+from app.shared import clock
 from app.shared.action_items import (
     GRID_GROUP_RULE_CODE,
     derive_recurrence,
@@ -476,7 +477,7 @@ class ActionCenterServiceImpl:
             raised_to=raised_to,
             limit=limit,
         )
-        now = datetime.now(UTC)
+        now = clock.now()
         all_items = [to_item(r, now=now) for r in rows]
 
         # Attach the tree author's description. One lookup for the page

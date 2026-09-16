@@ -64,7 +64,7 @@ WITH live_blocks AS (
       FROM blocks b
      WHERE b.farm_id = :farm
        AND b.deleted_at IS NULL
-       AND (b.active_to IS NULL OR b.active_to > now())
+       AND (b.active_to IS NULL OR b.active_to > public.app_now())
 ),
 block_days AS (
     SELECT
@@ -868,7 +868,7 @@ class ImageryRepository:
                     blocks_merged = EXCLUDED.blocks_merged,
                     indices       = EXCLUDED.indices,
                     source        = EXCLUDED.source,
-                    built_at      = now()
+                    built_at      = public.app_now()
                 WHERE farm_scene_rasters.source <> 'fetched'
                    OR EXCLUDED.source = 'fetched'
                 """
@@ -1075,7 +1075,7 @@ class ImageryRepository:
                 )
                 VALUES (
                     :id, :subscription_id, :block_id, :product_id, :scene_id,
-                    :scene_datetime, :cloud_cover_pct, 'pending', now()
+                    :scene_datetime, :cloud_cover_pct, 'pending', public.app_now()
                 )
                 ON CONFLICT (subscription_id, scene_id) DO NOTHING
                 RETURNING id
@@ -1209,7 +1209,7 @@ class ImageryRepository:
                         FROM blocks b
                         WHERE b.farm_id = :farm
                           AND b.deleted_at IS NULL
-                          AND (b.active_to IS NULL OR b.active_to > now())
+                          AND (b.active_to IS NULL OR b.active_to > public.app_now())
                         ORDER BY b.id
                         """
                     ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
@@ -1408,7 +1408,7 @@ class ImageryRepository:
                         SELECT b.id FROM blocks b
                          WHERE b.farm_id = :farm
                            AND b.deleted_at IS NULL
-                           AND (b.active_to IS NULL OR b.active_to > now())
+                           AND (b.active_to IS NULL OR b.active_to > public.app_now())
                            AND NOT EXISTS (
                                SELECT 1 FROM imagery_aoi_subscriptions s
                                 WHERE s.block_id = b.id
@@ -1498,7 +1498,7 @@ class ImageryRepository:
                            fetch_farm_aoi = :fetch,
                            is_active = TRUE,
                            updated_by = :actor,
-                           updated_at = now()
+                           updated_at = public.app_now()
                      WHERE id = :id
                     """
                 ).bindparams(
@@ -1560,7 +1560,7 @@ class ImageryRepository:
         if not changes:
             return await self.get_farm_subscription(subscription_id)
         sets = [f"{col} = :{col}" for col in changes]
-        sets += ["updated_by = :actor", "updated_at = now()"]
+        sets += ["updated_by = :actor", "updated_at = public.app_now()"]
         params: dict[str, Any] = {**changes, "id": subscription_id, "actor": actor_user_id}
         await self._session.execute(
             text(
@@ -1645,7 +1645,7 @@ class ImageryRepository:
         await self._session.execute(
             text(
                 "UPDATE imagery_farm_subscriptions "
-                "SET fetch_farm_aoi = FALSE, updated_at = now() WHERE id = :id"
+                "SET fetch_farm_aoi = FALSE, updated_at = public.app_now() WHERE id = :id"
             ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
             {"id": subscription_id},
         )
@@ -1758,7 +1758,7 @@ class ImageryRepository:
         await self._session.execute(
             text(
                 "UPDATE imagery_farm_subscriptions "
-                "SET last_attempted_at = :at, updated_at = now() "
+                "SET last_attempted_at = :at, updated_at = public.app_now() "
                 "WHERE id = :id"
             ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
             {"id": subscription_id, "at": attempted_at},
@@ -1777,7 +1777,7 @@ class ImageryRepository:
                                 WHERE j.subscription_id = s.id
                                   AND j.status = 'succeeded'
                            ),
-                           updated_at = now()
+                           updated_at = public.app_now()
                      WHERE s.id = :id
                  RETURNING s.last_successful_ingest_at
                     """
@@ -1811,7 +1811,7 @@ class ImageryRepository:
                 )
                 VALUES (
                     :id, :subscription_id, :farm_id, :product_id, :scene_id,
-                    :scene_datetime, :cloud_cover_pct, 'pending', now()
+                    :scene_datetime, :cloud_cover_pct, 'pending', public.app_now()
                 )
                 ON CONFLICT (subscription_id, scene_id) DO NOTHING
                 RETURNING id
@@ -1987,13 +1987,13 @@ class ImageryRepository:
                 f"""
                 UPDATE {table}
                    SET status = 'failed',
-                       completed_at = now(),
+                       completed_at = public.app_now(),
                        error_message =
                            'reaped after ' || attempts ||
                            ' attempt(s) with no terminal status',
                        error_code = 'stuck_no_progress'
                  WHERE status IN ('pending', 'running', 'requested')
-                   AND requested_at < now() - make_interval(hours => :stuck_hours)
+                   AND requested_at < public.app_now() - make_interval(hours => :stuck_hours)
                    AND attempts >= :max_attempts
                 """  # noqa: S608 - `table` is one of two literals
             ),
@@ -2035,7 +2035,7 @@ class ImageryRepository:
                            error_message = NULL,
                            error_code = NULL
                      WHERE status IN ('pending', 'running', 'requested')
-                       AND requested_at < now() - make_interval(hours => :stuck_hours)
+                       AND requested_at < public.app_now() - make_interval(hours => :stuck_hours)
                        AND attempts < :max_attempts
                     RETURNING id
                     """  # noqa: S608 - `table` is one of two literals

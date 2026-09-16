@@ -29,16 +29,19 @@ import threading
 from collections.abc import AsyncIterator
 
 from fastapi import Request
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.orm import Session as SyncSession
 from sqlalchemy.sql import text
 
 from app.core.logging import get_logger
 from app.core.settings import get_settings
+from app.shared import clock
 
 _log = get_logger(__name__)
 
@@ -177,6 +180,35 @@ def AsyncSessionLocal() -> async_sessionmaker[AsyncSession]:
         expire_on_commit=False,
         autoflush=False,
         autocommit=False,
+    )
+
+
+@event.listens_for(SyncSession, "after_begin")
+def _apply_simulated_clock(session, transaction, connection) -> None:  # type: ignore[no-untyped-def]
+    """Carry a simulated clock into SQL, once per transaction.
+
+    `public.app_now()` reads the `agripulse.now` setting, and application
+    SQL calls `app_now()` instead of `now()`. This is where that setting is
+    written.
+
+    The hook sits on the transaction rather than on `_set_search_path`
+    because 46 places in the application open a session and set their own
+    `search_path` without going through that function. A transaction is the
+    one thing they all have.
+
+    `set_config(..., TRUE)` is transaction-local, so the value disappears at
+    commit or rollback and cannot leak into the next request on the same
+    pooled connection.
+
+    With no simulated clock the hook returns before touching the database,
+    so the normal path costs one `ContextVar` read per transaction.
+    """
+    at = clock.simulated_now()
+    if at is None:
+        return
+    connection.execute(
+        text("SELECT set_config(:name, :value, TRUE)"),
+        {"name": clock.PG_SETTING, "value": at.isoformat()},
     )
 
 

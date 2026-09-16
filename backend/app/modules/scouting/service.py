@@ -15,7 +15,7 @@ succeed, regardless of how the requests interleave.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -31,6 +31,7 @@ from app.modules.scouting.errors import (
 )
 from app.modules.scouting.events import ScoutingVisitAssignedV1
 from app.modules.scouting.repository import ScoutingRepository
+from app.shared import clock
 from app.shared.eventbus import get_default_bus
 
 # A visit is still "open" in any of these — the states a sweep or a supervisor
@@ -74,7 +75,7 @@ class ScoutingService:
                     title=str(visit["title"]),
                     instruction=visit.get("instruction"),
                     due_by=visit.get("due_by"),
-                    assigned_at=visit.get("assigned_at") or datetime.now(UTC),
+                    assigned_at=visit.get("assigned_at") or clock.now(),
                     tenant_schema=self._tenant_schema,
                 )
             )
@@ -131,7 +132,7 @@ class ScoutingService:
         the scout should see a sentence a colleague typed, not a template.
         """
         due_by = (
-            datetime.now(UTC) + timedelta(hours=payload.due_within_hours)
+            clock.now() + timedelta(hours=payload.due_within_hours)
             if payload.due_within_hours
             else None
         )
@@ -154,7 +155,7 @@ class ScoutingService:
                 status="assigned",
                 assigned_to=payload.assigned_to,
                 assigned_by=actor_user_id,
-                assigned_at=datetime.now(UTC),
+                assigned_at=clock.now(),
             )
         if payload.lat is not None and payload.lon is not None:
             values.update(lat=payload.lat, lon=payload.lon)
@@ -210,7 +211,7 @@ class ScoutingService:
                 status="assigned",
                 assigned_to=assigned_to,
                 assigned_by=actor_user_id,
-                assigned_at=datetime.now(UTC),
+                assigned_at=clock.now(),
             )
         # Nested so a duplicate does not poison the caller's transaction — the
         # Action Center dispatches in batches and one already-covered item must
@@ -229,7 +230,7 @@ class ScoutingService:
         self, *, farm_id: UUID, payload: Any, actor_user_id: UUID | None
     ) -> dict[str, Any]:
         """The scout is already standing there, so skip the queue entirely."""
-        now = datetime.now(UTC)
+        now = clock.now()
         return await self._repo.insert_visit(
             values={
                 "farm_id": farm_id,
@@ -253,7 +254,7 @@ class ScoutingService:
 
     async def claim(self, *, visit_id: UUID, actor_user_id: UUID | None) -> dict[str, Any]:
         """Take an unassigned visit. Losing the race is a 409, not a silent no-op."""
-        now = datetime.now(UTC)
+        now = clock.now()
         updated = await self._repo.apply_transition(
             visit_id=visit_id,
             sets={
@@ -273,7 +274,7 @@ class ScoutingService:
         await self._assert_assignee(visit_id, actor_user_id)
         return await self._transition(
             visit_id,
-            sets={"status": "accepted", "accepted_at": datetime.now(UTC)},
+            sets={"status": "accepted", "accepted_at": clock.now()},
             expected=("assigned",),
             action="accepted",
         )
@@ -307,7 +308,7 @@ class ScoutingService:
             return visit  # idempotent: the app calls this on arrival
         return await self._transition(
             visit_id,
-            sets={"status": "in_progress", "started_at": datetime.now(UTC)},
+            sets={"status": "in_progress", "started_at": clock.now()},
             expected=("accepted",),
             action="started",
         )
@@ -334,7 +335,7 @@ class ScoutingService:
                 "summary_note": payload.summary_note,
                 "observation_group_id": payload.observation_group_id,
                 "idempotency_key": payload.idempotency_key,
-                "completed_at": datetime.now(UTC),
+                "completed_at": clock.now(),
                 "completed_by": actor_user_id,
             },
             expected=("accepted", "in_progress"),
@@ -352,7 +353,7 @@ class ScoutingService:
                 "status": "assigned",
                 "assigned_to": assignee_user_id,
                 "assigned_by": actor_user_id,
-                "assigned_at": datetime.now(UTC),
+                "assigned_at": clock.now(),
                 "accepted_at": None,
             },
             # Reassignment is allowed right up until the scout starts walking.

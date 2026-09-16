@@ -22,7 +22,7 @@ it — an Agronomist may resolve an alert and may not write a board plan.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -40,6 +40,7 @@ from app.modules.action_center.service import (
     ActionCenterServiceImpl,
     get_action_center_service,
 )
+from app.shared import clock
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
 from app.shared.db.session import get_db_session
@@ -123,7 +124,7 @@ async def list_action_items(
     # A named range is sugar for raised_from; explicit bounds win so the
     # custom-range picker does not have to clear it first.
     if raised_from is None and date_range in _RANGES:
-        raised_from = datetime.now(UTC) - timedelta(days=_RANGES[date_range])
+        raised_from = clock.now() - timedelta(days=_RANGES[date_range])
 
     return await service.list_items(
         farm_id=farm_id,

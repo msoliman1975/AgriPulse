@@ -30,7 +30,7 @@ a farm gets alert-driven scouting when somebody asks for it.
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Any
 from uuid import UUID
 
@@ -42,6 +42,7 @@ from app.core.logging import get_logger
 from app.modules.alerts.events import AlertOpenedV1
 from app.modules.recommendations.events import RecommendationOpenedV1
 from app.modules.scouting.events import ScoutingVisitAssignedV1
+from app.shared import clock
 from app.shared.db.session import sanitize_tenant_schema
 from app.shared.eventbus import EventBus, get_default_bus
 
@@ -175,7 +176,7 @@ def _dispatch(
             "origin": origin,
             "title": title[:200],
             "severity": severity,
-            "due_by": datetime.now(UTC) + timedelta(hours=int(hours)),
+            "due_by": clock.now() + timedelta(hours=int(hours)),
             "status": status,
             "template_id": (rule or {}).get("template_id"),
             **values,
@@ -184,7 +185,7 @@ def _dispatch(
             # assigned_by stays NULL: a rule did this, not a person, and the
             # supervisor board reads that distinction.
             row["assigned_to"] = assignee
-            row["assigned_at"] = datetime.now(UTC)
+            row["assigned_at"] = clock.now()
 
         visit_id = _create_visit(session, values=row)
         if visit_id is None:
@@ -209,7 +210,7 @@ def _dispatch(
                         priority=str(row.get("priority") or "medium"),
                         title=str(row["title"]),
                         due_by=row.get("due_by"),
-                        assigned_at=datetime.now(UTC),
+                        assigned_at=clock.now(),
                         tenant_schema=tenant_schema,
                     )
                 )

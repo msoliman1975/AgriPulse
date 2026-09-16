@@ -38,7 +38,7 @@ Apply / Reset / Lock. This module exposes:
 * :func:`compute_apply_diff`     — per-block list of will_add /
                                    will_update / will_deactivate rows.
 * :func:`apply_template`         — execute the reconcile atomically and
-                                   stamp ``applied_at = now()`` on each
+                                   stamp ``applied_at = public.app_now()`` on each
                                    touched block-side row.
 
 "Extra" subscriptions on a block (not in the template) are
@@ -50,7 +50,6 @@ preserving ingestion-job history is the safer call.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
@@ -73,6 +72,7 @@ from app.modules.farms.models import (
 )
 from app.modules.imagery.models import ImageryAoiSubscription
 from app.modules.weather.models import WeatherSubscription
+from app.shared import clock
 from app.shared.health_definition import HealthDefinitionError, parse_definition
 
 # `health` is in this list for the lock and the editor, and for nothing
@@ -456,7 +456,7 @@ async def apply_template(
     transaction (the router does this) so partial application is
     impossible.
 
-    Block-side rows touched by Apply get ``applied_at = now()``.
+    Block-side rows touched by Apply get ``applied_at = public.app_now()``.
     """
     block_ids = await _resolve_target_blocks(
         session, farm_id=farm_id, target_block_ids=target_block_ids
@@ -464,7 +464,7 @@ async def apply_template(
     imagery_tpl = await get_imagery_template(session, farm_id)
     weather_tpl = await get_weather_template(session, farm_id)
 
-    now = datetime.now(UTC)
+    now = clock.now()
     counts = {
         "blocks_touched": 0,
         "imagery_added": 0,

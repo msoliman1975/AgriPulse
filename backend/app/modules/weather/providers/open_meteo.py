@@ -29,6 +29,7 @@ from app.modules.weather.providers.protocol import (
     ProbeResult,
     WeatherProvider,
 )
+from app.shared import clock
 
 # Probe timeout — kept tight because the probe runs on Beat cadence
 # and a slow provider should be visible as a timeout, not a stuck task.
@@ -356,7 +357,7 @@ def _decimal_col(values: Any) -> list[Decimal | None]:
 
 
 def _now_utc() -> datetime:
-    return datetime.now(tz=UTC)
+    return clock.now()
 
 
 # Type-checker assist: the concrete class satisfies the Protocol.

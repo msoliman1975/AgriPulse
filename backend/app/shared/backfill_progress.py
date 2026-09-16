@@ -61,7 +61,7 @@ def mark_running(run_id: UUID | str | None) -> None:
         """
         UPDATE public.backfill_runs
            SET status = :running,
-               started_at = COALESCE(started_at, now())
+               started_at = COALESCE(started_at, public.app_now())
          WHERE id = :rid
            AND status = 'queued'
         """,
@@ -151,7 +151,7 @@ def fail_run(run_id: UUID | str | None, error: str) -> None:
     _execute(
         """
         UPDATE public.backfill_runs
-           SET status = :failed, error = :err, completed_at = now()
+           SET status = :failed, error = :err, completed_at = public.app_now()
          WHERE id = :rid
            AND status IN ('queued', 'running')
         """,
@@ -185,7 +185,7 @@ def _settle(run_id: UUID | str) -> None:
                           WHEN d.n_failed >= d.n_declared THEN 'failed'
                           ELSE 'partial'
                         END,
-               completed_at = now()
+               completed_at = public.app_now()
           FROM declared d
          WHERE r.id = d.id
            AND d.n_declared > 0

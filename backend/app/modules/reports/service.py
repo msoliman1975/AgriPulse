@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.farms.errors import FarmNotFoundError
 from app.modules.farms.repository import FarmsRepository
 from app.modules.grid.anomaly import DEFAULT_K, DEFAULT_MIN_CELLS, DEFAULT_MIN_STD
+from app.shared import clock
 from app.shared.crop_taxonomy import path_matches
 
 from .custom_fields import (
@@ -101,7 +102,7 @@ def resolve_period(since: datetime | None, until: datetime | None) -> ReportPeri
     `until` defaults to now; `since` to (until - 30d). Callers pass the
     raw query params straight through so the default lives in one place.
     """
-    resolved_until = until or datetime.now(UTC)
+    resolved_until = until or clock.now()
     resolved_since = since or (resolved_until - _DEFAULT_WINDOW)
     return ReportPeriod(since=resolved_since, until=resolved_until)
 

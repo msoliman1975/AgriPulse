@@ -273,7 +273,7 @@ class ScoutingRepository:
         """
         result = await self._session.execute(
             text(
-                "UPDATE scouting_visits SET status = 'expired', updated_at = now() "
+                "UPDATE scouting_visits SET status = 'expired', updated_at = public.app_now() "
                 "WHERE deleted_at IS NULL AND due_by IS NOT NULL AND due_by < :now "
                 "AND status IN ('queued', 'assigned', 'accepted', 'in_progress')"
             ),
@@ -356,7 +356,7 @@ class ScoutingRepository:
                             for c in cols
                             if c not in {"farm_id", "block_id", "origin"}
                         )
-                        + ", updated_at = now() RETURNING *"
+                        + ", updated_at = public.app_now() RETURNING *"
                     ),
                     values,
                 )

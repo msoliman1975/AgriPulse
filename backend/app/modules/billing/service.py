@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Any
 from uuid import UUID
 
@@ -44,6 +44,7 @@ from app.modules.billing.errors import (
 )
 from app.modules.billing.models import QUEUE_STATUSES, TrialSignup
 from app.modules.billing.repository import TrialRepository, day_and_week_start
+from app.shared import clock
 
 _log = get_logger(__name__)
 
@@ -124,7 +125,7 @@ class TrialService:
             locale=locale,
             status_handle=secrets.token_urlsafe(16),
             verification_token_hash=_hash_token(token),
-            verification_expires_at=datetime.now(UTC)
+            verification_expires_at=clock.now()
             + timedelta(hours=settings.trial_verification_ttl_hours),
             source_ip=source_ip,
             user_agent=user_agent,
@@ -158,12 +159,12 @@ class TrialService:
             return signup
 
         expires = signup.verification_expires_at
-        if expires is not None and expires < datetime.now(UTC):
+        if expires is not None and expires < clock.now():
             signup.status = "expired"
             await self._repo.save(signup)
             return signup
 
-        signup.verified_at = datetime.now(UTC)
+        signup.verified_at = clock.now()
         # The token is single-use. Clearing the hash makes a replayed link
         # fail even before the expiry is reached.
         signup.verification_token_hash = None
@@ -267,7 +268,7 @@ class TrialService:
 
         signup.status = "approved"
         signup.reviewed_by = actor_user_id
-        signup.reviewed_at = datetime.now(UTC)
+        signup.reviewed_at = clock.now()
         signup.cap_override = bool(over_day or over_week)
         if override_reason:
             signup.decision_reason = override_reason
@@ -308,7 +309,7 @@ class TrialService:
 
         signup.status = "paused"
         signup.reviewed_by = actor_user_id
-        signup.reviewed_at = datetime.now(UTC)
+        signup.reviewed_at = clock.now()
         signup.decision_reason = reason
         await self._repo.save(signup)
 
@@ -340,7 +341,7 @@ class TrialService:
 
         signup.status = "rejected"
         signup.reviewed_by = actor_user_id
-        signup.reviewed_at = datetime.now(UTC)
+        signup.reviewed_at = clock.now()
         signup.decision_reason = reason
         await self._repo.save(signup)
 

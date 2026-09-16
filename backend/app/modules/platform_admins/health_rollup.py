@@ -99,7 +99,7 @@ async def cross_tenant_health(
                                COALESCE(SUM(
                                    CASE WHEN weather_last_failed_at IS NOT NULL
                                         AND weather_last_failed_at >
-                                            now() - interval '24 hours'
+                                            public.app_now() - interval '24 hours'
                                         THEN 1 ELSE 0 END
                                ), 0) AS w_failed_24h,
                                COALESCE(SUM(imagery_active_subs), 0) AS i_subs,

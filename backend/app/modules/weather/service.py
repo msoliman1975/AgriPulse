@@ -36,6 +36,7 @@ from app.modules.weather.schemas import (
     SubscriptionRead,
 )
 from app.modules.weather.timezone import tz_for_centroid, tz_name_for_centroid
+from app.shared import clock
 from app.shared.db.ids import uuid7
 
 # How far either side of a moment to look for hourly samples. The feed is
@@ -364,7 +365,7 @@ class WeatherServiceImpl:
 
         # Window: today's local-midnight through (today + horizon_days)
         # local-midnight, both expressed in UTC for the hypertable scan.
-        today_local = datetime.now(tz).date()
+        today_local = clock.now().astimezone(tz).date()
         end_local = today_local + timedelta(days=horizon_days)
         since_utc = datetime.combine(today_local, datetime.min.time(), tzinfo=tz).astimezone(UTC)
         until_utc = datetime.combine(end_local, datetime.min.time(), tzinfo=tz).astimezone(UTC)

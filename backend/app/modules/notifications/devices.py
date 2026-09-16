@@ -55,10 +55,10 @@ async def register_device(
                            platform     = EXCLUDED.platform,
                            app_version  = EXCLUDED.app_version,
                            locale       = EXCLUDED.locale,
-                           last_seen_at = now(),
+                           last_seen_at = public.app_now(),
                            revoked_at   = NULL,
                            deleted_at   = NULL,
-                           updated_at   = now(),
+                           updated_at   = public.app_now(),
                            updated_by   = EXCLUDED.user_id
                     RETURNING id, user_id, platform, app_version, locale,
                               last_seen_at, revoked_at, created_at
@@ -116,7 +116,7 @@ async def revoke_device(session: AsyncSession, *, user_id: UUID, token: str) -> 
     """
     result = await session.execute(
         text(
-            "UPDATE device_tokens SET revoked_at = now(), updated_at = now(), "
+            "UPDATE device_tokens SET revoked_at = public.app_now(), updated_at = public.app_now(), "
             "updated_by = :user_id "
             "WHERE token = :token AND user_id = :user_id AND revoked_at IS NULL"
         ),

@@ -221,7 +221,7 @@ class PurgeEngine:
             text(
                 """
                 UPDATE resources r
-                   SET archived_at = now(), updated_at = now()
+                   SET archived_at = public.app_now(), updated_at = public.app_now()
                  WHERE r.archived_at IS NULL
                    AND NOT EXISTS (
                          SELECT 1 FROM resource_farms rf WHERE rf.resource_id = r.id

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date as date_type
-from datetime import datetime, timedelta
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -17,6 +17,7 @@ from app.modules.irrigation.errors import (
     InvalidIrrigationTransitionError,
 )
 from app.modules.irrigation.models import IrrigationSchedule
+from app.shared import clock
 
 
 class IrrigationRepository:
@@ -345,7 +346,7 @@ class IrrigationRepository:
             new_status = "applied"
             values: dict[str, Any] = {
                 "status": new_status,
-                "applied_at": datetime.now(_utc()),
+                "applied_at": clock.now(),
                 "applied_by": actor_user_id,
                 "applied_volume_mm": applied_volume_mm,
                 "updated_by": actor_user_id,
@@ -497,7 +498,7 @@ class IrrigationRepository:
                 ) VALUES (
                     :block_id, :date, :balance_mm, :etc_mm, :et0_mm,
                     :kc_used, :kc_source, :growth_stage,
-                    :precip_mm, :irrigation_mm, :irrigation_logged, now()
+                    :precip_mm, :irrigation_mm, :irrigation_logged, public.app_now()
                 )
                 ON CONFLICT (block_id, date) DO UPDATE SET
                     balance_mm = EXCLUDED.balance_mm,
@@ -509,7 +510,7 @@ class IrrigationRepository:
                     precip_mm = EXCLUDED.precip_mm,
                     irrigation_mm = EXCLUDED.irrigation_mm,
                     irrigation_logged = EXCLUDED.irrigation_logged,
-                    computed_at = now()
+                    computed_at = public.app_now()
                 """
             ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
             rows,

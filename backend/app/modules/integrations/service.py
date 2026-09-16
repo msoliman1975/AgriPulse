@@ -186,7 +186,7 @@ class IntegrationsService:
                     INSERT INTO farm_weather_overrides
                         (farm_id, provider_code, cadence_hours,
                          updated_at, updated_by)
-                    VALUES (:fid, :pc, :ch, now(), :actor)
+                    VALUES (:fid, :pc, :ch, public.app_now(), :actor)
                     ON CONFLICT (farm_id) DO UPDATE SET
                         provider_code = EXCLUDED.provider_code,
                         cadence_hours = EXCLUDED.cadence_hours,
@@ -255,7 +255,7 @@ class IntegrationsService:
                     INSERT INTO farm_imagery_overrides
                         (farm_id, cloud_cover_threshold_pct,
                          updated_at, updated_by)
-                    VALUES (:fid, :cc, now(), :actor)
+                    VALUES (:fid, :cc, public.app_now(), :actor)
                     ON CONFLICT (farm_id) DO UPDATE SET
                         cloud_cover_threshold_pct = EXCLUDED.cloud_cover_threshold_pct,
                         updated_at = EXCLUDED.updated_at,
@@ -300,7 +300,7 @@ class IntegrationsService:
                 """
                 UPDATE imagery_aoi_subscriptions
                 SET cloud_cover_max_pct = :cc,
-                    updated_at = now()
+                    updated_at = public.app_now()
                 WHERE block_id = :bid AND is_active = TRUE
                 """
             ).bindparams(bindparam("bid", type_=PG_UUID(as_uuid=True))),
@@ -333,7 +333,7 @@ class IntegrationsService:
                     """
                     UPDATE imagery_aoi_subscriptions ias
                     SET cloud_cover_max_pct = NULL,
-                        updated_at = now()
+                        updated_at = public.app_now()
                     FROM blocks b
                     WHERE ias.block_id = b.id
                       AND b.farm_id = :fid
@@ -362,7 +362,7 @@ class IntegrationsService:
                         """
                         UPDATE imagery_aoi_subscriptions ias
                         SET cloud_cover_max_pct = :cc,
-                            updated_at = now()
+                            updated_at = public.app_now()
                         FROM blocks b
                         WHERE ias.block_id = b.id
                           AND b.farm_id = :fid

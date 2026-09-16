@@ -29,7 +29,7 @@ _FLAG_COLUMNS = """
     f.note, f.severity, f.status,
     CASE WHEN f.point IS NULL THEN NULL
          ELSE ST_AsGeoJSON(f.point)::jsonb END AS point,
-    f.accuracy_m, f.pin_until, (f.pin_until > now()) AS is_pinned,
+    f.accuracy_m, f.pin_until, (f.pin_until > public.app_now()) AS is_pinned,
     f.raised_by, f.closed_at, f.closed_by, f.close_reason,
     f.created_at, f.updated_at,
     (SELECT count(*) FROM field_flag_comments c WHERE c.flag_id = f.id) AS comment_count
@@ -62,7 +62,7 @@ class FieldFlagRepository:
         if open_only:
             clauses.append("f.status = 'open'")
         if pinned_only:
-            clauses.append("f.pin_until > now()")
+            clauses.append("f.pin_until > public.app_now()")
         sql = (
             f"SELECT {_FLAG_COLUMNS} FROM {_FLAG_FROM} "  # noqa: S608
             f"WHERE {' AND '.join(clauses)} "
@@ -226,7 +226,7 @@ class FieldFlagRepository:
         await self._session.execute(
             text(
                 "UPDATE field_flags SET status = 'closed', close_reason = :reason, "
-                "       closed_by = :closed_by, closed_at = now(), updated_at = now() "
+                "       closed_by = :closed_by, closed_at = public.app_now(), updated_at = public.app_now() "
                 " WHERE id = :id AND status = 'open'"
             ).bindparams(
                 bindparam("id", type_=PG_UUID(as_uuid=True)),
@@ -247,7 +247,7 @@ class FieldFlagRepository:
             text(
                 "UPDATE field_flags SET status = 'open', close_reason = NULL, "
                 "       closed_by = NULL, closed_at = NULL, pin_until = :pin_until, "
-                "       updated_at = now() "
+                "       updated_at = public.app_now() "
                 " WHERE id = :id AND status = 'closed'"
             ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
             {"id": flag_id, "pin_until": pin_until},
