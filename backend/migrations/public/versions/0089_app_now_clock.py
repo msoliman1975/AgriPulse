@@ -115,14 +115,33 @@ FROM_NOW = "('now()', 'pg_catalog.now()')"
 FROM_APP_NOW = "('app_now()', 'public.app_now()')"
 
 
-def _rewrite_defaults(match_exprs: str, to_expr: str) -> str:
+# The upgrade rewrites `public` only. Each tenant schema is rewritten by
+# the matching tenant migration, which runs once per tenant.
+UPGRADE_SCOPE = "n.nspname = 'public'"
+
+# The downgrade has to reach further. A column default that calls
+# `public.app_now()` is a recorded dependency on that function, so
+# `DROP FUNCTION` is refused while any of them survives — including the
+# ones in tenant schemas, which the public chain cannot downgrade. Measured
+# on the production database: "cannot drop function ... because other
+# objects depend on it ... default value for column".
+#
+# System schemas are excluded, and so is `_timescaledb_internal`: the
+# upgrade never wrote into a chunk, so there is nothing there to undo.
+DOWNGRADE_SCOPE = (
+    r"n.nspname NOT LIKE 'pg\_%' "
+    r"AND n.nspname NOT LIKE '\_timescaledb%' "
+    r"AND n.nspname <> 'information_schema'"
+)
+
+
+def _rewrite_defaults(match_exprs: str, to_expr: str, scope: str) -> str:
     """Build a DO block that swaps one default expression for another.
 
-    Scope is the `public` schema. Tenant schemas are handled by the
-    matching tenant migration, which runs once per tenant.
-    `_timescaledb_internal` is out of scope: its chunks refuse the ALTER,
-    and their defaults never fire for a write that arrives through the
-    hypertable.
+    `scope` is a predicate on `n.nspname` that decides which schemas the
+    block walks. `_timescaledb_internal` is never in scope: its chunks
+    refuse the ALTER outright, and a chunk default never fires for a write
+    that arrives through the hypertable.
 
     A column already carrying the target expression does not match, so the
     block is safe to run more than once.
@@ -142,7 +161,7 @@ BEGIN
           JOIN pg_attribute a
             ON a.attrelid = d.adrelid AND a.attnum = d.adnum
          WHERE pg_get_expr(d.adbin, d.adrelid) IN {match_exprs}
-           AND n.nspname = 'public'
+           AND {scope}
     LOOP
         EXECUTE format(
             'ALTER TABLE %I.%I ALTER COLUMN %I SET DEFAULT {to_expr}',
@@ -158,10 +177,10 @@ def upgrade() -> None:
     op.execute(APP_NOW_FN)
     op.execute(APP_NOW_COMMENT)
     op.execute(TOUCH_FN_NEW)
-    op.execute(_rewrite_defaults(FROM_NOW, "public.app_now()"))
+    op.execute(_rewrite_defaults(FROM_NOW, "public.app_now()", UPGRADE_SCOPE))
 
 
 def downgrade() -> None:
-    op.execute(_rewrite_defaults(FROM_APP_NOW, "now()"))
+    op.execute(_rewrite_defaults(FROM_APP_NOW, "now()", DOWNGRADE_SCOPE))
     op.execute(TOUCH_FN_OLD)
     op.execute("DROP FUNCTION IF EXISTS public.app_now()")
