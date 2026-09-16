@@ -88,6 +88,7 @@ vi.mock("@/queries/decisionTrees", () => ({
   useDecisionTree: () => ({ data: tree(), isLoading: false, isError: false }),
   useAppendDecisionTreeVersion: () => noopMutation,
   usePublishDecisionTreeVersion: () => noopMutation,
+  useDiscardDecisionTreeVersion: () => noopMutation,
   useDryRunDecisionTree: () => noopMutation,
   useUpdateDecisionTree: () => noopMutation,
   useDecisionTreeCandidateBlocks: () => ({ data: [], isLoading: false, isError: false }),
@@ -143,7 +144,9 @@ describe("a platform tree", () => {
     renderPage();
 
     expect(
-      await screen.findByText(/This tree comes from the platform\. Your tenant cannot edit it here/),
+      await screen.findByText(
+        /This tree comes from the platform\. Your tenant cannot edit it here/,
+      ),
     ).toBeTruthy();
   });
 

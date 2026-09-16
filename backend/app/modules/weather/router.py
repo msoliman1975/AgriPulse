@@ -52,7 +52,7 @@ from app.modules.weather.schemas import (
 from app.modules.weather.service import WeatherServiceImpl, get_weather_service
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
-from app.shared.db.session import get_db_session
+from app.shared.db.session import get_admin_db_session, get_db_session
 from app.shared.rbac.check import has_capability, requires_capability
 
 # Canonical order for the summary response (matches the catalog sort_order).
@@ -190,6 +190,42 @@ async def list_weather_index_catalog(
     rows = (
         (
             await tenant_session.execute(
+                select(WeatherIndexCatalog)
+                .where(WeatherIndexCatalog.is_active.is_(True))
+                .order_by(WeatherIndexCatalog.sort_order.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [WeatherIndexCatalogEntry.model_validate(r) for r in rows]
+
+
+@router.get(
+    "/admin/weather/indices/catalog",
+    response_model=list[WeatherIndexCatalogEntry],
+    summary="List the first-class weather indices (platform scope).",
+)
+async def admin_list_weather_index_catalog(
+    context: RequestContext = Depends(requires_capability("platform.read")),
+    admin_session: AsyncSession = Depends(get_admin_db_session),
+) -> list[WeatherIndexCatalogEntry]:
+    """The same catalog as `/weather/indices/catalog`, for a caller with a
+    platform role and no tenant.
+
+    `public.weather_indices_catalog` is platform-wide curated data, so the
+    only thing the tenant assertion on the sibling route protected was
+    nothing. Without this, the decision-tree condition builder on
+    `/platform/decision-trees` got a 403 and rendered the weather-index
+    picker with no descriptions.
+
+    Bound to `get_admin_db_session`, which puts `public` alone on the
+    search path — the scope is a property of the session, not a flag.
+    """
+    del context
+    rows = (
+        (
+            await admin_session.execute(
                 select(WeatherIndexCatalog)
                 .where(WeatherIndexCatalog.is_active.is_(True))
                 .order_by(WeatherIndexCatalog.sort_order.asc())

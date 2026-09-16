@@ -67,6 +67,7 @@ vi.mock("@/queries/decisionTrees", () => ({
   }),
   useAppendDecisionTreeVersion: () => noopMutation,
   usePublishDecisionTreeVersion: () => noopMutation,
+  useDiscardDecisionTreeVersion: () => noopMutation,
   useDryRunDecisionTree: () => noopMutation,
   useUpdateDecisionTree: () => noopMutation,
   useDecisionTreeCandidateBlocks: () => ({ data: [], isLoading: false, isError: false }),

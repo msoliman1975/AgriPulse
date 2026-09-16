@@ -397,6 +397,19 @@ export async function appendDecisionTreeVersion(
   return data;
 }
 
+/**
+ * Delete one unpublished draft version.
+ *
+ * The editor hydrates from the newest version and a save that changes nothing
+ * is a no-op on the server, so before this there was no way back from an
+ * unwanted draft: it sat in front of every later author. The API refuses a
+ * published, current, pinned or last-remaining version with a 409 whose
+ * `reason` says which rule held it.
+ */
+export async function discardDecisionTreeVersion(code: string, version: number): Promise<void> {
+  await apiClient.delete(`/v1/decision-trees/${code}/versions/${version}`);
+}
+
 export async function publishDecisionTreeVersion(
   code: string,
   version: number,

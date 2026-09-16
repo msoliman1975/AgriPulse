@@ -139,6 +139,12 @@
       "publish": "Publish",
       "publishing": "Publishing…",
       "publishFailed": "Publish failed",
+      "discard": "Discard draft",
+      "discarding": "Discarding…",
+      "discardFailed": "Discard failed",
+      "discardTitle": "Discard draft v{{n}}?",
+      "discardBody": "Draft v{{n}} and anything unsaved on top of it are removed. Published versions are not touched. This cannot be undone.",
+      "discardConfirm": "Discard draft",
       "load": "Load into editor",
       "diffWithPrev": "Diff vs previous"
     },

@@ -21,6 +21,7 @@ import {
   clearDecisionTreeVersionPin,
   copyDecisionTree,
   createDecisionTree,
+  discardDecisionTreeVersion,
   dryRunDecisionTree,
   getDecisionTree,
   getDecisionTreeAvailability,
@@ -155,6 +156,17 @@ export function usePublishDecisionTreeVersion() {
     { code: string; version: number }
   >({
     mutationFn: ({ code, version }) => publishDecisionTreeVersion(code, version),
+    onSuccess: (_, vars) => {
+      void qc.invalidateQueries({ queryKey: ["decision_trees", "detail", vars.code] });
+      void qc.invalidateQueries({ queryKey: ["decision_trees", "list"] });
+    },
+  });
+}
+
+export function useDiscardDecisionTreeVersion() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { code: string; version: number }>({
+    mutationFn: ({ code, version }) => discardDecisionTreeVersion(code, version),
     onSuccess: (_, vars) => {
       void qc.invalidateQueries({ queryKey: ["decision_trees", "detail", vars.code] });
       void qc.invalidateQueries({ queryKey: ["decision_trees", "list"] });
