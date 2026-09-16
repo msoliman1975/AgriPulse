@@ -15,6 +15,7 @@ from typing import Any, Literal
 
 from app.shared.conditions.context import (
     CROP_ATTRIBUTE_KEYS,
+    FINDING_KEYS,
     GRID_FIELDS,
     SIGNAL_KEYS,
     WATER_BALANCE_FIELDS,
@@ -238,6 +239,49 @@ class CropAttributeValueRef:
     key: str  # one of CROP_ATTRIBUTE_KEYS
 
 
+@dataclass(frozen=True, slots=True)
+class FindingsValueRef:
+    """``{"source":"findings","code":"dry","key":"registered"}``
+
+    Answers whether a finding code was registered earlier on this folding
+    walk. Presence only — decision 8 of the unified decision-tree engine.
+    The severity a `register` node attached, and which node attached it,
+    are not readable. That is what stops a merged tree from growing one
+    branch per combination of earlier verdicts.
+
+    Resolves to ``True`` or ``False``, never ``None``, so a presence test
+    is a real two-way branch rather than a fail-closed comparison. Outside
+    a folding walk ``ctx.findings`` is empty and every test reads ``False``.
+
+    ``code`` is not validated against a closed list here, for the same
+    reason ``crop_attribute.code`` is not: the finding catalogue is data in
+    ``public.decision_tree_findings``, not a constant. The compiler checks
+    that a referenced code exists.
+    """
+
+    source: Literal["findings"]
+    code: str
+    key: str  # one of FINDING_KEYS
+
+
+@dataclass(frozen=True, slots=True)
+class VarsValueRef:
+    """``{"source":"vars","name":"index_used"}``
+
+    Reads a variable a `set` node wrote earlier on this folding walk
+    (section 4.2). The value is a literal the author typed or a copy of a
+    live reading taken at the moment the `set` node ran — there is no
+    arithmetic and no expression language behind it.
+
+    Permissive like ``params``: a name never written resolves to ``None``
+    and the comparison fails closed. Valid on either side of a comparison,
+    because a variable can hold a copied reading as well as a threshold.
+    """
+
+    source: Literal["vars"]
+    name: str
+
+
 ValueRef = (
     IndicesValueRef
     | BlockValueRef
@@ -249,6 +293,8 @@ ValueRef = (
     | GridValueRef
     | CropAttributeValueRef
     | ParamsValueRef
+    | FindingsValueRef
+    | VarsValueRef
 )
 
 
@@ -341,4 +387,17 @@ def parse_value_ref(raw: Any) -> ValueRef:  # noqa: PLR0911, PLR0912, PLR0915 - 
         if not isinstance(name, str) or not name:
             raise ConditionParseError("params ref missing 'name'")
         return ParamsValueRef(source="params", name=name)
+    if source == "findings":
+        code = raw.get("code")
+        if not isinstance(code, str) or not code:
+            raise ConditionParseError("findings ref missing 'code'")
+        key = raw.get("key", "registered")
+        if key not in FINDING_KEYS:
+            raise ConditionParseError(f"findings ref 'key' must be one of {FINDING_KEYS}")
+        return FindingsValueRef(source="findings", code=code, key=key)
+    if source == "vars":
+        name = raw.get("name")
+        if not isinstance(name, str) or not name:
+            raise ConditionParseError("vars ref missing 'name'")
+        return VarsValueRef(source="vars", name=name)
     raise ConditionParseError(f"unknown value-ref source {source!r}")
