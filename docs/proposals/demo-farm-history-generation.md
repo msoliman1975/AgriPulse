@@ -132,3 +132,81 @@ screen then has a case to show.
    consumes provider quota.
 5. Which area we use for the purpose-built farm.
 6. How often the snapshot is rebuilt, and who rebuilds it.
+
+## Phase 3, built 2026-09-15 — the replay runner
+
+`app/modules/demo_history/` holds the day loop.
+
+`steps.py` lists the work of one simulated day. Each step names a
+per-tenant task function that the scheduler also calls in production, so
+there is no second copy of the engine. The order and the cadence come from
+`workers/beat/main.py`:
+
+| Hour | Step | Cadence |
+| --- | --- | --- |
+| 05 | `phenology.advance_for_tenant` | daily |
+| 06 | `indices.refresh_index_caggs_for_tenant` | daily |
+| 06 | `indices.recompute_baselines_for_tenant` | Mondays |
+| 06 | `weather.recompute_weather_baselines_for_tenant` | Mondays |
+| 07 | `weather.compute_weather_risk_for_tenant` | daily |
+| 07 | `weather.compute_spi_for_tenant` | daily |
+| 08 | `irrigation.water_balance_for_tenant` | daily |
+| 08 | `irrigation.generate_for_tenant` | daily |
+| 09 | `grid.detect_anomalies_for_tenant` | daily |
+| 10 | `recommendations.evaluate_for_tenant` | daily |
+
+The hours are part of the data. Rows from one day carry different times of
+day, and the order inside a day stays visible: a recommendation is stamped
+after the index refresh that produced its input.
+
+Imagery acquisition and weather fetching are not steps. Those rows come
+from the historical backfill, which ran once against the real providers for
+real dates. Asking a provider again for a date it has already served spends
+quota and returns the same data.
+
+`runner.py` moves the clock with `clock.simulate` around each step, not
+around the whole day. The Postgres setting is written when a transaction
+begins, so a clock moved after that point moves the Python side alone and
+nothing reports an error.
+
+Three guards run before any row is written:
+
+1. The tenant schema must start with `DEMO_HISTORY_BUILD_SCHEMA_PREFIX`.
+   The setting is empty by default, which means no tenant qualifies. That
+   is the value production runs on.
+2. The last day must be in the past.
+3. A failing step stops the run. `--keep-going` turns that off.
+
+The run returns a report. `totals()` sums each step's counts across the
+span, so a step that produced nothing for months shows as a row of zeros
+rather than passing unread.
+
+`scripts/replay_demo_history.py` is the operator entry point. It runs the
+steps in its own process, because a Celery worker is a different process
+and the moved clock does not travel with a queued message.
+
+`clock.real_now()` was added for the guard. A guard that called `now()`
+would read the simulated instant it is meant to be checking.
+
+### Answers to two open questions
+
+Open question 2, how the simulated day reaches a Celery worker: it does
+not. The replay calls the task functions in its own process. Each of them
+is a synchronous wrapper around `asyncio.run`, and a `ContextVar` is copied
+into the task that `asyncio.run` creates, so the clock reaches the async
+body.
+
+The notification sink, listed under Traps: leave the sink on for the build
+tenant, so no mail can leave. The dispatch rows will read as suppressed.
+The snapshot export rewrites their status when it copies them out. Sending
+real mail from a replay has no upside and reaches addresses nobody owns.
+
+### Not built yet
+
+- Steered incidents (decision D12). The runner takes a step list, so an
+  incident step can be added to it, but nothing forces a condition yet.
+- Human work: acknowledging and closing items, scouting observations,
+  applied plans. A recommendation opened by the replay stays open, because
+  the engine is the only actor so far.
+- The writer that sets `farms.is_demo`.
+- Snapshot export and load, and the freeze at trial end.

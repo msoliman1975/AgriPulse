@@ -107,3 +107,13 @@ def test_work_started_outside_the_block_keeps_the_real_clock() -> None:
     with clock.simulate(AT):
         pass
     assert asyncio.run(main()) is False
+
+
+def test_real_now_ignores_the_simulation() -> None:
+    """A guard must not read the instant it is checking."""
+    past = datetime(2024, 3, 1, 12, tzinfo=UTC)
+
+    with clock.simulate(past):
+        assert clock.now() == past
+        assert clock.real_now() > past
+        assert clock.real_now().tzinfo is UTC

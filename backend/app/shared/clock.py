@@ -31,6 +31,7 @@ __all__ = [
     "PG_SETTING",
     "is_simulated",
     "now",
+    "real_now",
     "simulate",
     "simulated_now",
     "today",
@@ -59,6 +60,17 @@ def now() -> datetime:
 def today() -> date:
     """Return the current UTC date, or the simulated date during a replay."""
     return now().date()
+
+
+def real_now() -> datetime:
+    """Return the wall clock, ignoring any simulation.
+
+    This is for a guard that has to decide whether a replay may run at all.
+    A guard that asked `now()` would read the simulated instant it is
+    supposed to be checking, and would approve every run. Nothing that
+    writes a row may call this.
+    """
+    return datetime.now(UTC)
 
 
 def simulated_now() -> datetime | None:
