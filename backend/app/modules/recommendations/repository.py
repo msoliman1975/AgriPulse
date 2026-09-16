@@ -1144,7 +1144,7 @@ class RecommendationsRepository:
                 """
                 INSERT INTO public.tenant_tree_version_pins
                     (tenant_id, tree_id, version, pinned_at, pinned_by)
-                VALUES (:tid, :tree, :ver, now(), :actor)
+                VALUES (:tid, :tree, :ver, public.app_now(), :actor)
                 ON CONFLICT (tenant_id, tree_id) DO UPDATE
                    SET version = EXCLUDED.version,
                        pinned_at = EXCLUDED.pinned_at,

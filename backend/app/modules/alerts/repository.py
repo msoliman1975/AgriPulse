@@ -232,7 +232,7 @@ class AlertsRepository:
                    SET severity = :severity,
                        group_key = :group_key,
                        action_type = COALESCE(:action_type, action_type),
-                       updated_at = now()
+                       updated_at = public.app_now()
                  WHERE id = :id
                    AND (severity IS DISTINCT FROM :severity
                         OR group_key IS DISTINCT FROM :group_key)

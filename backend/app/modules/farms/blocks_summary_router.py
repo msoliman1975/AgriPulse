@@ -36,7 +36,7 @@ grows past a single tester.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -523,7 +523,7 @@ async def get_blocks_summary(
     # `at` with no offset; the resolver subtracts it from a timestamp that has
     # one, so it is stamped UTC here. `as_of` in the response is left exactly
     # as it was — this normalisation is the resolver's, not the echo's.
-    resolver_now = at if at is not None else datetime.now(UTC)
+    resolver_now = at if at is not None else clock.now()
     if resolver_now.tzinfo is None:
         resolver_now = resolver_now.replace(tzinfo=UTC)
 

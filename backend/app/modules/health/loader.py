@@ -218,7 +218,7 @@ async def sync_from_disk(public_session: AsyncSession) -> dict[str, int]:
                        notes         = EXCLUDED.notes,
                        source_path   = EXCLUDED.source_path,
                        compiled_hash = EXCLUDED.compiled_hash,
-                       updated_at    = now()
+                       updated_at    = public.app_now()
                  -- Idempotence. Without this predicate every startup would
                  -- rewrite every row and bump `updated_at`, which would make
                  -- "when did this crop's definition last change" unanswerable.

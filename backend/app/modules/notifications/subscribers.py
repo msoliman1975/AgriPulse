@@ -2070,8 +2070,8 @@ _MARK_DISPATCH_SQL = """
     UPDATE notification_dispatches
        SET status = :st,
            error = :err,
-           sent_at = CASE WHEN :st = 'sent' THEN now() ELSE sent_at END,
-           updated_at = now()
+           sent_at = CASE WHEN :st = 'sent' THEN public.app_now() ELSE sent_at END,
+           updated_at = public.app_now()
      WHERE {column} = :aid
        AND channel = :ch
        AND recipient_user_id = :uid
@@ -2276,7 +2276,7 @@ def _send_digest_push(
             if exc.unregistered:
                 session.execute(
                     text(
-                        "UPDATE device_tokens SET revoked_at = now() "
+                        "UPDATE device_tokens SET revoked_at = public.app_now() "
                         "WHERE token = :t AND revoked_at IS NULL"
                     ),
                     {"t": token},

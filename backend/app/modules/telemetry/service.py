@@ -31,6 +31,7 @@ from app.modules.telemetry.schemas import (
     IngestResult,
 )
 from app.modules.telemetry.taxonomy import Taxonomy, get_taxonomy
+from app.shared import clock
 from app.shared.auth.context import RequestContext
 from app.shared.db.ids import uuid7
 
@@ -146,7 +147,7 @@ class TelemetryServiceImpl:
         rows: list[dict[str, Any]] = []
         rejected = oversize
         props_dropped = 0
-        now = datetime.now(UTC)
+        now = clock.now()
         taxonomy = self.taxonomy
 
         for event in events:

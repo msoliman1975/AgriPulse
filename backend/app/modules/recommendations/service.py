@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from time import perf_counter
 from typing import Any, Protocol
@@ -1153,7 +1153,7 @@ class RecommendationsServiceImpl:
         Skipped entirely when the caller ran one tree instead of the whole
         set: the other trees were never walked, so their answers still stand.
         """
-        at = datetime.now(UTC)
+        at = clock.now()
         counts = await self._repo.sync_verdicts(rows=verdicts.rows, run_id=verdicts.run_id, at=at)
         if covers_every_tree:
             await self._repo.close_absent_verdicts(
@@ -1387,7 +1387,7 @@ class RecommendationsServiceImpl:
                     text_ar=outcome.text_ar,
                     node_path=entry.get("steps") or [],
                     resolved_values=result.evaluation_snapshot,
-                    evaluated_at=datetime.now(UTC),
+                    evaluated_at=clock.now(),
                 )
                 entry["narrative_en"] = narrative["en"]
                 entry["narrative_ar"] = narrative["ar"]
@@ -3379,7 +3379,7 @@ class DecisionTreesAuthorService:
             tree_compiled=compiled,
             compiled_hash=compiled_hash,
             notes=f"Copied from the platform tree {code} at version {version['version']}.",
-            published_at=datetime.now(UTC),
+            published_at=clock.now(),
             published_by=actor_user_id,
         )
         await self._repo.set_current_version(
