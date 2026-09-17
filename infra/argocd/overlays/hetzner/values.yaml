@@ -3771,9 +3771,32 @@ global:
     #   roll back with them; they are additive, and the old code ignores the
     #   new columns.
     api:
-      tag: "5de8597"
+    # 88e42fc = #704 #706, api, workers and frontend.
+    #
+    #   #706 is why this follows 5de8597 so closely. A beta tree could not be
+    #   created at all: the dialog sent name_en, name_ar and scope beside the
+    #   definition and BetaTreeCreateRequest forbids extra fields, so every
+    #   create answered 422. The three belong inside the definition, which is
+    #   where folding_authoring reads them from. Found by using the deployed
+    #   build, not by a test.
+    #
+    #   #704 adds the estate dry run and the run-results screen. The dry run
+    #   folds every block and cell a tenant has and writes no card, only its
+    #   own report row. It is started by a person from the platform screen;
+    #   beat/main.py is untouched, so nothing new runs on a schedule.
+    #
+    #   One migration: tenant 0096 folding_estate_dry_runs, the report row.
+    #
+    #   Images were not confirmed on the node before this commit, for the same
+    #   reason as 5de8597: SSH and curl are blocked from the authoring machine
+    #   and the gh login has no read:packages scope. All five container jobs
+    #   on main for 88e42fc completed green, and those jobs are what push.
+    #
+    #   Rollback is these three tags back to 5de8597. Migration 0096 is
+    #   additive and does not roll back with them.
+      tag: "88e42fc"
     workers:
-      tag: "5de8597"
+      tag: "88e42fc"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4351,7 +4374,7 @@ global:
       #   #693 is the only commit in 7364473..ff468b7 that touches frontend/.
       #
       #   Rollback is this tag alone back to 7364473.
-      tag: "5de8597"
+      tag: "88e42fc"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
