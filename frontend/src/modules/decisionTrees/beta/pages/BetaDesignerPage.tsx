@@ -68,6 +68,7 @@ import {
   attachBetaNode,
   betaNodeKind,
   buildBetaNode,
+  clearBetaNodePositions,
   deleteBetaNode,
   dumpBetaDoc,
   fillSwitchDefaults,
@@ -75,6 +76,7 @@ import {
   readCombinations,
   readRegisters,
   setBetaNode,
+  setBetaNodePosition,
   writeCombinations,
   writeRegisters,
   type BetaNode,
@@ -249,6 +251,20 @@ export function BetaDesignerPage(): ReactNode {
     });
     next.label_ar = current.label_ar;
     applyYaml(setBetaNode(draftYaml, selectedNodeId, next));
+  };
+
+  // A drop writes one node's position into the draft. It is an edit like any
+  // other, so the tree goes dirty and the position is saved with the next
+  // save — the engine never reads it, but the hash changes, which is what
+  // makes the server keep it.
+  const onMoveNode = (nodeId: string, x: number, y: number): void => {
+    if (draftYaml === null) return;
+    applyYaml(setBetaNodePosition(draftYaml, nodeId, { x, y }));
+  };
+
+  const onResetLayout = (): void => {
+    if (draftYaml === null) return;
+    applyYaml(clearBetaNodePositions(draftYaml));
   };
 
   const onDeleteNode = (): void => {
@@ -440,6 +456,8 @@ export function BetaDesignerPage(): ReactNode {
                     onAddNode={
                       readOnly ? undefined : (parentId, slot) => setPendingAdd({ parentId, slot })
                     }
+                    onMoveNode={readOnly ? undefined : onMoveNode}
+                    onResetLayout={readOnly ? undefined : onResetLayout}
                     rejectedNodeIds={rejectedNodeIds}
                     rejectedEdgeKeys={rejectedEdgeKeys}
                     height={canvasHeight}

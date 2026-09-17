@@ -61,6 +61,17 @@ interface BetaCanvasProps {
   onSelectNode: (nodeId: string | null) => void;
   /** Click a `+` port: add a node into that empty slot. */
   onAddNode?: (parentId: string, slot: EdgeSlot) => void;
+  /**
+   * Drop a node at a new place, in canvas units. Fires once, on pointer-up:
+   * the move is drawn from local state while the pointer is down, so the
+   * whole document is re-dumped once per drag rather than once per pixel.
+   *
+   * Left out for a read-only tree, which is what turns dragging off.
+   */
+  onMoveNode?: (nodeId: string, x: number, y: number) => void;
+  /** Drop every hand-placed position. Offered only while at least one node
+   *  carries one, so the button never promises an edit it cannot make. */
+  onResetLayout?: () => void;
   /** Nodes a publish rejection names. Drawn with a red halo. */
   rejectedNodeIds?: ReadonlySet<string>;
   /** Edges a publish rejection names, by `edgeKey`. */
@@ -69,6 +80,19 @@ interface BetaCanvasProps {
   pathNodeIds?: ReadonlySet<string>;
   height: number;
   onHeightChange: (height: number) => void;
+}
+
+/** A node being dragged: where it started, and where it is now. `moved`
+ *  keeps a click that wobbled by a pixel from counting as a move. */
+interface NodeDragState {
+  nodeId: string;
+  startScreenX: number;
+  startScreenY: number;
+  originX: number;
+  originY: number;
+  dx: number;
+  dy: number;
+  moved: boolean;
 }
 
 interface PanState {
@@ -84,6 +108,8 @@ export function BetaCanvas({
   selectedNodeId,
   onSelectNode,
   onAddNode,
+  onMoveNode,
+  onResetLayout,
   rejectedNodeIds,
   rejectedEdgeKeys,
   pathNodeIds,
@@ -94,7 +120,9 @@ export function BetaCanvas({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [view, setView] = useState<Viewport>(IDENTITY_VIEWPORT);
   const [pan, setPan] = useState<PanState | null>(null);
+  const [drag, setDrag] = useState<NodeDragState | null>(null);
   const suppressBackgroundClick = useRef(false);
+  const suppressNodeClick = useRef(false);
 
   const viewportSize = useCallback((): { width: number; height: number } => {
     const el = containerRef.current;
@@ -164,6 +192,47 @@ export function BetaCanvas({
     };
   }, [pan]);
 
+  // Dragging a node. The pointer moves in screen pixels and the graph is
+  // drawn in canvas units, so every delta is divided by the zoom — without
+  // that the node lags the cursor at any zoom other than 100%.
+  useEffect(() => {
+    if (!drag) return;
+    const onMove = (evt: PointerEvent): void => {
+      setDrag((prev) => {
+        if (!prev) return null;
+        const dx = (evt.clientX - prev.startScreenX) / view.scale;
+        const dy = (evt.clientY - prev.startScreenY) / view.scale;
+        return {
+          ...prev,
+          dx,
+          dy,
+          moved: prev.moved || Math.abs(dx) + Math.abs(dy) > DRAG_THRESHOLD_PX,
+        };
+      });
+    };
+    const onUp = (): void => {
+      setDrag((prev) => {
+        if (prev?.moved && onMoveNode) {
+          suppressNodeClick.current = true;
+          // Never off the top or the left edge: fit-to-screen measures from
+          // the origin, and a node at a negative coordinate cannot be seen.
+          onMoveNode(
+            prev.nodeId,
+            Math.max(0, prev.originX + prev.dx),
+            Math.max(0, prev.originY + prev.dy),
+          );
+        }
+        return null;
+      });
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [drag, view.scale, onMoveNode]);
+
   const onBackgroundPointerDown = (evt: ReactPointerEvent<SVGSVGElement>): void => {
     setPan({
       startScreenX: evt.clientX,
@@ -199,6 +268,13 @@ export function BetaCanvas({
 
   const ports = useMemo(() => collectPorts(layout), [layout]);
 
+  // While a node is under the pointer its box and both ends of every edge
+  // touching it are drawn at an offset. The document is untouched until the
+  // drop, so an abandoned drag leaves nothing behind.
+  const moving = drag?.moved ? drag : null;
+  const offsetOf = (nodeId: string): { dx: number; dy: number } =>
+    moving && moving.nodeId === nodeId ? { dx: moving.dx, dy: moving.dy } : { dx: 0, dy: 0 };
+
   return (
     <Card noPadding className="overflow-hidden">
       <div className="flex flex-wrap items-center gap-2 border-b border-ap-line px-3 py-2">
@@ -224,8 +300,14 @@ export function BetaCanvas({
         >
           +
         </Button>
+        {onResetLayout && layout.nodes.some((n) => n.pinned) ? (
+          <Button variant="secondary" size="sm" onClick={onResetLayout}>
+            {t("canvas.resetLayout")}
+          </Button>
+        ) : null}
         <span className="ms-auto text-meta text-ap-muted">
-          {t("canvas.nodeCount", { count: layout.nodes.length })} · {t("canvas.hint")}
+          {t("canvas.nodeCount", { count: layout.nodes.length })} ·{" "}
+          {onMoveNode ? t("canvas.hintDraggable") : t("canvas.hint")}
         </span>
       </div>
       <div
@@ -248,23 +330,61 @@ export function BetaCanvas({
             onClick={onBackgroundClick}
           >
             <g transform={`translate(${view.tx} ${view.ty}) scale(${view.scale})`}>
-              {layout.edges.map((edge) => (
-                <BetaEdge
-                  key={edge.key}
-                  edge={edge}
-                  rejected={rejectedEdgeKeys?.has(edge.key) ?? false}
-                />
-              ))}
-              {layout.nodes.map((node) => (
-                <BetaNodeBox
-                  key={node.id}
-                  node={node}
-                  selected={node.id === selectedNodeId}
-                  rejected={rejectedNodeIds?.has(node.id) ?? false}
-                  onPath={pathNodeIds?.has(node.id) ?? false}
-                  onClick={onSelectNode}
-                />
-              ))}
+              {layout.edges.map((edge) => {
+                const from = offsetOf(edge.from);
+                const to = offsetOf(edge.to);
+                return (
+                  <BetaEdge
+                    key={edge.key}
+                    edge={
+                      moving
+                        ? {
+                            ...edge,
+                            fromX: edge.fromX + from.dx,
+                            fromY: edge.fromY + from.dy,
+                            toX: edge.toX + to.dx,
+                            toY: edge.toY + to.dy,
+                          }
+                        : edge
+                    }
+                    rejected={rejectedEdgeKeys?.has(edge.key) ?? false}
+                  />
+                );
+              })}
+              {layout.nodes.map((node) => {
+                const { dx, dy } = offsetOf(node.id);
+                return (
+                  <BetaNodeBox
+                    key={node.id}
+                    node={node}
+                    dx={dx}
+                    dy={dy}
+                    draggable={Boolean(onMoveNode)}
+                    selected={node.id === selectedNodeId}
+                    rejected={rejectedNodeIds?.has(node.id) ?? false}
+                    onPath={pathNodeIds?.has(node.id) ?? false}
+                    onClick={(id) => {
+                      if (suppressNodeClick.current) {
+                        suppressNodeClick.current = false;
+                        return;
+                      }
+                      onSelectNode(id);
+                    }}
+                    onDragStart={(evt) =>
+                      setDrag({
+                        nodeId: node.id,
+                        startScreenX: evt.clientX,
+                        startScreenY: evt.clientY,
+                        originX: node.x,
+                        originY: node.y,
+                        dx: 0,
+                        dy: 0,
+                        moved: false,
+                      })
+                    }
+                  />
+                );
+              })}
               {onAddNode
                 ? ports.map((port) => (
                     <AddPort
@@ -469,16 +589,26 @@ const PALETTE: Record<BetaNodeKind, Palette> = {
 
 function BetaNodeBox({
   node,
+  dx,
+  dy,
+  draggable,
   selected,
   rejected,
   onPath,
   onClick,
+  onDragStart,
 }: {
   node: BetaPositionedNode;
+  /** Live drag offset, in canvas units. Zero unless this node is the one
+   *  under the pointer. */
+  dx: number;
+  dy: number;
+  draggable: boolean;
   selected: boolean;
   rejected: boolean;
   onPath: boolean;
   onClick: (id: string) => void;
+  onDragStart: (evt: ReactPointerEvent<SVGGElement>) => void;
 }): JSX.Element {
   const { t, i18n } = useTranslation("decisionTreesBeta");
   const palette = PALETTE[node.kind];
@@ -486,6 +616,23 @@ function BetaNodeBox({
   const label =
     localizedField(i18n.language, node.data.label_en ?? null, node.data.label_ar ?? null) ||
     t("canvas.body.unlabelled");
+
+  if (node.shape === "circle") {
+    return (
+      <StopNodeCircle
+        node={node}
+        dx={dx}
+        dy={dy}
+        draggable={draggable}
+        selected={selected}
+        rejected={rejected}
+        onPath={onPath}
+        label={label}
+        onClick={onClick}
+        onDragStart={onDragStart}
+      />
+    );
+  }
 
   return (
     <g
@@ -495,12 +642,17 @@ function BetaNodeBox({
       // only that a message with the id in it appeared somewhere.
       data-node-id={node.id}
       data-rejected={rejected ? "true" : "false"}
-      style={{ cursor: "pointer" }}
+      data-pinned={node.pinned ? "true" : "false"}
+      transform={dx || dy ? `translate(${dx} ${dy})` : undefined}
+      style={{ cursor: draggable ? "move" : "pointer" }}
       onClick={(evt) => {
         evt.stopPropagation();
         onClick(node.id);
       }}
-      onPointerDown={(evt) => evt.stopPropagation()}
+      onPointerDown={(evt) => {
+        evt.stopPropagation();
+        if (draggable) onDragStart(evt);
+      }}
     >
       {selected ? (
         <rect
@@ -585,6 +737,108 @@ function BetaNodeBox({
         </text>
         <NodeBody node={node} />
       </g>
+    </g>
+  );
+}
+
+/**
+ * The `stop` node, drawn as a circle.
+ *
+ * Every other kind is a step the walk takes. A stop is where the walk ends
+ * and the findings are folded into one card, and it is usually the one node
+ * every route reaches. A circle says that at a glance; before this it was a
+ * box like the rest and only its label told you.
+ */
+function StopNodeCircle({
+  node,
+  dx,
+  dy,
+  draggable,
+  selected,
+  rejected,
+  onPath,
+  label,
+  onClick,
+  onDragStart,
+}: {
+  node: BetaPositionedNode;
+  dx: number;
+  dy: number;
+  draggable: boolean;
+  selected: boolean;
+  rejected: boolean;
+  onPath: boolean;
+  label: string;
+  onClick: (id: string) => void;
+  onDragStart: (evt: ReactPointerEvent<SVGGElement>) => void;
+}): JSX.Element {
+  const { t } = useTranslation("decisionTreesBeta");
+  const palette = PALETTE.stop;
+  const cx = node.x + node.width / 2;
+  const cy = node.y + node.height / 2;
+  const r = node.width / 2;
+
+  return (
+    <g
+      data-node-id={node.id}
+      data-rejected={rejected ? "true" : "false"}
+      data-pinned={node.pinned ? "true" : "false"}
+      data-shape="circle"
+      transform={dx || dy ? `translate(${dx} ${dy})` : undefined}
+      style={{ cursor: draggable ? "move" : "pointer" }}
+      onClick={(evt) => {
+        evt.stopPropagation();
+        onClick(node.id);
+      }}
+      onPointerDown={(evt) => {
+        evt.stopPropagation();
+        if (draggable) onDragStart(evt);
+      }}
+    >
+      {selected ? (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r + 5}
+          fill="none"
+          stroke="#2563eb"
+          strokeWidth={2.5}
+          strokeDasharray="6 3"
+        />
+      ) : null}
+      {rejected ? (
+        <circle cx={cx} cy={cy} r={r + 4} fill="#fee2e2" stroke="#dc2626" strokeWidth={2.5} />
+      ) : null}
+      {onPath && !rejected ? (
+        <circle cx={cx} cy={cy} r={r + 4} fill="#fde04822" stroke="#facc15" strokeWidth={2} />
+      ) : null}
+      <circle cx={cx} cy={cy} r={r} fill={palette.bg} stroke={palette.border} strokeWidth={1.5} />
+      {/* A second ring, the way a flow chart draws a terminal state. */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r - 6}
+        fill="none"
+        stroke={palette.border}
+        strokeWidth={1}
+        opacity={0.6}
+      />
+      <text
+        x={cx}
+        y={cy - 10}
+        fontSize={10}
+        fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+        fill={palette.dim}
+        textAnchor="middle"
+      >
+        {node.id}
+      </text>
+      <text x={cx} y={cy + 6} fontSize={13} fontWeight={600} fill="#0f172a" textAnchor="middle">
+        {truncate(label, 16)}
+      </text>
+      <text x={cx} y={cy + 22} fontSize={10} fill={palette.dim} textAnchor="middle">
+        {t("canvas.kind.stop")}
+      </text>
     </g>
   );
 }
@@ -702,8 +956,13 @@ function describeCondition(node: BetaNode): string {
   if (typeof c.op === "string" && c.left) {
     return `${describeValueRef(c.left)} ${c.op} ${describeOperand(c.right)}`;
   }
-  if (Array.isArray(c.all)) return `all of ${c.all.length}`;
-  if (Array.isArray(c.any)) return `any of ${c.any.length}`;
+  // The dialect's group keys are `all_of` and `any_of`. This read `all` and
+  // `any`, which no condition carries, so every group read as "—" on the
+  // canvas. Now that groups are authorable here, that is every author's
+  // first surprise.
+  if (Array.isArray(c.all_of)) return `all of ${c.all_of.length}`;
+  if (Array.isArray(c.any_of)) return `any of ${c.any_of.length}`;
+  if (c.not) return "not …";
   return "—";
 }
 

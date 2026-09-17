@@ -101,6 +101,16 @@ export interface BetaNode {
   /** register and set continue to exactly one node. */
   next?: string | null;
 
+  /**
+   * Where the author dragged this node, in canvas units.
+   *
+   * The engine never reads it. It is kept on the node rather than in a
+   * document-level map so it travels with the node through a copy, and so
+   * moving a node changes the compiled body's hash — a save that changed
+   * nothing is a no-op on the server, and a moved node would not stick.
+   */
+  ui?: { x?: number; y?: number };
+
   [k: string]: unknown;
 }
 
@@ -551,6 +561,58 @@ export function slotLabelKey(slot: EdgeSlot): string {
 /** Stable identity for one edge, so the canvas can key and highlight it. */
 export function edgeKey(fromId: string, slot: EdgeSlot): string {
   return slot.kind === "case" ? `${fromId}:case:${slot.index}` : `${fromId}:${slot.kind}`;
+}
+
+// ---- Manual node positions -------------------------------------------
+
+/** Canvas positions are snapped to this many units, so two nodes dropped by
+ *  hand still line up with each other. */
+export const POSITION_GRID = 8;
+
+export interface NodePosition {
+  x: number;
+  y: number;
+}
+
+/** The position the author gave this node, or null when it has none and the
+ *  automatic layout decides. */
+export function readNodePosition(node: BetaNode | undefined): NodePosition | null {
+  const ui = node?.ui;
+  if (!ui || typeof ui !== "object") return null;
+  const { x, y } = ui;
+  if (typeof x !== "number" || typeof y !== "number") return null;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x, y };
+}
+
+/** True when at least one node carries a position. The designer shows its
+ *  "Back to automatic layout" button only then. */
+export function hasNodePositions(doc: BetaTreeDoc | null | undefined): boolean {
+  return Object.values(doc?.nodes ?? {}).some((node) => readNodePosition(node) !== null);
+}
+
+function snap(value: number): number {
+  return Math.round(value / POSITION_GRID) * POSITION_GRID;
+}
+
+/** Write one node's position. Called once on pointer-up, not on every
+ *  pointer move: each call re-dumps the whole document. */
+export function setBetaNodePosition(yaml: string, nodeId: string, pos: NodePosition): string {
+  const doc = parseBetaDoc(yaml);
+  if (!doc) throw new Error("setBetaNodePosition: source YAML did not parse");
+  const node = doc.nodes?.[nodeId];
+  if (!node) throw new Error(`setBetaNodePosition: node "${nodeId}" not found`);
+  node.ui = { x: snap(pos.x), y: snap(pos.y) };
+  return dumpBetaDoc(doc);
+}
+
+/** Drop every hand-placed position and hand the whole graph back to the
+ *  automatic layout. */
+export function clearBetaNodePositions(yaml: string): string {
+  const doc = parseBetaDoc(yaml);
+  if (!doc) throw new Error("clearBetaNodePositions: source YAML did not parse");
+  for (const node of Object.values(doc.nodes ?? {})) delete node.ui;
+  return dumpBetaDoc(doc);
 }
 
 // ---- registers and combinations --------------------------------------

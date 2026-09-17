@@ -33,6 +33,7 @@ import {
   type SwitchCase,
   type SwitchOp,
 } from "../lib/betaTree";
+import { BetaConditionEditor } from "./BetaConditionEditor";
 import { FindingPicker, SourcePill } from "./FindingPicker";
 import { ValueRefField } from "./ValueRefField";
 import { defaultBetaValueRef, scalarText } from "../lib/betaValueRef";
@@ -137,7 +138,13 @@ export function BetaNodePanel({
       </Field>
 
       {kind === "condition" ? (
-        <ConditionFields node={node} nodeIds={nodeIds} readOnly={readOnly} onChange={onChange} />
+        <ConditionFields
+          node={node}
+          nodeIds={nodeIds}
+          knownVarNames={knownVarNames}
+          readOnly={readOnly}
+          onChange={onChange}
+        />
       ) : null}
 
       {kind === "register" ? (
@@ -223,31 +230,52 @@ function NodeSelect({
 function ConditionFields({
   node,
   nodeIds,
+  knownVarNames,
   readOnly,
   onChange,
 }: {
   node: BetaNode;
   nodeIds: readonly string[];
+  knownVarNames: readonly string[];
   readOnly: boolean;
   onChange: (n: BetaNode) => void;
 }): JSX.Element {
   const { t } = useTranslation("decisionTreesBeta");
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <NodeSelect
-        label={t("node.onMatch")}
-        value={node.on_match ?? ""}
-        nodeIds={nodeIds}
-        readOnly={readOnly}
-        onChange={(id) => onChange({ ...node, on_match: id || undefined })}
-      />
-      <NodeSelect
-        label={t("node.onMiss")}
-        value={node.on_miss ?? ""}
-        nodeIds={nodeIds}
-        readOnly={readOnly}
-        onChange={(id) => onChange({ ...node, on_miss: id || undefined })}
-      />
+    <div className="flex flex-col gap-3">
+      <div>
+        <p className="mb-1 text-sm font-medium text-ap-ink">{t("condition.title")}</p>
+        <BetaConditionEditor
+          value={node.condition?.tree}
+          knownVarNames={knownVarNames}
+          readOnly={readOnly}
+          onChange={(tree) =>
+            onChange({
+              ...node,
+              // The key stays even when the test is empty: `condition` is what
+              // makes this node a condition, and dropping it would turn the
+              // node into a different kind under the author.
+              condition: { tree },
+            })
+          }
+        />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <NodeSelect
+          label={t("node.onMatch")}
+          value={node.on_match ?? ""}
+          nodeIds={nodeIds}
+          readOnly={readOnly}
+          onChange={(id) => onChange({ ...node, on_match: id || undefined })}
+        />
+        <NodeSelect
+          label={t("node.onMiss")}
+          value={node.on_miss ?? ""}
+          nodeIds={nodeIds}
+          readOnly={readOnly}
+          onChange={(id) => onChange({ ...node, on_miss: id || undefined })}
+        />
+      </div>
     </div>
   );
 }
