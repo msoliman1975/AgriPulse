@@ -3794,9 +3794,40 @@ global:
       #
       #   Rollback is these three tags back to 5de8597. Migration 0096 is
       #   additive and does not roll back with them.
-      tag: "88e42fc"
+      # 80f614c = #708 #709, api, workers and frontend.
+      #
+      #   #709 fixes the folding engine reporting every cell healthy. The engine
+      #   and its compiler carried a private health list — normal, watch,
+      #   stressed, unknown — while the finding catalogue, its CHECK constraint
+      #   and the block verdict all use status_codes: na, very_good, good,
+      #   issue, alert. The fold ranked with the private list and scored every
+      #   catalogue code 0, so a card always read normal. The estate dry run on
+      #   production is the evidence: 267 carded cells, all "status":"normal".
+      #   Both now read status_codes and rank by its own rank field.
+      #
+      #   The same list gated a combination rule's status on publish, so the
+      #   designer offered issue and the compiler refused it. A switch case was
+      #   refused on save for the same reason.
+      #
+      #   #708 is frontend only. The client read tree.published_version, a field
+      #   the API has never sent; it sends current_version and draft_version. A
+      #   published tree read as "Not published" in the designer header and in
+      #   both list columns, so an author would republish something already
+      #   live. #708 also refetches the estate run list while a run is running,
+      #   which kept the picker reading "Running — 0 cells" beside a finished
+      #   report.
+      #
+      #   No migrations in this range.
+      #
+      #   Images were not confirmed on the node before this commit, for the same
+      #   reason as 88e42fc: SSH is blocked from the authoring machine and the
+      #   gh login has no read:packages scope. All five container jobs on main
+      #   for 80f614c completed green, and those jobs are what push.
+      #
+      #   Rollback is these three tags back to 88e42fc.
+      tag: "80f614c"
     workers:
-      tag: "88e42fc"
+      tag: "80f614c"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4374,7 +4405,12 @@ global:
       #   #693 is the only commit in 7364473..ff468b7 that touches frontend/.
       #
       #   Rollback is this tag alone back to 7364473.
-      tag: "88e42fc"
+      # 80f614c = #708, frontend half of the same promote. A published beta
+      #   tree read as "Not published" in three places, and the estate run
+      #   picker did not refresh while a run was running.
+      #
+      #   Rollback is this tag alone back to 88e42fc.
+      tag: "80f614c"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
