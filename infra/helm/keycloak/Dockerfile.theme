@@ -33,7 +33,10 @@ USER 1001
 # wired. Failing here means the COPY didn't land where Keycloak looks.
 RUN test -f /opt/bitnami/keycloak/themes/agripulse/login/theme.properties \
  && test -f /opt/bitnami/keycloak/themes/agripulse/login/template.ftl \
+ && test -f /opt/bitnami/keycloak/themes/agripulse/login/login-update-password.ftl \
+ && test -f /opt/bitnami/keycloak/themes/agripulse/login/login-reset-password.ftl \
  && test -f /opt/bitnami/keycloak/themes/agripulse/login/resources/css/login.css \
+ && test -f /opt/bitnami/keycloak/themes/agripulse/login/resources/js/passwordToggle.js \
  && test -f /opt/bitnami/keycloak/themes/agripulse/login/resources/img/mark.svg \
  && test -f /opt/bitnami/keycloak/themes/agripulse/email/theme.properties \
  && test -f /opt/bitnami/keycloak/themes/agripulse/email/html/template.ftl \
