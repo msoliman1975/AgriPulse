@@ -16,8 +16,8 @@ from app.modules.recommendations.folding_engine import (
     fold,
 )
 from app.modules.recommendations.service import (
-    _FindingRow,
     _finding_rows_from,
+    _FindingRow,
     _fold_trace_columns,
     _folding_evaluation,
     _is_folding_shape,
