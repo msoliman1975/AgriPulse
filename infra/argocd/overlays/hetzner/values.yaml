@@ -3744,10 +3744,36 @@ global:
     #   Rollback is these two tags back to 7364473. Nothing to undo in the
     #   database; a discarded draft is already gone and rolling back does not
     #   bring one back.
+    # 5de8597 = #695 #696 #697 #698 #699 #700 #701 #702 #703, api, workers and
+    #   frontend. The beta decision-tree engine, plus the demo farm history.
+    #
+    #   A beta tree is authored on its own screen, validated by the server,
+    #   published, and run by a second walk that registers findings and folds
+    #   them into one card per cell. Beta trees carry stage='beta' and the
+    #   sweep reads stage='live', so nothing new runs on a schedule yet.
+    #
+    #   Eight migrations in this range, four public and four tenant:
+    #     public  0089 app_now_clock, 0090 decision_tree_findings,
+    #             0091 tree_version_definition_jsonb, 0092 decision_tree_stage
+    #     tenant  0092 app_now_clock, 0093 demo_farm_flags,
+    #             0094 decision_tree_findings, 0095 folding_execution
+    #
+    #   0091 makes decision_tree_versions.tree_yaml nullable and adds a check
+    #   constraint that exactly one of tree_yaml and definition is set. Every
+    #   existing row keeps tree_yaml, so the constraint holds on arrival.
+    #
+    #   Images were not confirmed on the node before this commit. SSH and curl
+    #   are blocked from the authoring machine today, and the gh login has no
+    #   read:packages scope. The evidence is that all five container jobs on
+    #   main for 5de8597 completed green, and those jobs are what push.
+    #
+    #   Rollback is these three tags back to ff468b7. The migrations do not
+    #   roll back with them; they are additive, and the old code ignores the
+    #   new columns.
     api:
-      tag: "ff468b7"
+      tag: "5de8597"
     workers:
-      tag: "ff468b7"
+      tag: "5de8597"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4325,7 +4351,7 @@ global:
       #   #693 is the only commit in 7364473..ff468b7 that touches frontend/.
       #
       #   Rollback is this tag alone back to 7364473.
-      tag: "ff468b7"
+      tag: "5de8597"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
