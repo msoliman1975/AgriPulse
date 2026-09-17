@@ -1167,48 +1167,157 @@ class RecommendationsRepository:
 
     # ---- Tree parameter overrides (tenant) ----------------------------
 
-    async def list_param_overrides_for_tree(self, *, tree_id: UUID) -> dict[str, Any]:
-        """Fetch every override row for one tree as a flat
+    async def list_param_overrides_for_tree(
+        self, *, tree_id: UUID, farm_id: UUID | None = None
+    ) -> dict[str, Any]:
+        """Fetch the override rows for one tree as a flat
         ``{param_name: value}`` dict — the shape the engine consumes
         via ``evaluate_tree(param_overrides=...)``.
+
+        ``farm_id`` layers that farm's own rows on top of the tenant rows
+        (tenant 0094). Omitted, only the tenant rows are returned, which is
+        what the authoring screen edits and shows.
 
         Returns ``{}`` when no overrides exist (the engine falls back
         to declared defaults entirely).
         """
+        binds = [bindparam("tid", type_=PG_UUID(as_uuid=True))]
+        params: dict[str, Any] = {"tid": tree_id}
+        clause = "farm_id IS NULL"
+        if farm_id is not None:
+            binds.append(bindparam("farm", type_=PG_UUID(as_uuid=True)))
+            params["farm"] = farm_id
+            clause = "(farm_id IS NULL OR farm_id = :farm)"
         rows = (
             await self._tenant.execute(
                 text(
-                    "SELECT param_name, value FROM tree_parameter_overrides " "WHERE tree_id = :tid"
-                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
-                {"tid": tree_id},
+                    "SELECT param_name, value, farm_id "
+                    "FROM tree_parameter_overrides "
+                    "WHERE tree_id = :tid AND " + clause + " "
+                    # Tenant rows first, so a farm row overwrites them in the
+                    # dict comprehension below. The ordering is the layering.
+                    "ORDER BY farm_id NULLS FIRST"
+                ).bindparams(*binds),
+                params,
             )
         ).all()
         return {r.param_name: r.value for r in rows}
 
     async def list_all_param_overrides_visible_to_tenant(
-        self, *, tree_ids: tuple[UUID, ...]
+        self, *, tree_ids: tuple[UUID, ...], farm_id: UUID | None = None
     ) -> dict[UUID, dict[str, Any]]:
         """Bulk variant of `list_param_overrides_for_tree` for the
         sweep: one query for every tree the sweep is about to walk,
         grouped by tree_id. Returns an empty dict per tree if the
         tenant has no overrides.
+
+        ``farm_id`` resolves both stored layers for one farm inside the same
+        single query: the tenant rows, then that farm's rows on top of them
+        (tenant 0094). It stays one statement, not one per block.
         """
         if not tree_ids:
             return {}
+        binds = [bindparam("tids", type_=postgresql.ARRAY(PG_UUID(as_uuid=True)))]
+        params: dict[str, Any] = {"tids": list(tree_ids)}
+        clause = "farm_id IS NULL"
+        if farm_id is not None:
+            binds.append(bindparam("farm", type_=PG_UUID(as_uuid=True)))
+            params["farm"] = farm_id
+            clause = "(farm_id IS NULL OR farm_id = :farm)"
         rows = (
             await self._tenant.execute(
                 text(
-                    "SELECT tree_id, param_name, value "
+                    "SELECT tree_id, param_name, value, farm_id "
                     "FROM tree_parameter_overrides "
-                    "WHERE tree_id = ANY(:tids)"
-                ).bindparams(bindparam("tids", type_=postgresql.ARRAY(PG_UUID(as_uuid=True)))),
-                {"tids": list(tree_ids)},
+                    "WHERE tree_id = ANY(:tids) AND " + clause + " "
+                    "ORDER BY farm_id NULLS FIRST"
+                ).bindparams(*binds),
+                params,
             )
         ).all()
         grouped: dict[UUID, dict[str, Any]] = {tid: {} for tid in tree_ids}
         for r in rows:
             grouped.setdefault(r.tree_id, {})[r.param_name] = r.value
         return grouped
+
+    async def list_param_overrides_by_farm(
+        self,
+    ) -> dict[UUID | None, dict[UUID, dict[str, Any]]]:
+        """Every override row in the tenant, keyed by farm and then by tree.
+
+        The sweep reads this once and hands it to each block, the same way it
+        already does with the farm-level tree selection. The tenant rows are
+        under the key ``None``; a farm's own rows are under its id, and the
+        caller layers the second on the first.
+
+        One query for the whole sweep. The table holds one row per
+        (tree, parameter, farm), so it stays small: 20 trees with three
+        overridden parameters each across five farms is 300 rows.
+        """
+        rows = (
+            await self._tenant.execute(
+                text("SELECT tree_id, param_name, value, farm_id FROM tree_parameter_overrides")
+            )
+        ).all()
+        by_farm: dict[UUID | None, dict[UUID, dict[str, Any]]] = {}
+        for r in rows:
+            by_farm.setdefault(r.farm_id, {}).setdefault(r.tree_id, {})[r.param_name] = r.value
+        return by_farm
+
+    # ---- Finding catalogue (public + tenant) --------------------------
+
+    async def list_finding_catalogue(self) -> list[dict[str, Any]]:
+        """Every active finding definition, platform rows first.
+
+        The catalogue tables arrive with the finding-catalogue change, not
+        this one, so both reads are guarded on the table being present. A
+        schema without them returns an empty list and a folding tree then
+        resolves its codes from its own ``findings:`` block. Once the tables
+        exist the same call starts returning their rows with no other change
+        anywhere.
+
+        Platform wins on a duplicate code, which is why the tenant rows are
+        read second and the caller keeps the first row it saw: the catalogue
+        exists so one code means one thing across every tenant.
+        """
+        rows: list[dict[str, Any]] = []
+        for schema, source in (("public", "platform"), ("current", "tenant")):
+            qualified = (
+                "public.decision_tree_findings" if schema == "public" else "decision_tree_findings"
+            )
+            # current_schema() for the tenant table, because the bare name
+            # would resolve through search_path and find the public table,
+            # reading the platform rows twice and calling half of them tenant.
+            lookup = (
+                "SELECT to_regclass(:name) IS NOT NULL"
+                if schema == "public"
+                else "SELECT to_regclass(current_schema() || '.' || :name) IS NOT NULL"
+            )
+            present = (
+                await self._tenant.execute(text(lookup), {"name": qualified})
+            ).scalar_one_or_none()
+            if not present:
+                continue
+            found = (
+                (
+                    await self._tenant.execute(
+                        text(
+                            "SELECT code, clause_en, clause_ar, name_en, name_ar, "  # noqa: S608
+                            "       default_status "
+                            # Bare name for the tenant table: search_path puts
+                            # the tenant schema first, and the guard above has
+                            # already established the table is there.
+                            f"  FROM {qualified} "
+                            " WHERE is_active = TRUE"
+                        )
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            seen = {r["code"] for r in rows}
+            rows.extend({**dict(r), "source": source} for r in found if r["code"] not in seen)
+        return rows
 
     # ---- Farm-level tree selection (tenant migration 0089) ------------
 
@@ -1406,41 +1515,70 @@ class RecommendationsRepository:
         param_name: str,
         value: Any,
         actor_user_id: UUID | None,
+        farm_id: UUID | None = None,
     ) -> None:
         """Set or replace one override. ON CONFLICT updates value +
-        updated_by/_at; created_by/_at stay from the first insert."""
+        updated_by/_at; created_by/_at stay from the first insert.
+
+        ``farm_id`` writes that farm's own row; omitted, it writes the
+        tenant-level row every farm inherits (tenant 0094). The conflict
+        target names the matching partial unique index, because the two rows
+        are enforced by two different indexes and a bare
+        ``(tree_id, param_name)`` target matches neither.
+        """
+        conflict = (
+            "(tree_id, param_name, farm_id) WHERE farm_id IS NOT NULL"
+            if farm_id is not None
+            else "(tree_id, param_name) WHERE farm_id IS NULL"
+        )
         await self._tenant.execute(
             text(
-                """
+                f"""
                 INSERT INTO tree_parameter_overrides
-                    (tree_id, param_name, value, created_by, updated_by)
-                VALUES (:tid, :n, CAST(:v AS jsonb), :actor, :actor)
-                ON CONFLICT (tree_id, param_name) DO UPDATE
+                    (tree_id, param_name, farm_id, value, created_by, updated_by)
+                VALUES (:tid, :n, :farm, CAST(:v AS jsonb), :actor, :actor)
+                ON CONFLICT {conflict} DO UPDATE
                 SET value = EXCLUDED.value,
                     updated_by = EXCLUDED.updated_by,
                     updated_at = public.app_now()
-                """
+                """  # noqa: S608
             ).bindparams(
                 bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                bindparam("farm", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
             ),
             {
                 "tid": tree_id,
                 "n": param_name,
+                "farm": farm_id,
                 "v": _serialize_jsonb(value),
                 "actor": actor_user_id,
             },
         )
 
-    async def delete_param_override(self, *, tree_id: UUID, param_name: str) -> bool:
-        """Remove one override. Returns True if a row was deleted."""
+    async def delete_param_override(
+        self, *, tree_id: UUID, param_name: str, farm_id: UUID | None = None
+    ) -> bool:
+        """Remove one override. Returns True if a row was deleted.
+
+        Deletes the tenant-level row unless ``farm_id`` names a farm, so
+        clearing one farm's value leaves the tenant default standing.
+        """
+        binds = [bindparam("tid", type_=PG_UUID(as_uuid=True))]
+        params: dict[str, Any] = {"tid": tree_id, "n": param_name}
+        clause = "farm_id IS NULL"
+        if farm_id is not None:
+            binds.append(bindparam("farm", type_=PG_UUID(as_uuid=True)))
+            params["farm"] = farm_id
+            clause = "farm_id = :farm"
         result = await self._tenant.execute(
             text(
-                "DELETE FROM tree_parameter_overrides " "WHERE tree_id = :tid AND param_name = :n"
-            ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
-            {"tid": tree_id, "n": param_name},
+                "DELETE FROM tree_parameter_overrides "  # noqa: S608
+                "WHERE tree_id = :tid AND param_name = :n AND " + clause
+            ).bindparams(*binds),
+            params,
         )
-        return bool(getattr(result, "rowcount", 0) or 0)
+        return bool(_rowcount(result))
 
     # ---- Recommendations (tenant) -------------------------------------
 
@@ -1470,6 +1608,7 @@ class RecommendationsRepository:
         group_parent_id: UUID | None = None,
         is_group: bool = False,
         today: date | None = None,
+        finding_set: list[str] | None = None,
     ) -> bool:
         """Open one recommendation. Returns True if a row was inserted,
         False if the partial UNIQUE on (block_id, tree_id) blocked it
@@ -1497,7 +1636,8 @@ class RecommendationsRepository:
                         valid_until, evaluation_snapshot, state,
                         created_by, updated_by,
                         group_key, group_parent_id, is_group,
-                        first_seen_at, last_seen_at, last_seen_day
+                        first_seen_at, last_seen_at, last_seen_day,
+                        finding_set
                     ) VALUES (
                         :id, :block_id, :cell_id, :farm_id, :tree_id, :tree_code,
                         :tree_version,
@@ -1508,7 +1648,8 @@ class RecommendationsRepository:
                         :valid_until, CAST(:snapshot AS jsonb), 'open',
                         :actor, :actor,
                         :group_key, :group_parent_id, :is_group,
-                        public.app_now(), public.app_now(), CAST(:today AS date)
+                        public.app_now(), public.app_now(), CAST(:today AS date),
+                        CAST(:finding_set AS jsonb)
                     )
                     """
                 ).bindparams(
@@ -1545,6 +1686,7 @@ class RecommendationsRepository:
                     "group_parent_id": group_parent_id,
                     "is_group": is_group,
                     "today": today,
+                    "finding_set": _serialize_jsonb(list(finding_set or [])),
                 },
             )
             await savepoint.commit()
@@ -1619,6 +1761,34 @@ class RecommendationsRepository:
                 params,
             )
         ).scalar_one_or_none()
+
+    async def get_card_identity(self, *, recommendation_id: UUID) -> dict[str, Any] | None:
+        """The stored finding set and severity of one card (tenant 0094).
+
+        The supersede check reads both in one statement: the set decides
+        whether the open card still describes what the tree found, and the
+        severity decides whether the replacement is worth a notification.
+
+        Returns None when the row is gone — a race with a close, which the
+        caller treats as "there was nothing to supersede".
+        """
+        row = (
+            (
+                await self._tenant.execute(
+                    text(
+                        "SELECT finding_set, severity FROM recommendations WHERE id = :id"
+                    ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+                    {"id": recommendation_id},
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            return None
+        raw = row["finding_set"]
+        codes = [str(c) for c in raw] if isinstance(raw, list) else []
+        return {"finding_set": codes, "severity": row["severity"]}
 
     async def bump_recurrence(
         self, *, row_id: UUID, today: date, actor_user_id: UUID | None
@@ -2509,6 +2679,11 @@ class RecommendationsRepository:
                 "alert_id": r["alert_id"],
                 "duration_ms": r["duration_ms"],
                 "error": r["error"],
+                # Written on every row whatever the status, unlike node_path
+                # and resolved_values above (tenant 0094 / design 6.6).
+                "finding_set": _serialize_jsonb(list(r.get("finding_set") or [])),
+                "matched_rule": r.get("matched_rule"),
+                "registered_by": _serialize_jsonb(dict(r.get("registered_by") or {})),
             }
             for r in rows
         ]
@@ -2520,14 +2695,17 @@ class RecommendationsRepository:
                     tree_id, tree_code, tree_version, scope, status,
                     skip_axis, skip_detail, node_path, resolved_values,
                     param_overrides, outcome, recommendation_id, alert_id,
-                    duration_ms, error
+                    duration_ms, error,
+                    finding_set, matched_rule, registered_by
                 ) VALUES (
                     :run_id, :farm_id, :block_id, :cell_id,
                     :tree_id, :tree_code, :tree_version, :scope, :status,
                     :skip_axis, CAST(:skip_detail AS jsonb),
                     CAST(:node_path AS jsonb), CAST(:resolved_values AS jsonb),
                     CAST(:param_overrides AS jsonb), CAST(:outcome AS jsonb),
-                    :recommendation_id, :alert_id, :duration_ms, :error
+                    :recommendation_id, :alert_id, :duration_ms, :error,
+                    CAST(:finding_set AS jsonb), :matched_rule,
+                    CAST(:registered_by AS jsonb)
                 )
                 """
             ).bindparams(
