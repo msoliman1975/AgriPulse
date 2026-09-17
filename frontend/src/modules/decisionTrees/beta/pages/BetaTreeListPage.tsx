@@ -161,14 +161,14 @@ export function BetaTreeListPage(): ReactNode {
           {
             key: "version",
             header: t("list.columns.version"),
-            cell: (row) => row.current_version ?? "—",
+            cell: (row) => row.draft_version ?? "—",
           },
           {
             key: "published",
             header: t("list.columns.published"),
             cell: (row) =>
-              row.published_version !== null ? (
-                <Pill kind="ok">{row.published_version}</Pill>
+              row.current_version !== null ? (
+                <Pill kind="ok">{row.current_version}</Pill>
               ) : (
                 <Pill kind="neutral">{t("list.notPublished")}</Pill>
               ),

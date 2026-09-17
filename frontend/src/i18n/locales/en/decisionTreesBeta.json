@@ -155,7 +155,9 @@
       "defaultHelp": "Required. A switch that matches no case stops the walk and the trace status is error. The editor pre-fills this with the node that came next; change it if it is wrong.",
       "moveUp": "Move case up",
       "moveDown": "Move case down",
-      "noCases": "No cases yet. Every cell would take the default."
+      "noCases": "No cases yet. Every cell would take the default.",
+      "low": "From",
+      "high": "To"
     },
     "stop": {
       "title": "Stop",
@@ -396,6 +398,7 @@
     "lt": "less than",
     "eq": "equals",
     "ne": "is not",
-    "in": "is one of"
+    "in": "is one of",
+    "between": "is between"
   }
 }

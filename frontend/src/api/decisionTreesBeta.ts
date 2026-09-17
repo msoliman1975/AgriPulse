@@ -183,8 +183,11 @@ export interface BetaTreeSummary {
   /** NULL = platform-shipped; non-NULL = the caller's own tenant tree. */
   tenant_id: string | null;
   scope: "block" | "cell";
+  /** The published version. `current_version_id` points at it, so a tree
+   *  with a number here is live and one with null has never been published. */
   current_version: number | null;
-  published_version: number | null;
+  /** The unpublished draft on top of it, or null when there is none. */
+  draft_version: number | null;
   updated_at: string;
 }
 
@@ -255,7 +258,7 @@ function normalizeDetail(raw: BetaTreeDetail & { definition?: BetaTreeDoc }): Be
         id: `${raw.id}:current`,
         version: raw.current_version ?? 1,
         definition: raw.definition,
-        published_at: raw.published_version === raw.current_version ? raw.updated_at : null,
+        published_at: raw.current_version != null ? raw.updated_at : null,
         created_at: raw.updated_at,
         notes: null,
       },

@@ -101,14 +101,14 @@ nodes:
 describe("betaNodeHeight", () => {
   it("grows a switch box with its cases, so the bands are readable in the body", () => {
     const one = betaNodeHeight({
-      switch: { cases: [{ op: "ge", value: 1, go: "x" }], default: "y" },
+      switch: { cases: [{ ge: 1, go: "x" }], default: "y" },
     });
     const three = betaNodeHeight({
       switch: {
         cases: [
-          { op: "ge", value: 1, go: "x" },
-          { op: "ge", value: 2, go: "x" },
-          { op: "ge", value: 3, go: "x" },
+          { ge: 1, go: "x" },
+          { ge: 2, go: "x" },
+          { ge: 3, go: "x" },
         ],
         default: "y",
       },

@@ -24,9 +24,14 @@ import {
   BETA_NODE_KINDS,
   SWITCH_OPS,
   betaNodeKind,
+  caseOp,
+  caseOperand,
+  withCaseOp,
   type BetaNode,
   type BetaNodeKind,
+  type CaseOperand,
   type SwitchCase,
+  type SwitchOp,
 } from "../lib/betaTree";
 import { FindingPicker, SourcePill } from "./FindingPicker";
 import { ValueRefField } from "./ValueRefField";
@@ -527,10 +532,11 @@ function SwitchFields({
               <select
                 {...props}
                 disabled={readOnly}
-                value={c.op}
+                value={caseOp(c) ?? "ge"}
                 onChange={(e) => {
+                  const nextOp = e.target.value as SwitchOp;
                   const next = [...cases];
-                  next[index] = { ...c, op: e.target.value as SwitchCase["op"] };
+                  next[index] = withCaseOp(c, nextOp, defaultOperandFor(nextOp, caseOperand(c)));
                   writeCases(next);
                 }}
                 className={SELECT_CLASS}
@@ -543,22 +549,69 @@ function SwitchFields({
               </select>
             )}
           </Field>
-          <Field label={t("node.switch.value")}>
-            {(props) => (
-              <input
-                {...props}
-                dir="ltr"
-                disabled={readOnly}
-                value={caseValueText(c.value)}
-                onChange={(e) => {
-                  const next = [...cases];
-                  next[index] = { ...c, value: parseCaseValue(e.target.value, c.op) };
-                  writeCases(next);
-                }}
-                className={SELECT_CLASS}
-              />
-            )}
-          </Field>
+          {caseOp(c) === "between" ? (
+            <>
+              <Field label={t("node.switch.low")}>
+                {(props) => (
+                  <input
+                    {...props}
+                    dir="ltr"
+                    disabled={readOnly}
+                    value={betweenPart(caseOperand(c), 0)}
+                    onChange={(e) => {
+                      const next = [...cases];
+                      next[index] = withCaseOp(c, "between", [
+                        parseCaseValue(e.target.value, "ge") as number | string,
+                        betweenPart(caseOperand(c), 1),
+                      ]);
+                      writeCases(next);
+                    }}
+                    className={SELECT_CLASS}
+                  />
+                )}
+              </Field>
+              <Field label={t("node.switch.high")}>
+                {(props) => (
+                  <input
+                    {...props}
+                    dir="ltr"
+                    disabled={readOnly}
+                    value={betweenPart(caseOperand(c), 1)}
+                    onChange={(e) => {
+                      const next = [...cases];
+                      next[index] = withCaseOp(c, "between", [
+                        betweenPart(caseOperand(c), 0),
+                        parseCaseValue(e.target.value, "ge") as number | string,
+                      ]);
+                      writeCases(next);
+                    }}
+                    className={SELECT_CLASS}
+                  />
+                )}
+              </Field>
+            </>
+          ) : (
+            <Field label={t("node.switch.value")}>
+              {(props) => (
+                <input
+                  {...props}
+                  dir="ltr"
+                  disabled={readOnly}
+                  value={caseValueText(caseOperand(c))}
+                  onChange={(e) => {
+                    const next = [...cases];
+                    next[index] = withCaseOp(
+                      c,
+                      caseOp(c) ?? "ge",
+                      parseCaseValue(e.target.value, caseOp(c) ?? "ge"),
+                    );
+                    writeCases(next);
+                  }}
+                  className={SELECT_CLASS}
+                />
+              )}
+            </Field>
+          )}
           <NodeSelect
             label={t("node.switch.go")}
             value={c.go}
@@ -607,7 +660,7 @@ function SwitchFields({
           variant="secondary"
           size="sm"
           className="self-start"
-          onClick={() => writeCases([...cases, { op: "ge", value: 0, go: "" }])}
+          onClick={() => writeCases([...cases, { ge: 0, go: "" }])}
         >
           {t("node.switch.addCase")}
         </Button>
@@ -635,14 +688,29 @@ function swap<T>(list: readonly T[], a: number, b: number): T[] {
   return next;
 }
 
-function caseValueText(value: SwitchCase["value"]): string {
+/** One half of a `between` pair, as text for its input. */
+function betweenPart(operand: CaseOperand | undefined, index: 0 | 1): number | string {
+  if (!Array.isArray(operand)) return "";
+  return operand[index] ?? "";
+}
+
+/** Carry the operand across an operator change where it still makes sense.
+ *  `between` needs a pair and `in` needs a list, so neither inherits a
+ *  single value. */
+function defaultOperandFor(op: SwitchOp, previous: CaseOperand | undefined): CaseOperand {
+  if (op === "between") return Array.isArray(previous) ? previous.slice(0, 2) : ["", ""];
+  if (op === "in") return Array.isArray(previous) ? previous : [];
+  return Array.isArray(previous) ? "" : (previous ?? "");
+}
+
+function caseValueText(value: CaseOperand | undefined): string {
   return Array.isArray(value) ? value.join(", ") : String(value ?? "");
 }
 
 /** Read the typed value back. `in` takes a list; everything else takes one
  *  value, kept as a number when it reads as one so the YAML carries `70`
  *  rather than `"70"` and the engine compares numerically. */
-function parseCaseValue(text: string, op: SwitchCase["op"]): SwitchCase["value"] {
+function parseCaseValue(text: string, op: SwitchOp): CaseOperand {
   if (op === "in") {
     return text
       .split(",")
