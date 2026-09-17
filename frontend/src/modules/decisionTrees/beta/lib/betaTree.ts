@@ -40,13 +40,37 @@ export const BETA_NODE_KINDS: readonly BetaNodeKind[] = [
 ];
 
 /** Comparison operators a switch case may use. `in` takes a list. */
-export const SWITCH_OPS = ["ge", "gt", "le", "lt", "eq", "ne", "in"] as const;
+export const SWITCH_OPS = ["ge", "gt", "le", "lt", "eq", "ne", "in", "between"] as const;
 export type SwitchOp = (typeof SWITCH_OPS)[number];
 
-export interface SwitchCase {
-  op: SwitchOp;
-  value: number | string | boolean | (number | string)[];
-  go: string;
+export type CaseOperand = number | string | boolean | (number | string)[];
+
+/**
+ * A case names its operator as the key, which is how the engine reads it:
+ * `{ge: 70, go: "n1"}`, and `{between: [40, 70], go: "n2"}`.
+ *
+ * It was `{op, value, go}` before. Neither the compiler nor the engine looks
+ * at an `op` key — both scan the case for a key that IS an operator name — so
+ * every switch was refused on save with "must name exactly one operator".
+ */
+export type SwitchCase = { go: string } & Partial<Record<SwitchOp, CaseOperand>>;
+
+/** The operator this case names, or null when it names none. */
+export function caseOp(c: SwitchCase | undefined): SwitchOp | null {
+  if (!c) return null;
+  return SWITCH_OPS.find((op) => op in c) ?? null;
+}
+
+/** The operand beside that operator. `between` carries `[low, high]`. */
+export function caseOperand(c: SwitchCase | undefined): CaseOperand | undefined {
+  const op = caseOp(c);
+  return op && c ? c[op] : undefined;
+}
+
+/** Rewrite a case onto one operator. The old operator key is dropped, so a
+ *  case can never name two. */
+export function withCaseOp(c: SwitchCase, op: SwitchOp, operand: CaseOperand): SwitchCase {
+  return { go: c.go, [op]: operand } as SwitchCase;
 }
 
 export interface BetaNode {

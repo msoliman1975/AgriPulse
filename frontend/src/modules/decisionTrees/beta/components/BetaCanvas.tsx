@@ -43,7 +43,14 @@ import {
   type BetaPositionedEdge,
   type BetaPositionedNode,
 } from "../lib/betaLayout";
-import { slotsOf, type BetaNode, type BetaNodeKind, type EdgeSlot } from "../lib/betaTree";
+import {
+  caseOp,
+  caseOperand,
+  slotsOf,
+  type BetaNode,
+  type BetaNodeKind,
+  type EdgeSlot,
+} from "../lib/betaTree";
 import { describeOperand, describeValueRef } from "../lib/betaValueRef";
 
 const DRAG_THRESHOLD_PX = 4;
@@ -638,7 +645,7 @@ function NodeBody({ node }: { node: BetaPositionedNode }): JSX.Element {
         fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
         fill="#155e75"
       >
-        {truncate(`${i + 1}. ${t(`op.${c.op}`)} ${describeOperand(c.value)} → ${c.go || "—"}`, 34)}
+        {truncate(`${i + 1}. ${t(`op.${caseOp(c) ?? "?"}`)} ${describeOperand(caseOperand(c))} → ${c.go || "—"}`, 34)}
       </text>
     ));
     const defaultTarget = data.switch?.default;
