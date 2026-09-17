@@ -260,8 +260,13 @@ async def _write_index(
 ) -> None:
     """One imagery reading, later than every reading written before it."""
     _READING_CLOCK["step"] += 1
-    at = datetime.now(UTC).replace(microsecond=0) - timedelta(
-        days=30 - _READING_CLOCK["step"] // 60, minutes=_READING_CLOCK["step"] % 60
+    # Monotonically later. Subtracting a growing number of minutes walked the
+    # clock backwards, so a later write landed before an earlier one and
+    # "latest reading per index" picked the wrong row.
+    at = (
+        datetime.now(UTC).replace(microsecond=0)
+        - timedelta(days=30)
+        + timedelta(minutes=_READING_CLOCK["step"])
     )
     await session.execute(text(f'SET LOCAL search_path TO "{schema}", public'))
     await session.execute(

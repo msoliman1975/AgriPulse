@@ -122,7 +122,8 @@ def test_an_action_type_outside_the_column_becomes_other() -> None:
     }
     walk = _walk(RegisteredFinding(code="odd", severity="info", registered_by=("r",)))
     card = fold(walk.findings, catalogue=catalogue)
-    assert card is not None and card.action_type == "rototill"
+    assert card is not None
+    assert card.action_type == "rototill"
 
     result = _folding_evaluation(walk, card)
     assert result.outcome is not None
