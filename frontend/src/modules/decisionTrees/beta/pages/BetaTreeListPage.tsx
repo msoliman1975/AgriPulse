@@ -10,7 +10,7 @@
 
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/Button";
 import { DataTable } from "@/components/DataTable";
@@ -40,6 +40,9 @@ const CODE_PATTERN = /^[a-z][a-z0-9_]*$/;
 
 export function BetaTreeListPage(): ReactNode {
   const { t, i18n } = useTranslation("decisionTreesBeta");
+  // The estate screens carry their own namespace; two links here are the
+  // only place the two namespaces meet.
+  const { t: tEstate } = useTranslation("decisionTreesEstate");
   const scope = useAuthoringScope();
   const navigate = useNavigate();
   const base = betaBasePath(scope);
@@ -162,6 +165,32 @@ export function BetaTreeListPage(): ReactNode {
               ) : (
                 <Pill kind="neutral">{t("list.notPublished")}</Pill>
               ),
+          },
+          {
+            // The way in to the estate dry run and to what real runs
+            // produced. Both are per tree, so the tree list is where they
+            // are reached from; neither has a place in the side navigation
+            // because neither means anything without a tree.
+            key: "runs",
+            header: tEstate("list.column"),
+            cell: (row) => (
+              <span className="flex gap-2">
+                <Link
+                  to={`${base}/${row.code}/estate`}
+                  className="text-xs text-ap-accent underline"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {tEstate("list.dryRun")}
+                </Link>
+                <Link
+                  to={`${base}/${row.code}/runs`}
+                  className="text-xs text-ap-accent underline"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {tEstate("list.results")}
+                </Link>
+              </span>
+            ),
           },
         ]}
       />

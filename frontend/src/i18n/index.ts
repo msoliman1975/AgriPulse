@@ -22,6 +22,7 @@ import enUsers from "./locales/en/users.json";
 import enAdmin from "./locales/en/admin.json";
 import enDecisionTrees from "./locales/en/decisionTrees.json";
 import enDecisionTreesBeta from "./locales/en/decisionTreesBeta.json";
+import enDecisionTreesEstate from "./locales/en/decisionTreesEstate.json";
 import enSettings from "./locales/en/settings.json";
 import enIntegrationsHealth from "./locales/en/integrationsHealth.json";
 import enIntegrations from "./locales/en/integrations.json";
@@ -54,6 +55,7 @@ import arUsers from "./locales/ar/users.json";
 import arAdmin from "./locales/ar/admin.json";
 import arDecisionTrees from "./locales/ar/decisionTrees.json";
 import arDecisionTreesBeta from "./locales/ar/decisionTreesBeta.json";
+import arDecisionTreesEstate from "./locales/ar/decisionTreesEstate.json";
 import arSettings from "./locales/ar/settings.json";
 import arIntegrationsHealth from "./locales/ar/integrationsHealth.json";
 import arIntegrations from "./locales/ar/integrations.json";
@@ -96,6 +98,7 @@ const resources = {
     admin: enAdmin,
     decisionTrees: enDecisionTrees,
     decisionTreesBeta: enDecisionTreesBeta,
+    decisionTreesEstate: enDecisionTreesEstate,
     users: enUsers,
     settings: enSettings,
     integrationsHealth: enIntegrationsHealth,
@@ -130,6 +133,7 @@ const resources = {
     admin: arAdmin,
     decisionTrees: arDecisionTrees,
     decisionTreesBeta: arDecisionTreesBeta,
+    decisionTreesEstate: arDecisionTreesEstate,
     users: arUsers,
     settings: arSettings,
     integrationsHealth: arIntegrationsHealth,
@@ -174,6 +178,7 @@ void i18n
       "admin",
       "decisionTrees",
       "decisionTreesBeta",
+      "decisionTreesEstate",
       "users",
       "settings",
       "integrationsHealth",

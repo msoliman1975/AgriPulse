@@ -39,6 +39,10 @@ _TASK_PACKAGES: tuple[str, ...] = (
     "app.modules.audit",
     "app.modules.notifications",
     "app.modules.recommendations.tasks",
+    # The estate dry run (design section 9, stage B). Started by a person from
+    # the platform screen, never by Beat, so it appears here and nowhere in
+    # `workers/beat/main.py`.
+    "app.modules.recommendations.folding_report_tasks",
     # Celery's `include=` imports the literal module name â€” packages are
     # NOT recursed. Point at the submodule that owns the @shared_task
     # decorators so Beat-dispatched tasks resolve on workers.

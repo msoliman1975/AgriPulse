@@ -48,6 +48,7 @@ from app.modules.recommendations.folding_compiler import FoldingCompileError
 from app.modules.recommendations.schemas import (
     BetaDryRunRequest,
     BetaDryRunResponse,
+    BetaRunResultRow,
     BetaTreeCreateRequest,
     BetaTreeDetailResponse,
     BetaTreePublishRequest,
@@ -73,6 +74,10 @@ from app.modules.recommendations.schemas import (
     DecisionTreeVersionPublishResponse,
     DecisionTreeVersionResponse,
     DryRunCandidateBlock,
+    EstateDryRunRequest,
+    EstateDryRunResponse,
+    EstateDryRunStartResponse,
+    EstateDryRunSummary,
     EvalRunResponse,
     EvalTraceDetailResponse,
     EvalTraceResponse,
@@ -1931,6 +1936,219 @@ async def dry_run_beta_tree(
         if mapped is not None:
             raise mapped from exc
         raise
+
+
+# ---------- Estate dry run and run results (design section 9) --------------
+#
+# Four routes, all platform routes, all naming their tenant:
+#
+#   POST /platform/decision-trees/beta/{tree_id}/estate-dry-run
+#   GET  /platform/decision-trees/beta/{tree_id}/estate-dry-run/{run_id}
+#   GET  /platform/decision-trees/beta/{tree_id}/estate-dry-runs
+#   GET  /platform/decision-trees/beta/{tree_id}/runs
+#
+# The tenant is a parameter rather than the caller's own scope because the
+# reader is a platform admin deciding whether to switch a tenant on. A
+# tenant-scoped caller may name only their own tenant, and may leave it out.
+# The alternative — a tenant-only route — is how six reads on one screen came
+# back empty for a platform admin, behind a 403 that read as "no permission"
+# when the truth was "you have no tenant".
+
+
+async def _estate_tenant(
+    context: RequestContext,
+    public_session: AsyncSession,
+    tenant_id: UUID | None,
+) -> tuple[UUID, str]:
+    """Which tenant's estate this call is about, and that tenant's schema.
+
+    A tenant-scoped caller gets their own tenant and cannot name another's. A
+    platform caller must name one: they have no schema of their own, and
+    guessing would be a wrong answer rather than a missing one.
+    """
+    from app.core.errors import APIError
+
+    if context.tenant_id is not None:
+        if tenant_id is not None and tenant_id != context.tenant_id:
+            raise APIError(
+                status_code=status.HTTP_403_FORBIDDEN,
+                title="Another tenant's estate",
+                detail=(
+                    "A tenant-scoped caller can only run and read estate dry runs "
+                    "for their own tenant."
+                ),
+                type_="https://agripulse.cloud/problems/tenant-mismatch",
+            )
+        schema = _ensure_tenant(context)
+        return context.tenant_id, schema
+
+    if tenant_id is None:
+        raise APIError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            title="Tenant required",
+            detail=(
+                "A platform caller has no tenant of their own, so this endpoint "
+                "needs tenant_id: the estate folded is a tenant's blocks."
+            ),
+            type_="https://agripulse.cloud/problems/tenant-required",
+        )
+    row = (
+        await public_session.execute(
+            text(
+                "SELECT schema_name FROM public.tenants WHERE id = :tid AND deleted_at IS NULL"
+            ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+            {"tid": tenant_id},
+        )
+    ).first()
+    if row is None:
+        raise APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Tenant not found",
+            detail=f"No tenant {tenant_id}.",
+            type_="https://agripulse.cloud/problems/tenant-not-found",
+        )
+    return tenant_id, str(row[0])
+
+
+@router.post(
+    _BETA_PREFIX + "/{tree_id}/estate-dry-run",
+    response_model=EstateDryRunStartResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Fold one beta tree over a whole tenant. Writes no card.",
+)
+async def start_estate_dry_run_route(
+    tree_id: UUID,
+    payload: EstateDryRunRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: FoldingTreeAuthorService = Depends(_beta_service),
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> dict[str, Any]:
+    """202 and a run id. The folding happens in a Celery task.
+
+    A cell-scoped tree over a tenant with 121-cell grids is thousands of
+    folds, each behind a per-block data load. Holding the request open for
+    that is how a report becomes a gateway timeout.
+    """
+    from app.modules.recommendations.folding_report import start_estate_dry_run
+
+    _ensure_authoring_scope(context)
+    tenant_id, tenant_schema = await _estate_tenant(context, public_session, payload.tenant_id)
+    try:
+        tree = await service.get_tree(tree_id)
+    except Exception as exc:
+        mapped = _map_beta_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+    run_id = await start_estate_dry_run(
+        tenant_schema=tenant_schema,
+        tenant_id=tenant_id,
+        tree_id=tree_id,
+        tree_code=str(tree["code"]),
+        tree_name=tree.get("name_en"),
+        version_id=tree.get("current_version_id"),
+        scope=str(tree.get("scope") or "cell"),
+        author_tenant_id=context.tenant_id,
+        requested_by=context.user_id,
+        block_limit=payload.block_limit,
+    )
+    return {
+        "run_id": run_id,
+        "tenant_id": tenant_id,
+        "tree_id": tree_id,
+        "tree_code": str(tree["code"]),
+        "scope": str(tree.get("scope") or "cell"),
+        "state": "running",
+    }
+
+
+@router.get(
+    _BETA_PREFIX + "/{tree_id}/estate-dry-run/{run_id}",
+    response_model=EstateDryRunResponse,
+    summary="One estate dry run and its report.",
+)
+async def get_estate_dry_run_route(
+    tree_id: UUID,
+    run_id: UUID,
+    tenant_id: UUID | None = Query(default=None),
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> dict[str, Any]:
+    from app.core.errors import APIError
+    from app.modules.recommendations.folding_report import (
+        EstateDryRunRepository,
+        tenant_scoped_session,
+    )
+
+    _ensure_authoring_scope(context)
+    _, tenant_schema = await _estate_tenant(context, public_session, tenant_id)
+    async with tenant_scoped_session(tenant_schema) as session:
+        row = await EstateDryRunRepository(tenant_session=session).get_run(run_id=run_id)
+    if row is None or row["tree_id"] != tree_id:
+        raise APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Estate dry run not found",
+            detail=f"No estate dry run {run_id} for this tree in this tenant.",
+            type_="https://agripulse.cloud/problems/recommendations/estate-dry-run-not-found",
+        )
+    return row
+
+
+@router.get(
+    _BETA_PREFIX + "/{tree_id}/estate-dry-runs",
+    response_model=list[EstateDryRunSummary],
+    summary="This tree's estate dry runs, newest first.",
+)
+async def list_estate_dry_runs_route(
+    tree_id: UUID,
+    tenant_id: UUID | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> list[dict[str, Any]]:
+    from app.modules.recommendations.folding_report import (
+        EstateDryRunRepository,
+        tenant_scoped_session,
+    )
+
+    _ensure_authoring_scope(context)
+    _, tenant_schema = await _estate_tenant(context, public_session, tenant_id)
+    async with tenant_scoped_session(tenant_schema) as session:
+        return await EstateDryRunRepository(tenant_session=session).list_runs(
+            tree_id=tree_id, limit=limit
+        )
+
+
+@router.get(
+    _BETA_PREFIX + "/{tree_id}/runs",
+    response_model=list[BetaRunResultRow],
+    summary="What real runs of this beta tree produced, by block and finding set.",
+)
+async def list_beta_run_results_route(
+    tree_id: UUID,
+    tenant_id: UUID | None = Query(default=None),
+    run_id: UUID | None = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=1000),
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> list[dict[str, Any]]:
+    """Real runs, not dry runs. Read from the evaluation traces.
+
+    Empty until the tree is on the sweep, which is stage C. Before that the
+    estate dry run is the only thing that has folded this tree, and it writes
+    no trace by design.
+    """
+    from app.modules.recommendations.folding_report import (
+        EstateDryRunRepository,
+        tenant_scoped_session,
+    )
+
+    _ensure_authoring_scope(context)
+    _, tenant_schema = await _estate_tenant(context, public_session, tenant_id)
+    async with tenant_scoped_session(tenant_schema) as session:
+        return await EstateDryRunRepository(tenant_session=session).list_real_run_results(
+            tree_id=tree_id, run_id=run_id, limit=limit
+        )
 
 
 # ---------- Finding catalogue ----------------------------------------------
