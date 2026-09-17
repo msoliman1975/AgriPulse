@@ -435,16 +435,23 @@ class ExplainBlockResponse(BaseModel):
 
 
 class DecisionTreeVersionResponse(BaseModel):
-    """One row from `public.decision_tree_versions`. Includes both raw
-    YAML and compiled JSON so the editor can round-trip without
-    re-compiling."""
+    """One row from `public.decision_tree_versions`. Includes the source
+    body and the compiled JSON so the editor can round-trip without
+    re-compiling.
+
+    A version holds exactly one source body (public migration 0090 CHECKs
+    it): ``tree_yaml`` on a live tree, ``definition`` on a beta one. Both
+    are optional here so one response model serves both shapes; the null
+    one says which shape the row is.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     tree_id: UUID
     version: int
-    tree_yaml: str
+    tree_yaml: str | None = None
+    definition: dict[str, Any] | None = None
     tree_compiled: dict[str, Any]
     compiled_hash: str
     published_at: datetime | None
@@ -917,3 +924,224 @@ class DecisionTreeVersionPinRequest(BaseModel):
 class DecisionTreeVersionPinResponse(BaseModel):
     code: str
     pinned_version: int | None = None
+
+
+# =====================================================================
+# Beta (folding) tree authoring
+#
+# The pinned contract sessions C and D build against:
+#
+#   POST   /platform/decision-trees/beta                     create
+#   GET    /platform/decision-trees/beta                     list
+#   GET    /platform/decision-trees/beta/{tree_id}           get + definition
+#   POST   /platform/decision-trees/beta/{tree_id}/versions  append draft
+#   POST   /platform/decision-trees/beta/{tree_id}/publish   publish
+#   DELETE /platform/decision-trees/beta/{tree_id}/draft     discard draft
+#   POST   /platform/decision-trees/beta/{tree_id}/dry-run   per-cell folds
+#
+# The body carries `definition` as a JSON object, never as YAML text. The
+# designer holds a graph; serialising it to YAML for the API to parse it
+# straight back buys nothing and loses things — PyYAML reads an unquoted
+# `on:` key as the boolean True, which breaks every `switch` node written
+# that way.
+# =====================================================================
+
+
+class BetaCompileErrorItem(BaseModel):
+    """One reason a definition cannot be stored, as the 422 body carries it.
+
+    ``node_id`` is the first node the rule names, or null for a whole-tree
+    problem. ``node_ids`` carries all of them, because a rule like "this path
+    never reaches stop" is about several nodes at once and the designer
+    highlights every one.
+
+    Both languages are always present. The compiler writes the Arabic; there
+    is no English-only error.
+    """
+
+    node_id: str | None = None
+    node_ids: list[str] = Field(default_factory=list)
+    rule: str
+    message_en: str
+    message_ar: str
+
+
+class BetaCompileErrorResponse(BaseModel):
+    """The 422 body a create, append or publish returns when checks fail."""
+
+    errors: list[BetaCompileErrorItem]
+
+
+class BetaTreeVersionResponse(BaseModel):
+    """One beta version row. ``definition`` is the authored graph."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    tree_id: UUID
+    version: int
+    definition: dict[str, Any] | None = None
+    tree_compiled: dict[str, Any]
+    compiled_hash: str
+    published_at: datetime | None
+    notes: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    @property
+    def is_draft(self) -> bool:
+        return self.published_at is None
+
+
+class BetaTreeSummary(BaseModel):
+    """One row of the beta tree list."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    code: str
+    tenant_id: UUID | None = None
+    name_en: str
+    name_ar: str | None = None
+    description_en: str | None = None
+    description_ar: str | None = None
+    crop_paths: list[str] = Field(default_factory=list)
+    country_codes: list[str] = Field(default_factory=list)
+    soil_textures: list[str] = Field(default_factory=list)
+    scope: str = "cell"
+    stage: str = "beta"
+    is_active: bool = True
+    current_version: int | None = None
+    #: The newest version when it is unpublished. Null when the newest
+    #: version is the published one, which is how the designer knows whether
+    #: to offer Discard.
+    draft_version: int | None = None
+
+
+class BetaTreeDetailResponse(BetaTreeSummary):
+    """One beta tree with its versions and the definition to open.
+
+    ``definition`` is the body the designer loads: the draft's when a draft
+    exists, otherwise the published version's. It is the single field the
+    canvas reads, so the editor never has to decide which version it is on.
+    """
+
+    definition: dict[str, Any] | None = None
+    definition_version: int | None = None
+    versions: list[BetaTreeVersionResponse] = Field(default_factory=list)
+
+
+class BetaTreeCreateRequest(BaseModel):
+    """POST /platform/decision-trees/beta.
+
+    Targeting comes from the definition, exactly as it does for a live tree:
+    `compile_folding_tree` validates `crop_paths`, `country_codes` and
+    `soil_textures` out of the body and the tree row is stamped from the
+    compiled result. There are no separate picker fields here, because the
+    beta designer edits the definition and nothing else.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9][a-z0-9_-]*$")
+    definition: dict[str, Any]
+    notes: str | None = Field(default=None, max_length=500)
+
+
+class BetaTreeVersionCreateRequest(BaseModel):
+    """POST /platform/decision-trees/beta/{tree_id}/versions."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    definition: dict[str, Any]
+    notes: str | None = Field(default=None, max_length=500)
+
+
+class BetaTreePublishRequest(BaseModel):
+    """POST /platform/decision-trees/beta/{tree_id}/publish."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version_id: UUID
+
+
+class BetaTreePublishResponse(BaseModel):
+    tree_id: UUID
+    code: str
+    version_id: UUID
+    version: int
+    published_at: datetime
+
+
+class BetaDryRunRequest(BaseModel):
+    """POST /platform/decision-trees/beta/{tree_id}/dry-run.
+
+    Writes nothing. ``definition``, when given, wins over every stored
+    version, so the designer can fold the canvas as it stands without saving
+    first.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    block_id: UUID
+    definition: dict[str, Any] | None = None
+    version_id: UUID | None = None
+
+
+class BetaDryRunFinding(BaseModel):
+    """One finding a walk registered, with the nodes that registered it."""
+
+    code: str
+    severity: str
+    registered_by: list[str] = Field(default_factory=list)
+
+
+class BetaDryRunCell(BaseModel):
+    """One cell's fold.
+
+    ``identity`` is the sorted finding codes — the key the fold picks a
+    combination rule with, the supersede check compares, and the Action
+    Center groups on. Empty means the tree ran and found nothing, which is a
+    healthy cell and not a missing answer, so ``card`` is null there.
+
+    ``composed`` says the text came from joining the findings' clauses rather
+    than from a combination rule. The design expects that to be the common
+    case, so the report counts it.
+    """
+
+    cell_id: UUID
+    cell_row: int | None = None
+    cell_col: int | None = None
+    identity: list[str] = Field(default_factory=list)
+    findings: list[BetaDryRunFinding] = Field(default_factory=list)
+    severity: str | None = None
+    status: str | None = None
+    action_type: str | None = None
+    text_en: str | None = None
+    text_ar: str | None = None
+    composed: bool = False
+    rule_code: str | None = None
+    stopped_at: str | None = None
+    error: str | None = None
+
+
+class BetaDryRunResponse(BaseModel):
+    """What a beta dry run found across one block's cells. Nothing written."""
+
+    tree_id: UUID
+    code: str
+    block_id: UUID
+    scope: str = "cell"
+    version_id: UUID | None = None
+    targeting: DryRunTargeting | None = None
+    cells_evaluated: int = 0
+    #: Cells whose fold produced a card. The rest are healthy or errored.
+    cells_carded: int = 0
+    #: Cells whose walk ended badly — a switch that matched no case, a
+    #: dangling target, a cycle. Counted separately because an errored cell
+    #: is not a healthy one and must never read as one.
+    cells_errored: int = 0
+    #: Of the carded cells, how many composed their text instead of matching
+    #: a combination rule.
+    cells_composed: int = 0
+    cells: list[BetaDryRunCell] = Field(default_factory=list)

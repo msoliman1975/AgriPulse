@@ -12,6 +12,7 @@ Two sessions:
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, cast
@@ -307,6 +308,34 @@ class VERDICT_SQL:  # named after REC_SQL / ALERT_SQL in shared.action_items
         """  # noqa: S608 - every fragment is a literal in this file
 
 
+@dataclass(frozen=True, slots=True)
+class FindingRow:
+    """One finding catalogue row, in the shape the fold reads.
+
+    Structurally a ``folding_engine.FindingDef``. Neither module imports the
+    other: the engine declares a Protocol, and this satisfies it.
+
+    A plain dataclass rather than the catalogue's ORM model on purpose. That
+    model is being built on a separate branch, so importing it would make
+    this module fail at import until it merges. The tenant half of the
+    catalogue also lives in a per-tenant schema, which a model addressed to
+    one schema cannot reach.
+    """
+
+    code: str
+    clause_en: str
+    clause_ar: str | None
+    name_en: str
+    name_ar: str | None
+    default_status: str
+    source: str
+    action_type: str | None = None
+    actions: dict[str, Any] | None = None
+
+
+_FINDING_COLUMNS = "code, clause_en, clause_ar, name_en, name_ar, default_status"
+
+
 class RecommendationsRepository:
     """Internal repository — service is the only consumer."""
 
@@ -333,6 +362,12 @@ class RecommendationsRepository:
         tree alive past its author unpublishing it — and the resolved version
         must still be published, so a pin to a draft yields no row and the
         tree is skipped rather than run from unpublished work.
+
+        Only ``stage = 'live'`` trees are returned. A beta tree is authored
+        against the folding engine and the sweep has no way to walk one yet,
+        so publishing a beta tree must not put it in front of a grower. This
+        is the only place that rule is enforced, because this is the only
+        query the sweep resolves its tree set from.
 
         ``only_code`` narrows the result to one tree. That is the whole
         mechanism behind the authoring "run this tree now" path: the
@@ -372,6 +407,13 @@ class RecommendationsRepository:
                      AND v.version = COALESCE(p.version, cur.version)
                     WHERE t.is_active = TRUE
                       AND t.deleted_at IS NULL
+                      -- A beta tree never runs in the sweep, published or
+                      -- not. Its author publishes so the designer and the
+                      -- dry run have a fixed version to read; wiring the
+                      -- folding engine to the sweep is separate work. Until
+                      -- then this one predicate is what keeps a beta tree
+                      -- from writing recommendations at growers.
+                      AND t.stage = 'live'
                       AND v.published_at IS NOT NULL
                       AND (t.tenant_id IS NULL OR t.tenant_id = :tid)
                       AND (:only_code IS NULL OR t.code = :only_code)
@@ -445,6 +487,11 @@ class RecommendationsRepository:
             "scope": row.scope,
             "applicable_regions": list(row.applicable_regions or []),
             "is_active": row.is_active,
+            # `stage` is carried here on purpose. This dictionary is
+            # hand-built, so a column left out of it is dropped silently —
+            # the copy path lost `tree_yaml` and `crop_path` exactly that way
+            # — and every beta authoring write reads the stage off it.
+            "stage": row.stage,
             "current_version_id": row.current_version_id,
         }
 
@@ -468,6 +515,10 @@ class RecommendationsRepository:
             # already loads the whole row, so leaving it out only hid it from
             # callers. The copy path needs it as its starting body.
             "tree_yaml": row.tree_yaml,
+            # The beta body, for the same reason. A version row holds one
+            # source or the other, never both, so a reader that wants "the
+            # source of this version" takes whichever is not null.
+            "definition": row.definition,
             "tree_compiled": row.tree_compiled,
             "compiled_hash": row.compiled_hash,
             "published_at": row.published_at,
@@ -476,7 +527,7 @@ class RecommendationsRepository:
     # ---- Decision-tree authoring (PlatformAdmin) ----------------------
 
     async def list_all_trees(
-        self, *, visible_to_tenant_id: UUID | None
+        self, *, visible_to_tenant_id: UUID | None, stage: str | None = "live"
     ) -> tuple[dict[str, Any], ...]:
         """Every non-deleted tree visible to the given scope + the
         version number of its current published version (if any).
@@ -486,8 +537,16 @@ class RecommendationsRepository:
         platform trees plus the tenant's own. Platform trees sort first
         so the authoring UI naturally groups them at the top (PR-A).
 
-        ``None`` is the platform scope: the `= :tid` half never matches,
-        so the caller sees the platform catalogue and no tenant's trees.
+        ``None`` as ``visible_to_tenant_id`` is the platform scope: the
+        `= :tid` half never matches, so the caller sees the platform
+        catalogue and no tenant's trees.
+
+        ``stage`` defaults to ``'live'`` rather than to no filter. A beta
+        tree's version holds a JSON ``definition`` and no ``tree_yaml``, so
+        the old editor cannot open one — it would offer the author a tree
+        with an empty body. Every row that existed before public migration
+        0091 is ``'live'``, so the default leaves the old editor showing
+        exactly what it shows today. ``None`` asks for both stages.
         """
         rows = (
             (
@@ -499,16 +558,24 @@ class RecommendationsRepository:
                            t.description_en, t.description_ar,
                            t.crop_id, t.crop_paths, t.country_codes,
                            t.soil_textures, t.scope, t.applicable_regions, t.is_active,
+                           t.stage,
                            v.version AS current_version
                     FROM public.decision_trees t
                     LEFT JOIN public.decision_tree_versions v
                       ON v.id = t.current_version_id
                     WHERE t.deleted_at IS NULL
                       AND (t.tenant_id IS NULL OR t.tenant_id = :tid)
+                      AND (:stage IS NULL OR t.stage = :stage)
                     ORDER BY t.tenant_id NULLS FIRST, t.code
                     """
-                    ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
-                    {"tid": visible_to_tenant_id},
+                    ).bindparams(
+                        bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                        # Typed explicitly: an untyped NULL bind leaves
+                        # Postgres unable to infer the parameter's type and
+                        # the whole statement fails, not just the branch.
+                        bindparam("stage", type_=Text()),
+                    ),
+                    {"tid": visible_to_tenant_id, "stage": stage},
                 )
             )
             .mappings()
@@ -524,8 +591,8 @@ class RecommendationsRepository:
                 await self._public.execute(
                     text(
                         """
-                    SELECT id, tree_id, version, tree_yaml, tree_compiled,
-                           compiled_hash, published_at, notes,
+                    SELECT id, tree_id, version, tree_yaml, definition,
+                           tree_compiled, compiled_hash, published_at, notes,
                            created_at, updated_at
                     FROM public.decision_tree_versions
                     WHERE tree_id = :tid
@@ -546,8 +613,8 @@ class RecommendationsRepository:
                 await self._public.execute(
                     text(
                         """
-                    SELECT id, tree_id, version, tree_yaml, tree_compiled,
-                           compiled_hash, published_at, notes,
+                    SELECT id, tree_id, version, tree_yaml, definition,
+                           tree_compiled, compiled_hash, published_at, notes,
                            created_at, updated_at
                     FROM public.decision_tree_versions
                     WHERE tree_id = :tid AND version = :v
@@ -640,6 +707,7 @@ class RecommendationsRepository:
         country_codes: list[str] | None = None,
         soil_textures: list[str] | None = None,
         scope: str = "block",
+        stage: str = "live",
     ) -> UUID:
         """Insert a new `decision_trees` row. Caller wraps insertion + first
         version + current_version_id update in one transaction.
@@ -656,13 +724,13 @@ class RecommendationsRepository:
                         (code, tenant_id, name_en, name_ar,
                          description_en, description_ar,
                          crop_id, crop_path, crop_paths, country_codes,
-                         soil_textures, scope, applicable_regions, is_active,
-                         created_by, updated_by)
+                         soil_textures, scope, stage, applicable_regions,
+                         is_active, created_by, updated_by)
                     VALUES (:code, :tenant_id, :name_en, :name_ar,
                             :description_en, :description_ar,
                             :crop_id, :crop_path, :crop_paths, :country_codes,
-                            :soil_textures, :scope, :applicable_regions, TRUE,
-                            :actor, :actor)
+                            :soil_textures, :scope, :stage, :applicable_regions,
+                            TRUE, :actor, :actor)
                     RETURNING id
                     """
                 ).bindparams(
@@ -683,6 +751,7 @@ class RecommendationsRepository:
                     "country_codes": country_codes or [],
                     "soil_textures": soil_textures or [],
                     "scope": scope,
+                    "stage": stage,
                     "applicable_regions": applicable_regions,
                     "actor": actor_user_id,
                 },
@@ -696,21 +765,35 @@ class RecommendationsRepository:
         *,
         tree_id: UUID,
         version: int,
-        tree_yaml: str,
+        tree_yaml: str | None = None,
+        definition: dict[str, Any] | None = None,
         tree_compiled: dict[str, Any],
         compiled_hash: str,
         notes: str | None,
         published_at: datetime | None,
         published_by: UUID | None,
     ) -> UUID:
+        """Insert one version row.
+
+        Exactly one of ``tree_yaml`` and ``definition`` must be given: the
+        old shape stores YAML text, the beta shape stores the graph as JSON.
+        Postgres CHECKs the same rule (public migration 0090), so passing
+        both or neither raises there rather than writing a row no reader can
+        classify. The assertion below is only so the failure names the
+        caller's mistake instead of a constraint.
+        """
+        assert (tree_yaml is None) != (
+            definition is None
+        ), "a version row stores exactly one of tree_yaml and definition"
         row = (
             await self._public.execute(
                 text(
                     """
                     INSERT INTO public.decision_tree_versions
-                        (tree_id, version, tree_yaml, tree_compiled,
+                        (tree_id, version, tree_yaml, definition, tree_compiled,
                          compiled_hash, notes, published_at, published_by)
-                    VALUES (:tid, :version, :yaml, CAST(:compiled AS jsonb),
+                    VALUES (:tid, :version, :yaml, CAST(:definition AS jsonb),
+                            CAST(:compiled AS jsonb),
                             :hash, :notes, :published_at, :published_by)
                     RETURNING id
                     """
@@ -722,6 +805,7 @@ class RecommendationsRepository:
                     "tid": tree_id,
                     "version": version,
                     "yaml": tree_yaml,
+                    "definition": _serialize_jsonb(definition),
                     "compiled": _serialize_jsonb(tree_compiled),
                     "hash": compiled_hash,
                     "notes": notes,
@@ -752,6 +836,202 @@ class RecommendationsRepository:
             ),
             {"tid": tree_id, "vid": version_id, "actor": actor_user_id},
         )
+
+    # ---- Beta (folding) authoring -------------------------------------
+    #
+    # The beta routes address a tree by its id, not by its code. Code is the
+    # old editor's key and it is scoped — a tenant may hold a code the
+    # platform also holds — so resolving one needs the caller's scope as well.
+    # An id needs nothing else, which is why the pinned beta contract uses it.
+
+    async def get_tree_by_id(
+        self,
+        tree_id: UUID,
+        *,
+        scope_tenant_id: UUID | None,
+        stage: str | None = None,
+    ) -> dict[str, Any] | None:
+        """One tree by id, within the caller's own scope.
+
+        ``scope_tenant_id`` is None for the platform scope, which matches
+        ``tenant_id IS NULL`` rows and no tenant's. ``stage``, when given,
+        must match — a beta route handed a live tree's id reads as absent
+        rather than editing a tree the folding compiler cannot compile.
+
+        Returns the same shape ``get_tree_by_code`` does, `stage` included.
+        """
+        stmt = select(DecisionTree).where(
+            DecisionTree.id == tree_id, DecisionTree.deleted_at.is_(None)
+        )
+        if scope_tenant_id is None:
+            stmt = stmt.where(DecisionTree.tenant_id.is_(None))
+        else:
+            stmt = stmt.where(DecisionTree.tenant_id == scope_tenant_id)
+        if stage is not None:
+            stmt = stmt.where(DecisionTree.stage == stage)
+        row = (await self._public.execute(stmt)).scalars().one_or_none()
+        if row is None:
+            return None
+        return {
+            "id": row.id,
+            "code": row.code,
+            "tenant_id": row.tenant_id,
+            "name_en": row.name_en,
+            "name_ar": row.name_ar,
+            "description_en": row.description_en,
+            "description_ar": row.description_ar,
+            "crop_id": row.crop_id,
+            "crop_path": row.crop_path,
+            "crop_paths": list(row.crop_paths or []),
+            "country_codes": list(row.country_codes or []),
+            "soil_textures": list(row.soil_textures or []),
+            "scope": row.scope,
+            "stage": row.stage,
+            "applicable_regions": list(row.applicable_regions or []),
+            "is_active": row.is_active,
+            "current_version_id": row.current_version_id,
+        }
+
+    async def get_latest_version(self, *, tree_id: UUID) -> dict[str, Any] | None:
+        """The newest version row of one tree — the draft, when there is one.
+
+        The beta editor hydrates from this and `append_version` compares its
+        hash against it, so both need the whole row rather than the number
+        `get_latest_version_number` returns.
+        """
+        row = (
+            (
+                await self._public.execute(
+                    text(
+                        """
+                    SELECT id, tree_id, version, tree_yaml, definition,
+                           tree_compiled, compiled_hash, published_at, notes,
+                           created_at, updated_at
+                    FROM public.decision_tree_versions
+                    WHERE tree_id = :tid
+                    ORDER BY version DESC
+                    LIMIT 1
+                    """
+                    ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                    {"tid": tree_id},
+                )
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row is not None else None
+
+    async def stamp_published(
+        self,
+        *,
+        version_id: UUID,
+        published_at: datetime,
+        published_by: UUID | None,
+    ) -> int:
+        """Mark one version published. Returns rows touched.
+
+        `published_at IS NULL` is in the predicate so a second publish of the
+        same row returns 0 rather than moving the timestamp. The caller reads
+        that as "already published", which is what makes the button
+        idempotent without a read-then-write race.
+        """
+        return _rowcount(
+            await self._public.execute(
+                text(
+                    "UPDATE public.decision_tree_versions "
+                    "SET published_at = :pub, published_by = :actor, "
+                    "    updated_at = public.app_now() "
+                    "WHERE id = :vid AND published_at IS NULL"
+                ).bindparams(
+                    bindparam("vid", type_=PG_UUID(as_uuid=True)),
+                    bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                ),
+                {"pub": published_at, "actor": published_by, "vid": version_id},
+            )
+        )
+
+    async def known_finding_codes(self, *, tenant_schema: str | None = None) -> set[str]:
+        """Every active finding code the catalogues resolve.
+
+        Read with raw SQL and a `to_regclass` guard rather than through the
+        catalogue's ORM model, for two reasons. The model lives on a branch
+        that is not merged, and importing it would make this module fail at
+        import until it is. And the tenant half lives in a per-tenant schema,
+        which an ORM model addressed to one schema cannot reach anyway.
+
+        A missing table yields no codes rather than an error. The compiler
+        then rejects every `registers` entry with a message naming the code,
+        which is the honest failure: the vocabulary is not there yet.
+
+        Platform first, then the tenant's own. A code in both resolves to the
+        platform row at fold time (design section 6.2); here only the set of
+        names matters, so the union is enough.
+        """
+        codes: set[str] = set()
+        if await self._table_exists("public", "decision_tree_findings"):
+            rows = await self._public.execute(
+                text("SELECT code FROM public.decision_tree_findings WHERE is_active = TRUE")
+            )
+            codes.update(str(r[0]) for r in rows.all())
+        if tenant_schema and await self._table_exists(tenant_schema, "decision_tree_findings"):
+            # The schema name is not a bind parameter anywhere in SQL, so it
+            # is interpolated. `_table_exists` has already proved it names a
+            # real table, and every caller takes it from the request context's
+            # tenant, never from a request body.
+            tenant_rows = await self._public.execute(
+                text(
+                    f'SELECT code FROM "{tenant_schema}".decision_tree_findings '  # noqa: S608
+                    "WHERE is_active = TRUE"
+                )
+            )
+            codes.update(str(r[0]) for r in tenant_rows.all())
+        return codes
+
+    async def list_finding_rows(self, *, tenant_schema: str | None = None) -> list[FindingRow]:
+        """Every active finding row the catalogues resolve, as the fold reads them.
+
+        A code held by both tables resolves to the platform row and the
+        tenant's is never read (design section 6.2). That is decided here,
+        once, rather than by whichever loop happens to run last.
+
+        An absent table contributes nothing instead of raising. The catalogue
+        lands in a separate change, and until it does a fold over a tree that
+        registers anything reports the missing code on the cell rather than
+        failing the whole request.
+        """
+        rows: dict[str, FindingRow] = {}
+        if tenant_schema and await self._table_exists(tenant_schema, "decision_tree_findings"):
+            # The schema name cannot be a bind parameter, so it is
+            # interpolated. `_table_exists` has already proved it names a real
+            # table, and every caller takes it from the request context's
+            # tenant, never from a request body.
+            result = await self._public.execute(
+                text(
+                    f'SELECT {_FINDING_COLUMNS} FROM "{tenant_schema}".decision_tree_findings '  # noqa: S608
+                    "WHERE is_active = TRUE"
+                )
+            )
+            for row in result.mappings().all():
+                rows[str(row["code"])] = FindingRow(**dict(row), source="tenant")
+        if await self._table_exists("public", "decision_tree_findings"):
+            result = await self._public.execute(
+                text(
+                    f"SELECT {_FINDING_COLUMNS} FROM public.decision_tree_findings "  # noqa: S608
+                    "WHERE is_active = TRUE"
+                )
+            )
+            for row in result.mappings().all():
+                rows[str(row["code"])] = FindingRow(**dict(row), source="platform")
+        return list(rows.values())
+
+    async def _table_exists(self, schema: str, table: str) -> bool:
+        row = (
+            await self._public.execute(
+                text("SELECT to_regclass(:qualified) IS NOT NULL AS present"),
+                {"qualified": f'"{schema}".{table}'},
+            )
+        ).first()
+        return bool(row is not None and row.present)
 
     async def update_tree_metadata(
         self,
