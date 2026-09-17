@@ -473,6 +473,11 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
 # DELETE by, so an entry could not be written — `OwnedTable` requires an owner
 # column or a `where_sql`, and both would be inventions. DROP SCHEMA takes it,
 # which is the same treatment `tree_parameter_overrides` already gets.
+#
+# `tenant_*.decision_tree_estate_dry_runs` (tenant migration 0096) is absent
+# for the same reason. A run spans every farm in the tenant, so there is no
+# single owner to name — the same argument `decision_tree_eval_runs` makes —
+# and the row holds counts, not farm or block data. DROP SCHEMA takes it.
 
 TENANT_PUBLIC_OWNED: tuple[OwnedTable, ...] = (
     OwnedTable(

@@ -1255,3 +1255,101 @@ class FindingUpdateRequest(_FindingFields):
     `recommendations.finding_set` that ever carried it and named by every
     tree that registers it, so renaming one would orphan both.
     """
+
+
+# ---------- Estate dry run and run results (design section 9) ---------------
+
+
+class EstateDryRunRequest(BaseModel):
+    """POST /platform/decision-trees/beta/{tree_id}/estate-dry-run.
+
+    Names the tenant whose estate is folded. The tree may be the platform's or
+    that tenant's own; the tenant here is whose blocks and cells are read, not
+    who owns the tree.
+
+    Writes nothing but the report row. No recommendation, no alert, no
+    evaluation trace.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: UUID
+    #: Fold only the first N active blocks, in farm and block order. For a
+    #: first look at a large tenant, and for the integration tests. Absent
+    #: means every active block.
+    block_limit: int | None = Field(default=None, ge=1, le=10_000)
+
+
+class EstateDryRunStartResponse(BaseModel):
+    """The run id, handed back before the folding starts."""
+
+    run_id: UUID
+    tenant_id: UUID
+    tree_id: UUID
+    tree_code: str
+    scope: str = "cell"
+    state: str = "running"
+
+
+class EstateDryRunSummary(BaseModel):
+    """One run, without its report document."""
+
+    id: UUID
+    tree_id: UUID
+    tree_code: str
+    tree_name: str | None = None
+    version_id: UUID | None = None
+    scope: str = "cell"
+    state: str = "running"
+    requested_by: UUID | None = None
+    started_at: datetime
+    finished_at: datetime | None = None
+    duration_ms: int | None = None
+    blocks_evaluated: int = 0
+    blocks_failed: int = 0
+    cells_evaluated: int = 0
+    cells_errored: int = 0
+    error: str | None = None
+
+
+class EstateDryRunResponse(EstateDryRunSummary):
+    """One run with its report.
+
+    ``report`` is the document `folding_report.build_estate_report` produced:
+    the finding-set table, the rule counts, the composed share, the timing and
+    the errors by node. It is empty while the run is still ``running``.
+    """
+
+    report: dict[str, Any] = Field(default_factory=dict)
+
+
+class BetaRunResultRow(BaseModel):
+    """One block-and-finding-set group from a real run of a beta tree.
+
+    Read from `decision_tree_eval_traces` and its three fold columns. Under
+    folding every walk ends at ``stop``, so nothing here is derived from the
+    last node: ``finding_set`` is the answer.
+    """
+
+    run_id: UUID
+    block_id: UUID
+    block_name: str | None = None
+    block_name_ar: str | None = None
+    farm_id: UUID | None = None
+    farm_name: str | None = None
+    tree_id: UUID
+    tree_code: str
+    #: Joined from `public.decision_trees`; a trace row carries no tree name.
+    tree_name: str | None = None
+    tree_name_ar: str | None = None
+    tree_version: int | None = None
+    scope: str = "cell"
+    status: str
+    finding_set: list[str] = Field(default_factory=list)
+    matched_rule: str | None = None
+    registered_by: dict[str, Any] = Field(default_factory=dict)
+    cells: int = 0
+    cards_opened: int = 0
+    recommendation_id: UUID | None = None
+    errored: int = 0
+    last_evaluated_at: datetime | None = None

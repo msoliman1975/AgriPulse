@@ -39,6 +39,8 @@ import { DecisionTreeViewerPage } from "@/modules/decisionTrees/pages/DecisionTr
 import { DecisionTreeTracesPage } from "@/modules/decisionTrees/pages/DecisionTreeTracesPage";
 import { BetaTreeListPage } from "@/modules/decisionTrees/beta/pages/BetaTreeListPage";
 import { BetaDesignerPage } from "@/modules/decisionTrees/beta/pages/BetaDesignerPage";
+import { EstateDryRunPage } from "@/modules/decisionTrees/beta/pages/EstateDryRunPage";
+import { BetaRunResultsPage } from "@/modules/decisionTrees/beta/pages/BetaRunResultsPage";
 import { FindingCataloguePage } from "@/modules/decisionTrees/beta/pages/FindingCataloguePage";
 import { MapExperiencePage } from "@/modules/labs/map/MapExperiencePage";
 import { FarmConsolePage } from "@/modules/labs/mapnext/FarmConsolePage";
@@ -256,6 +258,12 @@ export function App(): ReactNode {
                   happened to be "beta". */}
                 <Route path="/decision-trees-beta" element={<BetaTreeListPage />} />
                 <Route path="/decision-trees-beta/:code" element={<BetaDesignerPage />} />
+                {/* The estate dry run and its report, and what real runs
+                  produced. Under the tree so a reader keeps the tree they
+                  were reading; `estate` and `runs` cannot collide with a
+                  code, which is the segment before them. */}
+                <Route path="/decision-trees-beta/:code/estate" element={<EstateDryRunPage />} />
+                <Route path="/decision-trees-beta/:code/runs" element={<BetaRunResultsPage />} />
                 <Route path="/decision-tree-findings" element={<FindingCataloguePage />} />
                 {/* Tenant Settings Hub. Capability checks live on each
                   page so a deep link with the wrong role still 403s. */}
@@ -353,6 +361,8 @@ export function App(): ReactNode {
                     claims, so neither can edit the other's rows. */}
                 <Route path="decision-trees-beta" element={<BetaTreeListPage />} />
                 <Route path="decision-trees-beta/:code" element={<BetaDesignerPage />} />
+                <Route path="decision-trees-beta/:code/estate" element={<EstateDryRunPage />} />
+                <Route path="decision-trees-beta/:code/runs" element={<BetaRunResultsPage />} />
                 <Route path="decision-tree-findings" element={<FindingCataloguePage />} />
                 <Route path="plan-templates" element={<PlatformPlanTemplatesPage />} />
                 <Route path="backfill" element={<PlatformBackfillPage />} />

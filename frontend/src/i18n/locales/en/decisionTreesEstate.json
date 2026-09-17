@@ -1,0 +1,105 @@
+{
+  "title": "Estate dry run — {{tree}}",
+  "subtitle": "Fold this tree over every active block and cell in one tenant. Writes no card.",
+  "actions": {
+    "run": "Run over the whole tenant",
+    "back": "Back to beta trees"
+  },
+  "tenant": {
+    "label": "Tenant",
+    "hint": "Whose blocks and cells are folded. The tree itself may be the platform's.",
+    "placeholder": "Choose a tenant",
+    "required": {
+      "body": "Choose a tenant. A platform account has no blocks of its own, so there is nothing to fold until one is named."
+    }
+  },
+  "runPicker": {
+    "label": "Run",
+    "option": "{{started}} — {{state}} — {{cells}} cells"
+  },
+  "state": {
+    "running": "Running",
+    "done": "Done",
+    "failed": "Failed",
+    "runningBody": "The run is still folding. This page asks again every 3 seconds.",
+    "failedBody": "The run stopped: {{error}}"
+  },
+  "empty": {
+    "body": "This tree has no estate dry run yet. Run it to produce a report."
+  },
+  "report": {
+    "stats": {
+      "cells": "Cells evaluated",
+      "blocks": "{{blocks}} blocks",
+      "healthy": "No findings",
+      "carded": "Cells with a card",
+      "composedShare": "{{pct}} composed",
+      "errored": "Cells that errored"
+    },
+    "sets": {
+      "title": "Finding sets",
+      "set": "Set",
+      "cells": "Cells",
+      "share": "Share of cells",
+      "text": "Text",
+      "rule": "Rule {{rule}}",
+      "composed": "Composed",
+      "blocks": "Blocks",
+      "status": "Status",
+      "other": "{{sets}} other sets, {{cells}} cells",
+      "empty": "No cell produced a finding."
+    },
+    "rules": {
+      "title": "Combination rules",
+      "fired": "Rules fired: {{fired}} of {{defined}}.",
+      "composed": "Composed text on {{pct}} of the cells that produced a card.",
+      "allComposed": "No rule fired on any cell. Matching is exact, so a set with one extra code goes to composed text.",
+      "never": "Rules that never fired: {{rules}}"
+    },
+    "errors": {
+      "title": "Errors by node",
+      "node": "Node",
+      "cells": "Cells",
+      "share": "Share of errors",
+      "example": "Message",
+      "empty": "No cell errored.",
+      "some": "{{cells}} cells errored, {{pct}} of the cells evaluated. Read the node list before switching this tenant on.",
+      "blocking": "{{cells}} cells errored, {{pct}} of the cells evaluated. A switch on a missing index stops the walk, so those cells get no card at all."
+    },
+    "timing": {
+      "title": "Timing",
+      "total": "Total run time",
+      "perCell": "Per cell",
+      "includes": "Includes the per-block data loads, as the sweep does.",
+      "slowestBlock": "Slowest block",
+      "noNodeTiming": "Time per node is not measured. The walk has no timing hook and the per-cell fold does not return the node path."
+    },
+    "failures": {
+      "title": "Blocks that failed"
+    }
+  },
+  "results": {
+    "title": "Run results — {{tree}}",
+    "subtitle": "What real runs of this tree produced, by block and finding set.",
+    "block": "Block",
+    "cells": "Cells",
+    "set": "Finding set",
+    "text": "Text",
+    "status": "Status",
+    "cards": "Cards opened",
+    "when": "Last evaluated",
+    "empty": "No run of this tree has written a trace yet.",
+    "error": "The run results could not be read.",
+    "stageC": "A dry run writes no trace. Rows appear here after the tree is added to the sweep."
+  },
+  "list": {
+    "column": "Runs",
+    "dryRun": "Dry run",
+    "results": "Results"
+  },
+  "errors": {
+    "startFailed": "The run could not be started.",
+    "readFailed": "The report could not be read.",
+    "treesFailed": "The tree list could not be read."
+  }
+}

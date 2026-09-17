@@ -61,6 +61,8 @@ export const ROUTE_MANIFEST: RouteObject[] = [
   { path: "/decision-tree-traces" },
   { path: "/decision-trees-beta" },
   { path: "/decision-trees-beta/:code" },
+  { path: "/decision-trees-beta/:code/estate" },
+  { path: "/decision-trees-beta/:code/runs" },
   { path: "/decision-tree-findings" },
   { path: "/account/notifications" },
   {
@@ -104,6 +106,8 @@ export const ROUTE_MANIFEST: RouteObject[] = [
       { path: "crops/:cropId/attributes" },
       { path: "decision-trees-beta" },
       { path: "decision-trees-beta/:code" },
+      { path: "decision-trees-beta/:code/estate" },
+      { path: "decision-trees-beta/:code/runs" },
       { path: "decision-tree-findings" },
       { path: "plan-templates" },
       { path: "plan-templates/new" },
