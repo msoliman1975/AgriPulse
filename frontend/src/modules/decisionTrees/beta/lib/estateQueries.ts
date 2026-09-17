@@ -28,6 +28,12 @@ export function useEstateRuns(treeId: string | null, tenantId: string | null) {
     queryKey: [...KEY, "runs", treeId, tenantId] as const,
     queryFn: () => listEstateDryRuns(treeId!, tenantId),
     enabled: Boolean(treeId) && Boolean(tenantId),
+    // The picker labels each run with its state and its cell count, so this
+    // list has to keep up with the run itself. `useEstateRun` polls the
+    // report and stops at `done`, which left the label reading
+    // "Running — 0 cells" beside a finished report.
+    refetchInterval: (query) =>
+      (query.state.data ?? []).some((run) => run.state === "running") ? POLL_MS : false,
   });
 }
 

@@ -389,8 +389,8 @@ export function BetaDesignerPage(): ReactNode {
               title={localizedField(i18n.language, tree.name_en, tree.name_ar) ?? tree.code}
               badge={<Pill kind="info">{t("beta.badge")}</Pill>}
               subtitle={
-                tree.published_version
-                  ? t("designer.publishedVersion", { version: tree.published_version })
+                tree.current_version
+                  ? t("designer.publishedVersion", { version: tree.current_version })
                   : t("list.notPublished")
               }
               actions={
