@@ -4410,7 +4410,24 @@ global:
       #   picker did not refresh while a run was running.
       #
       #   Rollback is this tag alone back to 88e42fc.
-      tag: "80f614c"
+      # c1edd0a = #712, frontend only. Three things the beta designer could
+      #   not do. A condition node's test is editable at last: the panel had
+      #   only the two branches, so every operator, `between` included, and
+      #   nested all_of / any_of groups were reachable only by hand-editing
+      #   the definition. A node can be dragged, and its position is written
+      #   into the node as ui: {x, y} so the arrangement travels with the
+      #   tree; one button puts the graph back under the automatic layout.
+      #   A stop is drawn as a circle rather than a box.
+      #
+      #   No migrations, and no backend change: api and workers stay 80f614c.
+      #
+      #   Images were not confirmed on the node before this commit. SSH is
+      #   blocked from the authoring machine and the gh login has no
+      #   read:packages scope. All five container jobs on main for c1edd0a
+      #   completed green, and those jobs are what push.
+      #
+      #   Rollback is this tag alone back to 80f614c.
+      tag: "c1edd0a"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
