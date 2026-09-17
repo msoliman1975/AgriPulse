@@ -312,8 +312,6 @@
     "loadFailed": "The finding catalogue could not be read.",
     "inactive": "Inactive",
     "edit": "Edit {{code}}",
-    "remove": "Remove {{code}}",
-    "removeConfirm": "Remove the finding \"{{code}}\"? A tree that registers it will stop compiling.",
     "form": {
       "createTitle": "New finding",
       "editTitle": "Edit finding",
@@ -335,19 +333,18 @@
       "required": "This field is required.",
       "badCode": "Use lower case letters, numbers and underscores.",
       "duplicate": "A finding with that code already exists in this table.",
-      "saveFailed": "The finding was not saved."
-    }
+      "saveFailed": "The finding was not saved.",
+      "clauseNoComma": "A clause must not contain a comma. The card joins it to others, so write one fragment. Two ideas mean two findings.",
+      "tooLong": "At most {{max}} characters."
+    },
+    "deactivate": "Deactivate {{code}}",
+    "deactivateAction": "Deactivate",
+    "deactivateConfirm": "Deactivate the finding \"{{code}}\"? The row stays, because the code is stored in every card that ever carried it. A tree that registers it will stop compiling."
   },
   "severity": {
     "info": "Info",
     "warning": "Warning",
     "critical": "Critical"
-  },
-  "status": {
-    "normal": "Normal",
-    "watch": "Watch",
-    "stressed": "Stressed",
-    "unknown": "Unknown"
   },
   "actionType": {
     "irrigate": "Irrigate",

@@ -11,6 +11,8 @@ import { describe, expect, it } from "vitest";
 
 import ar from "@/i18n/locales/ar/decisionTreesBeta.json";
 import en from "@/i18n/locales/en/decisionTreesBeta.json";
+import arTrees from "@/i18n/locales/ar/decisionTrees.json";
+import enTrees from "@/i18n/locales/en/decisionTrees.json";
 
 import { ACTION_TYPES, FINDING_SEVERITIES, FINDING_STATUSES } from "./betaConstants";
 import { BETA_NODE_KINDS, SWITCH_OPS } from "./betaTree";
@@ -19,6 +21,14 @@ import { BETA_VALUE_SOURCES } from "./betaValueRef";
 const BUNDLES: [string, Record<string, unknown>][] = [
   ["en", en],
   ["ar", ar],
+];
+
+/** The five status labels are borrowed from the `decisionTrees` namespace
+ *  rather than copied — see `lib/useStatusLabel.ts`. So they are checked
+ *  there, in the bundle that actually has to carry them. */
+const TREE_BUNDLES: [string, Record<string, unknown>][] = [
+  ["en", enTrees as Record<string, unknown>],
+  ["ar", arTrees as Record<string, unknown>],
 ];
 
 function lookup(bundle: Record<string, unknown>, path: string): unknown {
@@ -89,12 +99,16 @@ describe.each(BUNDLES)("decisionTreesBeta copy (%s)", (_lang, bundle) => {
     expect(missing).toEqual([]);
   });
 
-  it("has a label for every severity and every status", () => {
-    const missing = [
-      ...FINDING_SEVERITIES.filter((s) => !hasString(bundle, `severity.${s}`)),
-      ...FINDING_STATUSES.filter((s) => !hasString(bundle, `status.${s}`)),
-    ];
+  it("has a label for every severity", () => {
+    const missing = FINDING_SEVERITIES.filter((s) => !hasString(bundle, `severity.${s}`));
     expect(missing).toEqual([]);
+  });
+
+  it("carries no second copy of the status labels", () => {
+    // They live in the `decisionTrees` namespace. A copy here would be five
+    // more strings to keep in step, and the same block would read one way on
+    // this screen and another on the map.
+    expect(lookup(bundle, "status")).toBeUndefined();
   });
 
   it("has a label for every action type the backend can emit", () => {
@@ -116,6 +130,13 @@ describe.each(BUNDLES)("decisionTreesBeta copy (%s)", (_lang, bundle) => {
     // Without this the publish panel would print the rule key at an author,
     // which is the one place the message has to be readable.
     const missing = REJECTION_RULES.filter((r) => !hasString(bundle, `publish.rule.${r}`));
+    expect(missing).toEqual([]);
+  });
+});
+
+describe.each(TREE_BUNDLES)("borrowed status labels (%s)", (_lang, bundle) => {
+  it("has a label for every finding status", () => {
+    const missing = FINDING_STATUSES.filter((s) => !hasString(bundle, `verdictStatus.${s}`));
     expect(missing).toEqual([]);
   });
 });

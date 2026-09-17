@@ -116,12 +116,12 @@ nodes:
 combinations:
   - codes: [dry, pest_high]
     action_type: scout
-    status: watch
+    status: issue
     text_en: a
     text_ar: أ
   - codes: [pest_high, dry]
     action_type: spray
-    status: stressed
+    status: alert
     text_en: b
     text_ar: ب
 root: stop_1
@@ -139,7 +139,7 @@ nodes:
 combinations:
   - codes: [ndvi_low]
     action_type: scout
-    status: watch
+    status: issue
     text_en: a
     text_ar: أ
 root: stop_1

@@ -20,7 +20,7 @@ const CATALOGUE = new Map<string, FoldFinding>([
       clause_ar: "ماء الورقة منخفض",
       name_en: "Low leaf water",
       name_ar: "انخفاض ماء الورقة",
-      default_status: "stressed",
+      default_status: "issue",
       source: "platform",
     },
   ],
@@ -32,7 +32,7 @@ const CATALOGUE = new Map<string, FoldFinding>([
       clause_ar: "انخفضت حيوية المجموع الخضري",
       name_en: "Canopy vigour dropped",
       name_ar: "انخفاض الحيوية",
-      default_status: "watch",
+      default_status: "good",
       source: "platform",
     },
   ],
@@ -44,7 +44,7 @@ const CATALOGUE = new Map<string, FoldFinding>([
       clause_ar: "ضغط الأنثراكنوز مرتفع",
       name_en: "Pest pressure high",
       name_ar: "ضغط آفات مرتفع",
-      default_status: "stressed",
+      default_status: "issue",
       source: "platform",
     },
   ],
@@ -59,7 +59,7 @@ const SEVERITY = new Map<string, FindingSeverity>([
 const RULE: CombinationRule = {
   codes: ["dry", "ndvi_low"],
   action_type: "irrigate",
-  status: "stressed",
+  status: "issue",
   text_en: "Water shortage is the cause. Irrigate before treating anything else.",
   text_ar: "نقص المياه هو السبب. اسقِ قبل معالجة أي شيء آخر.",
 };
@@ -72,7 +72,7 @@ describe("foldFindings", () => {
     expect(card.matched_rule).toBe(RULE);
     expect(card.text_en).toBe(RULE.text_en);
     expect(card.action_type).toBe("irrigate");
-    expect(card.status).toBe("stressed");
+    expect(card.status).toBe("issue");
   });
 
   it("composes when a third finding joins, because matching is exact", () => {
@@ -91,15 +91,16 @@ describe("foldFindings", () => {
   });
 
   it("takes the worst default status when nothing overrides it", () => {
-    expect(foldFindings(["ndvi_low"], [], ctx).status).toBe("watch");
-    expect(foldFindings(["ndvi_low", "dry"], [], ctx).status).toBe("stressed");
+    expect(foldFindings(["ndvi_low"], [], ctx).status).toBe("good");
+    expect(foldFindings(["ndvi_low", "dry"], [], ctx).status).toBe("issue");
   });
 
-  it("produces nothing for an empty set", () => {
+  it("produces nothing for an empty set, and calls it very_good", () => {
+    // The tree ran and no check fired. `na` would say no tree had an opinion.
     const card = foldFindings([], [RULE], ctx);
     expect(card.finding_set).toEqual([]);
     expect(card.text_en).toBe("");
-    expect(card.status).toBe("normal");
+    expect(card.status).toBe("very_good");
     expect(card.severity).toBeNull();
   });
 
@@ -127,7 +128,7 @@ describe("enumerateFindingSets", () => {
 combinations:
   - codes: [dry]
     action_type: irrigate
-    status: stressed
+    status: issue
     text_en: x
     text_ar: س
 root: cond_1
@@ -193,7 +194,7 @@ describe("foldCatalogueOf", () => {
         clause_ar: "ت",
         name_en: "Tenant wording",
         name_ar: "ت",
-        default_status: "watch",
+        default_status: "good",
         source: "tenant",
       },
       {
@@ -202,7 +203,7 @@ describe("foldCatalogueOf", () => {
         clause_ar: "ماء الورقة منخفض",
         name_en: "Low leaf water",
         name_ar: "ا",
-        default_status: "stressed",
+        default_status: "issue",
         source: "platform",
       },
     ]);

@@ -4,7 +4,7 @@ import {
   betaDryRun,
   compileBetaTreeRemote,
   createFinding,
-  deleteFinding,
+  deactivateFinding,
   getBetaCandidateBlocks,
   getBetaTree,
   listBetaTrees,
@@ -59,10 +59,11 @@ export function useUpdateFinding() {
   });
 }
 
-export function useDeleteFinding() {
+/** Deactivate, not delete — the row stays and `is_active` is cleared. */
+export function useDeactivateFinding() {
   const qc = useQueryClient();
-  return useMutation<void, Error, { source: FindingSource; code: string }>({
-    mutationFn: ({ source, code }) => deleteFinding(source, code),
+  return useMutation<Finding, Error, { source: FindingSource; code: string }>({
+    mutationFn: ({ source, code }) => deactivateFinding(source, code),
     onSuccess: () => void qc.invalidateQueries({ queryKey: [...KEY, "findings"] }),
   });
 }

@@ -39,6 +39,7 @@ import {
 } from "../lib/betaConstants";
 import { enumerateFindingSets, foldFindings, foldCatalogueOf, orphanRules } from "../lib/betaFold";
 import type { BetaTreeDoc, CombinationRule } from "../lib/betaTree";
+import { useFindingStatusLabel } from "../lib/useStatusLabel";
 
 const INPUT_CLASS = "w-full rounded-lg border border-ap-line px-2.5 py-1.5 text-sm text-ap-ink";
 
@@ -64,6 +65,7 @@ export function CombinationsTab({
   onChangeRules,
 }: CombinationsTabProps): JSX.Element {
   const { t, i18n } = useTranslation("decisionTreesBeta");
+  const statusLabel = useFindingStatusLabel();
   const [editing, setEditing] = useState<{ index: number | null } | null>(null);
 
   const catalogue = useMemo(() => foldCatalogueOf(findings), [findings]);
@@ -154,7 +156,7 @@ export function CombinationsTab({
                         ? t(`actionType.${card.action_type}`)
                         : t("actionType.unset")}
                     </Td>
-                    <Td className="px-2 py-2">{t(`status.${card.status}`)}</Td>
+                    <Td className="px-2 py-2">{statusLabel(card.status)}</Td>
                     <Td dir="ltr" className="px-2 py-2 text-ap-ink">
                       {card.text_en || "—"}
                     </Td>
@@ -277,9 +279,10 @@ function RuleForm({
   onRemove?: () => void;
 }): JSX.Element {
   const { t, i18n } = useTranslation("decisionTreesBeta");
+  const statusLabel = useFindingStatusLabel();
   const [codes, setCodes] = useState<string[]>(rule?.codes ?? []);
   const [actionType, setActionType] = useState<ActionType>(rule?.action_type ?? "scout");
-  const [status, setStatus] = useState<FindingStatus>(rule?.status ?? "watch");
+  const [status, setStatus] = useState<FindingStatus>(rule?.status ?? "issue");
   const [textEn, setTextEn] = useState(rule?.text_en ?? "");
   const [textAr, setTextAr] = useState(rule?.text_ar ?? "");
 
@@ -365,7 +368,7 @@ function RuleForm({
               >
                 {FINDING_STATUSES.map((s) => (
                   <option key={s} value={s}>
-                    {t(`status.${s}`)}
+                    {statusLabel(s)}
                   </option>
                 ))}
               </select>

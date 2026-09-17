@@ -234,7 +234,7 @@ describe("registers and combinations", () => {
       {
         codes: ["pest_high", "dry"],
         action_type: "irrigate",
-        status: "stressed",
+        status: "issue",
         text_en: "x",
         text_ar: "س",
       },

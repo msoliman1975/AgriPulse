@@ -15,6 +15,8 @@ import { Pill } from "@/components/Pill";
 import { localizedField } from "@/lib/localizedField";
 import type { Finding } from "@/api/decisionTreesBeta";
 
+import { useFindingStatusLabel } from "../lib/useStatusLabel";
+
 interface FindingPickerProps {
   findings: readonly Finding[];
   value: string;
@@ -37,6 +39,7 @@ export function FindingPicker({
   describedBy,
 }: FindingPickerProps): JSX.Element {
   const { t, i18n } = useTranslation("decisionTreesBeta");
+  const statusLabel = useFindingStatusLabel();
   const [search, setSearch] = useState("");
 
   const rows = useMemo(() => {
@@ -95,7 +98,7 @@ export function FindingPicker({
                     </span>
                     <SourcePill source={f.source} />
                     <span className="ms-auto text-meta text-ap-muted">
-                      {t(`status.${f.default_status}`)}
+                      {statusLabel(f.default_status)}
                     </span>
                   </span>
                   <span className="text-sm text-ap-ink">

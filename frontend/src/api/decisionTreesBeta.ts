@@ -12,14 +12,27 @@
  *
  * Endpoints still to replace, with the prompt that brings each one:
  *
- *   prompt 1  GET/POST/PATCH/DELETE /v1/decision-tree-findings          catalogue
- *   prompt 1  GET/POST/PATCH/DELETE /v1/platform/decision-tree-findings platform catalogue
- *   prompt 3  POST /v1/decision-trees-beta/{code}:compile               publish checks
- *   prompt 5  GET  /v1/decision-trees-beta                             list
- *   prompt 5  GET/PUT /v1/decision-trees-beta/{code}                   read / save draft
- *   prompt 5  POST /v1/decision-trees-beta/{code}/versions/{n}:publish  publish
- *   prompt 6  POST /v1/decision-trees-beta/{code}:dry-run               fold per cell
- *   prompt 6  GET  /v1/decision-trees-beta/{code}/candidate-blocks      block picker
+ *   prompt 1  GET/POST/PATCH/DELETE /v1/decision-tree-findings           platform catalogue
+ *   prompt 1  GET/POST/PATCH/DELETE /v1/tenant/decision-tree-findings    this tenant's codes
+ *   prompt 3  POST /v1/decision-trees-beta/{code}:compile                publish checks
+ *   prompt 5  GET  /v1/decision-trees-beta                               list
+ *   prompt 5  GET  /v1/decision-trees-beta/{code}                        read
+ *   prompt 5  POST /v1/decision-trees-beta/{code}/versions               save draft
+ *   prompt 5  POST /v1/decision-trees-beta/{code}/versions/{n}:publish   publish
+ *   prompt 6  POST /v1/decision-trees-beta/{code}:dry-run                fold per cell
+ *   prompt 6  GET  /v1/decision-trees-beta/{code}/candidate-blocks       block picker
+ *
+ * The finding routes are the ones PR #700 shipped, read off its router. Three
+ * things about them the mock already matches, so the swap does not change a
+ * screen:
+ *
+ *   * They are two endpoints, not one. `listFindings` concatenates them, and
+ *     `shadowed` comes back set on the tenant rows.
+ *   * Both list responses are an envelope, `{ findings: [...] }`, not a bare
+ *     array — unwrap `.findings`.
+ *   * DELETE deactivates. It clears `is_active` and keeps the row, because the
+ *     code is stored in every `recommendations.finding_set` that ever carried
+ *     it. Nothing on this screen may call it a delete.
  *
  * Shapes follow docs/proposals/unified-decision-tree-engine.md sections 6.1,
  * 6.2 and 6.5.
@@ -153,6 +166,8 @@ export interface BetaDryRunResponse {
 // Every function below is a one-line delegate today. Replace each body with
 // its `apiClient` call and delete the mock section; nothing else moves.
 
+/** Both catalogues, concatenated, with `shadowed` set on the tenant rows the
+ *  platform table also defines. Two GETs, one list. */
 export async function listFindings(): Promise<Finding[]> {
   return mock.listFindings();
 }
@@ -172,8 +187,15 @@ export async function updateFinding(
   return mock.updateFinding(source, code, payload);
 }
 
-export async function deleteFinding(source: FindingSource, code: string): Promise<void> {
-  return mock.deleteFinding(source, code);
+/**
+ * Deactivate a finding. Not a delete.
+ *
+ * The code is stored in every `recommendations.finding_set` that ever carried
+ * it and named by every tree that registers it, so the row stays and
+ * `is_active` is cleared. The screen says "Deactivate" for the same reason.
+ */
+export async function deactivateFinding(source: FindingSource, code: string): Promise<Finding> {
+  return mock.deactivateFinding(source, code);
 }
 
 export async function listBetaTrees(): Promise<BetaTreeSummary[]> {
@@ -234,52 +256,108 @@ function nowIso(): string {
 
 type MockFindingRow = Omit<Finding, "shadowed">;
 
+// The eight codes public migration 0090 seeds, copied from it so the mock and
+// the database agree on code, clause and default status. Wording comes from
+// the merged mango tree (design section 7).
 const platformFindings: MockFindingRow[] = [
   {
-    code: "dry",
-    name_en: "Low leaf water",
-    name_ar: "انخفاض ماء الورقة",
-    clause_en: "leaf water is low",
-    clause_ar: "ماء الورقة منخفض",
-    default_status: "stressed",
-    description_en: "NDMI is below its own baseline for this block and season.",
-    description_ar: "مؤشر NDMI أقل من خط الأساس لهذه القطعة وهذا الموسم.",
+    code: "ndvi_low",
+    name_en: "Low vigour",
+    name_ar: "حيوية منخفضة",
+    clause_en: "canopy vigour is below the band for this tree size",
+    clause_ar: "حيوية المجموع دون النطاق لهذا الحجم",
+    default_status: "issue",
+    description_en:
+      "The vigour index chosen for this block's soil and tree size reads below the band the index guide expects.",
+    description_ar:
+      "مؤشر الحيوية المختار لتربة القطعة وحجم الشجرة يقرأ دون النطاق الذي يتوقعه دليل المؤشرات.",
     is_active: true,
     source: "platform",
   },
   {
-    code: "ndvi_low",
-    name_en: "Canopy vigour dropped",
-    name_ar: "انخفاض حيوية المجموع الخضري",
-    clause_en: "canopy vigour dropped",
-    clause_ar: "انخفضت حيوية المجموع الخضري",
-    default_status: "watch",
-    description_en: "NDVI fell against the block's own recent history.",
-    description_ar: "انخفض مؤشر NDVI مقارنة بتاريخ القطعة القريب.",
+    code: "dry",
+    name_en: "Low leaf water",
+    name_ar: "نقص ماء الأوراق",
+    clause_en: "leaf water is low",
+    clause_ar: "ماء الأوراق منخفض",
+    default_status: "issue",
+    description_en: "At least two of NDMI, SMI and CWSI agree that the block is short of water.",
+    description_ar: "اتفق مؤشران على الأقل من NDMI و SMI و CWSI على أن القطعة تعاني نقص ماء.",
+    is_active: true,
+    source: "platform",
+  },
+  {
+    code: "nutrient_low",
+    name_en: "Low nitrogen",
+    name_ar: "نقص نيتروجين",
+    clause_en: "leaf nitrogen is below the band",
+    clause_ar: "نيتروجين الأوراق دون النطاق",
+    default_status: "issue",
+    description_en: "NDRE reads below the band the guide expects for this tree size.",
+    description_ar: "يقرأ NDRE دون النطاق الذي يتوقعه الدليل لهذا الحجم.",
+    is_active: true,
+    source: "platform",
+  },
+  {
+    code: "cover_open",
+    name_en: "Open ground cover",
+    name_ar: "غطاء أرضي مكشوف",
+    clause_en: "more bare ground is showing than the guide expects",
+    clause_ar: "الأرض المكشوفة أكثر مما يتوقعه الدليل",
+    default_status: "issue",
+    description_en: "BSI reads above the band for this tree size.",
+    description_ar: "يقرأ BSI فوق النطاق لهذا الحجم.",
     is_active: true,
     source: "platform",
   },
   {
     code: "pest_high",
-    name_en: "Pest pressure high",
-    name_ar: "ضغط آفات مرتفع",
+    name_en: "Anthracnose high",
+    name_ar: "أنثراكنوز مرتفع",
     clause_en: "anthracnose pressure is high",
     clause_ar: "ضغط الأنثراكنوز مرتفع",
-    default_status: "stressed",
-    description_en: "The anthracnose risk score passed its treatment threshold.",
-    description_ar: "تجاوزت درجة خطر الأنثراكنوز حد المعالجة.",
+    default_status: "alert",
+    description_en:
+      "Weather conditions strongly favour anthracnose infection while the block carries susceptible tissue.",
+    description_ar: "تُرجّح ظروف الطقس بقوة الإصابة بالأنثراكنوز والقطعة تحمل أنسجة قابلة للإصابة.",
     is_active: true,
     source: "platform",
   },
   {
-    code: "no_imagery",
-    name_en: "No recent imagery",
-    name_ar: "لا توجد صور حديثة",
-    clause_en: "no recent image covers this block",
-    clause_ar: "لا توجد صورة حديثة تغطي هذه القطعة",
-    default_status: "unknown",
-    description_en: "Every index read is older than the tree's freshness window.",
-    description_ar: "كل قراءات المؤشرات أقدم من نافذة الحداثة المحددة للشجرة.",
+    code: "pest_med",
+    name_en: "Anthracnose building",
+    name_ar: "أنثراكنوز متصاعد",
+    clause_en: "anthracnose pressure is building",
+    clause_ar: "ضغط الأنثراكنوز يتصاعد",
+    default_status: "issue",
+    description_en: "Conditions are moving toward anthracnose. This is the scouting window.",
+    description_ar: "تتجه الظروف نحو الأنثراكنوز. هذه نافذة الكشف الميداني.",
+    is_active: true,
+    source: "platform",
+  },
+  {
+    code: "mildew_high",
+    name_en: "Powdery mildew high",
+    name_ar: "بياض دقيقي مرتفع",
+    clause_en: "powdery mildew pressure is high",
+    clause_ar: "ضغط البياض الدقيقي مرتفع",
+    default_status: "alert",
+    description_en:
+      "Weather conditions strongly favour powdery mildew while the block is in bloom.",
+    description_ar: "تُرجّح ظروف الطقس بقوة البياض الدقيقي والقطعة في الإزهار.",
+    is_active: true,
+    source: "platform",
+  },
+  {
+    code: "fly_high",
+    name_en: "Fruit fly high",
+    name_ar: "ذبابة فاكهة مرتفعة",
+    clause_en: "fruit fly pressure is high",
+    clause_ar: "ضغط ذبابة الفاكهة مرتفع",
+    default_status: "alert",
+    description_en:
+      "Conditions strongly favour fruit fly activity while the block has ripening fruit.",
+    description_ar: "تُرجّح الظروف بقوة نشاط ذبابة الفاكهة والقطعة تحمل ثمارًا تنضج.",
     is_active: true,
     source: "platform",
   },
@@ -292,7 +370,7 @@ const tenantFindings: MockFindingRow[] = [
     name_ar: "ارتفاع الملوحة",
     clause_en: "soil salinity is rising",
     clause_ar: "ملوحة التربة في ارتفاع",
-    default_status: "watch",
+    default_status: "issue",
     description_en: "A tenant-authored finding, read from the EC probe signal.",
     description_ar: "نتيجة أنشأها المستأجر، تُقرأ من إشارة مسبار التوصيل الكهربائي.",
     is_active: true,
@@ -303,10 +381,10 @@ const tenantFindings: MockFindingRow[] = [
     // fold resolves the platform table first and this one is never read.
     code: "dry",
     name_en: "Low leaf water (local wording)",
-    name_ar: "انخفاض ماء الورقة (صياغة محلية)",
+    name_ar: "نقص ماء الأوراق (صياغة محلية)",
     clause_en: "the leaves are running dry",
     clause_ar: "الأوراق بدأت تجف",
-    default_status: "stressed",
+    default_status: "issue",
     description_en: "Written before the platform shipped `dry`. Never read now.",
     description_ar: "كُتبت قبل إصدار المنصة للرمز dry. لم تعد تُقرأ.",
     is_active: true,
@@ -328,7 +406,7 @@ registers:
 combinations:
   - codes: [dry, ndvi_low]
     action_type: irrigate
-    status: stressed
+    status: issue
     text_en: Water shortage is the cause. Irrigate before treating anything else.
     text_ar: نقص المياه هو السبب. اسقِ قبل معالجة أي شيء آخر.
 
@@ -553,11 +631,17 @@ const mock = {
     return delay({ ...row, shadowed: source === "tenant" && platformCodes.has(row.code) });
   },
 
-  deleteFinding(source: FindingSource, code: string): Promise<void> {
+  deactivateFinding(source: FindingSource, code: string): Promise<Finding> {
     const table = source === "platform" ? platformFindings : tenantFindings;
     const index = table.findIndex((f) => f.code === code);
-    if (index >= 0) table.splice(index, 1);
-    return delay(undefined);
+    if (index < 0) return Promise.reject(new Error(`No ${source} finding "${code}".`));
+    // The row stays. Only `is_active` changes.
+    table[index] = { ...table[index], is_active: false };
+    const platformCodes = new Set(platformFindings.map((f) => f.code));
+    return delay({
+      ...table[index],
+      shadowed: source === "tenant" && platformCodes.has(code),
+    });
   },
 
   listTrees(): Promise<BetaTreeSummary[]> {

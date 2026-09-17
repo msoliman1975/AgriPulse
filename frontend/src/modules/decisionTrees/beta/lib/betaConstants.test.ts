@@ -1,12 +1,14 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import {
   ACTION_TYPES,
+  EMPTY_SET_STATUS,
   FINDING_SEVERITIES,
   FINDING_STATUSES,
+  STATUS_RANK,
   findingSetKey,
   worstSeverity,
   worstStatus,
@@ -18,10 +20,17 @@ import {
  * Modelled on `lib/actionTypes.test.ts`, and for the same reason: a copy of a
  * backend list drifts with no error. These read the backend's own source
  * rather than a second copy of the values.
+ *
+ * This matters more here than usual. The design prompt named
+ * `normal | watch | stressed | unknown` for the finding status; the catalogue
+ * that shipped uses the platform's five decision-tree status codes, and the
+ * CHECK on `decision_tree_findings.default_status` rejects the other four. A
+ * test that reads the backend list is what catches that, and it is why this
+ * one is not allowed to skip.
  */
 const REPO_ROOT = join(__dirname, "../../../../../..");
 const BACKEND_SCHEMAS = join(REPO_ROOT, "backend/app/modules/recommendations/schemas.py");
-const FINDINGS_MIGRATION_DIR = join(REPO_ROOT, "backend/migrations/public/versions");
+const STATUS_CODES_PY = join(REPO_ROOT, "backend/app/modules/recommendations/status_codes.py");
 
 function backendSeverityLiteral(): string[] {
   const src = readFileSync(BACKEND_SCHEMAS, "utf8");
@@ -30,28 +39,20 @@ function backendSeverityLiteral(): string[] {
   return [...block[1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
 }
 
-/**
- * The `default_status` CHECK on `public.decision_tree_findings`.
- *
- * Session 1 of the beta engine adds that table. Until its migration is on this
- * branch there is nothing to compare against, so the assertion below is
- * reported as skipped rather than passing on an absent file — a check that
- * cannot fail is not evidence. Delete the guard when the migration lands.
- */
-function findingsStatusCheck(): string[] | null {
-  if (!existsSync(FINDINGS_MIGRATION_DIR)) return null;
-  for (const name of readdirSync(FINDINGS_MIGRATION_DIR)) {
-    if (!name.endsWith(".py")) continue;
-    const src = readFileSync(join(FINDINGS_MIGRATION_DIR, name), "utf8");
-    if (!src.includes("decision_tree_findings")) continue;
-    const block = /default_status IN \(([\s\S]*?)\)/.exec(src);
-    if (block === null) continue;
-    return [...block[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+/** `StatusDefinition(code, rank, …)` rows, in declaration order. */
+function backendStatusDefinitions(): Array<{ code: string; rank: number }> {
+  const src = readFileSync(STATUS_CODES_PY, "utf8");
+  const block = /STATUS_DEFINITIONS: tuple\[StatusDefinition, \.\.\.\] = \(([\s\S]*?)\n\)/.exec(
+    src,
+  );
+  if (block === null) {
+    throw new Error("STATUS_DEFINITIONS not found in backend status_codes.py");
   }
-  return null;
+  return [...block[1].matchAll(/StatusDefinition\("([a-z_]+)",\s*(\d+)/g)].map((m) => ({
+    code: m[1],
+    rank: Number(m[2]),
+  }));
 }
-
-const statusCheck = findingsStatusCheck();
 
 describe("FINDING_SEVERITIES", () => {
   it("matches the backend Severity Literal exactly", () => {
@@ -60,12 +61,26 @@ describe("FINDING_SEVERITIES", () => {
 });
 
 describe("FINDING_STATUSES", () => {
-  it.skipIf(statusCheck === null)(
-    "matches the decision_tree_findings default_status CHECK exactly",
-    () => {
-      expect([...FINDING_STATUSES].sort()).toEqual([...(statusCheck ?? [])].sort());
-    },
-  );
+  it("matches the platform status codes exactly", () => {
+    const backend = backendStatusDefinitions().map((d) => d.code);
+    expect([...FINDING_STATUSES].sort()).toEqual([...backend].sort());
+  });
+
+  it("uses the platform ranks, so a fold and a block verdict order the same way", () => {
+    // `findings.worst_status` ranks a fold with `StatusDefinition.rank`, and
+    // a block's worst verdict uses the same number. A second ordering here
+    // would colour a cell differently from the block it sits in.
+    const backend = Object.fromEntries(backendStatusDefinitions().map((d) => [d.code, d.rank]));
+    expect(STATUS_RANK).toEqual(backend);
+  });
+
+  it("is not the reports module's z-score vocabulary", () => {
+    // The one mistake this list exists to prevent. Writing `stressed` into
+    // `default_status` is a CHECK violation, not a display bug.
+    for (const wrong of ["normal", "watch", "stressed", "unknown"]) {
+      expect(FINDING_STATUSES as readonly string[]).not.toContain(wrong);
+    }
+  });
 });
 
 describe("ACTION_TYPES", () => {
@@ -81,10 +96,16 @@ describe("folding helpers", () => {
     expect(worstSeverity([])).toBeNull();
   });
 
-  it("takes the worst status, and calls an empty set normal", () => {
-    expect(worstStatus(["normal", "stressed", "watch"])).toBe("stressed");
-    expect(worstStatus(["normal", "unknown"])).toBe("unknown");
-    expect(worstStatus([])).toBe("normal");
+  it("takes the worst status", () => {
+    expect(worstStatus(["good", "alert", "issue"])).toBe("alert");
+    expect(worstStatus(["na", "good"])).toBe("good");
+  });
+
+  it("calls an empty set very_good, not na", () => {
+    // The tree ran and nothing fired. `na` means no tree had an opinion,
+    // which is a different answer. Matches `findings.worst_status`.
+    expect(worstStatus([])).toBe("very_good");
+    expect(EMPTY_SET_STATUS).toBe("very_good");
   });
 
   it("keys a finding set by its sorted codes, ignoring order and repeats", () => {

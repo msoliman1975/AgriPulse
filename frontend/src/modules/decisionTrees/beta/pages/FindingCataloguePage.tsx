@@ -33,7 +33,7 @@ import { localizedField } from "@/lib/localizedField";
 import { useCapability } from "@/rbac/useCapability";
 import {
   useCreateFinding,
-  useDeleteFinding,
+  useDeactivateFinding,
   useFindingCatalogue,
   useUpdateFinding,
 } from "@/queries/decisionTreesBeta";
@@ -41,6 +41,7 @@ import type { Finding, FindingSource, FindingWritePayload } from "@/api/decision
 
 import { useAuthoringScope } from "../../lib/authoringScope";
 import { FINDING_STATUSES, type FindingStatus } from "../lib/betaConstants";
+import { useFindingStatusLabel } from "../lib/useStatusLabel";
 
 const INPUT_CLASS = "w-full rounded-lg border border-ap-line px-2.5 py-1.5 text-sm text-ap-ink";
 
@@ -57,7 +58,7 @@ export function FindingCataloguePage(): ReactNode {
   const query = useFindingCatalogue();
   const create = useCreateFinding();
   const update = useUpdateFinding();
-  const remove = useDeleteFinding();
+  const deactivate = useDeactivateFinding();
 
   const [search, setSearch] = useState("");
   const [editor, setEditor] = useState<EditorState | null>(null);
@@ -119,10 +120,10 @@ export function FindingCataloguePage(): ReactNode {
                 rows={shown.filter((f) => f.source === "platform")}
                 editable={canManage && scope === "platform"}
                 onEdit={(f) => setEditor({ source: "platform", existing: f })}
-                onRemove={(f) => {
-                  if (!window.confirm(t("catalogue.removeConfirm", { code: f.code }))) return;
+                onDeactivate={(f) => {
+                  if (!window.confirm(t("catalogue.deactivateConfirm", { code: f.code }))) return;
                   setActionError(null);
-                  remove.mutate(
+                  deactivate.mutate(
                     { source: "platform", code: f.code },
                     {
                       onError: (err) =>
@@ -136,10 +137,10 @@ export function FindingCataloguePage(): ReactNode {
                 rows={shown.filter((f) => f.source === "tenant")}
                 editable={canManage && scope === "tenant"}
                 onEdit={(f) => setEditor({ source: "tenant", existing: f })}
-                onRemove={(f) => {
-                  if (!window.confirm(t("catalogue.removeConfirm", { code: f.code }))) return;
+                onDeactivate={(f) => {
+                  if (!window.confirm(t("catalogue.deactivateConfirm", { code: f.code }))) return;
                   setActionError(null);
-                  remove.mutate(
+                  deactivate.mutate(
                     { source: "tenant", code: f.code },
                     {
                       onError: (err) =>
@@ -201,15 +202,16 @@ function CatalogueSection({
   rows,
   editable,
   onEdit,
-  onRemove,
+  onDeactivate,
 }: {
   source: FindingSource;
   rows: readonly Finding[];
   editable: boolean;
   onEdit: (f: Finding) => void;
-  onRemove: (f: Finding) => void;
+  onDeactivate: (f: Finding) => void;
 }): ReactNode {
   const { t, i18n } = useTranslation("decisionTreesBeta");
+  const statusLabel = useFindingStatusLabel();
   return (
     <Card title={t(`catalogue.${source}Section`)} bodyClassName="flex flex-col gap-2">
       <p className="text-meta text-ap-muted">{t(`catalogue.${source}Help`)}</p>
@@ -250,7 +252,7 @@ function CatalogueSection({
                 <Td className="px-2 py-2 text-ap-muted">
                   {localizedField(i18n.language, f.clause_en, f.clause_ar)}
                 </Td>
-                <Td className="px-2 py-2">{t(`status.${f.default_status}`)}</Td>
+                <Td className="px-2 py-2">{statusLabel(f.default_status)}</Td>
                 <Td className="px-2 py-2 text-end">
                   {editable ? (
                     <span className="flex justify-end gap-2">
@@ -265,10 +267,10 @@ function CatalogueSection({
                       <Button
                         variant="secondary"
                         size="sm"
-                        aria-label={t("catalogue.remove", { code: f.code })}
-                        onClick={() => onRemove(f)}
+                        aria-label={t("catalogue.deactivate", { code: f.code })}
+                        onClick={() => onDeactivate(f)}
                       >
-                        {t("catalogue.removeAction")}
+                        {t("catalogue.deactivateAction")}
                       </Button>
                     </span>
                   ) : null}
@@ -284,7 +286,38 @@ function CatalogueSection({
 
 // ---- The form ---------------------------------------------------------
 
+/** Same expression as `FINDING_CODE_PATTERN` and the CHECK in both migrations. */
 const CODE_PATTERN = /^[a-z][a-z0-9_]*$/;
+
+/** Backend field limits, from `_FindingFields` in `recommendations/schemas.py`. */
+const CLAUSE_MAX = 200;
+const NAME_MAX = 80;
+
+/**
+ * The ASCII comma and the Arabic one (U+060C).
+ *
+ * A clause is one fragment the fold joins to others with commas. A clause
+ * carrying its own comma makes the composed sentence unreadable, and the fold
+ * cannot tell one kind of comma from the other. Both migrations CHECK this.
+ */
+const CLAUSE_COMMAS = [",", "،"];
+
+type Translate = (key: string, options?: Record<string, unknown>) => string;
+
+function clauseError(value: string, t: Translate): string | null {
+  if (value.trim() === "") return t("catalogue.form.required");
+  if (value.length > CLAUSE_MAX) return t("catalogue.form.tooLong", { max: CLAUSE_MAX });
+  if (CLAUSE_COMMAS.some((comma) => value.includes(comma))) {
+    return t("catalogue.form.clauseNoComma");
+  }
+  return null;
+}
+
+function nameError(value: string, t: Translate): string | null {
+  if (value.trim() === "") return t("catalogue.form.required");
+  if (value.length > NAME_MAX) return t("catalogue.form.tooLong", { max: NAME_MAX });
+  return null;
+}
 
 function FindingForm({
   source,
@@ -302,6 +335,7 @@ function FindingForm({
   onSave: (payload: FindingWritePayload) => void;
 }): ReactNode {
   const { t } = useTranslation("decisionTreesBeta");
+  const statusLabel = useFindingStatusLabel();
   const [code, setCode] = useState(existing?.code ?? "");
   const [nameEn, setNameEn] = useState(existing?.name_en ?? "");
   const [nameAr, setNameAr] = useState(existing?.name_ar ?? "");
@@ -309,7 +343,7 @@ function FindingForm({
   const [clauseAr, setClauseAr] = useState(existing?.clause_ar ?? "");
   const [descriptionEn, setDescriptionEn] = useState(existing?.description_en ?? "");
   const [descriptionAr, setDescriptionAr] = useState(existing?.description_ar ?? "");
-  const [status, setStatus] = useState<FindingStatus>(existing?.default_status ?? "watch");
+  const [status, setStatus] = useState<FindingStatus>(existing?.default_status ?? "issue");
   const [isActive, setIsActive] = useState(existing?.is_active ?? true);
 
   const codeError = useMemo(() => {
@@ -320,8 +354,20 @@ function FindingForm({
     return null;
   }, [code, existing, takenCodes, t]);
 
-  const required = [nameEn, nameAr, clauseEn, clauseAr].some((v) => v.trim() === "");
-  const invalid = Boolean(codeError) || required || saving;
+  // The rules the backend CHECKs and the Pydantic validator enforces. Told
+  // here, at the field, rather than as a 422 naming a constraint.
+  const clauseEnError = useMemo(() => clauseError(clauseEn, t), [clauseEn, t]);
+  const clauseArError = useMemo(() => clauseError(clauseAr, t), [clauseAr, t]);
+  const nameEnError = useMemo(() => nameError(nameEn, t), [nameEn, t]);
+  const nameArError = useMemo(() => nameError(nameAr, t), [nameAr, t]);
+
+  const invalid =
+    Boolean(codeError) ||
+    Boolean(clauseEnError) ||
+    Boolean(clauseArError) ||
+    Boolean(nameEnError) ||
+    Boolean(nameArError) ||
+    saving;
 
   return (
     <Modal open onClose={onCancel} labelledBy="beta-finding-form-title" className="max-w-2xl">
@@ -351,7 +397,12 @@ function FindingForm({
         </Field>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={t("catalogue.form.nameEn")} help={t("catalogue.form.nameHelp")} required>
+          <Field
+            label={t("catalogue.form.nameEn")}
+            help={t("catalogue.form.nameHelp")}
+            error={nameEnError}
+            required
+          >
             {(props) => (
               <input
                 {...props}
@@ -362,7 +413,7 @@ function FindingForm({
               />
             )}
           </Field>
-          <Field label={t("catalogue.form.nameAr")} required>
+          <Field label={t("catalogue.form.nameAr")} error={nameArError} required>
             {(props) => (
               <input
                 {...props}
@@ -379,6 +430,7 @@ function FindingForm({
           <Field
             label={t("catalogue.form.clauseEn")}
             help={t("catalogue.form.clauseHelp")}
+            error={clauseEnError}
             required
           >
             {(props) => (
@@ -391,7 +443,7 @@ function FindingForm({
               />
             )}
           </Field>
-          <Field label={t("catalogue.form.clauseAr")} required>
+          <Field label={t("catalogue.form.clauseAr")} error={clauseArError} required>
             {(props) => (
               <input
                 {...props}
@@ -444,7 +496,7 @@ function FindingForm({
             >
               {FINDING_STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {t(`status.${s}`)}
+                  {statusLabel(s)}
                 </option>
               ))}
             </select>

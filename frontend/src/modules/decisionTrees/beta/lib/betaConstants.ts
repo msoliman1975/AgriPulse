@@ -8,10 +8,8 @@
  *
  * So: the action type is not re-declared here at all, it is imported from
  * `@/lib/actionTypes`, which already fails a test when it drifts from the
- * backend Literal and the CHECK constraint. Severity is read back from the
- * backend source in `betaConstants.test.ts`. The finding status has no backend
- * source in this branch yet — session 1 adds `decision_tree_findings` with its
- * CHECK — so its drift check is written and inert until that migration lands.
+ * backend Literal and the CHECK constraint. Severity and the status list are
+ * read back from the backend source in `betaConstants.test.ts`.
  *
  * See docs/proposals/unified-decision-tree-engine.md sections 4.1 and 6.1.
  */
@@ -30,20 +28,46 @@ export const SEVERITY_RANK: Record<FindingSeverity, number> = {
   critical: 2,
 };
 
-/** The health class a finding carries in the catalogue, and that a
- *  combination rule may override. The worst status wins. */
-export const FINDING_STATUSES = ["normal", "watch", "stressed", "unknown"] as const;
+/**
+ * The health class a finding carries in the catalogue.
+ *
+ * This is the platform's decision-tree status vocabulary, the same five codes
+ * a leaf resolves to today and the same ones
+ * `tenant_*.decision_tree_block_verdicts.status_code` is CHECK constrained to.
+ * Not the reports module's `normal / watch / stressed / unknown`, which
+ * classifies a baseline z-score and which no tree ever writes — picking that
+ * one would have written a value the CHECK rejects.
+ *
+ * Mirrors `app.modules.recommendations.status_codes.STATUS_DEFINITIONS`.
+ */
+export const FINDING_STATUSES = ["na", "very_good", "good", "issue", "alert"] as const;
 export type FindingStatus = (typeof FINDING_STATUSES)[number];
 
-/** Rank used to fold several findings into one health class. `unknown` ranks
- *  above `normal` but below a real problem: not knowing is worse than fine and
- *  better than measured stress. */
+/**
+ * Rank used to fold several findings into one health class: the worst wins.
+ *
+ * These are `StatusDefinition.rank` from the platform list, so "the worst
+ * status wins" in a fold and "the highest rank wins" on a block's verdicts are
+ * one ordering. `na` is rank 0, so a finding with nothing to say never
+ * outranks a real answer.
+ */
 export const STATUS_RANK: Record<FindingStatus, number> = {
-  normal: 0,
-  unknown: 1,
-  watch: 2,
-  stressed: 3,
+  na: 0,
+  very_good: 1,
+  good: 2,
+  issue: 3,
+  alert: 4,
 };
+
+/**
+ * What an empty finding set resolves to.
+ *
+ * `very_good`, not `na`: the tree ran, walked every check, and none of them
+ * fired. That is the strongest thing the fold can say, and it is not the same
+ * as `na`, which means no tree had an opinion at all. Matches
+ * `recommendations.findings.worst_status`.
+ */
+export const EMPTY_SET_STATUS: FindingStatus = "very_good";
 
 /** Which table a finding code resolved from. The fold reads platform first. */
 export const FINDING_SOURCES = ["platform", "tenant"] as const;
@@ -70,9 +94,10 @@ export function worstSeverity(severities: readonly FindingSeverity[]): FindingSe
   return best;
 }
 
-/** The worst status in a list. An empty set is `normal` — nothing was found. */
+/** The worst status in a list. An empty list is `very_good` — see above. */
 export function worstStatus(statuses: readonly FindingStatus[]): FindingStatus {
-  let best: FindingStatus = "normal";
+  if (statuses.length === 0) return EMPTY_SET_STATUS;
+  let best: FindingStatus = statuses[0];
   for (const s of statuses) {
     if (STATUS_RANK[s] > STATUS_RANK[best]) best = s;
   }

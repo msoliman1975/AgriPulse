@@ -24,6 +24,8 @@ import { mapAsyncState, type AsyncState } from "@/components/asyncState";
 import { localizedField } from "@/lib/localizedField";
 import type { BetaCandidateBlock, BetaDryRunResponse } from "@/api/decisionTreesBeta";
 
+import { useFindingStatusLabel } from "../lib/useStatusLabel";
+
 const SELECT_CLASS = "w-full rounded-lg border border-ap-line px-2.5 py-1.5 text-sm text-ap-ink";
 
 interface BetaDryRunPanelProps {
@@ -46,6 +48,7 @@ export function BetaDryRunPanel({
   error,
 }: BetaDryRunPanelProps): JSX.Element {
   const { t, i18n } = useTranslation("decisionTreesBeta");
+  const statusLabel = useFindingStatusLabel();
   const isAr = i18n.language === "ar";
 
   // The picker wants the rows, the boundary wants the state. `mapAsyncState`
@@ -146,7 +149,7 @@ export function BetaDryRunPanel({
                   <Td className="px-2 py-2">
                     {cell.severity ? t(`severity.${cell.severity}`) : "—"}
                   </Td>
-                  <Td className="px-2 py-2">{t(`status.${cell.status}`)}</Td>
+                  <Td className="px-2 py-2">{statusLabel(cell.status)}</Td>
                   <Td className="px-2 py-2">
                     {cell.action_type ? t(`actionType.${cell.action_type}`) : "—"}
                   </Td>
