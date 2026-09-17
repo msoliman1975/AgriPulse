@@ -383,9 +383,54 @@ export function suggestSwitchDefault(
     });
     if (siblings.length > 0) return siblings[0].to;
   }
-  const stops = Object.entries(nodes).filter(([, n]) => betaNodeKind(n) === "stop");
-  if (stops.length === 1) return stops[0][0];
-  return "";
+  return firstStopId(doc) ?? "";
+}
+
+/** The tree's `stop` node, in document order. Almost every beta tree has
+ *  exactly one — every route ends at the same fold — so the first is the
+ *  right fallback for anything that needs somewhere to go. */
+export function firstStopId(doc: BetaTreeDoc): string | null {
+  for (const [id, node] of Object.entries(doc.nodes ?? {})) {
+    if (betaNodeKind(node) === "stop") return id;
+  }
+  return null;
+}
+
+/**
+ * Give every switch a default, and never write an empty one.
+ *
+ * Section 4.3: the default is required and the compiler rejects a switch
+ * without it. The editor already writes the key on every save, but it writes
+ * `""` when the author has not picked a target, and `""` names no node — the
+ * server refuses that exactly as it refuses a missing key.
+ *
+ * So this fills each empty default with the tree's `stop` node, and adds one
+ * when the tree has none: falling through to the fold is the only answer that
+ * is always correct, because a switch matching no case would otherwise end
+ * the walk with the trace status `error`.
+ *
+ * Runs on the body about to be saved, not on every keystroke. An author who
+ * has just added a switch and is on their way to its default should not have
+ * the field filled in under their cursor.
+ */
+export function fillSwitchDefaults(yaml: string): string {
+  const doc = parseBetaDoc(yaml);
+  if (!doc) throw new Error("fillSwitchDefaults: source YAML did not parse");
+  const nodes = (doc.nodes ??= {});
+  const empty = Object.entries(nodes).filter(
+    ([, node]) => betaNodeKind(node) === "switch" && !node.switch?.default,
+  );
+  if (empty.length === 0) return yaml;
+
+  let stopId = firstStopId(doc);
+  if (!stopId) {
+    stopId = generateBetaNodeId(doc, "stop");
+    nodes[stopId] = buildBetaNode("stop");
+  }
+  for (const [, node] of empty) {
+    if (node.switch) node.switch.default = stopId;
+  }
+  return dumpBetaDoc(doc);
 }
 
 /** Repoint one slot at an existing node. Refuses a self-loop and an unknown

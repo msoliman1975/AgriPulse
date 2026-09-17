@@ -3,9 +3,15 @@
  *
  * Same page frame as the current editor — `<Page>`, `<PageHeader>`, a
  * `<Breadcrumb>` above the title, `<Card>` panels, `<AsyncBoundary>` for every
- * read — and the same draft model: the canvas lays out a draft YAML held in
- * component state, structural edits rewrite that string, and the save appends
- * a version. Nothing here touches the current editor.
+ * read — and the same draft model: the canvas lays out a draft held in
+ * component state and structural edits rewrite it.
+ *
+ * The draft is a YAML string, and that is an editing buffer, not a format.
+ * Every helper in `lib/betaTree.ts` takes and returns one, because a text
+ * rewrite is how a structural edit stays one pure function. The wire carries
+ * JSON: the version row holds a `definition` JSONB column, so the save parses
+ * the buffer and posts the object, and the load dumps the object back into a
+ * buffer. Nothing between here and the server ever sees YAML.
  *
  * Three tabs: the canvas, the combinations table and the dry run. The publish
  * checks sit beside the canvas rather than behind the publish button, because
@@ -32,15 +38,21 @@ import { queryState, resolveErrorMessage } from "@/components/asyncState";
 import { localizedField } from "@/lib/localizedField";
 import { useCapability } from "@/rbac/useCapability";
 import {
-  useBetaCandidateBlocks,
   useBetaDryRun,
   useBetaTree,
-  useCompileBetaTree,
+  useDiscardBetaDraft,
+  useDryRunBlocks,
   useFindingCatalogue,
   usePublishBetaTree,
   useSaveBetaDraft,
 } from "@/queries/decisionTreesBeta";
-import type { BetaDryRunResponse } from "@/api/decisionTreesBeta";
+import {
+  draftVersion,
+  latestVersion,
+  readValidationErrors,
+  type BetaDryRunResponse,
+  type BetaValidationError,
+} from "@/api/decisionTreesBeta";
 
 import { useAuthoringScope } from "../../lib/authoringScope";
 import { BetaCanvas } from "../components/BetaCanvas";
@@ -48,7 +60,7 @@ import { BetaDryRunPanel } from "../components/BetaDryRunPanel";
 import { BetaNodePanel } from "../components/BetaNodePanel";
 import { CombinationsTab } from "../components/CombinationsTab";
 import { PublishChecksPanel } from "../components/PublishChecksPanel";
-import { compileBetaTree, type CompileRejection } from "../lib/betaCompile";
+import { betaEditorHints, type EditorHint } from "../lib/betaCompile";
 import { layoutBetaTree } from "../lib/betaLayout";
 import type { FindingSeverity } from "../lib/betaConstants";
 import {
@@ -57,6 +69,8 @@ import {
   betaNodeKind,
   buildBetaNode,
   deleteBetaNode,
+  dumpBetaDoc,
+  fillSwitchDefaults,
   parseBetaDoc,
   readCombinations,
   readRegisters,
@@ -85,12 +99,12 @@ export function BetaDesignerPage(): ReactNode {
   const canManage = useCapability("decision_tree.manage");
 
   const treeQ = useBetaTree(code);
-  const findingsQ = useFindingCatalogue();
+  const findingsQ = useFindingCatalogue(scope);
   const save = useSaveBetaDraft();
   const publish = usePublishBetaTree();
-  const remoteCompile = useCompileBetaTree();
+  const discard = useDiscardBetaDraft();
   const dryRun = useBetaDryRun();
-  const blocksQ = useBetaCandidateBlocks(code);
+  const blocksQ = useDryRunBlocks(scope);
 
   const [tab, setTab] = useState<Tab>("canvas");
   const [draftYaml, setDraftYaml] = useState<string | null>(null);
@@ -102,17 +116,32 @@ export function BetaDesignerPage(): ReactNode {
   const [blockId, setBlockId] = useState("");
   const [dryRunResult, setDryRunResult] = useState<BetaDryRunResponse | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  /**
+   * The compiler's answer to the body this screen last sent.
+   *
+   * Null until a save or a publish has asked. Cleared on the next edit,
+   * because the answer was about a body that no longer exists — holding it
+   * would either block a publish over a mistake the author has just fixed, or
+   * report clean on a body nobody has checked.
+   */
+  const [serverErrors, setServerErrors] = useState<BetaValidationError[] | null>(null);
 
-  // Hydrate the draft from the newest version, once per version. The editor
-  // always opens on the latest body, published or not.
-  const latest = treeQ.data?.versions[treeQ.data.versions.length - 1] ?? null;
+  // Hydrate the buffer from the newest version, once per version. The editor
+  // always opens on the latest body, published or not. `definition` is JSON;
+  // the dump is what makes it editable by the structural helpers.
+  const tree = treeQ.data ?? null;
+  const treeId = tree?.id ?? "";
+  const latest = tree ? latestVersion(tree) : null;
+  const draft = tree ? draftVersion(tree) : null;
   useEffect(() => {
     if (!latest) return;
-    const stamp = `${code}:${latest.version}`;
+    const stamp = `${code}:${latest.id}:${latest.version}`;
     if (hydratedFrom === stamp) return;
     setHydratedFrom(stamp);
-    setDraftYaml(latest.tree_yaml);
+    setDraftYaml(dumpBetaDoc(latest.definition));
     setDirty(false);
+    setServerErrors(null);
   }, [code, latest, hydratedFrom]);
 
   const doc = useMemo(() => (draftYaml ? parseBetaDoc(draftYaml) : null), [draftYaml]);
@@ -150,21 +179,23 @@ export function BetaDesignerPage(): ReactNode {
     [findingsQ.data],
   );
 
-  // The same rules the compiler runs, run locally on every edit. The remote
-  // check is authoritative and overrides this the moment it answers.
-  const localRejections: CompileRejection[] = useMemo(
-    () => (draftYaml === null ? [] : compileBetaTree({ yaml: draftYaml, knownFindingCodes })),
+  // Advisory, on every edit. The server decides — see `PublishChecksPanel`.
+  const hints: EditorHint[] = useMemo(
+    () => (draftYaml === null ? [] : betaEditorHints({ yaml: draftYaml, knownFindingCodes })),
     [draftYaml, knownFindingCodes],
   );
-  const rejections = remoteCompile.data?.rejections ?? localRejections;
 
-  const rejectedNodeIds = useMemo(
-    () => new Set(rejections.map((r) => r.node_id).filter((id): id is string => Boolean(id))),
-    [rejections],
-  );
+  // The canvas marks a node the server named as well as one a hint named, so
+  // a rejection that only the compiler knows about still points somewhere.
+  const rejectedNodeIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const hint of hints) if (hint.node_id) ids.add(hint.node_id);
+    for (const err of serverErrors ?? []) for (const id of err.node_ids) ids.add(id);
+    return ids;
+  }, [hints, serverErrors]);
   const rejectedEdgeKeys = useMemo(
-    () => new Set(rejections.map((r) => r.edge_key).filter((k): k is string => Boolean(k))),
-    [rejections],
+    () => new Set(hints.map((h) => h.edge_key).filter((k): k is string => Boolean(k))),
+    [hints],
   );
 
   const readOnly = !canManage;
@@ -172,9 +203,10 @@ export function BetaDesignerPage(): ReactNode {
   const applyYaml = (next: string): void => {
     setDraftYaml(next);
     setDirty(true);
-    // A local edit invalidates the last authoritative answer; falling back to
-    // the local rules is honest, holding a stale "clean" would not be.
-    remoteCompile.reset();
+    // The compiler's answer was about the previous body. Keeping it would
+    // either block a publish over a mistake just fixed, or report clean on a
+    // body the server has not seen.
+    setServerErrors(null);
   };
 
   const onAddNode = (kind: BetaNodeKind): void => {
@@ -240,42 +272,98 @@ export function BetaDesignerPage(): ReactNode {
     applyYaml(writeCombinations(draftYaml, next));
   };
 
+  /**
+   * Sort a failure into the two kinds this screen shows differently.
+   *
+   * A 422 carries the compiler's errors and belongs in the checks panel,
+   * beside the nodes it names. Anything else — a 403, a network failure — is
+   * one sentence at the top of the page, because there is no node to go to.
+   */
+  const handleFailure = (err: unknown, fallback: string): void => {
+    const errors = readValidationErrors(err);
+    if (errors) {
+      setServerErrors(errors);
+      setActionError(null);
+      setTab("canvas");
+      return;
+    }
+    setActionError(resolveErrorMessage(err, fallback));
+  };
+
   const onSave = (): void => {
-    if (draftYaml === null) return;
+    if (draftYaml === null || !treeId) return;
+    // Never send a switch with an empty default: the server refuses it, and
+    // the author would read a rejection about a field the editor left blank.
+    const body = fillSwitchDefaults(draftYaml);
+    const definition = parseBetaDoc(body);
+    if (!definition) {
+      setActionError(t("designer.saveFailed"));
+      return;
+    }
     setActionError(null);
+    setDraftYaml(body);
     save.mutate(
-      { code, tree_yaml: draftYaml },
+      { code, treeId, definition },
       {
-        onSuccess: () => setDirty(false),
-        onError: (err) => setActionError(resolveErrorMessage(err, t("designer.saveFailed"))),
+        onSuccess: () => {
+          setDirty(false);
+          // Cleared, not marked accepted. A save that came back 200 only
+          // says the server did not refuse the write; whether it ran the
+          // whole check is the publish's answer to give.
+          setServerErrors(null);
+        },
+        onError: (err) => handleFailure(err, t("designer.saveFailed")),
       },
     );
   };
 
-  const onCheck = (): void => {
-    if (draftYaml === null) return;
-    setActionError(null);
-    remoteCompile.mutate(
-      { code, tree_yaml: draftYaml },
-      { onError: (err) => setActionError(resolveErrorMessage(err, t("publish.failed"))) },
-    );
-  };
-
   const onPublish = (): void => {
-    const version = treeQ.data?.current_version;
-    if (!version) return;
+    if (!treeId || !latest) return;
     setActionError(null);
     publish.mutate(
-      { code, version },
-      { onError: (err) => setActionError(resolveErrorMessage(err, t("designer.publishFailed"))) },
+      { code, treeId, versionId: latest.id },
+      {
+        onSuccess: () => setServerErrors([]),
+        onError: (err) => handleFailure(err, t("designer.publishFailed")),
+      },
     );
   };
 
+  /**
+   * Remove the draft.
+   *
+   * Not the same as saving over it. Appending an identical body writes no
+   * version, so a draft that will not compile cannot be edited back to the
+   * published one — it has to go, or it blocks every later author.
+   */
+  const onDiscard = (): void => {
+    if (!treeId) return;
+    setActionError(null);
+    discard.mutate(
+      { code, treeId },
+      {
+        onSuccess: () => {
+          setConfirmDiscard(false);
+          setServerErrors(null);
+          setDirty(false);
+          // Force a re-hydrate: the version that was on screen is gone.
+          setHydratedFrom(null);
+        },
+        onError: (err) => {
+          setConfirmDiscard(false);
+          setActionError(resolveErrorMessage(err, t("designer.discardFailed")));
+        },
+      },
+    );
+  };
+
+  /** The run walks the stored version, so an unsaved edit would be answered
+   *  about the previous body. The panel holds the button and says why. */
   const onRunDryRun = (): void => {
-    if (!blockId || draftYaml === null) return;
+    if (!blockId || !treeId || dirty) return;
     setActionError(null);
     dryRun.mutate(
-      { code, payload: { block_id: blockId, tree_yaml: draftYaml } },
+      { treeId, blockId },
       {
         onSuccess: setDryRunResult,
         onError: (err) => setActionError(resolveErrorMessage(err, t("dryRun.failed"))),
@@ -315,6 +403,15 @@ export function BetaDesignerPage(): ReactNode {
                   >
                     {save.isPending ? t("designer.saving") : t("designer.save")}
                   </Button>
+                  {draft && !readOnly ? (
+                    <Button
+                      variant="danger"
+                      onClick={() => setConfirmDiscard(true)}
+                      disabled={discard.isPending}
+                    >
+                      {discard.isPending ? t("designer.discarding") : t("designer.discard")}
+                    </Button>
+                  ) : null}
                 </>
               }
             />
@@ -365,11 +462,17 @@ export function BetaDesignerPage(): ReactNode {
                 </div>
                 <div className="flex flex-col gap-4">
                   <PublishChecksPanel
-                    rejections={rejections}
-                    checking={remoteCompile.isPending}
+                    errors={serverErrors ?? []}
+                    serverState={
+                      serverErrors === null
+                        ? "unchecked"
+                        : serverErrors.length > 0
+                          ? "refused"
+                          : "accepted"
+                    }
+                    hints={hints}
                     publishing={publish.isPending}
-                    canPublish={!readOnly && !dirty && Boolean(tree.current_version)}
-                    onCheck={onCheck}
+                    canPublish={!readOnly && !dirty && latest !== null}
                     onPublish={onPublish}
                     onSelectNode={(id) => {
                       setTab("canvas");
@@ -415,7 +518,34 @@ export function BetaDesignerPage(): ReactNode {
                 onRun={onRunDryRun}
                 running={dryRun.isPending}
                 result={dryRunResult}
+                platformScope={scope === "platform"}
+                dirty={dirty}
               />
+            ) : null}
+
+            {confirmDiscard && draft ? (
+              <Modal
+                open
+                onClose={() => setConfirmDiscard(false)}
+                labelledBy="beta-discard-title"
+                className="max-w-md"
+              >
+                <div className="flex flex-col gap-3 p-4">
+                  <h2 id="beta-discard-title" className="text-card-title font-semibold text-ap-ink">
+                    {t("designer.discardTitle", { version: draft.version })}
+                  </h2>
+                  <p className="text-sm text-ap-ink">{t("designer.discardConfirm")}</p>
+                  <p className="text-meta text-ap-muted">{t("designer.discardWhy")}</p>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="secondary" onClick={() => setConfirmDiscard(false)}>
+                      {t("designer.cancel")}
+                    </Button>
+                    <Button variant="danger" onClick={onDiscard} disabled={discard.isPending}>
+                      {discard.isPending ? t("designer.discarding") : t("designer.discard")}
+                    </Button>
+                  </div>
+                </div>
+              </Modal>
             ) : null}
 
             {pendingAdd ? (

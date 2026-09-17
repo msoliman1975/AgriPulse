@@ -1,65 +1,70 @@
 /**
- * The beta decision-tree engine's API surface — mocked.
+ * The beta decision-tree engine's API surface.
  *
- * Sessions 1 and 3 are building these endpoints right now and none of them is
- * merged. So this file holds the whole contract twice: the types and the
- * exported client functions, which are what the screens import, and an
- * in-memory backend that answers them, marked off below.
+ * One file on purpose: every call the beta designer makes to the server goes
+ * through here, so the seam between the screens and the backend is in one
+ * place and a contract change is one diff.
  *
- * Swapping to the real API is one change in this file and nothing else: every
- * exported function's body becomes an `apiClient` call. No screen, query hook
- * or component references the mock.
+ * Two things this file converts, and nothing else does:
  *
- * Endpoints still to replace, with the prompt that brings each one:
+ *   1. **The definition travels as JSON, never as a YAML string.** The tree
+ *      version row holds a `definition` JSONB column. YAML exists only inside
+ *      the browser, as the editing buffer the pure helpers in
+ *      `beta/lib/betaTree.ts` rewrite; `dumpBetaDoc` / `parseBetaDoc` convert
+ *      at the page, and the wire never sees it.
+ *   2. **A tree is addressed by id, the screens route by code.** The routes
+ *      take `{tree_id}`; `/decision-trees-beta/:code` is what an author reads
+ *      and links to. `resolveTreeId` turns one into the other off the list
+ *      read, so no screen carries a uuid.
  *
- *   prompt 1  GET/POST/PATCH/DELETE /v1/decision-tree-findings           platform catalogue
- *   prompt 1  GET/POST/PATCH/DELETE /v1/tenant/decision-tree-findings    this tenant's codes
- *   prompt 3  POST /v1/decision-trees-beta/{code}:compile                publish checks
- *   prompt 5  GET  /v1/decision-trees-beta                               list
- *   prompt 5  GET  /v1/decision-trees-beta/{code}                        read
- *   prompt 5  POST /v1/decision-trees-beta/{code}/versions               save draft
- *   prompt 5  POST /v1/decision-trees-beta/{code}/versions/{n}:publish   publish
- *   prompt 6  POST /v1/decision-trees-beta/{code}:dry-run                fold per cell
- *   prompt 6  GET  /v1/decision-trees-beta/{code}/candidate-blocks       block picker
+ * Paths, and where each one came from:
  *
- * The finding routes are the ones PR #700 shipped, read off its router. Three
- * things about them the mock already matches, so the swap does not change a
- * screen:
+ *   /v1/platform/decision-trees/beta…   the pinned contract for session A.
+ *   /v1/decision-tree-findings          the platform catalogue, as built on
+ *   /v1/tenant/decision-tree-findings   `feat/dte-findings-catalogue`. The
+ *                                       pinned contract said
+ *                                       `/platform/decision-tree-findings`
+ *                                       and one route for both tables; the
+ *                                       branch that exists has two prefixes,
+ *                                       neither of them `/platform/`.
  *
- *   * They are two endpoints, not one. `listFindings` concatenates them, and
- *     `shadowed` comes back set on the tenant rows.
+ * Three things about the finding routes, read off the router PR #700 shipped:
+ *
+ *   * They are two endpoints, not one. `listFindings` reads both and
+ *     concatenates them, and `shadowed` comes back set on the tenant rows the
+ *     platform table also defines.
  *   * Both list responses are an envelope, `{ findings: [...] }`, not a bare
- *     array — unwrap `.findings`.
- *   * DELETE deactivates. It clears `is_active` and keeps the row, because the
- *     code is stored in every `recommendations.finding_set` that ever carried
- *     it. Nothing on this screen may call it a delete.
+ *     array. Unwrap `.findings`.
+ *   * DELETE deactivates. It clears `is_active`, keeps the row, and answers
+ *     204. Nothing on this screen may call it a delete.
  *
  * Shapes follow docs/proposals/unified-decision-tree-engine.md sections 6.1,
  * 6.2 and 6.5.
  */
 
-import {
-  compileBetaTree,
-  type CompileRejection,
-} from "@/modules/decisionTrees/beta/lib/betaCompile";
-import {
-  enumerateFindingSets,
-  foldFindings,
-  type FoldFinding,
-} from "@/modules/decisionTrees/beta/lib/betaFold";
-import {
-  parseBetaDoc,
-  readCombinations,
-  registeredCodes,
-  STARTER_BETA_YAML,
-} from "@/modules/decisionTrees/beta/lib/betaTree";
 import type {
   ActionType,
   FindingSeverity,
   FindingStatus,
 } from "@/modules/decisionTrees/beta/lib/betaConstants";
+import type { BetaTreeDoc } from "@/modules/decisionTrees/beta/lib/betaTree";
+import type { AuthoringScope } from "@/modules/decisionTrees/lib/authoringScope";
 
-// ---- Types -----------------------------------------------------------
+import { listBlocks } from "./blocks";
+import { apiClient } from "./client";
+import { isApiError, type ProblemDetails } from "./errors";
+import { listFarms } from "./farms";
+
+const BETA_TREES = "/v1/platform/decision-trees/beta";
+const PLATFORM_FINDINGS = "/v1/decision-tree-findings";
+const TENANT_FINDINGS = "/v1/tenant/decision-tree-findings";
+
+/** How many farms the dry-run block picker walks. A tenant with more farms
+ *  than this picks the block from the farm console instead; the picker is a
+ *  convenience, not the block catalogue. */
+const DRY_RUN_FARM_LIMIT = 20;
+
+// ---- Findings --------------------------------------------------------
 
 export type FindingSource = "platform" | "tenant";
 
@@ -77,14 +82,25 @@ export interface Finding {
   source: FindingSource;
   /**
    * A tenant row whose code also exists in the platform table. The fold
-   * resolves platform first, so this row is never read (section 6.2).
-   * Always false on a platform row.
+   * resolves platform first, so this row is never read (section 6.2). The
+   * server computes it; always false on a platform row.
    */
   shadowed: boolean;
 }
 
+interface FindingListResponse {
+  findings: Finding[];
+}
+
+/**
+ * The editable fields, and only those.
+ *
+ * `code` is the identity and is not in here: it is stored in every
+ * `recommendations.finding_set` that ever carried it. `is_active` is not
+ * either — the catalogue model forbids unknown fields, and a row is retired
+ * through DELETE rather than by writing the flag.
+ */
 export interface FindingWritePayload {
-  code: string;
   clause_en: string;
   clause_ar: string;
   name_en: string;
@@ -92,18 +108,75 @@ export interface FindingWritePayload {
   default_status: FindingStatus;
   description_en?: string | null;
   description_ar?: string | null;
-  is_active?: boolean;
 }
 
+function findingsPath(source: FindingSource): string {
+  return source === "platform" ? PLATFORM_FINDINGS : TENANT_FINDINGS;
+}
+
+/**
+ * Both catalogues, resolved the way the fold resolves them.
+ *
+ * A platform caller has no tenant, so the tenant route cannot answer for
+ * them and is not called. Calling it anyway would land a 403 in an empty
+ * list, and an empty tenant table on screen would read as "this tenant has
+ * written no codes" when the truth is "you are not in a tenant".
+ */
+export async function listFindings(
+  scope: AuthoringScope,
+  options: { includeInactive?: boolean } = {},
+): Promise<Finding[]> {
+  const params = options.includeInactive ? { include_inactive: true } : undefined;
+  const platform = await apiClient.get<FindingListResponse>(PLATFORM_FINDINGS, { params });
+  if (scope === "platform") return platform.data.findings;
+  const tenant = await apiClient.get<FindingListResponse>(TENANT_FINDINGS, { params });
+  return [...platform.data.findings, ...tenant.data.findings];
+}
+
+export async function createFinding(
+  source: FindingSource,
+  code: string,
+  payload: FindingWritePayload,
+): Promise<Finding> {
+  const { data } = await apiClient.post<Finding>(findingsPath(source), { ...payload, code });
+  return data;
+}
+
+export async function updateFinding(
+  source: FindingSource,
+  code: string,
+  payload: FindingWritePayload,
+): Promise<Finding> {
+  const { data } = await apiClient.patch<Finding>(
+    `${findingsPath(source)}/${encodeURIComponent(code)}`,
+    payload,
+  );
+  return data;
+}
+
+/** Deactivate a code. Not a delete.
+ *
+ *  The row stays — every card that carried it still names it, and every tree
+ *  that registers it still resolves — and `is_active` is cleared so it stops
+ *  being offered. The backend handler is `deactivate_platform_finding`.
+ *  204, no body. Nothing on this screen may call it a delete. */
+export async function deactivateFinding(source: FindingSource, code: string): Promise<void> {
+  await apiClient.delete(`${findingsPath(source)}/${encodeURIComponent(code)}`);
+}
+
+// ---- Trees -----------------------------------------------------------
+
 export interface BetaTreeVersion {
+  id: string;
   version: number;
-  tree_yaml: string;
+  definition: BetaTreeDoc;
   published_at: string | null;
   created_at: string;
   notes: string | null;
 }
 
 export interface BetaTreeSummary {
+  id: string;
   code: string;
   name_en: string;
   name_ar: string | null;
@@ -119,21 +192,210 @@ export interface BetaTreeDetail extends BetaTreeSummary {
   versions: BetaTreeVersion[];
 }
 
-export interface BetaCompileResponse {
-  rejections: CompileRejection[];
+export interface BetaTreeCreatePayload {
+  code: string;
+  name_en: string;
+  name_ar?: string | null;
+  description_en?: string | null;
+  description_ar?: string | null;
+  scope?: "block" | "cell";
+  definition: BetaTreeDoc;
 }
+
+interface BetaTreeListResponse {
+  trees?: BetaTreeSummary[];
+  items?: BetaTreeSummary[];
+}
+
+/**
+ * The newest version, whether it is a draft or the published one.
+ *
+ * The designer always opens on it. Kept here rather than in the page because
+ * "newest" is a property of what the endpoint returns, and a server that
+ * starts sorting the other way should be absorbed at the seam.
+ */
+export function latestVersion(tree: BetaTreeDetail): BetaTreeVersion | null {
+  if (tree.versions.length === 0) return null;
+  return tree.versions.reduce((best, v) => (v.version > best.version ? v : best));
+}
+
+/** The newest version when it is unpublished, else null. Only a draft can be
+ *  discarded, and only a draft is what Save appends to. */
+export function draftVersion(tree: BetaTreeDetail): BetaTreeVersion | null {
+  const latest = latestVersion(tree);
+  return latest && latest.published_at === null ? latest : null;
+}
+
+export async function listBetaTrees(): Promise<BetaTreeSummary[]> {
+  const { data } = await apiClient.get<BetaTreeSummary[] | BetaTreeListResponse>(BETA_TREES);
+  if (Array.isArray(data)) return data;
+  return data.trees ?? data.items ?? [];
+}
+
+/**
+ * A code to the id the routes take.
+ *
+ * Off the list read, and not cached here: a module-level map would answer
+ * with a tree the caller has since lost access to, and the list is one small
+ * request. React Query caches the list itself.
+ */
+export async function resolveBetaTreeId(code: string): Promise<string> {
+  const trees = await listBetaTrees();
+  const match = trees.find((t) => t.code === code);
+  if (!match) throw new Error(`No beta tree with code "${code}".`);
+  return match.id;
+}
+
+/** Normalise a detail body. A server that answers with the current
+ *  definition and no version list still gives the designer something to
+ *  open, rather than an empty canvas that reads as an empty tree. */
+function normalizeDetail(raw: BetaTreeDetail & { definition?: BetaTreeDoc }): BetaTreeDetail {
+  if (Array.isArray(raw.versions) && raw.versions.length > 0) return raw;
+  if (!raw.definition) return { ...raw, versions: [] };
+  return {
+    ...raw,
+    versions: [
+      {
+        id: `${raw.id}:current`,
+        version: raw.current_version ?? 1,
+        definition: raw.definition,
+        published_at: raw.published_version === raw.current_version ? raw.updated_at : null,
+        created_at: raw.updated_at,
+        notes: null,
+      },
+    ],
+  };
+}
+
+export async function getBetaTree(code: string): Promise<BetaTreeDetail> {
+  const treeId = await resolveBetaTreeId(code);
+  const { data } = await apiClient.get<BetaTreeDetail & { definition?: BetaTreeDoc }>(
+    `${BETA_TREES}/${treeId}`,
+  );
+  return normalizeDetail(data);
+}
+
+export async function createBetaTree(payload: BetaTreeCreatePayload): Promise<BetaTreeDetail> {
+  const { data } = await apiClient.post<BetaTreeDetail & { definition?: BetaTreeDoc }>(
+    BETA_TREES,
+    payload,
+  );
+  return normalizeDetail(data);
+}
+
+/**
+ * Append a draft version.
+ *
+ * Append-only, as the current engine is: posting a definition identical to
+ * the newest one writes nothing. That is why a bad draft is discarded and
+ * never saved over — see `discardBetaDraft`.
+ */
+export async function appendBetaDraft(
+  treeId: string,
+  definition: BetaTreeDoc,
+  notes?: string | null,
+): Promise<BetaTreeVersion> {
+  const { data } = await apiClient.post<BetaTreeVersion>(`${BETA_TREES}/${treeId}/versions`, {
+    definition,
+    notes: notes ?? null,
+  });
+  return data;
+}
+
+export async function publishBetaVersion(
+  treeId: string,
+  versionId: string,
+): Promise<BetaTreeDetail> {
+  const { data } = await apiClient.post<BetaTreeDetail & { definition?: BetaTreeDoc }>(
+    `${BETA_TREES}/${treeId}/publish`,
+    { version_id: versionId },
+  );
+  return normalizeDetail(data);
+}
+
+/** Discard the unpublished draft. 204, no body. */
+export async function discardBetaDraft(treeId: string): Promise<void> {
+  await apiClient.delete(`${BETA_TREES}/${treeId}/draft`);
+}
+
+// ---- Publish checks --------------------------------------------------
+
+/**
+ * One reason the server refused a version.
+ *
+ * This is the authoritative check. `beta/lib/betaCompile.ts` runs the same
+ * rule names in the browser while the author types, and is advisory only:
+ * the publish is held by what comes back from here.
+ *
+ * `node_ids` is what the compiler emits — a rule such as "a path ends
+ * without stop" names every node it found. `node_id` is the first of them,
+ * which is what the panel links to.
+ */
+export interface BetaValidationError {
+  rule: string;
+  node_id: string | null;
+  node_ids: string[];
+  message_en: string;
+  message_ar: string;
+}
+
+interface RawValidationError {
+  rule?: unknown;
+  node_id?: unknown;
+  node_ids?: unknown;
+  message_en?: unknown;
+  message_ar?: unknown;
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+}
+
+function readErrorList(raw: unknown): BetaValidationError[] {
+  if (!Array.isArray(raw)) return [];
+  const out: BetaValidationError[] = [];
+  for (const entry of raw) {
+    const e = (entry ?? {}) as RawValidationError;
+    if (typeof e.rule !== "string") continue;
+    const nodeIds = asStringArray(e.node_ids);
+    const nodeId = typeof e.node_id === "string" ? e.node_id : (nodeIds[0] ?? null);
+    out.push({
+      rule: e.rule,
+      node_id: nodeId,
+      node_ids: nodeIds.length > 0 ? nodeIds : nodeId ? [nodeId] : [],
+      message_en: typeof e.message_en === "string" ? e.message_en : e.rule,
+      message_ar: typeof e.message_ar === "string" ? e.message_ar : "",
+    });
+  }
+  return out;
+}
+
+/**
+ * The publish checks carried by a rejected save or publish.
+ *
+ * A validation failure is a 422 whose problem body carries `errors`. The
+ * list may sit at the top of the problem or under `extras`, depending on how
+ * the route raised it, so both are read. Returns null when the failure was
+ * something else — a 403, a network error — which the caller shows as a
+ * plain message rather than as a node to go and fix.
+ */
+export function readValidationErrors(error: unknown): BetaValidationError[] | null {
+  if (!isApiError(error) || error.status !== 422) return null;
+  const problem: ProblemDetails = error.problem;
+  const direct = readErrorList(problem.errors);
+  if (direct.length > 0) return direct;
+  const extras = problem.extras as { errors?: unknown } | undefined;
+  const nested = readErrorList(extras?.errors);
+  if (nested.length > 0) return nested;
+  return null;
+}
+
+// ---- Dry run ---------------------------------------------------------
 
 export interface BetaCandidateBlock {
   block_id: string;
   label: string;
   label_ar: string | null;
-  cells: number;
-}
-
-export interface BetaDryRunPayload {
-  block_id: string;
-  /** Evaluate an unsaved draft rather than the stored version. */
-  tree_yaml?: string;
 }
 
 /** One cell's fold. `matched_rule_codes` is null when the text was composed. */
@@ -161,625 +423,45 @@ export interface BetaDryRunResponse {
   cells: BetaDryRunCell[];
 }
 
-// ---- Client ----------------------------------------------------------
-//
-// Every function below is a one-line delegate today. Replace each body with
-// its `apiClient` call and delete the mock section; nothing else moves.
-
-/** Both catalogues, concatenated, with `shadowed` set on the tenant rows the
- *  platform table also defines. Two GETs, one list. */
-export async function listFindings(): Promise<Finding[]> {
-  return mock.listFindings();
-}
-
-export async function createFinding(
-  source: FindingSource,
-  payload: FindingWritePayload,
-): Promise<Finding> {
-  return mock.createFinding(source, payload);
-}
-
-export async function updateFinding(
-  source: FindingSource,
-  code: string,
-  payload: FindingWritePayload,
-): Promise<Finding> {
-  return mock.updateFinding(source, code, payload);
+/**
+ * Walk the tree's stored draft over one block.
+ *
+ * The route takes a block and nothing else, so the draft has to be saved
+ * first. The designer disables the run while the editor is dirty rather than
+ * running the previous body and labelling the answer as the author's edit.
+ *
+ * A block with no grid returns no cells. That is an answer, not a failure,
+ * and the panel says which one it is.
+ */
+export async function betaDryRun(treeId: string, blockId: string): Promise<BetaDryRunResponse> {
+  const { data } = await apiClient.post<BetaDryRunResponse>(`${BETA_TREES}/${treeId}/dry-run`, {
+    block_id: blockId,
+  });
+  return { ...data, cells: Array.isArray(data.cells) ? data.cells : [] };
 }
 
 /**
- * Deactivate a finding. Not a delete.
+ * Blocks the dry run can be pointed at.
  *
- * The code is stored in every `recommendations.finding_set` that ever carried
- * it and named by every tree that registers it, so the row stays and
- * `is_active` is cleared. The screen says "Deactivate" for the same reason.
+ * There is no candidate-block route on the contract, so this reads the
+ * caller's own farms and their blocks. Both are tenant-scoped: a platform
+ * caller has no farms, and asking anyway would land a 403 in an empty
+ * picker. The designer says so in words instead — see `dryRun.platformScope`.
  */
-export async function deactivateFinding(source: FindingSource, code: string): Promise<Finding> {
-  return mock.deactivateFinding(source, code);
+export async function listDryRunBlocks(): Promise<BetaCandidateBlock[]> {
+  const farms = await listFarms({ limit: DRY_RUN_FARM_LIMIT });
+  const perFarm = await Promise.all(
+    farms.items.map(async (farm) => {
+      const page = await listBlocks(farm.id, { limit: 200 });
+      return page.items.map((block) => ({
+        block_id: block.id,
+        label: `${farm.name} / ${block.name ?? block.code}`,
+        label_ar:
+          farm.name_ar || block.name_ar
+            ? `${farm.name_ar ?? farm.name} / ${block.name_ar ?? block.name ?? block.code}`
+            : null,
+      }));
+    }),
+  );
+  return perFarm.flat().sort((a, b) => a.label.localeCompare(b.label));
 }
-
-export async function listBetaTrees(): Promise<BetaTreeSummary[]> {
-  return mock.listTrees();
-}
-
-export async function getBetaTree(code: string): Promise<BetaTreeDetail> {
-  return mock.getTree(code);
-}
-
-/** Append a draft version. The engine is append-only, as today. */
-export async function saveBetaTreeDraft(
-  code: string,
-  tree_yaml: string,
-  notes?: string | null,
-): Promise<BetaTreeDetail> {
-  return mock.saveDraft(code, tree_yaml, notes ?? null);
-}
-
-export async function compileBetaTreeRemote(
-  code: string,
-  tree_yaml: string,
-): Promise<BetaCompileResponse> {
-  return mock.compile(code, tree_yaml);
-}
-
-export async function publishBetaTreeVersion(
-  code: string,
-  version: number,
-): Promise<BetaTreeDetail> {
-  return mock.publish(code, version);
-}
-
-export async function getBetaCandidateBlocks(code: string): Promise<BetaCandidateBlock[]> {
-  return mock.candidateBlocks(code);
-}
-
-export async function betaDryRun(
-  code: string,
-  payload: BetaDryRunPayload,
-): Promise<BetaDryRunResponse> {
-  return mock.dryRun(code, payload);
-}
-
-// ======================================================================
-// MOCK BACKEND — delete this whole section when the endpoints land.
-// ======================================================================
-
-const LATENCY_MS = 120;
-
-function delay<T>(value: T): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(value), LATENCY_MS));
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
-type MockFindingRow = Omit<Finding, "shadowed">;
-
-// The eight codes public migration 0090 seeds, copied from it so the mock and
-// the database agree on code, clause and default status. Wording comes from
-// the merged mango tree (design section 7).
-const platformFindings: MockFindingRow[] = [
-  {
-    code: "ndvi_low",
-    name_en: "Low vigour",
-    name_ar: "حيوية منخفضة",
-    clause_en: "canopy vigour is below the band for this tree size",
-    clause_ar: "حيوية المجموع دون النطاق لهذا الحجم",
-    default_status: "issue",
-    description_en:
-      "The vigour index chosen for this block's soil and tree size reads below the band the index guide expects.",
-    description_ar:
-      "مؤشر الحيوية المختار لتربة القطعة وحجم الشجرة يقرأ دون النطاق الذي يتوقعه دليل المؤشرات.",
-    is_active: true,
-    source: "platform",
-  },
-  {
-    code: "dry",
-    name_en: "Low leaf water",
-    name_ar: "نقص ماء الأوراق",
-    clause_en: "leaf water is low",
-    clause_ar: "ماء الأوراق منخفض",
-    default_status: "issue",
-    description_en: "At least two of NDMI, SMI and CWSI agree that the block is short of water.",
-    description_ar: "اتفق مؤشران على الأقل من NDMI و SMI و CWSI على أن القطعة تعاني نقص ماء.",
-    is_active: true,
-    source: "platform",
-  },
-  {
-    code: "nutrient_low",
-    name_en: "Low nitrogen",
-    name_ar: "نقص نيتروجين",
-    clause_en: "leaf nitrogen is below the band",
-    clause_ar: "نيتروجين الأوراق دون النطاق",
-    default_status: "issue",
-    description_en: "NDRE reads below the band the guide expects for this tree size.",
-    description_ar: "يقرأ NDRE دون النطاق الذي يتوقعه الدليل لهذا الحجم.",
-    is_active: true,
-    source: "platform",
-  },
-  {
-    code: "cover_open",
-    name_en: "Open ground cover",
-    name_ar: "غطاء أرضي مكشوف",
-    clause_en: "more bare ground is showing than the guide expects",
-    clause_ar: "الأرض المكشوفة أكثر مما يتوقعه الدليل",
-    default_status: "issue",
-    description_en: "BSI reads above the band for this tree size.",
-    description_ar: "يقرأ BSI فوق النطاق لهذا الحجم.",
-    is_active: true,
-    source: "platform",
-  },
-  {
-    code: "pest_high",
-    name_en: "Anthracnose high",
-    name_ar: "أنثراكنوز مرتفع",
-    clause_en: "anthracnose pressure is high",
-    clause_ar: "ضغط الأنثراكنوز مرتفع",
-    default_status: "alert",
-    description_en:
-      "Weather conditions strongly favour anthracnose infection while the block carries susceptible tissue.",
-    description_ar: "تُرجّح ظروف الطقس بقوة الإصابة بالأنثراكنوز والقطعة تحمل أنسجة قابلة للإصابة.",
-    is_active: true,
-    source: "platform",
-  },
-  {
-    code: "pest_med",
-    name_en: "Anthracnose building",
-    name_ar: "أنثراكنوز متصاعد",
-    clause_en: "anthracnose pressure is building",
-    clause_ar: "ضغط الأنثراكنوز يتصاعد",
-    default_status: "issue",
-    description_en: "Conditions are moving toward anthracnose. This is the scouting window.",
-    description_ar: "تتجه الظروف نحو الأنثراكنوز. هذه نافذة الكشف الميداني.",
-    is_active: true,
-    source: "platform",
-  },
-  {
-    code: "mildew_high",
-    name_en: "Powdery mildew high",
-    name_ar: "بياض دقيقي مرتفع",
-    clause_en: "powdery mildew pressure is high",
-    clause_ar: "ضغط البياض الدقيقي مرتفع",
-    default_status: "alert",
-    description_en:
-      "Weather conditions strongly favour powdery mildew while the block is in bloom.",
-    description_ar: "تُرجّح ظروف الطقس بقوة البياض الدقيقي والقطعة في الإزهار.",
-    is_active: true,
-    source: "platform",
-  },
-  {
-    code: "fly_high",
-    name_en: "Fruit fly high",
-    name_ar: "ذبابة فاكهة مرتفعة",
-    clause_en: "fruit fly pressure is high",
-    clause_ar: "ضغط ذبابة الفاكهة مرتفع",
-    default_status: "alert",
-    description_en:
-      "Conditions strongly favour fruit fly activity while the block has ripening fruit.",
-    description_ar: "تُرجّح الظروف بقوة نشاط ذبابة الفاكهة والقطعة تحمل ثمارًا تنضج.",
-    is_active: true,
-    source: "platform",
-  },
-];
-
-const tenantFindings: MockFindingRow[] = [
-  {
-    code: "salinity_rising",
-    name_en: "Salinity rising",
-    name_ar: "ارتفاع الملوحة",
-    clause_en: "soil salinity is rising",
-    clause_ar: "ملوحة التربة في ارتفاع",
-    default_status: "issue",
-    description_en: "A tenant-authored finding, read from the EC probe signal.",
-    description_ar: "نتيجة أنشأها المستأجر، تُقرأ من إشارة مسبار التوصيل الكهربائي.",
-    is_active: true,
-    source: "tenant",
-  },
-  {
-    // Deliberate: the admin screen has to show a shadowed row, because the
-    // fold resolves the platform table first and this one is never read.
-    code: "dry",
-    name_en: "Low leaf water (local wording)",
-    name_ar: "نقص ماء الأوراق (صياغة محلية)",
-    clause_en: "the leaves are running dry",
-    clause_ar: "الأوراق بدأت تجف",
-    default_status: "issue",
-    description_en: "Written before the platform shipped `dry`. Never read now.",
-    description_ar: "كُتبت قبل إصدار المنصة للرمز dry. لم تعد تُقرأ.",
-    is_active: true,
-    source: "tenant",
-  },
-];
-
-const MANGO_BETA_YAML = `code: mango_water_beta
-name_en: Mango water and pressure (beta)
-name_ar: الماء والضغط على المانجو (تجريبي)
-description_en: Registers water, vigour and pest findings, then folds them into one card.
-description_ar: تسجل نتائج الماء والحيوية والآفات ثم تدمجها في بطاقة واحدة.
-
-registers:
-  - dry
-  - ndvi_low
-  - pest_high
-
-combinations:
-  - codes: [dry, ndvi_low]
-    action_type: irrigate
-    status: issue
-    text_en: Water shortage is the cause. Irrigate before treating anything else.
-    text_ar: نقص المياه هو السبب. اسقِ قبل معالجة أي شيء آخر.
-
-root: cond_1
-nodes:
-  cond_1:
-    label_en: Is leaf water below baseline?
-    label_ar: هل ماء الورقة أقل من خط الأساس؟
-    condition:
-      tree:
-        op: lt
-        left: { source: indices, index_code: ndmi, key: baseline_deviation }
-        right: -0.1
-    on_match: reg_1
-    on_miss: set_1
-
-  reg_1:
-    label_en: Record low leaf water
-    label_ar: سجّل انخفاض ماء الورقة
-    register:
-      code: dry
-      severity: warning
-    next: set_1
-
-  set_1:
-    label_en: Remember which index was used
-    label_ar: احفظ المؤشر المستخدم
-    set:
-      index_used: ndmi
-      ndvi_now:
-        source: indices
-        index_code: ndvi
-        key: mean
-    next: sw_1
-
-  sw_1:
-    label_en: Anthracnose pressure bands
-    label_ar: نطاقات ضغط الأنثراكنوز
-    switch:
-      on: { source: weather_risk, risk_code: anthracnose, field: score }
-      cases:
-        - { op: ge, value: 70, go: reg_2 }
-        - { op: ge, value: 40, go: reg_3 }
-      default: stop_1
-
-  reg_2:
-    label_en: Record high pest pressure
-    label_ar: سجّل ارتفاع ضغط الآفات
-    register:
-      code: pest_high
-      severity: critical
-    next: stop_1
-
-  reg_3:
-    label_en: Record dropping vigour
-    label_ar: سجّل انخفاض الحيوية
-    register:
-      code: ndvi_low
-      severity: info
-    next: stop_1
-
-  stop_1:
-    label_en: End and fold
-    label_ar: إنهاء ودمج
-    stop: true
-`;
-
-interface MockTree {
-  summary: BetaTreeSummary;
-  versions: BetaTreeVersion[];
-}
-
-const trees: MockTree[] = [
-  {
-    summary: {
-      code: "mango_water_beta",
-      name_en: "Mango water and pressure (beta)",
-      name_ar: "الماء والضغط على المانجو (تجريبي)",
-      tenant_id: "mock-tenant",
-      scope: "cell",
-      current_version: 2,
-      published_version: 1,
-      updated_at: nowIso(),
-    },
-    versions: [
-      {
-        version: 1,
-        tree_yaml: MANGO_BETA_YAML,
-        published_at: nowIso(),
-        created_at: nowIso(),
-        notes: "First cut",
-      },
-      {
-        version: 2,
-        tree_yaml: MANGO_BETA_YAML,
-        published_at: null,
-        created_at: nowIso(),
-        notes: null,
-      },
-    ],
-  },
-  {
-    summary: {
-      code: "starter_beta",
-      name_en: "New beta tree",
-      name_ar: "شجرة تجريبية جديدة",
-      tenant_id: "mock-tenant",
-      scope: "block",
-      current_version: 1,
-      published_version: null,
-      updated_at: nowIso(),
-    },
-    versions: [
-      {
-        version: 1,
-        tree_yaml: STARTER_BETA_YAML.replace("code: REPLACE_ME", "code: starter_beta"),
-        published_at: null,
-        created_at: nowIso(),
-        notes: null,
-      },
-    ],
-  },
-];
-
-function resolvedFindings(): Finding[] {
-  const platformCodes = new Set(platformFindings.map((f) => f.code));
-  return [
-    ...platformFindings.map((f) => ({ ...f, shadowed: false })),
-    ...tenantFindings.map((f) => ({ ...f, shadowed: platformCodes.has(f.code) })),
-  ];
-}
-
-/** The codes the fold can resolve: platform first, then tenant. */
-function foldCatalogue(): Map<string, FoldFinding> {
-  const out = new Map<string, FoldFinding>();
-  for (const f of [...tenantFindings, ...platformFindings]) {
-    out.set(f.code, {
-      code: f.code,
-      clause_en: f.clause_en,
-      clause_ar: f.clause_ar,
-      name_en: f.name_en,
-      name_ar: f.name_ar,
-      default_status: f.default_status,
-      source: f.source,
-    });
-  }
-  return out;
-}
-
-function findTree(code: string): MockTree {
-  const tree = trees.find((t) => t.summary.code === code);
-  if (!tree) throw new Error(`No beta tree with code "${code}"`);
-  return tree;
-}
-
-function currentYaml(tree: MockTree): string {
-  const version = tree.versions[tree.versions.length - 1];
-  return version?.tree_yaml ?? "";
-}
-
-/**
- * A deterministic pseudo-random number from a string.
- *
- * The dry run has to invent cell readings, and they must not change on every
- * render — an author comparing two runs would read the churn as the tree
- * behaving differently.
- */
-function hashUnit(seed: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return ((h >>> 0) % 10000) / 10000;
-}
-
-const mock = {
-  listFindings(): Promise<Finding[]> {
-    return delay(resolvedFindings());
-  },
-
-  createFinding(source: FindingSource, payload: FindingWritePayload): Promise<Finding> {
-    const table = source === "platform" ? platformFindings : tenantFindings;
-    if (table.some((f) => f.code === payload.code)) {
-      return Promise.reject(new Error(`A ${source} finding "${payload.code}" already exists.`));
-    }
-    const row: MockFindingRow = {
-      code: payload.code,
-      clause_en: payload.clause_en,
-      clause_ar: payload.clause_ar,
-      name_en: payload.name_en,
-      name_ar: payload.name_ar,
-      default_status: payload.default_status,
-      description_en: payload.description_en ?? null,
-      description_ar: payload.description_ar ?? null,
-      is_active: payload.is_active ?? true,
-      source,
-    };
-    table.push(row);
-    const platformCodes = new Set(platformFindings.map((f) => f.code));
-    return delay({ ...row, shadowed: source === "tenant" && platformCodes.has(row.code) });
-  },
-
-  updateFinding(
-    source: FindingSource,
-    code: string,
-    payload: FindingWritePayload,
-  ): Promise<Finding> {
-    const table = source === "platform" ? platformFindings : tenantFindings;
-    const index = table.findIndex((f) => f.code === code);
-    if (index < 0) return Promise.reject(new Error(`No ${source} finding "${code}".`));
-    const row: MockFindingRow = {
-      ...table[index],
-      ...payload,
-      description_en: payload.description_en ?? null,
-      description_ar: payload.description_ar ?? null,
-      is_active: payload.is_active ?? true,
-      source,
-    };
-    table[index] = row;
-    const platformCodes = new Set(platformFindings.map((f) => f.code));
-    return delay({ ...row, shadowed: source === "tenant" && platformCodes.has(row.code) });
-  },
-
-  deactivateFinding(source: FindingSource, code: string): Promise<Finding> {
-    const table = source === "platform" ? platformFindings : tenantFindings;
-    const index = table.findIndex((f) => f.code === code);
-    if (index < 0) return Promise.reject(new Error(`No ${source} finding "${code}".`));
-    // The row stays. Only `is_active` changes.
-    table[index] = { ...table[index], is_active: false };
-    const platformCodes = new Set(platformFindings.map((f) => f.code));
-    return delay({
-      ...table[index],
-      shadowed: source === "tenant" && platformCodes.has(code),
-    });
-  },
-
-  listTrees(): Promise<BetaTreeSummary[]> {
-    return delay(trees.map((t) => ({ ...t.summary })));
-  },
-
-  getTree(code: string): Promise<BetaTreeDetail> {
-    const tree = findTree(code);
-    return delay({ ...tree.summary, versions: tree.versions.map((v) => ({ ...v })) });
-  },
-
-  saveDraft(code: string, tree_yaml: string, notes: string | null): Promise<BetaTreeDetail> {
-    const tree = findTree(code);
-    const last = tree.versions[tree.versions.length - 1];
-    // Append-only, with the same no-op the current engine has: re-saving an
-    // unchanged body writes no version.
-    if (last && last.published_at === null && last.tree_yaml === tree_yaml) {
-      return delay({ ...tree.summary, versions: tree.versions.map((v) => ({ ...v })) });
-    }
-    if (last && last.published_at === null) {
-      last.tree_yaml = tree_yaml;
-      last.notes = notes;
-    } else {
-      tree.versions.push({
-        version: (last?.version ?? 0) + 1,
-        tree_yaml,
-        published_at: null,
-        created_at: nowIso(),
-        notes,
-      });
-    }
-    tree.summary.current_version = tree.versions[tree.versions.length - 1].version;
-    tree.summary.updated_at = nowIso();
-    return delay({ ...tree.summary, versions: tree.versions.map((v) => ({ ...v })) });
-  },
-
-  compile(code: string, tree_yaml: string): Promise<BetaCompileResponse> {
-    void code;
-    const rejections = compileBetaTree({
-      yaml: tree_yaml,
-      knownFindingCodes: [...foldCatalogue().keys()],
-    });
-    return delay({ rejections });
-  },
-
-  publish(code: string, version: number): Promise<BetaTreeDetail> {
-    const tree = findTree(code);
-    const target = tree.versions.find((v) => v.version === version);
-    if (!target) return Promise.reject(new Error(`No version ${version} of "${code}".`));
-    const rejections = compileBetaTree({
-      yaml: target.tree_yaml,
-      knownFindingCodes: [...foldCatalogue().keys()],
-    });
-    if (rejections.length > 0) {
-      return Promise.reject(
-        new Error(`The compiler rejected version ${version} in ${rejections.length} places.`),
-      );
-    }
-    target.published_at = nowIso();
-    tree.summary.published_version = version;
-    tree.summary.updated_at = nowIso();
-    return delay({ ...tree.summary, versions: tree.versions.map((v) => ({ ...v })) });
-  },
-
-  candidateBlocks(code: string): Promise<BetaCandidateBlock[]> {
-    void code;
-    return delay([
-      {
-        block_id: "blk-north-12",
-        label: "Bashayer / North 12",
-        label_ar: "بشاير / شمال ١٢",
-        cells: 9,
-      },
-      {
-        block_id: "blk-north-13",
-        label: "Bashayer / North 13",
-        label_ar: "بشاير / شمال ١٣",
-        cells: 6,
-      },
-      { block_id: "blk-west-04", label: "Bashayer / West 4", label_ar: "بشاير / غرب ٤", cells: 12 },
-    ]);
-  },
-
-  dryRun(code: string, payload: BetaDryRunPayload): Promise<BetaDryRunResponse> {
-    const tree = findTree(code);
-    const yaml = payload.tree_yaml ?? currentYaml(tree);
-    const doc = parseBetaDoc(yaml);
-    const rules = readCombinations(doc);
-    const catalogue = foldCatalogue();
-    const severityByCode = new Map(
-      [...registeredCodes(doc).keys()].map((c) => {
-        const node = Object.values(doc?.nodes ?? {}).find(
-          (n) => n.register?.code === c && n.register?.severity,
-        );
-        const severity: FindingSeverity = node?.register?.severity ?? "warning";
-        return [c, severity] as const;
-      }),
-    );
-
-    // Which sets this tree can produce; the cells sample from them, so the
-    // dry run and the combinations tab cannot disagree about what is possible.
-    const producible = enumerateFindingSets(doc).sets;
-    const block = [
-      { block_id: "blk-north-12", cells: 9 },
-      { block_id: "blk-north-13", cells: 6 },
-      { block_id: "blk-west-04", cells: 12 },
-    ].find((b) => b.block_id === payload.block_id) ?? { block_id: payload.block_id, cells: 9 };
-
-    const cells: BetaDryRunCell[] = [];
-    for (let i = 0; i < block.cells; i++) {
-      const cell_id = `${block.block_id}-c${i + 1}`;
-      const pick = producible.length
-        ? producible[Math.floor(hashUnit(cell_id) * producible.length)]
-        : null;
-      const card = foldFindings(pick?.codes ?? [], rules, {
-        findings: catalogue,
-        severityByCode,
-      });
-      cells.push({
-        cell_id,
-        cell_row: Math.floor(i / 3) + 1,
-        cell_col: (i % 3) + 1,
-        finding_set: card.finding_set,
-        matched_rule_codes: card.matched_rule ? card.matched_rule.codes : null,
-        severity: card.severity,
-        status: card.status,
-        action_type: card.action_type,
-        text_en: card.text_en,
-        text_ar: card.text_ar,
-        unresolved: card.unresolved,
-        error: null,
-      });
-    }
-    return delay({
-      block_id: block.block_id,
-      cells_evaluated: cells.length,
-      cells_with_card: cells.filter((c) => c.finding_set.length > 0).length,
-      cells,
-    });
-  },
-};

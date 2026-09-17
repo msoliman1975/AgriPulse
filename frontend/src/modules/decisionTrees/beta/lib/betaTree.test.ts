@@ -8,6 +8,7 @@ import {
   deleteBetaNode,
   dumpBetaDoc,
   edgeKey,
+  fillSwitchDefaults,
   outgoingEdges,
   parseBetaDoc,
   readCombinations,
@@ -163,13 +164,62 @@ describe("suggestSwitchDefault", () => {
     expect(suggestSwitchDefault(doc(), "cond_1", { kind: "match" }, null)).toBe("set_1");
   });
 
-  it("returns empty rather than guessing when two stops exist", () => {
+  it("takes the first stop when the tree has more than one", () => {
+    // It used to return "" here rather than guess. An empty default is the
+    // one thing the server refuses outright, and falling through to a fold
+    // is always a legal answer, so a guess beats a blank.
     const twoStops = doc(`root: a
 nodes:
   a: { stop: true }
   b: { stop: true }
 `);
-    expect(suggestSwitchDefault(twoStops, "a", { kind: "next" }, null)).toBe("");
+    expect(suggestSwitchDefault(twoStops, "a", { kind: "next" }, null)).toBe("a");
+  });
+
+  it("returns empty only when the tree has no stop node at all", () => {
+    const noStop = doc(`root: a
+nodes:
+  a: { register: { code: dry, severity: info } }
+`);
+    expect(suggestSwitchDefault(noStop, "a", { kind: "next" }, null)).toBe("");
+  });
+});
+
+describe("fillSwitchDefaults", () => {
+  const SWITCH_NO_DEFAULT = `root: sw_1
+nodes:
+  sw_1:
+    switch:
+      on: { source: block, field: growth_stage }
+      cases: [{ op: eq, value: a, go: stop_1 }]
+      default: ""
+  stop_1:
+    stop: true
+`;
+
+  it("points an empty default at the tree's stop node", () => {
+    const filled = parseBetaDoc(fillSwitchDefaults(SWITCH_NO_DEFAULT));
+    expect(filled?.nodes?.sw_1.switch?.default).toBe("stop_1");
+  });
+
+  it("adds a stop node when the tree has none to fall through to", () => {
+    const noStop = `root: sw_1
+nodes:
+  sw_1:
+    switch:
+      on: { source: block, field: growth_stage }
+      cases: [{ op: eq, value: a, go: sw_1 }]
+      default: ""
+`;
+    const filled = parseBetaDoc(fillSwitchDefaults(noStop));
+    const target = filled?.nodes?.sw_1.switch?.default ?? "";
+    expect(target).not.toBe("");
+    expect(filled?.nodes?.[target]?.stop).toBe(true);
+  });
+
+  it("leaves a body with no empty default byte for byte alone", () => {
+    const already = SWITCH_NO_DEFAULT.replace('default: ""', "default: stop_1");
+    expect(fillSwitchDefaults(already)).toBe(already);
   });
 });
 

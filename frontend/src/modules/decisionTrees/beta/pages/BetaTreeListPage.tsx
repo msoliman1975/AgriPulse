@@ -8,28 +8,96 @@
  * behind one row.
  */
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
+import { Button } from "@/components/Button";
 import { DataTable } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
+import { Field } from "@/components/Field";
 import { LinkButton } from "@/components/LinkButton";
+import { Modal } from "@/components/Modal";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
-import { mapAsyncState, queryState } from "@/components/asyncState";
+import { StatusBanner } from "@/components/StatusBanner";
+import { mapAsyncState, queryState, resolveErrorMessage } from "@/components/asyncState";
 import { localizedField } from "@/lib/localizedField";
-import { useBetaTrees } from "@/queries/decisionTreesBeta";
+import { useCapability } from "@/rbac/useCapability";
+import { useBetaTrees, useCreateBetaTree } from "@/queries/decisionTreesBeta";
 import type { BetaTreeSummary } from "@/api/decisionTreesBeta";
 
 import { useAuthoringScope } from "../../lib/authoringScope";
-import { betaBasePath, findingCataloguePath } from "../lib/betaRoutes";
+import { parseBetaDoc, STARTER_BETA_YAML } from "../lib/betaTree";
+import { betaBasePath, betaTreePath, findingCataloguePath } from "../lib/betaRoutes";
+
+const INPUT_CLASS = "w-full rounded-lg border border-ap-line px-2.5 py-1.5 text-sm text-ap-ink";
+
+/** Lower snake case, the same expression the catalogue and both migrations
+ *  use. The code reaches a URL and a JSONB key, so it is not free text. */
+const CODE_PATTERN = /^[a-z][a-z0-9_]*$/;
 
 export function BetaTreeListPage(): ReactNode {
   const { t, i18n } = useTranslation("decisionTreesBeta");
   const scope = useAuthoringScope();
+  const navigate = useNavigate();
   const base = betaBasePath(scope);
   const query = useBetaTrees();
+  const create = useCreateBetaTree();
+  const canManage = useCapability("decision_tree.manage");
+
+  const [creating, setCreating] = useState(false);
+  const [code, setCode] = useState("");
+  const [nameEn, setNameEn] = useState("");
+  const [nameAr, setNameAr] = useState("");
+  const [treeScope, setTreeScope] = useState<"block" | "cell">("cell");
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const taken = new Set((query.data ?? []).map((row) => row.code));
+  const trimmedCode = code.trim();
+  const codeError =
+    trimmedCode === ""
+      ? null
+      : !CODE_PATTERN.test(trimmedCode)
+        ? t("list.create.badCode")
+        : taken.has(trimmedCode)
+          ? t("list.create.duplicate")
+          : null;
+  const cannotCreate =
+    trimmedCode === "" || nameEn.trim() === "" || Boolean(codeError) || create.isPending;
+
+  /**
+   * A new tree starts from the starter body, not from an empty one.
+   *
+   * An empty definition has no root, so the canvas would open on nothing and
+   * the first thing the author would read is a publish check about a tree
+   * they have not written yet. The starter is the smallest publishable shape:
+   * one condition, one register, one stop that both routes reach.
+   */
+  const onCreate = (): void => {
+    const definition = parseBetaDoc(
+      STARTER_BETA_YAML.replace("code: REPLACE_ME", "code: " + trimmedCode),
+    );
+    if (!definition) return;
+    setCreateError(null);
+    create.mutate(
+      {
+        code: trimmedCode,
+        name_en: nameEn.trim(),
+        name_ar: nameAr.trim() || null,
+        scope: treeScope,
+        definition,
+      },
+      {
+        onSuccess: (tree) => {
+          setCreating(false);
+          navigate(betaTreePath(scope, tree.code));
+        },
+        onError: (err) => setCreateError(resolveErrorMessage(err, t("list.create.failed"))),
+      },
+    );
+  };
 
   // Never cast a query result: `mapAsyncState` carries loading and error
   // through and only touches the success payload.
@@ -42,9 +110,14 @@ export function BetaTreeListPage(): ReactNode {
         badge={<Pill kind="info">{t("beta.badge")}</Pill>}
         subtitle={t("list.subtitle")}
         actions={
-          <LinkButton to={findingCataloguePath(scope)} variant="secondary">
-            {t("list.openCatalogue")}
-          </LinkButton>
+          <>
+            <LinkButton to={findingCataloguePath(scope)} variant="secondary">
+              {t("list.openCatalogue")}
+            </LinkButton>
+            {canManage ? (
+              <Button onClick={() => setCreating(true)}>{t("list.create.open")}</Button>
+            ) : null}
+          </>
         }
       />
       <p className="text-sm text-ap-muted">{t("beta.note")}</p>
@@ -92,6 +165,82 @@ export function BetaTreeListPage(): ReactNode {
           },
         ]}
       />
+
+      {creating ? (
+        <Modal
+          open
+          onClose={() => setCreating(false)}
+          labelledBy="beta-create-tree-title"
+          className="max-w-lg"
+        >
+          <div className="flex flex-col gap-4 p-4">
+            <h2 id="beta-create-tree-title" className="text-card-title font-semibold text-ap-ink">
+              {t("list.create.title")}
+            </h2>
+            {createError ? <StatusBanner kind="crit">{createError}</StatusBanner> : null}
+
+            <Field label={t("list.create.code")} help={t("list.create.codeHelp")} error={codeError}>
+              {(props) => (
+                <input
+                  {...props}
+                  dir="ltr"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  className={INPUT_CLASS + " font-mono"}
+                />
+              )}
+            </Field>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label={t("list.create.nameEn")}>
+                {(props) => (
+                  <input
+                    {...props}
+                    dir="ltr"
+                    value={nameEn}
+                    onChange={(e) => setNameEn(e.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                )}
+              </Field>
+              <Field label={t("list.create.nameAr")}>
+                {(props) => (
+                  <input
+                    {...props}
+                    dir="rtl"
+                    value={nameAr}
+                    onChange={(e) => setNameAr(e.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                )}
+              </Field>
+            </div>
+
+            <Field label={t("list.create.scope")} help={t("list.create.scopeHelp")}>
+              {(props) => (
+                <select
+                  {...props}
+                  value={treeScope}
+                  onChange={(e) => setTreeScope(e.target.value as "block" | "cell")}
+                  className={INPUT_CLASS}
+                >
+                  <option value="cell">{t("list.scope.cell")}</option>
+                  <option value="block">{t("list.scope.block")}</option>
+                </select>
+              )}
+            </Field>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setCreating(false)}>
+                {t("designer.cancel")}
+              </Button>
+              <Button onClick={onCreate} disabled={cannotCreate}>
+                {create.isPending ? t("list.create.saving") : t("list.create.save")}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </Page>
   );
 }

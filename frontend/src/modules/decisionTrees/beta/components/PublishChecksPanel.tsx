@@ -1,127 +1,186 @@
 /**
- * Every compiler rejection, named by node and linked to it.
+ * What the server said, and what this screen noticed.
  *
- * Section 8: "A publish check that lists every path that does not reach
- * `stop`, naming the node." The list is not a summary — one row per rejection,
- * each row a button that selects that node on the canvas, so the author moves
- * from the message to the thing that produced it in one click.
+ * Two lists, and they are not the same kind of thing:
  *
- * The publish button lives here too and is disabled while any rejection
- * stands. Nothing in this panel is a warning: the engine refuses the version,
- * so offering a publish would be offering something the API will reject.
+ *   * **Errors** come from the server's compiler, as the `errors` array of a
+ *     422 on the save or the publish that asked for them. They are the
+ *     authority. While any of them stands the publish button is dead, because
+ *     the API would refuse the version anyway.
+ *   * **Hints** come from `beta/lib/betaCompile.ts`, running in the browser on
+ *     every edit. They are advisory. They never disable anything: a hint that
+ *     was wrong would otherwise lock an author out of a version the compiler
+ *     would have taken.
+ *
+ * Section 8 asks the publish check to name the node. Every row that carries a
+ * node id is a button that selects it on the canvas, so an author goes from
+ * the sentence to the thing that produced it in one click.
+ *
+ * A server error carries its own English and Arabic text — the compiler writes
+ * both, because this panel renders in either — so those rows are not
+ * translated here. A hint is local copy and is.
  */
 
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { Pill } from "@/components/Pill";
 import { StatusBanner } from "@/components/StatusBanner";
+import type { BetaValidationError } from "@/api/decisionTreesBeta";
 
-import type { CompileRejection } from "../lib/betaCompile";
+import type { EditorHint } from "../lib/betaCompile";
+
+/** Whether the server has had a look at the body now on screen. */
+export type ServerCheckState = "unchecked" | "accepted" | "refused";
 
 interface PublishChecksPanelProps {
-  rejections: readonly CompileRejection[];
-  /** True while the authoritative check is in flight. */
-  checking?: boolean;
+  /** The compiler's answer. Authoritative; blocks the publish. */
+  errors: readonly BetaValidationError[];
+  /** Whether the server has seen this exact body yet. */
+  serverState: ServerCheckState;
+  /** The browser's own reading. Advisory; blocks nothing. */
+  hints: readonly EditorHint[];
   publishing?: boolean;
+  /** The caller's own rule — read-only scope, unsaved draft, no version. */
   canPublish: boolean;
-  onCheck: () => void;
   onPublish: () => void;
   onSelectNode: (nodeId: string) => void;
-  /** Set when a check or a publish failed for a reason that is not a
-   *  rejection — a network error, a 403. */
+  /** A failure that was not a compiler rejection — a network error, a 403. */
   error?: string | null;
 }
 
 export function PublishChecksPanel({
-  rejections,
-  checking = false,
+  errors,
+  serverState,
+  hints,
   publishing = false,
   canPublish,
-  onCheck,
   onPublish,
   onSelectNode,
   error,
 }: PublishChecksPanelProps): JSX.Element {
-  const { t } = useTranslation("decisionTreesBeta");
-  const blocked = rejections.length > 0;
+  const { t, i18n } = useTranslation("decisionTreesBeta");
+  const blocked = errors.length > 0;
 
   return (
     <Card
       title={t("publish.title")}
       actions={
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={onCheck} disabled={checking}>
-            {checking ? t("publish.checking") : t("publish.run")}
-          </Button>
-          <Button
-            size="sm"
-            onClick={onPublish}
-            // Blocked by a rejection, or by the caller's own rule (read-only
-            // scope, unsaved draft). Either way the button cannot be pressed.
-            disabled={blocked || publishing || !canPublish}
-          >
-            {publishing ? t("designer.publishing") : t("designer.publish")}
-          </Button>
-        </div>
+        <Button size="sm" onClick={onPublish} disabled={blocked || publishing || !canPublish}>
+          {publishing ? t("designer.publishing") : t("designer.publish")}
+        </Button>
       }
-      bodyClassName="flex flex-col gap-3"
+      bodyClassName="flex flex-col gap-4"
     >
       {error ? <StatusBanner kind="crit">{error}</StatusBanner> : null}
-      {blocked ? (
-        <p className="text-sm font-medium text-ap-crit" role="status">
-          {t("publish.blocked", { count: rejections.length })}
+
+      <section className="flex flex-col gap-2">
+        {blocked ? (
+          <>
+            <p className="text-sm font-medium text-ap-crit" role="status">
+              {t("publish.errorsTitle")} — {t("publish.errorsCount", { count: errors.length })}
+            </p>
+            <ul className="divide-y divide-ap-line rounded-lg border border-ap-crit/40">
+              {errors.map((entry, index) => (
+                <li key={`${entry.rule}-${entry.node_id ?? "doc"}-${index}`}>
+                  <CheckRow
+                    message={
+                      i18n.language === "ar" && entry.message_ar
+                        ? entry.message_ar
+                        : entry.message_en
+                    }
+                    rule={entry.rule}
+                    nodeId={entry.node_id}
+                    otherNodeIds={entry.node_ids.slice(1)}
+                    onSelectNode={onSelectNode}
+                  />
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p
+            className={
+              serverState === "accepted" ? "text-sm text-ap-primary" : "text-sm text-ap-muted"
+            }
+            role="status"
+          >
+            {serverState === "accepted" ? t("publish.accepted") : t("publish.notChecked")}
+          </p>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-2 border-t border-ap-line pt-3">
+        <p className="flex items-center gap-2 text-sm font-medium text-ap-ink">
+          {t("publish.hintsTitle")}
+          {hints.length > 0 ? (
+            <Pill kind="warn">{t("publish.hintsCount", { count: hints.length })}</Pill>
+          ) : (
+            <Pill kind="ok">{t("publish.hintsClean")}</Pill>
+          )}
         </p>
-      ) : (
-        <p className="text-sm text-ap-primary" role="status">
-          {t("publish.clean")}
-        </p>
-      )}
-      {blocked ? (
-        <ul className="divide-y divide-ap-line rounded-lg border border-ap-line">
-          {rejections.map((rejection, index) => (
-            <li key={`${rejection.rule}-${rejection.node_id ?? "doc"}-${index}`}>
-              <RejectionRow rejection={rejection} onSelectNode={onSelectNode} />
-            </li>
-          ))}
-        </ul>
-      ) : null}
+        <p className="text-meta text-ap-muted">{t("publish.hintsHelp")}</p>
+        {hints.length > 0 ? (
+          <ul className="divide-y divide-ap-line rounded-lg border border-ap-line">
+            {hints.map((hint, index) => (
+              <li key={`${hint.messageKey}-${hint.node_id ?? "doc"}-${index}`}>
+                <CheckRow
+                  message={t(`publish.rule.${hint.messageKey}`, {
+                    ...(hint.params ?? {}),
+                    defaultValue: hint.detail,
+                  })}
+                  rule={hint.rule}
+                  nodeId={hint.node_id}
+                  otherNodeIds={[]}
+                  onSelectNode={onSelectNode}
+                />
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
     </Card>
   );
 }
 
-function RejectionRow({
-  rejection,
+function CheckRow({
+  message,
+  rule,
+  nodeId,
+  otherNodeIds,
   onSelectNode,
 }: {
-  rejection: CompileRejection;
+  message: string;
+  rule: string;
+  nodeId: string | null;
+  /** The rest of the nodes one error named. "A path ends without stop" can
+   *  name several; the row links the first and lists the others. */
+  otherNodeIds: readonly string[];
   onSelectNode: (nodeId: string) => void;
 }): JSX.Element {
   const { t } = useTranslation("decisionTreesBeta");
-  // A rule this frontend has no copy for falls back to the backend's own
-  // English detail rather than rendering the key.
-  const message = t(`publish.rule.${rejection.rule}`, {
-    ...(rejection.params ?? {}),
-    defaultValue: rejection.detail,
-  });
 
   const body = (
     <span className="flex flex-col items-start gap-0.5 text-start">
       <span className="text-sm text-ap-ink">{message}</span>
+      {/* Node ids and rule names are ASCII identifiers. Left to right in
+          either interface language, or an id reads back to front. */}
       <span dir="ltr" className="font-mono text-meta text-ap-muted">
-        {rejection.node_id ?? t("publish.documentLevel")} · {rejection.rule}
+        {nodeId ?? t("publish.documentLevel")} · {rule}
+        {otherNodeIds.length > 0 ? ` · +${otherNodeIds.join(", ")}` : ""}
       </span>
     </span>
   );
 
-  if (!rejection.node_id) {
+  if (!nodeId) {
     return <div className="px-3 py-2">{body}</div>;
   }
   return (
     <button
       type="button"
-      onClick={() => onSelectNode(rejection.node_id!)}
-      aria-label={t("publish.goToNode", { node: rejection.node_id })}
+      onClick={() => onSelectNode(nodeId)}
+      aria-label={t("publish.goToNode", { node: nodeId })}
       className="w-full px-3 py-2 hover:bg-ap-line/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ap-primary"
     >
       {body}
