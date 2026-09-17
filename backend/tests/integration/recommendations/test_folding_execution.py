@@ -70,7 +70,7 @@ def _folding_compiled(code: str) -> dict[str, Any]:
                 "clause_ar": "محتوى الماء في الأوراق منخفض",
                 "name_en": "Dry",
                 "name_ar": "جفاف",
-                "default_status": "stressed",
+                "default_status": "alert",
                 "action_type": "irrigate",
             },
             "ndvi_low": {
@@ -78,7 +78,7 @@ def _folding_compiled(code: str) -> dict[str, Any]:
                 "clause_ar": "انخفضت حيوية المجموع الخضري",
                 "name_en": "Low vigour",
                 "name_ar": "ضعف الحيوية",
-                "default_status": "watch",
+                "default_status": "issue",
                 "action_type": "scout",
             },
         },
@@ -87,7 +87,7 @@ def _folding_compiled(code: str) -> dict[str, Any]:
                 "code": "dry_plus_vigour",
                 "codes": ["dry", "ndvi_low"],
                 "action_type": "irrigate",
-                "status": "stressed",
+                "status": "alert",
                 "text_en": "Water shortage is the cause. Irrigate before treating anything else.",
                 "text_ar": "نقص الماء هو السبب. اروِ قبل أي معالجة أخرى.",
             }

@@ -419,7 +419,7 @@ def mango_folding_tree() -> dict[str, Any]:
             {
                 "codes": ["ndvi_low", "cover_open"],
                 "action_type": "scout",
-                "status": "watch",
+                "status": "issue",
                 "text_en": (
                     "Vigour dropped and bare ground increased. Likely missing "
                     "trees, not a weak canopy."
@@ -429,7 +429,7 @@ def mango_folding_tree() -> dict[str, Any]:
             {
                 "codes": ["ndvi_low", "dry"],
                 "action_type": "irrigate",
-                "status": "stressed",
+                "status": "alert",
                 "text_en": (
                     "Vigour and leaf water both dropped. Water shortage is the "
                     "fix. Irrigate first."
@@ -439,21 +439,21 @@ def mango_folding_tree() -> dict[str, Any]:
             {
                 "codes": ["ndvi_low", "nutrient_low"],
                 "action_type": "fertilize",
-                "status": "stressed",
+                "status": "alert",
                 "text_en": "Vigour and leaf nitrogen both dropped. Feed before scouting.",
                 "text_ar": "انخفضت الحيوية والنيتروجين معاً. سمّد قبل الكشف الميداني.",
             },
             {
                 "codes": ["ndvi_low", "dry", "nutrient_low"],
                 "action_type": "irrigate",
-                "status": "stressed",
+                "status": "alert",
                 "text_en": "Both water and nitrogen are short. Irrigate first, then feed.",
                 "text_ar": "الماء والنيتروجين كلاهما ناقص. اسقِ أولاً ثم سمّد.",
             },
             {
                 "codes": ["ndvi_low", "pest_high"],
                 "action_type": "spray",
-                "status": "stressed",
+                "status": "alert",
                 "text_en": "Vigour dropped and anthracnose pressure is high. Treat now.",
                 "text_ar": "انخفضت الحيوية وضغط الأنثراكنوز مرتفع. عالج الآن.",
             },

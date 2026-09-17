@@ -31,7 +31,7 @@ _CATALOGUE = {
         clause_ar=None,
         name_en="Dry",
         name_ar=None,
-        default_status="stressed",
+        default_status="alert",
         source="tree",
         action_type="irrigate",
     ),
@@ -41,7 +41,7 @@ _CATALOGUE = {
         clause_ar=None,
         name_en="Low vigour",
         name_ar=None,
-        default_status="watch",
+        default_status="issue",
         source="tree",
         action_type="scout",
     ),
@@ -102,7 +102,7 @@ def test_a_card_becomes_a_recommendation_outcome() -> None:
     assert result.outcome.confidence == Decimal("1")
     assert result.outcome.leaf_node_id == "stop"
     assert result.outcome.parameters["finding_set"] == ["dry"]
-    assert result.outcome.parameters["health_status"] == "stressed"
+    assert result.outcome.parameters["health_status"] == "alert"
 
 
 def test_an_action_type_outside_the_column_becomes_other() -> None:
@@ -115,7 +115,7 @@ def test_an_action_type_outside_the_column_becomes_other() -> None:
             clause_ar=None,
             name_en="Odd",
             name_ar=None,
-            default_status="watch",
+            default_status="issue",
             source="tree",
             action_type="rototill",
         )
@@ -240,14 +240,14 @@ def test_nothing_changed_is_silent() -> None:
 
 def test_a_findings_block_reads_as_a_map_or_a_list() -> None:
     as_map = _finding_rows_from(
-        {"dry": {"clause_en": "leaf water is low", "default_status": "stressed"}}, source="tree"
+        {"dry": {"clause_en": "leaf water is low", "default_status": "alert"}}, source="tree"
     )
     as_list = _finding_rows_from(
-        [{"code": "dry", "clause_en": "leaf water is low", "default_status": "stressed"}],
+        [{"code": "dry", "clause_en": "leaf water is low", "default_status": "alert"}],
         source="tree",
     )
     assert as_map["dry"].clause_en == as_list["dry"].clause_en == "leaf water is low"
-    assert as_map["dry"].default_status == "stressed"
+    assert as_map["dry"].default_status == "alert"
     # No name declared, so the code stands in rather than an empty header.
     assert as_map["dry"].name_en == "dry"
 

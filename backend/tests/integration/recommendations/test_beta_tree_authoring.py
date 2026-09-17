@@ -95,7 +95,7 @@ def _definition(code: str, *, text_en: str = "first", registers: bool = False) -
             {
                 "codes": [TEST_CODES[0]],
                 "action_type": "irrigate",
-                "status": "stressed",
+                "status": "alert",
                 "text_en": "Water shortage.",
                 "text_ar": "نقص ماء.",
             }
@@ -215,7 +215,7 @@ async def test_a_definition_that_fails_three_rules_reports_all_three(
     # 2. a node nothing can reach.
     broken["nodes"]["n_orphan"] = {"stop": True}
     # 3. a combination rule naming a code the tree never declares.
-    broken["combinations"] = [{"codes": ["never_declared"], "text_en": "x", "status": "stressed"}]
+    broken["combinations"] = [{"codes": ["never_declared"], "text_en": "x", "status": "alert"}]
 
     with pytest.raises(FoldingCompileError) as caught:
         await service.create_tree(code=code, definition=broken, notes=None, actor_user_id=None)
@@ -260,7 +260,7 @@ async def test_registers_need_the_finding_catalogue(
     definition["registers"] = ["no_such_finding_code"]
     definition["nodes"]["n_register"]["register"]["code"] = "no_such_finding_code"
     definition["combinations"] = [
-        {"codes": ["no_such_finding_code"], "text_en": "x", "status": "watch"}
+        {"codes": ["no_such_finding_code"], "text_en": "x", "status": "issue"}
     ]
     with pytest.raises(FoldingCompileError) as caught:
         await service.create_tree(

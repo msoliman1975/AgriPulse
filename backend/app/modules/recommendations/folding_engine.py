@@ -54,6 +54,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
+from app.modules.recommendations import status_codes
 from app.modules.recommendations.engine import _build_params
 from app.shared.conditions import (
     ConditionContext,
@@ -72,7 +73,15 @@ _SEVERITY_RANK: dict[str, int] = {"info": 0, "warning": 1, "critical": 2}
 # ``unknown`` sits above ``normal`` and below ``watch`` on purpose: "we could
 # not read this" is worse than a clean reading and is not a reason to put a
 # block on a watch list.
-_STATUS_RANK: dict[str, int] = {"normal": 0, "unknown": 1, "watch": 2, "stressed": 3}
+# The block health vocabulary, from ``status_codes``: na, very_good, good,
+# issue, alert. The fold used to carry its own list — normal, watch,
+# stressed, unknown — which no other part of the system uses. A catalogue
+# row's `issue` was not in it, scored 0, and never beat `normal`, so every
+# folded card reported a healthy cell whatever it had found.
+_STATUS_RANK: dict[str, int] = {d.code: d.rank for d in status_codes.STATUS_DEFINITIONS}
+
+# What a fold with no findings, or with none the catalogue can rank, reports.
+_BASE_STATUS: str = "good"
 
 # Mirrors ``engine.py:_ACTION_HORIZONS``. Declared rather than imported so the
 # folding card's shape is readable here; ``test_folding_engine.py`` asserts the
@@ -705,10 +714,10 @@ def _matching_rule(
 
 
 def _worst_status(ordered: Sequence[RegisteredFinding], catalogue: Mapping[str, FindingDef]) -> str:
-    worst = "normal"
+    worst = _BASE_STATUS
     for entry in ordered:
         candidate = catalogue[entry.code].default_status
-        if _STATUS_RANK.get(candidate, 0) > _STATUS_RANK.get(worst, 0):
+        if _STATUS_RANK.get(candidate, -1) > _STATUS_RANK.get(worst, -1):
             worst = candidate
     return worst
 

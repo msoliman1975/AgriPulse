@@ -36,6 +36,7 @@ from collections.abc import Container, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.modules.recommendations import status_codes
 from app.modules.recommendations.errors import DecisionTreeParseError
 from app.modules.recommendations.loader import (
     _validate_condition_ops,
@@ -49,10 +50,12 @@ from app.modules.recommendations.loader import (
 # critical on another (section 4.1).
 SEVERITIES: tuple[str, ...] = ("info", "warning", "critical")
 
-# The health class a combination rule may force. This is the folding engine's
-# own vocabulary and is deliberately not ``status_codes.STATUS_CODES``, which
-# is the leaf verdict list the old shape uses.
-FOLDING_STATUSES: tuple[str, ...] = ("normal", "watch", "stressed", "unknown")
+# The health class a combination rule may force. One vocabulary across the
+# platform: the finding catalogue's CHECK constraint, the designer's picker
+# and the block health verdict all use ``status_codes``, so the fold does
+# too. It had its own list once, which meant the designer offered `issue`
+# and this rejected it on publish.
+FOLDING_STATUSES: tuple[str, ...] = status_codes.STATUS_CODES
 
 # Every comparison operator a switch case may use. The same list the shared
 # evaluator implements, so a case cannot ask a question the engine has no
