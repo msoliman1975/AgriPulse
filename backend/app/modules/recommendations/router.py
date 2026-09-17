@@ -64,6 +64,10 @@ from app.modules.recommendations.schemas import (
     FarmTreeToggleResponse,
     FarmVerdictHistoryResponse,
     FarmVerdictsResponse,
+    FindingCreateRequest,
+    FindingListResponse,
+    FindingResponse,
+    FindingUpdateRequest,
     RecommendationResponse,
     RecommendationScheduleRequest,
     RecommendationTransitionRequest,
@@ -76,6 +80,7 @@ from app.modules.recommendations.schemas import (
 )
 from app.modules.recommendations.service import (
     DecisionTreesAuthorService,
+    FindingsCatalogueService,
     RecommendationsServiceImpl,
     _DecisionTreeCodeAlreadyExistsError,
     _DecisionTreeCodeMismatchError,
@@ -84,11 +89,15 @@ from app.modules.recommendations.service import (
     _DecisionTreeUnknownCropAttributeError,
     _DecisionTreeVersionNotDiscardableError,
     _DecisionTreeVersionNotFoundError,
+    _FindingCodeAlreadyExistsError,
+    _FindingNotFoundError,
     _ParamNameUnknownError,
     _ParamValueCoercionError,
+    _PlatformFindingNotEditableError,
     _PlatformTreeNotEditableError,
     _TenantScopeRequiredError,
     get_decision_trees_author_service,
+    get_findings_catalogue_service,
     get_recommendations_service,
 )
 from app.shared.auth.context import RequestContext
@@ -1587,3 +1596,266 @@ async def get_farm_verdicts(
     """
     _ensure_tenant(context)
     return await service.farm_verdicts(farm_id=farm_id, at=at)
+
+
+# ---------- Finding catalogue ----------------------------------------------
+#
+# Two catalogues, two prefixes, one shape.
+#
+#   /decision-tree-findings            — the platform's shared vocabulary
+#   /tenant/decision-tree-findings     — this tenant's own codes
+#
+# The prefix is what picks the catalogue, not the caller's scope. That is
+# deliberate: a platform admin with no tenant used to hit a tenant-only
+# route and get a 403 that read as "you have no permission" when the truth
+# was "you have no tenant", and the picker on screen came back empty with
+# no explanation. Separate paths mean each one can say plainly which
+# callers it is for, and a platform admin reading the shared catalogue is
+# not routed through a tenant lookup that cannot succeed.
+
+
+def _findings_service(
+    public_session: AsyncSession = Depends(get_admin_db_session),
+    tenant_session: AsyncSession = Depends(get_db_session),
+    context: RequestContext = Depends(get_current_context),
+) -> FindingsCatalogueService:
+    return get_findings_catalogue_service(
+        public_session=public_session,
+        tenant_session=tenant_session,
+        tenant_schema=context.tenant_schema,
+    )
+
+
+def _platform_findings_service(
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> FindingsCatalogueService:
+    """The platform scope, whoever is calling.
+
+    No tenant session at all: the platform catalogue is one table in
+    `public` and a tenant session would only be a way to reach the wrong
+    one. `_ensure_platform_scope` on each write route is what refuses a
+    tenant caller.
+    """
+    return get_findings_catalogue_service(
+        public_session=public_session, tenant_session=None, tenant_schema=None
+    )
+
+
+def _ensure_platform_scope(context: RequestContext) -> None:
+    """Only platform staff write the shared catalogue.
+
+    A tenant admin is out of scope by definition: the clause is shared by
+    every tenant, and that is the whole reason the catalogue exists. They
+    write their own table instead, under `/tenant/decision-tree-findings`,
+    and the detail here says so rather than leaving them to guess.
+    """
+    if context.platform_role is not None:
+        return
+    from app.core.errors import APIError
+
+    raise APIError(
+        status_code=status.HTTP_403_FORBIDDEN,
+        title="Platform role required",
+        detail=(
+            "The shared finding catalogue is written by platform staff only — its "
+            "clauses appear on every tenant's cards. Add a code of your own under "
+            "/api/v1/tenant/decision-tree-findings instead."
+        ),
+        type_="https://agripulse.cloud/problems/platform-role-required",
+    )
+
+
+def _map_finding_error(exc: Exception) -> Exception | None:
+    """Map catalogue-service errors to APIError, return one to raise."""
+    from app.core.errors import APIError
+
+    if isinstance(exc, _FindingNotFoundError):
+        return APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Finding not found",
+            detail=f"No finding with code {exc.code!r}.",
+            type_="https://agripulse.cloud/problems/recommendations/finding-not-found",
+            extras={"code": exc.code},
+        )
+    if isinstance(exc, _FindingCodeAlreadyExistsError):
+        return APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Finding code already exists",
+            detail=f"A finding with code {exc.code!r} already exists in this catalogue.",
+            type_="https://agripulse.cloud/problems/recommendations/finding-code-conflict",
+            extras={"code": exc.code},
+        )
+    if isinstance(exc, _PlatformFindingNotEditableError):
+        return APIError(
+            status_code=status.HTTP_403_FORBIDDEN,
+            title="Platform finding is read-only",
+            detail=str(exc),
+            type_="https://agripulse.cloud/problems/recommendations/platform-finding-read-only",
+            extras={"code": exc.code},
+        )
+    return None
+
+
+@router.get(
+    "/decision-tree-findings",
+    response_model=FindingListResponse,
+    summary="List the platform's shared finding catalogue.",
+)
+async def list_platform_findings(
+    include_inactive: bool = Query(
+        default=False,
+        description=(
+            "Include retired codes. A retired code is still named by every card "
+            "that carried it, so the admin screen needs to show them."
+        ),
+    ),
+    _: RequestContext = Depends(requires_capability("decision_tree.read")),
+    service: FindingsCatalogueService = Depends(_platform_findings_service),
+) -> dict[str, Any]:
+    findings = await service.list_platform(include_inactive=include_inactive)
+    return {"findings": findings}
+
+
+@router.post(
+    "/decision-tree-findings",
+    response_model=FindingResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a code to the platform's shared finding catalogue.",
+)
+async def create_platform_finding(
+    payload: FindingCreateRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: FindingsCatalogueService = Depends(_platform_findings_service),
+) -> dict[str, Any]:
+    _ensure_platform_scope(context)
+    try:
+        return await service.create(payload=payload.model_dump(), actor_user_id=context.user_id)
+    except Exception as exc:
+        mapped = _map_finding_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.patch(
+    "/decision-tree-findings/{code}",
+    response_model=FindingResponse,
+    summary="Update a platform finding's clauses, labels and default status.",
+)
+async def update_platform_finding(
+    code: str,
+    payload: FindingUpdateRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: FindingsCatalogueService = Depends(_platform_findings_service),
+) -> dict[str, Any]:
+    _ensure_platform_scope(context)
+    try:
+        return await service.update(
+            code=code, payload=payload.model_dump(), actor_user_id=context.user_id
+        )
+    except Exception as exc:
+        mapped = _map_finding_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.delete(
+    "/decision-tree-findings/{code}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Retire a platform finding. The row stays; it stops being offered.",
+)
+async def deactivate_platform_finding(
+    code: str,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: FindingsCatalogueService = Depends(_platform_findings_service),
+) -> Response:
+    _ensure_platform_scope(context)
+    try:
+        await service.deactivate(code=code, actor_user_id=context.user_id)
+    except Exception as exc:
+        mapped = _map_finding_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/tenant/decision-tree-findings",
+    response_model=FindingListResponse,
+    summary="List this tenant's own finding codes.",
+)
+async def list_tenant_findings(
+    include_inactive: bool = Query(default=False),
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    service: FindingsCatalogueService = Depends(_findings_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    findings = await service.list_tenant(include_inactive=include_inactive)
+    return {"findings": findings}
+
+
+@router.post(
+    "/tenant/decision-tree-findings",
+    response_model=FindingResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a finding code of this tenant's own.",
+)
+async def create_tenant_finding(
+    payload: FindingCreateRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: FindingsCatalogueService = Depends(_findings_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    try:
+        return await service.create(payload=payload.model_dump(), actor_user_id=context.user_id)
+    except Exception as exc:
+        mapped = _map_finding_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.patch(
+    "/tenant/decision-tree-findings/{code}",
+    response_model=FindingResponse,
+    summary="Update one of this tenant's own finding codes.",
+)
+async def update_tenant_finding(
+    code: str,
+    payload: FindingUpdateRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: FindingsCatalogueService = Depends(_findings_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    try:
+        return await service.update(
+            code=code, payload=payload.model_dump(), actor_user_id=context.user_id
+        )
+    except Exception as exc:
+        mapped = _map_finding_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.delete(
+    "/tenant/decision-tree-findings/{code}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Retire one of this tenant's own finding codes.",
+)
+async def deactivate_tenant_finding(
+    code: str,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: FindingsCatalogueService = Depends(_findings_service),
+) -> Response:
+    _ensure_tenant(context)
+    try:
+        await service.deactivate(code=code, actor_user_id=context.user_id)
+    except Exception as exc:
+        mapped = _map_finding_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
