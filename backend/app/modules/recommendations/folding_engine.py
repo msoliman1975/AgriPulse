@@ -55,10 +55,13 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
 from app.modules.recommendations.engine import _build_params
-from app.shared.conditions import ConditionContext, ConditionParseError
+from app.shared.conditions import (
+    ConditionContext,
+    ConditionParseError,
+    parse_value_ref,
+    resolve_ref,
+)
 from app.shared.conditions import evaluate as _evaluate_condition_tree
-from app.shared.conditions.evaluator import resolve_ref
-from app.shared.conditions.models import parse_value_ref
 
 # Same three values and the same order as ``service.py:_SEVERITY_RANK``. A
 # register node carries the severity, not the finding catalogue, because the
