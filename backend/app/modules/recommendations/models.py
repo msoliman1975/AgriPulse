@@ -276,6 +276,13 @@ class Recommendation(Base, TimestampedMixin, GroupingMixin):
     deferred_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     outcome_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     evaluation_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    # The sorted finding codes a folding tree folded this card from (tenant
+    # 0094). `[]` for a card an old-style leaf opened, which has no findings.
+    # The Action Center groups on it and the next evaluation compares against
+    # it to decide whether this card still says what the tree found.
+    finding_set: Mapped[list[Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
 
 
 class TreeParameterOverride(Base, TimestampedMixin):
@@ -293,6 +300,14 @@ class TreeParameterOverride(Base, TimestampedMixin):
 
     tree_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
     param_name: Mapped[str] = mapped_column(Text, primary_key=True)
+    # NULL = the tenant-level row, which every farm inherits. Non-NULL = one
+    # farm's own value, which wins over it (tenant 0094). Declared primary_key
+    # here because SQLAlchemy needs a unique identity for the row; the database
+    # enforces it as two partial unique indexes, since a nullable column cannot
+    # sit in a primary key.
+    farm_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, nullable=True
+    )
     value: Mapped[Any] = mapped_column(JSONB, nullable=False)
 
 

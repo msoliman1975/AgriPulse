@@ -113,6 +113,7 @@ async def _evaluate_for_tenant_async(tenant_schema: str) -> dict[str, int]:
     blocks: tuple[Any, ...] = ()
     tenant_id = None
     excluded_by_farm: dict[Any, Any] = {}
+    overrides_by_farm: dict[Any, Any] = {}
     async with factory() as session, session.begin():
         await _set_tenant_context(session, tenant_schema)
         async with factory() as public_session:
@@ -125,6 +126,11 @@ async def _evaluate_for_tenant_async(tenant_schema: str) -> dict[str, int]:
             # block: the answer is the same for every block of one farm, and
             # a tenant has far fewer farms than blocks (tenant 0089).
             excluded_by_farm = await svc._repo.list_all_farm_tree_exclusions()
+            # Tree parameter overrides, also once per sweep (tenant 0094).
+            # The table now holds a row per farm as well as the tenant row,
+            # and the sweep must not turn that into a query per block: one
+            # pass over the whole table, layered per farm where it is used.
+            overrides_by_farm = await svc._repo.list_param_overrides_by_farm()
 
     if tenant_id is None:
         _log.warning("recommendations_tenant_sweep_skip_unknown_schema", schema=tenant_schema)
@@ -181,6 +187,7 @@ async def _evaluate_for_tenant_async(tenant_schema: str) -> dict[str, int]:
                         tenant_id=tenant_id,
                         run_id=run_id,
                         excluded_by_farm=excluded_by_farm,
+                        overrides_by_farm=overrides_by_farm,
                     )
             blocks_processed += 1
             recommendations_opened += summary.get("recommendations_opened", 0)

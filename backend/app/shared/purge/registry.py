@@ -319,6 +319,15 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
         "public.decision_trees and are not touched",
     ),
     OwnedTable(
+        "tree_parameter_overrides",
+        owner_column="farm_id",
+        order=10,
+        fk=False,
+        note="a farm's own value for a tree parameter (tenant 0094). Only the "
+        "rows with a farm_id belong to a farm; the tenant-level row keeps "
+        "farm_id NULL and survives, because it belongs to the tenant",
+    ),
+    OwnedTable(
         "imagery_farm_subscriptions",
         owner_column="farm_id",
         order=10,

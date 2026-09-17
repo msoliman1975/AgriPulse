@@ -63,12 +63,21 @@ from app.modules.recommendations.findings import (
     resolve_findings,
     shadowed_codes,
 )
+from app.modules.recommendations.folding_engine import (
+    CombinationRule,
+    FoldedCard,
+    FoldingWalkResult,
+    UnknownFindingError,
+    fold,
+    parse_combination_rules,
+)
+from app.modules.recommendations.folding_engine import walk_tree as walk_folding_tree
 from app.modules.recommendations.narrative import compose_both
 from app.modules.recommendations.repository import (
     FindingsRepository,
     RecommendationsRepository,
 )
-from app.modules.recommendations.status_codes import STATUS_DEFINITIONS, worst
+from app.modules.recommendations.status_codes import STATUS_DEFINITIONS, status_for, worst
 from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
 from app.modules.weather.snapshot import load_index_snapshot as load_weather_index_snapshot
 from app.modules.weather.snapshot import load_risk_snapshot as load_weather_risk_snapshot
@@ -144,6 +153,224 @@ class _BlockEvaluation:
 # ref). `clear` keeps the path but drops the values, and `skipped` never walked
 # at all — see migration 0062 for why the grain is uneven.
 _FULL_PAYLOAD_STATUSES = frozenset({"fired", "error"})
+
+# What a folding walk that collected nothing says. The tree ran, the checks all
+# came out clean, and that is an answer — the same one a `status` leaf gives.
+_NO_FINDINGS_EN = "Checked; no findings."
+_NO_FINDINGS_AR = "تم الفحص؛ لا توجد ملاحظات."
+
+# `recommendations.action_type` is check constrained (tenant 0015). A finding
+# catalogue row could name a verb outside that list, and the insert would then
+# fail for the whole block rather than for the one card. `other` is the honest
+# landing place: work is asked for, and the board has no more specific column.
+_ALLOWED_ACTION_TYPES: frozenset[str] = frozenset(
+    {"irrigate", "fertilize", "spray", "scout", "harvest_window", "prune", "no_action", "other"}
+)
+
+
+def _is_folding_shape(compiled: Any) -> bool:
+    """True when this compiled body is a folding tree.
+
+    The same two-line rule the compiler's ``is_folding_shape`` applies: a node
+    map holding any node with a ``register`` or a ``stop`` key. It is not
+    imported, because the compiler lands in a separate change; the rule is the
+    contract, and it is spelled the same way in both places on purpose.
+    """
+    nodes = compiled.get("nodes") if isinstance(compiled, Mapping) else None
+    if not isinstance(nodes, Mapping):
+        return False
+    return any(isinstance(n, Mapping) and ("register" in n or "stop" in n) for n in nodes.values())
+
+
+@dataclass(frozen=True, slots=True)
+class _FindingRow:
+    """One finding catalogue entry, as the fold reads it.
+
+    Structurally the ``FindingDef`` protocol in ``folding_engine``. Declared
+    here rather than imported because the catalogue tables and their module
+    land in a separate change; when they do, this class is replaced by that
+    module's row and the only thing that must match is the attribute names.
+    """
+
+    code: str
+    clause_en: str
+    clause_ar: str | None
+    name_en: str
+    name_ar: str | None
+    default_status: str
+    source: str
+    action_type: str | None = None
+    actions: dict[str, list[dict[str, Any]]] | None = None
+
+
+def _finding_rows_from(raw: Any, *, source: str) -> dict[str, _FindingRow]:
+    """Read a ``findings:`` block, or a set of catalogue rows, into the fold's
+    catalogue shape.
+
+    Accepts either a mapping of code to entry or a list of entries carrying
+    their own ``code``. A malformed entry is skipped rather than raised on: a
+    missing clause is caught where it matters, at the fold, which refuses to
+    build a card out of a code it cannot put into a sentence.
+    """
+    entries: list[tuple[str, Any]] = []
+    if isinstance(raw, Mapping):
+        entries = [(str(k), v) for k, v in raw.items()]
+    elif isinstance(raw, list):
+        for entry in raw:
+            if isinstance(entry, Mapping) and isinstance(entry.get("code"), str):
+                entries.append((str(entry["code"]), entry))
+
+    out: dict[str, _FindingRow] = {}
+    for code, entry in entries:
+        if not isinstance(entry, Mapping):
+            continue
+        clause_en = entry.get("clause_en")
+        if not isinstance(clause_en, str) or not clause_en:
+            continue
+        actions = entry.get("actions")
+        out[code] = _FindingRow(
+            code=code,
+            clause_en=clause_en,
+            clause_ar=entry.get("clause_ar") if isinstance(entry.get("clause_ar"), str) else None,
+            name_en=str(entry.get("name_en") or code),
+            name_ar=entry.get("name_ar") if isinstance(entry.get("name_ar"), str) else None,
+            default_status=str(entry.get("default_status") or "watch"),
+            source=source,
+            action_type=(
+                entry.get("action_type") if isinstance(entry.get("action_type"), str) else None
+            ),
+            actions=dict(actions) if isinstance(actions, Mapping) else None,
+        )
+    return out
+
+
+def _folding_path_steps(walk: FoldingWalkResult) -> list[TreePathStep]:
+    """The folding walk's path in the shape the stored ``tree_path`` uses.
+
+    A folding walk visits node kinds the old path never had, and what each one
+    did is in ``detail`` — the finding a register wrote, the case a switch
+    chose. Both are carried inside the step's values map, because that map is
+    free-form JSONB and the detail is the part of a folding walk anybody
+    reading the card actually wants.
+    """
+    steps: list[TreePathStep] = []
+    for step in walk.path:
+        values: dict[str, Any] = dict(step.condition_snapshot or {})
+        values["kind"] = step.kind
+        if step.detail:
+            values["detail"] = dict(step.detail)
+        steps.append(
+            TreePathStep(
+                node_id=step.node_id,
+                matched=step.matched,
+                label_en=step.label_en,
+                label_ar=step.label_ar,
+                condition_snapshot=values,
+            )
+        )
+    return steps
+
+
+def _folding_evaluation(walk: FoldingWalkResult, card: FoldedCard | None) -> EvaluationResult:
+    """Dress one folding walk plus its fold as an ``EvaluationResult``.
+
+    Everything downstream of the walk — the trace, the verdict, the card
+    insert, the audit row, the event — is written once, for both engines. This
+    adapter is what lets that stay true: a folded card becomes the same
+    ``TreeOutcome`` an old-style leaf produces, so there is one persistence
+    path rather than two that have to be kept in step.
+
+    An empty finding set is a ``status`` outcome, not a missing one. The tree
+    ran and found nothing, which is the same sentence a status leaf writes and
+    the same colour on the map.
+    """
+    path = _folding_path_steps(walk)
+    snapshot = dict(walk.evaluation_snapshot)
+    if not walk.ok:
+        # `ok` is both halves: no error, and a stop node actually reached. A
+        # walk that ended anywhere else never said it was finished, and its
+        # findings must not be read as a complete set.
+        return EvaluationResult(
+            outcome=None,
+            path=path,
+            error=walk.error or "the walk ended without reaching a stop node",
+            evaluation_snapshot=snapshot,
+        )
+
+    if card is None:
+        outcome = TreeOutcome(
+            action_type="no_action",
+            severity="info",
+            confidence=Decimal("1"),
+            parameters={},
+            text_en=_NO_FINDINGS_EN,
+            text_ar=_NO_FINDINGS_AR,
+            valid_for_hours=None,
+            kind="status",
+            status_code="good",
+            leaf_node_id=walk.stopped_at,
+        )
+        return EvaluationResult(outcome=outcome, path=path, evaluation_snapshot=snapshot)
+
+    action_type = card.action_type if card.action_type in _ALLOWED_ACTION_TYPES else "other"
+    outcome = TreeOutcome(
+        action_type=action_type,
+        severity=card.severity,
+        # A fold asserts what the checks found; it does not estimate a
+        # probability the way a leaf's `confidence:` does. The column is NOT
+        # NULL, so the honest value is 1.
+        confidence=Decimal("1"),
+        parameters={
+            "finding_set": list(card.identity),
+            # The fold's health class (normal / watch / stressed / unknown).
+            # Kept on the card so the Action Center work can read it without
+            # re-folding, and separate from `status_code`, which is the map's
+            # five-value legend and is not the same vocabulary.
+            "health_status": card.status,
+            "matched_rule": card.rule_code,
+            "composed": card.composed,
+        },
+        text_en=card.text_en,
+        text_ar=card.text_ar,
+        valid_for_hours=None,
+        kind="recommendation",
+        status_code=status_for("recommendation"),
+        leaf_node_id=walk.stopped_at,
+        actions={k: list(v) for k, v in card.actions.items()},
+    )
+    return EvaluationResult(outcome=outcome, path=path, evaluation_snapshot=snapshot)
+
+
+def _fold_trace_columns(walk: FoldingWalkResult | None, card: FoldedCard | None) -> dict[str, Any]:
+    """The three short columns every trace row carries (tenant 0094).
+
+    Empty for a tree the old engine walked, which has no findings at all —
+    ``[]`` and ``{}`` rather than null, so a reader never has to tell "this
+    tree does not fold" from "this column was not written".
+    """
+    if walk is None:
+        return {"finding_set": [], "matched_rule": None, "registered_by": {}}
+    return {
+        "finding_set": list(card.identity) if card is not None else [],
+        "matched_rule": card.rule_code if card is not None else None,
+        "registered_by": {f.code: list(f.registered_by) for f in walk.findings},
+    }
+
+
+def _notify_on_supersede(
+    *, old_codes: Sequence[str], old_severity: str, new_codes: Sequence[str], new_severity: str
+) -> bool:
+    """Whether a replaced card is worth a notification (design 5.6).
+
+    A set that gained a code says something new is wrong. A severity that rose
+    says the same thing about something already known. A set that only lost a
+    code is silent: a shrinking set never asks for more work, and a second
+    email about less work is how people learn to ignore the first.
+    """
+    gained = set(new_codes) - set(old_codes)
+    rose = _SEVERITY_RANK.get(new_severity, 0) > _SEVERITY_RANK.get(old_severity, 0)
+    return bool(gained) or rose
+
 
 # The guard on one window read. Not a page size: a farm past this has more
 # history than a day-by-day replay can draw, and the caller is told so
@@ -242,8 +469,13 @@ class _TraceBuffer:
         recommendation_id: UUID | None = None,
         alert_id: UUID | None = None,
         duration_ms: int | None = None,
+        fold: dict[str, Any] | None = None,
     ) -> None:
         full = status in _FULL_PAYLOAD_STATUSES
+        # Unconditional, unlike node_path and resolved_values. They are three
+        # short values and they answer the first question asked of a folding
+        # run: what did this walk hold at the end (tenant 0094, design 6.6).
+        fold_columns = fold or {"finding_set": [], "matched_rule": None, "registered_by": {}}
         self.rows.append(
             {
                 "run_id": self.run_id,
@@ -271,6 +503,9 @@ class _TraceBuffer:
                 "alert_id": alert_id,
                 "duration_ms": duration_ms,
                 "error": result.error if result is not None else None,
+                "finding_set": fold_columns["finding_set"],
+                "matched_rule": fold_columns["matched_rule"],
+                "registered_by": fold_columns["registered_by"],
             }
         )
 
@@ -386,6 +621,168 @@ class RecommendationsServiceImpl:
         # move under it; re-reading public.tenants for each would be one
         # cross-schema round trip per evaluation to learn the same date.
         self._today_cache: date | None = None
+        # The finding catalogue, read once per service instance. A sweep folds
+        # thousands of walks against the same rows, and the catalogue does not
+        # move under it. None means "not read yet"; an empty dict is a real
+        # answer and is not re-read.
+        self._finding_catalogue_cache: dict[str, _FindingRow] | None = None
+
+    async def _finding_catalogue(self, compiled: Mapping[str, Any]) -> dict[str, _FindingRow]:
+        """The finding definitions available to one folding tree.
+
+        Two layers, and the seam between this change and the catalogue change
+        runs right through them:
+
+        1. ``public.decision_tree_findings`` plus the tenant's own table, when
+           they exist. That is where the shared vocabulary lives once the
+           catalogue lands. The read is guarded on the tables being present,
+           so this code runs correctly both before and after they do.
+        2. The tree's own ``findings:`` block, for a tree that carries its
+           definitions with it. It fills codes the tables do not hold and
+           never overrides them, because the point of a shared catalogue is
+           that ``dry`` means one thing everywhere.
+
+        A code in neither layer reaches the fold as an ``UnknownFindingError``
+        and the walk is recorded as an error. That is deliberate: the
+        alternative is a card that prints a raw code at a grower.
+        """
+        if self._finding_catalogue_cache is None:
+            rows = await self._repo.list_finding_catalogue()
+            self._finding_catalogue_cache = {
+                str(r["code"]): _FindingRow(
+                    code=str(r["code"]),
+                    clause_en=str(r.get("clause_en") or ""),
+                    clause_ar=r.get("clause_ar"),
+                    name_en=str(r.get("name_en") or r["code"]),
+                    name_ar=r.get("name_ar"),
+                    default_status=str(r.get("default_status") or "watch"),
+                    source=str(r.get("source") or "platform"),
+                )
+                for r in rows
+                if r.get("clause_en")
+            }
+        catalogue = dict(_finding_rows_from(compiled.get("findings"), source="tree"))
+        for code, row in self._finding_catalogue_cache.items():
+            local = catalogue.get(code)
+            # The catalogue table has no action_type or actions column, so a
+            # catalogue row carries None for both. Replacing the tree's row
+            # wholesale would erase what the tree declared and drop the card
+            # back to the fallback action type. The table wins on the shared
+            # vocabulary it does define; the tree keeps the rest.
+            merged = row
+            if local is not None and row.action_type is None and row.actions is None:
+                merged = replace(row, action_type=local.action_type, actions=local.actions)
+            catalogue[code] = merged
+        return catalogue
+
+    async def _walk_and_fold(
+        self,
+        *,
+        tree: dict[str, Any],
+        eval_ctx: ConditionContext,
+        overrides: dict[str, Any],
+    ) -> tuple[FoldingWalkResult, FoldedCard | None]:
+        """One folding walk and its fold.
+
+        The fold is where a registered code meets the catalogue, so it is also
+        where a tree published against a catalogue it no longer agrees with is
+        caught. That is reported as a walk error rather than as a silent card,
+        because a card missing one of its findings reads as complete.
+        """
+        compiled = tree["tree_compiled"]
+        walk = walk_folding_tree(compiled, eval_ctx, param_overrides=overrides)
+        if not walk.ok:
+            return walk, None
+        catalogue = await self._finding_catalogue(compiled)
+        rules: list[CombinationRule] = parse_combination_rules(compiled.get("combinations"))
+        try:
+            card = fold(walk.findings, catalogue=catalogue, rules=rules)
+        except UnknownFindingError as exc:
+            walk.error = (
+                f"finding code {exc.code!r} is not in the catalogue; "
+                "the tree and the catalogue disagree"
+            )
+            return walk, None
+        return walk, card
+
+    async def _supersede_open_card(
+        self,
+        *,
+        card: FoldedCard,
+        block_id: UUID,
+        cell_id: UUID | None,
+        farm_id: UUID,
+        tree: dict[str, Any],
+        actor_user_id: UUID | None,
+    ) -> tuple[UUID | None, bool]:
+        """Close the open card when the finding set changed (design 5.6).
+
+        Returns ``(superseded_id, notify)``. ``superseded_id`` is the row this
+        evaluation closed, or None when there was nothing open or the open
+        card still says the same thing.
+
+        The dedup index — ``(block_id, cell_id, tree_id) WHERE state = 'open'``
+        — is right as it stands and is not touched. It is what makes the close
+        necessary: without it the second insert is refused with no error, and
+        the card on screen keeps yesterday's words about today's field.
+
+        The close uses ``expired``, one of the states the check constraint
+        already admits. A ``superseded`` state would read better and would
+        mean altering that constraint; the history row written alongside says
+        which of the two happened, so nothing is lost by reusing the state.
+        """
+        prior_id = await self._repo.find_open_recommendation(
+            block_id=block_id, tree_id=tree["tree_id"], cell_id=cell_id
+        )
+        if prior_id is None:
+            # Nothing open. The card about to be written is new, and new work
+            # is always worth announcing.
+            return None, True
+        prior = await self._repo.get_card_identity(recommendation_id=prior_id)
+        if prior is None:
+            return None, True
+        if list(prior["finding_set"]) == list(card.identity):
+            # The same findings again. The insert below is refused by the
+            # dedup index, the recurrence counters move, and nobody is told
+            # anything: they are already looking at this card.
+            return None, False
+
+        notify = _notify_on_supersede(
+            old_codes=prior["finding_set"],
+            old_severity=str(prior["severity"]),
+            new_codes=card.identity,
+            new_severity=card.severity,
+        )
+        await self._repo.transition_recommendation(
+            recommendation_id=prior_id, new_state="expired", actor_user_id=actor_user_id
+        )
+        await self._repo.insert_history(
+            recommendation_id=prior_id,
+            block_id=block_id,
+            cell_id=cell_id,
+            farm_id=farm_id,
+            from_state="open",
+            to_state="expired",
+            actor_user_id=actor_user_id,
+            details={
+                "reason": "superseded",
+                "tree_code": tree["tree_code"],
+                "tree_version": tree["version"],
+                "finding_set_before": list(prior["finding_set"]),
+                "finding_set_after": list(card.identity),
+                "notified": notify,
+            },
+        )
+        self._log.info(
+            "decision_tree_card_superseded",
+            tree_code=tree["tree_code"],
+            block_id=str(block_id),
+            cell_id=str(cell_id) if cell_id else None,
+            before=list(prior["finding_set"]),
+            after=list(card.identity),
+            notified=notify,
+        )
+        return prior_id, notify
 
     async def _today(self, tenant_schema: str) -> date:
         """Today in the tenant's timezone — the boundary streaks are cut on."""
@@ -447,6 +844,7 @@ class RecommendationsServiceImpl:
         only_tree_code: str | None = None,
         tally: dict[str, int] | None = None,
         excluded_by_farm: dict[UUID, frozenset[UUID]] | None = None,
+        overrides_by_farm: dict[UUID | None, dict[UUID, dict[str, Any]]] | None = None,
     ) -> dict[str, int]:
         """Run every active tree visible to this tenant against
         ``block_id``; insert new open recommendations.
@@ -476,13 +874,15 @@ class RecommendationsServiceImpl:
 
         ``excluded_by_farm`` carries the tenant's farm-level tree selection
         so the sweep reads it once instead of once per block. Omitted, this
-        block's farm is read on its own.
+        block's farm is read on its own. ``overrides_by_farm`` is the same
+        arrangement for the tree parameter overrides (tenant 0094).
         """
         setup = await self._prepare_block_evaluation(
             block_id=block_id,
             tenant_id=tenant_id,
             only_tree_code=only_tree_code,
             excluded_by_farm=excluded_by_farm,
+            overrides_by_farm=overrides_by_farm,
         )
         if setup is None:
             return {
@@ -815,6 +1215,7 @@ class RecommendationsServiceImpl:
         tenant_id: UUID,
         only_tree_code: str | None = None,
         excluded_by_farm: dict[UUID, frozenset[UUID]] | None = None,
+        overrides_by_farm: dict[UUID | None, dict[UUID, dict[str, Any]]] | None = None,
     ) -> _BlockEvaluation | None:
         """Load the trees, signals and targeting split for ``block_id``.
 
@@ -832,6 +1233,11 @@ class RecommendationsServiceImpl:
         same for every block of one farm. A caller that omits it gets that
         one farm's rows read here, so a single-block caller stays correct
         without knowing about the table.
+
+        ``overrides_by_farm`` is the parameter overrides read the same way,
+        keyed by farm and then by tree, with the tenant-level rows under the
+        key None (tenant 0094). Omitted, one query below reads both layers
+        for this block's farm.
         """
         trees = await self._repo.list_active_trees_with_current_version(
             visible_to_tenant_id=tenant_id, only_code=only_tree_code
@@ -907,12 +1313,26 @@ class RecommendationsServiceImpl:
             crop_attributes=crop_attributes,
         )
 
-        # PR-C: bulk-load tenant parameter overrides for every tree the
-        # sweep will walk. One query, grouped by tree_id; engine falls
-        # back to declared defaults for trees with no overrides.
-        param_overrides_per_tree = await self._repo.list_all_param_overrides_visible_to_tenant(
-            tree_ids=tuple(t["tree_id"] for t in trees)
-        )
+        # PR-C: bulk-load the parameter overrides for every tree the sweep
+        # will walk. One query, grouped by tree_id; the engine falls back to
+        # declared defaults for trees with no overrides.
+        #
+        # Three layers now resolve here, in this order (tenant 0094, design
+        # 6.4): the tree's declared default, which the engine applies; the
+        # tenant row; and this farm's own row on top of it. Whichever way the
+        # rows arrive, they are read once — either from the sweep's single
+        # pass over the table, or in one query for this farm.
+        tree_ids = tuple(t["tree_id"] for t in trees)
+        if overrides_by_farm is not None:
+            tenant_layer = overrides_by_farm.get(None, {})
+            farm_layer = overrides_by_farm.get(farm_id, {})
+            param_overrides_per_tree = {
+                tid: {**tenant_layer.get(tid, {}), **farm_layer.get(tid, {})} for tid in tree_ids
+            }
+        else:
+            param_overrides_per_tree = await self._repo.list_all_param_overrides_visible_to_tenant(
+                tree_ids=tree_ids, farm_id=farm_id
+            )
 
         # Split matched trees by execution scope (PR-C3). Block-scoped trees
         # evaluate once against the block context; cell-scoped trees fan out
@@ -1494,9 +1914,23 @@ class RecommendationsServiceImpl:
                 recommendation_id=recommendation_id,
                 alert_id=alert_id,
                 duration_ms=int((perf_counter() - started) * 1000),
+                fold=_fold_trace_columns(walk, card),
             )
 
-        result = evaluate_tree(tree["tree_compiled"], eval_ctx, param_overrides=overrides)
+        # Which engine walks this tree is decided by the tree's own shape and
+        # by nothing else — not by a flag, not by the caller. A compiled body
+        # holding a `register` or a `stop` node folds; everything else takes
+        # the leaf-returning walk unchanged. The compiler refuses a tree that
+        # has both shapes, so the two cases cannot overlap.
+        walk: FoldingWalkResult | None = None
+        card: FoldedCard | None = None
+        if _is_folding_shape(tree["tree_compiled"]):
+            walk, card = await self._walk_and_fold(
+                tree=tree, eval_ctx=eval_ctx, overrides=overrides
+            )
+            result = _folding_evaluation(walk, card)
+        else:
+            result = evaluate_tree(tree["tree_compiled"], eval_ctx, param_overrides=overrides)
         if result.error is not None:
             self._log.warning(
                 "decision_tree_walk_error",
@@ -1540,9 +1974,19 @@ class RecommendationsServiceImpl:
 
         # The aggregation identity of this finding (0079). Cell-scoped output
         # collapses onto it; block-scoped output uses it only as a label.
+        #
+        # For a folding tree the leaf is not the identity: almost every walk
+        # ends at the same `stop` node, so grouping on it would put every cell
+        # of a block in one pile whatever the trees found there. The finding
+        # set is the identity instead — the same key the Action Center groups
+        # on and the supersede check compares (design 5.1).
         group_key = build_group_key(
             tree_code=tree["tree_code"],
-            leaf_node_id=leaf_outcome["leaf_node_id"],
+            leaf_node_id=(
+                "findings:" + "+".join(card.identity)
+                if card is not None
+                else leaf_outcome["leaf_node_id"]
+            ),
             action_type=result.outcome.action_type,
             severity=result.outcome.severity,
         )
@@ -1587,6 +2031,21 @@ class RecommendationsServiceImpl:
                 "severity": result.outcome.severity,
             }
 
+        # Supersede (design 5.6). A folding tree writes one card per cell, so
+        # a changed finding set has to close the open card before the new one
+        # can be inserted: the dedup index would otherwise refuse the insert
+        # with no error and leave yesterday's words standing.
+        notify = True
+        if card is not None:
+            _superseded_id, notify = await self._supersede_open_card(
+                card=card,
+                block_id=block_id,
+                cell_id=cell_id,
+                farm_id=farm_id,
+                tree=tree,
+                actor_user_id=actor_user_id,
+            )
+
         written = await self._persist_recommendation(
             tree=tree,
             result=result,
@@ -1598,6 +2057,7 @@ class RecommendationsServiceImpl:
             group_key=group_key,
             today=today,
             actor_user_id=actor_user_id,
+            finding_set=list(card.identity) if card is not None else None,
         )
         if written is None:
             # Lost a race and the winner has since been closed. There is
@@ -1664,7 +2124,11 @@ class RecommendationsServiceImpl:
                 "severity": result.outcome.severity,
             },
         )
-        if cell_id is None:
+        # `notify` is True for every old-style leaf and for a folding card
+        # that gained a finding or rose in severity. A set that only lost a
+        # finding opens a new card and says nothing: a shrinking set never
+        # asks for more work (design 5.6).
+        if cell_id is None and notify:
             self._bus.publish(
                 RecommendationOpenedV1(
                     recommendation_id=recommendation_id,
@@ -1719,6 +2183,7 @@ class RecommendationsServiceImpl:
         group_key: str,
         today: date,
         actor_user_id: UUID | None,
+        finding_set: list[str] | None = None,
     ) -> dict[str, Any] | None:
         """Write the rows one firing of a recommendation leaf implies.
 
@@ -1775,6 +2240,7 @@ class RecommendationsServiceImpl:
                 group_parent_id=parent_id,
                 is_group=is_group,
                 today=today,
+                finding_set=finding_set,
             )
 
         member_id: UUID | None = None
