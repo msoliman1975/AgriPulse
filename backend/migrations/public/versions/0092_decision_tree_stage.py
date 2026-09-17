@@ -27,8 +27,8 @@ the way.
 
 Design: docs/proposals/unified-decision-tree-engine.md section 9.
 
-Revision ID: 0091
-Revises: 0090
+Revision ID: 0092
+Revises: 0091
 Create Date: 2026-09-16
 """
 
@@ -39,8 +39,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0091"
-down_revision: str | Sequence[str] | None = "0090"
+revision: str = "0092"
+down_revision: str | Sequence[str] | None = "0091"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

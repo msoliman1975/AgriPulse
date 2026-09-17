@@ -55,10 +55,13 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
 from app.modules.recommendations.engine import _build_params
-from app.shared.conditions import ConditionContext, ConditionParseError
+from app.shared.conditions import (
+    ConditionContext,
+    ConditionParseError,
+    parse_value_ref,
+    resolve_ref,
+)
 from app.shared.conditions import evaluate as _evaluate_condition_tree
-from app.shared.conditions.evaluator import resolve_ref
-from app.shared.conditions.models import parse_value_ref
 
 # Same three values and the same order as ``service.py:_SEVERITY_RANK``. A
 # register node carries the severity, not the finding catalogue, because the
@@ -107,15 +110,35 @@ class FindingDef(Protocol):
         ``scout`` when absent.
       * ``actions`` — ``{horizon: [{text_en, text_ar}]}``, the finding's own
         guidance. Absent means the finding adds no horizon items.
+
+    Declared as read-only properties, not as plain attributes. A plain
+    attribute on a Protocol is invariant, so a catalogue row typing
+    ``clause_ar`` as ``str`` would not satisfy a Protocol asking for
+    ``str | None`` — the real catalogue class does exactly that, and the
+    mismatch surfaces only when the two are first wired together. The fold
+    never writes to a definition, so read-only is also the honest shape.
     """
 
-    code: str
-    clause_en: str
-    clause_ar: str | None
-    name_en: str
-    name_ar: str | None
-    default_status: str
-    source: str
+    @property
+    def code(self) -> str: ...
+
+    @property
+    def clause_en(self) -> str: ...
+
+    @property
+    def clause_ar(self) -> str | None: ...
+
+    @property
+    def name_en(self) -> str: ...
+
+    @property
+    def name_ar(self) -> str | None: ...
+
+    @property
+    def default_status(self) -> str: ...
+
+    @property
+    def source(self) -> str: ...
 
 
 class UnknownFindingError(LookupError):

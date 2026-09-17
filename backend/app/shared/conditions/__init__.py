@@ -25,21 +25,27 @@ Design choices worth knowing:
 from app.shared.conditions.context import (
     ConditionContext,
     GridAnomalyEntry,
+    IndicesEntry,
     SignalEntry,
     WeatherIndexEntry,
     WeatherRiskEntry,
     WeatherSnapshot,
 )
 from app.shared.conditions.errors import ConditionParseError
-from app.shared.conditions.evaluator import evaluate
+from app.shared.conditions.evaluator import evaluate, resolve_ref
+from app.shared.conditions.models import ValueRef, parse_value_ref
 
 __all__ = [
     "ConditionContext",
     "ConditionParseError",
     "GridAnomalyEntry",
+    "IndicesEntry",
     "SignalEntry",
+    "ValueRef",
     "WeatherIndexEntry",
     "WeatherRiskEntry",
     "WeatherSnapshot",
     "evaluate",
+    "parse_value_ref",
+    "resolve_ref",
 ]

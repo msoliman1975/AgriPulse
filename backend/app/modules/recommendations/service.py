@@ -56,8 +56,18 @@ from app.modules.recommendations.events import (
     RecommendationDismissedV1,
     RecommendationOpenedV1,
 )
+from app.modules.recommendations.findings import (
+    PLATFORM_SOURCE,
+    TENANT_SOURCE,
+    FindingDef,
+    resolve_findings,
+    shadowed_codes,
+)
 from app.modules.recommendations.narrative import compose_both
-from app.modules.recommendations.repository import RecommendationsRepository
+from app.modules.recommendations.repository import (
+    FindingsRepository,
+    RecommendationsRepository,
+)
 from app.modules.recommendations.status_codes import STATUS_DEFINITIONS, worst
 from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
 from app.modules.weather.snapshot import load_index_snapshot as load_weather_index_snapshot
@@ -4112,3 +4122,217 @@ def get_decision_trees_author_service(
     *, public_session: AsyncSession, tenant_id: UUID | None
 ) -> DecisionTreesAuthorService:
     return DecisionTreesAuthorService(public_session=public_session, tenant_id=tenant_id)
+
+
+# ---- Finding catalogue ----------------------------------------------------
+
+
+class _FindingNotFoundError(_DecisionTreeAuthoringError):
+    def __init__(self, code: str) -> None:
+        super().__init__(f"No finding with code {code!r}")
+        self.code = code
+
+
+class _FindingCodeAlreadyExistsError(_DecisionTreeAuthoringError):
+    def __init__(self, code: str) -> None:
+        super().__init__(f"Finding {code!r} already exists")
+        self.code = code
+
+
+class _PlatformFindingNotEditableError(_DecisionTreeAuthoringError):
+    """A tenant tried to write the platform catalogue.
+
+    403, not 404: the row is there and the caller can read it. What they
+    cannot do is change it, and reporting it as missing sends an author
+    looking for a data problem that does not exist.
+    """
+
+    def __init__(self, code: str) -> None:
+        super().__init__(
+            f"Finding {code!r} belongs to the platform catalogue and is read-only here. "
+            "The clause is shared by every tenant, which is the reason the catalogue "
+            "exists. Add a code of your own instead."
+        )
+        self.code = code
+
+
+class FindingsCatalogueService:
+    """Author the finding vocabulary, in one of two scopes.
+
+    The scope is the caller's, decided once in the constructor rather than
+    per method, because getting it wrong is how a tenant would write a
+    shared row. A platform caller (`tenant_schema is None`, platform role)
+    acts on `public.decision_tree_findings`. A tenant caller acts on their
+    own schema's table and can only read the platform one.
+
+    The resolved read — both catalogues merged, platform winning — is
+    `app.modules.recommendations.findings.resolve_findings`, which holds no
+    session so the precedence rule can be unit tested directly. This class
+    fetches; that function decides.
+    """
+
+    def __init__(self, *, repo: FindingsRepository, tenant_schema: str | None) -> None:
+        self._repo = repo
+        self._tenant_schema = tenant_schema
+        self._audit = get_audit_service()
+
+    @property
+    def _is_platform_scope(self) -> bool:
+        return self._tenant_schema is None
+
+    # ---- Reads --------------------------------------------------------
+
+    async def list_platform(self, *, include_inactive: bool) -> list[dict[str, Any]]:
+        """The shared catalogue. Readable in either scope."""
+        rows = await self._repo.list_platform(include_inactive=include_inactive)
+        return [{**row, "source": PLATFORM_SOURCE, "shadowed": False} for row in rows]
+
+    async def list_tenant(self, *, include_inactive: bool) -> list[dict[str, Any]]:
+        """This tenant's own codes, each flagged if the platform shadows it.
+
+        The platform list is fetched too, only to compute `shadowed`. That
+        is one extra read of a table with fewer rows than a tree has nodes,
+        and without it a tenant author edits a clause, sees no change on
+        the card, and has nothing to read that explains it.
+        """
+        rows = await self._repo.list_tenant(include_inactive=include_inactive)
+        platform = await self._repo.list_platform(include_inactive=True)
+        shadowed = set(shadowed_codes(platform, rows))
+        return [
+            {**row, "source": TENANT_SOURCE, "shadowed": row["code"] in shadowed} for row in rows
+        ]
+
+    async def resolved(self) -> dict[str, FindingDef]:
+        """Both catalogues merged, active rows only, platform winning.
+
+        This is what the compiler validates a tree's `registers` block
+        against and what the fold reads to compose a card.
+        """
+        platform = await self._repo.list_platform(include_inactive=False)
+        tenant = await self._repo.list_tenant(include_inactive=False)
+        return resolve_findings(platform, tenant)
+
+    # ---- Writes -------------------------------------------------------
+
+    async def create(
+        self, *, payload: Mapping[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        code = str(payload["code"])
+        existing = (
+            await self._repo.get_platform(code=code)
+            if self._is_platform_scope
+            else await self._repo.get_tenant(code=code)
+        )
+        if existing is not None:
+            raise _FindingCodeAlreadyExistsError(code)
+
+        values = {**payload, "actor": actor_user_id}
+        if self._is_platform_scope:
+            row = await self._repo.insert_platform(**values)
+            source = PLATFORM_SOURCE
+            shadowed = False
+        else:
+            row = await self._repo.insert_tenant(**values)
+            source = TENANT_SOURCE
+            # A tenant may legally add a code the platform already has: the
+            # platform can add one tomorrow and shadow a row that was legal
+            # when it was written, so refusing at write time would only move
+            # the same situation to a place with no way to report it.
+            shadowed = await self._repo.get_platform(code=code) is not None
+
+        await self._record(
+            event="finding_created", code=code, actor_user_id=actor_user_id, source=source
+        )
+        return {**row, "source": source, "shadowed": shadowed}
+
+    async def update(
+        self, *, code: str, payload: Mapping[str, Any], actor_user_id: UUID | None
+    ) -> dict[str, Any]:
+        await self._own_row_or_raise(code)
+        values = {**payload, "code": code, "actor": actor_user_id}
+        row = (
+            await self._repo.update_platform(**values)
+            if self._is_platform_scope
+            else await self._repo.update_tenant(**values)
+        )
+        if row is None:
+            raise _FindingNotFoundError(code)
+
+        source = PLATFORM_SOURCE if self._is_platform_scope else TENANT_SOURCE
+        shadowed = (
+            False
+            if self._is_platform_scope
+            else await self._repo.get_platform(code=code) is not None
+        )
+        await self._record(
+            event="finding_updated", code=code, actor_user_id=actor_user_id, source=source
+        )
+        return {**row, "source": source, "shadowed": shadowed}
+
+    async def deactivate(self, *, code: str, actor_user_id: UUID | None) -> None:
+        """Retire a code. Never a delete — see the repository's note."""
+        await self._own_row_or_raise(code)
+        touched = (
+            await self._repo.deactivate_platform(code=code, actor_user_id=actor_user_id)
+            if self._is_platform_scope
+            else await self._repo.deactivate_tenant(code=code, actor_user_id=actor_user_id)
+        )
+        if touched == 0:
+            # The row exists — `_own_row_or_raise` just read it — so zero
+            # means it was already inactive. Idempotent, nothing to say.
+            return
+        source = PLATFORM_SOURCE if self._is_platform_scope else TENANT_SOURCE
+        await self._record(
+            event="finding_deactivated", code=code, actor_user_id=actor_user_id, source=source
+        )
+
+    # ---- Internals ----------------------------------------------------
+
+    async def _own_row_or_raise(self, code: str) -> dict[str, Any]:
+        """The row this scope may write, or the right refusal.
+
+        A tenant naming a platform code gets 403, not 404, and the two are
+        told apart here rather than at the route: only this class knows
+        which catalogue the caller is acting on.
+        """
+        if self._is_platform_scope:
+            row = await self._repo.get_platform(code=code)
+            if row is None:
+                raise _FindingNotFoundError(code)
+            return row
+
+        row = await self._repo.get_tenant(code=code)
+        if row is not None:
+            return row
+        if await self._repo.get_platform(code=code) is not None:
+            raise _PlatformFindingNotEditableError(code)
+        raise _FindingNotFoundError(code)
+
+    async def _record(
+        self, *, event: str, code: str, actor_user_id: UUID | None, source: str
+    ) -> None:
+        await self._audit.record(
+            tenant_schema=self._tenant_schema,
+            event_type=f"recommendations.{event}",
+            actor_user_id=actor_user_id,
+            actor_kind="user" if actor_user_id else "system",
+            subject_kind="decision_tree_finding",
+            # The catalogue is keyed by code, not by a UUID. `subject_kind`
+            # carries the meaning and the audit service normalises None to
+            # the nil UUID, which is what every non-UUID subject does.
+            subject_id=None,
+            farm_id=None,
+            details={"code": code, "catalogue": source},
+        )
+
+
+def get_findings_catalogue_service(
+    *,
+    public_session: AsyncSession,
+    tenant_session: AsyncSession | None,
+    tenant_schema: str | None,
+) -> FindingsCatalogueService:
+    return FindingsCatalogueService(
+        repo=FindingsRepository(tenant_session=tenant_session, public_session=public_session),
+        tenant_schema=tenant_schema,
+    )

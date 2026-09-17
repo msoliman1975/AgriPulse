@@ -215,6 +215,20 @@ async def seed(*, publish: bool, check_only: bool) -> int:
             for error in errors:
                 where = error.node_id or "(whole tree)"
                 print(f"  {error.rule}  {where}\n    {error.message_en}", file=sys.stderr)
+            declared = definition.get("registers") or []
+            missing = [code for code in declared if code not in codes]
+            if missing:
+                # The most likely reason, said once and plainly. The per-code
+                # messages do not add up to it on their own.
+                print(
+                    f"\nThe finding catalogue is missing {len(missing)} of this "
+                    f"tree's {len(declared)} codes: {', '.join(missing)}.\n"
+                    "Section 2.1 of the same document gives each one a name, a "
+                    "clause in both languages and a default status. They need "
+                    "rows in public.decision_tree_findings before this tree can "
+                    "be seeded.",
+                    file=sys.stderr,
+                )
             return 1
         print("  publish checks: passed")
 

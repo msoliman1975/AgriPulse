@@ -31,8 +31,8 @@ two apart without reading either source body.
 
 Design: docs/proposals/unified-decision-tree-engine.md section 6.5.
 
-Revision ID: 0090
-Revises: 0089
+Revision ID: 0091
+Revises: 0090
 Create Date: 2026-09-16
 """
 
@@ -44,8 +44,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0090"
-down_revision: str | Sequence[str] | None = "0089"
+revision: str = "0091"
+down_revision: str | Sequence[str] | None = "0090"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

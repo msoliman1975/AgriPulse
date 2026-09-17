@@ -42,8 +42,8 @@ pytestmark = [pytest.mark.integration]
 
 
 # The two finding codes these tests register. Named so they cannot collide
-# with a real catalogue row: the fixture below inserts them into whatever
-# catalogue table exists and removes them again afterwards.
+# with one of the eight the platform catalogue ships. The fixture below adds
+# them and removes them again.
 TEST_CODES = ("beta_test_dry", "beta_test_vigour_low")
 
 
@@ -105,35 +105,16 @@ def _definition(code: str, *, text_en: str = "first", registers: bool = False) -
 
 @pytest.fixture
 async def finding_codes(admin_session: AsyncSession):
-    """Make ``TEST_CODES`` resolvable, whatever state the catalogue is in.
+    """Two codes of this file's own in the platform finding catalogue.
 
-    `public.decision_tree_findings` arrives in a separate change. Until it
-    does there is no table at all, and a tree that registers anything cannot
-    compile — which is the correct behaviour and is asserted in its own test
-    below. These rows are what lets the rest of the file exercise the
-    register path either way.
+    Its own rather than the eight the catalogue ships, so a change to the
+    seeded vocabulary cannot break these tests and these tests cannot leave
+    anything behind. Both rows are removed at teardown.
 
-    `CREATE TABLE IF NOT EXISTS` so the fixture is a no-op once the real
-    migration lands; the rows are removed by code at teardown rather than by
-    dropping the table, for the same reason.
+    `default_status` is `'issue'`, from
+    `app.modules.recommendations.status_codes.STATUS_CODES`, which is what
+    the table's CHECK accepts.
     """
-    await admin_session.execute(
-        text(
-            """
-            CREATE TABLE IF NOT EXISTS public.decision_tree_findings (
-                code text PRIMARY KEY,
-                clause_en text NOT NULL,
-                clause_ar text NOT NULL,
-                name_en text NOT NULL,
-                name_ar text NOT NULL,
-                default_status text NOT NULL,
-                description_en text,
-                description_ar text,
-                is_active boolean NOT NULL DEFAULT TRUE
-            )
-            """
-        )
-    )
     for code in TEST_CODES:
         await admin_session.execute(
             text(

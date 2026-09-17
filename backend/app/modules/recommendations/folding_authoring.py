@@ -24,7 +24,7 @@ editor depends on.
 What is shared is the storage: one `public.decision_trees` row and its
 `public.decision_tree_versions` rows, with `stage` saying which engine the
 tree belongs to and `definition` holding the beta body (public migrations
-0090 and 0091). One catalogue, one version history, one publish rule.
+0091 and 0092). One catalogue, one version history, one publish rule.
 
 Design: docs/proposals/unified-decision-tree-engine.md sections 4, 5, 6.5, 9.
 """
@@ -40,6 +40,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.modules.audit import get_audit_service
+from app.modules.recommendations.findings import FindingDef, resolve_findings
 from app.modules.recommendations.folding_compiler import (
     CompileError,
     FoldingCompileError,
@@ -169,17 +170,16 @@ class FoldingTreeAuthorService:
     async def known_codes(self, *, tenant_schema: str | None = None) -> set[str]:
         """The finding codes a `registers` block may name.
 
-        Read straight out of the catalogue tables with raw SQL. The
-        catalogue's own module is being built on a separate branch, so
-        importing its ORM model would make this module fail at import until
-        that branch merges.
+        The same resolution the fold does, so a code the compiler accepts is
+        a code the fold can read. `resolve_findings` is the one place the
+        platform-wins rule lives; this asks it for the names only.
 
-        An absent table yields an empty set. The compiler then rejects every
-        entry in `registers`, naming each code, which is the honest failure:
-        the shared vocabulary does not exist yet, so no tree can be published
-        against it.
+        An absent catalogue table yields an empty set. The compiler then
+        rejects every entry in `registers`, naming each code, which is the
+        honest failure: the shared vocabulary is not there, so no tree can
+        be published against it.
         """
-        return await self._repo.known_finding_codes(tenant_schema=tenant_schema)
+        return set(await self._finding_catalogue(tenant_schema=tenant_schema))
 
     # ---- Reads --------------------------------------------------------
 
@@ -628,20 +628,16 @@ class FoldingTreeAuthorService:
             "cells": cells,
         }
 
-    async def _finding_catalogue(self, *, tenant_schema: str | None) -> dict[str, Any]:
+    async def _finding_catalogue(self, *, tenant_schema: str | None) -> dict[str, FindingDef]:
         """The catalogue rows the fold reads, keyed by code.
 
-        Raw SQL again, and for the same reason as `known_codes`: the
-        catalogue's module is on an unmerged branch and the tenant half lives
-        in a per-tenant schema. `folding_engine.FindingDef` is a structural
-        type, so a small object with the right attributes satisfies it
-        without either module importing the other.
-
-        Platform first, then the tenant's own, and a platform row wins a
-        collision (design section 6.2).
+        The repository returns the two tables' rows unmerged and
+        `resolve_findings` decides which wins: a code held by both resolves
+        to the platform row and the tenant's is never read (design section
+        6.2). One place decides it, and this is not that place.
         """
-        rows = await self._repo.list_finding_rows(tenant_schema=tenant_schema)
-        return {row.code: row for row in rows}
+        platform, tenant = await self._repo.finding_catalogue_rows(tenant_schema=tenant_schema)
+        return resolve_findings(platform, tenant)
 
     async def _dry_run_context(
         self,
