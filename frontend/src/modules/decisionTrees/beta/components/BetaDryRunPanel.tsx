@@ -6,8 +6,13 @@
  * set is empty produces no card, and the row says so rather than showing an
  * empty text cell that reads like missing data.
  *
- * The run walks the draft, not the stored version, so an author checks the
- * edit in front of them.
+ * Three answers that are not a failure, and each says which one it is:
+ *
+ *   * a platform account has no blocks to point the run at, because farms and
+ *     blocks are a tenant's;
+ *   * an unsaved edit cannot be run, because the route walks the stored
+ *     version and would quietly answer about the previous body;
+ *   * a block with no grid returns no cells, which is a fact about the block.
  */
 
 import { useTranslation } from "react-i18next";
@@ -35,6 +40,10 @@ interface BetaDryRunPanelProps {
   onRun: () => void;
   running: boolean;
   result: BetaDryRunResponse | null;
+  /** True for a caller with no tenant. The picker is not shown at all. */
+  platformScope?: boolean;
+  /** True while the editor holds unsaved changes. The run is held back. */
+  dirty?: boolean;
   error?: string | null;
 }
 
@@ -45,6 +54,8 @@ export function BetaDryRunPanel({
   onRun,
   running,
   result,
+  platformScope = false,
+  dirty = false,
   error,
 }: BetaDryRunPanelProps): JSX.Element {
   const { t, i18n } = useTranslation("decisionTreesBeta");
@@ -59,11 +70,19 @@ export function BetaDryRunPanel({
     <Card title={t("dryRun.title")} bodyClassName="flex flex-col gap-4">
       <p className="text-sm text-ap-muted">{t("dryRun.subtitle")}</p>
 
+      {platformScope ? <StatusBanner kind="info">{t("dryRun.platformScope")}</StatusBanner> : null}
+      {!platformScope && dirty ? (
+        <StatusBanner kind="warn">{t("dryRun.saveFirst")}</StatusBanner>
+      ) : null}
+
       <AsyncBoundary
-        state={blockOptions}
+        state={platformScope ? { status: "success", data: [] } : blockOptions}
         skeleton="lines"
         skeletonLines={1}
-        empty={<EmptyState message={t("dryRun.noBlocks")} />}
+        errorMessage={t("dryRun.blocksFailed")}
+        empty={
+          <EmptyState message={t(platformScope ? "dryRun.platformScope" : "dryRun.noBlocks")} />
+        }
       >
         {(rows) => (
           <div className="flex flex-wrap items-end gap-3">
@@ -84,7 +103,7 @@ export function BetaDryRunPanel({
                 </select>
               )}
             </Field>
-            <Button onClick={onRun} disabled={!blockId || running}>
+            <Button onClick={onRun} disabled={!blockId || running || dirty}>
               {running ? t("dryRun.running") : t("dryRun.run")}
             </Button>
           </div>
@@ -95,6 +114,10 @@ export function BetaDryRunPanel({
 
       {result === null ? (
         <EmptyState message={t("dryRun.empty")} />
+      ) : result.cells.length === 0 ? (
+        // Not an error and not an empty state: the block answered, and the
+        // answer is that it has no cells to fold.
+        <StatusBanner kind="info">{t("dryRun.noCells")}</StatusBanner>
       ) : (
         <>
           <p className="text-sm text-ap-ink">

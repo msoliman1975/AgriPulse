@@ -482,6 +482,12 @@ function BetaNodeBox({
 
   return (
     <g
+      // An SVG group carries no accessible name, so the node id and whether a
+      // check named it are exposed as data attributes. That is what lets a
+      // browser test assert an error landed on the right box rather than
+      // only that a message with the id in it appeared somewhere.
+      data-node-id={node.id}
+      data-rejected={rejected ? "true" : "false"}
       style={{ cursor: "pointer" }}
       onClick={(evt) => {
         evt.stopPropagation();

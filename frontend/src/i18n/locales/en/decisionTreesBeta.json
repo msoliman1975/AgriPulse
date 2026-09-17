@@ -21,7 +21,22 @@
       "cell": "Per cell"
     },
     "notPublished": "Not published",
-    "loadFailed": "The beta tree list could not be read."
+    "loadFailed": "The beta tree list could not be read.",
+    "create": {
+      "open": "New beta tree",
+      "title": "New beta tree",
+      "code": "Code",
+      "codeHelp": "Lower snake case. It is the identity and the address, so it cannot be changed later.",
+      "badCode": "Use lower case letters, numbers and underscores.",
+      "duplicate": "A beta tree with that code already exists.",
+      "nameEn": "Name (English)",
+      "nameAr": "Name (Arabic)",
+      "scope": "Runs on",
+      "scopeHelp": "Per cell gives one card for each grid cell. Per block gives one for the whole block.",
+      "save": "Create",
+      "saving": "Creating...",
+      "failed": "The tree was not created."
+    }
   },
   "designer": {
     "backToList": "Beta designer",
@@ -44,7 +59,15 @@
     "publishBlocked_other": "{{count}} rejections block the publish.",
     "draftVersion": "Draft version {{version}}",
     "publishedVersion": "Published version {{version}}",
-    "readOnly": "This tree belongs to another scope, so it is read-only here."
+    "readOnly": "This tree belongs to another scope, so it is read-only here.",
+    "discard": "Discard draft",
+    "discarding": "Discarding…",
+    "discardTitle": "Discard draft version {{version}}?",
+    "discardConfirm": "The draft is removed and the tree goes back to its published version. This cannot be undone.",
+    "discardWhy": "Saving cannot replace a draft: an unchanged body writes no version, so a draft that will not publish would block every later author.",
+    "discardFailed": "The draft was not discarded.",
+    "noDraft": "No draft. The published version is on screen.",
+    "cancel": "Cancel"
   },
   "canvas": {
     "aria": "Beta tree canvas",
@@ -251,18 +274,27 @@
     "ruleMatched": "Rule",
     "ruleComposed": "Composed",
     "noCard": "No card",
-    "cellLabel": "Row {{row}}, column {{col}}"
+    "cellLabel": "Row {{row}}, column {{col}}",
+    "platformScope": "The dry run reads a tenant's blocks. A platform account has none, so open this tree from a tenant account to run it.",
+    "noCells": "This block has no grid, so there are no cells to fold.",
+    "saveFirst": "Save the draft first. The run walks the stored version, not the unsaved edit.",
+    "blocksFailed": "The block list could not be read."
   },
   "publish": {
     "title": "Publish checks",
-    "run": "Check",
-    "checking": "Checking…",
-    "clean": "No rejections. This version can be published.",
-    "blocked_one": "{{count}} rejection. Fix it before publishing.",
-    "blocked_other": "{{count}} rejections. Fix them before publishing.",
     "goToNode": "Open {{node}}",
     "documentLevel": "Whole tree",
     "failed": "The publish checks could not be run.",
+    "notChecked": "Nothing has come back for this version. The server checks it on save and on publish.",
+    "accepted": "The server published this version.",
+    "errorsTitle": "The server refused this version",
+    "errorsCount_one": "{{count}} error. Fix it, then save again.",
+    "errorsCount_other": "{{count}} errors. Fix them, then save again.",
+    "hintsTitle": "While you edit",
+    "hintsHelp": "Checks this screen can run on its own. The server runs the full set on save and on publish, and its answer is the one that decides.",
+    "hintsCount_one": "{{count}} thing to look at.",
+    "hintsCount_other": "{{count}} things to look at.",
+    "hintsClean": "Nothing to flag here.",
     "rule": {
       "yaml_unparsed": "The tree body is not valid YAML.",
       "missing_root": "The tree has no root node.",
@@ -327,7 +359,6 @@
       "descriptionAr": "Description (Arabic)",
       "defaultStatus": "Default status",
       "defaultStatusHelp": "The health class this finding gives a cell. A combination rule may override it; the worst status wins.",
-      "active": "Active",
       "save": "Save",
       "cancel": "Cancel",
       "required": "This field is required.",
@@ -339,7 +370,8 @@
     },
     "deactivate": "Deactivate {{code}}",
     "deactivateAction": "Deactivate",
-    "deactivateConfirm": "Deactivate the finding \"{{code}}\"? The row stays, because the code is stored in every card that ever carried it. A tree that registers it will stop compiling."
+    "deactivateConfirm": "Deactivate the finding \"{{code}}\"? The row stays, because the code is stored in every card that ever carried it. A tree that registers it will stop compiling.",
+    "tenantPlatformScope": "A platform account is not in a tenant, so there is no tenant catalogue to read here."
   },
   "severity": {
     "info": "Info",

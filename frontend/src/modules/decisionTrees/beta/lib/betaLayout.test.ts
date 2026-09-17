@@ -54,6 +54,40 @@ describe("layoutBetaTree", () => {
     expect(layoutBetaTree(null).nodes).toEqual([]);
   });
 
+  it("draws a node with three parents once, below all three", () => {
+    // The known issue on this branch was that a shared `stop` is drawn twice.
+    // `layout/treeLayout.ts` does that — it walks a strict binary tree and
+    // re-places a shared child once per parent — which is why the beta canvas
+    // reads this module instead. A folding tree funnels many routes into one
+    // fold, so the shared node is the normal case, not the exception.
+    const diamond = parseBetaDoc(`root: sw_1
+nodes:
+  sw_1:
+    switch:
+      on: { source: block, field: growth_stage }
+      cases:
+        - { op: eq, value: a, go: reg_1 }
+        - { op: eq, value: b, go: reg_2 }
+      default: stop_1
+  reg_1: { register: { code: dry, severity: info }, next: stop_1 }
+  reg_2: { register: { code: dry, severity: info }, next: stop_1 }
+  stop_1: { stop: true }
+`);
+    const layout = layoutBetaTree(diamond);
+    expect(layout.nodes.filter((n) => n.id === "stop_1")).toHaveLength(1);
+    expect(layout.nodes).toHaveLength(4);
+    expect(layout.byId.size).toBe(4);
+
+    // Three pointers, three edges, one box. Each one arrives at the same
+    // place, and each one points down.
+    const intoStop = layout.edges.filter((e) => e.to === "stop_1");
+    expect(intoStop).toHaveLength(3);
+    for (const edge of intoStop) {
+      expect(edge.toX).toBe(layout.byId.get("stop_1")!.x + BETA_LAYOUT.NODE_WIDTH / 2);
+      expect(edge.toY).toBeGreaterThan(edge.fromY);
+    }
+  });
+
   it("lays out a cycle instead of hanging", () => {
     const cyclic = parseBetaDoc(`root: a
 nodes:

@@ -55,7 +55,7 @@ export function FindingCataloguePage(): ReactNode {
   const { t, i18n } = useTranslation("decisionTreesBeta");
   const scope = useAuthoringScope();
   const canManage = useCapability("decision_tree.manage");
-  const query = useFindingCatalogue();
+  const query = useFindingCatalogue(scope);
   const create = useCreateFinding();
   const update = useUpdateFinding();
   const deactivate = useDeactivateFinding();
@@ -163,18 +163,18 @@ export function FindingCataloguePage(): ReactNode {
             .map((f) => f.code)}
           saving={create.isPending || update.isPending}
           onCancel={() => setEditor(null)}
-          onSave={(payload) => {
+          onSave={(code, payload) => {
             setActionError(null);
             const onError = (err: unknown): void =>
               setActionError(resolveErrorMessage(err, t("catalogue.form.saveFailed")));
             if (editor.existing) {
               update.mutate(
-                { source: editor.source, code: editor.existing.code, payload },
+                { source: editor.source, code, payload },
                 { onSuccess: () => setEditor(null), onError },
               );
             } else {
               create.mutate(
-                { source: editor.source, payload },
+                { source: editor.source, code, payload },
                 { onSuccess: () => setEditor(null), onError },
               );
             }
@@ -332,7 +332,7 @@ function FindingForm({
   takenCodes: readonly string[];
   saving: boolean;
   onCancel: () => void;
-  onSave: (payload: FindingWritePayload) => void;
+  onSave: (code: string, payload: FindingWritePayload) => void;
 }): ReactNode {
   const { t } = useTranslation("decisionTreesBeta");
   const statusLabel = useFindingStatusLabel();
@@ -344,7 +344,6 @@ function FindingForm({
   const [descriptionEn, setDescriptionEn] = useState(existing?.description_en ?? "");
   const [descriptionAr, setDescriptionAr] = useState(existing?.description_ar ?? "");
   const [status, setStatus] = useState<FindingStatus>(existing?.default_status ?? "issue");
-  const [isActive, setIsActive] = useState(existing?.is_active ?? true);
 
   const codeError = useMemo(() => {
     if (existing) return null;
@@ -503,22 +502,11 @@ function FindingForm({
           )}
         </Field>
 
-        <label className="flex items-center gap-2 text-sm text-ap-ink">
-          <input
-            type="checkbox"
-            checked={isActive}
-            onChange={(e) => setIsActive(e.target.checked)}
-            className="h-4 w-4"
-          />
-          {t("catalogue.form.active")}
-        </label>
-
         <div className="flex gap-2">
           <Button
             disabled={invalid}
             onClick={() =>
-              onSave({
-                code: existing?.code ?? code.trim(),
+              onSave(existing?.code ?? code.trim(), {
                 name_en: nameEn.trim(),
                 name_ar: nameAr.trim(),
                 clause_en: clauseEn.trim(),
@@ -526,7 +514,6 @@ function FindingForm({
                 description_en: descriptionEn.trim() || null,
                 description_ar: descriptionAr.trim() || null,
                 default_status: status,
-                is_active: isActive,
               })
             }
           >

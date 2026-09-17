@@ -1,11 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import { blocksPublish, compileBetaTree, type RejectionRule } from "./betaCompile";
+import { betaEditorHints, hasEditorHints, type EditorHint } from "./betaCompile";
+
+/**
+ * The hints, read by the sentence they render rather than by the compiler
+ * rule they map to. Three different mistakes share the rule `unknown-target`
+ * — see `EditorHint.messageKey` — and a test that read the rule could not
+ * tell "you left the miss branch empty" from "the default points at a node
+ * that is gone".
+ */
 
 const KNOWN = ["dry", "pest_high", "ndvi_low"];
 
-function rules(yaml: string, known: string[] = KNOWN): RejectionRule[] {
-  return compileBetaTree({ yaml, knownFindingCodes: known }).map((r) => r.rule);
+function messages(yaml: string, known: string[] = KNOWN): string[] {
+  return betaEditorHints({ yaml, knownFindingCodes: known }).map((h) => h.messageKey);
+}
+
+function hints(yaml: string, known: string[] = KNOWN): EditorHint[] {
+  return betaEditorHints({ yaml, knownFindingCodes: known });
 }
 
 const CLEAN = `registers: [dry]
@@ -23,14 +35,14 @@ nodes:
     stop: true
 `;
 
-describe("compileBetaTree", () => {
+describe("betaEditorHints", () => {
   it("accepts a tree where every route reaches stop and every code resolves", () => {
-    expect(compileBetaTree({ yaml: CLEAN, knownFindingCodes: KNOWN })).toEqual([]);
-    expect(blocksPublish([])).toBe(false);
+    expect(hints(CLEAN)).toEqual([]);
+    expect(hasEditorHints([])).toBe(false);
   });
 
   it("rejects YAML that does not parse", () => {
-    expect(rules("nodes: [unterminated")).toEqual(["yaml_unparsed"]);
+    expect(messages("nodes: [unterminated")).toEqual(["yaml_unparsed"]);
   });
 
   it("rejects a switch with no default, and names the node", () => {
@@ -44,11 +56,12 @@ nodes:
   stop_1:
     stop: true
 `;
-    const found = compileBetaTree({ yaml, knownFindingCodes: KNOWN });
-    const rejection = found.find((r) => r.rule === "switch_without_default");
-    expect(rejection).toBeDefined();
-    expect(rejection!.node_id).toBe("sw_1");
-    expect(rejection!.edge_key).toBe("sw_1:default");
+    const found = hints(yaml);
+    const hint = found.find((h) => h.messageKey === "switch_without_default");
+    expect(hint).toBeDefined();
+    expect(hint!.rule).toBe("switch-without-default");
+    expect(hint!.node_id).toBe("sw_1");
+    expect(hint!.edge_key).toBe("sw_1:default");
   });
 
   it("rejects a default that points at nothing", () => {
@@ -63,19 +76,19 @@ nodes:
     stop: true
 `,
     );
-    expect(rules(yaml)).toContain("switch_default_unknown");
+    expect(messages(yaml)).toContain("switch_default_unknown");
   });
 
   it("rejects a register node whose code the tree does not declare", () => {
     const yaml = CLEAN.replace("registers: [dry]", "registers: []");
-    expect(rules(yaml)).toContain("register_not_declared");
+    expect(messages(yaml)).toContain("register_not_declared");
   });
 
   it("rejects a code that is in no catalogue, from the node and from the list", () => {
-    const found = compileBetaTree({ yaml: CLEAN, knownFindingCodes: [] });
-    const unknown = found.filter((r) => r.rule === "register_unknown_code");
+    const found = hints(CLEAN, []);
+    const unknown = found.filter((h) => h.messageKey === "register_unknown_code");
     expect(unknown).toHaveLength(2);
-    expect(unknown.map((r) => r.node_id).sort()).toEqual([null, "reg_1"]);
+    expect(unknown.map((h) => h.node_id).sort()).toEqual([null, "reg_1"]);
   });
 
   it("names every node from which no route reaches stop", () => {
@@ -85,22 +98,24 @@ nodes:
   a: { register: { code: x, severity: info }, next: b }
   b: { register: { code: x, severity: info }, next: a }
 `;
-    const found = compileBetaTree({ yaml, knownFindingCodes: ["x"] });
-    const unreached = found.filter((r) => r.rule === "unreached_stop").map((r) => r.node_id);
+    const found = hints(yaml, ["x"]);
+    const unreached = found.filter((h) => h.messageKey === "unreached_stop").map((h) => h.node_id);
     expect(unreached.sort()).toEqual(["a", "b"]);
   });
 
   it("names a node the root cannot reach", () => {
     const yaml = `${CLEAN}  orphan:\n    stop: true\n`;
-    const found = compileBetaTree({ yaml, knownFindingCodes: KNOWN });
-    expect(found.map((r) => [r.rule, r.node_id])).toContainEqual(["unreachable_node", "orphan"]);
+    expect(hints(yaml).map((h) => [h.messageKey, h.node_id])).toContainEqual([
+      "unreachable_node",
+      "orphan",
+    ]);
   });
 
   it("rejects an empty pointer and a dangling one separately", () => {
     const empty = CLEAN.replace("    on_miss: stop_1\n", "");
-    expect(rules(empty)).toContain("empty_slot");
+    expect(messages(empty)).toContain("empty_slot");
     const dangling = CLEAN.replace("on_miss: stop_1", "on_miss: ghost");
-    expect(rules(dangling)).toContain("dangling_pointer");
+    expect(messages(dangling)).toContain("dangling_pointer");
   });
 
   it("rejects an old-style outcome leaf in a folding tree", () => {
@@ -108,7 +123,7 @@ nodes:
       "  stop_1:\n    stop: true\n",
       "  stop_1:\n    stop: true\n    outcome: { action_type: scout }\n",
     );
-    expect(rules(yaml)).toContain("mixed_leaf_kinds");
+    expect(messages(yaml)).toContain("mixed_leaf_kinds");
   });
 
   it("rejects two rules that match the same set, whatever order the codes are in", () => {
@@ -128,9 +143,9 @@ root: stop_1
 nodes:
   stop_1: { stop: true }
 `;
-    const found = compileBetaTree({ yaml, knownFindingCodes: KNOWN });
-    const dup = found.find((r) => r.rule === "duplicate_combination");
+    const dup = hints(yaml).find((h) => h.messageKey === "duplicate_combination");
     expect(dup).toBeDefined();
+    expect(dup!.rule).toBe("combination-duplicate-set");
     expect(dup!.params).toMatchObject({ position: 2, first: 1 });
   });
 
@@ -146,12 +161,10 @@ root: stop_1
 nodes:
   stop_1: { stop: true }
 `;
-    expect(rules(yaml)).toContain("combination_unknown_code");
+    expect(messages(yaml)).toContain("combination_unknown_code");
   });
 
-  it("blocks the publish whenever anything is rejected", () => {
-    expect(
-      blocksPublish(compileBetaTree({ yaml: "root: x\nnodes: {}\n", knownFindingCodes: [] })),
-    ).toBe(true);
+  it("flags a body with nothing in it", () => {
+    expect(hasEditorHints(hints("root: x\nnodes: {}\n", []))).toBe(true);
   });
 });
