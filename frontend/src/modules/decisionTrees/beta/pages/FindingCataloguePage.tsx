@@ -262,7 +262,7 @@ function CatalogueSection({
                         aria-label={t("catalogue.edit", { code: f.code })}
                         onClick={() => onEdit(f)}
                       >
-                        {t("catalogue.editAction")}
+                        {t("findingPicker.editAction")}
                       </Button>
                       <Button
                         variant="secondary"

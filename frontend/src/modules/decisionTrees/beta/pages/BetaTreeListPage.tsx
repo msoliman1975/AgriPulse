@@ -76,17 +76,24 @@ export function BetaTreeListPage(): ReactNode {
    * one condition, one register, one stop that both routes reach.
    */
   const onCreate = (): void => {
-    const definition = parseBetaDoc(
+    const starter = parseBetaDoc(
       STARTER_BETA_YAML.replace("code: REPLACE_ME", "code: " + trimmedCode),
     );
-    if (!definition) return;
+    if (!starter) return;
+    // The name and the scope travel inside the definition, not beside it.
+    // `BetaTreeCreateRequest` forbids extra fields, and the tree row is
+    // stamped from the compiled body: `name_en=compiled["name_en"]` and
+    // `scope=compiled.get("scope")`. Sending them at the top level is a 422.
+    const definition = {
+      ...starter,
+      name_en: nameEn.trim(),
+      name_ar: nameAr.trim() || null,
+      scope: treeScope,
+    };
     setCreateError(null);
     create.mutate(
       {
         code: trimmedCode,
-        name_en: nameEn.trim(),
-        name_ar: nameAr.trim() || null,
-        scope: treeScope,
         definition,
       },
       {

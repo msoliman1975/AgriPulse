@@ -194,12 +194,8 @@ export interface BetaTreeDetail extends BetaTreeSummary {
 
 export interface BetaTreeCreatePayload {
   code: string;
-  name_en: string;
-  name_ar?: string | null;
-  description_en?: string | null;
-  description_ar?: string | null;
-  scope?: "block" | "cell";
   definition: BetaTreeDoc;
+  notes?: string | null;
 }
 
 interface BetaTreeListResponse {
