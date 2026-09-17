@@ -27,6 +27,10 @@ import {
   WEATHER_SCOPES,
 } from "../../lib/conditionEdit";
 
+/** The one reading a `findings` ref has. `FindingsValueRef` resolves true or
+ *  false and never null, so a presence test is a real two-way branch. */
+export const FINDINGS_KEYS = ["registered"] as const;
+
 export const BETA_VALUE_SOURCES = [
   "indices",
   "block",
@@ -39,6 +43,7 @@ export const BETA_VALUE_SOURCES = [
   "crop_attribute",
   "params",
   "vars",
+  "findings",
 ] as const;
 
 export type BetaValueSource = (typeof BETA_VALUE_SOURCES)[number];
@@ -75,6 +80,11 @@ export function defaultBetaValueRef(source: BetaValueSource): BetaValueRef {
       return { source, name: "" };
     case "vars":
       return { source, name: "" };
+    case "findings":
+      // Presence only: whether a `register` node recorded this code earlier
+      // on the same walk. The severity it attached is not readable, which is
+      // what stops a merged tree growing one branch per earlier verdict.
+      return { source, code: "", key: "registered" };
   }
 }
 
@@ -123,6 +133,11 @@ export function valueRefFields(ref: BetaValueRef): ValueRefFieldSpec[] {
     case "params":
     case "vars":
       return [{ key: "name", labelKey: "name" }];
+    case "findings":
+      return [
+        { key: "code", labelKey: "code" },
+        { key: "key", labelKey: "key", options: FINDINGS_KEYS },
+      ];
   }
 }
 

@@ -65,9 +65,12 @@ const DEFINITION = {
       label_en: "Anthracnose pressure bands",
       switch: {
         on: { source: "weather_risk", risk_code: "anthracnose", field: "score" },
+        // A case names its operator as the key. It was `{op, value, go}`
+        // until the engine refused every switch written that way; this stub
+        // kept the old shape and the band read as "op.?" on the canvas.
         cases: [
-          { op: "ge", value: 70, go: "reg_2" },
-          { op: "ge", value: 40, go: "reg_3" },
+          { ge: 70, go: "reg_2" },
+          { ge: 40, go: "reg_3" },
         ],
         default: "stop_1",
       },
@@ -422,6 +425,61 @@ test.describe("beta designer", () => {
     await expect(
       page.getByText("This block has no grid, so there are no cells to fold."),
     ).toBeVisible();
+  });
+
+  test("draws the stop as a circle, moves a node, and puts the layout back", async ({
+    authedPage: page,
+  }) => {
+    await stubBetaApi(page);
+    await page.goto(TREE);
+
+    const canvas = page.getByRole("application", { name: "Beta tree canvas" });
+    await expect(canvas).toBeVisible();
+
+    // The walk ending is the one thing on the canvas that is not a step.
+    const stop = page.locator('[data-node-id="stop_1"]');
+    await expect(stop).toHaveAttribute("data-shape", "circle");
+    await expect(page.locator('[data-node-id="reg_1"]')).not.toHaveAttribute(
+      "data-shape",
+      "circle",
+    );
+
+    // Nothing has been moved, so there is nothing to put back.
+    await expect(page.getByRole("button", { name: "Back to automatic layout" })).toHaveCount(0);
+
+    const node = page.locator('[data-node-id="reg_1"]');
+    const box = (await node.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 60, { steps: 8 });
+    await page.mouse.up();
+
+    // The move is an edit: it goes into the draft and it can be undone in one
+    // click.
+    await expect(page.getByText("Unsaved changes")).toBeVisible();
+    await expect(page.locator('[data-node-id="reg_1"]')).toHaveAttribute("data-pinned", "true");
+
+    await page.getByRole("button", { name: "Back to automatic layout" }).click();
+    await expect(page.locator('[data-node-id="reg_1"]')).toHaveAttribute("data-pinned", "false");
+  });
+
+  test("authors a condition, including a between range", async ({ authedPage: page }) => {
+    await stubBetaApi(page);
+    await page.goto(TREE);
+
+    await page.locator('[data-node-id="cond_1"]').click();
+
+    // The test itself, not only the two branches: this is what the panel
+    // could not edit before.
+    await expect(page.getByLabel("Operator")).toHaveValue("lt");
+    await page.getByLabel("Operator").selectOption("between");
+
+    await expect(page.getByLabel("From", { exact: true })).toBeVisible();
+    await page.getByLabel("To", { exact: true }).fill("0.2");
+    await expect(page.getByText("Unsaved changes")).toBeVisible();
+
+    // The canvas reads the same edit back.
+    await expect(page.locator('[data-node-id="cond_1"]')).toBeVisible();
   });
 
   test("shows the finding catalogue with the shadowed tenant row flagged", async ({

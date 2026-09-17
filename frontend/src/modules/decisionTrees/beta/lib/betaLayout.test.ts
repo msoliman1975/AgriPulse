@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BETA_LAYOUT, betaNodeHeight, layoutBetaTree } from "./betaLayout";
+import { BETA_LAYOUT, betaNodeHeight, betaNodeWidth, layoutBetaTree } from "./betaLayout";
 import { parseBetaDoc } from "./betaTree";
 
 const YAML = `root: cond_1
@@ -83,7 +83,11 @@ nodes:
     const intoStop = layout.edges.filter((e) => e.to === "stop_1");
     expect(intoStop).toHaveLength(3);
     for (const edge of intoStop) {
-      expect(edge.toX).toBe(layout.byId.get("stop_1")!.x + BETA_LAYOUT.NODE_WIDTH / 2);
+      // The stop is a circle, narrower than a step's box, so its centre is
+      // measured from its own width rather than the standard one.
+      const stop = layout.byId.get("stop_1")!;
+      expect(stop.width).toBe(BETA_LAYOUT.STOP_DIAMETER);
+      expect(edge.toX).toBe(stop.x + stop.width / 2);
       expect(edge.toY).toBeGreaterThan(edge.fromY);
     }
   });
@@ -117,9 +121,67 @@ describe("betaNodeHeight", () => {
   });
 
   it("leaves every other kind at the base height", () => {
-    expect(betaNodeHeight({ stop: true })).toBe(BETA_LAYOUT.NODE_HEIGHT);
     expect(betaNodeHeight({ register: { code: "x", severity: "info" } })).toBe(
       BETA_LAYOUT.NODE_HEIGHT,
     );
+    expect(betaNodeHeight({ condition: { tree: {} } })).toBe(BETA_LAYOUT.NODE_HEIGHT);
+  });
+
+  it("makes a stop square, because it is drawn as a circle", () => {
+    expect(betaNodeHeight({ stop: true })).toBe(BETA_LAYOUT.STOP_DIAMETER);
+    expect(betaNodeWidth({ stop: true })).toBe(BETA_LAYOUT.STOP_DIAMETER);
+    expect(betaNodeWidth({ register: { code: "x", severity: "info" } })).toBe(
+      BETA_LAYOUT.NODE_WIDTH,
+    );
+  });
+});
+
+describe("hand-placed nodes", () => {
+  const doc = (): ReturnType<typeof parseBetaDoc> =>
+    parseBetaDoc(`root: cond_1
+nodes:
+  cond_1:
+    condition: { tree: { op: lt, left: { source: indices, index_code: ndvi, key: baseline_deviation }, right: 0 } }
+    on_match: reg_1
+    on_miss: stop_1
+    ui: { x: 500, y: 40 }
+  reg_1: { register: { code: dry, severity: info }, next: stop_1 }
+  stop_1: { stop: true }
+`);
+
+  it("puts a node where the author dropped it and marks it pinned", () => {
+    const layout = layoutBetaTree(doc());
+    const cond = layout.byId.get("cond_1")!;
+    expect([cond.x, cond.y]).toEqual([500, 40]);
+    expect(cond.pinned).toBe(true);
+  });
+
+  it("leaves every other node to the automatic layout", () => {
+    const layout = layoutBetaTree(doc());
+    expect(layout.byId.get("reg_1")!.pinned).toBe(false);
+    expect(layout.byId.get("stop_1")!.pinned).toBe(false);
+  });
+
+  it("moves the edges with the node, both ends", () => {
+    const layout = layoutBetaTree(doc());
+    const cond = layout.byId.get("cond_1")!;
+    for (const edge of layout.edges.filter((e) => e.from === "cond_1")) {
+      expect(edge.fromY).toBe(cond.y + cond.height);
+      expect(edge.fromX).toBeGreaterThanOrEqual(cond.x);
+      expect(edge.fromX).toBeLessThanOrEqual(cond.x + cond.width);
+    }
+  });
+
+  it("grows the canvas to hold a node dragged past the automatic extent", () => {
+    const layout = layoutBetaTree(doc());
+    expect(layout.width).toBeGreaterThanOrEqual(500 + BETA_LAYOUT.NODE_WIDTH);
+  });
+
+  it("ignores a position that is not two numbers", () => {
+    const broken = parseBetaDoc(`root: a
+nodes:
+  a: { stop: true, ui: { x: "left", y: 4 } }
+`);
+    expect(layoutBetaTree(broken).byId.get("a")!.pinned).toBe(false);
   });
 });

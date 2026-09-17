@@ -18,6 +18,7 @@ import {
   betaNodeKind,
   edgeKey,
   outgoingEdges,
+  readNodePosition,
   type BetaNode,
   type BetaNodeKind,
   type BetaTreeDoc,
@@ -28,6 +29,10 @@ export const BETA_LAYOUT = {
   NODE_HEIGHT: 108,
   /** A switch grows with its cases; each row adds this much. */
   SWITCH_ROW_HEIGHT: 16,
+  /** A stop is drawn as a circle, so its box is square. The walk ending is
+   *  the one thing on the canvas that is not a step, and a different outline
+   *  says that faster than a label does. */
+  STOP_DIAMETER: 120,
   COL_GAP: 40,
   ROW_GAP: 56,
   MARGIN: 32,
@@ -39,9 +44,13 @@ export interface BetaPositionedNode {
   y: number;
   width: number;
   height: number;
+  /** How the canvas draws it. A stop is a circle inscribed in its square. */
+  shape: "box" | "circle";
   kind: BetaNodeKind;
   depth: number;
   data: BetaNode;
+  /** True when the author placed this node by hand. */
+  pinned: boolean;
 }
 
 export interface BetaPositionedEdge {
@@ -73,11 +82,21 @@ const EMPTY: BetaLayoutResult = {
 };
 
 /** How tall one node's box is. A switch shows its ordered cases and its
- *  default in the body, so it is as tall as it has rows. */
+ *  default in the body, so it is as tall as it has rows. A stop is a circle,
+ *  so it is as tall as it is wide. */
 export function betaNodeHeight(node: BetaNode): number {
-  if (betaNodeKind(node) !== "switch") return BETA_LAYOUT.NODE_HEIGHT;
+  const kind = betaNodeKind(node);
+  if (kind === "stop") return BETA_LAYOUT.STOP_DIAMETER;
+  if (kind !== "switch") return BETA_LAYOUT.NODE_HEIGHT;
   const rows = (node.switch?.cases?.length ?? 0) + 1; // + the default row
   return BETA_LAYOUT.NODE_HEIGHT + Math.max(0, rows - 2) * BETA_LAYOUT.SWITCH_ROW_HEIGHT;
+}
+
+/** How wide one node's box is. Only a stop differs: its circle is narrower
+ *  than a step's box, and it sits in the middle of the slot the band gave
+ *  it so its incoming edges still land on its top. */
+export function betaNodeWidth(node: BetaNode): number {
+  return betaNodeKind(node) === "stop" ? BETA_LAYOUT.STOP_DIAMETER : BETA_LAYOUT.NODE_WIDTH;
 }
 
 export function layoutBetaTree(doc: BetaTreeDoc | null | undefined): BetaLayoutResult {
@@ -140,15 +159,19 @@ export function layoutBetaTree(doc: BetaTreeDoc | null | undefined): BetaLayoutR
     const band = bands.get(d) ?? [];
     band.forEach((id, index) => {
       const node = nodes[id];
+      const width = betaNodeWidth(node);
+      const slotX = BETA_LAYOUT.MARGIN + index * (BETA_LAYOUT.NODE_WIDTH + BETA_LAYOUT.COL_GAP);
       placed.set(id, {
         id,
-        x: BETA_LAYOUT.MARGIN + index * (BETA_LAYOUT.NODE_WIDTH + BETA_LAYOUT.COL_GAP),
+        x: slotX + (BETA_LAYOUT.NODE_WIDTH - width) / 2,
         y: bandTop.get(d)!,
-        width: BETA_LAYOUT.NODE_WIDTH,
+        width,
         height: betaNodeHeight(node),
+        shape: betaNodeKind(node) === "stop" ? "circle" : "box",
         kind: betaNodeKind(node),
         depth: d,
         data: node,
+        pinned: false,
       });
     });
   }
@@ -167,6 +190,17 @@ export function layoutBetaTree(doc: BetaTreeDoc | null | undefined): BetaLayoutR
       const p = placed.get(id)!;
       p.x += shift;
     }
+  }
+
+  // A node the author dragged sits where they put it. The automatic layout
+  // still runs for everything else, so a half-arranged graph is readable
+  // rather than a pile at the origin.
+  for (const p of placed.values()) {
+    const manual = readNodePosition(p.data);
+    if (!manual) continue;
+    p.x = manual.x;
+    p.y = manual.y;
+    p.pinned = true;
   }
 
   const edges: BetaPositionedEdge[] = [];

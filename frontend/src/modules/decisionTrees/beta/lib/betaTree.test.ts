@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   STARTER_BETA_YAML,
+  POSITION_GRID,
   attachBetaNode,
   betaNodeKind,
   buildBetaNode,
+  clearBetaNodePositions,
   deleteBetaNode,
   dumpBetaDoc,
   edgeKey,
@@ -17,7 +19,10 @@ import {
   referrersOf,
   registeredCodes,
   rewireBetaSlot,
+  hasNodePositions,
+  readNodePosition,
   setBetaNode,
+  setBetaNodePosition,
   slotsOf,
   suggestSwitchDefault,
   writeCombinations,
@@ -311,5 +316,41 @@ describe("STARTER_BETA_YAML", () => {
     const d = parseBetaDoc(STARTER_BETA_YAML);
     expect(d).not.toBeNull();
     expect(parseBetaDoc(dumpBetaDoc(d!))).toEqual(d);
+  });
+});
+
+describe("node positions", () => {
+  it("writes a position and snaps it to the grid, so two dropped nodes line up", () => {
+    const next = setBetaNodePosition(YAML, "reg_1", { x: 303, y: 97 });
+    expect(readNodePosition(doc(next).nodes!.reg_1)).toEqual({ x: 304, y: 96 });
+    expect(304 % POSITION_GRID).toBe(0);
+  });
+
+  it("leaves every other node without one", () => {
+    const next = setBetaNodePosition(YAML, "reg_1", { x: 0, y: 0 });
+    expect(readNodePosition(doc(next).nodes!.stop_1)).toBeNull();
+  });
+
+  it("changes the body, which is what makes the server keep the move", () => {
+    // A save whose compiled body hashes the same as the last one is a no-op,
+    // so a position the engine ignores still has to reach the document.
+    expect(setBetaNodePosition(YAML, "reg_1", { x: 40, y: 40 })).not.toBe(YAML);
+  });
+
+  it("clears every position at once", () => {
+    let next = setBetaNodePosition(YAML, "reg_1", { x: 40, y: 40 });
+    next = setBetaNodePosition(next, "stop_1", { x: 80, y: 80 });
+    expect(hasNodePositions(doc(next))).toBe(true);
+    expect(hasNodePositions(doc(clearBetaNodePositions(next)))).toBe(false);
+  });
+
+  it("refuses a node that is not there, rather than writing a stray key", () => {
+    expect(() => setBetaNodePosition(YAML, "nope", { x: 1, y: 1 })).toThrow(/not found/);
+  });
+
+  it("reads a half-written position as none", () => {
+    expect(readNodePosition({ ui: { x: 10 } })).toBeNull();
+    expect(readNodePosition({ ui: { x: Number.NaN, y: 2 } })).toBeNull();
+    expect(readNodePosition({})).toBeNull();
   });
 });

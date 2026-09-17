@@ -108,7 +108,9 @@
       "switchDefault": "else → {{target}}",
       "switchNoDefault": "else → not set",
       "stop": "Ends the walk and folds"
-    }
+    },
+    "hintDraggable": "Click a node to edit it, drag a node to move it. Ctrl and scroll to zoom, drag the background to pan.",
+    "resetLayout": "Back to automatic layout"
   },
   "node": {
     "title": "Node",
@@ -177,7 +179,8 @@
       "grid": "Grid",
       "crop_attribute": "Crop attribute",
       "params": "Tree parameter",
-      "vars": "Variable set earlier"
+      "vars": "Variable set earlier",
+      "findings": "Finding recorded earlier"
     },
     "indexCode": "Index",
     "key": "Reading",
@@ -400,5 +403,27 @@
     "ne": "is not",
     "in": "is one of",
     "between": "is between"
+  },
+  "condition": {
+    "title": "Test",
+    "empty": "This node tests nothing yet, so every cell takes the miss branch.",
+    "addTest": "Add a test",
+    "addGroup": "Add a group",
+    "remove": "Remove",
+    "groupMode": "How the group matches",
+    "allOf": "Every one of these",
+    "anyOf": "Any one of these",
+    "not": "Not",
+    "left": "What to read",
+    "op": "Operator",
+    "right": "Value",
+    "low": "From",
+    "high": "To",
+    "values": "Values",
+    "valuesHelp": "Separate them with commas.",
+    "operandRef": "Another reading",
+    "useRef": "Compare against a reading",
+    "useValue": "Compare against a value",
+    "unsupported": "This test was written by hand in a shape the editor does not offer."
   }
 }
