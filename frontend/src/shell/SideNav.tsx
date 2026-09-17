@@ -230,6 +230,15 @@ export function SideNav(): ReactNode {
           activePathPrefix="/platform/decision-trees"
           collapsed={collapsed}
         />
+        {/* The beta designer, a separate surface beside the current editor
+            while the folding engine is built. */}
+        <SideNavItem
+          to="/platform/decision-trees-beta"
+          label={t("nav.platformDecisionTreesBeta")}
+          icon={<RulesIcon className="h-4 w-4" />}
+          activePathPrefix="/platform/decision-trees-beta"
+          collapsed={collapsed}
+        />
         <SideNavItem
           to="/platform/plan-templates"
           label={t("nav.planTemplates")}

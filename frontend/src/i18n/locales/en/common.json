@@ -47,6 +47,7 @@
     "configsTitle": "Configuration",
     "configTenantSettings": "Tenant settings",
     "configDecisionTrees": "Decision trees",
+    "configDecisionTreesBeta": "Beta designer",
     "preferences": "Preferences",
     "notificationSettings": "Notification settings",
     "alertsTitle": "Alerts",

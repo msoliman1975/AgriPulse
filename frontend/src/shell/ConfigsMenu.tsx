@@ -83,6 +83,17 @@ export function ConfigsMenu(): ReactNode {
               {t("shell.configDecisionTrees")}
             </Link>
           ) : null}
+          {canDecisionTrees ? (
+            <Link
+              to="/decision-trees-beta"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className={itemClass}
+            >
+              <RecommendationsIcon className="h-4 w-4" />
+              {t("shell.configDecisionTreesBeta")}
+            </Link>
+          ) : null}
           <Link
             to="/settings"
             role="menuitem"

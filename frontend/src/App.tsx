@@ -37,6 +37,9 @@ import { DecisionTreeListPage } from "@/modules/decisionTrees/pages/DecisionTree
 import { DecisionTreeCreatePage } from "@/modules/decisionTrees/pages/DecisionTreeCreatePage";
 import { DecisionTreeViewerPage } from "@/modules/decisionTrees/pages/DecisionTreeViewerPage";
 import { DecisionTreeTracesPage } from "@/modules/decisionTrees/pages/DecisionTreeTracesPage";
+import { BetaTreeListPage } from "@/modules/decisionTrees/beta/pages/BetaTreeListPage";
+import { BetaDesignerPage } from "@/modules/decisionTrees/beta/pages/BetaDesignerPage";
+import { FindingCataloguePage } from "@/modules/decisionTrees/beta/pages/FindingCataloguePage";
 import { MapExperiencePage } from "@/modules/labs/map/MapExperiencePage";
 import { FarmConsolePage } from "@/modules/labs/mapnext/FarmConsolePage";
 import { FarmConsoleV2Page } from "@/modules/labs/console/FarmConsoleV2Page";
@@ -247,6 +250,13 @@ export function App(): ReactNode {
                   a literal segment there would shadow a tree whose code
                   happened to be "traces", and the API paths match this. */}
                 <Route path="/decision-tree-traces" element={<DecisionTreeTracesPage />} />
+                {/* The beta designer and the finding catalogue. Outside
+                  /decision-trees/ for the same reason the traces page is: a
+                  literal segment there would shadow a tree whose code
+                  happened to be "beta". */}
+                <Route path="/decision-trees-beta" element={<BetaTreeListPage />} />
+                <Route path="/decision-trees-beta/:code" element={<BetaDesignerPage />} />
+                <Route path="/decision-tree-findings" element={<FindingCataloguePage />} />
                 {/* Tenant Settings Hub. Capability checks live on each
                   page so a deep link with the wrong role still 403s. */}
                 {/* The caller's own settings. Outside /settings on purpose:
@@ -338,6 +348,12 @@ export function App(): ReactNode {
                 <Route path="decision-trees" element={<DecisionTreeListPage />} />
                 <Route path="decision-trees/new" element={<DecisionTreeCreatePage />} />
                 <Route path="decision-trees/:code" element={<DecisionTreeViewerPage />} />
+                {/* The platform twin of the beta surface. Both prefixes mount
+                    the same pages; each reads its scope from the caller's own
+                    claims, so neither can edit the other's rows. */}
+                <Route path="decision-trees-beta" element={<BetaTreeListPage />} />
+                <Route path="decision-trees-beta/:code" element={<BetaDesignerPage />} />
+                <Route path="decision-tree-findings" element={<FindingCataloguePage />} />
                 <Route path="plan-templates" element={<PlatformPlanTemplatesPage />} />
                 <Route path="backfill" element={<PlatformBackfillPage />} />
                 <Route path="observer" element={<PlatformObserverPage />} />
