@@ -100,6 +100,12 @@ def rule_label(rule: CombinationRule) -> str:
     The author's own id when the rule has one, because that is what they read
     in the designer. Otherwise the set itself, which is unambiguous: two rules
     cannot hold the same set and both fire, since matching is on equality.
+
+    In practice the set is always what is used. ``folding_compiler``'s
+    ``_check_combinations`` keeps codes, action_type, status and both texts,
+    and drops ``code``, so no author-given rule id survives a publish. Design
+    section 9 prints "rule r3", which needs that id kept; that is a gap in the
+    compiler, and the compiler belongs to another session.
     """
     if rule.code:
         return rule.code
@@ -532,7 +538,12 @@ class EstateDryRunRepository:
             "       count(*) AS cells, "
             "       count(DISTINCT t.recommendation_id) "
             "         FILTER (WHERE t.recommendation_id IS NOT NULL) AS cards_opened, "
-            "       min(t.recommendation_id) AS recommendation_id, "
+            # `min()` has no uuid overload in Postgres. One id of the group is
+            # all this column is for — the row links to the card it opened —
+            # so the first of the aggregated ids is the answer.
+            "       (array_agg(t.recommendation_id) "
+            "          FILTER (WHERE t.recommendation_id IS NOT NULL))[1] "
+            "         AS recommendation_id, "
             "       max(t.evaluated_at) AS last_evaluated_at, "
             "       count(*) FILTER (WHERE t.error IS NOT NULL) AS errored "
             "FROM decision_tree_eval_traces t "

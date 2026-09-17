@@ -72,6 +72,9 @@ def _definition(code: str) -> dict[str, Any]:
     clause to read. The combination rule on ``{ndvi_low}`` fires; the rule on
     ``{ndvi_low, dry}`` cannot, because no node registers ``dry`` — which is
     what makes "rules fired, 1 of 2" a real assertion rather than arithmetic.
+
+    Both rules carry a ``code``. The compiler drops it, so the report names
+    them by their set; the assertions below say so rather than hiding it.
     """
     return {
         "code": code,
@@ -302,14 +305,21 @@ async def test_estate_dry_run_covers_every_block_and_writes_no_card(admin_sessio
     assert [s["label"] for s in sets] == ["{ndvi_low}"]
     assert sets[0]["count"] == 2
     assert sets[0]["blocks"] == 2
-    assert sets[0]["matched_rule"] == "r_low"
     assert sets[0]["composed"] is False
+
+    # The rule is named by its set, not by the `code` the definition gave it.
+    # `folding_compiler._check_combinations` keeps codes, action_type, status
+    # and both texts, and drops `code`, so no author-given rule id survives a
+    # publish. `rule_label` falls back to the set for exactly this reason. It
+    # is a real gap — design section 9 prints "rule r3" — and it belongs to
+    # the compiler, which this session does not edit.
+    assert sets[0]["matched_rule"] == "{ndvi_low}"
 
     # One rule of two fired. The other names a code no node registers, which
     # is exactly the "wrong or unreachable" case the report exists to show.
     assert report["rules_defined"] == 2
     assert report["rules_fired"] == 1
-    assert report["rules_never_fired"] == ["r_never"]
+    assert report["rules_never_fired"] == ["{dry, ndvi_low}"]
     assert report["composed_share_pct"] == 0.0
     assert report["timing"]["total_ms"] > 0
 

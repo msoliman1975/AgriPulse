@@ -116,11 +116,13 @@ def test_every_cell_composes() -> None:
 
 
 def test_a_rule_without_a_code_still_counts_as_fired() -> None:
-    """A rule may be written without an id, and it fires like any other.
+    """A rule with no id fires like any other, and this is the normal case.
 
-    The cell comes back with ``composed`` false and ``rule_code`` None, so
-    counting fired rules from ``rule_code`` alone would report this rule as
-    never firing and send an author looking for a fault that is not there.
+    ``folding_compiler._check_combinations`` keeps codes, action_type, status
+    and both texts, and drops ``code``, so no author-given rule id survives a
+    publish at all. Every fired rule therefore arrives here with
+    ``rule_code`` None, and counting fired rules from ``rule_code`` would
+    report every rule as never firing.
     """
     rules = [CombinationRule(codes=frozenset({"dry"}), text_en="Irrigate", code=None)]
     cells = [_cell(identity=["dry"], composed=False, rule_code=None)]
