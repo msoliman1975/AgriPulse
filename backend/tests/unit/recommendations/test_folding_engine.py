@@ -668,3 +668,120 @@ def test_a_shipped_catalogue_row_folds_and_shows_the_missing_action_type() -> No
     assert card.status == "stressed"
     assert card.action_type == "scout"
     assert card.actions == {}
+
+
+# --- against the compiler's own tree ----------------------------------------
+#
+# `folding_compiler_fixtures.mango_folding_tree` is the 40-node merged tree the
+# compiler is tested against. Walking it here is the only place the compiler's
+# output shape and this walk's input shape meet. Without it each half is tested
+# against its own idea of the other.
+
+
+def _mango_ctx(risks: dict[str, int]) -> ConditionContext:
+    from app.shared.conditions import WeatherRiskEntry
+
+    codes = (
+        "ndvi",
+        "savi",
+        "msavi",
+        "ndmi",
+        "ndre",
+        "evi",
+        "gndvi",
+        "msi",
+        "smi",
+        "cwsi",
+        "lst",
+        "bsi",
+    )
+    return ConditionContext(
+        block_id="b1",
+        indices={
+            code: IndicesEntry(
+                time=datetime(2026, 9, 1),
+                mean=Decimal("0.35"),
+                baseline_deviation=Decimal("-1.8"),
+            )
+            for code in codes
+        },
+        weather_risks={
+            code: WeatherRiskEntry(
+                date=date(2026, 9, 1), score=score, level="high" if score >= 70 else "low"
+            )
+            for code, score in risks.items()
+        },
+        block_attributes={
+            "growth_stage": "fruit_development",
+            "soil_texture": "sandy",
+            "salinity_class": "low",
+        },
+        crop_attributes={"canopy_size": "large", "bearing_status": "bearing"},
+    )
+
+
+_ALL_RISKS = {
+    "anthracnose": 78,
+    "powdery_mildew": 20,
+    "fruit_fly": 15,
+    "frost": 0,
+    "heat": 30,
+}
+
+
+def test_the_compilers_mango_tree_walks_to_a_stop_and_folds() -> None:
+    from app.modules.recommendations.findings import FindingDef as RealFindingDef
+    from app.modules.recommendations.folding_compiler_fixtures import mango_folding_tree
+
+    result = walk_tree(mango_folding_tree(), _mango_ctx(_ALL_RISKS))
+
+    assert result.ok, result.error
+    assert result.stopped_at is not None
+    # No node is visited twice on an honest walk of a real tree.
+    assert len({step.node_id for step in result.path}) == len(result.path)
+    assert result.variables["index_used"] == "savi"
+
+    codes = sorted(f.code for f in result.findings)
+    assert codes == ["block_declining", "cover_open", "pest_high"]
+
+    catalogue = {
+        code: RealFindingDef(
+            code=code,
+            clause_en=f"{code} was found",
+            clause_ar=f"تم رصد {code}",
+            name_en=code,
+            name_ar=code,
+            default_status="stressed",
+            source="platform",
+        )
+        for code in codes
+    }
+    card = fold(result.findings, catalogue=catalogue)
+
+    assert card is not None
+    assert card.identity == ("block_declining", "cover_open", "pest_high")
+    assert card.severity == "critical"
+
+
+def test_a_risk_code_the_context_never_loaded_stops_the_mango_walk() -> None:
+    """Section 10's trap, on the real tree: the switch subject is missing, so
+    the walk errors rather than taking the default."""
+    from app.modules.recommendations.folding_compiler_fixtures import mango_folding_tree
+
+    without_fruit_fly = {k: v for k, v in _ALL_RISKS.items() if k != "fruit_fly"}
+
+    result = walk_tree(mango_folding_tree(), _mango_ctx(without_fruit_fly))
+
+    assert not result.ok
+    assert result.error is not None
+    assert "matched no case" in result.error
+    assert "fruit_fly" in result.error
+
+
+def test_switch_case_operators_match_the_compiler() -> None:
+    """The compiler rejects a case using any other operator, so a case it
+    accepts must be one this walk can evaluate."""
+    from app.modules.recommendations.folding_compiler import SWITCH_CASE_OPS
+    from app.modules.recommendations.folding_engine import _CASE_OPS
+
+    assert set(_CASE_OPS) == set(SWITCH_CASE_OPS)
