@@ -33,7 +33,7 @@ def _cell(
     composed: bool = True,
     rule_code: str | None = None,
     error: str | None = None,
-    status: str = "watch",
+    status: str = "issue",
 ) -> dict[str, Any]:
     """One cell row in the shape the per-block dry run returns."""
     return {

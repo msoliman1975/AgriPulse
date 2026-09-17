@@ -140,7 +140,7 @@ def test_a_matching_rule_supplies_the_text_and_the_action() -> None:
             {
                 "codes": ["dry", "vigour_low"],
                 "action_type": "irrigate",
-                "status": "stressed",
+                "status": "alert",
                 "text_en": "Water shortage is the cause. Irrigate first.",
                 "text_ar": "السبب نقص ماء. اروِ أولًا.",
                 "code": "r_dry_vigour",
@@ -161,7 +161,7 @@ def test_a_matching_rule_supplies_the_text_and_the_action() -> None:
     assert row["rule_code"] == "r_dry_vigour"
     assert row["text_en"] == "Water shortage is the cause. Irrigate first."
     assert row["action_type"] == "irrigate"
-    assert row["status"] == "stressed"
+    assert row["status"] == "alert"
 
 
 def test_an_errored_walk_is_not_folded() -> None:
