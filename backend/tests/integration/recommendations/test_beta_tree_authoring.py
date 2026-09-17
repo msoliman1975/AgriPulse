@@ -75,7 +75,7 @@ def _definition(code: str, *, text_en: str = "first", registers: bool = False) -
                     # The key that YAML turns into the boolean True. Stored as
                     # JSON it stays a string, which is the change this whole
                     # piece of work rests on.
-                    "on": {"source": "indices", "index": "ndvi", "field": "mean"},
+                    "on": {"source": "indices", "index_code": "ndvi", "key": "mean"},
                     "cases": [{"ge": {"source": "params", "name": "floor"}, "go": "n_stop"}],
                     "default": "n_stop",
                 },
@@ -184,8 +184,8 @@ async def test_create_stores_the_definition_as_an_object(admin_session: AsyncSes
     stored = tree["definition"]
     assert stored["nodes"]["n_switch"]["switch"]["on"] == {
         "source": "indices",
-        "index": "ndvi",
-        "field": "mean",
+        "index_code": "ndvi",
+        "key": "mean",
     }, "the switch key came back as a string, not as the boolean True"
     assert stored["name_ar"] == "شجرة تجريبية"
 

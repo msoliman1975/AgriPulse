@@ -79,7 +79,7 @@ def _tree(*, registers: list[str], broken_switch: bool = False) -> dict:
         # permissive on missing data (design section 10).
         nodes["n_switch"] = {
             "switch": {
-                "on": {"source": "indices", "index": "never_measured", "field": "mean"},
+                "on": {"source": "indices", "index_code": "never_measured", "key": "mean"},
                 "cases": [{"ge": 0.5, "go": nxt}],
                 "default": None,
             }

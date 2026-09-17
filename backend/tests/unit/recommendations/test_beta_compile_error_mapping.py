@@ -47,7 +47,7 @@ def _three_rule_failure() -> dict[str, Any]:
             # 1. a switch with no default.
             "n_switch": {
                 "switch": {
-                    "on": {"source": "indices", "index": "ndvi", "field": "mean"},
+                    "on": {"source": "indices", "index_code": "ndvi", "key": "mean"},
                     "cases": [{"ge": 0.3, "go": "n_stop"}],
                 }
             },

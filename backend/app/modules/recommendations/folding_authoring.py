@@ -680,7 +680,7 @@ class FoldingTreeAuthorService:
         )
         from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
         from app.modules.weather.snapshot import load_water_balance_snapshot
-        from app.shared.conditions.context import ConditionContext
+        from app.shared.conditions import ConditionContext
 
         latest_indices = await repo.get_latest_aggregate_per_index(block_id=block_id)
         _merge_index_trends(latest_indices, await repo.get_index_trends(block_id=block_id))
@@ -764,7 +764,7 @@ class FoldingTreeAuthorService:
 def _cell_indices(base_ctx: Any, latest_indices: dict[str, Any], cell_means: Any) -> Any:
     """This cell's index readings, built the way the sweep builds them."""
     from app.modules.recommendations.service import _merge_cell_means
-    from app.shared.conditions.context import ConditionContext
+    from app.shared.conditions import ConditionContext
 
     return ConditionContext.from_block_signals(
         block_id=base_ctx.block_id,

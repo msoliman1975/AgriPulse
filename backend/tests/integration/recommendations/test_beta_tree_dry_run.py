@@ -75,7 +75,7 @@ def _definition(code: str) -> dict[str, Any]:
             "n_switch": {
                 "label_en": "Is the canopy above the floor?",
                 "switch": {
-                    "on": {"source": "indices", "index": "ndvi", "field": "mean"},
+                    "on": {"source": "indices", "index_code": "ndvi", "key": "mean"},
                     "cases": [
                         {"ge": {"source": "params", "name": "floor"}, "go": "n_ok"},
                     ],
