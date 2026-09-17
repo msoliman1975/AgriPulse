@@ -12,6 +12,7 @@ Two sessions:
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, cast
@@ -2672,3 +2673,190 @@ class RecommendationsRepository:
             .all()
         )
         return [dict(r) for r in rows]
+
+
+# --- Finding catalogue -----------------------------------------------------
+#
+# The two tables are the same eight columns in two schemas, so the SQL is
+# written once and the schema qualifier is the only thing that varies. Both
+# statements are parameterised except for that qualifier, which is never
+# caller-supplied: it is one of two literals chosen by `_PLATFORM` /
+# `_TENANT` below.
+
+_FINDING_COLUMNS = (
+    "code, clause_en, clause_ar, name_en, name_ar, default_status, "
+    "description_en, description_ar, is_active, created_at, updated_at"
+)
+
+
+class FindingsRepository:
+    """Reads and writes both finding catalogues.
+
+    Separate from `RecommendationsRepository` because it needs neither of
+    that class's two sessions in the roles it gives them: the platform
+    catalogue is read and written through the admin session, and a tenant's
+    own through the request-scoped one, and mixing them up is the bug that
+    would let one tenant write another's rows.
+    """
+
+    def __init__(
+        self, *, tenant_session: AsyncSession | None, public_session: AsyncSession
+    ) -> None:
+        self._tenant = tenant_session
+        self._public = public_session
+
+    # ---- Reads --------------------------------------------------------
+
+    async def list_platform(self, *, include_inactive: bool = False) -> tuple[dict[str, Any], ...]:
+        return await self._list(self._public, "public.decision_tree_findings", include_inactive)
+
+    async def list_tenant(self, *, include_inactive: bool = False) -> tuple[dict[str, Any], ...]:
+        """This tenant's own rows, through the request-scoped session.
+
+        Unqualified on purpose: the session's search_path decides which
+        tenant's table this is, and that is set per request from the JWT.
+        Schema-qualifying it here would need the schema name threaded down
+        and would be one more place a caller could name the wrong tenant.
+        """
+        if self._tenant is None:
+            return ()
+        return await self._list(self._tenant, "decision_tree_findings", include_inactive)
+
+    @staticmethod
+    async def _list(
+        session: AsyncSession, table: str, include_inactive: bool
+    ) -> tuple[dict[str, Any], ...]:
+        predicate = "" if include_inactive else "WHERE is_active "
+        rows = await session.execute(
+            text(
+                f"SELECT {_FINDING_COLUMNS} FROM {table} {predicate}ORDER BY code"  # noqa: S608 - `table` is one of two module literals, never caller input
+            )
+        )
+        return tuple(dict(row) for row in rows.mappings())
+
+    async def get_platform(self, *, code: str) -> dict[str, Any] | None:
+        return await self._get(self._public, "public.decision_tree_findings", code)
+
+    async def get_tenant(self, *, code: str) -> dict[str, Any] | None:
+        if self._tenant is None:
+            return None
+        return await self._get(self._tenant, "decision_tree_findings", code)
+
+    @staticmethod
+    async def _get(session: AsyncSession, table: str, code: str) -> dict[str, Any] | None:
+        row = (
+            (
+                await session.execute(
+                    text(
+                        f"SELECT {_FINDING_COLUMNS} FROM {table} WHERE code = :code"  # noqa: S608 - `table` is one of two module literals, never caller input
+                    ),
+                    {"code": code},
+                )
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row is not None else None
+
+    # ---- Writes -------------------------------------------------------
+
+    async def insert_platform(self, **values: Any) -> dict[str, Any]:
+        return await self._insert(self._public, "public.decision_tree_findings", values)
+
+    async def insert_tenant(self, **values: Any) -> dict[str, Any]:
+        assert self._tenant is not None, "tenant session required; the route checks scope first"
+        return await self._insert(self._tenant, "decision_tree_findings", values)
+
+    @staticmethod
+    async def _insert(
+        session: AsyncSession, table: str, values: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        row = (
+            (
+                await session.execute(
+                    text(
+                        f"INSERT INTO {table} "  # noqa: S608 - `table` is one of two module literals, never caller input
+                        "(code, clause_en, clause_ar, name_en, name_ar, default_status, "
+                        " description_en, description_ar, created_by, updated_by) "
+                        "VALUES (:code, :clause_en, :clause_ar, :name_en, :name_ar, "
+                        "        :default_status, :description_en, :description_ar, "
+                        "        :actor, :actor) "
+                        f"RETURNING {_FINDING_COLUMNS}"
+                    ).bindparams(bindparam("actor", type_=PG_UUID(as_uuid=True))),
+                    dict(values),
+                )
+            )
+            .mappings()
+            .one()
+        )
+        return dict(row)
+
+    async def update_platform(self, **values: Any) -> dict[str, Any] | None:
+        return await self._update(self._public, "public.decision_tree_findings", values)
+
+    async def update_tenant(self, **values: Any) -> dict[str, Any] | None:
+        assert self._tenant is not None, "tenant session required; the route checks scope first"
+        return await self._update(self._tenant, "decision_tree_findings", values)
+
+    @staticmethod
+    async def _update(
+        session: AsyncSession, table: str, values: Mapping[str, Any]
+    ) -> dict[str, Any] | None:
+        """Full replace of the editable fields. None when the code is absent.
+
+        `code` is not in the SET list. It is stored in every
+        `recommendations.finding_set` that ever carried it, so renaming one
+        would orphan history that has no way back to it.
+        """
+        row = (
+            (
+                await session.execute(
+                    text(
+                        f"UPDATE {table} SET "  # noqa: S608 - `table` is one of two module literals, never caller input
+                        "  clause_en = :clause_en, clause_ar = :clause_ar, "
+                        "  name_en = :name_en, name_ar = :name_ar, "
+                        "  default_status = :default_status, "
+                        "  description_en = :description_en, "
+                        "  description_ar = :description_ar, "
+                        "  updated_by = :actor "
+                        "WHERE code = :code "
+                        f"RETURNING {_FINDING_COLUMNS}"
+                    ).bindparams(bindparam("actor", type_=PG_UUID(as_uuid=True))),
+                    dict(values),
+                )
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row is not None else None
+
+    async def deactivate_platform(self, *, code: str, actor_user_id: UUID | None) -> int:
+        return await self._deactivate(
+            self._public, "public.decision_tree_findings", code, actor_user_id
+        )
+
+    async def deactivate_tenant(self, *, code: str, actor_user_id: UUID | None) -> int:
+        assert self._tenant is not None, "tenant session required; the route checks scope first"
+        return await self._deactivate(self._tenant, "decision_tree_findings", code, actor_user_id)
+
+    @staticmethod
+    async def _deactivate(
+        session: AsyncSession, table: str, code: str, actor_user_id: UUID | None
+    ) -> int:
+        """Retire a code. Returns rows touched, so 0 means "no such code".
+
+        Never a DELETE. Every `recommendations.finding_set` that carried this
+        code still names it, and a compiled tree may still register it; the
+        row has to stay readable so those cards keep their words. The
+        `is_active` predicate makes a second deactivate return 0 rather than
+        reporting success on a row it did not change.
+        """
+        return _rowcount(
+            await session.execute(
+                text(
+                    f"UPDATE {table} SET is_active = FALSE, updated_by = :actor "  # noqa: S608 - `table` is one of two module literals, never caller input
+                    "WHERE code = :code AND is_active"
+                ).bindparams(bindparam("actor", type_=PG_UUID(as_uuid=True))),
+                {"code": code, "actor": actor_user_id},
+            )
+        )

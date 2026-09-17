@@ -454,6 +454,16 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
 # The tenant schema is removed wholesale by DROP SCHEMA ... CASCADE, so nothing
 # tenant-schema lives here. This manifest covers only the public-schema residue,
 # which is where every observed tenant-purge orphan has come from.
+#
+# `tenant_*.decision_tree_findings` (tenant migration 0094) is deliberately
+# absent, and it is worth saying why because the rule "every new tenant table
+# joins the manifest" makes its absence look like the omission the guard test
+# exists to catch. It is not. The guard sweeps for `tenant_id`, `farm_id` and
+# `block_id`, and that table carries none of the three: it is keyed on the
+# finding code and the schema is the tenancy. There is nothing to scope a
+# DELETE by, so an entry could not be written — `OwnedTable` requires an owner
+# column or a `where_sql`, and both would be inventions. DROP SCHEMA takes it,
+# which is the same treatment `tree_parameter_overrides` already gets.
 
 TENANT_PUBLIC_OWNED: tuple[OwnedTable, ...] = (
     OwnedTable(
