@@ -40,11 +40,13 @@ from app.shared.conditions.errors import ConditionParseError
 from app.shared.conditions.models import (
     BlockValueRef,
     CropAttributeValueRef,
+    FindingsValueRef,
     GridValueRef,
     IndicesValueRef,
     ParamsValueRef,
     SignalsValueRef,
     ValueRef,
+    VarsValueRef,
     WaterBalanceValueRef,
     WeatherIndexValueRef,
     WeatherRiskValueRef,
@@ -204,7 +206,25 @@ def _resolve(  # noqa: PLR0911, PLR0912 - dispatch over ValueRef kinds
         return ctx.crop_attributes.get(ref.code)
     if isinstance(ref, ParamsValueRef):
         return ctx.params.get(ref.name)
+    if isinstance(ref, FindingsValueRef):
+        # Presence only, and a bool rather than None for an absent finding:
+        # "this finding was not registered" is a fact the walk knows, not
+        # missing data, so it must branch rather than fail closed.
+        return ref.code in ctx.findings
+    if isinstance(ref, VarsValueRef):
+        return ctx.vars.get(ref.name)
     return None
+
+
+def resolve_ref(ref: ValueRef, ctx: ConditionContext) -> Any:
+    """Resolve one already-parsed value ref against ``ctx``.
+
+    The public entry point to the same dispatch the comparison evaluator
+    uses. A ``set`` node in the folding engine copies a live reading by
+    resolving a ref outside any comparison, and it must read the value the
+    exact same way a condition would.
+    """
+    return _resolve(ref, ctx)
 
 
 def _ref_key(ref: ValueRef) -> str:  # noqa: PLR0911 - dispatch over ValueRef kinds
@@ -226,6 +246,10 @@ def _ref_key(ref: ValueRef) -> str:  # noqa: PLR0911 - dispatch over ValueRef ki
         return f"crop_attribute.{ref.code}.{ref.key}"
     if isinstance(ref, ParamsValueRef):
         return f"params.{ref.name}"
+    if isinstance(ref, FindingsValueRef):
+        return f"findings.{ref.code}.{ref.key}"
+    if isinstance(ref, VarsValueRef):
+        return f"vars.{ref.name}"
     return f"block.{ref.field}"
 
 

@@ -184,6 +184,14 @@ class SignalEntry:
 CROP_ATTRIBUTE_KEYS: tuple[str, ...] = ("value",)
 
 
+# Allowed keys for a `findings` value-ref (unified decision-tree engine,
+# decision 8). One key, and deliberately only one: a condition may ask
+# whether a finding was registered on this walk and nothing else. Adding
+# `severity` here would let a tree branch on how bad another branch judged
+# something, which is the multiplication the folding design removes.
+FINDING_KEYS: tuple[str, ...] = ("registered",)
+
+
 # Allowed fields for a grid value-ref (G-4). Each maps 1:1 to a
 # ``GridAnomalyEntry`` attribute; ``parse_value_ref`` validates against
 # this tuple and the evaluator reads via ``getattr``.
@@ -302,6 +310,19 @@ class ConditionContext:
     # `{source: params, name: x}` resolves via this dict; missing keys
     # return None (permissive).
     params: dict[str, Any] = field(default_factory=dict)
+    # Scratchpad written by `set` nodes during one folding walk (unified
+    # decision-tree engine, section 4.2). {name: literal-or-copied-reading}.
+    # Only the folding engine writes it; it rebuilds the context with
+    # `dataclasses.replace` after each `set` node, so the caller's context
+    # is never mutated. `{source: vars, name: x}` resolves via this dict and
+    # a name never written returns None, permissive like every other source.
+    vars: dict[str, Any] = field(default_factory=dict)
+    # Finding codes registered so far on one folding walk (section 4.1).
+    # `{source: findings, code: dry}` answers presence only and never
+    # exposes the finding's severity or the node that registered it —
+    # decision 8. Empty for every caller outside the folding engine, so a
+    # presence test outside a folding walk reads False rather than raising.
+    findings: frozenset[str] = frozenset()
 
     @classmethod
     def from_block_signals(
