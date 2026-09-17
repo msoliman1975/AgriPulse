@@ -960,6 +960,13 @@ fail on their own. The vote falls back to leaf water and soil moisture agreeing.
 That is exactly what `t_water_stress_confirm` does today, with no special case
 in the vote nodes.
 
+**Decided 2026-09-16: CWSI on its own no longer opens a critical card.**
+`t_cwsi_irrigation_stress` opens `critical` at every size on the thermal reading
+alone. Here one signal registers `dry_unconfirmed` at `info`, and `dry` needs two
+of three to agree. That follows `t_water_stress_confirm`, whose single-signal
+leaf already says "check, do not act yet". This was raised as a drop in severity
+and accepted. Sessions 2, 3 and 4 should treat it as settled.
+
 ### 5.5 Nutrient, chlorophyll and cover — 13 nodes
 
 ```yaml
