@@ -234,7 +234,7 @@ def _finding_rows_from(raw: Any, *, source: str) -> dict[str, _FindingRow]:
             clause_ar=entry.get("clause_ar") if isinstance(entry.get("clause_ar"), str) else None,
             name_en=str(entry.get("name_en") or code),
             name_ar=entry.get("name_ar") if isinstance(entry.get("name_ar"), str) else None,
-            default_status=str(entry.get("default_status") or "watch"),
+            default_status=str(entry.get("default_status") or "issue"),
             source=source,
             action_type=(
                 entry.get("action_type") if isinstance(entry.get("action_type"), str) else None
@@ -655,7 +655,7 @@ class RecommendationsServiceImpl:
                     clause_ar=r.get("clause_ar"),
                     name_en=str(r.get("name_en") or r["code"]),
                     name_ar=r.get("name_ar"),
-                    default_status=str(r.get("default_status") or "watch"),
+                    default_status=str(r.get("default_status") or "issue"),
                     source=str(r.get("source") or "platform"),
                 )
                 for r in rows

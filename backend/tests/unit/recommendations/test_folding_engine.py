@@ -56,7 +56,7 @@ CATALOGUE: dict[str, Def] = {
         clause_ar="ماء الورقة منخفض",
         name_en="Water shortage",
         name_ar="نقص الري",
-        default_status="stressed",
+        default_status="alert",
         source="water_balance",
         action_type="irrigate",
         actions={"immediate": [{"text_en": "Irrigate this block", "text_ar": "اسقِ هذه القطعة"}]},
@@ -67,7 +67,7 @@ CATALOGUE: dict[str, Def] = {
         clause_ar="تراجعت حيوية المجموع الخضري",
         name_en="Vigour drop",
         name_ar="تراجع الحيوية",
-        default_status="watch",
+        default_status="issue",
         source="indices",
         action_type="scout",
         actions={
@@ -80,7 +80,7 @@ CATALOGUE: dict[str, Def] = {
         clause_ar="ضغط الأنثراكنوز 78 من 100",
         name_en="Anthracnose pressure",
         name_ar="ضغط الأنثراكنوز",
-        default_status="stressed",
+        default_status="alert",
         source="weather_risk",
         action_type="spray",
         actions={
@@ -94,7 +94,7 @@ CATALOGUE: dict[str, Def] = {
         clause_ar=None,
         name_en="Trap count",
         name_ar=None,
-        default_status="watch",
+        default_status="issue",
         source="signals",
     ),
 }
@@ -449,7 +449,7 @@ def test_one_finding() -> None:
     assert card is not None
     assert card.identity == ("dry",)
     assert card.severity == "warning"
-    assert card.status == "stressed"
+    assert card.status == "alert"
     assert card.action_type == "irrigate"
     assert card.text_en == "Leaf water is low."
     assert card.text_ar == "ماء الورقة منخفض."
@@ -464,7 +464,7 @@ def test_three_findings_with_an_exact_combination_rule() -> None:
             text_en="Water shortage is the cause. Irrigate before treating anything else.",
             text_ar="نقص الري هو السبب. اسقِ قبل أي معالجة أخرى.",
             action_type="irrigate",
-            status="stressed",
+            status="alert",
             code="water_first",
         )
     ]
@@ -523,7 +523,7 @@ def test_three_findings_with_no_rule_compose_in_both_languages() -> None:
     # Worst finding sets both, with no author to say otherwise.
     assert card.severity == "critical"
     assert card.action_type == "spray"
-    assert card.status == "stressed"
+    assert card.status == "alert"
     assert card.identity == ("dry", "ndvi_low", "pest_high")
 
 
@@ -571,14 +571,14 @@ def test_arabic_is_dropped_whole_when_one_clause_has_none() -> None:
 def test_status_is_the_worst_default_status() -> None:
     card = fold([_reg("ndvi_low", "info", "n1")], catalogue=CATALOGUE)
     assert card is not None
-    assert card.status == "watch"
+    assert card.status == "issue"
 
     card = fold(
         [_reg("ndvi_low", "info", "n1"), _reg("dry", "info", "n2")],
         catalogue=CATALOGUE,
     )
     assert card is not None
-    assert card.status == "stressed"
+    assert card.status == "alert"
 
 
 def test_a_code_the_catalogue_does_not_hold_is_refused() -> None:
@@ -589,7 +589,7 @@ def test_a_code_the_catalogue_does_not_hold_is_refused() -> None:
 def test_parse_combination_rules_drops_what_it_cannot_read() -> None:
     rules = parse_combination_rules(
         [
-            {"findings": ["dry", "ndvi_low"], "text_en": "ok", "status": "watch", "code": "r1"},
+            {"findings": ["dry", "ndvi_low"], "text_en": "ok", "status": "issue", "code": "r1"},
             {"findings": [], "text_en": "no codes"},
             {"findings": ["dry"], "text_en": ""},
             {"findings": ["dry"], "text_en": "bad status", "status": "on_fire"},
@@ -599,7 +599,7 @@ def test_parse_combination_rules_drops_what_it_cannot_read() -> None:
 
     assert len(rules) == 2
     assert rules[0].codes == frozenset({"dry", "ndvi_low"})
-    assert rules[0].status == "watch"
+    assert rules[0].status == "issue"
     assert rules[1].status is None
 
 
@@ -655,7 +655,7 @@ def test_a_shipped_catalogue_row_folds_and_shows_the_missing_action_type() -> No
             clause_ar="ماء الورقة منخفض",
             name_en="Water shortage",
             name_ar="نقص الري",
-            default_status="stressed",
+            default_status="alert",
             source="platform",
         )
     }
@@ -665,7 +665,7 @@ def test_a_shipped_catalogue_row_folds_and_shows_the_missing_action_type() -> No
     assert card is not None
     assert card.text_en == "Leaf water is low."
     assert card.text_ar == "ماء الورقة منخفض."
-    assert card.status == "stressed"
+    assert card.status == "alert"
     assert card.action_type == "scout"
     assert card.actions == {}
 
@@ -751,7 +751,7 @@ def test_the_compilers_mango_tree_walks_to_a_stop_and_folds() -> None:
             clause_ar=f"تم رصد {code}",
             name_en=code,
             name_ar=code,
-            default_status="stressed",
+            default_status="alert",
             source="platform",
         )
         for code in codes
