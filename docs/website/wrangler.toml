@@ -1,0 +1,26 @@
+# AgriPulse documentation site — Cloudflare Worker serving static assets.
+#
+# The whole site is static HTML. No Worker code runs, so every request is
+# served from the static asset store and costs nothing on the free plan.
+#
+#   npx wrangler deploy            # from this directory
+#
+# Deployed automatically by .github/workflows/websites.yml on a push to main.
+
+name = "agripulse-docs"
+compatibility_date = "2026-08-01"
+workers_dev = false
+
+[assets]
+directory = "."
+# /kb -> kb.html, / -> index.html
+# "none" serves /x.html directly but 404s the site root, so the extra
+# 307 from /x.html to /x is the price of a working "/".
+html_handling = "auto-trailing-slash"
+not_found_handling = "404-page"
+
+# The custom domain is attached to this Worker once, out of band, with
+# infra/websites/attach-domains.sh. It is not declared here because the
+# deploy token has Workers Scripts edit but not zone Workers Routes edit,
+# and wrangler would fail on every deploy trying to reconcile the route.
+# Move the route back into this file once the token carries that permission.

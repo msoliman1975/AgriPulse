@@ -1,0 +1,1026 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AgriPulse Documentation — structure proposal</title>
+<meta name="description" content="Proposed structure for the AgriPulse documentation site at www.agripulse.tech: solution theme, product abstract and key concepts, How-To index, and the seeded Knowledge Base." />
+<meta name="robots" content="noindex" />
+<style>
+  /* ------------------------------------------------------------------
+     Palette is taken from marketing/tailwind.config.mjs so the docs site
+     and the marketing site read as one brand.
+     ------------------------------------------------------------------ */
+  :root {
+    --leaf-50:#f1faf6; --leaf-100:#dcf1e6; --leaf-200:#b5e0c8; --leaf-300:#7fc7a4;
+    --leaf-400:#3eae7c; --leaf-500:#1d9e75; --leaf-600:#0f8d63; --leaf-700:#0f6e56;
+    --leaf-800:#085041; --leaf-900:#04342c;
+    --pulse:#e24b4a; --pulse-soft:#fbe1e0;
+    --sand-50:#fbfaf5; --sand-100:#f7f6f1; --sand-200:#efeee6; --sand-300:#e8e5db;
+
+    --bg:var(--sand-50);
+    --surface:#ffffff;
+    --surface-2:var(--sand-100);
+    --border:var(--sand-300);
+    --border-strong:#d7d3c5;
+    --ink:#1f2420;
+    --ink-soft:#3c443c;
+    --muted:#6c7268;
+    --muted-soft:#9aa097;
+    --accent:var(--leaf-600);
+    --accent-ink:var(--leaf-800);
+    --accent-wash:var(--leaf-50);
+    --code-bg:#f4f3ec;
+
+    --radius:10px;
+    --maxw:1180px;
+    --sans: Inter, -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#0e1512; --surface:#141d19; --surface-2:#18231e;
+      --border:#22302a; --border-strong:#2e3f37;
+      --ink:#e8efea; --ink-soft:#c6d2cb; --muted:#93a29a; --muted-soft:#74837c;
+      --accent:var(--leaf-400); --accent-ink:var(--leaf-200); --accent-wash:#0f231c;
+      --code-bg:#101a16; --pulse-soft:#3a1f1f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#0e1512; --surface:#141d19; --surface-2:#18231e;
+    --border:#22302a; --border-strong:#2e3f37;
+    --ink:#e8efea; --ink-soft:#c6d2cb; --muted:#93a29a; --muted-soft:#74837c;
+    --accent:var(--leaf-400); --accent-ink:var(--leaf-200); --accent-wash:#0f231c;
+    --code-bg:#101a16; --pulse-soft:#3a1f1f;
+  }
+
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:84px; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--sans); font-size:16px; line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  code, kbd { font-family:var(--mono); font-size:.86em; background:var(--code-bg);
+    border:1px solid var(--border); border-radius:5px; padding:.08em .36em; }
+
+  /* ---------- top bar ---------- */
+  header.top {
+    position:sticky; top:0; z-index:40;
+    background:color-mix(in srgb, var(--surface) 92%, transparent);
+    backdrop-filter:saturate(140%) blur(8px);
+    border-bottom:1px solid var(--border);
+  }
+  .top-inner {
+    max-width:var(--maxw); margin:0 auto; padding:.7rem 1.25rem;
+    display:flex; align-items:center; gap:1rem;
+  }
+  .brand { display:flex; align-items:center; gap:.6rem; font-weight:700; letter-spacing:-.01em; color:var(--ink); }
+  .brand:hover { text-decoration:none; }
+  .brand .mark {
+    width:26px; height:26px; border-radius:7px; flex:none;
+    background:linear-gradient(140deg, var(--leaf-500), var(--leaf-800));
+    display:grid; place-items:center; color:#fff; font-size:13px; font-weight:800;
+  }
+  .brand .dom { color:var(--muted); font-weight:500; font-size:.82rem; }
+  .top-spacer { flex:1; }
+  .top-actions { display:flex; align-items:center; gap:.4rem; }
+  .btn {
+    font:inherit; font-size:.82rem; color:var(--ink-soft);
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; padding:.34rem .66rem; cursor:pointer;
+  }
+  .btn:hover { border-color:var(--border-strong); color:var(--ink); }
+  .search {
+    font:inherit; font-size:.85rem; color:var(--ink);
+    background:var(--surface-2); border:1px solid var(--border);
+    border-radius:8px; padding:.36rem .7rem; width:220px;
+  }
+  .search::placeholder { color:var(--muted-soft); }
+
+  /* ---------- layout ---------- */
+  .shell {
+    max-width:var(--maxw); margin:0 auto; padding:0 1.25rem;
+    display:grid; grid-template-columns:250px minmax(0,1fr) 200px; gap:2.25rem;
+    align-items:start;
+  }
+  nav.side, aside.rail { position:sticky; top:70px; max-height:calc(100vh - 84px); overflow-y:auto; padding:1.5rem 0; }
+  nav.side { font-size:.88rem; }
+  nav.side h4 {
+    margin:1.4rem 0 .45rem; font-size:.7rem; text-transform:uppercase;
+    letter-spacing:.09em; color:var(--muted-soft); font-weight:700;
+  }
+  nav.side h4:first-child { margin-top:0; }
+  nav.side a { display:block; padding:.22rem .55rem; border-radius:6px; color:var(--ink-soft); border-left:2px solid transparent; }
+  nav.side a:hover { background:var(--surface-2); text-decoration:none; }
+  nav.side a.sub { padding-left:1.2rem; font-size:.84rem; color:var(--muted); }
+  nav.side a.active { color:var(--accent-ink); background:var(--accent-wash); border-left-color:var(--accent); font-weight:600; }
+
+  aside.rail { font-size:.8rem; color:var(--muted); }
+  aside.rail .rail-title { font-size:.7rem; text-transform:uppercase; letter-spacing:.09em; font-weight:700; color:var(--muted-soft); margin-bottom:.5rem; }
+  aside.rail a { display:block; padding:.16rem 0; color:var(--muted); }
+
+  main { padding:2rem 0 5rem; min-width:0; }
+
+  /* ---------- typography ---------- */
+  h1 { font-size:2.1rem; line-height:1.2; letter-spacing:-.022em; margin:.2rem 0 .6rem; }
+  h2 { font-size:1.45rem; line-height:1.25; letter-spacing:-.016em; margin:3rem 0 .5rem; padding-top:.4rem; }
+  h3 { font-size:1.06rem; margin:2rem 0 .4rem; letter-spacing:-.01em; }
+  h4 { font-size:.94rem; margin:1.4rem 0 .3rem; }
+  p { margin:.6rem 0; color:var(--ink-soft); }
+  .lede { font-size:1.06rem; color:var(--ink-soft); max-width:62ch; }
+  ul, ol { color:var(--ink-soft); padding-left:1.15rem; }
+  li { margin:.2rem 0; }
+  hr { border:0; border-top:1px solid var(--border); margin:3rem 0 0; }
+
+  .section-tag {
+    display:inline-block; font-size:.68rem; font-weight:800; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--accent); background:var(--accent-wash);
+    border:1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    border-radius:999px; padding:.12rem .55rem; margin-bottom:.5rem;
+  }
+
+  /* ---------- status chips ---------- */
+  .chip {
+    display:inline-block; font-size:.66rem; font-weight:700; letter-spacing:.05em;
+    text-transform:uppercase; border-radius:999px; padding:.1rem .45rem;
+    border:1px solid var(--border-strong); color:var(--muted); background:var(--surface-2);
+    vertical-align:middle; margin-left:.4rem; white-space:nowrap;
+  }
+  .chip.written { color:var(--leaf-700); background:var(--leaf-50); border-color:var(--leaf-200); }
+  .chip.outline { color:#8a6d1f; background:#fdf6e3; border-color:#e8dcb4; }
+  .chip.notstarted { color:var(--muted); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .chip.written { color:var(--leaf-200); background:#0f231c; border-color:#1d4536; }
+    :root:not([data-theme="light"]) .chip.outline { color:#e2c777; background:#2a2312; border-color:#4a3d18; }
+  }
+  :root[data-theme="dark"] .chip.written { color:var(--leaf-200); background:#0f231c; border-color:#1d4536; }
+  :root[data-theme="dark"] .chip.outline { color:#e2c777; background:#2a2312; border-color:#4a3d18; }
+
+  /* ---------- cards / grids ---------- */
+  .grid { display:grid; gap:.85rem; }
+  .g2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .g3 { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius); padding:1rem 1.05rem;
+  }
+  .card h4 { margin:0 0 .25rem; font-size:.95rem; color:var(--ink); }
+  .card p { margin:.2rem 0 0; font-size:.87rem; color:var(--muted); }
+  .card .path { font-family:var(--mono); font-size:.74rem; color:var(--muted-soft); display:block; margin-top:.5rem; }
+
+  .note {
+    border-left:3px solid var(--accent); background:var(--accent-wash);
+    border-radius:0 var(--radius) var(--radius) 0; padding:.75rem 1rem; margin:1rem 0;
+    font-size:.9rem; color:var(--ink-soft);
+  }
+  .note.warn { border-left-color:var(--pulse); background:var(--pulse-soft); }
+  .note strong { color:var(--ink); }
+
+  /* ---------- tables ---------- */
+  .table-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); margin:.9rem 0; background:var(--surface); }
+  table { border-collapse:collapse; width:100%; font-size:.86rem; min-width:520px; }
+  th, td { text-align:left; padding:.5rem .75rem; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { background:var(--surface-2); font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:700; white-space:nowrap; }
+  tbody tr:last-child td { border-bottom:0; }
+  td code { background:transparent; border:0; padding:0; color:var(--accent-ink); }
+
+  /* ---------- how-to list ---------- */
+  .howto { border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); overflow:hidden; margin:.8rem 0; }
+  .howto > .hd { padding:.6rem .9rem; background:var(--surface-2); border-bottom:1px solid var(--border); font-weight:700; font-size:.9rem; display:flex; align-items:center; gap:.5rem; }
+  .howto > .hd .num { width:22px; height:22px; border-radius:6px; background:var(--accent); color:#fff; display:grid; place-items:center; font-size:.72rem; flex:none; }
+  .howto ol { margin:0; padding:.55rem 1rem .7rem 2.2rem; }
+  .howto li { margin:.24rem 0; font-size:.89rem; }
+  .howto li .chip { font-size:.6rem; }
+
+  /* ---------- footer ---------- */
+  footer { border-top:1px solid var(--border); margin-top:3rem; padding:1.5rem 0 3rem; font-size:.82rem; color:var(--muted); }
+
+  /* ---------- responsive ---------- */
+  @media (max-width:1080px) {
+    .shell { grid-template-columns:220px minmax(0,1fr); }
+    aside.rail { display:none; }
+  }
+  @media (max-width:760px) {
+    .shell { grid-template-columns:minmax(0,1fr); gap:0; }
+    nav.side { position:static; max-height:none; border-bottom:1px solid var(--border); }
+    .g2, .g3 { grid-template-columns:minmax(0,1fr); }
+    .search { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <a class="brand" href="#top">
+      <span class="mark">A</span>
+      <span>AgriPulse Docs <span class="dom">www.agripulse.tech</span></span>
+    </a>
+    <span class="top-spacer"></span>
+    <div class="top-actions">
+      <input class="search" type="search" placeholder="Search the docs (not wired)" aria-label="Search" disabled />
+      <button class="btn" id="lang" type="button" title="Arabic locale is planned, not built">العربية</button>
+      <button class="btn" id="theme" type="button">Theme</button>
+    </div>
+  </div>
+</header>
+
+<div class="shell" id="top">
+
+  <!-- ============================ LEFT NAV ============================ -->
+  <nav class="side" aria-label="Documentation sections">
+    <h4>About this page</h4>
+    <a href="#proposal">Structure proposal</a>
+
+    <h4>A · Solution theme</h4>
+    <a href="#theme">The theme</a>
+    <a class="sub" href="#theme-pillars">Three pillars</a>
+    <a class="sub" href="#theme-audience">Who reads what</a>
+    <a class="sub" href="#theme-promise">What we claim</a>
+
+    <h4>B · What AgriPulse is</h4>
+    <a href="#abstract">Abstract</a>
+    <a class="sub" href="#abstract-short">In one paragraph</a>
+    <a class="sub" href="#abstract-long">In one page</a>
+    <a href="#concepts">Key concepts</a>
+    <a class="sub" href="#concepts-shape">Farm shape</a>
+    <a class="sub" href="#concepts-data">Data</a>
+    <a class="sub" href="#concepts-logic">Logic</a>
+    <a class="sub" href="#concepts-action">Action</a>
+    <a class="sub" href="#concepts-people">People and access</a>
+    <a href="#lifecycle">Data lifecycle</a>
+
+    <h4>C · How-Tos</h4>
+    <a href="#howtos">Index</a>
+    <a class="sub" href="#ht-start">1 Get started</a>
+    <a class="sub" href="#ht-farm">2 Set up a farm</a>
+    <a class="sub" href="#ht-crop">3 Crops and seasons</a>
+    <a class="sub" href="#ht-data">4 Imagery and weather</a>
+    <a class="sub" href="#ht-read">5 Read the data</a>
+    <a class="sub" href="#ht-trees">6 Decision trees</a>
+    <a class="sub" href="#ht-scout">7 Signals and scouting</a>
+    <a class="sub" href="#ht-act">8 Act on output</a>
+    <a class="sub" href="#ht-report">9 Reports</a>
+    <a class="sub" href="#ht-admin">10 Administration</a>
+
+    <h4>D · Knowledge Base</h4>
+    <a href="#kb">What ships with the app</a>
+    <a class="sub" href="#kb-crops">Crop catalog</a>
+    <a class="sub" href="#kb-taxonomy">Taxonomy and cultivars</a>
+    <a class="sub" href="#kb-pheno">Phenology models</a>
+    <a class="sub" href="#kb-attrs">Crop attributes</a>
+    <a class="sub" href="#kb-plans">Plan templates</a>
+    <a class="sub" href="#kb-indices">Imagery index catalog</a>
+    <a class="sub" href="#kb-weather">Weather catalog</a>
+    <a class="sub" href="#kb-trees">Decision tree library</a>
+    <a class="sub" href="#kb-signals">Scouting signal catalog</a>
+    <a class="sub" href="#kb-notify">Notification templates</a>
+    <a class="sub" href="#kb-platform">Platform catalogs</a>
+
+    <h4>Later</h4>
+    <a href="#reference">Reference</a>
+    <a href="#build">Build plan</a>
+  </nav>
+
+  <!-- ============================ MAIN ============================ -->
+  <main>
+
+    <!-- ---------------------------------------------------------- -->
+    <section id="proposal">
+      <span class="section-tag">Skeleton</span>
+      <h1>AgriPulse documentation — proposed structure</h1>
+      <p class="lede">
+        This page is the skeleton, not the documentation. It fixes the shape of the site,
+        names every page we plan to write, and lists the seeded content the Knowledge Base
+        must cover. Text marked <span class="chip notstarted">Not started</span> is a title
+        only. Nothing on this page is final wording.
+      </p>
+
+      <div class="note">
+        <strong>How to read the chips.</strong>
+        <span class="chip written">Written</span> means a source document already exists in
+        <code>docs/guide/</code> and can be moved in.
+        <span class="chip outline">Outline</span> means the content exists in the product or in
+        code and needs an author.
+        <span class="chip notstarted">Not started</span> means nothing is written yet.
+      </div>
+
+      <h3>Site map at a glance</h3>
+      <div class="grid g2">
+        <div class="card">
+          <h4>A · Solution theme</h4>
+          <p>The one-sentence claim, the three pillars, and who each part of the site is for.</p>
+          <span class="path">/ (home)</span>
+        </div>
+        <div class="card">
+          <h4>B · What AgriPulse is</h4>
+          <p>A short abstract, a one-page abstract, and the vocabulary the rest of the site uses.</p>
+          <span class="path">/overview, /concepts</span>
+        </div>
+        <div class="card">
+          <h4>C · How-Tos</h4>
+          <p>Ten task groups, about 70 pages. Each page is one task, start to finish, with screenshots.</p>
+          <span class="path">/how-to/&lt;group&gt;/&lt;task&gt;</span>
+        </div>
+        <div class="card">
+          <h4>D · Knowledge Base</h4>
+          <p>Everything that ships seeded: crops, indices, weather, decision trees, signals, templates.</p>
+          <span class="path">/kb/&lt;catalog&gt;</span>
+        </div>
+      </div>
+    </section>
+
+    <hr />
+
+    <!-- =============== A · SOLUTION THEME =============== -->
+    <section id="theme">
+      <span class="section-tag">Section A</span>
+      <h2>Solution theme</h2>
+      <p class="lede">
+        One claim the whole site serves. Every page should be traceable back to it.
+      </p>
+
+      <div class="note">
+        <strong>Draft theme.</strong> AgriPulse turns each satellite pass, each weather day,
+        and each field visit into a dated decision for a named block, and keeps the record of
+        why that decision was made. <span class="chip outline">Outline</span>
+      </div>
+
+      <h3 id="theme-pillars">Three pillars</h3>
+      <div class="grid g3">
+        <div class="card">
+          <h4>Observe</h4>
+          <p>Satellite optical and thermal imagery, daily weather, and scout observations,
+             all keyed to the same farm and block shapes.</p>
+        </div>
+        <div class="card">
+          <h4>Interpret</h4>
+          <p>Vegetation, water and heat indices, per-block and per-cell aggregates, baselines,
+             anomalies and weather risk.</p>
+        </div>
+        <div class="card">
+          <h4>Act</h4>
+          <p>Decision trees fire recommendations and alerts, they get assigned, dispatched to
+             a worker or a scout, and closed.</p>
+        </div>
+      </div>
+
+      <h3 id="theme-audience">Who reads what <span class="chip notstarted">Not started</span></h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Reader</th><th>What they need</th><th>Entry page</th></tr></thead>
+          <tbody>
+            <tr><td>Farm manager</td><td>Where is my crop stressed, what do I do this week</td><td>How-To 1, 5, 8</td></tr>
+            <tr><td>Agronomist</td><td>Index meaning, thresholds, authoring decision trees</td><td>How-To 6, KB indices, KB trees</td></tr>
+            <tr><td>Scout</td><td>Which visits are mine, how to record an observation</td><td>How-To 7</td></tr>
+            <tr><td>Platform admin</td><td>Tenants, roles, catalogs, imagery subscriptions, health</td><td>How-To 10</td></tr>
+            <tr><td>Evaluator or buyer</td><td>What the product is, what ships with it</td><td>Section B, Section D</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="theme-promise">What we claim, and what we do not <span class="chip notstarted">Not started</span></h3>
+      <p>
+        A short honesty page. It states the spatial resolution, the revisit gap, the cloud
+        limits, and that decision trees are agronomic rules with cited evidence, not
+        validated infection models. Placeholder until the numbers are confirmed against prod.
+      </p>
+    </section>
+
+    <hr />
+
+    <!-- =============== B · ABSTRACT + CONCEPTS =============== -->
+    <section id="abstract">
+      <span class="section-tag">Section B</span>
+      <h2>What AgriPulse is</h2>
+
+      <h3 id="abstract-short">In one paragraph <span class="chip outline">Outline</span></h3>
+      <p>
+        Placeholder. AgriPulse is a multi-tenant farm intelligence platform. A tenant maps its
+        farms and blocks, subscribes them to satellite and weather data, and the platform
+        computes indices per block and per grid cell on every pass. Decision trees read those
+        indices together with weather, scouting signals, crop stage and block attributes, and
+        open recommendations and alerts that a team assigns, dispatches and closes.
+      </p>
+
+      <h3 id="abstract-long">In one page <span class="chip notstarted">Not started</span></h3>
+      <p>
+        Longer version for evaluators. Covers the tenant model, the farm and block model,
+        the imagery pipeline, the weather pipeline, the rule engine, the action loop,
+        the mobile scouting app, Arabic support, and where the data is hosted.
+      </p>
+
+      <div class="note">
+        <strong>Diagram slot.</strong> One system diagram: sources on the left, the platform in
+        the middle, the four output surfaces on the right. To be drawn.
+      </div>
+    </section>
+
+    <section id="concepts">
+      <h2>Key concepts</h2>
+      <p class="lede">
+        The vocabulary every other page uses. One short definition each, linked from the
+        How-Tos. Terms below are taken from the running product.
+      </p>
+
+      <h3 id="concepts-shape">Farm shape</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Term</th><th>Short definition</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Tenant</td><td>One customer organisation. Own schema, own data, own users.</td><td><span class="chip outline">Outline</span></td></tr>
+            <tr><td>Farm</td><td>A named boundary. Imagery and weather subscriptions attach here.</td><td><span class="chip outline">Outline</span></td></tr>
+            <tr><td>Block</td><td>A managed sub-area of a farm. Carries the crop, the plan and the responsible person.</td><td><span class="chip outline">Outline</span></td></tr>
+            <tr><td>Grid cell</td><td>A fixed-size square inside a block, used for within-block variation. Cell size is set per farm.</td><td><span class="chip outline">Outline</span></td></tr>
+            <tr><td>Land unit</td><td>A non-crop area on the farm, for example a road, a building or a canal.</td><td><span class="chip notstarted">Not started</span></td></tr>
+            <tr><td>Farm surface</td><td>Whole-farm imagery, computed with the pixel-centre rule at the boundary.</td><td><span class="chip notstarted">Not started</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="concepts-data">Data</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Term</th><th>Short definition</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Pass / scene</td><td>One satellite acquisition over the farm on a date.</td><td><span class="chip outline">Outline</span></td></tr>
+            <tr><td>Index</td><td>A number computed from bands, for example NDVI. See the KB catalog.</td><td><span class="chip written">Written</span></td></tr>
+            <tr><td>Aggregate</td><td>Mean, min, max and percentiles of an index over a block or a cell, per pass.</td><td><span class="chip outline">Outline</span></td></tr>
+            <tr><td>Baseline</td><td>The expected value for this block at this time of year, used to call an anomaly.</td><td><span class="chip outline">Outline</span></td></tr>
+            <tr><td>Weather derived signal</td><td>A daily number computed from the weather feed, for example ET₀ or GDD.</td><td><span class="chip outline">Outline</span></td></tr>
+            <tr><td>Weather index</td><td>A named weather view on the dashboard, for example the rainfall to ET balance.</td><td><span class="chip outline">Outline</span></td></tr>
+            <tr><td>Forecast</td><td>Weather days ahead of today. Excluded from baselines and summaries.</td><td><span class="chip outline">Outline</span></td></tr>
+            <tr><td>Signal / observation</td><td>A field-recorded value, for example canopy vigour or pest incidence.</td><td><span class="chip outline">Outline</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="concepts-logic">Logic</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Term</th><th>Short definition</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Decision tree</td><td>A versioned flow of nodes that reads data and opens recommendations or alerts.</td><td><span class="chip written">Written</span></td></tr>
+            <tr><td>Condition source</td><td>What a condition can read: index, weather, signal, crop stage, block attribute.</td><td><span class="chip written">Written</span></td></tr>
+            <tr><td>Parameter and override</td><td>A named threshold declared by the author, changeable per tenant.</td><td><span class="chip written">Written</span></td></tr>
+            <tr><td>Scope</td><td>Whether a tree runs per block or per grid cell.</td><td><span class="chip outline">Outline</span></td></tr>
+            <tr><td>Dry run</td><td>Run a draft against real data without opening anything.</td><td><span class="chip written">Written</span></td></tr>
+            <tr><td>Evaluation trace</td><td>The stored record of why a tree fired or did not fire.</td><td><span class="chip outline">Outline</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="concepts-action">Action</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Term</th><th>Short definition</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Recommendation</td><td>A dated suggested action on a block or cell, with a reason.</td><td><span class="chip written">Written</span></td></tr>
+            <tr><td>Alert</td><td>A dated warning that needs attention, same origin as a recommendation.</td><td><span class="chip outline">Outline</span></td></tr>
+            <tr><td>Action horizon</td><td>How soon the action is due. Four horizons.</td><td><span class="chip written">Written</span></td></tr>
+            <tr><td>Dispatch</td><td>Sending an item to a worker or a scout, in app and by push.</td><td><span class="chip outline">Outline</span></td></tr>
+            <tr><td>Visit</td><td>A scouting job on a block, with a form to fill and photos to attach.</td><td><span class="chip outline">Outline</span></td></tr>
+            <tr><td>Plan and activity</td><td>The season calendar for a block and the jobs on it.</td><td><span class="chip outline">Outline</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="concepts-people">People and access</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Term</th><th>Short definition</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Membership and role</td><td>A user's place in a tenant and what they may do.</td><td><span class="chip written">Written</span></td></tr>
+            <tr><td>Capability</td><td>The single permission a role grants, for example open a recommendation.</td><td><span class="chip written">Written</span></td></tr>
+            <tr><td>Farm scope</td><td>Limiting a member to named farms.</td><td><span class="chip outline">Outline</span></td></tr>
+            <tr><td>Resource / worker</td><td>A person or machine on the farm roster that work can be assigned to.</td><td><span class="chip outline">Outline</span></td></tr>
+            <tr><td>Platform admin</td><td>Operates the platform across tenants: catalogs, defaults, backfill, Observer.</td><td><span class="chip outline">Outline</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="lifecycle">
+      <h3>Data lifecycle in five steps <span class="chip outline">Outline</span></h3>
+      <div class="grid g3">
+        <div class="card"><h4>1 · Subscribe</h4><p>A farm is subscribed to an imagery provider and to weather. Blocks inherit.</p></div>
+        <div class="card"><h4>2 · Acquire</h4><p>Passes are discovered, fetched and stored. Weather is pulled daily, history and forecast.</p></div>
+        <div class="card"><h4>3 · Compute</h4><p>Indices per pass, per block and per grid cell. Weather derived signals per day.</p></div>
+        <div class="card"><h4>4 · Evaluate</h4><p>Decision trees read the aggregates, weather, signals and crop stage, and record a trace.</p></div>
+        <div class="card"><h4>5 · Act</h4><p>Recommendations and alerts open, get assigned, dispatched, and closed with an outcome.</p></div>
+        <div class="card"><h4>Throughout · Watch</h4><p>Observer tracks acquisition and computation health across tenants.</p></div>
+      </div>
+    </section>
+
+    <hr />
+
+    <!-- =============== C · HOW-TOS =============== -->
+    <section id="howtos">
+      <span class="section-tag">Section C</span>
+      <h2>How-Tos</h2>
+      <p class="lede">
+        Ten groups. Each entry becomes one page: the goal in a sentence, who can do it,
+        the steps with screenshots, and what to check afterwards. Titles below are the
+        proposal; we will write them one group at a time.
+      </p>
+
+      <div class="howto" id="ht-start">
+        <div class="hd"><span class="num">1</span> Get started</div>
+        <ol>
+          <li>Sign in and pick a farm <span class="chip notstarted">Not started</span></li>
+          <li>Tour the workspace: Insights, Farm management, Plan, Signals, Action Center, Recommendations, Alerts, Reports <span class="chip notstarted">Not started</span></li>
+          <li>Switch language between English and Arabic <span class="chip notstarted">Not started</span></li>
+          <li>Understand what you can see, and why some pages need a farm <span class="chip notstarted">Not started</span></li>
+        </ol>
+      </div>
+
+      <div class="howto" id="ht-farm">
+        <div class="hd"><span class="num">2</span> Set up a farm</div>
+        <ol>
+          <li>Create a farm and draw its boundary <span class="chip outline">Outline</span></li>
+          <li>Add blocks by drawing, by upload, or by auto-grid <span class="chip outline">Outline</span></li>
+          <li>Set the grid cell size for the farm <span class="chip outline">Outline</span></li>
+          <li>Add land units for roads, buildings and canals <span class="chip notstarted">Not started</span></li>
+          <li>Assign a responsible agronomist to a block <span class="chip notstarted">Not started</span></li>
+          <li>Manage farm members and farm scope <span class="chip outline">Outline</span></li>
+          <li>Deactivate or reactivate a block, and what happens to its subscriptions <span class="chip outline">Outline</span></li>
+        </ol>
+      </div>
+
+      <div class="howto" id="ht-crop">
+        <div class="hd"><span class="num">3</span> Crops and seasons</div>
+        <ol>
+          <li>Assign a crop to a block, with variety and planting date <span class="chip outline">Outline</span></li>
+          <li>Use the crop taxonomy path, for example <code>mango.sukkary</code> <span class="chip outline">Outline</span></li>
+          <li>Fill crop custom attributes, for example rootstock or seed grade <span class="chip outline">Outline</span></li>
+          <li>Bulk-assign a crop across many blocks <span class="chip outline">Outline</span></li>
+          <li>Remove a crop assignment, and what the preview tells you <span class="chip outline">Outline</span></li>
+          <li>Start a season plan from a plan template <span class="chip outline">Outline</span></li>
+          <li>Work the Plan board: activities, dates, resources <span class="chip outline">Outline</span></li>
+        </ol>
+      </div>
+
+      <div class="howto" id="ht-data">
+        <div class="hd"><span class="num">4</span> Imagery and weather</div>
+        <ol>
+          <li>Subscribe a farm to satellite imagery <span class="chip outline">Outline</span></li>
+          <li>Choose which indices to compute <span class="chip outline">Outline</span></li>
+          <li>Add thermal, and what it needs that optical does not <span class="chip outline">Outline</span></li>
+          <li>Subscribe a farm to weather, history depth and forecast days <span class="chip outline">Outline</span></li>
+          <li>Request a backfill and follow it <span class="chip outline">Outline</span></li>
+          <li>Read the scene strip and check coverage and cloud <span class="chip outline">Outline</span></li>
+          <li>Check integration health when data stops arriving <span class="chip outline">Outline</span></li>
+        </ol>
+      </div>
+
+      <div class="howto" id="ht-read">
+        <div class="hd"><span class="num">5</span> Read the data</div>
+        <ol>
+          <li>Read the Insights page: KPIs, index chart, time range <span class="chip outline">Outline</span></li>
+          <li>Compare a block against its baseline <span class="chip outline">Outline</span></li>
+          <li>Read the weather trends panel, and where the forecast starts <span class="chip outline">Outline</span></li>
+          <li>Use the Farm Console map: pixels, cells, blocks <span class="chip outline">Outline</span></li>
+          <li>Inspect one cell and its history <span class="chip outline">Outline</span></li>
+          <li>Show thermal on the map <span class="chip outline">Outline</span></li>
+          <li>Read block signals in the Farm Console <span class="chip outline">Outline</span></li>
+          <li>Which index answers which question <span class="chip written">Written</span></li>
+        </ol>
+      </div>
+
+      <div class="howto" id="ht-trees">
+        <div class="hd"><span class="num">6</span> Decision trees</div>
+        <ol>
+          <li>Browse the tree library and read a tree card <span class="chip written">Written</span></li>
+          <li>Create a tree from a template <span class="chip written">Written</span></li>
+          <li>Edit on the canvas: add, rewire, delete nodes <span class="chip written">Written</span></li>
+          <li>Build a condition: sources, operators, thresholds <span class="chip written">Written</span></li>
+          <li>Declare parameters, and set tenant overrides <span class="chip written">Written</span></li>
+          <li>Dry-run a draft on real data <span class="chip written">Written</span></li>
+          <li>Publish a version, and roll back <span class="chip written">Written</span></li>
+          <li>Run a tree on a farm on demand <span class="chip outline">Outline</span></li>
+          <li>Read the evaluation trace when nothing fired <span class="chip outline">Outline</span></li>
+          <li>Scope a tree to a crop, a region, or grid cells <span class="chip written">Written</span></li>
+        </ol>
+      </div>
+
+      <div class="howto" id="ht-scout">
+        <div class="hd"><span class="num">7</span> Signals and scouting</div>
+        <ol>
+          <li>Read the seeded scouting forms <span class="chip outline">Outline</span></li>
+          <li>Author a custom signal definition <span class="chip outline">Outline</span></li>
+          <li>Import observations from a CSV file <span class="chip outline">Outline</span></li>
+          <li>Enrol a scout and hand over the phone app <span class="chip outline">Outline</span></li>
+          <li>Dispatch a visit to a scout <span class="chip outline">Outline</span></li>
+          <li>Record an observation in the field, with GPS and photos <span class="chip notstarted">Not started</span></li>
+          <li>Use a signal inside a decision tree <span class="chip outline">Outline</span></li>
+        </ol>
+      </div>
+
+      <div class="howto" id="ht-act">
+        <div class="hd"><span class="num">8</span> Act on output</div>
+        <ol>
+          <li>Work the Action Center queue <span class="chip outline">Outline</span></li>
+          <li>Read a recommendation and its "why this" <span class="chip written">Written</span></li>
+          <li>Assign an item to a person <span class="chip outline">Outline</span></li>
+          <li>Dispatch work to a worker, in app and by push <span class="chip outline">Outline</span></li>
+          <li>Close an item with an outcome <span class="chip outline">Outline</span></li>
+          <li>Configure who gets notified, and on which channel <span class="chip outline">Outline</span></li>
+        </ol>
+      </div>
+
+      <div class="howto" id="ht-report">
+        <div class="hd"><span class="num">9</span> Reports</div>
+        <ol>
+          <li>Generate a farm report <span class="chip outline">Outline</span></li>
+          <li>Export data for a block and a date range <span class="chip notstarted">Not started</span></li>
+        </ol>
+      </div>
+
+      <div class="howto" id="ht-admin">
+        <div class="hd"><span class="num">10</span> Administration</div>
+        <ol>
+          <li>Create a tenant and provision its first admin <span class="chip outline">Outline</span></li>
+          <li>Invite users and set roles <span class="chip outline">Outline</span></li>
+          <li>Read the roles and capabilities page <span class="chip written">Written</span></li>
+          <li>Set platform defaults <span class="chip outline">Outline</span></li>
+          <li>Maintain the crop catalog and the index catalog <span class="chip outline">Outline</span></li>
+          <li>Maintain the platform signal catalog <span class="chip outline">Outline</span></li>
+          <li>Run and watch a backfill <span class="chip outline">Outline</span></li>
+          <li>Use Observer to check acquisition health <span class="chip outline">Outline</span></li>
+          <li>Archive and purge a tenant <span class="chip outline">Outline</span></li>
+        </ol>
+      </div>
+
+      <div class="note">
+        <strong>Page template.</strong> Every How-To page uses the same five parts: goal,
+        who can do it, before you start, steps with screenshots, check it worked.
+        We write the template once and reuse it.
+      </div>
+    </section>
+
+    <hr />
+
+    <!-- =============== D · KNOWLEDGE BASE =============== -->
+    <section id="kb">
+      <span class="section-tag">Section D</span>
+      <h2>AgriPulse Knowledge Base</h2>
+      <p class="lede">
+        Everything the platform ships with before a customer types anything. These are seeded
+        catalogs: a new tenant reads the same crops, indices, weather signals, decision trees
+        and scouting forms on day one. Counts below are read from the seed migrations and the
+        decision tree files in the repository, as of 18 August 2026.
+      </p>
+
+      <div class="grid g3">
+        <div class="card"><h4>23</h4><p>crops in the public catalog</p></div>
+        <div class="card"><h4>12</h4><p>imagery indices, optical and thermal</p></div>
+        <div class="card"><h4>18</h4><p>seeded decision trees with cited evidence</p></div>
+        <div class="card"><h4>9 + 5</h4><p>scouting signal definitions and forms</p></div>
+        <div class="card"><h4>6 + 9</h4><p>weather derived signals and weather indices</p></div>
+        <div class="card"><h4>3</h4><p>crops with phenology and plan templates</p></div>
+      </div>
+
+      <!-- ---- crops ---- -->
+      <h3 id="kb-crops">Crop catalog <span class="chip outline">Outline</span></h3>
+      <p>
+        23 crops relevant to Egypt and the region. Each row carries an English and an Arabic
+        name, a scientific name, a category, whether it is perennial, a typical growing-days
+        figure, a GDD base and upper limit, and the indices that matter for it.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Perennial</th><th>Growing days</th><th>GDD base / upper</th><th>Relevant indices</th></tr></thead>
+          <tbody>
+            <tr><td><code>wheat</code></td><td>Wheat</td><td>cereal</td><td>no</td><td>—</td><td>—</td><td>ndvi, ndre</td></tr>
+            <tr><td><code>maize</code></td><td>Maize</td><td>cereal</td><td>no</td><td>110</td><td>10 / 30</td><td>ndvi, ndre</td></tr>
+            <tr><td><code>rice</code></td><td>Rice</td><td>cereal</td><td>no</td><td>130</td><td>10 / 35</td><td>ndvi, ndwi</td></tr>
+            <tr><td><code>potato</code></td><td>Potato</td><td>vegetable</td><td>no</td><td>—</td><td>—</td><td>ndvi, ndre, ndwi</td></tr>
+            <tr><td><code>mango</code></td><td>Mango</td><td>fruit_tree</td><td>yes</td><td>—</td><td>—</td><td>ndvi, ndre, ndwi</td></tr>
+            <tr><td><code>date_palm</code></td><td>Date palm</td><td>fruit_tree</td><td>yes</td><td>—</td><td>—</td><td>ndvi, ndwi</td></tr>
+            <tr><td colspan="7"><em>Full table to be generated from the catalog: sugarcane, sugar_beet, cotton, soybean, peanut, sunflower, sesame, alfalfa, egyptian_clover, tomato, onion, garlic, citrus_orange, citrus_mandarin, olive, banana, grape.</em></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        <strong>Page plan.</strong> One index page with the full table, plus one page per crop
+        family that says what the platform actually does for it: which indices, which phenology,
+        which decision trees, which plan template.
+      </div>
+
+      <!-- ---- taxonomy ---- -->
+      <h3 id="kb-taxonomy">Crop taxonomy, varieties and size classes <span class="chip outline">Outline</span></h3>
+      <p>
+        Crops have a dotted path so a tree or a plan can target a cultivar rather than a whole
+        species. Examples in the seed: <code>mango</code>, <code>mango.alphonso</code>,
+        <code>mango.sukkary</code>, <code>mango.kitti</code>, <code>citrus.valencia</code>,
+        <code>potato</code>, <code>tomato</code>, <code>wheat</code>, <code>olive</code>.
+        Size classes small, medium and large are seeded for tree crops.
+      </p>
+      <ul>
+        <li>How a crop path is matched by a decision tree</li>
+        <li>Seeded potato and date palm varieties</li>
+        <li>Canopy size classes and where they are used</li>
+      </ul>
+
+      <!-- ---- phenology ---- -->
+      <h3 id="kb-pheno">Phenology models <span class="chip outline">Outline</span></h3>
+      <p>
+        Stage models tell the platform where a crop is in its cycle, which is what a decision
+        tree reads as growth stage. Two modes ship: calendar day-of-year for perennials, and
+        days-from-planting for annuals.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Crop</th><th>Mode</th><th>Stages</th></tr></thead>
+          <tbody>
+            <tr><td>Mango</td><td>calendar day-of-year</td><td>pre_flowering, flowering, fruit_set, fruit_development, maturation, post_harvest_flush</td></tr>
+            <tr><td>Potato</td><td>days from planting</td><td>emergence, tuber_initiation, tuber_bulking, maturation</td></tr>
+            <tr><td>Date palm</td><td>calendar day-of-year</td><td>seeded in migration 0038 — to be listed</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ---- attributes ---- -->
+      <h3 id="kb-attrs">Crop custom attributes <span class="chip outline">Outline</span></h3>
+      <p>
+        Per-crop fields a block can record, seeded so every tenant collects the same things.
+        Examples: establishment method, transplant date, age at transplant, rootstock type,
+        nursery source, graft union height, offshoot age and weight, mother palm reference,
+        tissue-culture lab and batch, seed tuber grade, seed generation, seed lot code,
+        sprouting status, seed treatment, seedling age, true leaves at transplant, tray cell
+        count. Decision trees can read these as a condition source.
+      </p>
+
+      <!-- ---- plan templates ---- -->
+      <h3 id="kb-plans">Plan templates <span class="chip outline">Outline</span></h3>
+      <p>
+        A plan template is a ready season calendar for a crop or a cultivar. A farm starts
+        from one and edits it. Seeded: a mango plan template, mango cultivar templates,
+        potato season templates, and date palm cultivar templates.
+      </p>
+      <ul>
+        <li>What an activity in a template carries</li>
+        <li>How a template becomes a block plan</li>
+        <li>What happens when the template changes later</li>
+      </ul>
+
+      <!-- ---- indices ---- -->
+      <h3 id="kb-indices">Imagery index catalog <span class="chip outline">Outline</span></h3>
+      <p>
+        Twelve indices ship in the public catalog. Each carries an English and Arabic name, a
+        unit, a formula, the bands it needs, and the satellite product it comes from.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Code</th><th>Name</th><th>Family</th><th>Reads</th><th>Source</th></tr></thead>
+          <tbody>
+            <tr><td><code>ndvi</code></td><td>Normalized Difference Vegetation Index</td><td>vegetation</td><td>red, nir</td><td>optical</td></tr>
+            <tr><td><code>ndre</code></td><td>Normalized Difference Red Edge</td><td>vegetation</td><td>red edge, nir</td><td>optical</td></tr>
+            <tr><td><code>evi</code></td><td>Enhanced Vegetation Index</td><td>vegetation</td><td>blue, red, nir</td><td>optical</td></tr>
+            <tr><td><code>savi</code></td><td>Soil Adjusted Vegetation Index</td><td>vegetation</td><td>red, nir</td><td>optical</td></tr>
+            <tr><td><code>msavi</code></td><td>Modified Soil Adjusted Vegetation Index</td><td>vegetation</td><td>red, nir</td><td>optical</td></tr>
+            <tr><td><code>ndwi</code></td><td>Normalized Difference Water Index</td><td>surface water</td><td>green, nir</td><td>optical</td></tr>
+            <tr><td><code>ndmi</code></td><td>Normalized Difference Moisture Index</td><td>canopy moisture</td><td>nir, swir</td><td>optical</td></tr>
+            <tr><td><code>msi</code></td><td>Moisture Stress Index</td><td>canopy moisture</td><td>nir, swir</td><td>optical</td></tr>
+            <tr><td><code>bsi</code></td><td>Bare Soil Index</td><td>soil</td><td>blue, red, nir, swir</td><td>optical</td></tr>
+            <tr><td><code>lst</code></td><td>Land Surface Temperature</td><td>thermal</td><td>thermal band</td><td>Landsat thermal</td></tr>
+            <tr><td><code>cwsi</code></td><td>Crop Water Stress Index</td><td>thermal</td><td>LST and weather</td><td>Landsat thermal</td></tr>
+            <tr><td><code>smi</code></td><td>Soil Moisture Index</td><td>thermal</td><td>LST and NDVI</td><td>Landsat thermal</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn">
+        <strong>Must be stated on the page.</strong> NDWI here is the McFeeters surface-water
+        index, so a high value means water on the surface, not a healthy canopy. Thermal
+        indices come from a different satellite with a different revisit and a coarser pixel,
+        and thermal has no grid cells.
+      </div>
+
+      <!-- ---- weather ---- -->
+      <h3 id="kb-weather">Weather catalog <span class="chip outline">Outline</span></h3>
+      <p>Provider: Open-Meteo, free tier, history and forecast.</p>
+      <h4>Six derived daily signals</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Code</th><th>Name</th><th>Unit</th></tr></thead>
+          <tbody>
+            <tr><td><code>gdd_base10</code></td><td>Growing Degree Days, base 10 °C</td><td>°C·day</td></tr>
+            <tr><td><code>gdd_base15</code></td><td>Growing Degree Days, base 15 °C</td><td>°C·day</td></tr>
+            <tr><td><code>gdd_cumulative_base10_season</code></td><td>Season-cumulative GDD, base 10 °C</td><td>°C·day</td></tr>
+            <tr><td><code>et0</code></td><td>Reference evapotranspiration, Penman-Monteith</td><td>mm</td></tr>
+            <tr><td><code>rain_7d</code></td><td>Rainfall, 7-day cumulative</td><td>mm</td></tr>
+            <tr><td><code>rain_30d</code></td><td>Rainfall, 30-day cumulative</td><td>mm</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>Nine weather indices on the dashboard</h4>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Code</th><th>Name</th></tr></thead>
+          <tbody>
+            <tr><td><code>temperature</code></td><td>Max / min temperature</td></tr>
+            <tr><td><code>radiation</code></td><td>Solar radiation</td></tr>
+            <tr><td><code>wind</code></td><td>Wind speed and direction</td></tr>
+            <tr><td><code>rainfall</code></td><td>Rainfall amount and density</td></tr>
+            <tr><td><code>humidity</code></td><td>Humidity</td></tr>
+            <tr><td><code>evapotranspiration</code></td><td>Plant water loss, ET₀</td></tr>
+            <tr><td><code>evaporation_coeff</code></td><td>Soil dry-down and water deficit</td></tr>
+            <tr><td><code>rain_et_balance</code></td><td>Rainfall against ET balance</td></tr>
+            <tr><td><code>drought_spi</code></td><td>Drought, SPI-90</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Weather risk scores derived from these feed the disease and stress decision trees.</p>
+
+      <!-- ---- trees ---- -->
+      <h3 id="kb-trees">Decision tree library <span class="chip written">Written</span></h3>
+      <p>
+        Eighteen trees ship as versioned files. Unlike the other catalogs they carry
+        scientific provenance: an evidence block with a confidence level, notes, citations,
+        and a transferability rating for Egypt, the Middle East and globally. Thresholds are
+        declared parameters, so a tenant tunes them without editing the tree.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tree</th><th>Crop</th><th>Reads</th></tr></thead>
+          <tbody>
+            <tr><td><code>mango_anthracnose_risk_v1</code></td><td>mango</td><td>weather risk, warm and wet days</td></tr>
+            <tr><td><code>mango_powdery_mildew_risk_v1</code></td><td>mango</td><td>weather risk</td></tr>
+            <tr><td><code>mango_fruit_fly_risk_v1</code></td><td>mango</td><td>weather, stage</td></tr>
+            <tr><td><code>mango_canopy_health_v1</code></td><td>mango</td><td>vegetation index</td></tr>
+            <tr><td><code>mango_stress_induction_v1</code></td><td>mango</td><td>stage, water</td></tr>
+            <tr><td><code>mango_post_harvest_nitrogen_v1</code></td><td>mango</td><td>stage</td></tr>
+            <tr><td><code>date_palm_pollination_rain_v1</code></td><td>date palm</td><td>rainfall, stage</td></tr>
+            <tr><td><code>date_palm_ripening_rain_risk_v1</code></td><td>date palm</td><td>rainfall, stage</td></tr>
+            <tr><td><code>date_palm_soil_salinity_v1</code></td><td>date palm</td><td>salinity signal</td></tr>
+            <tr><td><code>potato_frost_risk_v1</code></td><td>potato</td><td>temperature</td></tr>
+            <tr><td><code>potato_heat_stress_v1</code></td><td>potato</td><td>temperature</td></tr>
+            <tr><td><code>potato_petiole_nitrogen_v1</code></td><td>potato</td><td>lab signal</td></tr>
+            <tr><td><code>potato_petiole_phosphorus_v1</code></td><td>potato</td><td>lab signal</td></tr>
+            <tr><td><code>potato_petiole_potassium_v1</code></td><td>potato</td><td>lab signal</td></tr>
+            <tr><td><code>potato_soil_salinity_v1</code></td><td>potato</td><td>salinity signal</td></tr>
+            <tr><td><code>ndvi_baseline_alert_v1</code></td><td>any</td><td>NDVI against baseline</td></tr>
+            <tr><td><code>demo_cell_low_ndvi_v1</code></td><td>any</td><td>NDVI per grid cell</td></tr>
+            <tr><td><code>scout_for_stress_v1</code></td><td>any</td><td>index drop, opens a scouting visit</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Page plan: one page per tree, generated from the file. Each shows what it reads, the
+        thresholds and their defaults, what it opens, the evidence notes and citations, and
+        the transferability rating.
+      </p>
+
+      <!-- ---- signals ---- -->
+      <h3 id="kb-signals">Scouting signal catalog <span class="chip outline">Outline</span></h3>
+      <p>
+        Nine platform signal definitions and five forms, shared by every tenant so the field
+        vocabulary is the same everywhere. A tenant can add its own, and its own row shadows
+        the platform one when the codes collide.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Code</th><th>Kind</th><th>Aggregation</th></tr></thead>
+          <tbody>
+            <tr><td><code>canopy_vigour</code></td><td>categorical: good, fair, poor, severe</td><td>latest</td></tr>
+            <tr><td><code>pest_incidence_pct</code></td><td>numeric, percent</td><td>mean</td></tr>
+            <tr><td><code>disease_severity</code></td><td>categorical</td><td>latest</td></tr>
+            <tr><td><code>disease_symptom</code></td><td>categorical: anthracnose, powdery, leaf_spot, necrosis, chlorosis, unknown</td><td>latest</td></tr>
+            <tr><td><code>weed_pressure</code></td><td>categorical</td><td>latest</td></tr>
+            <tr><td><code>soil_moisture_feel</code></td><td>categorical</td><td>latest</td></tr>
+            <tr><td><code>stress_cause_observed</code></td><td>categorical: water, nutrition, pest, disease, salinity, mechanical, none</td><td>latest</td></tr>
+            <tr><td><code>irrigation_fault</code></td><td>event</td><td>count</td></tr>
+            <tr><td><code>scout_photo</code></td><td>attachment</td><td>count</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        <strong>Rule to document.</strong> Only numeric signals can use mean, max, min or sum.
+        Anything else falls back to latest. A form that asks for max on a categorical field is
+        silently treated as latest.
+      </div>
+
+      <!-- ---- notifications ---- -->
+      <h3 id="kb-notify">Notification and push templates <span class="chip notstarted">Not started</span></h3>
+      <p>
+        Seeded message bodies for alerts and recommendations across in-app, email and webhook,
+        in English and Arabic, plus push templates for the scouting app. The page lists the
+        variables each template can use.
+      </p>
+
+      <!-- ---- platform ---- -->
+      <h3 id="kb-platform">Platform catalogs <span class="chip outline">Outline</span></h3>
+      <ul>
+        <li>Countries catalog, used for farm location and regional targeting</li>
+        <li>Platform defaults, the settings a new tenant inherits</li>
+        <li>Grid anomaly threshold default</li>
+        <li>Imagery provider catalog and the products each one serves</li>
+        <li>Capability catalog: every permission a role can grant <span class="chip written">Written</span></li>
+      </ul>
+    </section>
+
+    <hr />
+
+    <!-- =============== LATER =============== -->
+    <section id="reference">
+      <span class="section-tag">Later</span>
+      <h2>Reference <span class="chip notstarted">Not started</span></h2>
+      <p>Proposed, not part of the first release of the site.</p>
+      <div class="grid g2">
+        <div class="card"><h4>Glossary</h4><p>Every term from Section B, alphabetical, English and Arabic.</p></div>
+        <div class="card"><h4>Roles and capabilities</h4><p>The full permission table, generated from the capability catalog.</p></div>
+        <div class="card"><h4>API</h4><p>For integrators. Decide later whether this is public.</p></div>
+        <div class="card"><h4>Release notes</h4><p>What changed, by date.</p></div>
+      </div>
+    </section>
+
+    <section id="build">
+      <h2>Build plan for this site</h2>
+      <ol>
+        <li>Agree this structure and the section titles.</li>
+        <li>Write Section A and Section B first. They are short and every other page links to them.</li>
+        <li>Move the existing documents in <code>docs/guide/</code> into Section C group 6 and Section D. They are already written and cover decision trees, the knowledge base, farm management, the capability catalog and the index gap analysis, in English and Arabic.</li>
+        <li>Write Section D from the seed files, one catalog at a time. Generate the long tables from the database rather than typing them.</li>
+        <li>Write the How-To groups in order 1, 5, 8, 2, 3, 4, 6, 7, 10, 9. That order matches what a new user hits first.</li>
+        <li>Decide the site generator. The marketing site already uses Astro, so the docs site can reuse it and the same palette.</li>
+        <li>Add Arabic. The product is bilingual, so the site should be too, with right-to-left layout.</li>
+      </ol>
+
+      <div class="note">
+        <strong>Open questions.</strong>
+        Does <code>www.agripulse.tech</code> serve the marketing site today, and do the docs go
+        on a path or a subdomain? Is the site public or behind a login? Do we publish the API
+        reference? Who signs off on the agronomy pages in Section D?
+      </div>
+    </section>
+
+    <footer>
+      AgriPulse documentation structure proposal · drafted 18 August 2026 ·
+      counts read from the seed migrations and decision tree files in this repository.
+    </footer>
+
+  </main>
+
+  <!-- ============================ RIGHT RAIL ============================ -->
+  <aside class="rail">
+    <div class="rail-title">On this page</div>
+    <a href="#proposal">Structure proposal</a>
+    <a href="#theme">A · Solution theme</a>
+    <a href="#abstract">B · What AgriPulse is</a>
+    <a href="#concepts">Key concepts</a>
+    <a href="#howtos">C · How-Tos</a>
+    <a href="#kb">D · Knowledge Base</a>
+    <a href="#reference">Reference</a>
+    <a href="#build">Build plan</a>
+  </aside>
+
+</div>
+
+<script>
+  // Theme toggle — cycles light / dark / system.
+  (function () {
+    var btn = document.getElementById("theme");
+    var order = ["light", "dark", ""];
+    btn.addEventListener("click", function () {
+      var cur = document.documentElement.getAttribute("data-theme") || "";
+      var next = order[(order.indexOf(cur) + 1) % order.length];
+      if (next) document.documentElement.setAttribute("data-theme", next);
+      else document.documentElement.removeAttribute("data-theme");
+    });
+  })();
+
+  // Language button is a placeholder: it flips direction so we can see the
+  // right-to-left layout early. Arabic copy is not written yet.
+  (function () {
+    var btn = document.getElementById("lang");
+    btn.addEventListener("click", function () {
+      var rtl = document.documentElement.dir === "rtl";
+      document.documentElement.dir = rtl ? "ltr" : "rtl";
+      btn.textContent = rtl ? "العربية" : "English";
+    });
+  })();
+
+  // Highlight the nav entry for the section in view.
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll("nav.side a"));
+    var map = {};
+    links.forEach(function (a) { map[a.getAttribute("href").slice(1)] = a; });
+    var targets = Object.keys(map)
+      .map(function (id) { return document.getElementById(id); })
+      .filter(Boolean);
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        links.forEach(function (a) { a.classList.remove("active"); });
+        var a = map[e.target.id];
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-80px 0px -70% 0px", threshold: 0 });
+    targets.forEach(function (t) { obs.observe(t); });
+  })();
+</script>
+</body>
+</html>

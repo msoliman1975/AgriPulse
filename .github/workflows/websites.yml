@@ -1,0 +1,99 @@
+name: websites
+
+# Deploys the two static sites to Cloudflare Workers static assets:
+#
+#   marketing/      -> agripulse.cloud, www.agripulse.cloud
+#   docs/website/   -> docs.agripulse.cloud
+#
+# Both are static files. No Worker code runs, so requests are served from the
+# static asset store at no cost.
+#
+# Secrets used: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "marketing/**"
+      - "docs/website/**"
+      - ".github/workflows/websites.yml"
+  workflow_dispatch:
+    inputs:
+      site:
+        description: "Which site to deploy"
+        type: choice
+        options: [both, marketing, docs]
+        default: both
+
+concurrency:
+  group: websites-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  marketing:
+    name: marketing → agripulse.cloud
+    if: >-
+      github.event_name == 'push' ||
+      contains(fromJSON('["both","marketing"]'), inputs.site)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: marketing/pnpm-lock.yaml
+
+      - name: Install
+        working-directory: marketing
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        working-directory: marketing
+        run: pnpm build
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: marketing
+
+  docs:
+    name: docs → docs.agripulse.cloud
+    if: >-
+      github.event_name == 'push' ||
+      contains(fromJSON('["both","docs"]'), inputs.site)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Rebuild the pages from build.py
+        run: python docs/website/build.py
+
+      - name: Fail if the committed pages are stale
+        run: |
+          if ! git diff --quiet -- docs/website; then
+            echo "::error::docs/website is out of date. Run 'python docs/website/build.py' and commit the result."
+            git --no-pager diff --stat -- docs/website
+            exit 1
+          fi
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: docs/website

@@ -1,0 +1,7 @@
+# Files in this directory that must not be published.
+# Same format as .gitignore.
+build.py
+README.md
+wrangler.toml
+.assetsignore
+_structure-proposal.html
