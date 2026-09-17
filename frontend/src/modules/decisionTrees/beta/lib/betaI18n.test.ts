@@ -27,8 +27,8 @@ const BUNDLES: [string, Record<string, unknown>][] = [
  *  rather than copied — see `lib/useStatusLabel.ts`. So they are checked
  *  there, in the bundle that actually has to carry them. */
 const TREE_BUNDLES: [string, Record<string, unknown>][] = [
-  ["en", enTrees as Record<string, unknown>],
-  ["ar", arTrees as Record<string, unknown>],
+  ["en", enTrees],
+  ["ar", arTrees],
 ];
 
 function lookup(bundle: Record<string, unknown>, path: string): unknown {
@@ -143,8 +143,8 @@ describe.each(TREE_BUNDLES)("borrowed status labels (%s)", (_lang, bundle) => {
 
 describe("decisionTreesBeta bundles", () => {
   it("carries the same keys in both languages", () => {
-    const enKeys = leafKeys(en as Record<string, unknown>);
-    const arKeys = leafKeys(ar as Record<string, unknown>);
+    const enKeys = leafKeys(en);
+    const arKeys = leafKeys(ar);
     expect([...enKeys].filter((k) => !arKeys.has(k)).sort()).toEqual([]);
     expect([...arKeys].filter((k) => !enKeys.has(k)).sort()).toEqual([]);
   });
@@ -152,10 +152,10 @@ describe("decisionTreesBeta bundles", () => {
   it("has no Arabic value left as its English original", () => {
     // A copied English string is the failure that looks translated. Codes and
     // punctuation-only values are exempt; nothing here is either.
-    const enKeys = [...leafKeys(en as Record<string, unknown>)];
+    const enKeys = [...leafKeys(en)];
     const same = enKeys.filter((path) => {
-      const e = lookup(en as Record<string, unknown>, path);
-      const a = lookup(ar as Record<string, unknown>, path);
+      const e = lookup(en, path);
+      const a = lookup(ar, path);
       return typeof e === "string" && typeof a === "string" && e.trim() !== "" && e === a;
     });
     expect(same).toEqual([]);
