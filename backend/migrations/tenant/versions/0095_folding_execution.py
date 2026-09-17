@@ -53,8 +53,8 @@ manifest in ``app/shared/purge/registry.py``. Purging a farm deletes that
 farm's override rows and leaves the tenant-level row (``farm_id IS NULL``)
 standing, which is right: it belongs to the tenant, not to the farm.
 
-Revision ID: 0094
-Revises: 0093
+Revision ID: 0095
+Revises: 0094
 Create Date: 2026-09-16
 """
 
@@ -66,8 +66,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0094"
-down_revision: str | Sequence[str] | None = "0093"
+revision: str = "0095"
+down_revision: str | Sequence[str] | None = "0094"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
