@@ -1,11 +1,23 @@
 /**
  * The publish checks, named per node.
  *
- * Prompt 3 puts the compiler on the backend. This is the same rule set run in
- * the browser so the author sees a rejection while they are looking at the
- * node that caused it, rather than after a round trip. Both produce the same
- * `CompileRejection` shape, so when the real endpoint lands the panel renders
- * its answer without a change: `betaApi.compile()` is the one swap point.
+ * Prompt 3 put the compiler on the backend, and PR #696 merged it as
+ * `recommendations/folding_compiler.py`. This is the same rule set run in the
+ * browser so the author sees a rejection while they are looking at the node
+ * that caused it, rather than after a round trip.
+ *
+ * The two shapes are close but not identical, and the difference is the one
+ * thing to get right when the endpoint is wired up (PR #703):
+ *
+ *   * its rule names are kebab-case (`register-without-code`), these are
+ *     snake_case (`register_missing_code`);
+ *   * it carries `node_ids`, a list, because one rejection can name several
+ *     nodes; this carries a single `node_id`;
+ *   * it already ships `message_en` and `message_ar`, so a wired panel should
+ *     render the backend's own Arabic rather than translating from the rule.
+ *
+ * `RejectionRow` falls back to `detail` whenever it has no copy for a rule, so
+ * an unmapped backend rejection still reads as a sentence rather than a key.
  *
  * Every rejection carries a `rule` the UI translates and a `detail` in English
  * for the cases where the backend knows something this copy does not. Nothing
