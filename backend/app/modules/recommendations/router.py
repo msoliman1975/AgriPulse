@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from datetime import date as date_type
 from datetime import datetime
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response, status
@@ -34,7 +34,26 @@ from app.modules.recommendations.errors import (
     RecommendationNotFoundError,
 )
 from app.modules.recommendations.events import EvaluationRunFinishedV1
+from app.modules.recommendations.folding_authoring import (
+    BetaDryRunUnavailableError,
+    BetaNoDraftError,
+    BetaTreeCodeExistsError,
+    BetaTreeNotFoundError,
+    BetaVersionNotFoundError,
+    FoldingTreeAuthorService,
+    compile_errors_to_body,
+    get_folding_tree_author_service,
+)
+from app.modules.recommendations.folding_compiler import FoldingCompileError
 from app.modules.recommendations.schemas import (
+    BetaDryRunRequest,
+    BetaDryRunResponse,
+    BetaTreeCreateRequest,
+    BetaTreeDetailResponse,
+    BetaTreePublishRequest,
+    BetaTreePublishResponse,
+    BetaTreeSummary,
+    BetaTreeVersionCreateRequest,
     BlockVerdictsResponse,
     DecisionTreeAvailabilityResponse,
     DecisionTreeCopyRequest,
@@ -109,6 +128,13 @@ from app.shared.db.session import get_admin_db_session, get_db_session
 # boundary.
 from app.shared.eventbus import get_default_bus
 from app.shared.rbac.check import has_capability, requires_capability
+
+if TYPE_CHECKING:
+    # Every route in this file imports `APIError` inside the function that
+    # raises it. Only the two beta mappers below name it in a signature, and
+    # a type-checking-only import keeps that readable without moving the
+    # runtime import for 20 other handlers.
+    from app.core.errors import APIError
 
 router = APIRouter(prefix="/api/v1", tags=["recommendations"])
 
@@ -1596,6 +1622,315 @@ async def get_farm_verdicts(
     """
     _ensure_tenant(context)
     return await service.farm_verdicts(farm_id=farm_id, at=at)
+
+
+# =====================================================================
+# Beta (folding) tree authoring
+#
+# Mounted under the same `/api/v1` prefix as everything else in this file,
+# so the full paths are:
+#
+#   POST   /api/v1/platform/decision-trees/beta                     create
+#   GET    /api/v1/platform/decision-trees/beta                     list
+#   GET    /api/v1/platform/decision-trees/beta/{tree_id}           get
+#   POST   /api/v1/platform/decision-trees/beta/{tree_id}/versions  append draft
+#   POST   /api/v1/platform/decision-trees/beta/{tree_id}/publish   publish
+#   DELETE /api/v1/platform/decision-trees/beta/{tree_id}/draft     discard draft
+#   POST   /api/v1/platform/decision-trees/beta/{tree_id}/dry-run   per-cell folds
+#
+# `beta` is a literal segment and it is declared here, not under
+# `/decision-trees/…`, where it would have to be declared ahead of the
+# existing `/decision-trees/{code}` routes to avoid being swallowed by them.
+# The same reason the eval-trace and status routes sit where they do.
+#
+# A tree is addressed by id rather than by code. Code is the old editor's key
+# and it is scoped — a tenant may hold a code the platform also holds — so
+# resolving one needs the caller's scope as well. An id needs nothing else.
+# =====================================================================
+
+_BETA_PREFIX = "/platform/decision-trees/beta"
+
+
+def _beta_service(
+    public_session: AsyncSession = Depends(get_admin_db_session),
+    context: RequestContext = Depends(get_current_context),
+) -> FoldingTreeAuthorService:
+    return get_folding_tree_author_service(
+        public_session=public_session, tenant_id=context.tenant_id
+    )
+
+
+def _beta_compile_error(exc: FoldingCompileError) -> APIError:
+    """The pinned 422 body, and never a 500.
+
+    The compiler collects every problem rather than stopping at the first,
+    and this hands all of them over in one response. An author fixing one
+    message per round trip is the slow path the designer exists to remove.
+    """
+    from app.core.errors import APIError
+
+    return APIError(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        title="The tree definition cannot be stored",
+        detail=(
+            f"{len(exc.errors)} publish check(s) failed. Each entry names the "
+            "rule and, where the problem belongs to one node, that node."
+        ),
+        type_="https://agripulse.cloud/problems/recommendations/beta-tree-invalid",
+        extras=compile_errors_to_body(exc.errors),
+    )
+
+
+# One return per way a beta write can be refused; a dispatch table would
+# hide which HTTP status belongs to which rule, which is the thing a
+# reader comes here for.
+def _map_beta_error(exc: Exception) -> APIError | None:  # noqa: PLR0911
+    from app.core.errors import APIError
+
+    if isinstance(exc, FoldingCompileError):
+        return _beta_compile_error(exc)
+    if isinstance(exc, BetaTreeNotFoundError):
+        return APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Beta decision tree not found",
+            detail=(
+                f"No beta decision tree with id {exc.tree_id} in this scope. A live "
+                "tree is edited through /decision-trees, not here."
+            ),
+            type_="https://agripulse.cloud/problems/recommendations/beta-tree-not-found",
+        )
+    if isinstance(exc, BetaVersionNotFoundError):
+        return APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Version not found",
+            detail=f"No version {exc.version_id} on this tree.",
+            type_="https://agripulse.cloud/problems/recommendations/beta-version-not-found",
+        )
+    if isinstance(exc, BetaTreeCodeExistsError):
+        return APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Code already in use",
+            detail=(
+                f"A decision tree with code {exc.code!r} already exists. Codes are "
+                "unique across the live and beta catalogues, because every lookup "
+                "by code would otherwise be ambiguous."
+            ),
+            type_="https://agripulse.cloud/problems/recommendations/decision-tree-code-exists",
+            extras={"code": exc.code},
+        )
+    if isinstance(exc, BetaNoDraftError):
+        # 409, not 404. The tree is there and the caller may edit it; there is
+        # simply nothing unpublished to remove.
+        return APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            title="No draft to discard",
+            detail=(
+                "This tree's newest version is published, so there is no draft to "
+                "discard. A published version is the record of what ran and stays."
+            ),
+            type_="https://agripulse.cloud/problems/recommendations/beta-no-draft",
+        )
+    if isinstance(exc, BetaDryRunUnavailableError):
+        return APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            title="Nothing to dry-run",
+            detail=str(exc),
+            type_="https://agripulse.cloud/problems/recommendations/beta-dry-run-unavailable",
+        )
+    return None
+
+
+@router.get(
+    _BETA_PREFIX,
+    response_model=list[BetaTreeSummary],
+    summary="List beta (folding) decision trees.",
+)
+async def list_beta_trees(
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    service: FoldingTreeAuthorService = Depends(_beta_service),
+) -> list[dict[str, Any]]:
+    _ensure_authoring_scope(context)
+    return await service.list_trees()
+
+
+@router.get(
+    _BETA_PREFIX + "/{tree_id}",
+    response_model=BetaTreeDetailResponse,
+    summary="Read one beta tree with the definition the designer opens.",
+)
+async def get_beta_tree(
+    tree_id: UUID,
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    service: FoldingTreeAuthorService = Depends(_beta_service),
+) -> dict[str, Any]:
+    _ensure_authoring_scope(context)
+    try:
+        return await service.get_tree(tree_id)
+    except Exception as exc:
+        mapped = _map_beta_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.post(
+    _BETA_PREFIX,
+    response_model=BetaTreeDetailResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a beta tree (its first version is a draft).",
+)
+async def create_beta_tree(
+    payload: BetaTreeCreateRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: FoldingTreeAuthorService = Depends(_beta_service),
+) -> dict[str, Any]:
+    _ensure_authoring_scope(context)
+    try:
+        return await service.create_tree(
+            code=payload.code,
+            definition=payload.definition,
+            notes=payload.notes,
+            actor_user_id=context.user_id,
+            tenant_schema=context.tenant_schema,
+        )
+    except Exception as exc:
+        mapped = _map_beta_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.post(
+    _BETA_PREFIX + "/{tree_id}/versions",
+    response_model=BetaTreeDetailResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Append a draft version to a beta tree.",
+)
+async def append_beta_tree_version(
+    tree_id: UUID,
+    payload: BetaTreeVersionCreateRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: FoldingTreeAuthorService = Depends(_beta_service),
+) -> dict[str, Any]:
+    """Save the canvas.
+
+    A definition whose compiled hash matches the newest version returns that
+    tree unchanged and inserts nothing, so the designer can save liberally.
+    That is also why DELETE .../draft exists: saving cannot undo a save.
+    """
+    _ensure_authoring_scope(context)
+    try:
+        return await service.append_version(
+            tree_id=tree_id,
+            definition=payload.definition,
+            notes=payload.notes,
+            actor_user_id=context.user_id,
+            tenant_schema=context.tenant_schema,
+        )
+    except Exception as exc:
+        mapped = _map_beta_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.post(
+    _BETA_PREFIX + "/{tree_id}/publish",
+    response_model=BetaTreePublishResponse,
+    summary="Publish one version of a beta tree.",
+)
+async def publish_beta_tree_version(
+    tree_id: UUID,
+    payload: BetaTreePublishRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: FoldingTreeAuthorService = Depends(_beta_service),
+) -> dict[str, Any]:
+    """Fix a version the designer, the dry run and a reviewer can agree on.
+
+    Publishing a beta tree does not put it in front of a grower. The sweep's
+    tree query filters on `stage = 'live'`, so a published beta tree runs
+    nowhere until the sweep is wired to the folding engine.
+    """
+    _ensure_authoring_scope(context)
+    try:
+        return await service.publish_version(
+            tree_id=tree_id,
+            version_id=payload.version_id,
+            actor_user_id=context.user_id,
+        )
+    except Exception as exc:
+        mapped = _map_beta_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.delete(
+    _BETA_PREFIX + "/{tree_id}/draft",
+    status_code=status.HTTP_204_NO_CONTENT,
+    # A 204 carries no body, and FastAPI builds a response field from the
+    # `-> None` annotation unless told not to. Without this every test that
+    # assembles the app fails at import with "Status code 204 must not have a
+    # response body". Same spelling as the other 204s in this file.
+    response_model=None,
+    summary="Discard a beta tree's unpublished draft.",
+)
+async def discard_beta_tree_draft(
+    tree_id: UUID,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    service: FoldingTreeAuthorService = Depends(_beta_service),
+) -> None:
+    """Delete the draft, because appending cannot undo one.
+
+    Append is a no-op when the compiled hash is unchanged, so re-saving the
+    draft's own body does nothing, and saving a different body adds a third
+    version rather than removing the second. Without this route a single bad
+    draft sits in front of every later author for ever.
+    """
+    _ensure_authoring_scope(context)
+    try:
+        await service.discard_draft(tree_id=tree_id, actor_user_id=context.user_id)
+    except Exception as exc:
+        mapped = _map_beta_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.post(
+    _BETA_PREFIX + "/{tree_id}/dry-run",
+    response_model=BetaDryRunResponse,
+    summary="Fold one block cell by cell. Writes nothing.",
+)
+async def dry_run_beta_tree(
+    tree_id: UUID,
+    payload: BetaDryRunRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    service: FoldingTreeAuthorService = Depends(_beta_service),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """What this tree would say about one block, per cell, with no writes.
+
+    Needs a tenant session: the signals, imagery and weather a fold reads are
+    the tenant's. A platform caller with no tenant has no block to fold
+    against, which is what `_ensure_tenant` says here.
+    """
+    _ensure_authoring_scope(context)
+    tenant_schema = _ensure_tenant(context)
+    try:
+        return await service.dry_run(
+            tree_id=tree_id,
+            block_id=payload.block_id,
+            definition=payload.definition,
+            version_id=payload.version_id,
+            tenant_session=tenant_session,
+            tenant_schema=tenant_schema,
+        )
+    except Exception as exc:
+        mapped = _map_beta_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
 
 
 # ---------- Finding catalogue ----------------------------------------------

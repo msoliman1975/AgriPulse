@@ -73,6 +73,13 @@ class DecisionTree(Base, TimestampedMixin):
         server_default=text("ARRAY[]::text[]"),
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
+    # Which engine this tree belongs to: 'live' (the sweep runs it) or 'beta'
+    # (folding engine, authored and dry-run but never swept). CHECK
+    # constrained by public migration 0092. A beta tree can be published —
+    # its author needs that to dry-run and to hand it to a reviewer — and
+    # still never runs, because `list_active_trees_with_current_version`
+    # filters on `stage = 'live'`.
+    stage: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'live'"))
     current_version_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("public.decision_tree_versions.id", ondelete="SET NULL"),
@@ -95,7 +102,19 @@ class DecisionTreeVersion(Base):
         nullable=False,
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
-    tree_yaml: Mapped[str] = mapped_column(Text, nullable=False)
+    # A version holds exactly one source body, never both and never neither
+    # (public migration 0091 CHECKs `num_nonnulls(tree_yaml, definition) = 1`).
+    #
+    #   tree_yaml   the old shape. YAML text, compiled by `loader.compile_tree`.
+    #   definition  the beta shape. The graph as JSON, compiled by
+    #               `folding_compiler.compile_folding_tree`.
+    #
+    # The beta designer produces an object, so storing it as JSON removes a
+    # serialise-and-reparse round trip that has no purpose and does real
+    # damage: PyYAML reads an unquoted `on:` key as the boolean True, which
+    # silently breaks every `switch` node written in YAML.
+    tree_yaml: Mapped[str | None] = mapped_column(Text, nullable=True)
+    definition: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     tree_compiled: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     compiled_hash: Mapped[str] = mapped_column(Text, nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
