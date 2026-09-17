@@ -1217,7 +1217,9 @@ class RecommendationsRepository:
         """
         if not tree_ids:
             return {}
-        binds = [bindparam("tids", type_=postgresql.ARRAY(PG_UUID(as_uuid=True)))]
+        # Annotated: inferred from the first element, the list would be
+        # list[BindParameter[Sequence[UUID]]] and refuse the scalar farm bind.
+        binds: list[Any] = [bindparam("tids", type_=postgresql.ARRAY(PG_UUID(as_uuid=True)))]
         params: dict[str, Any] = {"tids": list(tree_ids)}
         clause = "farm_id IS NULL"
         if farm_id is not None:

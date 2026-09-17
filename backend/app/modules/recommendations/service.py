@@ -662,7 +662,17 @@ class RecommendationsServiceImpl:
                 if r.get("clause_en")
             }
         catalogue = dict(_finding_rows_from(compiled.get("findings"), source="tree"))
-        catalogue.update(self._finding_catalogue_cache)
+        for code, row in self._finding_catalogue_cache.items():
+            local = catalogue.get(code)
+            # The catalogue table has no action_type or actions column, so a
+            # catalogue row carries None for both. Replacing the tree's row
+            # wholesale would erase what the tree declared and drop the card
+            # back to the fallback action type. The table wins on the shared
+            # vocabulary it does define; the tree keeps the rest.
+            merged = row
+            if local is not None and row.action_type is None and row.actions is None:
+                merged = replace(row, action_type=local.action_type, actions=local.actions)
+            catalogue[code] = merged
         return catalogue
 
     async def _walk_and_fold(
