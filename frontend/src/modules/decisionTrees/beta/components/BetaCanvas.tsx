@@ -645,7 +645,10 @@ function NodeBody({ node }: { node: BetaPositionedNode }): JSX.Element {
         fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
         fill="#155e75"
       >
-        {truncate(`${i + 1}. ${t(`op.${caseOp(c) ?? "?"}`)} ${describeOperand(caseOperand(c))} → ${c.go || "—"}`, 34)}
+        {truncate(
+          `${i + 1}. ${t(`op.${caseOp(c) ?? "?"}`)} ${describeOperand(caseOperand(c))} → ${c.go || "—"}`,
+          34,
+        )}
       </text>
     ));
     const defaultTarget = data.switch?.default;

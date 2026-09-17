@@ -70,7 +70,7 @@ export function caseOperand(c: SwitchCase | undefined): CaseOperand | undefined 
 /** Rewrite a case onto one operator. The old operator key is dropped, so a
  *  case can never name two. */
 export function withCaseOp(c: SwitchCase, op: SwitchOp, operand: CaseOperand): SwitchCase {
-  return { go: c.go, [op]: operand } as SwitchCase;
+  return { go: c.go, [op]: operand };
 }
 
 export interface BetaNode {
