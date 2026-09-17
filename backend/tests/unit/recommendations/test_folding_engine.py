@@ -601,3 +601,70 @@ def test_parse_combination_rules_drops_what_it_cannot_read() -> None:
     assert rules[0].codes == frozenset({"dry", "ndvi_low"})
     assert rules[0].status == "watch"
     assert rules[1].status is None
+
+
+# --- the real catalogue row -------------------------------------------------
+#
+# `Def` above is a stand-in. These two read the class that actually ships, so a
+# rename there fails here rather than at whatever later point the two are first
+# wired together.
+
+# Every attribute `fold` reads off a catalogue row. Spelled out rather than
+# derived from the Protocol, because a Protocol of read-only properties carries
+# no class-level annotations to derive them from.
+_CONTRACT_FIELDS = (
+    "code",
+    "clause_en",
+    "clause_ar",
+    "name_en",
+    "name_ar",
+    "default_status",
+    "source",
+)
+
+
+def test_the_shipped_catalogue_row_carries_every_field_the_fold_reads() -> None:
+    import dataclasses
+
+    from app.modules.recommendations.findings import FindingDef as RealFindingDef
+
+    names = {f.name for f in dataclasses.fields(RealFindingDef)}
+    missing = sorted(set(_CONTRACT_FIELDS) - names)
+    assert not missing, (
+        f"findings.FindingDef no longer carries {missing}. The folding engine "
+        "declares a local Protocol with these names; rename them in both or in "
+        "neither."
+    )
+
+
+def test_a_shipped_catalogue_row_folds_and_shows_the_missing_action_type() -> None:
+    """The shipped row has no `action_type` and no `actions`.
+
+    Section 5.4 of the design says the action type with no combination rule is
+    the highest severity finding's, and that every finding contributes its own
+    horizon items. The catalogue carries neither, so the fold falls back to
+    `scout` and the card gets no horizon items at all. This test pins that, so
+    the gap is visible in a test name rather than discovered on a real card.
+    """
+    from app.modules.recommendations.findings import FindingDef as RealFindingDef
+
+    real = {
+        "dry": RealFindingDef(
+            code="dry",
+            clause_en="leaf water is low",
+            clause_ar="ماء الورقة منخفض",
+            name_en="Water shortage",
+            name_ar="نقص الري",
+            default_status="stressed",
+            source="platform",
+        )
+    }
+
+    card = fold([_reg("dry", "critical", "n_dry")], catalogue=real)
+
+    assert card is not None
+    assert card.text_en == "Leaf water is low."
+    assert card.text_ar == "ماء الورقة منخفض."
+    assert card.status == "stressed"
+    assert card.action_type == "scout"
+    assert card.actions == {}
