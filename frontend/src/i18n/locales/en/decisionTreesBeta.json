@@ -284,7 +284,10 @@
     "platformScope": "The dry run reads a tenant's blocks. A platform account has none, so open this tree from a tenant account to run it.",
     "noCells": "This block has no grid, so there are no cells to fold.",
     "saveFirst": "Save the draft first. The run walks the stored version, not the unsaved edit.",
-    "blocksFailed": "The block list could not be read."
+    "blocksFailed": "The block list could not be read.",
+    "errored_one": "{{count}} cell errored.",
+    "errored_other": "{{count}} cells errored.",
+    "stoppedAt": "Ended at {{node}}."
   },
   "publish": {
     "title": "Publish checks",
