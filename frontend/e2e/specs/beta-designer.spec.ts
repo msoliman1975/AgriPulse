@@ -167,7 +167,14 @@ interface StubOptions {
   refusePublishes?: number;
   /** Cells the dry run answers with. Empty means a block with no grid. */
   dryRunCells?: number;
+  /** Answer with a platform tree — `tenant_id: null` — while the signed-in
+   *  caller is a tenant admin. A tenant may read one and may not change it. */
+  platformOwned?: boolean;
 }
+
+/** Set by `stubBetaApi`, read by `summary`, because both the list and the
+ *  detail have to agree about who owns the tree. */
+let platformOwned = false;
 
 function summary() {
   return {
@@ -175,7 +182,7 @@ function summary() {
     code: TREE_CODE,
     name_en: DEFINITION.name_en,
     name_ar: DEFINITION.name_ar,
-    tenant_id: "22222222-2222-7222-8222-222222222222",
+    tenant_id: platformOwned ? null : "22222222-2222-7222-8222-222222222222",
     scope: "cell",
     current_version: 2,
     published_version: 1,
@@ -236,6 +243,7 @@ function dryRunBody(cells: number) {
 async function stubBetaApi(page: Page, options: StubOptions = {}): Promise<void> {
   let publishesLeftToRefuse = options.refusePublishes ?? 0;
   const cells = options.dryRunCells ?? 6;
+  platformOwned = options.platformOwned ?? false;
 
   await page.route("**/api/v1/**", async (route, request): Promise<void> => {
     const path = new URL(request.url()).pathname.replace(/^\/api\/v1/, "");
@@ -480,6 +488,28 @@ test.describe("beta designer", () => {
 
     // The canvas reads the same edit back.
     await expect(page.locator('[data-node-id="cond_1"]')).toBeVisible();
+  });
+
+  test("opens the platform's tree for a tenant, and offers no way to change it", async ({
+    authedPage: page,
+  }) => {
+    // The list has always shown a platform tree to a tenant. Opening it used
+    // to answer 404, and the screen said "cannot load" about a row it had
+    // just drawn. It opens now, read-only.
+    await stubBetaApi(page, { platformOwned: true });
+    await page.goto(TREE);
+
+    await expect(page.getByRole("application", { name: "Beta tree canvas" })).toBeVisible();
+    await expect(page.getByText("This tree belongs to another scope")).toBeVisible();
+
+    await expect(page.getByRole("button", { name: "Save draft" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Publish" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Discard draft" })).toHaveCount(0);
+
+    // And no node can be edited or dragged.
+    await page.locator('[data-node-id="cond_1"]').click();
+    await expect(page.getByLabel("Label (English)").first()).toBeDisabled();
+    await expect(page.getByLabel("Operator")).toBeDisabled();
   });
 
   test("shows the finding catalogue with the shadowed tenant row flagged", async ({

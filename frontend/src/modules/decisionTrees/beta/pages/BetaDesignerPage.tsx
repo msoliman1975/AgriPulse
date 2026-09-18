@@ -54,7 +54,7 @@ import {
   type BetaValidationError,
 } from "@/api/decisionTreesBeta";
 
-import { useAuthoringScope } from "../../lib/authoringScope";
+import { isEditableInScope, useAuthoringScope } from "../../lib/authoringScope";
 import { BetaCanvas } from "../components/BetaCanvas";
 import { BetaDryRunPanel } from "../components/BetaDryRunPanel";
 import { BetaNodePanel } from "../components/BetaNodePanel";
@@ -200,7 +200,12 @@ export function BetaDesignerPage(): ReactNode {
     [hints],
   );
 
-  const readOnly = !canManage;
+  // Not editable is not the same as not permitted, and both end here. A
+  // tenant can open the platform's tree — the list has always shown it, and
+  // the server now serves it rather than answering 404 — but a save would be
+  // refused, so the screen must not offer one.
+  const notMine = tree !== null && !isEditableInScope(scope, tree);
+  const readOnly = !canManage || notMine;
 
   const applyYaml = (next: string): void => {
     setDraftYaml(next);
@@ -432,7 +437,11 @@ export function BetaDesignerPage(): ReactNode {
               }
             />
 
-            {readOnly ? <StatusBanner kind="info">{t("designer.readOnly")}</StatusBanner> : null}
+            {readOnly ? (
+              <StatusBanner kind="info">
+                {notMine ? t("designer.readOnly") : t("designer.readOnlyNoPermission")}
+              </StatusBanner>
+            ) : null}
             {actionError ? <StatusBanner kind="crit">{actionError}</StatusBanner> : null}
 
             <SegmentedControl<Tab>
