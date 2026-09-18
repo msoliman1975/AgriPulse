@@ -7,14 +7,26 @@
  * the drift `betaCompile.ts` exists to catch.
  */
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
-import definition from "../../../../../../docs/trees/mango_unified.definition.json";
 import { betaEditorHints } from "./betaCompile";
 import { layoutBetaTree } from "./betaLayout";
 import { dumpBetaDoc, readRegisters, type BetaTreeDoc } from "./betaTree";
 
-const doc = definition as unknown as BetaTreeDoc;
+// Read rather than imported. `pnpm build` typechecks this file inside the
+// frontend Docker image, whose build context is `frontend/` alone, so an
+// import of a path under `docs/` fails to resolve there and takes the whole
+// container build with it. Reading it at run time keeps the fixture where it
+// belongs and out of the module graph.
+const doc = JSON.parse(
+  readFileSync(
+    resolve(__dirname, "../../../../../../docs/trees/mango_unified.definition.json"),
+    "utf-8",
+  ),
+) as BetaTreeDoc;
 
 describe("mango_unified in the designer", () => {
   it("raises no editor hint", () => {

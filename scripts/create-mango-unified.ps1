@@ -34,6 +34,11 @@ param(
   [string] $ApiBase = "https://api.agripulse.cloud/api",
   [string] $KeycloakBase = "https://keycloak.agripulse.cloud",
   [string] $Realm = "agripulse",
+  # A second copy of the tree needs its own code: codes are unique across the
+  # live and beta catalogues, tenant rows included. The definition's own `code`
+  # is rewritten to match, because the API refuses a payload whose code and
+  # definition disagree.
+  [string] $Code = "",
   [string] $ClientId = "agripulse-api",
   [switch] $WhatIfOnly
 )
@@ -93,14 +98,25 @@ function Invoke-Api {
 }
 
 # --- findings ---------------------------------------------------------------
+# What the tree needs, against what a code already resolves to. The fold reads
+# the platform catalogue first, so a tenant row that repeats a platform code is
+# never read — it only shows up on the catalogue screen as "Shadowed". A
+# tenant-scope run therefore creates a row only when neither catalogue has the
+# code.
 $wanted = Get-Content $findingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
-$existing = (Invoke-Api -Method Get -Path "$findingsPath_api`?include_inactive=true").findings
-$have = @($existing | ForEach-Object { $_.code })
-Write-Host "catalogue holds $($have.Count) codes; the tree needs $($wanted.Count)"
+$own = (Invoke-Api -Method Get -Path "$findingsPath_api`?include_inactive=true").findings
+$have = @($own | ForEach-Object { $_.code })
+$resolves = $have
+if ($scope -eq "tenant") {
+  $platform = (Invoke-Api -Method Get -Path "/v1/decision-tree-findings?include_inactive=true").findings
+  $resolves = @($have) + @($platform | ForEach-Object { $_.code })
+  Write-Host "this tenant holds $($have.Count) codes and the platform holds $(@($platform).Count)"
+}
+Write-Host "the tree needs $($wanted.Count) codes"
 
 foreach ($finding in $wanted) {
-  if ($have -contains $finding.code) {
-    Write-Host "  = $($finding.code) already there, left alone"
+  if ($resolves -contains $finding.code) {
+    Write-Host "  = $($finding.code) already resolves, left alone"
     continue
   }
   if ($WhatIfOnly) { Write-Host "  + $($finding.code) would be created"; continue }
@@ -118,6 +134,10 @@ foreach ($finding in $wanted) {
 
 # --- the tree ---------------------------------------------------------------
 $definition = Get-Content $definitionPath -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($Code) {
+  $definition.code = $Code
+  Write-Host "creating it under the code $Code"
+}
 $code = $definition.code
 $trees = Invoke-Api -Method Get -Path "/v1/platform/decision-trees/beta"
 $tree = $trees | Where-Object { $_.code -eq $code } | Select-Object -First 1
