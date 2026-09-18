@@ -39,13 +39,16 @@ param(
   # is rewritten to match, because the API refuses a payload whose code and
   # definition disagree.
   [string] $Code = "",
+  # Which tree to create. The default is the one tree; the split writes four
+  # more beside it, and each is created with this pointed at its file.
+  [string] $DefinitionFile = "mango_unified.definition.json",
   [string] $ClientId = "agripulse-api",
   [switch] $WhatIfOnly
 )
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$definitionPath = Join-Path $root "docs/trees/mango_unified.definition.json"
+$definitionPath = Join-Path $root "docs/trees/$DefinitionFile"
 $findingsPath = Join-Path $root "docs/trees/mango_unified.findings.json"
 
 foreach ($path in @($definitionPath, $findingsPath)) {

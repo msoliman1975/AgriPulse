@@ -153,3 +153,56 @@ reason beside each.
 4. **The 17 old trees stay live until it is promoted.** Turning them off is a
    separate decision with its own evidence: an estate dry run of this tree
    beside a week of their real cards.
+
+---
+
+## 8. Four trees, by area
+
+Added 2026-09-18. One tree of 74 nodes is right for the engine and hard for a
+person: its name says nothing about what it does, and an author changing an
+irrigation band reads past 50 nodes that have nothing to do with irrigation.
+
+So the same graph is also published as four trees, cut along the lines the
+agronomy already draws. `scripts/build_mango_split.py` does the cutting, and
+every node, band and threshold in them is the one section 4 designed — moved,
+not re-authored.
+
+| Tree | What it answers | Nodes | Findings | Rules | Parameters |
+| --- | --- | --- | --- | --- | --- |
+| `mango_water_status` | Is this cell short of water? | 35 | 2 | 2 | 20 |
+| `mango_canopy_health` | Is the canopy weak, and is it feed? | 33 | 5 | 5 | 22 |
+| `mango_pest_pressure` | How hard is the weather pushing pests? | 13 | 6 | 1 | 3 |
+| `mango_record_check` | Can these trees be judged at all? | 3 | 1 | 1 | 0 |
+
+Each tree carries only the bands it reads. The band `set` nodes loaded all
+eleven because the unified tree read all eleven; the water tree now loads four
+and the canopy tree seven.
+
+### 8.1 What the cut costs
+
+A combination rule matches the finding set of **one walk**, and each tree walks
+alone. Five of the unified tree's rules pair findings that now sit in two
+trees, so those five cannot fire:
+
+| Rule | What the farmer reads instead |
+| --- | --- |
+| `{vigour_low, dry}` | two cards: "irrigate" from the water tree, "vigour is below the band" from the canopy tree |
+| `{vigour_low, dry, nutrient_low}` | two cards, and neither says to water before feeding |
+| `{dry, cover_open}` | two cards; the blocked-line reading is not offered |
+| `{vigour_low, pest_high}` | two cards; the canopy card does not name anthracnose as the cause |
+| `{vigour_low, mildew_high}` | two cards; the canopy card does not name mildew as the cause |
+
+That is the trade. Four trees a person can name and own, against five sentences
+that joined two areas into one instruction. The other six rules, and all
+fourteen clauses, are untouched.
+
+**Both shapes are published**, so the choice is not final: `mango_unified` and
+the four are the same content, and a run of each over the same estate is the
+evidence for keeping one and retiring the other.
+
+### 8.2 What would bring the five back
+
+A condition source that reads another tree's finding set for the same cell in
+the same sweep. `{source: findings}` already exists and is walk-scoped; the
+cross-tree version is section 7's open question 1 with a wider answer. Until
+then, a pairing that must hold has to live inside one tree.
