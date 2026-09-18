@@ -1,0 +1,772 @@
+{
+  "code": "mango_canopy_health",
+  "name_en": "Mango — canopy vigour and feed",
+  "name_ar": "المانجو — حيوية المجموع والتغذية",
+  "description_en": "Picks the vegetation index that suits the soil and the tree size, checks it against this size's band and against the block's own seasonal baseline, then checks red-edge for nitrogen, green for chlorophyll and the bare-ground share for a canopy that is opening up.",
+  "description_ar": "يختار مؤشر الغطاء النباتي المناسب للتربة ولحجم الشجرة ويقارنه بنطاق هذا الحجم وبخط الأساس الموسمي للقطعة، ثم يفحص الحافة الحمراء للنيتروجين والأخضر للكلوروفيل ونسبة التربة العارية لانكشاف المجموع.",
+  "scope": "cell",
+  "crop_path": "mango",
+  "country_codes": [
+    "EG"
+  ],
+  "registers": [
+    "vigour_low",
+    "block_declining",
+    "nutrient_low",
+    "chlorophyll_low",
+    "cover_open"
+  ],
+  "parameters": {
+    "small_ndvi_floor": {
+      "type": "number",
+      "default": 0.1,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "medium_ndvi_floor": {
+      "type": "number",
+      "default": 0.25,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "large_ndvi_floor": {
+      "type": "number",
+      "default": 0.65,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "small_evi_floor": {
+      "type": "number",
+      "default": 0.05,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "medium_evi_floor": {
+      "type": "number",
+      "default": 0.14,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "large_evi_floor": {
+      "type": "number",
+      "default": 0.43,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "small_savi_floor": {
+      "type": "number",
+      "default": 0.12,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "medium_savi_floor": {
+      "type": "number",
+      "default": 0.28,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "large_savi_floor": {
+      "type": "number",
+      "default": 0.54,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "small_msavi_floor": {
+      "type": "number",
+      "default": 0.15,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "medium_msavi_floor": {
+      "type": "number",
+      "default": 0.3,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "large_msavi_floor": {
+      "type": "number",
+      "default": 0.56,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "small_gndvi_floor": {
+      "type": "number",
+      "default": 0.12,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "medium_gndvi_floor": {
+      "type": "number",
+      "default": 0.3,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "large_gndvi_floor": {
+      "type": "number",
+      "default": 0.59,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "small_ndre_floor": {
+      "type": "number",
+      "default": 0.08,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "medium_ndre_floor": {
+      "type": "number",
+      "default": 0.18,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "large_ndre_floor": {
+      "type": "number",
+      "default": 0.38,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "small_bsi_ceiling": {
+      "type": "number",
+      "default": 0.55,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "medium_bsi_ceiling": {
+      "type": "number",
+      "default": 0.3,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "large_bsi_ceiling": {
+      "type": "number",
+      "default": 0.14,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "vigour_drop_z": {
+      "type": "number",
+      "default": -1.0,
+      "min": -6.0,
+      "max": 0.0
+    }
+  },
+  "combinations": [
+    {
+      "codes": [
+        "vigour_low"
+      ],
+      "action_type": "scout",
+      "status": "issue",
+      "text_en": "Canopy vigour is below the band for this tree size and nothing else measured here explains it. Water, red-edge, ground cover and the pest scores all read normal. This is the case that needs eyes on the tree: check the trunk and the roots and ask about salinity in the irrigation water.",
+      "text_ar": "حيوية المجموع دون النطاق المتوقع لهذا الحجم ولا يوجد قياس آخر هنا يفسّر ذلك. الماء والحافة الحمراء وغطاء الأرض ودرجات الآفات كلها طبيعية. هذه هي الحالة التي تحتاج معاينة على الأرض: افحص الجذع والجذور واسأل عن ملوحة ماء الري."
+    },
+    {
+      "codes": [
+        "vigour_low",
+        "cover_open"
+      ],
+      "action_type": "scout",
+      "status": "issue",
+      "text_en": "Canopy vigour dropped and bare ground increased together. That pattern is missing trees, not a weak canopy. Count the trees on the ground before changing water or feed.",
+      "text_ar": "هبطت حيوية المجموع وزادت التربة العارية معًا. هذا النمط يعني أشجارًا مفقودة لا مجموعًا ضعيفًا. عُدّ الأشجار في الأرض قبل تغيير الماء أو السماد."
+    },
+    {
+      "codes": [
+        "vigour_low",
+        "nutrient_low"
+      ],
+      "action_type": "fertilize",
+      "status": "issue",
+      "text_en": "Canopy vigour and red-edge dropped together with the water readings normal. Take a leaf sample and feed. Scouting can wait.",
+      "text_ar": "هبطت حيوية المجموع والحافة الحمراء معًا وقراءات الماء طبيعية. خذ عينة أوراق وأضف السماد. يمكن تأجيل الاستكشاف."
+    },
+    {
+      "codes": [
+        "vigour_low",
+        "block_declining"
+      ],
+      "action_type": "scout",
+      "status": "issue",
+      "text_en": "This cell is below its band and the block as a whole is below its seasonal baseline. The decline is not confined to one cell. Walk the block, not just this spot.",
+      "text_ar": "هذه الخلية دون نطاقها والقطعة ككل دون خط أساسها الموسمي. التدهور لا يقتصر على خلية واحدة. تجوّل في القطعة كلها لا في هذه البقعة وحدها."
+    },
+    {
+      "codes": [
+        "chlorophyll_low",
+        "nutrient_low"
+      ],
+      "action_type": "fertilize",
+      "status": "issue",
+      "text_en": "Chlorophyll and red-edge are both below their bands. Two readings pointing the same way is a nutrition problem, not leaf age. Sample the leaves and correct the nitrogen rate.",
+      "text_ar": "الكلوروفيل والحافة الحمراء كلاهما دون نطاقه. قراءتان تشيران الاتجاه نفسه تعني مشكلة تغذية لا عمر أوراق. خذ عينة أوراق وصحّح معدل النيتروجين."
+    }
+  ],
+  "root": "n_n_size_small",
+  "nodes": {
+    "n_n_size_small": {
+      "label_en": "Are the trees in the small size class?",
+      "label_ar": "هل الأشجار في فئة الحجم صغيرة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "small"
+        }
+      },
+      "on_match": "n_bands_small",
+      "on_miss": "n_n_size_medium"
+    },
+    "n_n_size_medium": {
+      "label_en": "Are the trees in the medium size class?",
+      "label_ar": "هل الأشجار في فئة الحجم متوسطة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "medium"
+        }
+      },
+      "on_match": "n_bands_medium",
+      "on_miss": "n_n_size_large"
+    },
+    "n_n_size_large": {
+      "label_en": "Are the trees in the large size class?",
+      "label_ar": "هل الأشجار في فئة الحجم كبيرة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "large"
+        }
+      },
+      "on_match": "n_bands_large",
+      "on_miss": "n_stop"
+    },
+    "n_bands_small": {
+      "label_en": "Load the small-tree bands",
+      "label_ar": "حمّل نطاقات الشجرة الصغيرة",
+      "set": {
+        "size_class": "small",
+        "deficit_window": "no",
+        "ndvi_floor": {
+          "source": "params",
+          "name": "small_ndvi_floor"
+        },
+        "evi_floor": {
+          "source": "params",
+          "name": "small_evi_floor"
+        },
+        "savi_floor": {
+          "source": "params",
+          "name": "small_savi_floor"
+        },
+        "msavi_floor": {
+          "source": "params",
+          "name": "small_msavi_floor"
+        },
+        "gndvi_floor": {
+          "source": "params",
+          "name": "small_gndvi_floor"
+        },
+        "ndre_floor": {
+          "source": "params",
+          "name": "small_ndre_floor"
+        },
+        "bsi_ceiling": {
+          "source": "params",
+          "name": "small_bsi_ceiling"
+        }
+      },
+      "next": "n_pick_sandy"
+    },
+    "n_bands_medium": {
+      "label_en": "Load the medium-tree bands",
+      "label_ar": "حمّل نطاقات الشجرة المتوسطة",
+      "set": {
+        "size_class": "medium",
+        "deficit_window": "no",
+        "ndvi_floor": {
+          "source": "params",
+          "name": "medium_ndvi_floor"
+        },
+        "evi_floor": {
+          "source": "params",
+          "name": "medium_evi_floor"
+        },
+        "savi_floor": {
+          "source": "params",
+          "name": "medium_savi_floor"
+        },
+        "msavi_floor": {
+          "source": "params",
+          "name": "medium_msavi_floor"
+        },
+        "gndvi_floor": {
+          "source": "params",
+          "name": "medium_gndvi_floor"
+        },
+        "ndre_floor": {
+          "source": "params",
+          "name": "medium_ndre_floor"
+        },
+        "bsi_ceiling": {
+          "source": "params",
+          "name": "medium_bsi_ceiling"
+        }
+      },
+      "next": "n_pick_sandy"
+    },
+    "n_bands_large": {
+      "label_en": "Load the large-tree bands",
+      "label_ar": "حمّل نطاقات الشجرة الكبيرة",
+      "set": {
+        "size_class": "large",
+        "deficit_window": "no",
+        "ndvi_floor": {
+          "source": "params",
+          "name": "large_ndvi_floor"
+        },
+        "evi_floor": {
+          "source": "params",
+          "name": "large_evi_floor"
+        },
+        "savi_floor": {
+          "source": "params",
+          "name": "large_savi_floor"
+        },
+        "msavi_floor": {
+          "source": "params",
+          "name": "large_msavi_floor"
+        },
+        "gndvi_floor": {
+          "source": "params",
+          "name": "large_gndvi_floor"
+        },
+        "ndre_floor": {
+          "source": "params",
+          "name": "large_ndre_floor"
+        },
+        "bsi_ceiling": {
+          "source": "params",
+          "name": "large_bsi_ceiling"
+        }
+      },
+      "next": "n_pick_sandy"
+    },
+    "n_pick_sandy": {
+      "label_en": "Is the soil sandy?",
+      "label_ar": "هل التربة رملية؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "block",
+            "field": "soil_texture"
+          },
+          "right": "sandy"
+        }
+      },
+      "on_match": "n_use_savi",
+      "on_miss": "n_pick_small"
+    },
+    "n_pick_small": {
+      "label_en": "Is this a small or young tree?",
+      "label_ar": "هل الشجرة صغيرة أو حديثة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "vars",
+            "name": "size_class"
+          },
+          "right": "small"
+        }
+      },
+      "on_match": "n_use_msavi",
+      "on_miss": "n_pick_large"
+    },
+    "n_pick_large": {
+      "label_en": "Is this a large, dense canopy?",
+      "label_ar": "هل المجموع كبير وكثيف؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "vars",
+            "name": "size_class"
+          },
+          "right": "large"
+        }
+      },
+      "on_match": "n_use_evi",
+      "on_miss": "n_use_ndvi"
+    },
+    "n_use_savi": {
+      "label_en": "Use SAVI — sandy soil",
+      "label_ar": "استخدم SAVI — تربة رملية",
+      "set": {
+        "index_used": "savi",
+        "vigour_now": {
+          "source": "indices",
+          "index_code": "savi",
+          "key": "mean"
+        },
+        "vigour_baseline": {
+          "source": "indices",
+          "index_code": "savi",
+          "key": "baseline_deviation"
+        },
+        "vigour_floor": {
+          "source": "vars",
+          "name": "savi_floor"
+        }
+      },
+      "next": "n_vigour_check"
+    },
+    "n_use_msavi": {
+      "label_en": "Use MSAVI — small or young tree",
+      "label_ar": "استخدم MSAVI — شجرة صغيرة أو حديثة",
+      "set": {
+        "index_used": "msavi",
+        "vigour_now": {
+          "source": "indices",
+          "index_code": "msavi",
+          "key": "mean"
+        },
+        "vigour_baseline": {
+          "source": "indices",
+          "index_code": "msavi",
+          "key": "baseline_deviation"
+        },
+        "vigour_floor": {
+          "source": "vars",
+          "name": "msavi_floor"
+        }
+      },
+      "next": "n_vigour_check"
+    },
+    "n_use_evi": {
+      "label_en": "Use EVI — large dense canopy",
+      "label_ar": "استخدم EVI — مجموع كبير كثيف",
+      "set": {
+        "index_used": "evi",
+        "vigour_now": {
+          "source": "indices",
+          "index_code": "evi",
+          "key": "mean"
+        },
+        "vigour_baseline": {
+          "source": "indices",
+          "index_code": "evi",
+          "key": "baseline_deviation"
+        },
+        "vigour_floor": {
+          "source": "vars",
+          "name": "evi_floor"
+        }
+      },
+      "next": "n_vigour_check"
+    },
+    "n_use_ndvi": {
+      "label_en": "Use NDVI — the default",
+      "label_ar": "استخدم NDVI — الافتراضي",
+      "set": {
+        "index_used": "ndvi",
+        "vigour_now": {
+          "source": "indices",
+          "index_code": "ndvi",
+          "key": "mean"
+        },
+        "vigour_baseline": {
+          "source": "indices",
+          "index_code": "ndvi",
+          "key": "baseline_deviation"
+        },
+        "vigour_floor": {
+          "source": "vars",
+          "name": "ndvi_floor"
+        }
+      },
+      "next": "n_vigour_check"
+    },
+    "n_vigour_check": {
+      "label_en": "Is the chosen index below its band for this tree size?",
+      "label_ar": "هل المؤشر المختار دون نطاقه لهذا الحجم؟",
+      "condition": {
+        "tree": {
+          "op": "lt",
+          "left": {
+            "source": "vars",
+            "name": "vigour_now"
+          },
+          "right": {
+            "source": "vars",
+            "name": "vigour_floor"
+          }
+        }
+      },
+      "on_match": "n_vigour_sev",
+      "on_miss": "n_baseline"
+    },
+    "n_vigour_sev": {
+      "label_en": "Is this a small tree, where the guide grades confidence low?",
+      "label_ar": "هل الشجرة صغيرة حيث يخفض الدليل الثقة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "vars",
+            "name": "size_class"
+          },
+          "right": "small"
+        }
+      },
+      "on_match": "n_reg_vigour_info",
+      "on_miss": "n_reg_vigour_warn"
+    },
+    "n_reg_vigour_info": {
+      "label_en": "Canopy vigour below band, small tree",
+      "label_ar": "حيوية المجموع دون النطاق، شجرة صغيرة",
+      "register": {
+        "code": "vigour_low",
+        "severity": "info"
+      },
+      "next": "n_baseline"
+    },
+    "n_reg_vigour_warn": {
+      "label_en": "Canopy vigour below band",
+      "label_ar": "حيوية المجموع دون النطاق",
+      "register": {
+        "code": "vigour_low",
+        "severity": "warning"
+      },
+      "next": "n_baseline"
+    },
+    "n_baseline": {
+      "label_en": "Has the block as a whole dropped against its own seasonal baseline?",
+      "label_ar": "هل هبطت القطعة ككل دون خط أساسها الموسمي؟",
+      "condition": {
+        "tree": {
+          "op": "le",
+          "left": {
+            "source": "vars",
+            "name": "vigour_baseline"
+          },
+          "right": {
+            "source": "params",
+            "name": "vigour_drop_z"
+          }
+        }
+      },
+      "on_match": "n_reg_block_declining",
+      "on_miss": "n_ndre_stage"
+    },
+    "n_reg_block_declining": {
+      "label_en": "The block is below its seasonal baseline",
+      "label_ar": "القطعة دون خط أساسها الموسمي",
+      "register": {
+        "code": "block_declining",
+        "severity": "info"
+      },
+      "next": "n_ndre_stage"
+    },
+    "n_ndre_stage": {
+      "label_en": "Is the block inside the deliberate nitrogen-stop window?",
+      "label_ar": "هل القطعة داخل نافذة إيقاف النيتروجين المتعمد؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "pre_flowering",
+            "flowering"
+          ]
+        }
+      },
+      "on_match": "n_gndvi_check",
+      "on_miss": "n_ndre_check"
+    },
+    "n_ndre_check": {
+      "label_en": "Is red-edge below its band for this tree size?",
+      "label_ar": "هل الحافة الحمراء دون نطاقها لهذا الحجم؟",
+      "condition": {
+        "tree": {
+          "op": "lt",
+          "left": {
+            "source": "indices",
+            "index_code": "ndre",
+            "key": "mean"
+          },
+          "right": {
+            "source": "vars",
+            "name": "ndre_floor"
+          }
+        }
+      },
+      "on_match": "n_nutrient_sev",
+      "on_miss": "n_gndvi_check"
+    },
+    "n_nutrient_sev": {
+      "label_en": "Is this a small tree, where the guide grades confidence low?",
+      "label_ar": "هل الشجرة صغيرة حيث يخفض الدليل الثقة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "vars",
+            "name": "size_class"
+          },
+          "right": "small"
+        }
+      },
+      "on_match": "n_reg_nutrient_info",
+      "on_miss": "n_reg_nutrient_warn"
+    },
+    "n_reg_nutrient_info": {
+      "label_en": "Red-edge below band, small tree",
+      "label_ar": "الحافة الحمراء دون النطاق، شجرة صغيرة",
+      "register": {
+        "code": "nutrient_low",
+        "severity": "info"
+      },
+      "next": "n_gndvi_check"
+    },
+    "n_reg_nutrient_warn": {
+      "label_en": "Red-edge below band",
+      "label_ar": "الحافة الحمراء دون النطاق",
+      "register": {
+        "code": "nutrient_low",
+        "severity": "warning"
+      },
+      "next": "n_gndvi_check"
+    },
+    "n_gndvi_check": {
+      "label_en": "Is leaf chlorophyll below its band for this tree size?",
+      "label_ar": "هل الكلوروفيل دون نطاقه لهذا الحجم؟",
+      "condition": {
+        "tree": {
+          "op": "lt",
+          "left": {
+            "source": "indices",
+            "index_code": "gndvi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "vars",
+            "name": "gndvi_floor"
+          }
+        }
+      },
+      "on_match": "n_chlorophyll_sev",
+      "on_miss": "n_bsi_check"
+    },
+    "n_chlorophyll_sev": {
+      "label_en": "Is this a small tree, where the guide grades confidence low?",
+      "label_ar": "هل الشجرة صغيرة حيث يخفض الدليل الثقة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "vars",
+            "name": "size_class"
+          },
+          "right": "small"
+        }
+      },
+      "on_match": "n_reg_chlorophyll_info",
+      "on_miss": "n_reg_chlorophyll_warn"
+    },
+    "n_reg_chlorophyll_info": {
+      "label_en": "Leaf chlorophyll below band, small tree",
+      "label_ar": "الكلوروفيل دون النطاق، شجرة صغيرة",
+      "register": {
+        "code": "chlorophyll_low",
+        "severity": "info"
+      },
+      "next": "n_bsi_check"
+    },
+    "n_reg_chlorophyll_warn": {
+      "label_en": "Leaf chlorophyll below band",
+      "label_ar": "الكلوروفيل دون النطاق",
+      "register": {
+        "code": "chlorophyll_low",
+        "severity": "warning"
+      },
+      "next": "n_bsi_check"
+    },
+    "n_bsi_check": {
+      "label_en": "Is more bare ground showing than the band for this tree size?",
+      "label_ar": "هل التربة العارية أكثر من نطاق هذا الحجم؟",
+      "condition": {
+        "tree": {
+          "op": "gt",
+          "left": {
+            "source": "indices",
+            "index_code": "bsi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "vars",
+            "name": "bsi_ceiling"
+          }
+        }
+      },
+      "on_match": "n_cover_sev",
+      "on_miss": "n_stop"
+    },
+    "n_cover_sev": {
+      "label_en": "Is this a small tree, where the guide grades confidence low?",
+      "label_ar": "هل الشجرة صغيرة حيث يخفض الدليل الثقة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "vars",
+            "name": "size_class"
+          },
+          "right": "small"
+        }
+      },
+      "on_match": "n_reg_cover_info",
+      "on_miss": "n_reg_cover_warn"
+    },
+    "n_reg_cover_info": {
+      "label_en": "Ground opening up, small tree",
+      "label_ar": "انكشاف الأرض، شجرة صغيرة",
+      "register": {
+        "code": "cover_open",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_reg_cover_warn": {
+      "label_en": "Ground opening up",
+      "label_ar": "انكشاف الأرض",
+      "register": {
+        "code": "cover_open",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  }
+}
