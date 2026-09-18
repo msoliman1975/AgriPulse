@@ -203,7 +203,7 @@ class FoldingTreeAuthorService:
         return out
 
     async def get_tree(self, tree_id: UUID) -> dict[str, Any]:
-        tree = await self._own_tree_or_raise(tree_id)
+        tree = await self._visible_tree_or_raise(tree_id)
         versions = await self._repo.list_versions_for_tree(tree_id=tree_id)
         current_version: int | None = None
         for version in versions:
@@ -231,8 +231,31 @@ class FoldingTreeAuthorService:
         }
 
     async def _own_tree_or_raise(self, tree_id: UUID) -> dict[str, Any]:
+        """The caller's own tree. What every write starts with.
+
+        A tenant may read the platform's trees and may not change them, so
+        this stays own-scope and :meth:`_visible_tree_or_raise` is the wider
+        one.
+        """
         tree = await self._repo.get_tree_by_id(
             tree_id, scope_tenant_id=self._tenant_id, stage=BETA_STAGE
+        )
+        if tree is None:
+            raise BetaTreeNotFoundError(tree_id)
+        return tree
+
+    async def _visible_tree_or_raise(self, tree_id: UUID) -> dict[str, Any]:
+        """Any tree the caller can see: their own, and the platform's.
+
+        The same visibility :meth:`list_trees` has. They disagreed until now —
+        a tenant saw a platform tree in the list and got a 404 opening it, so
+        the designer said "cannot load" about a row it had just drawn.
+        """
+        tree = await self._repo.get_tree_by_id(
+            tree_id,
+            scope_tenant_id=self._tenant_id,
+            stage=BETA_STAGE,
+            include_platform=True,
         )
         if tree is None:
             raise BetaTreeNotFoundError(tree_id)
@@ -551,7 +574,10 @@ class FoldingTreeAuthorService:
         """
         from app.modules.recommendations import folding_engine
 
-        tree = await self._own_tree_or_raise(tree_id)
+        # Visible rather than own: the dry run writes nothing, and folding the
+        # platform's tree over your own block is how a tenant decides whether
+        # they want it.
+        tree = await self._visible_tree_or_raise(tree_id)
 
         resolved_version_id: UUID | None = None
         if definition is not None:

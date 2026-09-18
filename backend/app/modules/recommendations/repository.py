@@ -18,7 +18,7 @@ from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import Text, bindparam, select, text
+from sqlalchemy import Text, bindparam, or_, select, text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.engine import CursorResult
@@ -829,6 +829,7 @@ class RecommendationsRepository:
         *,
         scope_tenant_id: UUID | None,
         stage: str | None = None,
+        include_platform: bool = False,
     ) -> dict[str, Any] | None:
         """One tree by id, within the caller's own scope.
 
@@ -837,6 +838,14 @@ class RecommendationsRepository:
         must match — a beta route handed a live tree's id reads as absent
         rather than editing a tree the folding compiler cannot compile.
 
+        ``include_platform`` widens a tenant caller to the platform's trees as
+        well as their own, which is the visibility
+        :meth:`list_all_trees` has always had. Without it the two disagreed: a
+        tenant saw a platform tree in the list and got a 404 opening it, which
+        is what the designer reports as "cannot load". It stays off by default,
+        so a write keeps matching one scope and one scope only — a tenant may
+        read the platform's tree and may not change it.
+
         Returns the same shape ``get_tree_by_code`` does, `stage` included.
         """
         stmt = select(DecisionTree).where(
@@ -844,6 +853,13 @@ class RecommendationsRepository:
         )
         if scope_tenant_id is None:
             stmt = stmt.where(DecisionTree.tenant_id.is_(None))
+        elif include_platform:
+            stmt = stmt.where(
+                or_(
+                    DecisionTree.tenant_id == scope_tenant_id,
+                    DecisionTree.tenant_id.is_(None),
+                )
+            )
         else:
             stmt = stmt.where(DecisionTree.tenant_id == scope_tenant_id)
         if stage is not None:

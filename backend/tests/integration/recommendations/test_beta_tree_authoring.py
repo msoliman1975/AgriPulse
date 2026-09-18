@@ -535,3 +535,75 @@ async def test_one_tenants_beta_tree_is_invisible_to_another(
     with pytest.raises(BetaTreeNotFoundError):
         await other.get_tree(tree["id"])
     assert code not in {row["code"] for row in await other.list_trees()}
+
+
+@pytest.mark.asyncio
+async def test_a_tenant_can_open_a_platform_tree_and_cannot_change_it(
+    admin_session: AsyncSession,
+) -> None:
+    """The list and the detail used to disagree about one row.
+
+    `list_all_trees` has always been `tenant_id IS NULL OR tenant_id = :tid`,
+    and `get_tree_by_id` matched the tenant only. So a tenant saw the
+    platform's beta tree in the designer's list, clicked it, and got a 404 —
+    which the screen reports as "cannot load" about a row it had just drawn.
+
+    Read is now the wider scope and every write is still the narrow one.
+    """
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug=f"beta-read-{uuid4().hex[:8]}", name="reader", contact_email="r@beta.test"
+    )
+    platform = await _service(admin_session)
+    theirs = FoldingTreeAuthorService(public_session=admin_session, tenant_id=tenant.tenant_id)
+
+    code = _code("shared")
+    tree = await platform.create_tree(
+        code=code, definition=_definition(code), notes=None, actor_user_id=None
+    )
+
+    # It is in their list, and now it opens.
+    assert code in {row["code"] for row in await theirs.list_trees()}
+    opened = await theirs.get_tree(tree["id"])
+    assert opened["code"] == code
+    assert opened["tenant_id"] is None
+    assert opened["definition"]["root"] == "n_start"
+
+    # Every write still refuses it. `tenant_id IS NULL` is not their row.
+    with pytest.raises(BetaTreeNotFoundError):
+        await theirs.append_version(
+            tree_id=tree["id"],
+            definition=_definition(code, text_en="second"),
+            notes=None,
+            actor_user_id=None,
+        )
+    with pytest.raises(BetaTreeNotFoundError):
+        await theirs.publish_version(tree_id=tree["id"], actor_user_id=None)
+    with pytest.raises(BetaTreeNotFoundError):
+        await theirs.discard_draft(tree_id=tree["id"], actor_user_id=None)
+
+
+@pytest.mark.asyncio
+async def test_the_platform_still_cannot_open_a_tenants_tree(
+    admin_session: AsyncSession,
+) -> None:
+    """The widening goes one way only.
+
+    A tenant reads the platform catalogue because every tenant runs those
+    trees. The platform reading one tenant's authoring is a different thing
+    and nothing here grants it.
+    """
+    tenancy = get_tenant_service(admin_session)
+    tenant = await tenancy.create_tenant(
+        slug=f"beta-own-{uuid4().hex[:8]}", name="owner", contact_email="o@beta.test"
+    )
+    theirs = FoldingTreeAuthorService(public_session=admin_session, tenant_id=tenant.tenant_id)
+    platform = await _service(admin_session)
+
+    code = _code("private")
+    tree = await theirs.create_tree(
+        code=code, definition=_definition(code), notes=None, actor_user_id=None
+    )
+    with pytest.raises(BetaTreeNotFoundError):
+        await platform.get_tree(tree["id"])
+    assert code not in {row["code"] for row in await platform.list_trees()}

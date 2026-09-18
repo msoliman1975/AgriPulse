@@ -67,7 +67,8 @@
     "discardWhy": "Saving cannot replace a draft: an unchanged body writes no version, so a draft that will not publish would block every later author.",
     "discardFailed": "The draft was not discarded.",
     "noDraft": "No draft. The published version is on screen.",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "readOnlyNoPermission": "You do not have permission to change this tree."
   },
   "canvas": {
     "aria": "Beta tree canvas",
