@@ -397,28 +397,58 @@ export interface BetaCandidateBlock {
   label_ar: string | null;
 }
 
-/** One cell's fold. `matched_rule_codes` is null when the text was composed. */
+/**
+ * One cell's fold, in the server's own field names.
+ *
+ * This read `finding_set`, `matched_rule_codes` and `unresolved` — a contract
+ * written before the endpoint existed. The server sends `identity`,
+ * `rule_code` and `composed` and has never sent an unresolved list, so the
+ * table read `undefined.length` and the whole page fell over the moment a dry
+ * run returned. Every field here was checked against a live response.
+ */
 export interface BetaDryRunCell {
   cell_id: string;
   cell_row: number | null;
   cell_col: number | null;
-  finding_set: string[];
-  matched_rule_codes: string[] | null;
+  /** The sorted finding codes. Empty means the tree found nothing, which is
+   *  a healthy cell and not a missing answer. */
+  identity: string[];
+  findings: BetaDryRunFinding[];
   severity: FindingSeverity | null;
-  status: FindingStatus;
+  status: FindingStatus | null;
   action_type: ActionType | null;
-  text_en: string;
-  text_ar: string;
-  /** Codes in the set that no catalogue resolved. */
-  unresolved: string[];
+  text_en: string | null;
+  text_ar: string | null;
+  /** True when the text came from joining clauses rather than from a rule. */
+  composed: boolean;
+  /** The combination rule that matched, when one did. */
+  rule_code: string | null;
+  /** The node the walk ended on. A cell that stopped anywhere else errored. */
+  stopped_at: string | null;
   error: string | null;
 }
 
+/** One finding a walk registered, with the nodes that registered it. */
+export interface BetaDryRunFinding {
+  code: string;
+  severity: FindingSeverity;
+  registered_by: string[];
+}
+
 export interface BetaDryRunResponse {
+  tree_id: string;
+  code: string;
   block_id: string;
+  scope: string;
+  version_id: string | null;
   cells_evaluated: number;
-  /** Cells whose finding set was non-empty, i.e. that produce a card. */
-  cells_with_card: number;
+  /** Cells whose fold produced a card. The rest are healthy or errored. */
+  cells_carded: number;
+  /** Cells whose walk ended badly. Counted apart, because an errored cell is
+   *  not a healthy one and must never read as one. */
+  cells_errored: number;
+  /** Of the carded cells, how many composed their text. */
+  cells_composed: number;
   cells: BetaDryRunCell[];
 }
 
@@ -436,7 +466,17 @@ export async function betaDryRun(treeId: string, blockId: string): Promise<BetaD
   const { data } = await apiClient.post<BetaDryRunResponse>(`${BETA_TREES}/${treeId}/dry-run`, {
     block_id: blockId,
   });
-  return { ...data, cells: Array.isArray(data.cells) ? data.cells : [] };
+  // Defensive on the two lists the table walks. A field this client expects
+  // and the server does not send used to reach the table as `undefined` and
+  // take the page down with it; the report is worth more than the field.
+  return {
+    ...data,
+    cells: (Array.isArray(data.cells) ? data.cells : []).map((cell) => ({
+      ...cell,
+      identity: Array.isArray(cell.identity) ? cell.identity : [],
+      findings: Array.isArray(cell.findings) ? cell.findings : [],
+    })),
+  };
 }
 
 /**

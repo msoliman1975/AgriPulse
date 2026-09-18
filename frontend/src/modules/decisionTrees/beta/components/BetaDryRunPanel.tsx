@@ -122,9 +122,17 @@ export function BetaDryRunPanel({
         <>
           <p className="text-sm text-ap-ink">
             {t("dryRun.summary", {
-              cards: result.cells_with_card,
+              cards: result.cells_carded,
               total: result.cells_evaluated,
             })}
+            {result.cells_errored > 0 ? (
+              // An errored cell is not a healthy one. The summary counted
+              // cards and total only, so a walk that fell over read as a cell
+              // with nothing to say.
+              <span className="ms-2 text-ap-crit">
+                {t("dryRun.errored", { count: result.cells_errored })}
+              </span>
+            ) : null}
           </p>
           <Table>
             <caption className="sr-only">{t("dryRun.title")}</caption>
@@ -148,11 +156,11 @@ export function BetaDryRunPanel({
                       : cell.cell_id}
                   </Td>
                   <Td className="px-2 py-2">
-                    {cell.finding_set.length === 0 ? (
+                    {cell.identity.length === 0 ? (
                       <span className="text-ap-muted">{t("dryRun.noCard")}</span>
                     ) : (
                       <span dir="ltr" className="flex flex-wrap gap-1 font-mono text-xs">
-                        {cell.finding_set.map((c) => (
+                        {cell.identity.map((c) => (
                           <span key={c} className="rounded bg-ap-line/60 px-1.5 py-0.5 text-ap-ink">
                             {c}
                           </span>
@@ -161,18 +169,21 @@ export function BetaDryRunPanel({
                     )}
                   </Td>
                   <Td className="px-2 py-2">
-                    {cell.finding_set.length === 0 ? (
+                    {cell.identity.length === 0 ? (
                       "—"
-                    ) : cell.matched_rule_codes ? (
-                      <Pill kind="ok">{t("dryRun.ruleMatched")}</Pill>
-                    ) : (
+                    ) : cell.composed ? (
                       <Pill kind="neutral">{t("dryRun.ruleComposed")}</Pill>
+                    ) : (
+                      // The rule's own code, when the compiler kept one. A
+                      // rule with no code still matched, and saying so beats
+                      // showing nothing.
+                      <Pill kind="ok">{cell.rule_code ?? t("dryRun.ruleMatched")}</Pill>
                     )}
                   </Td>
                   <Td className="px-2 py-2">
                     {cell.severity ? t(`severity.${cell.severity}`) : "—"}
                   </Td>
-                  <Td className="px-2 py-2">{statusLabel(cell.status)}</Td>
+                  <Td className="px-2 py-2">{cell.status ? statusLabel(cell.status) : "—"}</Td>
                   <Td className="px-2 py-2">
                     {cell.action_type ? t(`actionType.${cell.action_type}`) : "—"}
                   </Td>
@@ -181,11 +192,9 @@ export function BetaDryRunPanel({
                     {cell.error ? (
                       <span className="block text-meta text-ap-crit">{cell.error}</span>
                     ) : null}
-                    {cell.unresolved.length > 0 ? (
-                      <span className="block text-meta text-ap-warn">
-                        {t("combinations.preview.unresolved", {
-                          codes: cell.unresolved.join(", "),
-                        })}
+                    {cell.error === null && cell.stopped_at !== null && cell.identity.length > 0 ? (
+                      <span className="block text-meta text-ap-muted">
+                        {t("dryRun.stoppedAt", { node: cell.stopped_at })}
                       </span>
                     ) : null}
                   </Td>

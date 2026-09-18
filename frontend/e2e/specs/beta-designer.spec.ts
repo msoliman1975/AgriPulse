@@ -212,23 +212,45 @@ function versions() {
   ];
 }
 
+/**
+ * A dry run answer, in the field names the server actually sends.
+ *
+ * This stub carried `finding_set`, `matched_rule_codes`, `unresolved` and
+ * `cells_with_card` — a contract written before the endpoint existed. The
+ * server sends `identity`, `rule_code`, `composed` and `cells_carded`, so
+ * every test here passed while the real screen crashed on
+ * `undefined.length` the moment an author pressed Run. Taken from a live
+ * response on 2026-09-18.
+ */
 function dryRunBody(cells: number) {
   return {
+    tree_id: TREE_ID,
+    code: TREE_CODE,
     block_id: BLOCK_ID,
+    scope: "cell",
+    version_id: "v2",
+    targeting: null,
     cells_evaluated: cells,
-    cells_with_card: cells,
+    cells_carded: cells,
+    cells_errored: 0,
+    cells_composed: 0,
     cells: Array.from({ length: cells }, (_, i) => ({
       cell_id: `cell-${i + 1}`,
       cell_row: Math.floor(i / 3) + 1,
       cell_col: (i % 3) + 1,
-      finding_set: ["dry", "ndvi_low"],
-      matched_rule_codes: ["dry", "ndvi_low"],
+      identity: ["dry", "ndvi_low"],
+      findings: [
+        { code: "dry", severity: "warning", registered_by: ["reg_1"] },
+        { code: "ndvi_low", severity: "info", registered_by: ["reg_3"] },
+      ],
       severity: "warning",
-      status: "stressed",
+      status: "issue",
       action_type: "irrigate",
       text_en: "Water shortage is the cause. Irrigate before treating anything else.",
       text_ar: "نقص المياه هو السبب. اسقِ قبل معالجة أي شيء آخر.",
-      unresolved: [],
+      composed: false,
+      rule_code: null,
+      stopped_at: "stop_1",
       error: null,
     })),
   };
