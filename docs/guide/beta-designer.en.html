@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html { color-scheme: light dark; }
+  body { margin: 0; }
+  img { max-width: 100%; }
+</style>
+<title>How a reading becomes advice — AgriPulse Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap">
+
+<style>
+  :root {
+    --ground: #f5f6f2;
+    --panel: #ffffff;
+    --panel-2: #eef0ea;
+    --ink: #1a211d;
+    --ink-2: #4e5a53;
+    --ink-3: #78857c;
+    --line: #dde1d8;
+    --line-2: #c8cfc2;
+    --leaf: #3d6b4f;
+    --leaf-soft: #e4ede6;
+    --clay: #a8511f;
+    --clay-soft: #f6e8df;
+    --sky: #2b5f7a;
+    --sky-soft: #e2edf2;
+
+    --step--1: 0.8125rem;
+    --step-0: 1rem;
+    --step-1: 1.1875rem;
+    --step-2: 1.5rem;
+    --step-3: 2rem;
+    --step-4: 2.75rem;
+
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --serif: "IBM Plex Serif", ui-serif, Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #121614;
+      --panel: #1a201d;
+      --panel-2: #222a26;
+      --ink: #e7ece8;
+      --ink-2: #b0bdb5;
+      --ink-3: #8a988f;
+      --line: #2c352f;
+      --line-2: #3b463f;
+      --leaf: #7fb392;
+      --leaf-soft: #1e2d24;
+      --clay: #e0915f;
+      --clay-soft: #2e2018;
+      --sky: #8ec3dc;
+      --sky-soft: #172830;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #121614;
+    --panel: #1a201d;
+    --panel-2: #222a26;
+    --ink: #e7ece8;
+    --ink-2: #b0bdb5;
+    --ink-3: #8a988f;
+    --line: #2c352f;
+    --line-2: #3b463f;
+    --leaf: #7fb392;
+    --leaf-soft: #1e2d24;
+    --clay: #e0915f;
+    --clay-soft: #2e2018;
+    --sky: #8ec3dc;
+    --sky-soft: #172830;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: var(--step-0);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 52rem;
+    margin: 0 auto;
+    padding-inline: 16px;
+    padding-block: 0 5rem;
+  }
+
+  /* ---- masthead ---- */
+  .masthead {
+    padding-block: 3.5rem 2rem;
+    border-bottom: 2px solid var(--ink);
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--leaf);
+    margin: 0 0 1rem;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-size: var(--step-4);
+    font-weight: 600;
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    margin: 0 0 1rem;
+  }
+  .standfirst {
+    font-size: var(--step-1);
+    color: var(--ink-2);
+    max-width: 38ch;
+    margin: 0;
+  }
+
+  /* ---- sections ---- */
+  section { padding-block: 2.75rem; border-bottom: 1px solid var(--line); }
+  section:last-of-type { border-bottom: 0; }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: var(--step-3);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0 0 0.35rem;
+  }
+  .part {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 0.6rem;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-size: var(--step-1);
+    font-weight: 600;
+    margin: 2rem 0 0.5rem;
+  }
+  p { margin: 0 0 1rem; max-width: 65ch; }
+  ul, ol { margin: 0 0 1rem; padding-inline-start: 1.25rem; max-width: 65ch; }
+  li { margin-bottom: 0.4rem; }
+  strong { font-weight: 600; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.875em;
+    background: var(--panel-2);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+
+  /* ---- the lede of each part ---- */
+  .lede {
+    font-size: var(--step-1);
+    color: var(--ink-2);
+    max-width: 46ch;
+    margin-bottom: 1.75rem;
+  }
+
+  /* ---- plain-word table ---- */
+  .table-scroll { overflow-x: auto; margin: 0 0 1.5rem; }
+  table { border-collapse: collapse; width: 100%; font-size: var(--step--1); }
+  th, td {
+    text-align: start;
+    padding: 0.7rem 0.9rem 0.7rem 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th {
+    font-family: var(--mono);
+    font-weight: 500;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    border-bottom-color: var(--line-2);
+    white-space: nowrap;
+  }
+  td:first-child { white-space: nowrap; padding-inline-end: 1.25rem; }
+
+  /* ---- node kinds ---- */
+  .kinds { display: grid; gap: 0.75rem; margin-bottom: 1.5rem; }
+  @media (min-width: 40rem) { .kinds { grid-template-columns: 1fr 1fr; } }
+  .kind {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 1rem 1.1rem;
+    display: grid;
+    gap: 0.3rem;
+  }
+  .kind .k-name { font-weight: 600; }
+  .kind .k-code { font-family: var(--mono); font-size: var(--step--1); color: var(--leaf); }
+  .kind p { margin: 0; font-size: var(--step--1); color: var(--ink-2); }
+  .kind.stop { border-radius: 999px; padding-inline: 1.75rem; text-align: center; justify-items: center; }
+
+  /* ---- example card ---- */
+  .card-demo {
+    background: var(--panel);
+    border: 1px solid var(--line-2);
+    border-inline-start: 3px solid var(--clay);
+    padding: 1.1rem 1.25rem;
+    margin: 0 0 1.5rem;
+    display: grid;
+    gap: 0.5rem;
+  }
+  .card-demo .c-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .card-demo .c-text { margin: 0; font-size: var(--step-0); }
+  .card-demo .c-text.ar { direction: rtl; text-align: right; color: var(--ink-2); }
+
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.5rem;
+    border-radius: 2px;
+    background: var(--panel-2);
+    color: var(--ink-2);
+  }
+  .pill.alert { background: var(--clay-soft); color: var(--clay); }
+  .pill.good { background: var(--leaf-soft); color: var(--leaf); }
+  .pill.info { background: var(--sky-soft); color: var(--sky); }
+
+  /* ---- figures ---- */
+  figure { margin: 0 0 1.75rem; }
+  .fig-box {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 1.25rem;
+    overflow-x: auto;
+  }
+  figcaption {
+    font-size: var(--step--1);
+    color: var(--ink-3);
+    margin-top: 0.6rem;
+    max-width: 60ch;
+  }
+  svg { display: block; max-width: 100%; height: auto; }
+
+  /* ---- callout ---- */
+  .note {
+    border-inline-start: 3px solid var(--leaf);
+    background: var(--leaf-soft);
+    padding: 1rem 1.1rem;
+    margin: 0 0 1.5rem;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .n-label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--leaf);
+    display: block;
+    margin-bottom: 0.3rem;
+  }
+
+  /* ---- steps ---- */
+  ol.steps { list-style: none; padding: 0; margin: 0 0 1.5rem; display: grid; gap: 0.9rem; counter-reset: s; }
+  ol.steps > li {
+    counter-increment: s;
+    display: grid;
+    grid-template-columns: 2rem 1fr;
+    gap: 0.9rem;
+    margin: 0;
+    max-width: 62ch;
+  }
+  ol.steps > li::before {
+    content: counter(s);
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--leaf);
+    border-top: 2px solid var(--leaf);
+    padding-top: 0.2rem;
+  }
+  ol.steps p { margin: 0; }
+  ol.steps .s-title { font-weight: 600; }
+
+  /* ---- glossary ---- */
+  dl.glossary { margin: 0; display: grid; gap: 0.9rem; }
+  dl.glossary > div {
+    display: grid;
+    gap: 0.15rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--line);
+  }
+  dl.glossary dt { font-weight: 600; }
+  dl.glossary dd { margin: 0; color: var(--ink-2); font-size: var(--step--1); max-width: 62ch; }
+
+  footer {
+    padding-block: 2.5rem 0;
+    font-size: var(--step--1);
+    color: var(--ink-3);
+  }
+  footer p { max-width: 62ch; }
+
+  a { color: var(--leaf); }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--leaf); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">AgriPulse · decision trees · beta</p>
+    <h1>How a reading becomes advice</h1>
+    <p class="standfirst">The new way of writing agronomy rules, and the way they run. Written for anyone who needs to read a tree, not only for the person who builds one.</p>
+  </header>
+
+  <section>
+    <p class="part">Part 1</p>
+    <h2>The problem this replaces</h2>
+    <p class="lede">One broken valve used to send the farmer five messages. None of them said what was broken.</p>
+
+    <p>A tree used to do one job: read one number, compare it to a limit, and open a card when the number was out of range. That works when one number means one thing.</p>
+
+    <p>It does not work in a real orchard. When an irrigation valve fails, the leaves hold less water, the canopy thins, and the plants get warmer. Five different readings move at once. Five trees fire. The farmer gets five cards, and each one ends with the same sentence: <em>could be water, pest or nutrient</em>.</p>
+
+    <p>The farmer already knew something was wrong. What they needed was the cause and the order of work.</p>
+
+    <figure>
+      <div class="fig-box">
+        <svg viewBox="0 0 640 210" role="img" aria-label="Before: one event produces five vague cards. After: one event produces one card that names the cause.">
+          <g font-family="IBM Plex Mono, monospace" font-size="11">
+            <text x="0" y="14" fill="currentColor" opacity="0.55">BEFORE</text>
+            <rect x="0" y="26" width="86" height="34" fill="none" stroke="currentColor" stroke-opacity="0.35"/>
+            <text x="12" y="47" fill="currentColor">valve</text>
+            <g stroke="currentColor" stroke-opacity="0.35">
+              <line x1="86" y1="43" x2="150" y2="20"/>
+              <line x1="86" y1="43" x2="150" y2="35"/>
+              <line x1="86" y1="43" x2="150" y2="50"/>
+              <line x1="86" y1="43" x2="150" y2="65"/>
+              <line x1="86" y1="43" x2="150" y2="80"/>
+            </g>
+            <g fill="currentColor" opacity="0.75">
+              <rect x="152" y="12" width="230" height="16" fill="none" stroke="currentColor" stroke-opacity="0.35"/>
+              <text x="160" y="24">NDVI low — could be water, pest or nutrient</text>
+              <rect x="152" y="32" width="230" height="16" fill="none" stroke="currentColor" stroke-opacity="0.35"/>
+              <text x="160" y="44">SAVI low — could be water, pest or nutrient</text>
+              <rect x="152" y="52" width="230" height="16" fill="none" stroke="currentColor" stroke-opacity="0.35"/>
+              <text x="160" y="64">EVI low — could be water, pest or nutrient</text>
+              <rect x="152" y="72" width="230" height="16" fill="none" stroke="currentColor" stroke-opacity="0.35"/>
+              <text x="160" y="84">NDMI low — could be water, pest or nutrient</text>
+              <rect x="152" y="92" width="230" height="16" fill="none" stroke="currentColor" stroke-opacity="0.35"/>
+              <text x="160" y="104">CWSI high — could be water, pest or nutrient</text>
+            </g>
+
+            <text x="0" y="148" fill="currentColor" opacity="0.55">NOW</text>
+            <rect x="0" y="160" width="86" height="34" fill="none" stroke="currentColor" stroke-opacity="0.35"/>
+            <text x="12" y="181" fill="currentColor">valve</text>
+            <line x1="86" y1="177" x2="150" y2="177" stroke="currentColor" stroke-opacity="0.35"/>
+            <rect x="152" y="160" width="330" height="34" fill="none" stroke="currentColor" stroke-opacity="0.75"/>
+            <text x="160" y="180" fill="currentColor">Water shortage is the cause of the weak canopy.</text>
+            <text x="160" y="190" fill="currentColor" opacity="0.7">Irrigate before treating anything else.</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>The readings did not change. What changed is that one walk now holds all of them and answers once.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <p class="part">Part 2</p>
+    <h2>The idea in one page</h2>
+    <p class="lede">A tree no longer opens a card when it finds something. It writes the finding down and keeps going.</p>
+
+    <p>The tree runs once for each cell — the small square of a block that a reading covers. As it walks, it writes down what it finds. Each thing it finds is called a <strong>finding</strong>: a short code such as <code>dry</code> or <code>vigour_low</code>.</p>
+
+    <p>At the end of the walk, the tree has a list. It could be empty. It could hold four findings. That list is turned into <strong>one card</strong>. Turning the list into one card is called the <strong>fold</strong>.</p>
+
+    <ol class="steps">
+      <li>
+        <p class="s-title">Walk</p>
+        <p>The tree reads the cell's numbers and follows the branches.</p>
+      </li>
+      <li>
+        <p class="s-title">Register</p>
+        <p>Every time it finds something, it writes down a finding code and how serious it is.</p>
+      </li>
+      <li>
+        <p class="s-title">Stop</p>
+        <p>The walk ends at a single end point. The list of findings is complete.</p>
+      </li>
+      <li>
+        <p class="s-title">Fold</p>
+        <p>The list becomes one card, with one sentence and one action.</p>
+      </li>
+    </ol>
+
+    <div class="note">
+      <span class="n-label">Why this matters</span>
+      <p>Nothing about the readings changed. What changed is where the answer is decided. A card used to be decided at the moment one check failed. Now it is decided after every check has been made, when the tree can see all of them together.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="part">Part 3</p>
+    <h2>The five kinds of step</h2>
+    <p class="lede">A tree is a small number of steps, joined by arrows. There are five kinds and no more.</p>
+
+    <div class="kinds">
+      <div class="kind">
+        <span class="k-code">condition</span>
+        <span class="k-name">Check</span>
+        <p>Asks one question about a number. Two ways out: it matched, or it did not.</p>
+      </div>
+      <div class="kind">
+        <span class="k-code">register</span>
+        <span class="k-name">Write it down</span>
+        <p>Records one finding and carries on. This is what opens no card by itself.</p>
+      </div>
+      <div class="kind">
+        <span class="k-code">set</span>
+        <span class="k-name">Remember a value</span>
+        <p>Keeps a number or a word for later in the same walk, so a check is written once instead of four times.</p>
+      </div>
+      <div class="kind">
+        <span class="k-code">switch</span>
+        <span class="k-name">Bands</span>
+        <p>One value, several bands in order. The first band that fits wins. Always has a fallback.</p>
+      </div>
+      <div class="kind stop">
+        <span class="k-code">stop</span>
+        <span class="k-name">End</span>
+        <p>The walk ends here and the findings are folded. Drawn as a circle, because it is not a step.</p>
+      </div>
+    </div>
+
+    <p>Almost every route in a tree ends at the same <code>stop</code>. That is normal and it is the point: one walk, one ending, one card.</p>
+  </section>
+
+  <section>
+    <p class="part">Part 4</p>
+    <h2>Findings, and the words on the card</h2>
+    <p class="lede">A finding is a code. The words the farmer reads live somewhere else, written once.</p>
+
+    <p>When a tree writes down <code>dry</code>, it is not writing a sentence. It is naming something that was found. The sentence lives in the <strong>finding catalogue</strong>, a list every tree shares.</p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>The catalogue holds</th><th>Example</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>code</td><td><code>dry</code></td></tr>
+          <tr><td>name</td><td>Water stress agreed</td></tr>
+          <tr><td>clause, English</td><td>two of the three water readings say this cell is dry</td></tr>
+          <tr><td>clause, Arabic</td><td>قراءتان من ثلاث قراءات للماء تقولان إن هذه الخلية جافة</td></tr>
+          <tr><td>health class</td><td><span class="pill alert">alert</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>The clause is a fragment, not a sentence. It starts in lower case, it ends without a full stop, and it <strong>must not contain a comma</strong>. The fold joins several clauses with commas, so a clause carrying its own comma makes the result unreadable.</p>
+
+    <p>One code, one wording, everywhere. Change the wording once and every card that uses that finding changes with it.</p>
+
+    <h3>Two different words for "how bad"</h3>
+    <p>They are easy to mix up and they do different jobs.</p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Word</th><th>Values</th><th>Set where</th><th>Used for</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Severity</strong></td>
+            <td><code>info</code> <code>warning</code> <code>critical</code></td>
+            <td>On the step that writes the finding</td>
+            <td>Sorting the clauses, and picking which action comes first</td>
+          </tr>
+          <tr>
+            <td><strong>Health class</strong></td>
+            <td><code>na</code> <code>very_good</code> <code>good</code> <code>issue</code> <code>alert</code></td>
+            <td>On the catalogue row, or on a rule</td>
+            <td>The colour of the block on the map</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Severity sits on the step, not on the catalogue, so the same finding can be a warning on a small tree and critical on a large one.</p>
+  </section>
+
+  <section>
+    <p class="part">Part 5</p>
+    <h2>The fold: one list, one card</h2>
+    <p class="lede">The tree has finished walking and holds a list of findings. Two things can happen.</p>
+
+    <h3>A rule matches</h3>
+    <p>A <strong>combination rule</strong> is written by the author and names an exact set of findings. When the list is exactly that set, the rule's own sentence is used. This is where a cause gets named, because a pair of findings often means something neither one means alone.</p>
+
+    <div class="card-demo">
+      <div class="c-head">
+        <span>rule</span>
+        <span class="pill">vigour_low + dry</span>
+        <span class="pill alert">alert</span>
+        <span class="pill">irrigate</span>
+      </div>
+      <p class="c-text">Canopy vigour and the water readings dropped together. Water shortage is the cause. Irrigate before treating anything else.</p>
+      <p class="c-text ar">هبطت حيوية المجموع وقراءات الماء معًا. السبب نقص ماء. اروِ القطعة قبل أي معالجة أخرى.</p>
+    </div>
+
+    <p>The set must match exactly. A third finding means this rule does not fire, which is deliberate: three findings are a different situation from two.</p>
+
+    <h3>No rule matches</h3>
+    <p>Then the card writes itself. The clauses are sorted with the most serious first and joined into one sentence. A closing line names what to do first, taken from the most serious finding.</p>
+
+    <div class="card-demo">
+      <div class="c-head">
+        <span>composed</span>
+        <span class="pill">pest_high + dry + vigour_low</span>
+        <span class="pill alert">alert</span>
+        <span class="pill">spray</span>
+      </div>
+      <p class="c-text">Anthracnose pressure is high, two of the three water readings say this cell is dry, and canopy vigour is below the band for this tree size. Start with the spray.</p>
+    </div>
+
+    <p>This is the common case, and it is why a handful of rules covers thousands of situations. The author writes rules only where a pairing means something special. Everything else still produces a readable card.</p>
+
+    <div class="note">
+      <span class="n-label">An empty list is an answer</span>
+      <p>A cell where nothing was found opens no card. The tree ran, every check was made, and none of them fired. That is not the same as a cell nobody looked at.</p>
+    </div>
+  </section>
+
+  <section>
+    <p class="part">Part 6</p>
+    <h2>The designer</h2>
+    <p class="lede">Three tabs. The canvas is where the tree is drawn, and the other two are how you know it works.</p>
+
+    <h3>Canvas</h3>
+    <p>The tree as a picture. Click a step to edit it. Drag a step to move it, and the position is saved with the tree, so everyone who opens it sees the same arrangement. One button puts the whole picture back the way the machine would lay it out.</p>
+    <p>Each step shows its kind, its label and the important part of its contents, so bands and findings can be read without opening anything. A <code>+</code> under an empty arrow adds the next step there.</p>
+
+    <h3>Combinations</h3>
+    <p>Every set of findings this tree is able to produce, listed beside the rules the author has written. A set with a rule is marked as such. A set without one composes. This is the screen that answers "what will a farmer actually read".</p>
+
+    <h3>Dry run</h3>
+    <p>Pick one block and fold every cell in it. The table shows, per cell, what was found, whether a rule matched, and the exact card text.</p>
+    <p><strong>A dry run writes nothing.</strong> No card is opened, no verdict is stored, nothing reaches a farmer. Run it as often as you like.</p>
+
+    <h3>Checks before publishing</h3>
+    <p>The panel beside the canvas lists what is wrong while you work: an arrow pointing nowhere, a band with no fallback, a finding the catalogue does not know. Errors land on the step that caused them. Publishing is held until they are gone.</p>
+  </section>
+
+  <section>
+    <p class="part">Part 7</p>
+    <h2>Drafts, publishing, and what actually runs</h2>
+    <p class="lede">Saving, publishing and running are three separate things.</p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Action</th><th>What it does</th><th>Who sees it</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Save draft</strong></td>
+            <td>Stores a new version on top of the published one</td>
+            <td>Anyone who opens the tree</td>
+          </tr>
+          <tr>
+            <td><strong>Publish</strong></td>
+            <td>Fixes one version as the tree's current one</td>
+            <td>Anyone; it is the version a run uses</td>
+          </tr>
+          <tr>
+            <td><strong>Discard draft</strong></td>
+            <td>Deletes the unpublished draft</td>
+            <td>Needed because saving cannot undo</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>A saved draft that is identical to the last one is not stored again. That is why a bad draft must be discarded rather than saved over.</p>
+
+    <div class="note">
+      <span class="n-label">Nothing is running yet</span>
+      <p>Every tree in the new designer is marked <code>beta</code>. The nightly job only picks up trees marked <code>live</code>. So publishing a beta tree does not put it in front of a single farmer — it fixes a version that you, the dry run and a reviewer can all agree on.</p>
+    </div>
+
+    <h3>Platform trees and tenant trees</h3>
+    <p>A tree belongs either to the platform, and every tenant can see it, or to one tenant, and only they can. A tenant can open a platform tree and dry run it against their own blocks. They cannot change it. The designer shows it as read-only and offers no Save.</p>
+  </section>
+
+  <section>
+    <p class="part">Part 8</p>
+    <h2>What this looks like on real mangoes</h2>
+    <p class="lede">Twenty-three mango trees, most of them checking one number each, became five.</p>
+
+    <p>One tree, <code>mango_unified</code>, holds all of it: 74 steps, 14 findings, 11 rules. It is correct and it is hard for a person to own, so the same content is also published as four trees named after the work they do.</p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Tree</th><th>The question it answers</th><th>Steps</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>mango_water_status</code></td><td>Is this cell short of water?</td><td>35</td></tr>
+          <tr><td><code>mango_canopy_health</code></td><td>Is the canopy weak, and is it feed?</td><td>33</td></tr>
+          <tr><td><code>mango_pest_pressure</code></td><td>How hard is the weather pushing pests?</td><td>13</td></tr>
+          <tr><td><code>mango_record_check</code></td><td>Can these trees be judged at all?</td><td>3</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Splitting has a price, and it is worth knowing before choosing. A rule matches the findings of <em>one</em> walk, and each tree walks alone. So a rule that pairs a canopy finding with a water finding cannot fire once they live in two trees. The farmer gets two cards — "irrigate" and "vigour is below the band" — and nothing joins them.</p>
+
+    <p>Both shapes exist in the platform catalogue. A dry run of each over the same estate is how the choice gets made.</p>
+  </section>
+
+  <section>
+    <p class="part">Part 9</p>
+    <h2>Words used here</h2>
+
+    <dl class="glossary">
+      <div>
+        <dt>Cell</dt>
+        <dd>The smallest piece of a block that a reading covers. A tree usually runs once per cell.</dd>
+      </div>
+      <div>
+        <dt>Block</dt>
+        <dd>A named part of a farm. A block is made of cells.</dd>
+      </div>
+      <div>
+        <dt>Walk</dt>
+        <dd>One run of one tree over one cell, from the first step to the end.</dd>
+      </div>
+      <div>
+        <dt>Finding</dt>
+        <dd>One thing a walk found, named by a short code. Not a sentence and not a card.</dd>
+      </div>
+      <div>
+        <dt>Finding catalogue</dt>
+        <dd>The shared list of finding codes with their wording in both languages. The platform has one; a tenant can add its own codes.</dd>
+      </div>
+      <div>
+        <dt>Fold</dt>
+        <dd>Turning the findings of one walk into one card.</dd>
+      </div>
+      <div>
+        <dt>Combination rule</dt>
+        <dd>A sentence the author writes for one exact set of findings.</dd>
+      </div>
+      <div>
+        <dt>Composed card</dt>
+        <dd>A card whose sentence was built by joining clauses, because no rule matched the set.</dd>
+      </div>
+      <div>
+        <dt>Card</dt>
+        <dd>What the farmer reads: one sentence, one health class, one action.</dd>
+      </div>
+      <div>
+        <dt>Dry run</dt>
+        <dd>Folding a block without writing anything, to see what a tree would say.</dd>
+      </div>
+      <div>
+        <dt>Beta / live</dt>
+        <dd>A mark on the tree. The nightly job runs live trees only. Everything in the new designer is beta.</dd>
+      </div>
+    </dl>
+  </section>
+
+  <footer>
+    <p>AgriPulse internal documentation. The behaviour described here is what the folding engine does today; the screens are the beta designer at <code>/decision-trees-beta</code>.</p>
+  </footer>
+</div>
+</body>
+</html>
