@@ -577,8 +577,11 @@ async def test_a_tenant_can_open_a_platform_tree_and_cannot_change_it(
             notes=None,
             actor_user_id=None,
         )
+    # The version id is the platform's own draft: the point is that the
+    # refusal comes from the tree's scope, not from a version that is missing.
+    draft = (await platform.get_tree(tree["id"]))["versions"][0]
     with pytest.raises(BetaTreeNotFoundError):
-        await theirs.publish_version(tree_id=tree["id"], actor_user_id=None)
+        await theirs.publish_version(tree_id=tree["id"], version_id=draft["id"], actor_user_id=None)
     with pytest.raises(BetaTreeNotFoundError):
         await theirs.discard_draft(tree_id=tree["id"], actor_user_id=None)
 
