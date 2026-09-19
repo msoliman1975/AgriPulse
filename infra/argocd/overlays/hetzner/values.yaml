@@ -3825,9 +3825,35 @@ global:
       #   for 80f614c completed green, and those jobs are what push.
       #
       #   Rollback is these three tags back to 88e42fc.
-      tag: "80f614c"
+      # 9bacb61 = #715 #716, api, workers and frontend.
+      #
+      #   #715 fixes a tenant seeing a platform beta tree in the designer's
+      #   list and getting a 404 on opening it, which the screen reported as
+      #   "cannot load". `list_all_trees` has always been
+      #   `tenant_id IS NULL OR tenant_id = :tid` and `get_tree_by_id` matched
+      #   the tenant alone. The read is now the wider scope and every write is
+      #   still the narrow one: a tenant may open and dry run the platform's
+      #   tree and may not append, publish or discard it.
+      #
+      #   #716 is frontend only and fixes the dry run taking the whole page
+      #   down on its first cell. The client read `finding_set` and
+      #   `cells_with_card`; the server sends `identity` and `cells_carded`.
+      #
+      #   No migrations in this range.
+      #
+      #   `backend-integration` is red on this commit: one test added in #715
+      #   calls `publish_version` without `version_id`. It is a test bug, fixed
+      #   in #717, and the behaviour it covers is exercised by the rest of the
+      #   same test. All five container jobs on main for 9bacb61 are green and
+      #   those jobs are what push.
+      #
+      #   Images were not confirmed on the node: SSH is blocked from the
+      #   authoring machine and the gh login has no read:packages scope.
+      #
+      #   Rollback is these three tags back to 80f614c.
+      tag: "9bacb61"
     workers:
-      tag: "80f614c"
+      tag: "9bacb61"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4427,7 +4453,12 @@ global:
       #   completed green, and those jobs are what push.
       #
       #   Rollback is this tag alone back to 80f614c.
-      tag: "c1edd0a"
+      # 9bacb61 = #715 #716, the frontend half. The designer marks a tree
+      #   this scope cannot edit read-only instead of offering a Save the API
+      #   refuses, and the dry run table reads the fields the server sends.
+      #
+      #   Rollback is this tag alone back to c1edd0a.
+      tag: "9bacb61"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
