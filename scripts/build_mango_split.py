@@ -35,6 +35,18 @@ ROOT = Path(__file__).resolve().parents[1]
 TREES = ROOT / "docs" / "trees"
 SOURCE = TREES / "mango_unified.definition.json"
 
+
+def write_json(path: Path, payload: object) -> None:
+    """Write UTF-8 with LF endings.
+
+    ``Path.write_text`` translates newlines on Windows, so a rebuild there
+    rewrote every file with CRLF and git reported six changed files that
+    carried no change at all.
+    """
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+
+
 # --- the four trees ---------------------------------------------------
 #
 # `nodes` names every node that moves into the tree. `rewire` repoints the
@@ -493,8 +505,7 @@ def main() -> int:
             failed = True
             print(f"{tree['code']}: reads variables nothing in it writes: {orphans}")
         covered |= set(tree["registers"])
-        out = TREES / f"{tree['code']}.definition.json"
-        out.write_text(json.dumps(tree, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        write_json(TREES / f"{tree['code']}.definition.json", tree)
         print(
             f"{tree['code']:22s} {len(tree['nodes']):3d} nodes  "
             f"{len(tree['registers']):2d} findings  "

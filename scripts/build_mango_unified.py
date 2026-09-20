@@ -35,6 +35,18 @@ ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / "docs" / "proposals" / "mango-unified-tree.md"
 OUT_DIR = ROOT / "docs" / "trees"
 
+
+def write_json(path: Path, payload: object) -> None:
+    """Write UTF-8 with LF endings.
+
+    ``Path.write_text`` translates newlines on Windows, so a rebuild there
+    rewrote every file with CRLF and git reported six changed files that
+    carried no change at all.
+    """
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+
+
 # The document's YAML blocks, in the order `re.findall` meets them.
 BLOCK_EXAMPLE = 0  # the `set` example in section 1, not part of the tree
 BLOCK_PARAMETERS = 1
@@ -176,12 +188,8 @@ def main() -> int:
         return 1
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    (OUT_DIR / "mango_unified.definition.json").write_text(
-        json.dumps(definition, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-    (OUT_DIR / "mango_unified.findings.json").write_text(
-        json.dumps(findings, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    write_json(OUT_DIR / "mango_unified.definition.json", definition)
+    write_json(OUT_DIR / "mango_unified.findings.json", findings)
     print(
         f"ok: {len(definition['nodes'])} nodes, "
         f"{len(definition['registers'])} registers, "
