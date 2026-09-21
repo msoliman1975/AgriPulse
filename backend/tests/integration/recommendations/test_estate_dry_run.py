@@ -317,9 +317,12 @@ async def test_estate_dry_run_covers_every_block_and_writes_no_card(admin_sessio
 
     # One rule of two fired. The other names a code no node registers, which
     # is exactly the "wrong or unreachable" case the report exists to show.
+    # Named by its own code, for the same reason as `matched_rule` above: an
+    # author told to go and fix a rule needs the name they gave it, not the
+    # set it happens to cover.
     assert report["rules_defined"] == 2
     assert report["rules_fired"] == 1
-    assert report["rules_never_fired"] == ["{dry, ndvi_low}"]
+    assert report["rules_never_fired"] == ["r_never"]
     assert report["composed_share_pct"] == 0.0
     assert report["timing"]["total_ms"] > 0
 
