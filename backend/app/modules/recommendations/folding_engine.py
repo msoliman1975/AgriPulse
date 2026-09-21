@@ -693,6 +693,71 @@ def fold(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class ClauseUsed:
+    """One finding's clause, as composition read it off the catalogue."""
+
+    code: str
+    severity: str
+    clause_en: str
+    clause_ar: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class CardExplanation:
+    """What turned a walk's findings into the card's text.
+
+    Exactly one side is filled. ``rule`` is the combination rule that matched
+    the whole finding set; ``clauses`` is what composition joined, worst
+    first, in the order the sentence reads.
+
+    Split out of ``fold`` rather than returned by it because every caller that
+    writes a card wants neither — the card carries the text already. Only a
+    reader asking "why does it say this" wants the working, and that reader is
+    one screen.
+    """
+
+    rule: CombinationRule | None = None
+    clauses: tuple[ClauseUsed, ...] = ()
+
+
+def explain_card(
+    card: FoldedCard,
+    *,
+    catalogue: Mapping[str, FindingDef],
+    rules: Sequence[CombinationRule],
+) -> CardExplanation:
+    """The working behind one folded card.
+
+    Re-derives rather than re-folds: the card already says which path ran, so
+    this reads the rule back out of the same list ``fold`` picked from, or
+    lists the clauses in the same order ``_compose_text`` joined them. It
+    cannot disagree with the card, because it asks the same two functions the
+    same question.
+
+    A finding whose catalogue row has since gone is skipped rather than
+    raised on. The card in hand was folded against a catalogue that had it,
+    and one missing clause is no reason to refuse the whole explanation.
+    """
+    if not card.composed:
+        return CardExplanation(rule=_matching_rule(card.identity, rules))
+    ordered = _order_by_severity(card.findings)
+    clauses: list[ClauseUsed] = []
+    for entry in ordered:
+        row = catalogue.get(entry.code)
+        if row is None:
+            continue
+        clauses.append(
+            ClauseUsed(
+                code=entry.code,
+                severity=entry.severity,
+                clause_en=row.clause_en,
+                clause_ar=row.clause_ar,
+            )
+        )
+    return CardExplanation(clauses=tuple(clauses))
+
+
 def _order_by_severity(findings: Iterable[RegisteredFinding]) -> list[RegisteredFinding]:
     """Worst first, then by code.
 

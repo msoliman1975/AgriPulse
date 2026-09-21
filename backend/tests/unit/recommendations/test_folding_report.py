@@ -246,3 +246,78 @@ def test_per_node_timing_is_declared_unavailable_rather_than_guessed() -> None:
 
     assert report["timing"]["node_timing"]["available"] is False
     assert "walk_tree" in report["timing"]["node_timing"]["reason"]
+
+
+# --- coverage by node ------------------------------------------------------
+#
+# The report could not say which branches of a tree an estate exercises,
+# because the walk was thrown away before the report saw it. These pin the
+# two rows that answer it.
+
+NODES: dict[str, Any] = {
+    "root": {"condition": {"tree": {}}, "on_match": "n_dry", "on_miss": "n_stop"},
+    "n_dry": {"register": {"code": "dry"}, "next": "n_stop", "label_en": "Soil is dry"},
+    "n_cold": {"register": {"code": "frost"}, "next": "n_stop", "label_en": "Frost risk"},
+    "n_stop": {"stop": True},
+}
+
+
+def _covered(cells: list[dict[str, Any]], counts: dict[str, int], **kw: Any) -> BlockFold:
+    block = _block(cells, **kw)
+    return BlockFold(
+        block_id=block.block_id,
+        block_name=block.block_name,
+        farm_id=block.farm_id,
+        farm_name=block.farm_name,
+        targeted=block.targeted,
+        duration_ms=block.duration_ms,
+        cells=block.cells,
+        node_counts=counts,
+    )
+
+
+def test_coverage_counts_every_node_a_cell_reached() -> None:
+    blocks = [
+        _covered([_cell(identity=["dry"]), _cell()], {"root": 2, "n_dry": 1, "n_stop": 2}),
+        _covered([_cell()], {"root": 1, "n_stop": 1}),
+    ]
+    report = build_estate_report(blocks=blocks, rules=[], scope="cell", total_ms=1.0, nodes=NODES)
+    rows = {r["node_id"]: r for r in report["coverage_by_node"]}
+    assert rows["root"]["cells"] == 3
+    assert rows["n_dry"]["cells"] == 1
+    assert rows["n_dry"]["kind"] == "register"
+    assert rows["n_dry"]["label_en"] == "Soil is dry"
+    # Three cells were evaluated, and one of them reached n_dry.
+    assert rows["n_dry"]["share_pct"] == 33.3
+
+
+def test_coverage_names_the_nodes_no_cell_reached() -> None:
+    """The useful half: a check this estate never exercised."""
+    blocks = [_covered([_cell()], {"root": 1, "n_stop": 1})]
+    report = build_estate_report(blocks=blocks, rules=[], scope="cell", total_ms=1.0, nodes=NODES)
+    assert [r["node_id"] for r in report["never_reached"]] == ["n_cold", "n_dry"]
+    assert report["never_reached"][0]["label_en"] == "Frost risk"
+
+
+def test_a_block_the_tree_does_not_target_is_left_out_of_coverage() -> None:
+    """The same rule every other total in this report follows.
+
+    The sweep would never walk that block, so counting its cells would
+    overstate which branches the tree really reaches.
+    """
+    blocks = [
+        _covered([_cell()], {"root": 1, "n_stop": 1}),
+        _covered([_cell()], {"root": 1, "n_cold": 1}, targeted=False),
+    ]
+    report = build_estate_report(blocks=blocks, rules=[], scope="cell", total_ms=1.0, nodes=NODES)
+    assert [r["node_id"] for r in report["coverage_by_node"]] == ["n_stop", "root"]
+    assert "n_cold" in [r["node_id"] for r in report["never_reached"]]
+
+
+def test_a_run_that_collected_no_coverage_reports_nothing_rather_than_everything() -> None:
+    """A run that did not count cannot report that every node was missed."""
+    report = build_estate_report(
+        blocks=[_block([_cell()])], rules=[], scope="cell", total_ms=1.0, nodes=NODES
+    )
+    assert report["coverage_by_node"] == []
+    assert report["never_reached"] == []

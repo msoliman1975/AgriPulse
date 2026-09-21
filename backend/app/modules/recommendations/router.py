@@ -46,6 +46,8 @@ from app.modules.recommendations.folding_authoring import (
 )
 from app.modules.recommendations.folding_compiler import FoldingCompileError
 from app.modules.recommendations.schemas import (
+    BetaCellWalkRequest,
+    BetaCellWalkResponse,
     BetaDryRunRequest,
     BetaDryRunResponse,
     BetaRunResultRow,
@@ -1642,6 +1644,7 @@ async def get_farm_verdicts(
 #   POST   /api/v1/platform/decision-trees/beta/{tree_id}/publish   publish
 #   DELETE /api/v1/platform/decision-trees/beta/{tree_id}/draft     discard draft
 #   POST   /api/v1/platform/decision-trees/beta/{tree_id}/dry-run   per-cell folds
+#   POST   /api/v1/platform/decision-trees/beta/{tree_id}/dry-run/cell  one walk
 #
 # `beta` is a literal segment and it is declared here, not under
 # `/decision-trees/…`, where it would have to be declared ahead of the
@@ -1926,6 +1929,47 @@ async def dry_run_beta_tree(
         return await service.dry_run(
             tree_id=tree_id,
             block_id=payload.block_id,
+            definition=payload.definition,
+            version_id=payload.version_id,
+            tenant_session=tenant_session,
+            tenant_schema=tenant_schema,
+        )
+    except Exception as exc:
+        mapped = _map_beta_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.post(
+    _BETA_PREFIX + "/{tree_id}/dry-run/cell",
+    response_model=BetaCellWalkResponse,
+    summary="Why one cell got the result it got. Writes nothing.",
+)
+async def walk_beta_tree_cell(
+    tree_id: UUID,
+    payload: BetaCellWalkRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    service: FoldingTreeAuthorService = Depends(_beta_service),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """One cell's walk, its steps, and the working behind its card.
+
+    Separate from the dry run rather than a field on it: a 300-cell block
+    would otherwise carry a 20-step path 300 times over to answer a question
+    asked about one row.
+
+    Same tenant rule as the dry run. The signals, imagery and weather a fold
+    reads are the tenant's, so a platform caller with no tenant has no cell to
+    walk.
+    """
+    _ensure_authoring_scope(context)
+    tenant_schema = _ensure_tenant(context)
+    try:
+        return await service.cell_walk(
+            tree_id=tree_id,
+            block_id=payload.block_id,
+            cell_id=payload.cell_id,
             definition=payload.definition,
             version_id=payload.version_id,
             tenant_session=tenant_session,

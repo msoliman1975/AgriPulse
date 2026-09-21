@@ -60,6 +60,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
+from app.modules.recommendations.folding_compiler import kind_of_node
 from app.modules.recommendations.folding_engine import CombinationRule
 
 _log = get_logger(__name__)
@@ -145,6 +146,8 @@ class BlockFold:
     duration_ms: float
     cells: tuple[Mapping[str, Any], ...] = ()
     error: str | None = None
+    #: How many of this block's cells walked through each node.
+    node_counts: Mapping[str, int] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -162,13 +165,14 @@ class _SetTally:
     blocks: set[UUID] = field(default_factory=set)
 
 
-def build_estate_report(
+def build_estate_report(  # noqa: PLR0915 - one pass over the cells, counting six things
     *,
     blocks: Sequence[BlockFold],
     rules: Sequence[CombinationRule],
     scope: str,
     total_ms: float,
     top_sets: int = TOP_SETS,
+    nodes: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Turn one run's per-block folds into the report of section 9.
 
@@ -177,6 +181,10 @@ def build_estate_report(
     and read the numbers back.
     """
     counted = [b for b in blocks if b.targeted and b.error is None]
+    coverage: Counter[str] = Counter()
+    for block in blocks:
+        if block.targeted and block.error is None:
+            coverage.update(block.node_counts)
     not_targeted = [b for b in blocks if not b.targeted]
     failed = [b for b in blocks if b.error is not None]
 
@@ -310,13 +318,71 @@ def build_estate_report(
             "node_timing": {
                 "available": False,
                 "reason": (
-                    "folding_engine.walk_tree has no timing hook and "
-                    "folding_authoring._fold_one_cell drops walk.path, so no "
-                    "caller outside those modules can attribute time to a node"
+                    "folding_engine.walk_tree has no timing hook, so no caller "
+                    "outside it can attribute time to a node. The walk itself "
+                    "is now kept, which is what coverage_by_node counts"
                 ),
             },
         },
+        "coverage_by_node": _coverage_rows(coverage, nodes, cells_evaluated),
+        "never_reached": _never_reached(coverage, nodes),
     }
+
+
+def _node_label(nodes: Mapping[str, Any] | None, node_id: str) -> tuple[str, str | None]:
+    """One node's kind and its own label, off the compiled body.
+
+    Falls back to ``unknown`` rather than raising. A run's coverage is still
+    worth reading when it names a node the tree no longer has, and saying so
+    beats dropping the row.
+    """
+    node = (nodes or {}).get(node_id)
+    if not isinstance(node, Mapping):
+        return "unknown", None
+    return kind_of_node(node) or "unknown", node.get("label_en")
+
+
+def _coverage_rows(
+    coverage: Mapping[str, int], nodes: Mapping[str, Any] | None, cells: int
+) -> list[dict[str, Any]]:
+    """Every node a cell reached, most walked first."""
+    rows: list[dict[str, Any]] = []
+    for node_id, count in sorted(coverage.items(), key=lambda kv: (-kv[1], kv[0])):
+        kind, label = _node_label(nodes, node_id)
+        rows.append(
+            {
+                "node_id": node_id,
+                "kind": kind,
+                "label_en": label,
+                "cells": count,
+                "share_pct": _pct(count, cells),
+            }
+        )
+    return rows
+
+
+def _never_reached(
+    coverage: Mapping[str, int], nodes: Mapping[str, Any] | None
+) -> list[dict[str, Any]]:
+    """The nodes no cell in the estate walked through.
+
+    The useful half of coverage. It names the branches of the tree this
+    tenant's estate never exercised, which is what an author wants to know
+    after a first run: either the check is dead, or the condition in front of
+    it is wrong.
+
+    Empty rather than the whole tree when no coverage was collected. A run
+    that did not count cannot report that every node was missed.
+    """
+    if not nodes or not coverage:
+        return []
+    rows: list[dict[str, Any]] = []
+    for node_id in sorted(nodes):
+        if node_id in coverage:
+            continue
+        kind, label = _node_label(nodes, node_id)
+        rows.append({"node_id": node_id, "kind": kind, "label_en": label})
+    return rows
 
 
 def _rule_for(identity: Sequence[str], rules: Sequence[CombinationRule]) -> str | None:
@@ -624,7 +690,13 @@ class EstateDryRunService:
             folds.append(await self._fold_block(tree_id=tree_id, row=row))
         total_ms = (time.perf_counter() - started) * 1000.0
 
-        report = build_estate_report(blocks=folds, rules=rules, scope=scope, total_ms=total_ms)
+        report = build_estate_report(
+            blocks=folds,
+            rules=rules,
+            scope=scope,
+            total_ms=total_ms,
+            nodes=compiled.get("nodes") or {},
+        )
         report["tree_id"] = str(tree_id)
         report["version_id"] = str(version_id) if version_id else None
         report["run_id"] = str(run_id)
@@ -648,6 +720,7 @@ class EstateDryRunService:
                 version_id=None,
                 tenant_session=self._tenant,
                 tenant_schema=self._schema,
+                collect_coverage=True,
             )
         # One bad block must not end the run: the tenant has dozens and the
         # report is the reason to run at all.
@@ -676,6 +749,7 @@ class EstateDryRunService:
             targeted=bool(targeting.get("matched")),
             duration_ms=(time.perf_counter() - started) * 1000.0,
             cells=tuple(result.get("cells") or ()),
+            node_counts=dict(result.get("node_counts") or {}),
         )
 
     async def _compiled_tree(self, tree_id: UUID) -> tuple[dict[str, Any], UUID | None, str]:
