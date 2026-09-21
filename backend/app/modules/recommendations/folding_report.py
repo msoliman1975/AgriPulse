@@ -102,11 +102,15 @@ def rule_label(rule: CombinationRule) -> str:
     in the designer. Otherwise the set itself, which is unambiguous: two rules
     cannot hold the same set and both fire, since matching is on equality.
 
-    In practice the set is always what is used. ``folding_compiler``'s
-    ``_check_combinations`` keeps codes, action_type, status and both texts,
-    and drops ``code``, so no author-given rule id survives a publish. Design
-    section 9 prints "rule r3", which needs that id kept; that is a gap in the
-    compiler, and the compiler belongs to another session.
+    The set used to be all there was. ``folding_compiler``'s
+    ``_check_combinations`` kept codes, action_type, status and both texts and
+    dropped ``code``, so no author-given rule id survived a publish and this
+    always fell back. It carries ``code`` now, and design section 9's "rule
+    r3" is what a named rule reports.
+
+    The fallback stays for two reasons: a rule may be written without a name,
+    and a version stored before that fix keeps a compiled body with no name
+    until ``scripts/recompile_beta_tree_versions.py`` has run over it.
     """
     if rule.code:
         return rule.code

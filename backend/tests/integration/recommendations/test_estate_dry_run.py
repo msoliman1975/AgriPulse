@@ -307,13 +307,13 @@ async def test_estate_dry_run_covers_every_block_and_writes_no_card(admin_sessio
     assert sets[0]["blocks"] == 2
     assert sets[0]["composed"] is False
 
-    # The rule is named by its set, not by the `code` the definition gave it.
-    # `folding_compiler._check_combinations` keeps codes, action_type, status
-    # and both texts, and drops `code`, so no author-given rule id survives a
-    # publish. `rule_label` falls back to the set for exactly this reason. It
-    # is a real gap — design section 9 prints "rule r3" — and it belongs to
-    # the compiler, which this session does not edit.
-    assert sets[0]["matched_rule"] == "{ndvi_low}"
+    # The rule is named by the `code` the definition gave it, which is what
+    # the author reads in the designer and what design section 9 prints.
+    # This asserted the set label `{ndvi_low}` until the compiler carried a
+    # rule's `code`: `_check_combinations` kept codes, action_type, status and
+    # both texts and dropped `code`, so no author-given rule id survived a
+    # publish and `rule_label` had nothing to fall back on but the set.
+    assert sets[0]["matched_rule"] == "r_low"
 
     # One rule of two fired. The other names a code no node registers, which
     # is exactly the "wrong or unreachable" case the report exists to show.
