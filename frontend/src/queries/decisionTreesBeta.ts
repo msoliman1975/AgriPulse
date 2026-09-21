@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   appendBetaDraft,
+  betaCellWalk,
   betaDryRun,
   createBetaTree,
   createFinding,
@@ -14,6 +15,7 @@ import {
   publishBetaVersion,
   updateFinding,
   type BetaCandidateBlock,
+  type BetaCellWalkResponse,
   type BetaDryRunResponse,
   type BetaTreeCreatePayload,
   type BetaTreeDetail,
@@ -177,5 +179,32 @@ export function useDryRunBlocks(scope: AuthoringScope) {
 export function useBetaDryRun() {
   return useMutation<BetaDryRunResponse, Error, { treeId: string; blockId: string }>({
     mutationFn: ({ treeId, blockId }) => betaDryRun(treeId, blockId),
+  });
+}
+
+/**
+ * Why one cell got the result it got.
+ *
+ * A query, not a mutation, so re-opening the same row is free. The key holds
+ * the version the walk ran against, so switching version or saving a draft
+ * asks again rather than showing the previous body's path.
+ *
+ * `staleTime` is zero on purpose. This call re-walks, and a stale answer is
+ * exactly the drift the panel exists to report.
+ */
+export function useBetaCellWalk(args: {
+  treeId: string | null;
+  blockId: string | null;
+  cellId: string | null;
+  versionId?: string | null;
+}) {
+  const { treeId, blockId, cellId, versionId = null } = args;
+  return useQuery<BetaCellWalkResponse>({
+    queryKey: [...KEY, "cell_walk", treeId, blockId, cellId, versionId] as const,
+    queryFn: () =>
+      betaCellWalk(treeId as string, blockId as string, cellId as string, { versionId }),
+    enabled: treeId !== null && blockId !== null && cellId !== null,
+    staleTime: 0,
+    gcTime: 5 * 60_000,
   });
 }

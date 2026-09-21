@@ -780,6 +780,15 @@ class EvalTraceDetailResponse(EvalTraceResponse):
     resolved_values: dict[str, Any] = Field(default_factory=dict)
     param_overrides: dict[str, Any] = Field(default_factory=dict)
 
+    # The three fold columns tenant 0095 added. The query has always selected
+    # them — it reads `t.*` — and this model dropped them, so the walk
+    # explainer could see every step of a real run and not the card the steps
+    # added up to. Empty and null on a tree the old engine walked, which has
+    # no findings at all.
+    finding_set: list[str] = Field(default_factory=list)
+    matched_rule: str | None = None
+    registered_by: dict[str, Any] = Field(default_factory=dict)
+
 
 # =====================================================================
 # Tree parameter overrides (PR-C)
@@ -1144,7 +1153,106 @@ class BetaDryRunResponse(BaseModel):
     #: Of the carded cells, how many composed their text instead of matching
     #: a combination rule.
     cells_composed: int = 0
+    #: How many of this block's cells walked through each node. Empty unless
+    #: the caller asked for it; the estate report is what asks. Counts, not
+    #: paths: the question is coverage, and a path per cell to answer it would
+    #: carry a 20-step list for every cell of every block.
+    node_counts: dict[str, int] = Field(default_factory=dict)
     cells: list[BetaDryRunCell] = Field(default_factory=list)
+
+
+# ---------- One cell's walk, for the explainer -------------------------------
+#
+# The dry run above answers "what did the tree say about this block". These
+# answer "why did it say that about this one cell". They are a separate call
+# because a 300-cell block would otherwise carry a 20-step path 300 times to
+# answer a question asked about one row.
+
+
+class BetaWalkStep(BaseModel):
+    """One node the walk visited.
+
+    The same information ``folding_engine.FoldingPathStep`` holds, with the
+    parts a reader needs as their own fields rather than packed into a values
+    map. A stored trace row packs ``kind`` and ``detail`` inside
+    ``condition_snapshot`` because that column is free-form JSONB; this
+    response does not have to, and an explicit field is one less thing for
+    the browser to unpack.
+
+    ``matched`` is the branch a condition took and is null on every other
+    kind — nothing else has a yes or no answer.
+    """
+
+    node_id: str
+    kind: str
+    matched: bool | None = None
+    label_en: str | None = None
+    label_ar: str | None = None
+    #: What a condition read, by reference name. Empty on every other kind.
+    values: dict[str, Any] = Field(default_factory=dict)
+    #: What the node did: the finding a register wrote, the variables a set
+    #: wrote, the case a switch chose. Null when the node did nothing but
+    #: branch.
+    detail: dict[str, Any] | None = None
+
+
+class BetaWalkRule(BaseModel):
+    """The combination rule that wrote this cell's text."""
+
+    code: str | None = None
+    codes: list[str] = Field(default_factory=list)
+    text_en: str | None = None
+    text_ar: str | None = None
+    status: str | None = None
+    action_type: str | None = None
+
+
+class BetaWalkClause(BaseModel):
+    """One finding's own clause, as composition joined it."""
+
+    code: str
+    severity: str
+    clause_en: str | None = None
+    clause_ar: str | None = None
+
+
+class BetaCellWalkRequest(BaseModel):
+    """POST /platform/decision-trees/beta/{tree_id}/dry-run/cell.
+
+    Same body as the dry run plus the cell. ``definition`` still wins over a
+    stored version, so the explainer opened from an unsaved canvas walks the
+    same body the row came from.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    block_id: UUID
+    cell_id: UUID
+    definition: dict[str, Any] | None = None
+    version_id: UUID | None = None
+
+
+class BetaCellWalkResponse(BaseModel):
+    """One cell, its walk, and what turned the walk into a card.
+
+    ``rule`` and ``composed_from`` are the two ways a card gets its text, and
+    at most one of them is set. Both are null when the walk registered
+    nothing, which is a healthy cell, or when it errored.
+
+    The cell is echoed in full on purpose. This call re-walks, and nothing
+    stores a dry run, so the reading behind this path can differ from the
+    reading behind the row the author clicked. The caller compares the two
+    and says so rather than drawing a path that explains a different answer.
+    """
+
+    tree_id: UUID
+    code: str
+    block_id: UUID
+    version_id: UUID | None = None
+    cell: BetaDryRunCell
+    path: list[BetaWalkStep] = Field(default_factory=list)
+    rule: BetaWalkRule | None = None
+    composed_from: list[BetaWalkClause] | None = None
 
 
 # ---------- Finding catalogue ----------------------------------------------

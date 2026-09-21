@@ -31,6 +31,7 @@ Design: docs/proposals/unified-decision-tree-engine.md sections 4, 5, 6.5, 9.
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import replace
 from datetime import datetime
 from typing import Any
@@ -555,6 +556,7 @@ class FoldingTreeAuthorService:
         version_id: UUID | None,
         tenant_session: AsyncSession,
         tenant_schema: str | None = None,
+        collect_coverage: bool = False,
     ) -> dict[str, Any]:
         """Fold one block, cell by cell, and write nothing.
 
@@ -571,31 +573,20 @@ class FoldingTreeAuthorService:
         healthy cell is an answer, and a report that showed only the cells
         with findings would hide how much of the block the tree says nothing
         about.
+
+        ``collect_coverage`` adds ``node_counts``: how many of this block's
+        cells walked through each node. Counts, never paths — the estate
+        report wants the total across a tenant, and carrying one path per cell
+        to get it would move a 20-step list for every cell of every block.
         """
         from app.modules.recommendations import folding_engine
 
-        # Visible rather than own: the dry run writes nothing, and folding the
-        # platform's tree over your own block is how a tenant decides whether
-        # they want it.
-        tree = await self._visible_tree_or_raise(tree_id)
-
-        resolved_version_id: UUID | None = None
-        if definition is not None:
-            compiled = await self._compile(definition, tenant_schema=tenant_schema)
-        else:
-            row = None
-            if version_id is not None:
-                row = await self._repo.get_version(version_id)
-                if row is None or row["tree_id"] != tree_id:
-                    raise BetaVersionNotFoundError(version_id)
-            elif tree["current_version_id"] is not None:
-                row = await self._repo.get_version(tree["current_version_id"])
-            if row is None:
-                row = await self._repo.get_latest_version(tree_id=tree_id)
-            if row is None:
-                raise BetaDryRunUnavailableError("This tree has no version to run.")
-            compiled = row["tree_compiled"]
-            resolved_version_id = row["id"]
+        tree, compiled, resolved_version_id = await self._resolve_run_body(
+            tree_id=tree_id,
+            definition=definition,
+            version_id=version_id,
+            tenant_schema=tenant_schema,
+        )
 
         repo = RecommendationsRepository(tenant_session=tenant_session, public_session=self._public)
         base_ctx, targeting, latest_indices = await self._dry_run_context(
@@ -609,6 +600,7 @@ class FoldingTreeAuthorService:
         labels = await repo.get_grid_cell_labels(block_id=block_id)
 
         cells: list[dict[str, Any]] = []
+        node_counts: Counter[str] = Counter()
         for cell_id, cell_means in cell_aggs.items():
             # Only the imagery means are per-cell. Weather, soil, crop and
             # signals inherit the block, the same fidelity rule the sweep
@@ -619,18 +611,23 @@ class FoldingTreeAuthorService:
                 indices=_cell_indices(base_ctx, latest_indices, cell_means),
             )
             row_idx, col_idx = labels.get(cell_id, (None, None))
-            cells.append(
-                _fold_one_cell(
-                    folding_engine,
-                    compiled=compiled,
-                    ctx=cell_ctx,
-                    catalogue=catalogue,
-                    rules=rules,
-                    cell_id=cell_id,
-                    cell_row=row_idx,
-                    cell_col=col_idx,
-                )
+            row, walk, _card = _walk_one_cell(
+                folding_engine,
+                compiled=compiled,
+                ctx=cell_ctx,
+                catalogue=catalogue,
+                rules=rules,
+                cell_id=cell_id,
+                cell_row=row_idx,
+                cell_col=col_idx,
             )
+            cells.append(row)
+            if collect_coverage:
+                # A node is counted once per cell however many times the walk
+                # touched it. It cannot touch one twice — the walk refuses a
+                # revisit as a cycle — but counting the set says what the
+                # number means without depending on that.
+                node_counts.update({step.node_id for step in walk.path})
 
         cells.sort(
             key=lambda c: (
@@ -651,7 +648,145 @@ class FoldingTreeAuthorService:
             "cells_carded": len(carded),
             "cells_errored": sum(1 for c in cells if c["error"] is not None),
             "cells_composed": sum(1 for c in carded if c["composed"]),
+            "node_counts": dict(node_counts),
             "cells": cells,
+        }
+
+    async def _resolve_run_body(
+        self,
+        *,
+        tree_id: UUID,
+        definition: dict[str, Any] | None,
+        version_id: UUID | None,
+        tenant_schema: str | None,
+    ) -> tuple[dict[str, Any], dict[str, Any], UUID | None]:
+        """The tree, the compiled body to walk, and which version that was.
+
+        Visible rather than own: neither the dry run nor the explainer writes
+        anything, and folding the platform's tree over your own block is how a
+        tenant decides whether they want it.
+
+        ``definition`` wins over every stored version, so the designer can
+        fold the canvas as it stands. It is compiled the same way a save would
+        compile it, so a body one of these calls accepts is a body that saves.
+        The version id comes back null in that case, because no stored version
+        is what ran.
+        """
+        tree = await self._visible_tree_or_raise(tree_id)
+
+        if definition is not None:
+            compiled = await self._compile(definition, tenant_schema=tenant_schema)
+            return tree, compiled, None
+
+        row = None
+        if version_id is not None:
+            row = await self._repo.get_version(version_id)
+            if row is None or row["tree_id"] != tree_id:
+                raise BetaVersionNotFoundError(version_id)
+        elif tree["current_version_id"] is not None:
+            row = await self._repo.get_version(tree["current_version_id"])
+        if row is None:
+            row = await self._repo.get_latest_version(tree_id=tree_id)
+        if row is None:
+            raise BetaDryRunUnavailableError("This tree has no version to run.")
+        return tree, row["tree_compiled"], row["id"]
+
+    async def cell_walk(
+        self,
+        *,
+        tree_id: UUID,
+        block_id: UUID,
+        cell_id: UUID,
+        definition: dict[str, Any] | None,
+        version_id: UUID | None,
+        tenant_session: AsyncSession,
+        tenant_schema: str | None = None,
+    ) -> dict[str, Any]:
+        """One cell's walk, step by step, and the working behind its card.
+
+        Write-free, like the dry run, and for the same reason: an author reads
+        this as often as they like and the tenant's data is exactly as it was.
+
+        This re-walks. Nothing stores a dry run, so the readings behind this
+        path are the readings at the moment of this call, which can differ
+        from the ones behind the row the author clicked. The cell comes back
+        in full for that reason: the caller compares it with the row it opened
+        from and says so, rather than drawing a path that explains a different
+        answer.
+        """
+        from app.modules.recommendations import folding_engine
+
+        tree, compiled, resolved_version_id = await self._resolve_run_body(
+            tree_id=tree_id,
+            definition=definition,
+            version_id=version_id,
+            tenant_schema=tenant_schema,
+        )
+
+        repo = RecommendationsRepository(tenant_session=tenant_session, public_session=self._public)
+        base_ctx, _targeting, latest_indices = await self._dry_run_context(
+            compiled=compiled, repo=repo, block_id=block_id, tenant_session=tenant_session
+        )
+
+        cell_aggs = await repo.get_latest_cell_aggregates(block_id=block_id)
+        if cell_id not in cell_aggs:
+            raise BetaDryRunUnavailableError(
+                f"Cell {cell_id} is not one of block {block_id}'s current grid cells."
+            )
+
+        catalogue = await self._finding_catalogue(tenant_schema=tenant_schema)
+        rules = folding_engine.parse_combination_rules(compiled.get("combinations"))
+        labels = await repo.get_grid_cell_labels(block_id=block_id)
+        row_idx, col_idx = labels.get(cell_id, (None, None))
+
+        cell_ctx = replace(
+            base_ctx, indices=_cell_indices(base_ctx, latest_indices, cell_aggs[cell_id])
+        )
+        row, walk, card = _walk_one_cell(
+            folding_engine,
+            compiled=compiled,
+            ctx=cell_ctx,
+            catalogue=catalogue,
+            rules=rules,
+            cell_id=cell_id,
+            cell_row=row_idx,
+            cell_col=col_idx,
+        )
+
+        rule_body: dict[str, Any] | None = None
+        composed_from: list[dict[str, Any]] | None = None
+        if card is not None:
+            explanation = folding_engine.explain_card(card, catalogue=catalogue, rules=rules)
+            if explanation.rule is not None:
+                matched = explanation.rule
+                rule_body = {
+                    "code": matched.code,
+                    "codes": sorted(matched.codes),
+                    "text_en": matched.text_en,
+                    "text_ar": matched.text_ar,
+                    "status": matched.status,
+                    "action_type": matched.action_type,
+                }
+            elif explanation.clauses:
+                composed_from = [
+                    {
+                        "code": clause.code,
+                        "severity": clause.severity,
+                        "clause_en": clause.clause_en,
+                        "clause_ar": clause.clause_ar,
+                    }
+                    for clause in explanation.clauses
+                ]
+
+        return {
+            "tree_id": tree_id,
+            "code": tree["code"],
+            "block_id": block_id,
+            "version_id": resolved_version_id,
+            "cell": row,
+            "path": _serialize_walk_path(walk),
+            "rule": rule_body,
+            "composed_from": composed_from,
         }
 
     async def _finding_catalogue(self, *, tenant_schema: str | None) -> dict[str, FindingDef]:
@@ -812,6 +947,37 @@ def _fold_one_cell(
     they are reported, because a trace without them is harder to read, but
     the card is null and the cell counts as errored, not as healthy.
     """
+    row, _walk, _card = _walk_one_cell(
+        folding_engine,
+        compiled=compiled,
+        ctx=ctx,
+        catalogue=catalogue,
+        rules=rules,
+        cell_id=cell_id,
+        cell_row=cell_row,
+        cell_col=cell_col,
+    )
+    return row
+
+
+def _walk_one_cell(
+    folding_engine: Any,
+    *,
+    compiled: dict[str, Any],
+    ctx: Any,
+    catalogue: dict[str, Any],
+    rules: Any,
+    cell_id: UUID,
+    cell_row: int | None,
+    cell_col: int | None,
+) -> tuple[dict[str, Any], Any, Any]:
+    """The report row, and the walk and the card it was built from.
+
+    ``_fold_one_cell`` wants the row and nothing else. The explainer wants all
+    three: the path is on the walk, and the working behind the text needs the
+    card. Returning the triple here keeps one walk and one fold, rather than
+    two that could answer differently.
+    """
     walk = folding_engine.walk_tree(compiled, ctx)
     row: dict[str, Any] = {
         "cell_id": cell_id,
@@ -837,7 +1003,7 @@ def _fold_one_cell(
         "error": walk.error,
     }
     if not walk.ok:
-        return row
+        return row, walk, None
     try:
         card = folding_engine.fold(walk.findings, catalogue=catalogue, rules=rules)
     except folding_engine.UnknownFindingError as exc:
@@ -846,9 +1012,9 @@ def _fold_one_cell(
         # on the cell rather than raised, so one missing code does not hide
         # the rest of the block's answer.
         row["error"] = str(exc)
-        return row
+        return row, walk, None
     if card is None:
-        return row
+        return row, walk, None
     row.update(
         {
             "identity": list(card.identity),
@@ -861,7 +1027,29 @@ def _fold_one_cell(
             "rule_code": card.rule_code,
         }
     )
-    return row
+    return row, walk, card
+
+
+def _serialize_walk_path(walk: Any) -> list[dict[str, Any]]:
+    """The walk's steps in the response's shape.
+
+    ``kind`` and ``detail`` are their own fields here. A stored trace row
+    packs them inside the step's values map, because that column is free-form
+    JSONB and had nowhere else to put them. This response has somewhere, so
+    the browser does not have to unpack anything.
+    """
+    return [
+        {
+            "node_id": step.node_id,
+            "kind": step.kind,
+            "matched": step.matched,
+            "label_en": step.label_en,
+            "label_ar": step.label_ar,
+            "values": dict(step.condition_snapshot or {}),
+            "detail": dict(step.detail) if step.detail else None,
+        }
+        for step in walk.path
+    ]
 
 
 def get_folding_tree_author_service(

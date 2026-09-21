@@ -685,6 +685,7 @@ def _check_combinations(
         return []
     normalized: list[dict[str, Any]] = []
     seen_keys: set[tuple[str, ...]] = set()
+    seen_codes: set[str] = set()
     for index, rule in enumerate(raw):
         if not isinstance(rule, dict):
             errors.add(
@@ -742,8 +743,19 @@ def _check_combinations(
                 "تُستخدم إلا الأولى.",
             )
         seen_keys.add(key)
+
+        # The rule's own name. Optional, because a tree may leave its rules
+        # unnamed, but carried through when it is there: it is the only way a
+        # trace, a dry run row or the estate report can say which rule wrote
+        # the card. Dropping it here is why `matched_rule` was null on every
+        # trace row the folding engine has ever written.
+        code = _combination_code(rule.get("code"), index, seen_codes, errors)
+        if code is not None:
+            seen_codes.add(code)
+
         normalized.append(
             {
+                "code": code,
                 "codes": list(key),
                 "action_type": rule.get("action_type"),
                 "status": status,
@@ -752,6 +764,36 @@ def _check_combinations(
             }
         )
     return normalized
+
+
+def _combination_code(raw: Any, index: int, seen_codes: set[str], errors: _Collector) -> str | None:
+    """One combination rule's name, or None when it has none.
+
+    Absent is allowed and is not an error. Present and unusable is: a name
+    that is not a non-empty string cannot be shown, and a name used twice
+    points at two different rules, so neither a trace nor the report could say
+    which one wrote the card.
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, str) or not raw.strip():
+        errors.add(
+            "combination-bad-code",
+            f"Combination rule number {index} has a 'code' that is not a " "non-empty string.",
+            f"قاعدة الدمج رقم {index} تحمل 'code' ليس نصًا غير فارغ.",
+        )
+        return None
+    code = raw.strip()
+    if code in seen_codes:
+        errors.add(
+            "combination-duplicate-code",
+            f"Combination rule number {index} repeats the code {code!r}, "
+            "which another rule in this tree already uses.",
+            f"قاعدة الدمج رقم {index} تكرر الرمز {code!r} المستخدم بالفعل في "
+            "قاعدة أخرى بهذه الشجرة.",
+        )
+        return None
+    return code
 
 
 # ---------------------------------------------------------------------
