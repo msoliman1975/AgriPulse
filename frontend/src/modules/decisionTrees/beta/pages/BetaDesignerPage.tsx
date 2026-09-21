@@ -57,6 +57,7 @@ import {
 import { isEditableInScope, useAuthoringScope } from "../../lib/authoringScope";
 import { BetaCanvas } from "../components/BetaCanvas";
 import { BetaDryRunPanel } from "../components/BetaDryRunPanel";
+import { WalkExplainerPanel } from "../components/WalkExplainerPanel";
 import { BetaNodePanel } from "../components/BetaNodePanel";
 import { CombinationsTab } from "../components/CombinationsTab";
 import { PublishChecksPanel } from "../components/PublishChecksPanel";
@@ -117,6 +118,9 @@ export function BetaDesignerPage(): ReactNode {
   const [pendingAdd, setPendingAdd] = useState<PendingAdd | null>(null);
   const [blockId, setBlockId] = useState("");
   const [dryRunResult, setDryRunResult] = useState<BetaDryRunResponse | null>(null);
+  // The row the explainer is open on. The panel re-walks that one cell;
+  // the row itself is kept so the two answers can be compared.
+  const [explainCell, setExplainCell] = useState<BetaDryRunResponse["cells"][number] | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   /**
@@ -547,8 +551,29 @@ export function BetaDesignerPage(): ReactNode {
                 result={dryRunResult}
                 platformScope={scope === "platform"}
                 dirty={dirty}
+                onShowDetails={setExplainCell}
               />
             ) : null}
+
+            <WalkExplainerPanel
+              open={explainCell !== null}
+              onClose={() => setExplainCell(null)}
+              treeId={treeId}
+              blockId={blockId || null}
+              cell={explainCell}
+              versionId={dryRunResult?.version_id ?? null}
+              layout={layout}
+              title={
+                explainCell === null
+                  ? ""
+                  : explainCell.cell_row !== null && explainCell.cell_col !== null
+                    ? t("dryRun.cellLabel", {
+                        row: explainCell.cell_row,
+                        col: explainCell.cell_col,
+                      })
+                    : explainCell.cell_id
+              }
+            />
 
             {confirmDiscard && draft ? (
               <Modal

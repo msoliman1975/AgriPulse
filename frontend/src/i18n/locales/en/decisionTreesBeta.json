@@ -275,7 +275,8 @@
       "severity": "Severity",
       "status": "Status",
       "actionType": "Action type",
-      "text": "Card text"
+      "text": "Card text",
+      "details": "Why"
     },
     "ruleMatched": "Rule",
     "ruleComposed": "Composed",
@@ -429,5 +430,37 @@
     "useRef": "Compare against a reading",
     "useValue": "Compare against a value",
     "unsupported": "This test was written by hand in a shape the editor does not offer."
+  },
+  "explainer": {
+    "canvasHint": "The route is drawn. Everything the walk did not touch is dimmed.",
+    "close": "Close",
+    "composed": "Composed",
+    "composedHelp": "The text joins each finding's own clause, worst first.",
+    "drifted": "This walk read the field again, and it found something different from the row you clicked. Nothing stores a dry run, so a new imagery or weather reading since the run changes the answer. Run the dry run again to line the two up.",
+    "endOfWalk": "End of walk",
+    "failed": "That cell's walk could not be read.",
+    "hideSetSteps": "Hide the variable steps",
+    "no": "No",
+    "noCardErrored": "The walk never reached a stop node, so the tree did not say it was finished and no card was folded.",
+    "noFindings": "The walk registered no findings. This cell is healthy, and no card opens.",
+    "noNode": "(no node named)",
+    "noReading": "no reading",
+    "noSteps": "This walk recorded no steps.",
+    "noTree": "The tree could not be drawn, so only the steps are shown.",
+    "open": "Show details",
+    "openFor": "Show why {{cell}} got this result",
+    "raised": "severity raised",
+    "repeat": "already found",
+    "resultTitle": "What wrote this card",
+    "ruleMatched": "Rule matched",
+    "ruleUnnamed": "this rule has no code",
+    "showSetSteps_one": "Show {{count}} variable step",
+    "showSetSteps_other": "Show {{count}} variable steps",
+    "stepsTitle_one": "{{count}} step",
+    "stepsTitle_other": "{{count}} steps",
+    "title": "Why this cell got this result",
+    "unlabelled": "No label",
+    "walkFailed": "The walk ended on node {{node}} without reaching a stop node.",
+    "yes": "Yes"
   }
 }

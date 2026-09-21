@@ -55,6 +55,11 @@ import { describeOperand, describeValueRef } from "../lib/betaValueRef";
 
 const DRAG_THRESHOLD_PX = 4;
 
+/** How much of a node or edge the walk did not touch still shows. Low enough
+ *  that the route reads at a glance, high enough that the shape of the rest of
+ *  the tree is still there to place it in. */
+const DIMMED = 0.2;
+
 interface BetaCanvasProps {
   layout: BetaLayoutResult;
   selectedNodeId: string | null;
@@ -76,8 +81,16 @@ interface BetaCanvasProps {
   rejectedNodeIds?: ReadonlySet<string>;
   /** Edges a publish rejection names, by `edgeKey`. */
   rejectedEdgeKeys?: ReadonlySet<string>;
-  /** Cells the dry run walked through, for the path overlay. */
+  /**
+   * The nodes one walk visited, for the path overlay.
+   *
+   * Passing it also dims every node and edge the walk did not touch. That is
+   * the difference between "here is the tree, and some of it is marked" and
+   * "here is the route", and on a 74-node tree only the second is readable.
+   */
   pathNodeIds?: ReadonlySet<string>;
+  /** The edges that walk traversed, by `edgeKey`. */
+  pathEdgeKeys?: ReadonlySet<string>;
   height: number;
   onHeightChange: (height: number) => void;
 }
@@ -113,6 +126,7 @@ export function BetaCanvas({
   rejectedNodeIds,
   rejectedEdgeKeys,
   pathNodeIds,
+  pathEdgeKeys,
   height,
   onHeightChange,
 }: BetaCanvasProps): JSX.Element {
@@ -348,6 +362,8 @@ export function BetaCanvas({
                         : edge
                     }
                     rejected={rejectedEdgeKeys?.has(edge.key) ?? false}
+                    onPath={pathEdgeKeys?.has(edge.key) ?? false}
+                    offPath={pathNodeIds !== undefined && !(pathEdgeKeys?.has(edge.key) ?? false)}
                   />
                 );
               })}
@@ -363,6 +379,7 @@ export function BetaCanvas({
                     selected={node.id === selectedNodeId}
                     rejected={rejectedNodeIds?.has(node.id) ?? false}
                     onPath={pathNodeIds?.has(node.id) ?? false}
+                    offPath={pathNodeIds !== undefined && !pathNodeIds.has(node.id)}
                     onClick={(id) => {
                       if (suppressNodeClick.current) {
                         suppressNodeClick.current = false;
@@ -502,25 +519,31 @@ const EDGE_COLOR: Record<BetaPositionedEdge["kind"], string> = {
 function BetaEdge({
   edge,
   rejected,
+  onPath = false,
+  offPath = false,
 }: {
   edge: BetaPositionedEdge;
   rejected: boolean;
+  /** This walk went this way. */
+  onPath?: boolean;
+  /** A walk is being shown and it did not go this way. */
+  offPath?: boolean;
 }): JSX.Element {
   const { t } = useTranslation("decisionTreesBeta");
   const dy = edge.toY - edge.fromY;
   const d = `M ${edge.fromX} ${edge.fromY} C ${edge.fromX} ${edge.fromY + dy * 0.5}, ${edge.toX} ${edge.toY - dy * 0.5}, ${edge.toX} ${edge.toY}`;
-  const stroke = rejected ? "#dc2626" : EDGE_COLOR[edge.kind];
+  const stroke = rejected ? "#dc2626" : onPath ? "#ca8a04" : EDGE_COLOR[edge.kind];
   const label =
     edge.kind === "case"
       ? t("canvas.edge.case", { position: (edge.caseIndex ?? 0) + 1 })
       : t(`canvas.edge.${edge.kind}`);
   const dx = edge.toX - edge.fromX;
   return (
-    <g>
+    <g opacity={offPath ? DIMMED : 1}>
       <path
         d={d}
         stroke={stroke}
-        strokeWidth={rejected ? 3 : 2}
+        strokeWidth={rejected || onPath ? 3 : 2}
         strokeDasharray={edge.kind === "miss" || edge.kind === "default" ? "5 4" : undefined}
         fill="none"
         opacity={0.9}
@@ -595,6 +618,7 @@ function BetaNodeBox({
   selected,
   rejected,
   onPath,
+  offPath = false,
   onClick,
   onDragStart,
 }: {
@@ -607,6 +631,8 @@ function BetaNodeBox({
   selected: boolean;
   rejected: boolean;
   onPath: boolean;
+  /** A walk is being shown and it never reached this node. */
+  offPath?: boolean;
   onClick: (id: string) => void;
   onDragStart: (evt: ReactPointerEvent<SVGGElement>) => void;
 }): JSX.Element {
@@ -627,6 +653,7 @@ function BetaNodeBox({
         selected={selected}
         rejected={rejected}
         onPath={onPath}
+        offPath={offPath}
         label={label}
         onClick={onClick}
         onDragStart={onDragStart}
@@ -643,6 +670,8 @@ function BetaNodeBox({
       data-node-id={node.id}
       data-rejected={rejected ? "true" : "false"}
       data-pinned={node.pinned ? "true" : "false"}
+      data-off-path={offPath ? "true" : "false"}
+      opacity={offPath ? DIMMED : 1}
       transform={dx || dy ? `translate(${dx} ${dy})` : undefined}
       style={{ cursor: draggable ? "move" : "pointer" }}
       onClick={(evt) => {
@@ -757,6 +786,7 @@ function StopNodeCircle({
   selected,
   rejected,
   onPath,
+  offPath = false,
   label,
   onClick,
   onDragStart,
@@ -768,6 +798,7 @@ function StopNodeCircle({
   selected: boolean;
   rejected: boolean;
   onPath: boolean;
+  offPath?: boolean;
   label: string;
   onClick: (id: string) => void;
   onDragStart: (evt: ReactPointerEvent<SVGGElement>) => void;
@@ -784,6 +815,8 @@ function StopNodeCircle({
       data-rejected={rejected ? "true" : "false"}
       data-pinned={node.pinned ? "true" : "false"}
       data-shape="circle"
+      data-off-path={offPath ? "true" : "false"}
+      opacity={offPath ? DIMMED : 1}
       transform={dx || dy ? `translate(${dx} ${dy})` : undefined}
       style={{ cursor: draggable ? "move" : "pointer" }}
       onClick={(evt) => {

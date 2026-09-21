@@ -18,6 +18,9 @@ import { Card } from "@/components/Card";
 import { DataTable } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
+
+import { TraceWalkExplainer } from "@/modules/decisionTrees/beta/components/TraceWalkExplainer";
+import { isFoldingPath } from "@/modules/decisionTrees/beta/lib/walkTrace";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
@@ -327,7 +330,12 @@ function TraceDetailModal({
   const trace = traceQ.data;
 
   return (
-    <Modal open={Boolean(traceId)} onClose={onClose} labelledBy="trace-detail-title">
+    <Modal
+      open={Boolean(traceId)}
+      onClose={onClose}
+      labelledBy="trace-detail-title"
+      className={trace && isFoldingPath(trace.node_path) ? "max-w-6xl" : undefined}
+    >
       <div className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto p-4">
         <h2 id="trace-detail-title" className="text-sm font-semibold text-ap-ink">
           {t("traces.detail.title")}
@@ -386,7 +394,19 @@ function TraceDetailModal({
               </section>
             ) : null}
 
-            {trace.node_path.length > 0 ? (
+            {/* A folding walk is not a list of decisions ending at a leaf.
+                It always ends at `stop`, and the answer is built from the
+                register nodes along the way, so the flat list below cannot
+                read it. The explainer draws the route and says what the
+                findings added up to. */}
+            {isFoldingPath(trace.node_path) ? (
+              <section className="flex flex-col gap-1">
+                <h3 className="text-xs font-medium text-ap-muted">{t("traces.detail.walk")}</h3>
+                <TraceWalkExplainer trace={trace} />
+              </section>
+            ) : null}
+
+            {!isFoldingPath(trace.node_path) && trace.node_path.length > 0 ? (
               <section className="flex flex-col gap-1">
                 <h3 className="text-xs font-medium text-ap-muted">{t("traces.detail.walk")}</h3>
                 <ol className="flex flex-col gap-1">

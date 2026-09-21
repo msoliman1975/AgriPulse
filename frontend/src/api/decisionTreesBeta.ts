@@ -504,3 +504,91 @@ export async function listDryRunBlocks(): Promise<BetaCandidateBlock[]> {
   );
   return perFarm.flat().sort((a, b) => a.label.localeCompare(b.label));
 }
+
+// ---- One cell's walk -------------------------------------------------
+
+/** One node the walk visited, in the server's own field names. */
+export interface BetaWalkStep {
+  node_id: string;
+  kind: string;
+  matched: boolean | null;
+  label_en: string | null;
+  label_ar: string | null;
+  /** What a condition read, by reference name. Empty on every other kind. */
+  values: Record<string, unknown>;
+  /** What the node did: the finding a register wrote, the variables a set
+   *  wrote, the case a switch chose. */
+  detail: Record<string, unknown> | null;
+}
+
+/** The combination rule that wrote a cell's text. */
+export interface BetaWalkRule {
+  code: string | null;
+  codes: string[];
+  text_en: string | null;
+  text_ar: string | null;
+  status: FindingStatus | null;
+  action_type: ActionType | null;
+}
+
+/** One finding's own clause, as composition joined it. */
+export interface BetaWalkClause {
+  code: string;
+  severity: FindingSeverity;
+  clause_en: string | null;
+  clause_ar: string | null;
+}
+
+export interface BetaCellWalkResponse {
+  tree_id: string;
+  code: string;
+  block_id: string;
+  version_id: string | null;
+  /** The cell as this walk found it. Echoed in full on purpose — see
+   *  `betaCellWalk`. */
+  cell: BetaDryRunCell;
+  path: BetaWalkStep[];
+  /** Set when a combination rule matched. Null when the text was composed. */
+  rule: BetaWalkRule | null;
+  /** Set when the text was composed. Null when a rule matched. */
+  composed_from: BetaWalkClause[] | null;
+}
+
+/**
+ * Why one cell got the result it got.
+ *
+ * A separate call from the dry run rather than a field on it: a 300-cell
+ * block would otherwise carry a 20-step path 300 times over to answer a
+ * question asked about one row.
+ *
+ * **This re-walks.** Nothing stores a dry run, so the readings behind the
+ * path are the readings at the moment of this call, and an imagery or weather
+ * load that landed in between can change the answer. That is why `cell` comes
+ * back in full: the caller compares it with the row it opened from and says
+ * so, rather than drawing a path that explains a different answer.
+ *
+ * Defensive on `path` for the same reason `betaDryRun` is defensive on
+ * `cells`: a field this client expects and the server does not send used to
+ * reach a table as `undefined` and take the page down with it.
+ */
+export async function betaCellWalk(
+  treeId: string,
+  blockId: string,
+  cellId: string,
+  options: { definition?: BetaTreeDoc | null; versionId?: string | null } = {},
+): Promise<BetaCellWalkResponse> {
+  const { data } = await apiClient.post<BetaCellWalkResponse>(
+    `${BETA_TREES}/${treeId}/dry-run/cell`,
+    {
+      block_id: blockId,
+      cell_id: cellId,
+      definition: options.definition ?? null,
+      version_id: options.versionId ?? null,
+    },
+  );
+  return {
+    ...data,
+    path: Array.isArray(data.path) ? data.path : [],
+    composed_from: Array.isArray(data.composed_from) ? data.composed_from : null,
+  };
+}

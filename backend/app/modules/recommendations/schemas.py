@@ -780,6 +780,15 @@ class EvalTraceDetailResponse(EvalTraceResponse):
     resolved_values: dict[str, Any] = Field(default_factory=dict)
     param_overrides: dict[str, Any] = Field(default_factory=dict)
 
+    # The three fold columns tenant 0095 added. The query has always selected
+    # them — it reads `t.*` — and this model dropped them, so the walk
+    # explainer could see every step of a real run and not the card the steps
+    # added up to. Empty and null on a tree the old engine walked, which has
+    # no findings at all.
+    finding_set: list[str] = Field(default_factory=list)
+    matched_rule: str | None = None
+    registered_by: dict[str, Any] = Field(default_factory=dict)
+
 
 # =====================================================================
 # Tree parameter overrides (PR-C)

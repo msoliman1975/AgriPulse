@@ -330,6 +330,14 @@ export interface EvalTraceDetail extends EvalTrace {
   /** Empty on a `clear` row by design — the walk is kept, the values are not. */
   resolved_values: Record<string, unknown>;
   param_overrides: Record<string, unknown>;
+  /** The folding card's finding set. Empty on a tree the old engine walked,
+   *  which has no findings at all. */
+  finding_set?: string[];
+  /** The combination rule that wrote the card. Null on a composed card, and
+   *  null on every row written before the compiler carried a rule's code. */
+  matched_rule?: string | null;
+  /** Which node registered each finding, by code. */
+  registered_by?: Record<string, unknown>;
 }
 
 export interface EvalTraceFilters {
@@ -612,9 +620,7 @@ export async function copyDecisionTree(
   return data;
 }
 
-export async function getDecisionTreeAvailability(
-  code: string,
-): Promise<DecisionTreeAvailability> {
+export async function getDecisionTreeAvailability(code: string): Promise<DecisionTreeAvailability> {
   const { data } = await apiClient.get<DecisionTreeAvailability>(
     `/v1/decision-trees/${code}/availability`,
   );

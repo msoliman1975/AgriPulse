@@ -1,6 +1,8 @@
 # The walk explainer: show why a cell got the result it got
 
-Status: draft for discussion. Nothing built.
+Status: built. This document was the spec and is now the record of what
+was built, with the three places the build departed from the draft marked
+**changed in the build**.
 
 ## 1. The goal
 
@@ -240,9 +242,16 @@ over the wire to answer one question. The per-cell route with React Query cachin
 on `(tree, version or definition hash, block_id, cell_id)` makes a re-open free,
 which covers the repeat-click case the alternative was protecting.
 
-### 5.2 The real run: nothing new
+### 5.2 The real run: one field, already in the query
 
 `GET /v1/decision-tree-traces/{trace_id}` already answers with `node_path`.
+
+**Changed in the build.** One thing was missing after all. The repository reads
+`SELECT t.*`, so the three fold columns tenant 0095 added are already fetched,
+but `EvalTraceDetailResponse` did not declare them and Pydantic dropped them.
+The explainer could see every step of a real run and not the card the steps
+added up to. `finding_set`, `matched_rule` and `registered_by` are now on that
+model. No SQL changed.
 
 The explainer also needs the tree to draw. The trace row carries `tree_code` and
 `tree_version`; `getBetaTree(code)` returns every version with its `definition`,
@@ -275,11 +284,17 @@ The traces page gains the same button on its detail view, opening the same panel
 A right panel, up to 50 percent of the screen width, over the page. Two rows.
 
 **Top row, left column — the tree.** The read-only `BetaCanvas`. Nodes on the
-route are drawn normally. Every other node is dimmed. Register nodes on the route
-carry the finding code they wrote. The stop node is marked as the end. On an
-errored walk, the last node reached carries the error mark instead. The canvas
-gets no `onAddNode`, no `onMoveNode` and no `onResetLayout`, which is what turns
-editing off; panning and zoom stay on, because a 74-node tree does not fit.
+route are drawn normally and the edges it traversed are drawn thicker. Every
+other node and edge is dimmed to 20 percent. On an errored walk, the last node
+reached carries the error mark. The canvas gets no `onAddNode`, no `onMoveNode`
+and no `onResetLayout`, which is what turns editing off; panning and zoom stay
+on, because a 74-node tree does not fit.
+
+**Changed in the build.** The draft also marked each register node on the canvas
+with the code it wrote. That was dropped. The step list already names the code
+beside the node, and a second copy on a node box that is 140 pixels wide costs
+more than it says. `walkHighlight` still returns `registerNodes`, so a later
+change can add it without touching the engine or the wire.
 
 **Top row, right column — the steps.** One box per step, in walk order, numbered.
 The box header holds the node name and its result:
@@ -337,7 +352,14 @@ first estate run.
 `node_timing` stays `available: false`. Timing needs a clock inside `walk_tree`,
 which puts a `perf_counter()` call on every step of every production walk. That
 is a separate decision with a cost, and it is not needed for this goal. The
-`reason` string is updated, because half of it will no longer be true.
+`reason` string is updated, because half of it is no longer true.
+
+**Changed in the build.** The estate run does not carry paths. `dry_run` takes
+`collect_coverage`, counts node ids into a `Counter` per block, and answers with
+`node_counts`. Carrying a path per cell to reach the same totals would move a
+20-step list for every cell of every block, for a report that only ever prints
+counts. A block the tree does not target is left out of the totals, the same
+rule every other number in that report follows.
 
 ## 8. Recompiling the stored versions
 
@@ -383,6 +405,5 @@ Phase 8 is the report half.
 2. Does the explainer belong on the block health screen too? A grower looking at
    a red cell asks the same question an author asks. Out of scope here, but the
    component is built so that it could.
-3. Should the step list hide `set` steps by default? A tree that writes six
-   variables early gives six boxes that say nothing an agronomist wants. A
-   "show all steps" toggle, off by default, is one option.
+3. ~~Should the step list hide `set` steps by default?~~ Settled: hidden, with
+   a "show N variable steps" toggle that says how many are hidden.

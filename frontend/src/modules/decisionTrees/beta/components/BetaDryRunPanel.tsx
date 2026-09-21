@@ -13,6 +13,10 @@
  *   * an unsaved edit cannot be run, because the route walks the stored
  *     version and would quietly answer about the previous body;
  *   * a block with no grid returns no cells, which is a fact about the block.
+ *
+ * Every row carries a "why" button, the healthy and the errored ones included.
+ * "Why did this cell find nothing" and "where did this walk fall over" are the
+ * same question as "why this card", and the walk answers all three.
  */
 
 import { useTranslation } from "react-i18next";
@@ -45,6 +49,8 @@ interface BetaDryRunPanelProps {
   /** True while the editor holds unsaved changes. The run is held back. */
   dirty?: boolean;
   error?: string | null;
+  /** Open the walk explainer on one row. Left out hides the column. */
+  onShowDetails?: (cell: BetaDryRunResponse["cells"][number]) => void;
 }
 
 export function BetaDryRunPanel({
@@ -57,6 +63,7 @@ export function BetaDryRunPanel({
   platformScope = false,
   dirty = false,
   error,
+  onShowDetails,
 }: BetaDryRunPanelProps): JSX.Element {
   const { t, i18n } = useTranslation("decisionTreesBeta");
   const statusLabel = useFindingStatusLabel();
@@ -145,6 +152,9 @@ export function BetaDryRunPanel({
                 <Th className="px-2 py-2 text-start">{t("dryRun.columns.status")}</Th>
                 <Th className="px-2 py-2 text-start">{t("dryRun.columns.actionType")}</Th>
                 <Th className="px-2 py-2 text-start">{t("dryRun.columns.text")}</Th>
+                {onShowDetails ? (
+                  <Th className="px-2 py-2 text-start">{t("dryRun.columns.details")}</Th>
+                ) : null}
               </Tr>
             </Thead>
             <Tbody>
@@ -198,6 +208,23 @@ export function BetaDryRunPanel({
                       </span>
                     ) : null}
                   </Td>
+                  {onShowDetails ? (
+                    <Td className="px-2 py-2 whitespace-nowrap">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onShowDetails(cell)}
+                        aria-label={t("explainer.openFor", {
+                          cell:
+                            cell.cell_row !== null && cell.cell_col !== null
+                              ? t("dryRun.cellLabel", { row: cell.cell_row, col: cell.cell_col })
+                              : cell.cell_id,
+                        })}
+                      >
+                        {t("explainer.open")}
+                      </Button>
+                    </Td>
+                  ) : null}
                 </Tr>
               ))}
             </Tbody>
