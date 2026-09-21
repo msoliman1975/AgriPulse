@@ -3851,9 +3851,52 @@ global:
       #   authoring machine and the gh login has no read:packages scope.
       #
       #   Rollback is these three tags back to 80f614c.
-      tag: "9bacb61"
+      # 5f5fe82 = #720, api, workers and frontend. The walk explainer.
+      #
+      #   An author could read a dry run row and not tell why the tree said
+      #   what it said. The engine records every node a walk visits, with the
+      #   values each condition read and the finding each register wrote, and
+      #   `folding_authoring._fold_one_cell` dropped `walk.path` before the
+      #   response was built. A new route, POST
+      #   .../beta/{tree_id}/dry-run/cell, answers one cell's walk step by
+      #   step. It writes nothing, like the dry run.
+      #
+      #   Second defect in the same range: `folding_compiler`'s
+      #   `_check_combinations` normalised every combination rule without
+      #   copying its `code`, so `FoldedCard.rule_code` was always null and
+      #   `decision_tree_eval_traces.matched_rule` has been null on every row
+      #   the folding engine has ever written. The compiler carries it now.
+      #
+      #   **Old versions still do not name their rules after this deploy.**
+      #   The compiled body is stored per version, so a version saved before
+      #   this fix keeps a nameless one until
+      #   `scripts/recompile_beta_tree_versions.py` has run. That script is a
+      #   separate, manual step, `--dry-run` first.
+      #
+      #   `EvalTraceDetailResponse` now declares `finding_set`,
+      #   `matched_rule` and `registered_by`. The query already read `t.*`, so
+      #   the columns were always fetched and the model dropped them. No SQL
+      #   changed.
+      #
+      #   The estate report gains `coverage_by_node` and `never_reached`,
+      #   which name the branches of a tree an estate never exercised.
+      #
+      #   No migrations in this range.
+      #
+      #   Images were not confirmed on the node, for the same reason as
+      #   9bacb61: SSH times out from the authoring machine and the gh login
+      #   has no read:packages scope, which this promote re-checked and got a
+      #   403 on. All five container jobs on main for 5f5fe82 are green, and
+      #   those jobs are what push.
+      #
+      #   `backend-integration` was still running on main at the time of this
+      #   commit. It passed on the branch at the identical tree, run
+      #   35643704550, 1387 passed.
+      #
+      #   Rollback is these three tags back to 9bacb61.
+      tag: "5f5fe82"
     workers:
-      tag: "9bacb61"
+      tag: "5f5fe82"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4458,7 +4501,14 @@ global:
       #   refuses, and the dry run table reads the fields the server sends.
       #
       #   Rollback is this tag alone back to c1edd0a.
-      tag: "9bacb61"
+      # 5f5fe82 = #720, the frontend half. A "Why" button on every dry run
+      #   row opens a read-only panel: the tree with the route drawn and
+      #   everything the walk did not touch dimmed, a numbered step list, and
+      #   what wrote the card. The traces page uses the same panel for a
+      #   folding walk and keeps its flat list for an old-engine one.
+      #
+      #   Rollback is this tag alone back to 9bacb61.
+      tag: "5f5fe82"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
