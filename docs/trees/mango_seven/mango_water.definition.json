@@ -1,0 +1,563 @@
+{
+  "code": "mango_water",
+  "name_en": "Mango — water and irrigation",
+  "name_ar": "المانجو — المياه والريّ",
+  "description_en": "Is this cell short of water, and is the pre-harvest cut on plan? Reads leaf water, soil moisture and canopy temperature against the band the mango index guide gives for the block's recorded tree size, and registers one finding for each reading that is short. The fold turns agreement into severity, so one reading alone never opens an irrigation card. In the maturity window on a bearing block it asks the deficit question instead.",
+  "description_ar": "هل تنقص هذه الخلية مياه، وهل يسير خفض ما قبل الحصاد على الخطة؟ يقرأ ماء الأوراق ورطوبة التربة وحرارة المجموع مقابل النطاق الذي يعطيه دليل مؤشرات المانجو لحجم الشجرة المسجّل، ويسجّل نتيجة لكل قراءة ناقصة. يحوّل الدمج الاتفاق إلى درجة خطورة، فلا تفتح قراءة واحدة بطاقة ريّ وحدها. وفي نافذة النضج على قطعة مثمرة يسأل سؤال التعطيش بدلاً من ذلك.",
+  "scope": "cell",
+  "crop_path": "mango",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_size_small",
+  "registers": [
+    "dry",
+    "soil_dry",
+    "canopy_hot",
+    "deficit_confirmed",
+    "deficit_missing",
+    "deficit_overshot",
+    "size_missing"
+  ],
+  "parameters": {
+    "small_ndmi_floor": {
+      "type": "number",
+      "default": -0.15,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "medium_ndmi_floor": {
+      "type": "number",
+      "default": 0.0,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "large_ndmi_floor": {
+      "type": "number",
+      "default": 0.11,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "small_smi_floor": {
+      "type": "number",
+      "default": 0.35,
+      "min": 0.0,
+      "max": 1.0
+    },
+    "medium_smi_floor": {
+      "type": "number",
+      "default": 0.4,
+      "min": 0.0,
+      "max": 1.0
+    },
+    "large_smi_floor": {
+      "type": "number",
+      "default": 0.45,
+      "min": 0.0,
+      "max": 1.0
+    },
+    "small_smi_deficit_floor": {
+      "type": "number",
+      "default": 0.27,
+      "min": 0.0,
+      "max": 1.0
+    },
+    "medium_smi_deficit_floor": {
+      "type": "number",
+      "default": 0.31,
+      "min": 0.0,
+      "max": 1.0
+    },
+    "large_smi_deficit_floor": {
+      "type": "number",
+      "default": 0.35,
+      "min": 0.0,
+      "max": 1.0
+    },
+    "small_cwsi_ceiling": {
+      "type": "number",
+      "default": 0.35,
+      "min": 0.0,
+      "max": 1.0
+    },
+    "medium_cwsi_ceiling": {
+      "type": "number",
+      "default": 0.3,
+      "min": 0.0,
+      "max": 1.0
+    },
+    "large_cwsi_ceiling": {
+      "type": "number",
+      "default": 0.25,
+      "min": 0.0,
+      "max": 1.0
+    },
+    "saturation_guard": {
+      "type": "number",
+      "default": 0.99,
+      "min": 0.0,
+      "max": 1.0
+    }
+  },
+  "nodes": {
+    "n_size_small": {
+      "label_en": "Is the block recorded as small trees?",
+      "label_ar": "هل القطعة مسجّلة كأشجار صغيرة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "small"
+        }
+      },
+      "on_match": "n_bands_small",
+      "on_miss": "n_size_medium"
+    },
+    "n_size_medium": {
+      "label_en": "Is the block recorded as medium trees?",
+      "label_ar": "هل القطعة مسجّلة كأشجار متوسطة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "medium"
+        }
+      },
+      "on_match": "n_bands_medium",
+      "on_miss": "n_size_large"
+    },
+    "n_size_large": {
+      "label_en": "Is the block recorded as large trees?",
+      "label_ar": "هل القطعة مسجّلة كأشجار كبيرة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "large"
+        }
+      },
+      "on_match": "n_bands_large",
+      "on_miss": "n_reg_size_missing"
+    },
+    "n_bands_small": {
+      "label_en": "Load the small-tree water bands",
+      "label_ar": "حمّل نطاقات المياه للأشجار الصغيرة",
+      "set": {
+        "size_class": "small",
+        "ndmi_floor": {
+          "source": "params",
+          "name": "small_ndmi_floor"
+        },
+        "smi_floor": {
+          "source": "params",
+          "name": "small_smi_floor"
+        },
+        "smi_deficit_floor": {
+          "source": "params",
+          "name": "small_smi_deficit_floor"
+        },
+        "cwsi_ceiling": {
+          "source": "params",
+          "name": "small_cwsi_ceiling"
+        }
+      },
+      "next": "n_deficit_gate"
+    },
+    "n_bands_medium": {
+      "label_en": "Load the medium-tree water bands",
+      "label_ar": "حمّل نطاقات المياه للأشجار المتوسطة",
+      "set": {
+        "size_class": "medium",
+        "ndmi_floor": {
+          "source": "params",
+          "name": "medium_ndmi_floor"
+        },
+        "smi_floor": {
+          "source": "params",
+          "name": "medium_smi_floor"
+        },
+        "smi_deficit_floor": {
+          "source": "params",
+          "name": "medium_smi_deficit_floor"
+        },
+        "cwsi_ceiling": {
+          "source": "params",
+          "name": "medium_cwsi_ceiling"
+        }
+      },
+      "next": "n_deficit_gate"
+    },
+    "n_bands_large": {
+      "label_en": "Load the large-tree water bands",
+      "label_ar": "حمّل نطاقات المياه للأشجار الكبيرة",
+      "set": {
+        "size_class": "large",
+        "ndmi_floor": {
+          "source": "params",
+          "name": "large_ndmi_floor"
+        },
+        "smi_floor": {
+          "source": "params",
+          "name": "large_smi_floor"
+        },
+        "smi_deficit_floor": {
+          "source": "params",
+          "name": "large_smi_deficit_floor"
+        },
+        "cwsi_ceiling": {
+          "source": "params",
+          "name": "large_cwsi_ceiling"
+        }
+      },
+      "next": "n_deficit_gate"
+    },
+    "n_reg_size_missing": {
+      "label_en": "No tree size is recorded, so no band could be checked",
+      "label_ar": "لا يوجد حجم شجرة مسجّل، فلا يمكن فحص أي نطاق",
+      "register": {
+        "code": "size_missing",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_deficit_gate": {
+      "label_en": "Is this a bearing block inside the pre-harvest maturity window?",
+      "label_ar": "هل هذه قطعة مثمرة داخل نافذة النضج قبل الحصاد؟",
+      "condition": {
+        "tree": {
+          "all_of": [
+            {
+              "op": "eq",
+              "left": {
+                "source": "crop_attribute",
+                "code": "bearing_status",
+                "key": "value"
+              },
+              "right": "bearing"
+            },
+            {
+              "op": "in",
+              "left": {
+                "source": "block",
+                "field": "growth_stage"
+              },
+              "values": [
+                "maturation"
+              ]
+            }
+          ]
+        }
+      },
+      "on_match": "n_deficit_overshot",
+      "on_miss": "n_leaf_water"
+    },
+    "n_deficit_overshot": {
+      "label_en": "Has soil moisture fallen below the deficit band?",
+      "label_ar": "هل هبطت رطوبة التربة دون نطاق التعطيش؟",
+      "condition": {
+        "tree": {
+          "op": "lt",
+          "left": {
+            "source": "indices",
+            "index_code": "smi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "vars",
+            "name": "smi_deficit_floor"
+          }
+        }
+      },
+      "on_match": "n_reg_deficit_overshot",
+      "on_miss": "n_deficit_confirmed"
+    },
+    "n_reg_deficit_overshot": {
+      "label_en": "The pre-harvest cut went deeper than intended",
+      "label_ar": "تجاوز خفض الريّ قبل الحصاد الحدّ المقصود",
+      "register": {
+        "code": "deficit_overshot",
+        "severity": "critical"
+      },
+      "next": "n_stop"
+    },
+    "n_deficit_confirmed": {
+      "label_en": "Is soil moisture inside the reduced band the cut should produce?",
+      "label_ar": "هل رطوبة التربة داخل النطاق المخفّض الذي يفترض أن يُنتجه الخفض؟",
+      "condition": {
+        "tree": {
+          "op": "lt",
+          "left": {
+            "source": "indices",
+            "index_code": "smi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "vars",
+            "name": "smi_floor"
+          }
+        }
+      },
+      "on_match": "n_reg_deficit_confirmed",
+      "on_miss": "n_reg_deficit_missing"
+    },
+    "n_reg_deficit_confirmed": {
+      "label_en": "The pre-harvest cut is on plan",
+      "label_ar": "خفض الريّ قبل الحصاد يسير على الخطة",
+      "register": {
+        "code": "deficit_confirmed",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_reg_deficit_missing": {
+      "label_en": "The pre-harvest cut has not happened",
+      "label_ar": "لم يحدث خفض الريّ قبل الحصاد",
+      "register": {
+        "code": "deficit_missing",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_leaf_water": {
+      "label_en": "Is leaf water below the band for this tree size?",
+      "label_ar": "هل ماء الأوراق دون النطاق لهذا الحجم؟",
+      "condition": {
+        "tree": {
+          "op": "le",
+          "left": {
+            "source": "indices",
+            "index_code": "ndmi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "vars",
+            "name": "ndmi_floor"
+          }
+        }
+      },
+      "on_match": "n_reg_dry",
+      "on_miss": "n_soil_water"
+    },
+    "n_reg_dry": {
+      "label_en": "Leaf water is low",
+      "label_ar": "ماء الأوراق منخفض",
+      "register": {
+        "code": "dry",
+        "severity": "warning"
+      },
+      "next": "n_soil_water"
+    },
+    "n_soil_water": {
+      "label_en": "Is soil moisture below the band for this tree size?",
+      "label_ar": "هل رطوبة التربة دون النطاق لهذا الحجم؟",
+      "condition": {
+        "tree": {
+          "op": "lt",
+          "left": {
+            "source": "indices",
+            "index_code": "smi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "vars",
+            "name": "smi_floor"
+          }
+        }
+      },
+      "on_match": "n_reg_soil_dry",
+      "on_miss": "n_cwsi_guard"
+    },
+    "n_reg_soil_dry": {
+      "label_en": "Soil moisture is below the band",
+      "label_ar": "رطوبة التربة دون النطاق",
+      "register": {
+        "code": "soil_dry",
+        "severity": "warning"
+      },
+      "next": "n_cwsi_guard"
+    },
+    "n_cwsi_guard": {
+      "label_en": "Is the thermal reading clipped at its ceiling?",
+      "label_ar": "هل القراءة الحرارية مثبّتة عند سقفها؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "indices",
+            "index_code": "cwsi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "params",
+            "name": "saturation_guard"
+          }
+        }
+      },
+      "on_match": "n_stop",
+      "on_miss": "n_canopy_temp"
+    },
+    "n_canopy_temp": {
+      "label_en": "Is the canopy hotter than the band for this tree size?",
+      "label_ar": "هل المجموع الخضري أسخن من النطاق لهذا الحجم؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "indices",
+            "index_code": "cwsi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "vars",
+            "name": "cwsi_ceiling"
+          }
+        }
+      },
+      "on_match": "n_reg_canopy_hot",
+      "on_miss": "n_stop"
+    },
+    "n_reg_canopy_hot": {
+      "label_en": "The canopy is warmer than the air by more than usual",
+      "label_ar": "المجموع الخضري أسخن من الهواء بأكثر من المعتاد",
+      "register": {
+        "code": "canopy_hot",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "water_all_three",
+      "codes": [
+        "canopy_hot",
+        "dry",
+        "soil_dry"
+      ],
+      "status": "alert",
+      "action_type": "irrigate",
+      "text_en": "All three water readings agree that this cell is short of water: leaf water, soil moisture and canopy temperature. Irrigate. Check the line and the emitters while you are there.",
+      "text_ar": "القراءات الثلاث كلها تتفق على أن هذه الخلية تنقصها المياه: ماء الأوراق ورطوبة التربة وحرارة المجموع. ارْوِ القطعة، وافحص الخط والنقاطات أثناء ذلك."
+    },
+    {
+      "code": "water_leaf_soil",
+      "codes": [
+        "dry",
+        "soil_dry"
+      ],
+      "status": "alert",
+      "action_type": "irrigate",
+      "text_en": "Leaf water and soil moisture both read short for this tree size. Irrigate.",
+      "text_ar": "ماء الأوراق ورطوبة التربة كلاهما دون المطلوب لهذا الحجم. ارْوِ القطعة."
+    },
+    {
+      "code": "water_leaf_thermal",
+      "codes": [
+        "canopy_hot",
+        "dry"
+      ],
+      "status": "alert",
+      "action_type": "irrigate",
+      "text_en": "Leaf water is low and the canopy is running hot. Irrigate.",
+      "text_ar": "ماء الأوراق منخفض والمجموع الخضري ساخن. ارْوِ القطعة."
+    },
+    {
+      "code": "water_soil_thermal",
+      "codes": [
+        "canopy_hot",
+        "soil_dry"
+      ],
+      "status": "alert",
+      "action_type": "irrigate",
+      "text_en": "Soil moisture is below the band and the canopy is running hot. Irrigate.",
+      "text_ar": "رطوبة التربة دون النطاق والمجموع الخضري ساخن. ارْوِ القطعة."
+    },
+    {
+      "code": "water_leaf_only",
+      "codes": [
+        "dry"
+      ],
+      "status": "issue",
+      "action_type": "no_action",
+      "text_en": "Leaf water is low, and the soil and thermal readings do not agree. Watch this cell on the next pass before changing the schedule.",
+      "text_ar": "ماء الأوراق منخفض، ولا تتفق معه قراءتا التربة والحرارة. راقب هذه الخلية في المرور القادم قبل تغيير برنامج الريّ."
+    },
+    {
+      "code": "water_soil_only",
+      "codes": [
+        "soil_dry"
+      ],
+      "status": "issue",
+      "action_type": "no_action",
+      "text_en": "Soil moisture is below the band, and the leaf and thermal readings do not agree. Watch this cell on the next pass.",
+      "text_ar": "رطوبة التربة دون النطاق، ولا تتفق معها قراءتا الأوراق والحرارة. راقب هذه الخلية في المرور القادم."
+    },
+    {
+      "code": "water_thermal_only",
+      "codes": [
+        "canopy_hot"
+      ],
+      "status": "issue",
+      "action_type": "no_action",
+      "text_en": "The canopy is warmer than usual, and neither water reading agrees. Watch this cell on the next pass.",
+      "text_ar": "المجموع الخضري أسخن من المعتاد، ولا تتفق معه أي من قراءتي المياه. راقب هذه الخلية في المرور القادم."
+    },
+    {
+      "code": "deficit_on_plan",
+      "codes": [
+        "deficit_confirmed"
+      ],
+      "status": "good",
+      "action_type": "no_action",
+      "text_en": "Soil moisture has fallen into the reduced band that pre-harvest deficit irrigation is meant to produce. Hold the current schedule.",
+      "text_ar": "هبطت رطوبة التربة إلى النطاق المخفّض المقصود من تعطيش ما قبل الحصاد. حافظ على البرنامج الحالي."
+    },
+    {
+      "code": "deficit_not_done",
+      "codes": [
+        "deficit_missing"
+      ],
+      "status": "issue",
+      "action_type": "irrigate",
+      "text_en": "The block is in its maturity window and soil moisture is still at the full irrigation level. Cut the water now, or fruit sugars and colour will lag.",
+      "text_ar": "القطعة في نافذة النضج ورطوبة التربة ما زالت عند مستوى الريّ الكامل. اخفض المياه الآن وإلا تأخّرت السكريات واللون."
+    },
+    {
+      "code": "deficit_too_deep",
+      "codes": [
+        "deficit_overshot"
+      ],
+      "status": "alert",
+      "action_type": "irrigate",
+      "text_en": "The pre-harvest cut has gone deeper than intended and is now costing fruit size. Give one recovery irrigation and return to the deficit band.",
+      "text_ar": "تجاوز خفض ما قبل الحصاد الحدّ المقصود وصار يكلّف حجم الثمار. أعطِ ريّة تعويضية واحدة ثم عُد إلى نطاق التعطيش."
+    },
+    {
+      "code": "water_size_missing",
+      "codes": [
+        "size_missing"
+      ],
+      "status": "na",
+      "action_type": "no_action",
+      "text_en": "No tree size is recorded for this block, so no water band could be checked. Set the Tree size attribute on the crop assignment.",
+      "text_ar": "لا يوجد حجم شجرة مسجّل لهذه القطعة، فلم يمكن فحص أي نطاق مياه. اضبط خاصية حجم الشجرة على تخصيص المحصول."
+    }
+  ]
+}

@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mango trees, regrouped for the new designer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap">
+<style>
+:root {
+  --ground: #f3f4f0;
+  --surface: #ffffff;
+  --surface-2: #eceee8;
+  --ink: #191d18;
+  --ink-2: #4b554b;
+  --ink-3: #788276;
+  --line: #d7dbd3;
+  --line-soft: #e5e8e1;
+  --accent: #356b30;
+  --accent-ink: #2a5626;
+  --accent-soft: #e2ebdf;
+  --amber: #8a6212;
+  --amber-soft: #f2e9d5;
+  --red: #963232;
+  --red-soft: #f3dedd;
+  --blue: #2f5a72;
+  --blue-soft: #dde8ee;
+  --shadow: 0 1px 2px rgba(25, 29, 24, .06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #12160f;
+    --surface: #1a1f18;
+    --surface-2: #222820;
+    --ink: #e7ebe2;
+    --ink-2: #a9b3a5;
+    --ink-3: #7d8879;
+    --line: #333b30;
+    --line-soft: #272e25;
+    --accent: #8bbd7f;
+    --accent-ink: #a8d29d;
+    --accent-soft: #26331f;
+    --amber: #d9b268;
+    --amber-soft: #33290f;
+    --red: #d99490;
+    --red-soft: #351f1e;
+    --blue: #94bdd3;
+    --blue-soft: #1c2b33;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #12160f;
+  --surface: #1a1f18;
+  --surface-2: #222820;
+  --ink: #e7ebe2;
+  --ink-2: #a9b3a5;
+  --ink-3: #7d8879;
+  --line: #333b30;
+  --line-soft: #272e25;
+  --accent: #8bbd7f;
+  --accent-ink: #a8d29d;
+  --accent-soft: #26331f;
+  --amber: #d9b268;
+  --amber-soft: #33290f;
+  --red: #d99490;
+  --red-soft: #351f1e;
+  --blue: #94bdd3;
+  --blue-soft: #1c2b33;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "Newsreader", Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 24px 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 44px;
+}
+
+/* ---------- masthead ---------- */
+.mast { display: flex; flex-direction: column; gap: 18px; }
+.eyebrow {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+h1 {
+  font-family: "Archivo", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(30px, 4.6vw, 46px);
+  line-height: 1.05;
+  letter-spacing: -.022em;
+  margin: 0;
+  text-wrap: balance;
+}
+.standfirst {
+  max-width: 66ch;
+  font-size: 18px;
+  color: var(--ink-2);
+  margin: 0;
+}
+.meta {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--ink-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+/* ---------- counts ---------- */
+.counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.count { background: var(--surface); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.count b {
+  font-family: "Archivo", system-ui, sans-serif;
+  font-size: 26px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.count span {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* ---------- nav ---------- */
+nav.toc { display: flex; flex-wrap: wrap; gap: 8px; }
+nav.toc a {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  text-decoration: none;
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 6px 11px;
+}
+nav.toc a:hover { color: var(--accent-ink); border-color: var(--accent); }
+nav.toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- how to read ---------- */
+.legend {
+  border-left: 3px solid var(--accent);
+  padding: 4px 0 4px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 78ch;
+}
+.legend p { margin: 0; color: var(--ink-2); font-size: 16px; }
+.legend dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 14px;
+  font-size: 15px;
+}
+.legend dt {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--ink);
+  padding-top: 3px;
+}
+.legend dd { margin: 0; color: var(--ink-2); }
+
+/* ---------- sections ---------- */
+section { display: flex; flex-direction: column; gap: 14px; }
+h2 {
+  font-family: "Archivo", system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: -.012em;
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  text-wrap: balance;
+}
+h2 .tag {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .1em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+.lede { margin: 0; max-width: 74ch; color: var(--ink-2); font-size: 16px; }
+
+/* ---------- tables ---------- */
+.scroller {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+table { border-collapse: collapse; width: 100%; min-width: 940px; }
+thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-weight: 500;
+  font-size: 10.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  text-align: left;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--surface-2); }
+td.name {
+  font-family: "Archivo", system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 14.5px;
+  color: var(--ink);
+  width: 20%;
+  min-width: 160px;
+}
+td.name .ref {
+  display: block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-top: 3px;
+}
+td.desc { width: 34%; min-width: 260px; }
+td.deps { width: 17%; min-width: 150px; font-size: 14px; }
+td.deps.none { color: var(--ink-3); }
+td.size, td.state { width: 1%; white-space: nowrap; }
+td.doc {
+  width: 20%;
+  min-width: 190px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  word-break: break-word;
+}
+
+/* ---------- badges ---------- */
+.size {
+  display: inline-block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: .06em;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+.size.s { border-color: var(--accent); color: var(--accent-ink); }
+.size.m { border-color: var(--amber); color: var(--amber); }
+.size.l { border-color: var(--red); color: var(--red); }
+
+.state {
+  display: inline-block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.state.notstarted { background: var(--surface-2); color: var(--ink-3); }
+.state.written { background: var(--blue-soft); color: var(--blue); }
+.state.review { background: var(--blue-soft); color: var(--blue); }
+.state.merged { background: var(--accent-soft); color: var(--accent-ink); }
+.state.blocked { background: var(--red-soft); color: var(--red); }
+.state.decision { background: var(--amber-soft); color: var(--amber); }
+
+.prio {
+  display: inline-block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  margin-right: 4px;
+}
+.prio.high { border-color: var(--red); color: var(--red); }
+.prio.med { border-color: var(--amber); color: var(--amber); }
+.prio.low { border-color: var(--line); color: var(--ink-3); }
+
+/* ---------- decision list ---------- */
+.decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.decision { background: var(--surface); padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
+.decision h3 {
+  font-family: "Archivo", system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--ink);
+}
+.decision p { margin: 0; font-size: 14.5px; color: var(--ink-2); }
+.decision .who {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--ink-3);
+  letter-spacing: .05em;
+}
+
+/* ---------- caution ---------- */
+.caution {
+  background: var(--amber-soft);
+  border: 1px solid var(--amber);
+  padding: 14px 18px;
+  font-size: 15.5px;
+  color: var(--ink);
+  max-width: 82ch;
+}
+.caution b { font-family: "Archivo", system-ui, sans-serif; font-weight: 600; }
+
+footer {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  line-height: 1.7;
+}
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .wrap { padding: 28px 16px 72px; gap: 34px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+<style>
+/* wider page than the roadmap sheet: this table carries five columns */
+.wrap { max-width: 1680px; }
+table.wide { min-width: 1500px; }
+table.wide td.name { width: 13%; min-width: 150px; }
+table.wide td.desc { width: 27%; min-width: 300px; }
+table.wide td.find { width: 21%; min-width: 250px; }
+table.wide td.rules { width: 25%; min-width: 300px; }
+table.wide td.deps { width: 14%; min-width: 165px; }
+ul.tight { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 5px; }
+ul.tight li { font-size: 14px; line-height: 1.4; }
+code {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  background: var(--surface-2);
+  padding: 1px 4px;
+  color: var(--ink);
+}
+.new { color: var(--amber); font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10px; letter-spacing: .06em; }
+.set { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px; color: var(--ink); }
+.st { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; padding: 1px 5px; }
+.st.alert { background: var(--red-soft); color: var(--red); }
+.st.issue { background: var(--amber-soft); color: var(--amber); }
+.st.good { background: var(--accent-soft); color: var(--accent-ink); }
+.st.na { background: var(--surface-2); color: var(--ink-3); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <div class="eyebrow">Decision trees &middot; mango</div>
+  <h1>Mango trees, regrouped for the new designer</h1>
+  <p class="standfirst">Production runs 31 mango decision trees written in the old designer. Most of them ask one question about one index and open one card. This page groups them into seven trees by agronomy problem area, gives each one its findings and its combination rules, and records what was created in production on 2026-09-21.</p>
+  <div class="meta">
+    <span>Read from production on 2026-09-21</span>
+    <span>Source: GET /api/v1/decision-trees and /api/v1/decision-tree-findings</span>
+    <span>Status: Created in production as drafts, 2026-09-21</span>
+  </div>
+</header>
+
+<div class="counts">
+  <div class="count"><b>31</b><span>old mango trees</span></div>
+  <div class="count"><b>7</b><span>trees built</span></div>
+  <div class="count"><b>54</b><span>combination rules</span></div>
+  <div class="count"><b>13</b><span>catalogue codes reused</span></div>
+  <div class="count"><b>14</b><span>new codes added</span></div>
+  <div class="count"><b>0</b><span>cells errored</span></div>
+</div>
+
+<nav class="toc">
+  <a href="#concepts">What the new designer changes</a>
+  <a href="#proposed">The seven proposed trees</a>
+  <a href="#codes">The finding catalogue</a>
+  <a href="#oldset">The 31 old trees</a>
+  <a href="#decisions">Decisions needed</a>
+</nav>
+
+<section id="concepts">
+  <h2>What the new designer changes <span class="tag">the five concepts</span></h2>
+  <p class="lede">An old tree walks to one leaf, and that leaf says everything. A new tree walks past several findings and folds them at the end. Five concepts carry this.</p>
+  <div class="legend">
+    <dl>
+      <dt>set</dt><dd>Writes one or more variables. Use it to load the band for the recorded tree size once, instead of repeating the numbers in every branch.</dd>
+      <dt>switch</dt><dd>Ordered cases, first match wins, and a default is required. This replaces a chain of two-way condition nodes.</dd>
+      <dt>register</dt><dd>Records one finding code with a severity of info, warning, or critical, then carries on walking. One walk can register several findings.</dd>
+      <dt>stop</dt><dd>Ends the walk and starts the fold. Every path must reach a stop, or the tree does not publish.</dd>
+      <dt>combinations</dt><dd>A list of rules. Each rule names an exact set of finding codes and gives the card text, the action type, and one status of very_good, good, issue, alert, or na.</dd>
+    </dl>
+    <p><b>Two limits shape every rule on this page.</b> A rule matches the finding set of a single walk, so two findings join into one card only if the same tree registered both. A rule matches the whole set exactly, so a tree that can register 4 findings needs a rule for every set those 4 can form, minus the sets the stage gates make impossible.</p>
+  </div>
+</section>
+
+<section id="proposed">
+  <h2>The seven proposed trees <span class="tag">table 1</span></h2>
+  <p class="lede">Each bucket is one agronomy problem area. Each tree answers one question a grower asks, and opens at most one card per cell or block. Codes marked <span class="new">NEW</span> were added to the platform finding catalogue on 2026-09-21.</p>
+  <div class="scroller">
+  <table class="wide">
+    <thead><tr><th>Tree</th><th>What the tree does</th><th>Findings it can register</th><th>Combination rules</th><th>Old trees covered</th></tr></thead>
+    <tbody>
+
+      <tr>
+        <td class="name">Water and irrigation<span class="ref">mango_water &middot; cell</span></td>
+        <td class="desc">Is this cell short of water, and is the pre-harvest cut on plan? Reads leaf water, soil moisture and canopy temperature against the band the mango index guide gives for the block's recorded tree size, and registers one finding for each reading that is short. The fold turns agreement into severity, so one reading alone never opens an irrigation card. In the maturity window on a bearing block it asks the deficit question instead.</td>
+        <td class="find"><ul class="tight"><li><code>dry</code> leaf water is low</li><li><code>soil_dry</code> <span class="new">NEW</span> soil moisture is below the band for this tree size</li><li><code>canopy_hot</code> <span class="new">NEW</span> the canopy is warmer than the air by more than usual</li><li><code>deficit_confirmed</code> <span class="new">NEW</span> soil moisture has fallen into the reduced band the pre-harvest cut is meant to produce</li><li><code>deficit_missing</code> <span class="new">NEW</span> the block is in its maturity window and the water has not been cut</li><li><code>deficit_overshot</code> <span class="new">NEW</span> the pre-harvest cut has gone deeper than intended and is costing fruit size</li><li><code>size_missing</code> tree size is not recorded so no index band could be checked</li></ul></td>
+        <td class="rules"><ul class="tight"><li><span class="set">canopy_hot + dry + soil_dry</span> <span class="st alert">alert</span> irrigate. All three water readings agree that this cell is short of water: leaf water, soil moisture and canopy temperature.</li><li><span class="set">dry + soil_dry</span> <span class="st alert">alert</span> irrigate. Leaf water and soil moisture both read short for this tree size.</li><li><span class="set">canopy_hot + dry</span> <span class="st alert">alert</span> irrigate. Leaf water is low and the canopy is running hot.</li><li><span class="set">canopy_hot + soil_dry</span> <span class="st alert">alert</span> irrigate. Soil moisture is below the band and the canopy is running hot.</li><li><span class="set">dry</span> <span class="st issue">issue</span> no_action. Leaf water is low, and the soil and thermal readings do not agree.</li><li><span class="set">soil_dry</span> <span class="st issue">issue</span> no_action. Soil moisture is below the band, and the leaf and thermal readings do not agree.</li><li><span class="set">canopy_hot</span> <span class="st issue">issue</span> no_action. The canopy is warmer than usual, and neither water reading agrees.</li><li><span class="set">deficit_confirmed</span> <span class="st good">good</span> no_action. Soil moisture has fallen into the reduced band that pre-harvest deficit irrigation is meant to produce.</li><li><span class="set">deficit_missing</span> <span class="st issue">issue</span> irrigate. The block is in its maturity window and soil moisture is still at the full irrigation level.</li><li><span class="set">deficit_overshot</span> <span class="st alert">alert</span> irrigate. The pre-harvest cut has gone deeper than intended and is now costing fruit size.</li><li><span class="set">size_missing</span> <span class="st na">na</span> no_action. No tree size is recorded for this block, so no water band could be checked.</li></ul></td>
+        <td class="deps">t_cwsi_irrigation_stress<br>t_smi_soil_moisture<br>t_ndmi_leaf_water<br>t_msi_moisture_stress<br>t_water_stress_confirm<br>t_deficit_irrigation_verify<br>mango_canopy_moisture_by_size_v1<br><b>7 trees</b></td>
+      </tr>
+
+      <tr>
+        <td class="name">Canopy and stand<span class="ref">mango_canopy_and_stand &middot; cell</span></td>
+        <td class="desc">Is the canopy weaker than it should be, and is the cause the trees or the number of trees? Picks the vigour index the guide recommends for the recorded tree size — MSAVI for small, SAVI for medium, NDVI for large — and compares it against the size band and against the block's own day-of-year history. When both say weak, it reads bare ground, leaf water and red-edge to name the cause on one card.</td>
+        <td class="find"><ul class="tight"><li><code>vigour_low</code> canopy vigour is below the band for this tree size</li><li><code>block_declining</code> the block as a whole is below its seasonal baseline</li><li><code>cover_open</code> more bare ground is showing than the guide expects</li><li><code>dry</code> leaf water is low</li><li><code>nutrient_low</code> leaf nitrogen is below the band</li><li><code>size_missing</code> tree size is not recorded so no index band could be checked</li></ul></td>
+        <td class="rules"><ul class="tight"><li><span class="set">block_declining + cover_open + vigour_low</span> <span class="st alert">alert</span> scout. The canopy is weak and more bare ground is showing at the same time.</li><li><span class="set">block_declining + dry + vigour_low</span> <span class="st alert">alert</span> irrigate. The canopy is weak against its band and its own history, and leaf water is below normal.</li><li><span class="set">block_declining + nutrient_low + vigour_low</span> <span class="st alert">alert</span> fertilize. The canopy is weak against its band and its own history, and red-edge is below normal.</li><li><span class="set">block_declining + dry + nutrient_low + vigour_low</span> <span class="st alert">alert</span> scout. The canopy is weak and both leaf water and red-edge are below normal.</li><li><span class="set">block_declining + vigour_low</span> <span class="st issue">issue</span> scout. The canopy is below its band and below its own history, and no single cause stands out in the imagery.</li><li><span class="set">vigour_low</span> <span class="st issue">issue</span> scout. The canopy is below the band for this tree size, but it is not below the block's own history.</li><li><span class="set">cover_open + vigour_low</span> <span class="st alert">alert</span> scout. The canopy is below its band and more bare ground is showing than expected for this tree size.</li><li><span class="set">block_declining</span> <span class="st issue">issue</span> scout. The block is falling against its own history for this day of year while still inside its band.</li><li><span class="set">block_declining + cover_open</span> <span class="st issue">issue</span> scout. The block is falling against its own history and more bare ground is showing.</li><li><span class="set">cover_open</span> <span class="st issue">issue</span> scout. More bare ground is showing than the guide expects for this tree size, while the canopy itself reads normally.</li><li><span class="set">size_missing</span> <span class="st na">na</span> no_action. No tree size is recorded for this block, so no vigour band could be checked.</li></ul></td>
+        <td class="deps">t_ndvi_canopy_vigour<br>t_savi_canopy_vigour<br>t_msavi_canopy_vigour<br>t_evi_canopy_vigour<br>t_vigour_cause_split<br>t_bsi_ground_cover<br>t_young_orchard_establishment<br>mango_canopy_health_v1<br>mango_canopy_vigour_by_size_v1<br>mango_canopy_cover_gap_v1<br><b>10 trees</b></td>
+      </tr>
+
+      <tr>
+        <td class="name">Feeding<span class="ref">mango_nutrition &middot; cell</span></td>
+        <td class="desc">Does this cell need feeding, and with what? Reads red-edge for nitrogen sufficiency and green for leaf chlorophyll and leaf age, both against the band for the recorded tree size. Red-edge is used rather than NDVI because a dense mango canopy saturates NDVI before a shortage shows. In the post-harvest flush the card changes from a warning into the recovery feed.</td>
+        <td class="find"><ul class="tight"><li><code>nutrient_low</code> leaf nitrogen is below the band</li><li><code>chlorophyll_low</code> leaf chlorophyll is below the band and the leaves may be old or starved</li><li><code>post_harvest_feed_due</code> <span class="new">NEW</span> the block is in the post-harvest flush and the recovery feed is due</li><li><code>size_missing</code> tree size is not recorded so no index band could be checked</li></ul></td>
+        <td class="rules"><ul class="tight"><li><span class="set">chlorophyll_low + nutrient_low</span> <span class="st alert">alert</span> fertilize. Red-edge and green both read below the band for this tree size.</li><li><span class="set">nutrient_low</span> <span class="st issue">issue</span> fertilize. Red-edge is below the nitrogen band for this tree size.</li><li><span class="set">chlorophyll_low</span> <span class="st issue">issue</span> scout. Leaf chlorophyll is below the band while red-edge is not.</li><li><span class="set">post_harvest_feed_due</span> <span class="st issue">issue</span> fertilize. The block is in the post-harvest flush and the balanced recovery feed is due.</li><li><span class="set">nutrient_low + post_harvest_feed_due</span> <span class="st alert">alert</span> fertilize. The block is rebuilding reserves after harvest and red-edge is already below the band.</li><li><span class="set">chlorophyll_low + post_harvest_feed_due</span> <span class="st issue">issue</span> fertilize. The block is in the post-harvest flush and leaf chlorophyll is below the band.</li><li><span class="set">chlorophyll_low + nutrient_low + post_harvest_feed_due</span> <span class="st alert">alert</span> fertilize. Both feeding readings are below the band in the post-harvest flush, the one window where the tree must rebuild reserves.</li><li><span class="set">size_missing</span> <span class="st na">na</span> no_action. No tree size is recorded for this block, so no feeding band could be checked.</li></ul></td>
+        <td class="deps">t_ndre_nitrogen<br>t_gndvi_chlorophyll<br>mango_post_harvest_nitrogen_v1<br><b>3 trees</b></td>
+      </tr>
+
+      <tr>
+        <td class="name">Pest and disease pressure<span class="ref">mango_pest_disease &middot; block</span></td>
+        <td class="desc">How hard is the weather pushing pests and disease on this block now? Reads the three weather-driven pressure scores the platform computes — anthracnose, powdery mildew and fruit fly — and gates each on the growth stage where it matters. The fold writes one visit instead of three cards. Block scope, because the weather score is keyed to the farm and every cell would read the same number.</td>
+        <td class="find"><ul class="tight"><li><code>pest_high</code> anthracnose pressure is high</li><li><code>pest_med</code> anthracnose pressure is building</li><li><code>mildew_high</code> powdery mildew pressure is high</li><li><code>mildew_med</code> powdery mildew pressure is rising while the block is in bloom</li><li><code>fly_high</code> fruit fly pressure is high</li><li><code>fly_med</code> fruit fly pressure is rising on ripening fruit</li></ul></td>
+        <td class="rules"><ul class="tight"><li><span class="set">mildew_high</span> <span class="st alert">alert</span> spray. Powdery mildew pressure is high while the block is in bloom.</li><li><span class="set">mildew_med</span> <span class="st issue">issue</span> scout. Powdery mildew pressure is rising while the block is in bloom.</li><li><span class="set">pest_high</span> <span class="st alert">alert</span> spray. Anthracnose pressure is high.</li><li><span class="set">pest_med</span> <span class="st issue">issue</span> scout. Anthracnose pressure is building.</li><li><span class="set">fly_high</span> <span class="st alert">alert</span> scout. Fruit fly pressure is high on ripening fruit.</li><li><span class="set">fly_med</span> <span class="st issue">issue</span> scout. Fruit fly pressure is rising on ripening fruit.</li><li><span class="set">mildew_high + pest_high</span> <span class="st alert">alert</span> spray. Anthracnose and powdery mildew pressure are both high in the same bloom window.</li><li><span class="set">mildew_med + pest_high</span> <span class="st alert">alert</span> spray. Anthracnose pressure is high and mildew is rising in the same bloom window.</li><li><span class="set">mildew_high + pest_med</span> <span class="st alert">alert</span> spray. Mildew pressure is high and anthracnose is building in the same bloom window.</li><li><span class="set">mildew_med + pest_med</span> <span class="st issue">issue</span> scout. Both anthracnose and mildew pressure are building in the bloom window.</li><li><span class="set">fly_high + pest_high</span> <span class="st alert">alert</span> spray. Anthracnose and fruit fly pressure are both high on ripening fruit.</li><li><span class="set">fly_med + pest_high</span> <span class="st alert">alert</span> spray. Anthracnose pressure is high and fruit fly is rising on ripening fruit.</li><li><span class="set">fly_high + pest_med</span> <span class="st alert">alert</span> scout. Fruit fly pressure is high and anthracnose is building on ripening fruit.</li><li><span class="set">fly_med + pest_med</span> <span class="st issue">issue</span> scout. Anthracnose and fruit fly pressure are both building on ripening fruit.</li></ul></td>
+        <td class="deps">t_anthracnose_mealybug_watch<br>t_bloom_protection<br>mango_anthracnose_risk_v1<br>mango_powdery_mildew_risk_v1<br>mango_fruit_fly_risk_v1<br><b>5 trees</b></td>
+      </tr>
+
+      <tr>
+        <td class="name">Flowering and fruit program<span class="ref">mango_flowering_program &middot; block</span></td>
+        <td class="desc">What is due in the flowering and fruit-set part of the season? In pre-flowering it uses canopy greenness against the block's own history to decide whether the vegetative flush has stopped, then says hold or start the 50 to 60 day dry period. It also warns when the canopy is well-watered while the forecast is cool, which pushes a flush instead of flowers. Through fruit set and fruit development it gives the due half of the KNO3 and thinning program.</td>
+        <td class="find"><ul class="tight"><li><code>flush_active</code> <span class="new">NEW</span> the canopy is still growing and the flush has not hardened off</li><li><code>induction_ready</code> <span class="new">NEW</span> the flush has stopped and the induction dry period can start</li><li><code>wet_and_cool</code> <span class="new">NEW</span> canopy moisture is high while the forecast is cool</li><li><code>fruit_program_early_due</code> <span class="new">NEW</span> the first KNO3 spray and fruit thinning are due</li><li><code>fruit_program_late_due</code> <span class="new">NEW</span> the second KNO3 spray and the bulking irrigation are due</li></ul></td>
+        <td class="rules"><ul class="tight"><li><span class="set">flush_active</span> <span class="st good">good</span> no_action. The canopy is still growing, so the flush has not hardened off.</li><li><span class="set">induction_ready</span> <span class="st issue">issue</span> no_action. The flush has stopped.</li><li><span class="set">flush_active + wet_and_cool</span> <span class="st issue">issue</span> irrigate. The canopy is still growing and it is being watered into a cool window.</li><li><span class="set">induction_ready + wet_and_cool</span> <span class="st alert">alert</span> irrigate. The block is ready for induction but the canopy is still well-watered in a cool window.</li><li><span class="set">fruit_program_early_due</span> <span class="st issue">issue</span> spray. Fruit set: the first KNO3 foliar spray and fruit thinning are due, with the shift to a low-nitrogen potassium-rich feed.</li><li><span class="set">fruit_program_late_due</span> <span class="st issue">issue</span> spray. Fruit development: the second KNO3 foliar spray and the bulking irrigation are due.</li></ul></td>
+        <td class="deps">t_flower_induction_readiness<br>t_fruit_development_program<br>mango_stress_induction_v1<br><b>3 trees</b></td>
+      </tr>
+
+      <tr>
+        <td class="name">Harvest and post-harvest<span class="ref">mango_harvest_post_harvest &middot; block</span></td>
+        <td class="desc">What is due while the fruit is on the tree, and what is due once it is off? On a bearing block in the maturity window it carries the repeated selective picking passes mango needs and the hot water treatment export markets require. Once the block enters the post-harvest flush it lists pruning, sanitation, the recovery feed and the irrigation restart. No index can see whether a block was pruned, so this tree reads no imagery. Fruit fly pressure stays in the pest tree.</td>
+        <td class="find"><ul class="tight"><li><code>picking_due</code> <span class="new">NEW</span> the fruit is in its maturity window and needs repeated selective picking passes</li><li><code>post_harvest_care_due</code> <span class="new">NEW</span> post-harvest pruning and recovery work are due</li></ul></td>
+        <td class="rules"><ul class="tight"><li><span class="set">picking_due</span> <span class="st issue">issue</span> harvest_window. The fruit is in its maturity window.</li><li><span class="set">post_harvest_care_due</span> <span class="st issue">issue</span> prune. The block has entered the post-harvest flush.</li></ul></td>
+        <td class="deps">t_fruit_fly_harvest_readiness<br>t_post_harvest_care<br><b>2 trees</b></td>
+      </tr>
+
+      <tr>
+        <td class="name">Record check<span class="ref">mango_records &middot; block</span></td>
+        <td class="desc">Are the records the other six trees depend on set, and are they right? The size-aware mango rules compare a reading against a band keyed on the block's recorded tree size, and a missing size makes all of them stop with no finding and no visible reason. This tree makes that visible, and it also checks the recorded size against what NDVI and BSI actually show. Data quality, not agronomy.</td>
+        <td class="find"><ul class="tight"><li><code>size_missing</code> tree size is not recorded so no index band could be checked</li><li><code>size_mismatch</code> <span class="new">NEW</span> the recorded tree size does not match what the imagery shows</li></ul></td>
+        <td class="rules"><ul class="tight"><li><span class="set">size_missing</span> <span class="st na">na</span> no_action. No tree size is recorded for this block.</li><li><span class="set">size_mismatch</span> <span class="st issue">issue</span> no_action. The recorded tree size does not match what the imagery shows.</li></ul></td>
+        <td class="deps">t_size_record_check<br><b>1 trees</b></td>
+      </tr>
+
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="codes">
+  <h2>The finding catalogue <span class="tag">15 codes before, 29 after</span></h2>
+  <p class="lede">The 15 rows below are what the catalogue held before this work. 14 more were added on 2026-09-21, listed after the table. A platform row is shared across every tree and every tenant, and every card that ever carried the code quotes its clause, so changing the wording of a live row changes old cards as well.</p>
+  <div class="scroller">
+  <table>
+    <thead><tr><th>Code</th><th>Status</th><th>Clause on the card</th><th>Used by</th></tr></thead>
+    <tbody>
+      <tr><td class="name">dry</td><td class="state"><span class="st issue">issue</span></td><td class="desc">leaf water is low</td><td class="deps">mango_water, mango_canopy_and_stand</td></tr>
+      <tr><td class="name">vigour_low</td><td class="state"><span class="st issue">issue</span></td><td class="desc">canopy vigour is below the band for this tree size</td><td class="deps">mango_canopy_and_stand</td></tr>
+      <tr><td class="name">block_declining</td><td class="state"><span class="st issue">issue</span></td><td class="desc">the block as a whole is below its seasonal baseline</td><td class="deps">mango_canopy_and_stand</td></tr>
+      <tr><td class="name">cover_open</td><td class="state"><span class="st issue">issue</span></td><td class="desc">more bare ground is showing than the guide expects</td><td class="deps">mango_canopy_and_stand</td></tr>
+      <tr><td class="name">nutrient_low</td><td class="state"><span class="st issue">issue</span></td><td class="desc">leaf nitrogen is below the band</td><td class="deps">mango_nutrition, mango_canopy_and_stand</td></tr>
+      <tr><td class="name">chlorophyll_low</td><td class="state"><span class="st issue">issue</span></td><td class="desc">leaf chlorophyll is below the band and the leaves may be old or starved</td><td class="deps">mango_nutrition</td></tr>
+      <tr><td class="name">pest_high</td><td class="state"><span class="st alert">alert</span></td><td class="desc">anthracnose pressure is high</td><td class="deps">mango_pest_disease</td></tr>
+      <tr><td class="name">pest_med</td><td class="state"><span class="st issue">issue</span></td><td class="desc">anthracnose pressure is building</td><td class="deps">mango_pest_disease</td></tr>
+      <tr><td class="name">mildew_high</td><td class="state"><span class="st alert">alert</span></td><td class="desc">powdery mildew pressure is high</td><td class="deps">mango_pest_disease</td></tr>
+      <tr><td class="name">mildew_med</td><td class="state"><span class="st issue">issue</span></td><td class="desc">powdery mildew pressure is rising while the block is in bloom</td><td class="deps">mango_pest_disease</td></tr>
+      <tr><td class="name">fly_high</td><td class="state"><span class="st alert">alert</span></td><td class="desc">fruit fly pressure is high</td><td class="deps">mango_pest_disease</td></tr>
+      <tr><td class="name">fly_med</td><td class="state"><span class="st issue">issue</span></td><td class="desc">fruit fly pressure is rising on ripening fruit</td><td class="deps">mango_pest_disease</td></tr>
+      <tr><td class="name">size_missing</td><td class="state"><span class="st na">na</span></td><td class="desc">tree size is not recorded so no index band could be checked</td><td class="deps">mango_records, mango_water, mango_canopy_and_stand, mango_nutrition</td></tr>
+      <tr><td class="name">dry_unconfirmed</td><td class="state"><span class="st issue">issue</span></td><td class="desc">one water reading says dry and the others do not</td><td class="deps">not used. A single-code rule says the same thing and keeps the register list one code per measurement.</td></tr>
+      <tr><td class="name">ndvi_low</td><td class="state"><span class="st issue">issue</span></td><td class="desc">canopy vigour is below the band for this tree size</td><td class="deps">not used. Its clause is word for word the same as vigour_low. One of the two should be retired.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="lede">The 14 codes added on 2026-09-21: <code>canopy_hot</code>, <code>deficit_confirmed</code>, <code>deficit_missing</code>, <code>deficit_overshot</code>, <code>flush_active</code>, <code>fruit_program_early_due</code>, <code>fruit_program_late_due</code>, <code>induction_ready</code>, <code>picking_due</code>, <code>post_harvest_care_due</code>, <code>post_harvest_feed_due</code>, <code>size_mismatch</code>, <code>soil_dry</code>, <code>wet_and_cool</code>.</p>
+</section>
+
+<section id="built">
+  <h2>What is in production <span class="tag">created 2026-09-21</span></h2>
+  <p class="lede">All seven were created in the platform catalogue as beta trees, draft version 1. None is published. A beta tree carries stage beta and the nightly sweep reads stage live, so none of them runs on a schedule. The dry run below is one block, Bashier Elkhier block-009, 33 cells.</p>
+  <div class="scroller">
+  <table>
+    <thead><tr><th>Tree</th><th>Scope</th><th>Nodes</th><th>Findings</th><th>Rules</th><th>Dry run</th><th>Id</th></tr></thead>
+    <tbody>
+      <tr><td class="name">mango_water</td><td class="state">cell</td><td class="state">21</td><td class="state">7</td><td class="state">11</td><td class="desc">33 cells, 0 carded, 0 errored</td><td class="doc">01a0c607-db7e-7c58-9e3b-ac9690a432b6</td></tr>
+      <tr><td class="name">mango_canopy_and_stand</td><td class="state">cell</td><td class="state">21</td><td class="state">6</td><td class="state">11</td><td class="desc">33 cells, 0 carded, 0 errored</td><td class="doc">01a0c607-d38f-7075-8728-092c9a5430e4</td></tr>
+      <tr><td class="name">mango_nutrition</td><td class="state">cell</td><td class="state">14</td><td class="state">4</td><td class="state">8</td><td class="desc">33 cells, 33 carded, 0 errored</td><td class="doc">01a0c607-d820-7bfb-9b7d-caad33326c2e</td></tr>
+      <tr><td class="name">mango_pest_disease</td><td class="state">block</td><td class="state">13</td><td class="state">6</td><td class="state">14</td><td class="desc">33 cells, 0 carded, 0 errored</td><td class="doc">01a0c607-d94f-7882-994a-34db56efca97</td></tr>
+      <tr><td class="name">mango_flowering_program</td><td class="state">block</td><td class="state">11</td><td class="state">5</td><td class="state">6</td><td class="desc">33 cells, 0 carded, 0 errored</td><td class="doc">01a0c607-d5fe-7e00-b657-36bef15ab2fa</td></tr>
+      <tr><td class="name">mango_harvest_post_harvest</td><td class="state">block</td><td class="state">6</td><td class="state">2</td><td class="state">2</td><td class="desc">33 cells, 33 carded, 0 errored</td><td class="doc">01a0c607-d71e-7d0c-81c1-87e55ba8058e</td></tr>
+      <tr><td class="name">mango_records</td><td class="state">block</td><td class="state">9</td><td class="state">2</td><td class="state">2</td><td class="desc">33 cells, 27 carded, 0 errored</td><td class="doc">01a0c607-da72-7046-a56b-4a3998e7ec21</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="oldset">
+  <h2>The 31 old trees and where each one goes <span class="tag">table 2</span></h2>
+  <p class="lede">Read from production on 2026-09-21. Active means the tree runs in the nightly sweep today. Judged against says whether the tree compares a reading with an absolute band from the mango index guide, or with a z-score against the block's own day-of-year history.</p>
+  <div class="scroller">
+  <table>
+    <thead><tr><th>Old tree</th><th>Active</th><th>Scope</th><th>What it reads</th><th>Judged against</th><th>Goes to</th></tr></thead>
+    <tbody>
+      <tr><td class="name">t_cwsi_irrigation_stress</td><td class="state">yes</td><td class="state">block</td><td class="desc">CWSI, growth stage</td><td class="state">size band</td><td class="deps">mango_water</td></tr>
+      <tr><td class="name">t_smi_soil_moisture</td><td class="state">yes</td><td class="state">block</td><td class="desc">SMI, growth stage</td><td class="state">size band</td><td class="deps">mango_water</td></tr>
+      <tr><td class="name">t_ndmi_leaf_water</td><td class="state">yes</td><td class="state">block</td><td class="desc">NDMI</td><td class="state">size band</td><td class="deps">mango_water</td></tr>
+      <tr><td class="name">t_msi_moisture_stress</td><td class="state">yes</td><td class="state">block</td><td class="desc">MSI, inverted scale</td><td class="state">size band</td><td class="deps">mango_water, dropped as a duplicate of NDMI</td></tr>
+      <tr><td class="name">t_water_stress_confirm</td><td class="state">yes</td><td class="state">cell</td><td class="desc">NDMI, SMI, CWSI</td><td class="state">z-score</td><td class="deps">mango_water, becomes the fold</td></tr>
+      <tr><td class="name">t_deficit_irrigation_verify</td><td class="state">yes</td><td class="state">block</td><td class="desc">SMI, bearing status, maturation stage</td><td class="state">size band</td><td class="deps">mango_water</td></tr>
+      <tr><td class="name">mango_canopy_moisture_by_size_v1</td><td class="state">no</td><td class="state">block</td><td class="desc">NDMI</td><td class="state">size band</td><td class="deps">mango_water</td></tr>
+
+      <tr><td class="name">t_ndvi_canopy_vigour</td><td class="state">yes</td><td class="state">block</td><td class="desc">NDVI</td><td class="state">size band</td><td class="deps">mango_canopy_and_stand</td></tr>
+      <tr><td class="name">t_savi_canopy_vigour</td><td class="state">yes</td><td class="state">block</td><td class="desc">SAVI</td><td class="state">size band</td><td class="deps">mango_canopy_and_stand</td></tr>
+      <tr><td class="name">t_msavi_canopy_vigour</td><td class="state">yes</td><td class="state">block</td><td class="desc">MSAVI</td><td class="state">size band</td><td class="deps">mango_canopy_and_stand</td></tr>
+      <tr><td class="name">t_evi_canopy_vigour</td><td class="state">yes</td><td class="state">block</td><td class="desc">EVI</td><td class="state">size band</td><td class="deps">mango_canopy_and_stand</td></tr>
+      <tr><td class="name">t_vigour_cause_split</td><td class="state">yes</td><td class="state">block</td><td class="desc">SAVI, NDMI, NDRE, BSI</td><td class="state">z-score</td><td class="deps">mango_canopy_and_stand, becomes the fold</td></tr>
+      <tr><td class="name">t_bsi_ground_cover</td><td class="state">yes</td><td class="state">block</td><td class="desc">BSI</td><td class="state">size band</td><td class="deps">mango_canopy_and_stand</td></tr>
+      <tr><td class="name">t_young_orchard_establishment</td><td class="state">yes</td><td class="state">block</td><td class="desc">MSAVI, BSI on small-tree blocks</td><td class="state">size band</td><td class="deps">mango_canopy_and_stand</td></tr>
+      <tr><td class="name">mango_canopy_health_v1</td><td class="state">yes</td><td class="state">block</td><td class="desc">SAVI on sandy soil, NDVI otherwise</td><td class="state">z-score</td><td class="deps">mango_canopy_and_stand</td></tr>
+      <tr><td class="name">mango_canopy_vigour_by_size_v1</td><td class="state">no</td><td class="state">block</td><td class="desc">MSAVI, SAVI or NDVI picked by size</td><td class="state">size band</td><td class="deps">mango_canopy_and_stand</td></tr>
+      <tr><td class="name">mango_canopy_cover_gap_v1</td><td class="state">no</td><td class="state">block</td><td class="desc">BSI</td><td class="state">size band</td><td class="deps">mango_canopy_and_stand</td></tr>
+
+      <tr><td class="name">t_ndre_nitrogen</td><td class="state">yes</td><td class="state">block</td><td class="desc">NDRE, growth stage</td><td class="state">size band</td><td class="deps">mango_nutrition</td></tr>
+      <tr><td class="name">t_gndvi_chlorophyll</td><td class="state">yes</td><td class="state">block</td><td class="desc">GNDVI</td><td class="state">size band</td><td class="deps">mango_nutrition</td></tr>
+      <tr><td class="name">mango_post_harvest_nitrogen_v1</td><td class="state">no</td><td class="state">block</td><td class="desc">NDRE in the post-harvest flush stage</td><td class="state">size band</td><td class="deps">mango_nutrition</td></tr>
+
+      <tr><td class="name">t_anthracnose_mealybug_watch</td><td class="state">yes</td><td class="state">block</td><td class="desc">Anthracnose weather score, fruit set to maturation</td><td class="state">score threshold</td><td class="deps">mango_pest_disease</td></tr>
+      <tr><td class="name">t_bloom_protection</td><td class="state">yes</td><td class="state">block</td><td class="desc">Powdery mildew weather score during flowering</td><td class="state">score threshold</td><td class="deps">mango_pest_disease</td></tr>
+      <tr><td class="name">mango_anthracnose_risk_v1</td><td class="state">no</td><td class="state">block</td><td class="desc">Anthracnose weather score</td><td class="state">score threshold</td><td class="deps">mango_pest_disease</td></tr>
+      <tr><td class="name">mango_powdery_mildew_risk_v1</td><td class="state">no</td><td class="state">block</td><td class="desc">Powdery mildew weather score</td><td class="state">score threshold</td><td class="deps">mango_pest_disease</td></tr>
+      <tr><td class="name">mango_fruit_fly_risk_v1</td><td class="state">no</td><td class="state">block</td><td class="desc">Fruit fly weather score</td><td class="state">score threshold</td><td class="deps">mango_pest_disease</td></tr>
+
+      <tr><td class="name">t_flower_induction_readiness</td><td class="state">yes</td><td class="state">block</td><td class="desc">NDVI, pre-flowering stage</td><td class="state">z-score</td><td class="deps">mango_flowering_program</td></tr>
+      <tr><td class="name">t_fruit_development_program</td><td class="state">yes</td><td class="state">block</td><td class="desc">Growth stage and bearing status, no index</td><td class="state">calendar</td><td class="deps">mango_flowering_program</td></tr>
+      <tr><td class="name">mango_stress_induction_v1</td><td class="state">no</td><td class="state">block</td><td class="desc">NDMI and the minimum air temperature forecast</td><td class="state">absolute</td><td class="deps">mango_flowering_program</td></tr>
+
+      <tr><td class="name">t_fruit_fly_harvest_readiness</td><td class="state">yes</td><td class="state">block</td><td class="desc">Fruit fly weather score, bearing status, maturation stage</td><td class="state">score threshold</td><td class="deps">mango_harvest_post_harvest</td></tr>
+      <tr><td class="name">t_post_harvest_care</td><td class="state">yes</td><td class="state">block</td><td class="desc">Growth stage and bearing status, no index</td><td class="state">calendar</td><td class="deps">mango_harvest_post_harvest</td></tr>
+
+      <tr><td class="name">t_size_record_check</td><td class="state">yes</td><td class="state">block</td><td class="desc">NDVI and BSI against the recorded tree size</td><td class="state">size band</td><td class="deps">mango_records</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="decisions">
+  <h2>Decisions still open <span class="tag">8 items</span></h2>
+  <div class="decisions">
+
+    <div class="decision">
+      <h3>Cell scope or block scope</h3>
+      <p>30 of the 31 old trees run per block. Only t_water_stress_confirm runs per cell. This page puts the three measured trees at cell scope and the four calendar or weather trees at block scope. Mixing scopes means a grower sees cell cards and block cards on the same screen.</p>
+    </div>
+
+    <div class="decision">
+      <h3>The canopy tree reads water and nutrition indices too</h3>
+      <p>A combination rule matches one walk, so the canopy tree cannot read the water tree's findings. To name the cause of a weak canopy it registers <code>dry</code> and <code>nutrient_low</code> itself. The same index is then read by two trees, and the two cards can disagree.</p>
+    </div>
+
+    <div class="decision">
+      <h3>A clause may not contain a comma</h3>
+      <p>The API refuses a finding clause with a comma in it: a clause is one fragment the card joins to others, so two ideas mean two findings. Three of the 14 new clauses had to be rewritten before they were accepted. Plan for it when adding more.</p>
+    </div>
+
+    <div class="decision">
+      <h3>ndvi_low and vigour_low say the same thing</h3>
+      <p>Both clauses read "canopy vigour is below the band for this tree size", word for word. Two codes for one meaning split the finding set and break rule matching. One should be retired before the new trees are written.</p>
+    </div>
+
+    <div class="decision">
+      <h3>MSI and EVI are dropped</h3>
+      <p>MSI measures the same thing as NDMI on an inverted scale, and keeping both lets one signal vote twice in the fold. EVI is a fourth view of the vigour question the size switch already answers with MSAVI, SAVI and NDVI. Neither is read by any of the seven. Dropping them removes two cards that fire today.</p>
+    </div>
+
+    <div class="decision">
+      <h3>Absolute bands or z-scores</h3>
+      <p>26 of the 31 old trees compare against an absolute band keyed on tree size. 5 compare against a z-score on the block's own history. Each proposed tree mixes both: bands for the per-index findings, z-scores for the joining question. A z-score needs 3 samples in a 15-day day-of-year window, so it returns nothing on a new block.</p>
+    </div>
+
+    <div class="decision">
+      <h3>ndvi_baseline_alert_v1 targets any crop</h3>
+      <p>That tree has an empty crop path, so it also fires on mango blocks and says the same thing as the canopy tree. It is not counted in the 31. Decide whether it keeps running on mango or gets a crop path that excludes mango.</p>
+    </div>
+
+    <div class="decision">
+      <h3>Cutover of the 23 active trees</h3>
+      <p>A beta tree carries stage beta and the nightly sweep reads stage live, so the new trees run on nothing until the sweep is switched. The 23 active old trees keep firing until they are deactivated one by one.</p>
+    </div>
+
+  </div>
+</section>
+
+</div>
+</body>
+</html>

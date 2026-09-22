@@ -1,0 +1,118 @@
+{
+  "code": "mango_harvest_post_harvest",
+  "name_en": "Mango — harvest and post-harvest",
+  "name_ar": "المانجو — الحصاد وما بعده",
+  "description_en": "What is due while the fruit is on the tree, and what is due once it is off? On a bearing block in the maturity window it carries the repeated selective picking passes mango needs and the hot water treatment export markets require. Once the block enters the post-harvest flush it lists pruning, sanitation, the recovery feed and the irrigation restart. No index can see whether a block was pruned, so this tree reads no imagery. Fruit fly pressure stays in the pest tree.",
+  "description_ar": "ما المستحقّ والثمار على الشجرة، وما المستحقّ بعد نزولها؟ في قطعة مثمرة داخل نافذة النضج يحمل مرورات الجني الانتقائي المتكرّرة التي يحتاجها المانجو والمعاملة بالماء الساخن التي تشترطها أسواق التصدير. وحين تدخل القطعة دفعة ما بعد الحصاد يذكر التقليم والتطهير وتغذية التعافي واستئناف الريّ. لا يرى أي مؤشر إن كانت القطعة قد قُلّمت، فهذه الشجرة لا تقرأ صورًا. ويبقى ضغط ذبابة الفاكهة في شجرة الآفات.",
+  "scope": "block",
+  "crop_path": "mango",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_bearing_gate",
+  "registers": [
+    "picking_due",
+    "post_harvest_care_due"
+  ],
+  "parameters": {},
+  "nodes": {
+    "n_bearing_gate": {
+      "label_en": "Is this a bearing block this season?",
+      "label_ar": "هل هذه قطعة مثمرة هذا الموسم؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "bearing_status",
+            "key": "value"
+          },
+          "right": "bearing"
+        }
+      },
+      "on_match": "n_maturity_gate",
+      "on_miss": "n_stop"
+    },
+    "n_maturity_gate": {
+      "label_en": "Is the block in its maturity window?",
+      "label_ar": "هل القطعة في نافذة النضج؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "maturation"
+          ]
+        }
+      },
+      "on_match": "n_reg_picking",
+      "on_miss": "n_post_harvest_gate"
+    },
+    "n_reg_picking": {
+      "label_en": "The block needs its repeated selective picking passes",
+      "label_ar": "تحتاج القطعة مرورات الجني الانتقائي المتكرّرة",
+      "register": {
+        "code": "picking_due",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_post_harvest_gate": {
+      "label_en": "Is the block in the post-harvest flush?",
+      "label_ar": "هل القطعة في دفعة النمو بعد الحصاد؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "post_harvest_flush"
+          ]
+        }
+      },
+      "on_match": "n_reg_post_harvest_care",
+      "on_miss": "n_stop"
+    },
+    "n_reg_post_harvest_care": {
+      "label_en": "Post-harvest pruning, sanitation and recovery are due",
+      "label_ar": "التقليم والتطهير والتعافي بعد الحصاد مستحقّة",
+      "register": {
+        "code": "post_harvest_care_due",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "harvest_picking",
+      "codes": [
+        "picking_due"
+      ],
+      "status": "issue",
+      "action_type": "harvest_window",
+      "text_en": "The fruit is in its maturity window. Mango does not ripen evenly, so plan repeated selective picking passes rather than one strip pick. If the fruit is going to an export market, book the hot water treatment now: several importing countries require it.",
+      "text_ar": "الثمار في نافذة النضج. المانجو لا ينضج بانتظام، فخطّط مرورات جني انتقائي متكرّرة بدل جني واحد شامل. وإن كانت الثمار للتصدير فاحجز المعاملة بالماء الساخن الآن: تشترطها عدة دول مستوردة."
+    },
+    {
+      "code": "harvest_post_care",
+      "codes": [
+        "post_harvest_care_due"
+      ],
+      "status": "issue",
+      "action_type": "prune",
+      "text_en": "The block has entered the post-harvest flush. Four things are due in this window: structural pruning, orchard sanitation, a balanced recovery feed, and resuming irrigation so the flush can grow and mature before flower induction.",
+      "text_ar": "دخلت القطعة دفعة النمو بعد الحصاد. أربعة أمور مستحقّة في هذه النافذة: التقليم الهيكلي، وتطهير البستان، وتغذية تعافٍ متوازنة، واستئناف الريّ كي تنمو الدفعة وتنضج قبل التصويم."
+    }
+  ]
+}

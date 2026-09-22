@@ -1,0 +1,266 @@
+{
+  "code": "mango_flowering_program",
+  "name_en": "Mango — flowering and fruit program",
+  "name_ar": "المانجو — برنامج التزهير والإثمار",
+  "description_en": "What is due in the flowering and fruit-set part of the season? In pre-flowering it uses canopy greenness against the block's own history to decide whether the vegetative flush has stopped, then says hold or start the 50 to 60 day dry period. It also warns when the canopy is well-watered while the forecast is cool, which pushes a flush instead of flowers. Through fruit set and fruit development it gives the due half of the KNO3 and thinning program.",
+  "description_ar": "ما المستحقّ في جزء التزهير وعقد الثمار من الموسم؟ في ما قبل التزهير يستخدم خضرة المجموع مقابل تاريخ القطعة ليقرّر هل توقفت دفعة النمو الخضري، ثم يقول أجّل أو ابدأ فترة التصويم من 50 إلى 60 يومًا. وينبّه كذلك حين يكون المجموع مرويًا والتوقع باردًا، فهذا يدفع نموًا خضريًا بدل الأزهار. وخلال عقد الثمار ونموها يعطي النصف المستحقّ من برنامج نترات البوتاسيوم والخفّ.",
+  "scope": "block",
+  "crop_path": "mango",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_pre_gate",
+  "registers": [
+    "flush_active",
+    "induction_ready",
+    "wet_and_cool",
+    "fruit_program_early_due",
+    "fruit_program_late_due"
+  ],
+  "parameters": {
+    "flush_z": {
+      "type": "number",
+      "default": 0.8,
+      "min": 0.0,
+      "max": 5.0
+    },
+    "wet_ndmi": {
+      "type": "number",
+      "default": 0.3,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "cool_induction_c": {
+      "type": "number",
+      "default": 15.0,
+      "min": 0.0,
+      "max": 30.0
+    }
+  },
+  "nodes": {
+    "n_pre_gate": {
+      "label_en": "Is the block in the pre-flowering (induction) stage?",
+      "label_ar": "هل القطعة في مرحلة ما قبل التزهير (التصويم)؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "pre_flowering"
+          ]
+        }
+      },
+      "on_match": "n_flush_check",
+      "on_miss": "n_fruit_set_gate"
+    },
+    "n_flush_check": {
+      "label_en": "Is the canopy still growing against this block's own history?",
+      "label_ar": "هل ما زال المجموع ينمو مقارنة بتاريخ هذه القطعة؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "indices",
+            "index_code": "ndvi",
+            "key": "baseline_deviation"
+          },
+          "right": {
+            "source": "params",
+            "name": "flush_z"
+          }
+        }
+      },
+      "on_match": "n_reg_flush_active",
+      "on_miss": "n_reg_induction_ready"
+    },
+    "n_reg_flush_active": {
+      "label_en": "The vegetative flush has not stopped yet",
+      "label_ar": "لم تتوقف دفعة النمو الخضري بعد",
+      "register": {
+        "code": "flush_active",
+        "severity": "info"
+      },
+      "next": "n_wet_check"
+    },
+    "n_reg_induction_ready": {
+      "label_en": "The flush has stopped and the dry period can start",
+      "label_ar": "توقفت دفعة النمو ويمكن بدء فترة التصويم",
+      "register": {
+        "code": "induction_ready",
+        "severity": "warning"
+      },
+      "next": "n_wet_check"
+    },
+    "n_wet_check": {
+      "label_en": "Is the canopy well-watered while the forecast is cool?",
+      "label_ar": "هل المجموع مُروى جيدًا والتوقع بارد؟",
+      "condition": {
+        "tree": {
+          "all_of": [
+            {
+              "op": "gt",
+              "left": {
+                "source": "indices",
+                "index_code": "ndmi",
+                "key": "mean"
+              },
+              "right": {
+                "source": "params",
+                "name": "wet_ndmi"
+              }
+            },
+            {
+              "op": "le",
+              "left": {
+                "source": "weather",
+                "scope": "forecast_72h",
+                "field": "air_temp_c_min"
+              },
+              "right": {
+                "source": "params",
+                "name": "cool_induction_c"
+              }
+            }
+          ]
+        }
+      },
+      "on_match": "n_reg_wet_and_cool",
+      "on_miss": "n_stop"
+    },
+    "n_reg_wet_and_cool": {
+      "label_en": "Canopy moisture is high in the cool induction window",
+      "label_ar": "رطوبة المجموع مرتفعة في نافذة التصويم الباردة",
+      "register": {
+        "code": "wet_and_cool",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_fruit_set_gate": {
+      "label_en": "Is the block setting fruit?",
+      "label_ar": "هل القطعة في عقد الثمار؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "fruit_set"
+          ]
+        }
+      },
+      "on_match": "n_reg_early_program",
+      "on_miss": "n_fruit_dev_gate"
+    },
+    "n_reg_early_program": {
+      "label_en": "The early half of the fruit program is due",
+      "label_ar": "النصف المبكر من برنامج الثمار مستحقّ",
+      "register": {
+        "code": "fruit_program_early_due",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_fruit_dev_gate": {
+      "label_en": "Is the block in fruit development?",
+      "label_ar": "هل القطعة في مرحلة نمو الثمار؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "fruit_development"
+          ]
+        }
+      },
+      "on_match": "n_reg_late_program",
+      "on_miss": "n_stop"
+    },
+    "n_reg_late_program": {
+      "label_en": "The late half of the fruit program is due",
+      "label_ar": "النصف المتأخر من برنامج الثمار مستحقّ",
+      "register": {
+        "code": "fruit_program_late_due",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "flower_hold",
+      "codes": [
+        "flush_active"
+      ],
+      "status": "good",
+      "action_type": "no_action",
+      "text_en": "The canopy is still growing, so the flush has not hardened off. Hold the dry period: starting it now induces a weak, uneven bloom.",
+      "text_ar": "ما زال المجموع ينمو، فلم تنضج الدفعة بعد. أجّل فترة التصويم: بدؤها الآن يعطي تزهيرًا ضعيفًا غير منتظم."
+    },
+    {
+      "code": "flower_start_dry",
+      "codes": [
+        "induction_ready"
+      ],
+      "status": "issue",
+      "action_type": "no_action",
+      "text_en": "The flush has stopped. Start the 50 to 60 day dry period: withhold irrigation, stop nitrogen, and move to a potassium-only feed.",
+      "text_ar": "توقفت الدفعة. ابدأ فترة التصويم من 50 إلى 60 يومًا: أوقف الريّ، وأوقف النيتروجين، وانتقل إلى تسميد بالبوتاسيوم فقط."
+    },
+    {
+      "code": "flower_wet_flush",
+      "codes": [
+        "flush_active",
+        "wet_and_cool"
+      ],
+      "status": "issue",
+      "action_type": "irrigate",
+      "text_en": "The canopy is still growing and it is being watered into a cool window. Reduce water now so the flush hardens off instead of pushing more growth.",
+      "text_ar": "المجموع ما زال ينمو ويُروى في نافذة باردة. اخفض المياه الآن كي تنضج الدفعة بدل دفع نمو جديد."
+    },
+    {
+      "code": "flower_withhold_now",
+      "codes": [
+        "induction_ready",
+        "wet_and_cool"
+      ],
+      "status": "alert",
+      "action_type": "irrigate",
+      "text_en": "The block is ready for induction but the canopy is still well-watered in a cool window. Withhold irrigation now, or it flushes instead of flowering.",
+      "text_ar": "القطعة جاهزة للتصويم لكن المجموع ما زال مرويًا في نافذة باردة. أوقف الريّ الآن، وإلا دفعت نموًا خضريًا بدل التزهير."
+    },
+    {
+      "code": "fruit_early",
+      "codes": [
+        "fruit_program_early_due"
+      ],
+      "status": "issue",
+      "action_type": "spray",
+      "text_en": "Fruit set: the first KNO3 foliar spray and fruit thinning are due, with the shift to a low-nitrogen potassium-rich feed. The day counts run from flower induction.",
+      "text_ar": "عقد الثمار: الرشة الورقية الأولى من نترات البوتاسيوم وخفّ الثمار مستحقّان، مع الانتقال إلى تسميد منخفض النيتروجين غني بالبوتاسيوم. تُحسب الأيام من التصويم."
+    },
+    {
+      "code": "fruit_late",
+      "codes": [
+        "fruit_program_late_due"
+      ],
+      "status": "issue",
+      "action_type": "spray",
+      "text_en": "Fruit development: the second KNO3 foliar spray and the bulking irrigation are due. Keep nitrogen low and potassium high.",
+      "text_ar": "نمو الثمار: الرشة الثانية من نترات البوتاسيوم وريّة التحجيم مستحقّتان. أبقِ النيتروجين منخفضًا والبوتاسيوم مرتفعًا."
+    }
+  ]
+}
