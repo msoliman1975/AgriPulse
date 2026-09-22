@@ -1,0 +1,552 @@
+{
+  "code": "mango_canopy_and_stand",
+  "name_en": "Mango — canopy vigour and stand",
+  "name_ar": "المانجو — حيوية المجموع وعدد الأشجار",
+  "description_en": "Is the canopy weaker than it should be, and is the cause the trees or the number of trees? Picks the vigour index the guide recommends for the recorded tree size — MSAVI for small, SAVI for medium, NDVI for large — and compares it against the size band and against the block's own day-of-year history. When both say weak, it reads bare ground, leaf water and red-edge to name the cause on one card.",
+  "description_ar": "هل المجموع أضعف مما ينبغي، وهل السبب الأشجار أم عددها؟ يختار مؤشر الحيوية الذي يوصي به الدليل لحجم الشجرة المسجّل — MSAVI للصغيرة وSAVI للمتوسطة وNDVI للكبيرة — ويقارنه بنطاق الحجم وبتاريخ القطعة لهذا اليوم من السنة. وحين يتفق الاثنان على الضعف، يقرأ الأرض العارية وماء الأوراق والحافة الحمراء ليسمّي السبب في بطاقة واحدة.",
+  "scope": "cell",
+  "crop_path": "mango",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_size_small",
+  "registers": [
+    "vigour_low",
+    "block_declining",
+    "cover_open",
+    "dry",
+    "nutrient_low",
+    "size_missing"
+  ],
+  "parameters": {
+    "small_msavi_floor": {
+      "type": "number",
+      "default": 0.15,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "medium_savi_floor": {
+      "type": "number",
+      "default": 0.28,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "large_ndvi_floor": {
+      "type": "number",
+      "default": 0.65,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "small_bsi_ceiling": {
+      "type": "number",
+      "default": 0.55,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "medium_bsi_ceiling": {
+      "type": "number",
+      "default": 0.3,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "large_bsi_ceiling": {
+      "type": "number",
+      "default": 0.14,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "vigour_drop_z": {
+      "type": "number",
+      "default": -1.0,
+      "min": -5.0,
+      "max": 0.0
+    },
+    "dry_z": {
+      "type": "number",
+      "default": -1.0,
+      "min": -5.0,
+      "max": 0.0
+    },
+    "low_ndre_z": {
+      "type": "number",
+      "default": -1.0,
+      "min": -5.0,
+      "max": 0.0
+    }
+  },
+  "nodes": {
+    "n_size_small": {
+      "label_en": "Is the block recorded as small trees?",
+      "label_ar": "هل القطعة مسجّلة كأشجار صغيرة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "small"
+        }
+      },
+      "on_match": "n_bands_small",
+      "on_miss": "n_size_medium"
+    },
+    "n_size_medium": {
+      "label_en": "Is the block recorded as medium trees?",
+      "label_ar": "هل القطعة مسجّلة كأشجار متوسطة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "medium"
+        }
+      },
+      "on_match": "n_bands_medium",
+      "on_miss": "n_size_large"
+    },
+    "n_size_large": {
+      "label_en": "Is the block recorded as large trees?",
+      "label_ar": "هل القطعة مسجّلة كأشجار كبيرة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "large"
+        }
+      },
+      "on_match": "n_bands_large",
+      "on_miss": "n_reg_size_missing"
+    },
+    "n_bands_small": {
+      "label_en": "Load the small-tree bands and read MSAVI",
+      "label_ar": "حمّل نطاقات الأشجار الصغيرة واقرأ MSAVI",
+      "set": {
+        "size_class": "small",
+        "index_used": "msavi",
+        "vigour_now": {
+          "source": "indices",
+          "index_code": "msavi",
+          "key": "mean"
+        },
+        "vigour_z": {
+          "source": "indices",
+          "index_code": "msavi",
+          "key": "baseline_deviation"
+        },
+        "vigour_floor": {
+          "source": "params",
+          "name": "small_msavi_floor"
+        },
+        "bsi_now": {
+          "source": "indices",
+          "index_code": "bsi",
+          "key": "mean"
+        },
+        "bsi_ceiling": {
+          "source": "params",
+          "name": "small_bsi_ceiling"
+        },
+        "vigour_flag": "ok"
+      },
+      "next": "n_vigour_check"
+    },
+    "n_bands_medium": {
+      "label_en": "Load the medium-tree bands and read SAVI",
+      "label_ar": "حمّل نطاقات الأشجار المتوسطة واقرأ SAVI",
+      "set": {
+        "size_class": "medium",
+        "index_used": "savi",
+        "vigour_now": {
+          "source": "indices",
+          "index_code": "savi",
+          "key": "mean"
+        },
+        "vigour_z": {
+          "source": "indices",
+          "index_code": "savi",
+          "key": "baseline_deviation"
+        },
+        "vigour_floor": {
+          "source": "params",
+          "name": "medium_savi_floor"
+        },
+        "bsi_now": {
+          "source": "indices",
+          "index_code": "bsi",
+          "key": "mean"
+        },
+        "bsi_ceiling": {
+          "source": "params",
+          "name": "medium_bsi_ceiling"
+        },
+        "vigour_flag": "ok"
+      },
+      "next": "n_vigour_check"
+    },
+    "n_bands_large": {
+      "label_en": "Load the large-tree bands and read NDVI",
+      "label_ar": "حمّل نطاقات الأشجار الكبيرة واقرأ NDVI",
+      "set": {
+        "size_class": "large",
+        "index_used": "ndvi",
+        "vigour_now": {
+          "source": "indices",
+          "index_code": "ndvi",
+          "key": "mean"
+        },
+        "vigour_z": {
+          "source": "indices",
+          "index_code": "ndvi",
+          "key": "baseline_deviation"
+        },
+        "vigour_floor": {
+          "source": "params",
+          "name": "large_ndvi_floor"
+        },
+        "bsi_now": {
+          "source": "indices",
+          "index_code": "bsi",
+          "key": "mean"
+        },
+        "bsi_ceiling": {
+          "source": "params",
+          "name": "large_bsi_ceiling"
+        },
+        "vigour_flag": "ok"
+      },
+      "next": "n_vigour_check"
+    },
+    "n_reg_size_missing": {
+      "label_en": "No tree size is recorded, so no band could be checked",
+      "label_ar": "لا يوجد حجم شجرة مسجّل، فلا يمكن فحص أي نطاق",
+      "register": {
+        "code": "size_missing",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_vigour_check": {
+      "label_en": "Is canopy vigour below the band for this tree size?",
+      "label_ar": "هل حيوية المجموع دون النطاق لهذا الحجم؟",
+      "condition": {
+        "tree": {
+          "op": "le",
+          "left": {
+            "source": "vars",
+            "name": "vigour_now"
+          },
+          "right": {
+            "source": "vars",
+            "name": "vigour_floor"
+          }
+        }
+      },
+      "on_match": "n_reg_vigour_low",
+      "on_miss": "n_decline_check"
+    },
+    "n_reg_vigour_low": {
+      "label_en": "Canopy vigour is below the band for this tree size",
+      "label_ar": "حيوية المجموع دون النطاق لهذا الحجم",
+      "register": {
+        "code": "vigour_low",
+        "severity": "warning"
+      },
+      "next": "n_mark_low"
+    },
+    "n_mark_low": {
+      "label_en": "Remember that vigour read low",
+      "label_ar": "سجّل أن الحيوية جاءت منخفضة",
+      "set": {
+        "vigour_flag": "low"
+      },
+      "next": "n_decline_check"
+    },
+    "n_decline_check": {
+      "label_en": "Has the block fallen below its own history for this day of year?",
+      "label_ar": "هل هبطت القطعة دون تاريخها لهذا اليوم من السنة؟",
+      "condition": {
+        "tree": {
+          "op": "le",
+          "left": {
+            "source": "vars",
+            "name": "vigour_z"
+          },
+          "right": {
+            "source": "params",
+            "name": "vigour_drop_z"
+          }
+        }
+      },
+      "on_match": "n_reg_declining",
+      "on_miss": "n_cover_check"
+    },
+    "n_reg_declining": {
+      "label_en": "The block as a whole is below its seasonal baseline",
+      "label_ar": "القطعة ككل دون خط أساسها الموسمي",
+      "register": {
+        "code": "block_declining",
+        "severity": "warning"
+      },
+      "next": "n_both_gate"
+    },
+    "n_both_gate": {
+      "label_en": "Is vigour weak against the band as well as against the block's history?",
+      "label_ar": "هل الحيوية ضعيفة مقابل النطاق وتاريخ القطعة معًا؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "vars",
+            "name": "vigour_flag"
+          },
+          "right": "low"
+        }
+      },
+      "on_match": "n_cause_cover",
+      "on_miss": "n_cover_check"
+    },
+    "n_cause_cover": {
+      "label_en": "Has more bare ground appeared between the trees?",
+      "label_ar": "هل ظهرت أرض عارية أكثر بين الأشجار؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "vars",
+            "name": "bsi_now"
+          },
+          "right": {
+            "source": "vars",
+            "name": "bsi_ceiling"
+          }
+        }
+      },
+      "on_match": "n_reg_cover_open",
+      "on_miss": "n_cause_dry"
+    },
+    "n_cause_dry": {
+      "label_en": "Is leaf water below normal for this block at this time of year?",
+      "label_ar": "هل ماء الأوراق دون المعتاد لهذه القطعة في هذا الوقت؟",
+      "condition": {
+        "tree": {
+          "op": "le",
+          "left": {
+            "source": "indices",
+            "index_code": "ndmi",
+            "key": "baseline_deviation"
+          },
+          "right": {
+            "source": "params",
+            "name": "dry_z"
+          }
+        }
+      },
+      "on_match": "n_reg_dry",
+      "on_miss": "n_cause_nutrient"
+    },
+    "n_reg_dry": {
+      "label_en": "Leaf water is low",
+      "label_ar": "ماء الأوراق منخفض",
+      "register": {
+        "code": "dry",
+        "severity": "warning"
+      },
+      "next": "n_cause_nutrient"
+    },
+    "n_cause_nutrient": {
+      "label_en": "Is red-edge below normal for this block at this time of year?",
+      "label_ar": "هل الحافة الحمراء دون المعتاد لهذه القطعة في هذا الوقت؟",
+      "condition": {
+        "tree": {
+          "op": "le",
+          "left": {
+            "source": "indices",
+            "index_code": "ndre",
+            "key": "baseline_deviation"
+          },
+          "right": {
+            "source": "params",
+            "name": "low_ndre_z"
+          }
+        }
+      },
+      "on_match": "n_reg_nutrient",
+      "on_miss": "n_stop"
+    },
+    "n_reg_nutrient": {
+      "label_en": "Leaf nitrogen is below the band",
+      "label_ar": "نيتروجين الأوراق دون النطاق",
+      "register": {
+        "code": "nutrient_low",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_cover_check": {
+      "label_en": "Is more bare ground showing than the guide expects for this size?",
+      "label_ar": "هل الأرض العارية أكثر مما يتوقعه الدليل لهذا الحجم؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "vars",
+            "name": "bsi_now"
+          },
+          "right": {
+            "source": "vars",
+            "name": "bsi_ceiling"
+          }
+        }
+      },
+      "on_match": "n_reg_cover_open",
+      "on_miss": "n_stop"
+    },
+    "n_reg_cover_open": {
+      "label_en": "More bare ground is showing than the guide expects",
+      "label_ar": "الأرض العارية أكثر مما يتوقعه الدليل",
+      "register": {
+        "code": "cover_open",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "canopy_missing_trees",
+      "codes": [
+        "block_declining",
+        "cover_open",
+        "vigour_low"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "The canopy is weak and more bare ground is showing at the same time. That points at missing, failed or removed trees rather than at the health of the trees still standing. Walk the rows and count the gaps.",
+      "text_ar": "المجموع ضعيف وظهرت أرض عارية أكثر في الوقت نفسه. هذا يشير إلى أشجار مفقودة أو فاشلة أو مقلوعة، لا إلى صحة الأشجار القائمة. امشِ بين الصفوف وعُدّ الفجوات."
+    },
+    {
+      "code": "canopy_cause_water",
+      "codes": [
+        "block_declining",
+        "dry",
+        "vigour_low"
+      ],
+      "status": "alert",
+      "action_type": "irrigate",
+      "text_en": "The canopy is weak against its band and its own history, and leaf water is below normal. Water shortage is the likely cause. Irrigate and check the line.",
+      "text_ar": "المجموع ضعيف مقابل نطاقه وتاريخه، وماء الأوراق دون المعتاد. نقص المياه هو السبب المرجّح. ارْوِ القطعة وافحص الخط."
+    },
+    {
+      "code": "canopy_cause_nitrogen",
+      "codes": [
+        "block_declining",
+        "nutrient_low",
+        "vigour_low"
+      ],
+      "status": "alert",
+      "action_type": "fertilize",
+      "text_en": "The canopy is weak against its band and its own history, and red-edge is below normal. A nitrogen shortage is the likely cause. Feed the block.",
+      "text_ar": "المجموع ضعيف مقابل نطاقه وتاريخه، والحافة الحمراء دون المعتاد. نقص النيتروجين هو السبب المرجّح. سمّد القطعة."
+    },
+    {
+      "code": "canopy_cause_combined",
+      "codes": [
+        "block_declining",
+        "dry",
+        "nutrient_low",
+        "vigour_low"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "The canopy is weak and both leaf water and red-edge are below normal. Water and nutrition cannot be separated from the imagery. Scout the block before spending on either.",
+      "text_ar": "المجموع ضعيف وكل من ماء الأوراق والحافة الحمراء دون المعتاد. لا يمكن فصل المياه عن التغذية من الصور. افحص القطعة قبل الإنفاق على أي منهما."
+    },
+    {
+      "code": "canopy_no_cause",
+      "codes": [
+        "block_declining",
+        "vigour_low"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "The canopy is below its band and below its own history, and no single cause stands out in the imagery. Scout the block.",
+      "text_ar": "المجموع دون نطاقه ودون تاريخه، ولا يبرز سبب واحد في الصور. افحص القطعة."
+    },
+    {
+      "code": "canopy_band_only",
+      "codes": [
+        "vigour_low"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "The canopy is below the band for this tree size, but it is not below the block's own history. This can be a young or thin block rather than a new problem.",
+      "text_ar": "المجموع دون النطاق لهذا الحجم، لكنه ليس دون تاريخ القطعة. قد تكون قطعة صغيرة أو خفيفة، لا مشكلة جديدة."
+    },
+    {
+      "code": "canopy_weak_and_open",
+      "codes": [
+        "cover_open",
+        "vigour_low"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "The canopy is below its band and more bare ground is showing than expected for this tree size. On a young block this reads as lost saplings. Count the gaps and plan replanting.",
+      "text_ar": "المجموع دون نطاقه والأرض العارية أكثر من المتوقع لهذا الحجم. في قطعة صغيرة يُقرأ هذا كشتلات مفقودة. عُدّ الفجوات وخطّط لإعادة الزراعة."
+    },
+    {
+      "code": "canopy_declining_only",
+      "codes": [
+        "block_declining"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "The block is falling against its own history for this day of year while still inside its band. Watch it, and scout if it falls again.",
+      "text_ar": "القطعة تهبط مقابل تاريخها لهذا اليوم من السنة وهي ما زالت داخل نطاقها. راقبها، وافحصها إن هبطت مرة أخرى."
+    },
+    {
+      "code": "canopy_declining_open",
+      "codes": [
+        "block_declining",
+        "cover_open"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "The block is falling against its own history and more bare ground is showing. Check whether trees have been lost.",
+      "text_ar": "القطعة تهبط مقابل تاريخها وظهرت أرض عارية أكثر. تحقّق مما إذا كانت أشجار قد فُقدت."
+    },
+    {
+      "code": "canopy_open_only",
+      "codes": [
+        "cover_open"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "More bare ground is showing than the guide expects for this tree size, while the canopy itself reads normally. Check the stand rather than the trees.",
+      "text_ar": "الأرض العارية أكثر مما يتوقعه الدليل لهذا الحجم، بينما المجموع نفسه طبيعي. تحقّق من عدد الأشجار لا من صحتها."
+    },
+    {
+      "code": "canopy_size_missing",
+      "codes": [
+        "size_missing"
+      ],
+      "status": "na",
+      "action_type": "no_action",
+      "text_en": "No tree size is recorded for this block, so no vigour band could be checked. Set the Tree size attribute on the crop assignment.",
+      "text_ar": "لا يوجد حجم شجرة مسجّل لهذه القطعة، فلم يمكن فحص نطاق الحيوية. اضبط خاصية حجم الشجرة على تخصيص المحصول."
+    }
+  ]
+}

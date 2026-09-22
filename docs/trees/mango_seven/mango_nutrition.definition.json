@@ -1,0 +1,344 @@
+{
+  "code": "mango_nutrition",
+  "name_en": "Mango — feeding",
+  "name_ar": "المانجو — التغذية",
+  "description_en": "Does this cell need feeding, and with what? Reads red-edge for nitrogen sufficiency and green for leaf chlorophyll and leaf age, both against the band for the recorded tree size. Red-edge is used rather than NDVI because a dense mango canopy saturates NDVI before a shortage shows. In the post-harvest flush the card changes from a warning into the recovery feed.",
+  "description_ar": "هل تحتاج هذه الخلية إلى تسميد، وبماذا؟ يقرأ الحافة الحمراء لكفاية النيتروجين والأخضر لكلوروفيل الأوراق وعمرها، كليهما مقابل النطاق لحجم الشجرة المسجّل. تُستخدم الحافة الحمراء بدل NDVI لأن مجموع المانجو الكثيف يُشبع NDVI قبل ظهور النقص. وفي دفعة ما بعد الحصاد تتحوّل البطاقة من تحذير إلى تغذية التعافي.",
+  "scope": "cell",
+  "crop_path": "mango",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_size_small",
+  "registers": [
+    "nutrient_low",
+    "chlorophyll_low",
+    "post_harvest_feed_due",
+    "size_missing"
+  ],
+  "parameters": {
+    "small_ndre_floor": {
+      "type": "number",
+      "default": 0.08,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "medium_ndre_floor": {
+      "type": "number",
+      "default": 0.18,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "large_ndre_floor": {
+      "type": "number",
+      "default": 0.38,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "small_gndvi_floor": {
+      "type": "number",
+      "default": 0.12,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "medium_gndvi_floor": {
+      "type": "number",
+      "default": 0.3,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "large_gndvi_floor": {
+      "type": "number",
+      "default": 0.59,
+      "min": -1.0,
+      "max": 1.0
+    }
+  },
+  "nodes": {
+    "n_size_small": {
+      "label_en": "Is the block recorded as small trees?",
+      "label_ar": "هل القطعة مسجّلة كأشجار صغيرة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "small"
+        }
+      },
+      "on_match": "n_bands_small",
+      "on_miss": "n_size_medium"
+    },
+    "n_size_medium": {
+      "label_en": "Is the block recorded as medium trees?",
+      "label_ar": "هل القطعة مسجّلة كأشجار متوسطة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "medium"
+        }
+      },
+      "on_match": "n_bands_medium",
+      "on_miss": "n_size_large"
+    },
+    "n_size_large": {
+      "label_en": "Is the block recorded as large trees?",
+      "label_ar": "هل القطعة مسجّلة كأشجار كبيرة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "large"
+        }
+      },
+      "on_match": "n_bands_large",
+      "on_miss": "n_reg_size_missing"
+    },
+    "n_bands_small": {
+      "label_en": "Load the small-tree feeding bands",
+      "label_ar": "حمّل نطاقات التغذية للأشجار الصغيرة",
+      "set": {
+        "size_class": "small",
+        "ndre_floor": {
+          "source": "params",
+          "name": "small_ndre_floor"
+        },
+        "gndvi_floor": {
+          "source": "params",
+          "name": "small_gndvi_floor"
+        }
+      },
+      "next": "n_ndre_check"
+    },
+    "n_bands_medium": {
+      "label_en": "Load the medium-tree feeding bands",
+      "label_ar": "حمّل نطاقات التغذية للأشجار المتوسطة",
+      "set": {
+        "size_class": "medium",
+        "ndre_floor": {
+          "source": "params",
+          "name": "medium_ndre_floor"
+        },
+        "gndvi_floor": {
+          "source": "params",
+          "name": "medium_gndvi_floor"
+        }
+      },
+      "next": "n_ndre_check"
+    },
+    "n_bands_large": {
+      "label_en": "Load the large-tree feeding bands",
+      "label_ar": "حمّل نطاقات التغذية للأشجار الكبيرة",
+      "set": {
+        "size_class": "large",
+        "ndre_floor": {
+          "source": "params",
+          "name": "large_ndre_floor"
+        },
+        "gndvi_floor": {
+          "source": "params",
+          "name": "large_gndvi_floor"
+        }
+      },
+      "next": "n_ndre_check"
+    },
+    "n_reg_size_missing": {
+      "label_en": "No tree size is recorded, so no band could be checked",
+      "label_ar": "لا يوجد حجم شجرة مسجّل، فلا يمكن فحص أي نطاق",
+      "register": {
+        "code": "size_missing",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_ndre_check": {
+      "label_en": "Is red-edge below the nitrogen band for this tree size?",
+      "label_ar": "هل الحافة الحمراء دون نطاق النيتروجين لهذا الحجم؟",
+      "condition": {
+        "tree": {
+          "op": "le",
+          "left": {
+            "source": "indices",
+            "index_code": "ndre",
+            "key": "mean"
+          },
+          "right": {
+            "source": "vars",
+            "name": "ndre_floor"
+          }
+        }
+      },
+      "on_match": "n_reg_nutrient",
+      "on_miss": "n_gndvi_check"
+    },
+    "n_reg_nutrient": {
+      "label_en": "Leaf nitrogen is below the band",
+      "label_ar": "نيتروجين الأوراق دون النطاق",
+      "register": {
+        "code": "nutrient_low",
+        "severity": "warning"
+      },
+      "next": "n_gndvi_check"
+    },
+    "n_gndvi_check": {
+      "label_en": "Is leaf chlorophyll below the band for this tree size?",
+      "label_ar": "هل كلوروفيل الأوراق دون النطاق لهذا الحجم؟",
+      "condition": {
+        "tree": {
+          "op": "le",
+          "left": {
+            "source": "indices",
+            "index_code": "gndvi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "vars",
+            "name": "gndvi_floor"
+          }
+        }
+      },
+      "on_match": "n_reg_chlorophyll",
+      "on_miss": "n_post_harvest_gate"
+    },
+    "n_reg_chlorophyll": {
+      "label_en": "Leaf chlorophyll is below the band and the leaves may be old or starved",
+      "label_ar": "كلوروفيل الأوراق دون النطاق وقد تكون الأوراق مسنّة أو جائعة",
+      "register": {
+        "code": "chlorophyll_low",
+        "severity": "warning"
+      },
+      "next": "n_post_harvest_gate"
+    },
+    "n_post_harvest_gate": {
+      "label_en": "Is the block in the post-harvest flush?",
+      "label_ar": "هل القطعة في دفعة النمو بعد الحصاد؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "post_harvest_flush"
+          ]
+        }
+      },
+      "on_match": "n_reg_post_harvest_feed",
+      "on_miss": "n_stop"
+    },
+    "n_reg_post_harvest_feed": {
+      "label_en": "The post-harvest recovery feed is due",
+      "label_ar": "تغذية التعافي بعد الحصاد مستحقّة",
+      "register": {
+        "code": "post_harvest_feed_due",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "feed_both_low",
+      "codes": [
+        "chlorophyll_low",
+        "nutrient_low"
+      ],
+      "status": "alert",
+      "action_type": "fertilize",
+      "text_en": "Red-edge and green both read below the band for this tree size. Two independent readings agree on a feeding shortage. Feed the block.",
+      "text_ar": "الحافة الحمراء والأخضر كلاهما دون النطاق لهذا الحجم. قراءتان مستقلتان تتفقان على نقص تغذية. سمّد القطعة."
+    },
+    {
+      "code": "feed_nitrogen",
+      "codes": [
+        "nutrient_low"
+      ],
+      "status": "issue",
+      "action_type": "fertilize",
+      "text_en": "Red-edge is below the nitrogen band for this tree size. This shows before any yellowing is visible to the eye. Feed the block.",
+      "text_ar": "الحافة الحمراء دون نطاق النيتروجين لهذا الحجم. يظهر هذا قبل أن يُرى أي اصفرار بالعين. سمّد القطعة."
+    },
+    {
+      "code": "feed_chlorophyll",
+      "codes": [
+        "chlorophyll_low"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Leaf chlorophyll is below the band while red-edge is not. This separates tired old leaves from a shortage. Look at leaf age before feeding.",
+      "text_ar": "كلوروفيل الأوراق دون النطاق بينما الحافة الحمراء ليست كذلك. هذا يفصل الأوراق المسنّة عن النقص. انظر إلى عمر الأوراق قبل التسميد."
+    },
+    {
+      "code": "feed_post_harvest",
+      "codes": [
+        "post_harvest_feed_due"
+      ],
+      "status": "issue",
+      "action_type": "fertilize",
+      "text_en": "The block is in the post-harvest flush and the balanced recovery feed is due. This is the feed that rebuilds reserves for next season's flowering.",
+      "text_ar": "القطعة في دفعة النمو بعد الحصاد وتغذية التعافي المتوازنة مستحقّة. هذه هي التغذية التي تعيد بناء المخزون لتزهير الموسم القادم."
+    },
+    {
+      "code": "feed_post_harvest_short",
+      "codes": [
+        "nutrient_low",
+        "post_harvest_feed_due"
+      ],
+      "status": "alert",
+      "action_type": "fertilize",
+      "text_en": "The block is rebuilding reserves after harvest and red-edge is already below the band. Reserves are not rebuilding. Feed now.",
+      "text_ar": "القطعة تعيد بناء مخزونها بعد الحصاد والحافة الحمراء دون النطاق بالفعل. المخزون لا يُبنى. سمّد الآن."
+    },
+    {
+      "code": "feed_post_harvest_chlorophyll",
+      "codes": [
+        "chlorophyll_low",
+        "post_harvest_feed_due"
+      ],
+      "status": "issue",
+      "action_type": "fertilize",
+      "text_en": "The block is in the post-harvest flush and leaf chlorophyll is below the band. Give the recovery feed and check leaf age.",
+      "text_ar": "القطعة في دفعة ما بعد الحصاد وكلوروفيل الأوراق دون النطاق. أعطِ تغذية التعافي وافحص عمر الأوراق."
+    },
+    {
+      "code": "feed_post_harvest_both",
+      "codes": [
+        "chlorophyll_low",
+        "nutrient_low",
+        "post_harvest_feed_due"
+      ],
+      "status": "alert",
+      "action_type": "fertilize",
+      "text_en": "Both feeding readings are below the band in the post-harvest flush, the one window where the tree must rebuild reserves. Feed now.",
+      "text_ar": "قراءتا التغذية كلتاهما دون النطاق في دفعة ما بعد الحصاد، وهي النافذة الوحيدة التي يجب أن تعيد فيها الشجرة بناء مخزونها. سمّد الآن."
+    },
+    {
+      "code": "feed_size_missing",
+      "codes": [
+        "size_missing"
+      ],
+      "status": "na",
+      "action_type": "no_action",
+      "text_en": "No tree size is recorded for this block, so no feeding band could be checked. Set the Tree size attribute on the crop assignment.",
+      "text_ar": "لا يوجد حجم شجرة مسجّل لهذه القطعة، فلم يمكن فحص نطاق التغذية. اضبط خاصية حجم الشجرة على تخصيص المحصول."
+    }
+  ]
+}
