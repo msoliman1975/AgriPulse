@@ -490,8 +490,6 @@ export function BetaDesignerPage(): ReactNode {
                       );
                     }}
                   />
-                </div>
-                <div className="flex flex-col gap-4">
                   <PublishChecksPanel
                     errors={serverErrors ?? []}
                     serverState={
@@ -510,6 +508,8 @@ export function BetaDesignerPage(): ReactNode {
                       setSelectedNodeId(id);
                     }}
                   />
+                </div>
+                <div className="flex flex-col gap-4">
                   {selectedNode && selectedNodeId ? (
                     <BetaNodePanel
                       nodeId={selectedNodeId}

@@ -19,8 +19,20 @@
  * A server error carries its own English and Arabic text — the compiler writes
  * both, because this panel renders in either — so those rows are not
  * translated here. A hint is local copy and is.
+ *
+ * **Collapsed by default, and it opens itself on a refusal.** Most of the time
+ * this panel has nothing to say, and an author editing a tree wants the room.
+ * But a publish that comes back refused with the reasons folded away is a
+ * button that appears to do nothing, so the panel opens whenever the server's
+ * answer turns into a rejection. The author can shut it again; it reopens only
+ * when a different refusal arrives.
+ *
+ * The header carries both the publish button and a one-line summary of what is
+ * inside, so collapsing hides neither the action nor the fact that something
+ * is wrong.
  */
 
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/Button";
@@ -62,84 +74,135 @@ export function PublishChecksPanel({
 }: PublishChecksPanelProps): JSX.Element {
   const { t, i18n } = useTranslation("decisionTreesBeta");
   const blocked = errors.length > 0;
+  // Shut when there is nothing to report, open when there already is. Mounting
+  // straight onto a refusal — a remount, a return to the tab — must not hide
+  // the reasons behind a panel the author never closed.
+  const [open, setOpen] = useState(() => serverState !== "unchecked" || Boolean(error));
+
+  // Open whenever the server has just answered about this body, whichever way
+  // it answered. A refusal behind a shut panel is a publish button that looks
+  // like it did nothing; an acceptance behind one is a silent success. Both
+  // follow the author pressing Publish, so neither is the default state.
+  //
+  // Keyed on a signature rather than on the arrays: keying on `errors` would
+  // re-open the panel every render and take the close button away from the
+  // author. This opens once per distinct answer.
+  const answer =
+    serverState === "unchecked"
+      ? ""
+      : `${serverState}:${errors.map((e) => `${e.rule}@${e.node_id ?? ""}`).join(",")}`;
+  const lastAnswer = useRef(answer);
+  useEffect(() => {
+    if (answer !== "" && answer !== lastAnswer.current) setOpen(true);
+    lastAnswer.current = answer;
+  }, [answer]);
+
+  // A failure that is not a compiler rejection — a 403, a dropped connection —
+  // renders in the body and would otherwise land behind a shut panel.
+  useEffect(() => {
+    if (error) setOpen(true);
+  }, [error]);
 
   return (
     <Card
       title={t("publish.title")}
+      noPadding={!open}
       actions={
-        <Button size="sm" onClick={onPublish} disabled={blocked || publishing || !canPublish}>
-          {publishing ? t("designer.publishing") : t("designer.publish")}
-        </Button>
+        <>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            aria-label={open ? t("publish.collapse") : t("publish.expand")}
+            className={
+              "rounded-md px-2 py-1 text-meta underline hover:bg-ap-line/40 " +
+              (blocked ? "text-ap-crit" : hints.length > 0 ? "text-ap-ink" : "text-ap-muted")
+            }
+          >
+            {blocked
+              ? t("publish.toggleErrors", { count: errors.length })
+              : hints.length > 0
+                ? t("publish.toggleHints", { count: hints.length })
+                : t("publish.toggleClean")}
+          </button>
+          <Button size="sm" onClick={onPublish} disabled={blocked || publishing || !canPublish}>
+            {publishing ? t("designer.publishing") : t("designer.publish")}
+          </Button>
+        </>
       }
       bodyClassName="flex flex-col gap-4"
     >
-      {error ? <StatusBanner kind="crit">{error}</StatusBanner> : null}
+      {!open ? null : (
+        <>
+          {error ? <StatusBanner kind="crit">{error}</StatusBanner> : null}
 
-      <section className="flex flex-col gap-2">
-        {blocked ? (
-          <>
-            <p className="text-sm font-medium text-ap-crit" role="status">
-              {t("publish.errorsTitle")} — {t("publish.errorsCount", { count: errors.length })}
+          <section className="flex flex-col gap-2">
+            {blocked ? (
+              <>
+                <p className="text-sm font-medium text-ap-crit" role="status">
+                  {t("publish.errorsTitle")} — {t("publish.errorsCount", { count: errors.length })}
+                </p>
+                <ul className="divide-y divide-ap-line rounded-lg border border-ap-crit/40">
+                  {errors.map((entry, index) => (
+                    <li key={`${entry.rule}-${entry.node_id ?? "doc"}-${index}`}>
+                      <CheckRow
+                        message={
+                          i18n.language === "ar" && entry.message_ar
+                            ? entry.message_ar
+                            : entry.message_en
+                        }
+                        rule={entry.rule}
+                        nodeId={entry.node_id}
+                        otherNodeIds={entry.node_ids.slice(1)}
+                        onSelectNode={onSelectNode}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p
+                className={
+                  serverState === "accepted" ? "text-sm text-ap-primary" : "text-sm text-ap-muted"
+                }
+                role="status"
+              >
+                {serverState === "accepted" ? t("publish.accepted") : t("publish.notChecked")}
+              </p>
+            )}
+          </section>
+
+          <section className="flex flex-col gap-2 border-t border-ap-line pt-3">
+            <p className="flex items-center gap-2 text-sm font-medium text-ap-ink">
+              {t("publish.hintsTitle")}
+              {hints.length > 0 ? (
+                <Pill kind="warn">{t("publish.hintsCount", { count: hints.length })}</Pill>
+              ) : (
+                <Pill kind="ok">{t("publish.hintsClean")}</Pill>
+              )}
             </p>
-            <ul className="divide-y divide-ap-line rounded-lg border border-ap-crit/40">
-              {errors.map((entry, index) => (
-                <li key={`${entry.rule}-${entry.node_id ?? "doc"}-${index}`}>
-                  <CheckRow
-                    message={
-                      i18n.language === "ar" && entry.message_ar
-                        ? entry.message_ar
-                        : entry.message_en
-                    }
-                    rule={entry.rule}
-                    nodeId={entry.node_id}
-                    otherNodeIds={entry.node_ids.slice(1)}
-                    onSelectNode={onSelectNode}
-                  />
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : (
-          <p
-            className={
-              serverState === "accepted" ? "text-sm text-ap-primary" : "text-sm text-ap-muted"
-            }
-            role="status"
-          >
-            {serverState === "accepted" ? t("publish.accepted") : t("publish.notChecked")}
-          </p>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-2 border-t border-ap-line pt-3">
-        <p className="flex items-center gap-2 text-sm font-medium text-ap-ink">
-          {t("publish.hintsTitle")}
-          {hints.length > 0 ? (
-            <Pill kind="warn">{t("publish.hintsCount", { count: hints.length })}</Pill>
-          ) : (
-            <Pill kind="ok">{t("publish.hintsClean")}</Pill>
-          )}
-        </p>
-        <p className="text-meta text-ap-muted">{t("publish.hintsHelp")}</p>
-        {hints.length > 0 ? (
-          <ul className="divide-y divide-ap-line rounded-lg border border-ap-line">
-            {hints.map((hint, index) => (
-              <li key={`${hint.messageKey}-${hint.node_id ?? "doc"}-${index}`}>
-                <CheckRow
-                  message={t(`publish.rule.${hint.messageKey}`, {
-                    ...(hint.params ?? {}),
-                    defaultValue: hint.detail,
-                  })}
-                  rule={hint.rule}
-                  nodeId={hint.node_id}
-                  otherNodeIds={[]}
-                  onSelectNode={onSelectNode}
-                />
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
+            <p className="text-meta text-ap-muted">{t("publish.hintsHelp")}</p>
+            {hints.length > 0 ? (
+              <ul className="divide-y divide-ap-line rounded-lg border border-ap-line">
+                {hints.map((hint, index) => (
+                  <li key={`${hint.messageKey}-${hint.node_id ?? "doc"}-${index}`}>
+                    <CheckRow
+                      message={t(`publish.rule.${hint.messageKey}`, {
+                        ...(hint.params ?? {}),
+                        defaultValue: hint.detail,
+                      })}
+                      rule={hint.rule}
+                      nodeId={hint.node_id}
+                      otherNodeIds={[]}
+                      onSelectNode={onSelectNode}
+                    />
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+        </>
+      )}
     </Card>
   );
 }

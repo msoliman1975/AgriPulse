@@ -326,7 +326,14 @@
       "combination_unknown_code": "Combination rule {{position}} names \"{{code}}\", which this tree never registers.",
       "combination_empty": "Combination rule {{position}} names no findings.",
       "duplicate_combination": "Combination rule {{position}} matches the same set as rule {{first}}."
-    }
+    },
+    "expand": "Show publish checks",
+    "collapse": "Hide publish checks",
+    "toggleErrors_one": "{{count}} error",
+    "toggleErrors_other": "{{count}} errors",
+    "toggleHints_one": "{{count}} hint",
+    "toggleHints_other": "{{count}} hints",
+    "toggleClean": "No problems"
   },
   "catalogue": {
     "title": "Finding catalogue",
