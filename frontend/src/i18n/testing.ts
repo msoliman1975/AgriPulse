@@ -25,6 +25,7 @@ import enTimeline from "./locales/en/timeline.json";
 import enReports from "./locales/en/reports.json";
 import enFieldAccess from "./locales/en/fieldAccess.json";
 import enIntegrationsHealth from "./locales/en/integrationsHealth.json";
+import enIntegrations from "./locales/en/integrations.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
 import arAccount from "./locales/ar/account.json";
@@ -49,6 +50,7 @@ import arTimeline from "./locales/ar/timeline.json";
 import arReports from "./locales/ar/reports.json";
 import arFieldAccess from "./locales/ar/fieldAccess.json";
 import arIntegrationsHealth from "./locales/ar/integrationsHealth.json";
+import arIntegrations from "./locales/ar/integrations.json";
 
 /**
  * Test-only i18n bootstrap. Identical resources to the production
@@ -82,10 +84,11 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           actionCenter: enActionCenter,
           users: enUsers,
           farmHealth: enFarmHealth,
-    timeline: enTimeline,
+          timeline: enTimeline,
           reports: enReports,
           fieldAccess: enFieldAccess,
           integrationsHealth: enIntegrationsHealth,
+          integrations: enIntegrations,
         },
         ar: {
           common: arCommon,
@@ -108,10 +111,11 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           actionCenter: arActionCenter,
           users: arUsers,
           farmHealth: arFarmHealth,
-    timeline: arTimeline,
+          timeline: arTimeline,
           reports: arReports,
           fieldAccess: arFieldAccess,
           integrationsHealth: arIntegrationsHealth,
+          integrations: arIntegrations,
         },
       },
       lng: language,
