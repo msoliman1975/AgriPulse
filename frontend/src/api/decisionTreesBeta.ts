@@ -64,6 +64,43 @@ const TENANT_FINDINGS = "/v1/tenant/decision-tree-findings";
  *  convenience, not the block catalogue. */
 const DRY_RUN_FARM_LIMIT = 20;
 
+// ---- Decision engine switch ------------------------------------------
+
+const DECISION_ENGINE = "/v1/platform/decision-engine";
+
+export type DecisionEngine = "old" | "beta";
+
+/** What one flip closed in one tenant schema. */
+export interface EngineCloseOutCounts {
+  recommendations_expired: number;
+  history_rows: number;
+  alerts_resolved: number;
+  verdicts_closed: number;
+}
+
+export interface DecisionEngineState {
+  engine: DecisionEngine;
+  switched_at: string | null;
+  switched_by: string | null;
+  last_close_out: {
+    from: DecisionEngine;
+    to: DecisionEngine;
+    tenants: Record<string, EngineCloseOutCounts>;
+  } | null;
+  /** Set on a PUT only. False when the switch already held that engine. */
+  changed?: boolean | null;
+}
+
+export async function getDecisionEngine(): Promise<DecisionEngineState> {
+  const { data } = await apiClient.get<DecisionEngineState>(DECISION_ENGINE);
+  return data;
+}
+
+export async function switchDecisionEngine(engine: DecisionEngine): Promise<DecisionEngineState> {
+  const { data } = await apiClient.put<DecisionEngineState>(DECISION_ENGINE, { engine });
+  return data;
+}
+
 // ---- Findings --------------------------------------------------------
 
 export type FindingSource = "platform" | "tenant";

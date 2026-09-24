@@ -342,11 +342,13 @@ class RecommendationsRepository:
         must still be published, so a pin to a draft yields no row and the
         tree is skipped rather than run from unpublished work.
 
-        Only ``stage = 'live'`` trees are returned. A beta tree is authored
-        against the folding engine and the sweep has no way to walk one yet,
-        so publishing a beta tree must not put it in front of a grower. This
+        Only trees of the stage the platform switch names are returned
+        (public migration 0093). ``engine = 'old'`` returns ``stage = 'live'``
+        trees and ``engine = 'beta'`` returns ``stage = 'beta'`` trees, never
+        both, so one problem is never reported by two engines at once. This
         is the only place that rule is enforced, because this is the only
-        query the sweep resolves its tree set from.
+        query the sweep, the on-demand run and the farm tree selection
+        resolve their tree set from. A missing switch row reads as 'old'.
 
         ``only_code`` narrows the result to one tree. That is the whole
         mechanism behind the authoring "run this tree now" path: the
@@ -386,13 +388,15 @@ class RecommendationsRepository:
                      AND v.version = COALESCE(p.version, cur.version)
                     WHERE t.is_active = TRUE
                       AND t.deleted_at IS NULL
-                      -- A beta tree never runs in the sweep, published or
-                      -- not. Its author publishes so the designer and the
-                      -- dry run have a fixed version to read; wiring the
-                      -- folding engine to the sweep is separate work. Until
-                      -- then this one predicate is what keeps a beta tree
-                      -- from writing recommendations at growers.
-                      AND t.stage = 'live'
+                      -- One engine at a time. The switch row decides which
+                      -- stage runs; flipping it is DecisionEngineSwitch's job
+                      -- and it closes the outgoing trees' open output in the
+                      -- same transaction.
+                      AND t.stage = COALESCE(
+                            (SELECT CASE e.engine WHEN 'beta' THEN 'beta' ELSE 'live' END
+                               FROM public.decision_engine e
+                              WHERE e.id = 1),
+                            'live')
                       AND v.published_at IS NOT NULL
                       AND (t.tenant_id IS NULL OR t.tenant_id = :tid)
                       AND (:only_code IS NULL OR t.code = :only_code)
