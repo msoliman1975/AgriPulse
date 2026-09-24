@@ -79,6 +79,12 @@ CONSTRAINTS: dict[str, KeyConstraint] = {
     "recommendations.sweep_cadence_hours": KeyConstraint(
         numeric_choices=(4, 8, 24, 168), integer_only=True
     ),
+    # How a block's health class is built from its cells (public 0094). The
+    # same three names `app.shared.health_definition.CELL_ROLLUPS` accepts.
+    "health.cell_rollup": KeyConstraint(choices=("worst", "share", "most_common")),
+    # A percent, not a fraction, because a person types it. 0 would make
+    # every block take its worst cell's status, which is what 'worst' is for.
+    "health.cell_share_pct": KeyConstraint(minimum=1, maximum=100, integer_only=True),
 }
 
 

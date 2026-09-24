@@ -96,6 +96,20 @@ _MAPPABLE: frozenset[str] = frozenset({"healthy", "watch", "critical"})
 # competes with a real verdict.
 _RANK: dict[Health, int] = {"critical": 3, "watch": 2, "healthy": 1, "unknown": 0}
 
+# How a block's class is built from its cell verdicts. See `_roll_cells`.
+CellRollup = Literal["worst", "share", "most_common"]
+CELL_ROLLUPS: tuple[str, ...] = get_args(CellRollup)
+
+# The decision-tree status list, ranked. Declared here for the same reason
+# the alert vocabulary is: app.shared must not import app.modules.
+# tests/unit/shared/test_health_definition.py pins it to
+# `recommendations.status_codes.STATUS_DEFINITIONS`.
+_STATUS_RANK: dict[str, int] = {"na": 0, "very_good": 1, "good": 2, "issue": 3, "alert": 4}
+
+# The share `share` uses when the definition names none. 20%, the value the
+# rollup was first described with (2026-09-24).
+_DEFAULT_CELL_SHARE = Decimal("0.2")
+
 
 class HealthDefinitionError(ValueError):
     """A definition that cannot be honoured as written.
@@ -140,6 +154,16 @@ class HealthDefinition:
     ``no_tree_coverage``
         Class for a block no tree applies to. "unknown" is honest.
         "healthy" is there for a tenant that would rather see green.
+    ``cell_rollup``
+        How cell verdicts become one block status. ``worst``: the worst
+        cell decides, with ``cell_critical_share`` able to hold alert cells
+        back to watch, which is how every block was judged before this
+        field. ``share``: the worst status that covers at least
+        ``cell_critical_share`` of the evaluated cells, counting worse
+        statuses too, decides (20% when the share is None).
+        ``most_common``: the status on the most cells decides, and a tie
+        goes to the worse one. Block-scoped verdicts are about the whole
+        block and always count in full.
 
     ``severity_map`` is a plain dict, so this dataclass is frozen but not
     deeply immutable. Callers build a definition and read it; nothing in
@@ -156,6 +180,7 @@ class HealthDefinition:
     recommendation_floor: Decimal | None = None
     stale_after_hours: int = 48
     no_tree_coverage: Health = "unknown"
+    cell_rollup: CellRollup = "worst"
 
     def __post_init__(self) -> None:
         _validate(self)
@@ -232,6 +257,8 @@ def resolve_health(
     stays for blocks whose sweep predates the verdict table.
     """
     if inputs.verdicts:
+        if definition.cell_rollup != "worst":
+            return _from_rolled_verdicts(definition, inputs, now=now)
         return _from_verdicts(definition, inputs, now=now)
 
     alert_class, alert_reason = _from_alerts(definition, inputs)
@@ -291,6 +318,82 @@ def _from_verdicts(  # noqa: PLR0911 - one return per status the block can land 
     # Every verdict is `na`: the trees ran and none of them had anything to
     # say about this block. Same answer as no tree covering it at all.
     return definition.no_tree_coverage, "no_tree"
+
+
+def _from_rolled_verdicts(
+    definition: HealthDefinition, inputs: HealthInputs, *, now: datetime
+) -> tuple[Health, HealthReason]:
+    """Step 0 for the `share` and `most_common` rollups.
+
+    Each cell first takes the worst status any tree gave it, so a cell two
+    trees looked at counts once. The cells then roll up into one status,
+    and the block takes the worse of that and its block-scoped verdicts.
+    """
+    block_codes = [v.status_code for v in inputs.verdicts if v.cell_id is None]
+    per_cell: dict[Any, str] = {}
+    for v in inputs.verdicts:
+        if v.cell_id is None:
+            continue
+        seen = per_cell.get(v.cell_id)
+        if seen is None or _status_rank(v.status_code) > _status_rank(seen):
+            per_cell[v.cell_id] = v.status_code
+
+    candidates = list(block_codes)
+    rolled = _roll_cells(definition, list(per_cell.values()))
+    if rolled is not None:
+        candidates.append(rolled)
+    status = max(candidates, key=_status_rank)
+
+    if status == "alert":
+        return "critical", "verdict_alert"
+    if status == "issue":
+        # Alert cells were present but covered too little of the block to
+        # decide it: say so, rather than blaming an issue that may not exist.
+        held_back = rolled == "issue" and "alert" in per_cell.values()
+        return "watch", "cell_share" if held_back else "verdict_issue"
+    if status in ("good", "very_good"):
+        return _fresh_or_unknown(definition, inputs, now=now)
+    return definition.no_tree_coverage, "no_tree"
+
+
+def _roll_cells(definition: HealthDefinition, statuses: list[str]) -> str | None:
+    """One status for a block's cells, by the definition's rollup rule."""
+    if not statuses:
+        return None
+    if definition.cell_rollup == "most_common":
+        counts: dict[str, int] = {}
+        for code in statuses:
+            counts[code] = counts.get(code, 0) + 1
+        # A tie goes to the worse status: calm is the point of this rule,
+        # but not at the price of hiding half the block.
+        return max(counts, key=lambda code: (counts[code], _status_rank(code)))
+
+    share = definition.cell_critical_share or _DEFAULT_CELL_SHARE
+    total = Decimal(len(statuses))
+    for code in sorted(set(statuses), key=_status_rank, reverse=True):
+        at_or_worse = sum(1 for s in statuses if _status_rank(s) >= _status_rank(code))
+        if Decimal(at_or_worse) / total >= share:
+            return code
+    # Unreachable: the best status present covers every cell. Kept so the
+    # function never returns a status that is not in the list.
+    return min(statuses, key=_status_rank)
+
+
+def _status_rank(code: str) -> int:
+    # An unknown code ranks below `na`, so it never decides a block.
+    return _STATUS_RANK.get(code, -1)
+
+
+def _fresh_or_unknown(
+    definition: HealthDefinition, inputs: HealthInputs, *, now: datetime
+) -> tuple[Health, HealthReason]:
+    """A good verdict is only as good as the last look."""
+    seen = inputs.verdict_last_evaluated_at
+    if seen is None:
+        return "unknown", "no_coverage"
+    if now - seen > timedelta(hours=definition.stale_after_hours):
+        return "unknown", "stale"
+    return "healthy", "verdict_good"
 
 
 # ---------- Step 1: alerts ---------------------------------------------------
@@ -418,6 +521,7 @@ _FIELDS: frozenset[str] = frozenset(
         "recommendation_floor",
         "stale_after_hours",
         "no_tree_coverage",
+        "cell_rollup",
     }
 )
 
@@ -459,6 +563,8 @@ def parse_definition(raw: Mapping[str, Any]) -> HealthDefinition:
         kwargs["stale_after_hours"] = _as_int(raw["stale_after_hours"], "stale_after_hours")
     if "no_tree_coverage" in raw:
         kwargs["no_tree_coverage"] = raw["no_tree_coverage"]
+    if "cell_rollup" in raw:
+        kwargs["cell_rollup"] = raw["cell_rollup"]
 
     return HealthDefinition(**kwargs)
 
@@ -474,6 +580,11 @@ def _validate(d: HealthDefinition) -> None:
     _validate_severity_map(d)
     _validate_statuses(d)
     _validate_thresholds(d)
+
+    if d.cell_rollup not in CELL_ROLLUPS:
+        raise HealthDefinitionError(
+            f"cell_rollup is {d.cell_rollup!r}; expected one of {list(CELL_ROLLUPS)}"
+        )
 
     if d.no_tree_coverage not in ("unknown", "healthy"):
         raise HealthDefinitionError(

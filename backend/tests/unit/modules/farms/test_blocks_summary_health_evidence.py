@@ -79,6 +79,7 @@ def _session(
     crops: list[Any] | None = None,
     definitions: list[Any] | None = None,
     farm_override: dict[str, Any] | None = None,
+    tenant_settings: list[Any] | None = None,
     grid: list[Any] | None = None,
     roster: list[Any] | None = None,
     indices: list[Any] | None = None,
@@ -102,11 +103,12 @@ def _session(
       6. cells         — live grid cell count per block                │
       7. crops         — current crop path per block                   ┘
       8. definitions   — the per-crop health catalog          ┐ the health
-      9. farm_override — this farm's own health override      ┘ definitions
-     10. grid          — current grid config per block
-     11. roster        — the active block ids
-     12. indices       — latest values, bounded to the recent window
-     13. unbounded     — latest values, unbounded; issued ONLY for blocks
+      9. farm_override — this farm's own health override      │ definitions
+     10. tenant_settings — the tenant's rollup settings       ┘
+     11. grid          — current grid config per block
+     12. roster        — the active block ids
+     13. indices       — latest values, bounded to the recent window
+     14. unbounded     — latest values, unbounded; issued ONLY for blocks
                          the recent window returned nothing for
 
     `unbounded` defaults to not being supplied at all, so a test whose
@@ -123,6 +125,7 @@ def _session(
         crops or [],
         definitions or [],
         [_Row(health_definition=farm_override)] if farm_override is not None else [],
+        tenant_settings or [],
         grid or [],
         roster or [],
         indices or [],

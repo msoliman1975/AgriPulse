@@ -1025,6 +1025,7 @@
   },
   "healthSource": {
     "platform": "Platform default",
+    "tenant": "Your organisation's setting",
     "crop": "Crop defaults",
     "cropVersioned": "Crop defaults (v{{version}})",
     "farm": "This farm's setting"

@@ -42,5 +42,23 @@
   },
   "save": "Save",
   "loadFailed": "Could not load integration settings.",
-  "noSettings": "No settings to display."
+  "noSettings": "No settings to display.",
+  "cellRollup": {
+    "title": "Block health from cells",
+    "help": "A cell-level tree gives every grid cell its own status. Choose how those cells make one status for the whole block. A tree that judges the whole block always counts in full.",
+    "rule": {
+      "worst": "The worst cell decides",
+      "share": "The worst status on a share of the cells decides",
+      "most_common": "The status on the most cells decides"
+    },
+    "ruleHelp": {
+      "worst": "One cell at Alert makes the whole block Alert. Cautious, and noisy on large blocks.",
+      "share": "A status decides only when it, or a worse one, covers at least the percent you set. One bad cell shows on the map but does not recolour the block.",
+      "most_common": "Calm, but a real hotspot can be hidden. A tie goes to the worse status."
+    },
+    "shareLabel": "Share of cells (%)",
+    "shareError": "Enter a whole number from 1 to 100.",
+    "saved": "Saved. The map uses the new rule on its next load.",
+    "failed": "Could not save. Nothing was changed."
+  }
 }

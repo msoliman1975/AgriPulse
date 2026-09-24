@@ -49,7 +49,13 @@ WEATHER_KEYS = (
 IMAGERY_KEYS = ("imagery.cloud_cover_threshold_pct",)
 # Detection / alerting thresholds (G-3). Tenant-tier override of the
 # platform default; per-block overrides live on grid_configs.
-DETECTION_KEYS = ("grid.anomaly_z_threshold",)
+DETECTION_KEYS = (
+    "grid.anomaly_z_threshold",
+    # How a block's class is built from its cells. Read by the health
+    # definition resolver as the tenant tier (public 0094).
+    "health.cell_rollup",
+    "health.cell_share_pct",
+)
 # Decision-tree engine cadence. Tenant tier only: a platform admin sets how
 # often the sweep evaluates this tenant. There is no farm or block tier —
 # the sweep walks a whole tenant in one task.
