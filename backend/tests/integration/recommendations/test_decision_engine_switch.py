@@ -118,7 +118,7 @@ async def test_only_the_selected_engine_writes(
     # Other tests leave trees of both stages in the catalogue, so only these
     # two trees' rows are counted.
     mine = "AND tree_id IN (:live, :beta)"
-    await _evaluate(schema, tenant.id, block_id)
+    await _evaluate(schema, tenant.tenant_id, block_id)
     cards = await _rows(
         admin_session,
         schema,
@@ -130,7 +130,7 @@ async def test_only_the_selected_engine_writes(
     assert {c["tree_id"] for c in cards} == {live_id}
 
     await _flip("beta")
-    await _evaluate(schema, tenant.id, block_id)
+    await _evaluate(schema, tenant.tenant_id, block_id)
     open_cards = await _rows(
         admin_session,
         schema,
@@ -151,7 +151,7 @@ async def test_flip_closes_the_outgoing_trees_output(
     schema = tenant.schema_name
     live_id, live_code, _, _ = await _two_trees(admin_session, suffix)
     _, block_id = await _dry_block(admin_session, schema, suffix)
-    await _evaluate(schema, tenant.id, block_id)
+    await _evaluate(schema, tenant.tenant_id, block_id)
 
     # One alert from the live tree and one from a rule, which is not a tree
     # and must stay open.
