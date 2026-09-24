@@ -87,7 +87,11 @@ def _folding_compiled(code: str) -> dict[str, Any]:
                 "code": "dry_plus_vigour",
                 "codes": ["dry", "ndvi_low"],
                 "action_type": "irrigate",
-                "status": "alert",
+                # `issue`, so the combined card is a recommendation like the
+                # single-finding ones and the supersede sequence below stays on
+                # one table. An `alert` status opens an alert instead
+                # (test_fold_status_routes_the_card).
+                "status": "issue",
                 "text_en": "Water shortage is the cause. Irrigate before treating anything else.",
                 "text_ar": "نقص الماء هو السبب. اروِ قبل أي معالجة أخرى.",
             }
