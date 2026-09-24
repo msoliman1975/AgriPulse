@@ -15,7 +15,16 @@ export interface AreaCell {
   col: number;
   status: StatusCode;
   leafNodeId: string;
+  /** The cell's worst verdict. The one the chip and the map colour follow. */
   verdict: Verdict;
+  /**
+   * What makes two neighbouring cells one area. Absent means the leaf,
+   * which is the rule for a tree whose leaves each say one fixed thing.
+   * See `cellGroupKey`.
+   */
+  groupKey?: string;
+  /** Every verdict on this cell, one per tree. Absent means `[verdict]`. */
+  verdicts?: Verdict[];
 }
 
 export interface Area {
@@ -33,6 +42,32 @@ export interface Area {
   spots: number;
   /** One verdict from the area; they all say the same thing. */
   sample: Verdict;
+  /**
+   * Every tree's verdict on one cell of the area, worst first. The cells of
+   * an area share a group key, so they share this list too.
+   */
+  verdicts: Verdict[];
+}
+
+/**
+ * What makes two neighbouring cells one area: every tree on the cell said
+ * the same thing about both.
+ *
+ * The leaf alone is not enough. A folding tree ends almost every walk at the
+ * same stop node, so grouping on the leaf put a block's every cell in one
+ * area whatever each cell's findings were. The sentence is what differs, so
+ * it is part of the key. With all trees shown at once the key covers each
+ * tree's answer, so an area is cells on which no tree disagrees.
+ */
+export function cellGroupKey(verdicts: Verdict[]): string {
+  return [...verdicts]
+    .sort((a, z) => a.tree_code.localeCompare(z.tree_code))
+    .map((v) => `${v.tree_code}:${v.leaf_node_id}:${v.status_code}:${v.text_en ?? ""}`)
+    .join("|");
+}
+
+function keyOf(cell: AreaCell): string {
+  return cell.groupKey ?? cell.leafNodeId;
 }
 
 /**
@@ -81,7 +116,7 @@ function patches(cells: AreaCell[]): AreaCell[][] {
       ]) {
         const key = `${cell.row + dr}:${cell.col + dc}`;
         const neighbour = index.get(key);
-        if (neighbour && !seen.has(key) && neighbour.leafNodeId === start.leafNodeId) {
+        if (neighbour && !seen.has(key) && keyOf(neighbour) === keyOf(start)) {
           seen.add(key);
           stack.push(neighbour);
         }
@@ -129,21 +164,22 @@ export function buildAreas(cells: AreaCell[], rows: number, cols: number): Area[
   if (cells.length === 0) return [];
   const total = cells.length;
 
-  const byLeaf = new Map<string, AreaCell[]>();
+  const byKey = new Map<string, AreaCell[]>();
   for (const cell of cells) {
-    const list = byLeaf.get(cell.leafNodeId);
+    const list = byKey.get(keyOf(cell));
     if (list) list.push(cell);
-    else byLeaf.set(cell.leafNodeId, [cell]);
+    else byKey.set(keyOf(cell), [cell]);
   }
 
   const areas: Area[] = [];
-  for (const [leafNodeId, leafCells] of byLeaf) {
+  for (const [groupKey, leafCells] of byKey) {
+    const leafNodeId = leafCells[0].leafNodeId;
     const groups = patches(leafCells);
     const small: AreaCell[][] = [];
     for (const members of groups) {
       if (members.length >= 3) {
         areas.push({
-          key: `${leafNodeId}|${members[0].row}:${members[0].col}`,
+          key: `${groupKey}|${members[0].row}:${members[0].col}`,
           name: nameOf(members, rows, cols, total),
           status: members[0].status,
           leafNodeId,
@@ -152,6 +188,7 @@ export function buildAreas(cells: AreaCell[], rows: number, cols: number): Area[
           scattered: false,
           spots: 1,
           sample: members[0].verdict,
+          verdicts: members[0].verdicts ?? [members[0].verdict],
         });
       } else {
         small.push(members);
@@ -160,7 +197,7 @@ export function buildAreas(cells: AreaCell[], rows: number, cols: number): Area[
     if (small.length > 0) {
       const merged = small.flat();
       areas.push({
-        key: `${leafNodeId}|scattered`,
+        key: `${groupKey}|scattered`,
         name: { kind: "scattered" },
         status: merged[0].status,
         leafNodeId,
@@ -169,6 +206,7 @@ export function buildAreas(cells: AreaCell[], rows: number, cols: number): Area[
         scattered: true,
         spots: small.length,
         sample: merged[0].verdict,
+        verdicts: merged[0].verdicts ?? [merged[0].verdict],
       });
     }
   }

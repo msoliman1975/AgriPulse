@@ -7,6 +7,12 @@
 
 import type { BlockVerdicts, StatusCode, StatusDefinition, Verdict } from "@/api/farmHealth";
 
+/**
+ * The picker value that shows every tree at once. Not a tree code: a code is
+ * lower snake case and cannot start with an underscore.
+ */
+export const ALL_TREES = "__all__";
+
 /** Worst first. The order the rail sorts by and the legend lists. */
 export const STATUS_ORDER: StatusCode[] = ["alert", "issue", "good", "very_good", "na"];
 

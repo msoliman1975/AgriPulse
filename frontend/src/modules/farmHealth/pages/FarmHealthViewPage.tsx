@@ -30,6 +30,7 @@ import {
   type FarmVerdicts,
   type StatusCode,
   type StatusDefinition,
+  type Verdict,
 } from "@/api/farmHealth";
 import { AsyncBoundary } from "@/components/AsyncBoundary";
 import { EmptyState } from "@/components/EmptyState";
@@ -50,7 +51,7 @@ import {
 import { HealthMap, type FitMode, type MapBlock, type MapCell } from "../components/HealthMap";
 import { MapDate } from "../components/MapDate";
 import { Transport } from "../components/Transport";
-import { buildAreas, pickArea, type AreaCell } from "../lib/areas";
+import { buildAreas, cellGroupKey, pickArea, type AreaCell } from "../lib/areas";
 import { usePanelSize } from "../lib/panelSize";
 import {
   DEFAULT_RANGE,
@@ -65,7 +66,7 @@ import {
   type DayWindow,
   type RangeId,
 } from "../lib/window";
-import { buildBlockRows, treeOptions, type BlockMeta } from "../lib/blockRows";
+import { ALL_TREES, buildBlockRows, rankOf, treeOptions, type BlockMeta } from "../lib/blockRows";
 
 interface HealthData {
   blocks: BlockListItem[];
@@ -277,18 +278,29 @@ export function FarmHealthViewPage(): ReactNode {
     // history-only tree whose name sorts earlier would take the slot — on
     // the newest day, where it has nothing to say, so every block would
     // suddenly read "tree did not run".
-    const activeTree = treeCode ?? liveTrees[0]?.code ?? trees[0]?.code ?? null;
+    //
+    // Since 2026-09-24 the default is every tree at once: Mohamed chose it
+    // when the beta trees split one crop's checks across several trees, so
+    // no single tree is "the" answer about a block any more. The first tree
+    // saying something today is still the rule for a farm with no tree
+    // saying anything, so the screen does not open on an empty "all".
+    const activeTree = treeCode ?? (liveTrees.length > 0 ? ALL_TREES : (trees[0]?.code ?? null));
     // Changing the range re-reads the history, and the old window's trees go
     // with it. A controlled `select` whose value matches no option renders as
     // a blank box, so the chosen tree always has one, named by its code until
     // its verdicts come back.
-    const choices =
-      activeTree !== null && !trees.some((tree) => tree.code === activeTree)
+    const named =
+      activeTree !== null &&
+      activeTree !== ALL_TREES &&
+      !trees.some((tree) => tree.code === activeTree)
         ? [{ code: activeTree, count: 0, label: activeTree }, ...trees]
         : trees;
+    const allLabel = t("farmHealth:treePicker.all");
+    const choices =
+      named.length > 0 ? [{ code: ALL_TREES, count: 0, label: allLabel }, ...named] : named;
     const activeTreeName = choices.find((tree) => tree.code === activeTree)?.label ?? activeTree;
     return { choices, activeTree, activeTreeName };
-  }, [state, arabic, treeCode]);
+  }, [state, arabic, treeCode, t]);
 
   // The palette, as one stable function. Rebuilt inline it was a new
   // identity on every render, and `HealthMap`'s cell effect depends on it —
@@ -381,7 +393,9 @@ export function FarmHealthViewPage(): ReactNode {
               code: block.code,
               name: block.name ?? block.code,
             }));
-            const rows = buildBlockRows(blocks, frameBlocks, activeTree, data.statuses);
+            // `null` asks `buildBlockRows` for every tree's verdicts at once.
+            const treeFilter = activeTree === ALL_TREES ? null : activeTree;
+            const rows = buildBlockRows(blocks, frameBlocks, treeFilter, data.statuses);
             const selectedBlockId = blockId ?? rows[0]?.blockId ?? null;
             const selected = rows.find((row) => row.blockId === selectedBlockId) ?? null;
 
@@ -406,12 +420,27 @@ export function FarmHealthViewPage(): ReactNode {
             // the tree did not reach it, and painting it any colour would say
             // otherwise.
             const gridBlock = data.grid?.blocks.find((b) => b.block_id === selectedBlockId);
-            const statusByCell = new Map<string, StatusCode>();
+            //
+            // One cell can hold one verdict per tree. It is painted, and
+            // grouped, by the worst of them; every one is kept for the panel.
+            const verdictsByCell = new Map<string, Verdict[]>();
             if (selected) {
               for (const verdict of selected.verdicts) {
-                if (verdict.cell_id) statusByCell.set(verdict.cell_id, verdict.status_code);
+                if (!verdict.cell_id) continue;
+                const list = verdictsByCell.get(verdict.cell_id);
+                if (list) list.push(verdict);
+                else verdictsByCell.set(verdict.cell_id, [verdict]);
               }
             }
+            for (const list of verdictsByCell.values()) {
+              list.sort(
+                (a, z) =>
+                  rankOf(z.status_code, data.statuses) - rankOf(a.status_code, data.statuses),
+              );
+            }
+            const statusByCell = new Map<string, StatusCode>(
+              [...verdictsByCell].map(([cellId, list]) => [cellId, list[0].status_code]),
+            );
             const mapCells: MapCell[] = (gridBlock?.cells ?? [])
               .filter((cell) => statusByCell.has(cell.cell_id))
               .map((cell) => ({
@@ -425,19 +454,20 @@ export function FarmHealthViewPage(): ReactNode {
               (gridBlock?.cells ?? []).map((cell) => [cell.cell_id, cell]),
             );
             const areaCells: AreaCell[] = [];
-            if (selected) {
-              for (const verdict of selected.verdicts) {
-                const geometry = verdict.cell_id ? geometryByCell.get(verdict.cell_id) : undefined;
-                if (!verdict.cell_id || !geometry) continue;
-                areaCells.push({
-                  cellId: verdict.cell_id,
-                  row: geometry.row_idx,
-                  col: geometry.col_idx,
-                  status: verdict.status_code,
-                  leafNodeId: verdict.leaf_node_id,
-                  verdict,
-                });
-              }
+            for (const [cellId, list] of verdictsByCell) {
+              const geometry = geometryByCell.get(cellId);
+              if (!geometry) continue;
+              const worst = list[0];
+              areaCells.push({
+                cellId,
+                row: geometry.row_idx,
+                col: geometry.col_idx,
+                status: worst.status_code,
+                leafNodeId: worst.leaf_node_id,
+                verdict: worst,
+                groupKey: cellGroupKey(list),
+                verdicts: list,
+              });
             }
             const gridRows =
               areaCells.length > 0 ? Math.max(...areaCells.map((c) => c.row)) + 1 : 0;
@@ -674,6 +704,7 @@ export function FarmHealthViewPage(): ReactNode {
                             rows={gridRows}
                             cols={gridCols}
                             treeName={activeTreeName}
+                            allTrees={activeTree === ALL_TREES}
                           />
 
                           {/* A block tree writes one verdict with no cell, so
