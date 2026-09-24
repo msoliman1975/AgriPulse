@@ -77,7 +77,11 @@ from app.modules.recommendations.repository import (
     FindingsRepository,
     RecommendationsRepository,
 )
-from app.modules.recommendations.status_codes import STATUS_DEFINITIONS, status_for, worst
+from app.modules.recommendations.status_codes import (
+    STATUS_BY_CODE,
+    STATUS_DEFINITIONS,
+    worst,
+)
 from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
 from app.modules.weather.snapshot import load_index_snapshot as load_weather_index_snapshot
 from app.modules.weather.snapshot import load_risk_snapshot as load_weather_risk_snapshot
@@ -166,6 +170,11 @@ _NO_FINDINGS_AR = "تم الفحص؛ لا توجد ملاحظات."
 _ALLOWED_ACTION_TYPES: frozenset[str] = frozenset(
     {"irrigate", "fertilize", "spray", "scout", "harvest_window", "prune", "no_action", "other"}
 )
+
+
+# What a folded card becomes, by its status. Anything not listed writes a
+# verdict and nothing else.
+_FOLD_KIND_BY_STATUS: dict[str, str] = {"alert": "alert", "issue": "recommendation"}
 
 
 def _is_folding_shape(compiled: Any) -> bool:
@@ -312,9 +321,24 @@ def _folding_evaluation(walk: FoldingWalkResult, card: FoldedCard | None) -> Eva
         )
         return EvaluationResult(outcome=outcome, path=path, evaluation_snapshot=snapshot)
 
+    # The fold's status decides both what the map paints and what, if
+    # anything, opens in the Action Center:
+    #
+    #   alert                 -> an alert, red on the map
+    #   issue                 -> a recommendation, amber on the map
+    #   good, very_good, na   -> no work item; the verdict alone says what
+    #                            the cell is, with the findings' own words
+    #
+    # A status outside the vocabulary cannot come out of the fold, which
+    # ranks against `status_codes`; `issue` is the landing place if one does,
+    # because it asks a person to look without raising an alarm.
+    status = card.status if card.status in STATUS_BY_CODE else "issue"
+    kind = _FOLD_KIND_BY_STATUS.get(status, "status")
     action_type = card.action_type if card.action_type in _ALLOWED_ACTION_TYPES else "other"
     outcome = TreeOutcome(
-        action_type=action_type,
+        # `no_action` is what keeps a good or very good card off the board:
+        # the dispatcher opens no work item for it and writes the verdict.
+        action_type=action_type if kind != "status" else "no_action",
         severity=card.severity,
         # A fold asserts what the checks found; it does not estimate a
         # probability the way a leaf's `confidence:` does. The column is NOT
@@ -322,23 +346,39 @@ def _folding_evaluation(walk: FoldingWalkResult, card: FoldedCard | None) -> Eva
         confidence=Decimal("1"),
         parameters={
             "finding_set": list(card.identity),
-            # The fold's health class (normal / watch / stressed / unknown).
-            # Kept on the card so the Action Center work can read it without
-            # re-folding, and separate from `status_code`, which is the map's
-            # five-value legend and is not the same vocabulary.
-            "health_status": card.status,
+            # The same value as `status_code` since the fold learned the
+            # five-value vocabulary. Kept under its old name because cards
+            # already written carry it.
+            "health_status": status,
             "matched_rule": card.rule_code,
             "composed": card.composed,
         },
         text_en=card.text_en,
         text_ar=card.text_ar,
         valid_for_hours=None,
-        kind="recommendation",
-        status_code=status_for("recommendation"),
+        kind=kind,
+        status_code=status,
         leaf_node_id=walk.stopped_at,
         actions={k: list(v) for k, v in card.actions.items()},
     )
     return EvaluationResult(outcome=outcome, path=path, evaluation_snapshot=snapshot)
+
+
+def _alert_rule_leaf(outcome: TreeOutcome) -> str:
+    """The last segment of a tree alert's ``rule_code``.
+
+    An old-style leaf is its own identity. A folding walk almost always ends
+    at the same stop node, so the stop node cannot tell one alert from
+    another; the finding set can, and it is what the dedup index must see. A
+    block whose findings changed gets a new alert with the new words, instead
+    of a bump on an alert that describes yesterday's findings. The segment
+    holds no colon, so ``tree:<code>:`` still splits the way every reader of
+    ``rule_code`` expects.
+    """
+    finding_set = (outcome.parameters or {}).get("finding_set")
+    if finding_set:
+        return "findings=" + "+".join(str(c) for c in finding_set)
+    return outcome.leaf_node_id or "leaf"
 
 
 def _fold_trace_columns(walk: FoldingWalkResult | None, card: FoldedCard | None) -> dict[str, Any]:
@@ -2341,8 +2381,7 @@ class RecommendationsServiceImpl:
         from app.modules.alerts.repository import AlertsRepository
 
         outcome = result.outcome
-        leaf_node_id = outcome.leaf_node_id or "leaf"
-        rule_code = f"tree:{tree['tree_code']}:{leaf_node_id}"
+        rule_code = f"tree:{tree['tree_code']}:{_alert_rule_leaf(outcome)}"
         alert_repo = AlertsRepository(tenant_session=self._tenant, public_session=self._public)
 
         async def _insert(
@@ -2482,7 +2521,7 @@ class RecommendationsServiceImpl:
                 "action_type": outcome.action_type,
                 "tree_code": tree["tree_code"],
                 "tree_version": tree["version"],
-                "leaf_node_id": leaf_node_id,
+                "leaf_node_id": outcome.leaf_node_id or "leaf",
                 "group_key": group_key,
                 "is_group": cell_id is not None,
             },
