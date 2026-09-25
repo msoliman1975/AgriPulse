@@ -73,12 +73,12 @@ class DecisionTree(Base, TimestampedMixin):
         server_default=text("ARRAY[]::text[]"),
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
-    # Which engine this tree belongs to: 'live' (the sweep runs it) or 'beta'
-    # (folding engine, authored and dry-run but never swept). CHECK
+    # Which engine this tree belongs to: 'live' (the old engine) or 'beta'
+    # (the folding engine and its designer). CHECK
     # constrained by public migration 0092. A beta tree can be published —
     # its author needs that to dry-run and to hand it to a reviewer — and
-    # still never runs, because `list_active_trees_with_current_version`
-    # filters on `stage = 'live'`.
+    # runs only while the platform decision engine (public 0093) is 'beta':
+    # `list_active_trees_with_current_version` returns one stage at a time.
     stage: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'live'"))
     current_version_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),

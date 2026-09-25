@@ -58,6 +58,8 @@ from app.modules.recommendations.schemas import (
     BetaTreeSummary,
     BetaTreeVersionCreateRequest,
     BlockVerdictsResponse,
+    DecisionEngineResponse,
+    DecisionEngineSwitchRequest,
     DecisionTreeAvailabilityResponse,
     DecisionTreeCopyRequest,
     DecisionTreeCreateRequest,
@@ -1855,9 +1857,9 @@ async def publish_beta_tree_version(
 ) -> dict[str, Any]:
     """Fix a version the designer, the dry run and a reviewer can agree on.
 
-    Publishing a beta tree does not put it in front of a grower. The sweep's
-    tree query filters on `stage = 'live'`, so a published beta tree runs
-    nowhere until the sweep is wired to the folding engine.
+    Publishing a beta tree puts it in front of growers only while the
+    platform decision engine is set to 'beta' (`/platform/decision-engine`).
+    Under 'old' the sweep runs `stage = 'live'` trees only.
     """
     _ensure_authoring_scope(context)
     try:
@@ -2193,6 +2195,53 @@ async def list_beta_run_results_route(
         return await EstateDryRunRepository(tenant_session=session).list_real_run_results(
             tree_id=tree_id, run_id=run_id, limit=limit
         )
+
+
+# ---------- Decision engine switch -----------------------------------------
+#
+#   GET /api/v1/platform/decision-engine   which engine the sweep runs
+#   PUT /api/v1/platform/decision-engine   flip it, closing the outgoing
+#                                          trees' open output in the same
+#                                          transaction (public 0093)
+
+
+@router.get(
+    "/platform/decision-engine",
+    response_model=DecisionEngineResponse,
+    summary="Which decision-tree engine the sweep runs: old or beta.",
+)
+async def get_decision_engine(
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> dict[str, Any]:
+    from app.modules.recommendations.engine_switch import read_engine
+
+    _ensure_platform_scope(context)
+    return await read_engine(public_session)
+
+
+@router.put(
+    "/platform/decision-engine",
+    response_model=DecisionEngineResponse,
+    summary="Switch the sweep to the old or the beta engine, for every tenant.",
+)
+async def put_decision_engine(
+    payload: DecisionEngineSwitchRequest,
+    context: RequestContext = Depends(requires_capability("decision_tree.manage")),
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> dict[str, Any]:
+    """One click, every tenant, one transaction.
+
+    The outgoing trees' open recommendations expire, their open alerts
+    resolve and their current verdicts end, all at the moment of the flip.
+    History keeps every row. Flipping back does the same to the other side.
+    Switching to the engine that already runs changes nothing.
+    """
+    from app.modules.recommendations.engine_switch import switch_engine
+
+    _ensure_platform_scope(context)
+    # The session dependency commits on exit, as for every other write here.
+    return await switch_engine(public_session, to=payload.engine, actor_user_id=context.user_id)
 
 
 # ---------- Finding catalogue ----------------------------------------------

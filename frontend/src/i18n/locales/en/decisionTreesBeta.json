@@ -462,5 +462,39 @@
     "unlabelled": "No label",
     "walkFailed": "The walk ended on node {{node}} without reaching a stop node.",
     "yes": "Yes"
+  },
+  "engine": {
+    "title": "Decision engine for all tenants",
+    "loading": "Reading which engine runs…",
+    "loadFailed": "Could not read which engine runs.",
+    "failed": "The switch failed. Nothing was changed.",
+    "switching": "Switching…",
+    "name": {
+      "old": "Old engine",
+      "beta": "Beta engine"
+    },
+    "explain": {
+      "old": "The sweep runs the old live trees. Published beta trees run nowhere.",
+      "beta": "The sweep runs published beta trees only. The old live trees run nowhere."
+    },
+    "switchTo": {
+      "old": "Switch back to the old engine",
+      "beta": "Switch to the beta engine"
+    },
+    "lastFlip": "Last switch {{at}}: {{recommendations}} recommendations expired, {{alerts}} alerts resolved, {{verdicts}} verdicts ended.",
+    "confirm": {
+      "title": {
+        "old": "Switch every tenant back to the old engine?",
+        "beta": "Switch every tenant to the beta engine?"
+      },
+      "stops": {
+        "old": "Beta trees stop running for every tenant. The old live trees run from the next sweep.",
+        "beta": "The old live trees stop running for every tenant and every crop. A crop with no published beta tree gets no results."
+      },
+      "closes": "Open recommendations, tree alerts and current verdicts from the trees that stop are closed now, in one step.",
+      "history": "History, farm replay and verdict history keep every closed row.",
+      "publishedCount": "Published beta trees: {{n}}.",
+      "noBetaTrees": "No beta tree is published. After this switch, no tenant gets any decision-tree results."
+    }
   }
 }

@@ -9,10 +9,12 @@ import {
   deactivateFinding,
   discardBetaDraft,
   getBetaTree,
+  getDecisionEngine,
   listBetaTrees,
   listDryRunBlocks,
   listFindings,
   publishBetaVersion,
+  switchDecisionEngine,
   updateFinding,
   type BetaCandidateBlock,
   type BetaCellWalkResponse,
@@ -20,6 +22,8 @@ import {
   type BetaTreeCreatePayload,
   type BetaTreeDetail,
   type BetaTreeVersion,
+  type DecisionEngine,
+  type DecisionEngineState,
   type Finding,
   type FindingSource,
   type FindingWritePayload,
@@ -82,6 +86,24 @@ export function useDeactivateFinding() {
   return useMutation<void, Error, { source: FindingSource; code: string }>({
     mutationFn: ({ source, code }) => deactivateFinding(source, code),
     onSuccess: invalidate,
+  });
+}
+
+/** Which engine the sweep runs. Platform scope only; the route 403s a tenant. */
+export function useDecisionEngine(enabled: boolean) {
+  return useQuery({
+    queryKey: [...KEY, "engine"] as const,
+    queryFn: getDecisionEngine,
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+export function useSwitchDecisionEngine() {
+  const qc = useQueryClient();
+  return useMutation<DecisionEngineState, Error, DecisionEngine>({
+    mutationFn: switchDecisionEngine,
+    onSuccess: (state) => qc.setQueryData([...KEY, "engine"], state),
   });
 }
 
