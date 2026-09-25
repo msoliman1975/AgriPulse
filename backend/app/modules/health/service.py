@@ -10,11 +10,17 @@ block. The catalog is small — one row per crop that needs its own values,
 so tens of rows, not thousands — and it is platform data that changes only
 when a seed file does.
 
-Three tiers, shallow-merged, deepest winning per key:
+Four tiers, shallow-merged, deepest winning per key:
 
     PLATFORM_DEFAULT_DEFINITION
-      <- public.crop_health_definitions, merged along the crop path
-        <- farms.health_definition                    (the farm override)
+      <- the tenant's settings                         (public 0094)
+        <- public.crop_health_definitions, merged along the crop path
+          <- farms.health_definition                   (the farm override)
+
+The tenant tier holds one thing: how a block's class is built from its
+cells (`cell_rollup`, and the share `share` reads). It is written through
+the tenant settings keys `health.cell_rollup` and `health.cell_share_pct`,
+and it is a tier only when the tenant has overridden one of them.
 
 A block on ``mango.keitt`` takes ``mango``'s keys, then ``mango.keitt``'s on
 top, then its farm's, and `PLATFORM_DEFAULT_DEFINITION` for anything none of
@@ -40,6 +46,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
@@ -56,7 +63,11 @@ from app.shared.health_definition import (
 # Which tier had the last word. Rendered beside the class, because "why is
 # my block red" has two halves and this is the other one: the reason says
 # what the evidence showed, the source says whose rule read it.
-DefinitionSource = Literal["platform", "crop", "farm"]
+DefinitionSource = Literal["platform", "tenant", "crop", "farm"]
+
+# The tenant settings keys that make up the tenant tier.
+_ROLLUP_KEY = "health.cell_rollup"
+_SHARE_KEY = "health.cell_share_pct"
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,7 +98,7 @@ class CropHealthDefinitions:
     cache 34 times instead of merging and re-parsing per block.
     """
 
-    __slots__ = ("_by_path", "_cache", "_farm_override", "_versions")
+    __slots__ = ("_by_path", "_cache", "_farm_override", "_tenant_tier", "_versions")
 
     def __init__(
         self,
@@ -95,9 +106,14 @@ class CropHealthDefinitions:
         *,
         versions: Mapping[str, int] | None = None,
         farm_override: Mapping[str, Any] | None = None,
+        tenant_tier: Mapping[str, Any] | None = None,
     ) -> None:
         self._by_path = dict(by_path)
         self._versions = dict(versions or {})
+        # Under the crop tier and over the platform default. Empty when the
+        # tenant has not overridden anything, so "platform" stays the source
+        # a tenant sees until it chooses otherwise.
+        self._tenant_tier = dict(tenant_tier) if tenant_tier else None
         # Baked in rather than passed to `for_path`, so the memo cannot be
         # keyed on the crop path alone while the answer depends on two
         # things. One instance is one farm's view of the catalog.
@@ -123,7 +139,7 @@ class CropHealthDefinitions:
         return resolved
 
     def _resolve(self, crop_path: str | None) -> ResolvedDefinition:
-        merged: dict[str, Any] = {}
+        merged: dict[str, Any] = dict(self._tenant_tier or {})
         matched_path: str | None = None
 
         segments = crop_path.split(".") if crop_path else []
@@ -148,7 +164,13 @@ class CropHealthDefinitions:
             merged.update(self._farm_override)
 
         source: DefinitionSource = (
-            "farm" if has_farm else ("crop" if matched_path is not None else "platform")
+            "farm"
+            if has_farm
+            else (
+                "crop"
+                if matched_path is not None
+                else ("tenant" if self._tenant_tier else "platform")
+            )
         )
         if source == "platform":
             return ResolvedDefinition(PLATFORM_DEFAULT_DEFINITION, "platform")
@@ -210,8 +232,61 @@ async def load_health_definitions(session: AsyncSession, *, farm_id: UUID) -> Cr
     # on a page that had already decided what to say about it.
     farm_override = override.health_definition if override is not None else None
 
+    tenant_rows = (
+        (
+            await session.execute(
+                text(_TENANT_TIER_SQL),
+                {"rollup": _ROLLUP_KEY, "share": _SHARE_KEY},
+            )
+        )
+        .mappings()
+        .all()
+    )
+
     return CropHealthDefinitions(
         {r["crop_path"]: dict(r["definition"] or {}) for r in rows},
         versions={r["crop_path"]: int(r["version"]) for r in rows},
         farm_override=farm_override,
+        tenant_tier=tenant_tier_from_settings(tenant_rows),
     )
+
+
+# The two keys, the tenant's value where it wrote one and the platform's
+# otherwise, as text, and whether the tenant wrote one. The tenant is found through
+# the session's own `app.current_tenant_id`, the sanitized schema name every
+# tenant session sets (`app.shared.db.session._set_search_path`), so neither
+# caller has to thread a tenant id through for a setting it does not own.
+# Always one statement, so the caller's query count does not depend on data.
+_TENANT_TIER_SQL = """
+SELECT d.key,
+       COALESCE(o.value, d.value) #>> '{}' AS value,
+       (o.value IS NOT NULL)      AS overridden
+  FROM public.platform_defaults d
+  LEFT JOIN public.tenant_settings_overrides o
+         ON o.key = d.key
+        AND o.tenant_id = (
+              SELECT t.id FROM public.tenants t
+               WHERE t.schema_name = current_setting('app.current_tenant_id', TRUE)
+            )
+ WHERE d.key IN (:rollup, :share)
+"""
+
+
+def tenant_tier_from_settings(rows: Any) -> dict[str, Any] | None:
+    """The definition keys the tenant's two settings stand for.
+
+    None when the tenant overrode neither, so the tier stays out of the
+    source it reports. The share is written only for `share`: under
+    `worst`, `cell_critical_share` holds alert cells back to watch, and a
+    tenant that chose "the worst cell decides" did not ask for that.
+    """
+    by_key = {str(r["key"]): r for r in rows}
+    if not any(bool(r["overridden"]) for r in by_key.values()):
+        return None
+    rollup_row = by_key.get(_ROLLUP_KEY)
+    rollup = str(rollup_row["value"]) if rollup_row is not None else "worst"
+    tier: dict[str, Any] = {"cell_rollup": rollup}
+    share_row = by_key.get(_SHARE_KEY)
+    if rollup == "share" and share_row is not None and share_row["value"] is not None:
+        tier["cell_critical_share"] = str(Decimal(str(share_row["value"])) / Decimal(100))
+    return tier

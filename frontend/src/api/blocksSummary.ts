@@ -30,7 +30,7 @@ export type HealthReason =
 /** Which tier had the last word on a block's health definition. Mirrors
  *  `app.modules.health.service.DefinitionSource`. The reason says what the
  *  evidence showed; the source says whose rule read it. */
-export type HealthSource = "platform" | "crop" | "farm";
+export type HealthSource = "platform" | "tenant" | "crop" | "farm";
 
 export interface BlockSummary {
   id: string;

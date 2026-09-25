@@ -29,6 +29,7 @@ import { useBetaTrees, useCreateBetaTree } from "@/queries/decisionTreesBeta";
 import type { BetaTreeSummary } from "@/api/decisionTreesBeta";
 
 import { useAuthoringScope } from "../../lib/authoringScope";
+import { DecisionEngineSwitch } from "../components/DecisionEngineSwitch";
 import { parseBetaDoc, STARTER_BETA_YAML } from "../lib/betaTree";
 import { betaBasePath, betaTreePath, findingCataloguePath } from "../lib/betaRoutes";
 
@@ -131,6 +132,15 @@ export function BetaTreeListPage(): ReactNode {
         }
       />
       <p className="text-sm text-ap-muted">{t("beta.note")}</p>
+      {/* The switch is platform-wide, so only platform staff who can author
+          trees see it. The route refuses anyone else. */}
+      {scope === "platform" && canManage ? (
+        <DecisionEngineSwitch
+          publishedBetaTrees={
+            (query.data ?? []).filter((row) => row.current_version !== null).length
+          }
+        />
+      ) : null}
       <DataTable<BetaTreeSummary>
         state={rows}
         rowKey={(row) => row.code}
