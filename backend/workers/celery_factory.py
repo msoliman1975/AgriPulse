@@ -113,7 +113,6 @@ def build_celery(queue: QueueName) -> Celery:
     return app
 
 
-@worker_init.connect(weak=False)
 def register_event_subscribers(**_: object) -> None:
     """Give a worker process the event handlers its tasks need.
 
@@ -132,6 +131,11 @@ def register_event_subscribers(**_: object) -> None:
     from app.shared.eventbus import get_default_bus
 
     register_worker_subscribers(get_default_bus())
+
+
+# Connected with a call rather than the `@worker_init.connect` decorator,
+# which mypy reads as untyped and which would untype the function with it.
+worker_init.connect(register_event_subscribers, weak=False)
 
 
 def build_publisher() -> Celery:
