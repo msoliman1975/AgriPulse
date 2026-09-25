@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Literal
 
 from celery import Celery
+from celery.signals import worker_init
 
 from app.core.logging import configure_logging
 from app.core.settings import get_settings
@@ -110,6 +111,31 @@ def build_celery(queue: QueueName) -> Celery:
         enable_utc=True,
     )
     return app
+
+
+def register_event_subscribers(**_: object) -> None:
+    """Give a worker process the event handlers its tasks need.
+
+    The API registers its subscribers when it builds the app, and a worker
+    never builds the app, so every event a task published went nowhere. The
+    daily decision-tree sweep runs here, so it opened alerts and
+    recommendations and told nobody.
+
+    On `worker_init`, not inside `build_celery`: unit tests build the app
+    too, and registering there would attach notification handlers to the
+    shared bus for every test that runs after them. `worker_init` fires in
+    the main worker process before the pool forks, so each child inherits
+    the handlers. Beat never starts a worker, so it registers nothing.
+    """
+    from app.modules.notifications.subscribers import register_worker_subscribers
+    from app.shared.eventbus import get_default_bus
+
+    register_worker_subscribers(get_default_bus())
+
+
+# Connected with a call rather than the `@worker_init.connect` decorator,
+# which mypy reads as untyped and which would untype the function with it.
+worker_init.connect(register_event_subscribers, weak=False)
 
 
 def build_publisher() -> Celery:
