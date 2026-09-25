@@ -171,10 +171,12 @@ async def _close_out_tenant(
             INSERT INTO recommendations_history
                 (recommendation_id, block_id, cell_id, farm_id, from_state,
                  to_state, actor_user_id, details)
+            -- Each value in jsonb_build_object is cast: a bare bind there has
+            -- no type Postgres can infer, and the statement fails to prepare.
             SELECT r.id, r.block_id, r.cell_id, r.farm_id, r.state, 'expired', :actor,
-                   jsonb_build_object('reason', :reason,
-                                      'engine_from', :efrom,
-                                      'engine_to', :eto)
+                   jsonb_build_object('reason', CAST(:reason AS text),
+                                      'engine_from', CAST(:efrom AS text),
+                                      'engine_to', CAST(:eto AS text))
               FROM recommendations r
              WHERE r.state IN ('open', 'deferred')
                AND r.tree_id = ANY(CAST(:ids AS uuid[]))
