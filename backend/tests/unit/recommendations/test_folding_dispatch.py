@@ -45,6 +45,16 @@ _CATALOGUE = {
         source="tree",
         action_type="scout",
     ),
+    "in_band": _FindingRow(
+        code="in_band",
+        clause_en="nitrogen is in band",
+        clause_ar=None,
+        name_en="In band",
+        name_ar=None,
+        default_status="good",
+        source="tree",
+        action_type="scout",
+    ),
 }
 
 
@@ -87,7 +97,7 @@ def test_a_body_with_no_nodes_does_not_fold() -> None:
 # --- the adapter ------------------------------------------------------------
 
 
-def test_a_card_becomes_a_recommendation_outcome() -> None:
+def test_an_alert_card_becomes_an_alert_outcome() -> None:
     walk = _walk(RegisteredFinding(code="dry", severity="warning", registered_by=("reg_dry",)))
     card = fold(walk.findings, catalogue=_CATALOGUE)
     assert card is not None
@@ -96,13 +106,45 @@ def test_a_card_becomes_a_recommendation_outcome() -> None:
 
     assert result.error is None
     assert result.outcome is not None
-    assert result.outcome.kind == "recommendation"
+    assert result.outcome.kind == "alert"
+    # The fold's own status, not the fixed amber every card used to get.
+    assert result.outcome.status_code == "alert"
     assert result.outcome.action_type == "irrigate"
     assert result.outcome.severity == "warning"
     assert result.outcome.confidence == Decimal("1")
     assert result.outcome.leaf_node_id == "stop"
     assert result.outcome.parameters["finding_set"] == ["dry"]
     assert result.outcome.parameters["health_status"] == "alert"
+
+
+def test_an_issue_card_becomes_a_recommendation_outcome() -> None:
+    walk = _walk(RegisteredFinding(code="ndvi_low", severity="warning", registered_by=("r",)))
+    card = fold(walk.findings, catalogue=_CATALOGUE)
+    assert card is not None
+
+    result = _folding_evaluation(walk, card)
+
+    assert result.outcome is not None
+    assert result.outcome.kind == "recommendation"
+    assert result.outcome.status_code == "issue"
+    assert result.outcome.action_type == "scout"
+
+
+def test_a_good_card_asks_for_no_work_and_keeps_its_words() -> None:
+    """`no_action` is what keeps the card off the board; the text stays the
+    finding's own, so the verdict says what was found and not a blank."""
+    walk = _walk(RegisteredFinding(code="in_band", severity="info", registered_by=("r",)))
+    card = fold(walk.findings, catalogue=_CATALOGUE)
+    assert card is not None
+
+    result = _folding_evaluation(walk, card)
+
+    assert result.outcome is not None
+    assert result.outcome.kind == "status"
+    assert result.outcome.status_code == "good"
+    assert result.outcome.action_type == "no_action"
+    assert "nitrogen is in band" in result.outcome.text_en.lower()
+    assert result.outcome.parameters["finding_set"] == ["in_band"]
 
 
 def test_an_action_type_outside_the_column_becomes_other() -> None:
