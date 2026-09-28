@@ -51,10 +51,10 @@ from app.modules.recommendations.folding_compiler import (
 from app.modules.recommendations.repository import RecommendationsRepository
 from app.shared import clock
 
-# The stage value a tree authored here carries. The sweep's tree query
-# filters on `stage = 'live'`, so this one value is what keeps every tree in
-# this module out of production until the sweep is wired to the folding
-# engine.
+# The stage value a tree authored here carries. The sweep's tree query runs
+# this stage only while the platform decision engine is 'beta' (public
+# migration 0093), so this one value and that switch decide whether a tree
+# in this module reaches growers.
 BETA_STAGE = "beta"
 
 
@@ -429,8 +429,8 @@ class FoldingTreeAuthorService:
     ) -> dict[str, Any]:
         """Stamp one version published and make it the tree's current one.
 
-        Publishing a beta tree does not put it in front of anybody: the
-        sweep's tree query filters on `stage = 'live'`. It fixes a version
+        Publishing a beta tree puts it in front of growers only while the
+        platform decision engine is 'beta'. It fixes a version
         the designer, the dry run and a reviewer can all agree on.
 
         Idempotent. A second publish of the same version returns the same

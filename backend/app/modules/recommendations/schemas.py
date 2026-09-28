@@ -1074,6 +1074,29 @@ class BetaTreePublishRequest(BaseModel):
     version_id: UUID
 
 
+class DecisionEngineResponse(BaseModel):
+    """GET and PUT /platform/decision-engine.
+
+    ``last_close_out`` is what the last flip closed, per tenant schema:
+    ``{"from", "to", "tenants": {schema: {recommendations_expired,
+    history_rows, alerts_resolved, verdicts_closed}}}``.
+    """
+
+    engine: Literal["old", "beta"]
+    switched_at: datetime | None = None
+    switched_by: UUID | None = None
+    last_close_out: dict[str, Any] | None = None
+    changed: bool | None = None
+
+
+class DecisionEngineSwitchRequest(BaseModel):
+    """PUT /platform/decision-engine."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    engine: Literal["old", "beta"]
+
+
 class BetaTreePublishResponse(BaseModel):
     tree_id: UUID
     code: str
