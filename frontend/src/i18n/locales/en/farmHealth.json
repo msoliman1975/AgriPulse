@@ -82,7 +82,8 @@
       "recommendation": "recommendation",
       "status": "status",
       "no_action": "no action needed"
-    }
+    },
+    "noPermission": "Your role does not include seeing how the tree decided."
   },
   "range": {
     "label": "Range",

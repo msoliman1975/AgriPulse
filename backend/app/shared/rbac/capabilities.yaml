@@ -430,6 +430,13 @@ capabilities:
     description: Author or publish decision trees within the tenant.
     scope: tenant
     status: active
+  verdict.reasoning.read:
+    description: >-
+      See how a decision tree reached its result on a block or cell: the
+      walk step by step, on Farm Health and in the Action Center. Does not
+      open the tree itself; that is decision_tree.read.
+    scope: farm
+    status: active
 
   # --- Operational records ---------------------------------------------
   irrigation.record:

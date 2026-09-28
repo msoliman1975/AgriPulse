@@ -7,10 +7,15 @@ and PlatformSupport hold. That made the tab 403 for every field role,
 including the Agronomist, who is the whole audience for a "why did this tree
 fire" screen.
 
-It is gated on ``recommendation.read`` instead: the endpoint explains
+It was then gated on ``recommendation.read``: the endpoint explains
 recommendations, so anyone allowed to see one should be allowed to see why it
 fired. Widening ``decision_tree.read`` is not an alternative — it also gates
 ``:evaluate`` and ``:dry-run``, both of which write.
+
+Since 2026-09-28 it, and the verdict reasoning route beside it, are gated on
+``verdict.reasoning.read``: seeing how a tree decided is its own grant. Every
+role that holds ``recommendation.read`` holds it too, which the tests below
+pin, so nobody who could read the reasoning before has lost it.
 
 These tests pin that down against the real YAML policy.
 """
@@ -30,7 +35,7 @@ from app.shared.auth.context import (
 )
 from app.shared.rbac.check import CapabilityRegistry, get_default_registry, has_capability
 
-EXPLAIN_CAPABILITY = "recommendation.read"
+EXPLAIN_CAPABILITY = "verdict.reasoning.read"
 
 _FARM_ID = uuid4()
 
@@ -125,3 +130,13 @@ def test_platform_support_can_read_it_for_support_cases(registry: CapabilityRegi
         farm_scopes=(),
     )
     assert has_capability(ctx, EXPLAIN_CAPABILITY, registry=registry) is True
+
+
+def test_every_role_that_reads_recommendations_reads_the_reasoning(
+    registry: CapabilityRegistry,
+) -> None:
+    """The new grant follows `recommendation.read` role for role."""
+    for role in FarmRole:
+        ctx = _farm_ctx(role)
+        reads = has_capability(ctx, "recommendation.read", farm_id=_FARM_ID, registry=registry)
+        assert has_capability(ctx, EXPLAIN_CAPABILITY, farm_id=_FARM_ID, registry=registry) is reads

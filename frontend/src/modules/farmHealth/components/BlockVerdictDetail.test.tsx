@@ -19,6 +19,9 @@ import { BlockVerdictDetail } from "./AreaPanel";
 
 const reasoning = vi.hoisted(() => ({ fn: vi.fn() }));
 
+// The reader holds `verdict.reasoning.read`; the walk is what these tests read.
+vi.mock("@/rbac/useCapability", () => ({ useCapability: () => true }));
+
 vi.mock("@/api/farmHealth", async () => {
   const actual = await vi.importActual<typeof import("@/api/farmHealth")>("@/api/farmHealth");
   return { ...actual, getVerdictReasoning: reasoning.fn };

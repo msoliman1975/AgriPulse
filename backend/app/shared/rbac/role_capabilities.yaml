@@ -40,6 +40,7 @@ roles:
       - plan.read
       - plan_template.read
       - recommendation.read
+      - verdict.reasoning.read
       - decision_tree.read
       - analytics.read
       - tenant.read_integration_health
@@ -118,6 +119,7 @@ roles:
       - irrigation.schedule.read
       - irrigation.schedule.manage
       - recommendation.read
+      - verdict.reasoning.read
       - recommendation.act
       - decision_tree.read
       - decision_tree.manage
@@ -202,6 +204,7 @@ roles:
       - irrigation.schedule.read
       - irrigation.schedule.manage
       - recommendation.read
+      - verdict.reasoning.read
       - recommendation.act
       - decision_tree.read
       - decision_tree.manage
@@ -281,6 +284,7 @@ roles:
       - irrigation.schedule.read
       - irrigation.schedule.manage
       - recommendation.read
+      - verdict.reasoning.read
       - recommendation.act
       - irrigation.record
       - fertilization.record
@@ -323,6 +327,7 @@ roles:
       - irrigation.schedule.read
       - irrigation.schedule.manage
       - recommendation.read
+      - verdict.reasoning.read
       - recommendation.act
       - irrigation.record
       - fertilization.record
@@ -360,6 +365,7 @@ roles:
       - resource.read
       - irrigation.schedule.read
       - recommendation.read
+      - verdict.reasoning.read
       - irrigation.record
       - fertilization.record
       - scouting.record
@@ -390,6 +396,7 @@ roles:
       - resource.read
       - irrigation.schedule.read
       - recommendation.read
+      - verdict.reasoning.read
       - scouting.record
       - scouting.visit.read
       - scouting.visit.claim
@@ -416,6 +423,7 @@ roles:
       - resource.read
       - irrigation.schedule.read
       - recommendation.read
+      - verdict.reasoning.read
       - analytics.read
       - notification.read_inbox
       - notification.write_inbox

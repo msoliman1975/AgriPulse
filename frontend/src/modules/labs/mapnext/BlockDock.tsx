@@ -80,9 +80,9 @@ const TABS: DockTab[] = [
 const FAMILY_TABS = new Set<DockTab>(INDEX_FAMILIES.map((f) => f.key));
 
 // Conditions is the only tab behind a capability: it calls the tree-explain
-// endpoint, which is gated on `recommendation.read`. Hide it rather than let
-// it render and 403.
-const TAB_CAPABILITY = "recommendation.read" as const;
+// endpoint, which is gated on `verdict.reasoning.read` since 2026-09-28. Hide
+// it rather than let it render and 403.
+const TAB_CAPABILITY = "verdict.reasoning.read" as const;
 
 // Height is user-draggable and remembered. The bar alone is COLLAPSED_H.
 const HEIGHT_KEY = "labs/map/dockHeight";

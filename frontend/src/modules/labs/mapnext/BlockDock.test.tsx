@@ -10,7 +10,7 @@ import { BlockDock } from "./BlockDock";
 import { INDEX_FAMILIES, OPTICAL_INDEX_ORDER } from "./constants";
 
 // The Conditions tab calls the tree-explain endpoint, which is gated on
-// `recommendation.read`. Roles without it must not see a tab that 403s.
+// `verdict.reasoning.read`. Roles without it must not see a tab that 403s.
 const caps = vi.hoisted(() => ({ value: true }));
 const getCropAttrs = vi.fn();
 vi.mock("@/api/cropAssignments", () => ({
