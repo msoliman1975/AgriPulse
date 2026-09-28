@@ -34,11 +34,18 @@ function totals(state: DecisionEngineState): Record<string, number> {
     verdicts_closed: 0,
   };
   for (const counts of Object.values(state.last_close_out?.tenants ?? {})) {
-    out.recommendations_expired += counts.recommendations_expired;
-    out.alerts_resolved += counts.alerts_resolved;
-    out.verdicts_closed += counts.verdicts_closed;
+    out.recommendations_expired += counts.recommendations_expired ?? 0;
+    out.alerts_resolved += counts.alerts_resolved ?? 0;
+    out.verdicts_closed += counts.verdicts_closed ?? 0;
   }
   return out;
+}
+
+/** Tenant schemas the last flip skipped because a table was missing. */
+function skippedTenants(state: DecisionEngineState): string[] {
+  return Object.entries(state.last_close_out?.tenants ?? {})
+    .filter(([, counts]) => (counts.skipped_missing_tables ?? []).length > 0)
+    .map(([schema]) => schema);
 }
 
 export function DecisionEngineSwitch({ publishedBetaTrees }: Props): ReactNode {
@@ -62,6 +69,7 @@ export function DecisionEngineSwitch({ publishedBetaTrees }: Props): ReactNode {
   const state = query.data;
   const target: DecisionEngine = state.engine === "old" ? "beta" : "old";
   const sum = state.last_close_out ? totals(state) : null;
+  const skipped = skippedTenants(state);
   const switchedAt = state.switched_at
     ? new Date(state.switched_at).toLocaleString(i18n.language)
     : null;
@@ -105,6 +113,11 @@ export function DecisionEngineSwitch({ publishedBetaTrees }: Props): ReactNode {
             verdicts: sum.verdicts_closed,
           })}
         </p>
+      ) : null}
+      {skipped.length > 0 ? (
+        <StatusBanner kind="warn">
+          {t("engine.skipped", { n: skipped.length, schemas: skipped.join(", ") })}
+        </StatusBanner>
       ) : null}
 
       {confirming ? (

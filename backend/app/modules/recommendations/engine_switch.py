@@ -43,6 +43,14 @@ STAGE_FOR_ENGINE: dict[str, str] = {"old": "live", "beta": "beta"}
 # a card closed with nobody acting on it.
 RETIRED_REASON = "engine_retired"
 
+# Every tenant table the close-out writes.
+_CLOSE_OUT_TABLES: tuple[str, ...] = (
+    "recommendations",
+    "recommendations_history",
+    "alerts",
+    "decision_tree_block_verdicts",
+)
+
 
 async def read_engine(public_session: AsyncSession) -> dict[str, Any]:
     """The current switch row. A missing row reads as 'old', as the sweep does."""
@@ -112,7 +120,7 @@ async def switch_engine(
         )
     ).scalars()
 
-    close_out: dict[str, dict[str, int]] = {}
+    close_out: dict[str, dict[str, Any]] = {}
     for raw in list(schemas):
         schema = sanitize_tenant_schema(str(raw))
         close_out[schema] = await _close_out_tenant(
@@ -156,8 +164,30 @@ async def _close_out_tenant(
     actor_user_id: UUID | None,
     engine_from: str,
     engine_to: str,
-) -> dict[str, int]:
-    """Close one tenant's open output from the outgoing trees. Returns counts."""
+) -> dict[str, Any]:
+    """Close one tenant's open output from the outgoing trees. Returns counts.
+
+    A schema that lacks any of the four tables is behind on its migrations.
+    It is skipped whole and named in the counts, rather than half closed or
+    left to fail the flip for every other tenant: a statement that fails
+    inside the one transaction rolls back the whole switch.
+    """
+    missing = (
+        (
+            await session.execute(
+                text(
+                    "SELECT t FROM unnest(CAST(:names AS text[])) AS t "
+                    "WHERE to_regclass(CAST(:schema AS text) || '.' || t) IS NULL"
+                ),
+                {"names": list(_CLOSE_OUT_TABLES), "schema": schema},
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if missing:
+        return {"skipped_missing_tables": sorted(missing)}
+
     await session.execute(text(f"SET LOCAL search_path TO {schema}, public"))
     await session.execute(
         text("SELECT set_config('app.current_tenant_id', :v, TRUE)"), {"v": schema}

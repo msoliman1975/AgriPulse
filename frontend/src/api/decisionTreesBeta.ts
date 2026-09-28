@@ -70,12 +70,14 @@ const DECISION_ENGINE = "/v1/platform/decision-engine";
 
 export type DecisionEngine = "old" | "beta";
 
-/** What one flip closed in one tenant schema. */
+/** What one flip closed in one tenant schema. A schema behind on its
+ *  migrations is skipped whole and carries only `skipped_missing_tables`. */
 export interface EngineCloseOutCounts {
-  recommendations_expired: number;
-  history_rows: number;
-  alerts_resolved: number;
-  verdicts_closed: number;
+  recommendations_expired?: number;
+  history_rows?: number;
+  alerts_resolved?: number;
+  verdicts_closed?: number;
+  skipped_missing_tables?: string[];
 }
 
 export interface DecisionEngineState {
