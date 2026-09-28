@@ -371,6 +371,16 @@ _CROP_PATHS = text(
 ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True)))
 
 
+async def load_crop_paths(session: AsyncSession, *, farm_id: UUID) -> dict[UUID, str]:
+    """Each block's current crop path, for one farm. One statement.
+
+    The same read `load_health_evidence` makes, for a caller that needs the
+    health definition per block but none of the evidence.
+    """
+    rows = (await session.execute(_CROP_PATHS, {"farm_id": farm_id})).mappings().all()
+    return {r["block_id"]: r["crop_path"] for r in rows}
+
+
 async def load_health_evidence(
     session: AsyncSession, *, farm_id: UUID, at: datetime | None = None
 ) -> dict[UUID, BlockEvidence]:

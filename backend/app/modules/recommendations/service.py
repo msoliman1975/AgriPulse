@@ -1676,14 +1676,44 @@ class RecommendationsServiceImpl:
         by_block: dict[UUID, list[dict[str, Any]]] = {}
         for row in rows:
             by_block.setdefault(row["block_id"], []).append(row)
+        rules = await self._cell_rollup_rules(farm_id=farm_id, block_ids=list(by_block))
         return {
             "farm_id": farm_id,
             "as_of": at,
             "blocks": [
-                _block_group(block_id=block_id, rows=block_rows, as_of=at)
+                {**_block_group(block_id=block_id, rows=block_rows, as_of=at), **rules[block_id]}
                 for block_id, block_rows in by_block.items()
             ],
         }
+
+    async def _cell_rollup_rules(
+        self, *, farm_id: UUID, block_ids: list[UUID]
+    ) -> dict[UUID, dict[str, Any]]:
+        """How each block's cells make one colour, by the block-health rule.
+
+        Farm Health paints a block the way block health classes it
+        (Mohamed, 2026-09-28), so the rule is resolved through the same
+        tiers: platform, tenant, crop, farm. The page applies it itself,
+        because a replay frame is built in the browser from the history
+        and the rule has to reach those frames too. The share is sent as a
+        fraction and only for `share`, as the definition reads it.
+        """
+        from app.modules.health.service import load_health_definitions
+        from app.shared.health_evidence import load_crop_paths
+
+        definitions = await load_health_definitions(self._tenant, farm_id=farm_id)
+        crops = await load_crop_paths(self._tenant, farm_id=farm_id)
+        out: dict[UUID, dict[str, Any]] = {}
+        for block_id in block_ids:
+            definition = definitions.for_path(crops.get(block_id)).definition
+            share = definition.cell_critical_share
+            out[block_id] = {
+                "cell_rollup": definition.cell_rollup,
+                "cell_share": (
+                    float(share or Decimal("0.2")) if definition.cell_rollup == "share" else None
+                ),
+            }
+        return out
 
     async def farm_verdict_history(
         self,

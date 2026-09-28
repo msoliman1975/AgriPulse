@@ -66,7 +66,14 @@ import {
   type DayWindow,
   type RangeId,
 } from "../lib/window";
-import { ALL_TREES, buildBlockRows, rankOf, treeOptions, type BlockMeta } from "../lib/blockRows";
+import {
+  ALL_TREES,
+  buildBlockRows,
+  rankOf,
+  rulesFrom,
+  treeOptions,
+  type BlockMeta,
+} from "../lib/blockRows";
 
 interface HealthData {
   blocks: BlockListItem[];
@@ -395,7 +402,16 @@ export function FarmHealthViewPage(): ReactNode {
             }));
             // `null` asks `buildBlockRows` for every tree's verdicts at once.
             const treeFilter = activeTree === ALL_TREES ? null : activeTree;
-            const rows = buildBlockRows(blocks, frameBlocks, treeFilter, data.statuses);
+            // The block-health rule, per block, from the live read. A replay
+            // frame is rebuilt here from the history and carries no rule of
+            // its own, so every frame is coloured by today's rule.
+            const rows = buildBlockRows(
+              blocks,
+              frameBlocks,
+              treeFilter,
+              data.statuses,
+              rulesFrom(data.verdicts.blocks),
+            );
             const selectedBlockId = blockId ?? rows[0]?.blockId ?? null;
             const selected = rows.find((row) => row.blockId === selectedBlockId) ?? null;
 

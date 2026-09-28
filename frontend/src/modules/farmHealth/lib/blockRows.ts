@@ -22,9 +22,11 @@ export interface BlockRow {
   name: string;
   crop: string | null;
   /**
-   * The worst status across this block's verdicts for the selected tree.
-   * Null means no verdict row exists, which means the tree did not run
-   * here — not that it ran and found nothing.
+   * The status the block reads as for the selected tree or trees: its
+   * cells rolled up by the block-health rule (`rollUp`), and never milder
+   * than a whole-block verdict. Under the default rule that is the worst
+   * status. Null means no verdict row exists, which means the tree did not
+   * run here — not that it ran and found nothing.
    */
   worst: StatusCode | null;
   /** How many verdicts hold each status. Empty when the tree did not run. */
@@ -69,6 +71,7 @@ export function buildBlockRows(
   farmBlocks: BlockVerdicts[],
   treeCode: string | null,
   statuses: StatusDefinition[],
+  rules: ReadonlyMap<string, CellRule> = new Map(),
 ): BlockRow[] {
   const byBlock = new Map<string, BlockVerdicts>();
   for (const entry of farmBlocks) byBlock.set(entry.block_id, entry);
@@ -81,13 +84,7 @@ export function buildBlockRows(
     const counts = emptyCounts();
     for (const verdict of verdicts) counts[verdict.status_code] += 1;
 
-    let worst: StatusCode | null = null;
-    for (const status of STATUS_ORDER) {
-      if (counts[status] > 0) {
-        worst = status;
-        break;
-      }
-    }
+    const worst = rollUp(verdicts, rules.get(block.id) ?? DEFAULT_RULE);
 
     return {
       blockId: block.id,
@@ -110,6 +107,81 @@ export function buildBlockRows(
     if (ar !== zr) return zr - ar;
     return a.code.localeCompare(z.code);
   });
+}
+
+/** How a block's cells make one status. Sent per block by the farm read. */
+export interface CellRule {
+  rule: "worst" | "share" | "most_common";
+  /** The fraction `share` reads. Ignored by the other two rules. */
+  share: number | null;
+}
+
+export const DEFAULT_RULE: CellRule = { rule: "worst", share: null };
+
+const RANK: Record<StatusCode, number> = { na: 0, very_good: 1, good: 2, issue: 3, alert: 4 };
+
+/** The rule each block of a farm read carries. Absent blocks use the default. */
+export function rulesFrom(farmBlocks: BlockVerdicts[]): Map<string, CellRule> {
+  return new Map(
+    farmBlocks.map((b) => [
+      b.block_id,
+      { rule: b.cell_rollup ?? "worst", share: b.cell_share ?? null },
+    ]),
+  );
+}
+
+/**
+ * One status for a block, from its verdicts, by the block-health rule.
+ *
+ * The same steps as `_from_rolled_verdicts` and `_roll_cells` in
+ * `backend/app/shared/health_definition.py`, so the colour on this map and
+ * the class in Farm Management come from one rule:
+ *
+ *   1. each cell takes the worst status any tree gave it;
+ *   2. the cells roll up: `worst` takes the worst cell; `share` takes the
+ *      worst status that, counting worse ones, covers at least `share` of
+ *      the cells (20% when none is given); `most_common` takes the status
+ *      on the most cells, and a tie goes to the worse one;
+ *   3. a whole-block verdict counts in full, so the block is never milder
+ *      than one.
+ */
+export function rollUp(verdicts: Verdict[], rule: CellRule): StatusCode | null {
+  if (verdicts.length === 0) return null;
+  const perCell = new Map<string, StatusCode>();
+  const candidates: StatusCode[] = [];
+  for (const v of verdicts) {
+    if (v.cell_id === null) {
+      candidates.push(v.status_code);
+      continue;
+    }
+    const seen = perCell.get(v.cell_id);
+    if (seen === undefined || RANK[v.status_code] > RANK[seen])
+      perCell.set(v.cell_id, v.status_code);
+  }
+  const cells = [...perCell.values()];
+  if (cells.length > 0) candidates.push(rollCells(cells, rule));
+  return candidates.reduce((a, z) => (RANK[z] > RANK[a] ? z : a));
+}
+
+function rollCells(cells: StatusCode[], rule: CellRule): StatusCode {
+  if (rule.rule === "most_common") {
+    const counts = new Map<StatusCode, number>();
+    for (const c of cells) counts.set(c, (counts.get(c) ?? 0) + 1);
+    let best: StatusCode = cells[0];
+    for (const [code, n] of counts) {
+      const bn = counts.get(best) ?? 0;
+      if (n > bn || (n === bn && RANK[code] > RANK[best])) best = code;
+    }
+    return best;
+  }
+  const ordered = [...new Set(cells)].sort((a, z) => RANK[z] - RANK[a]);
+  if (rule.rule === "worst") return ordered[0];
+  const share = rule.share ?? 0.2;
+  for (const code of ordered) {
+    const atOrWorse = cells.filter((c) => RANK[c] >= RANK[code]).length;
+    if (atOrWorse / cells.length >= share) return code;
+  }
+  return ordered[ordered.length - 1];
 }
 
 /** One entry of the tree picker: the code it selects by, the name it shows. */
