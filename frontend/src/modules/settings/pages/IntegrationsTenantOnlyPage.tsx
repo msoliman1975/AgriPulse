@@ -5,6 +5,11 @@ import type { ResolvedSetting } from "@/api/integrations";
 import { Card } from "@/components/Card";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
+import {
+  CELL_ROLLUP_KEY,
+  CELL_SHARE_KEY,
+  CellRollupCard,
+} from "@/modules/settings/components/CellRollupCard";
 import { SourcePill } from "@/modules/settings/components/SourcePill";
 import {
   usePutTenantIntegration,
@@ -35,20 +40,35 @@ export function IntegrationsTenantOnlyPage({
   const tenantQ = useTenantIntegration(category);
   const putTenant = usePutTenantIntegration(category);
 
+  // The two block-health keys are one choice, so they get their own card and
+  // stay out of the raw key list below.
+  const all = tenantQ.data?.settings ?? [];
+  const rollup = all.find((s) => s.key === CELL_ROLLUP_KEY);
+  const share = all.find((s) => s.key === CELL_SHARE_KEY);
+  const settings = all.filter((s) => s.key !== CELL_ROLLUP_KEY && s.key !== CELL_SHARE_KEY);
+
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title={t(i18nTitleKey)} subtitle={t(i18nSubtitleKey)} />
+
+      {rollup ? (
+        <CellRollupCard
+          rollup={rollup}
+          share={share}
+          onSave={(key, value) => putTenant.mutateAsync({ key, value })}
+        />
+      ) : null}
 
       <Card noPadding className="p-4">
         {tenantQ.isLoading ? (
           <Skeleton className="h-24 w-full" />
         ) : tenantQ.isError ? (
           <p className="text-sm text-ap-crit">{t("loadFailed")}</p>
-        ) : (tenantQ.data?.settings ?? []).length === 0 ? (
+        ) : settings.length === 0 ? (
           <p className="text-sm text-ap-muted">{t("noSettings")}</p>
         ) : (
           <div className="divide-y divide-ap-line">
-            {(tenantQ.data?.settings ?? []).map((s) => (
+            {settings.map((s) => (
               <SettingRow
                 key={s.key}
                 setting={s}

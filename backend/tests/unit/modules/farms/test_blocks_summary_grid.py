@@ -53,7 +53,7 @@ def _session(
 ) -> AsyncMock:
     """Feed `execute` its results, named rather than positional.
 
-    Only the four this file cares about are named; the eight health-evidence
+    Only the four this file cares about are named; the nine health-evidence
     queries it never varies are stubbed empty. The full call order lives in
     `test_blocks_summary_health_evidence._session`, which is the one place
     that knows it — this file used to carry its own copy as a bare list of
@@ -73,6 +73,7 @@ def _session(
         [],  # crop paths          ┘
         [],  # per-crop health definitions
         [],  # this farm's health override
+        [],  # the tenant's rollup settings
         grid or [],
         roster or [],
         indices or [],
