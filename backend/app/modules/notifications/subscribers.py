@@ -2559,6 +2559,53 @@ def register_subscribers(bus: EventBus) -> None:
         bus.register(EvaluationRunFinishedV1, _on_evaluation_run_finished, mode="sync")
 
 
+def _on_tree_alert_opened(event: AlertOpenedV1) -> None:
+    """`_on_alert_opened`, for alerts a decision tree wrote and no others.
+
+    The worker-side alert handler. The grid anomaly sweep also runs in a
+    worker and also publishes `AlertOpenedV1`; those alerts have never sent
+    a message, and on 2026-09-24 Mohamed chose to keep them silent when the
+    scheduled sweep started notifying. A tree alert's `rule_code` is
+    `tree:<code>:...`, which is what tells the two apart.
+    """
+    if not (event.rule_code or "").startswith("tree:"):
+        return
+    _on_alert_opened(event)
+
+
+def register_worker_subscribers(bus: EventBus) -> None:
+    """Register the handlers a task worker needs, and only those.
+
+    The API registers its subscribers in `app.core.app_factory`; a worker
+    process never builds the app, so until this existed nothing in a worker
+    listened to anything. Every message users ever received came from an
+    on-demand run in the API, and the scheduled sweep - the run that
+    happens every day - told nobody.
+
+    Three handlers, the ones a sweep's output needs:
+
+      * the run digest, sent when the run ends. Inside a run the per-user
+        channels wait for it, so a sweep sends one message per finding group
+        and farm, and only for items the run opened;
+      * the recommendation handler, which sends the webhook per item;
+      * the alert handler, for tree alerts only (see `_on_tree_alert_opened`).
+
+    Not scouting auto-dispatch, which Mohamed kept on-demand only
+    (2026-09-24). Idempotent, like `register_subscribers`.
+    """
+    if not any(sub.handler is _on_tree_alert_opened for sub in bus.handlers_for(AlertOpenedV1)):
+        bus.register(AlertOpenedV1, _on_tree_alert_opened, mode="sync")
+    if not any(
+        sub.handler is _on_recommendation_opened for sub in bus.handlers_for(RecommendationOpenedV1)
+    ):
+        bus.register(RecommendationOpenedV1, _on_recommendation_opened, mode="sync")
+    if not any(
+        sub.handler is _on_evaluation_run_finished
+        for sub in bus.handlers_for(EvaluationRunFinishedV1)
+    ):
+        bus.register(EvaluationRunFinishedV1, _on_evaluation_run_finished, mode="sync")
+
+
 # ---------- Scouting: announce an assigned visit ----------------------------
 
 
