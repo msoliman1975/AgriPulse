@@ -351,9 +351,9 @@ describe("FarmHealthViewPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("AG-R02-C01");
     });
-    expect(
-      screen.getByText(/t_cwsi did not run on this block\./),
-    ).toBeInTheDocument();
+    // The screen opens on every tree at once, so the sentence is about all
+    // of them, not about one tree's name.
+    expect(screen.getByText(/No tree ran on this block\./)).toBeInTheDocument();
   });
 
   it("lists only trees that have said something about this farm", async () => {
@@ -368,7 +368,7 @@ describe("FarmHealthViewPage", () => {
 
     const picker = await screen.findByRole("combobox", { name: "Decision tree" });
     const options = within(picker).getAllByRole("option").map((o) => o.textContent);
-    expect(options).toEqual(["t_cwsi", "t_ndvi"]);
+    expect(options).toEqual(["All trees", "t_cwsi", "t_ndvi"]);
   });
 
   it("puts the tree picker in the header, beside the farm name", async () => {
@@ -819,11 +819,13 @@ describe("FarmHealthViewPage", () => {
     const picker = await screen.findByRole("combobox", { name: "Decision tree" });
     const options = within(picker).getAllByRole("option");
     expect(options.map((option) => option.textContent)).toEqual([
+      "All trees",
       "Canopy vigour",
       "Mango water stress",
     ]);
     // The value is still the code: it is what a verdict row carries.
     expect(options.map((option) => (option as HTMLOptionElement).value)).toEqual([
+      "__all__",
       "t_ndvi",
       "t_cwsi",
     ]);
@@ -841,6 +843,10 @@ describe("FarmHealthViewPage", () => {
     };
     renderPage();
 
+    // One tree chosen: the sentence names it.
+    const picker = await screen.findByRole("combobox", { name: "Decision tree" });
+    fireEvent.change(picker, { target: { value: "t_cwsi" } });
+
     const rail = await screen.findByRole("list");
     const target = within(rail)
       .getAllByRole("button")
@@ -850,6 +856,107 @@ describe("FarmHealthViewPage", () => {
     expect(
       await screen.findByText(/Mango water stress did not run on this block\./),
     ).toBeInTheDocument();
+  });
+
+  it("paints a cell by the worst of its trees and lists every tree's words", async () => {
+    // Three cells, two trees. Water stress says alert on all three; vigour
+    // says good. With every tree shown the area is alert, and the panel says
+    // what each tree found rather than one tree's sentence.
+    grid.current = {
+      farm_id: FARM_ID,
+      index_code: "ndvi",
+      blocks: [
+        {
+          block_id: "b2",
+          product_id: "p1",
+          at: null,
+          cells: [gridCell("c00", 0, 0), gridCell("c01", 0, 1), gridCell("c02", 0, 2)],
+        },
+      ],
+    };
+    const cells = ["c00", "c01", "c02"];
+    farmVerdicts.current = {
+      farm_id: FARM_ID,
+      as_of: null,
+      blocks: [
+        farmBlock("b2", [
+          ...cells.map((cell, i) => ({
+            ...verdict("b2", "t_cwsi", "alert", i),
+            id: `w${i}`,
+            cell_id: cell,
+            leaf_node_id: "stop",
+            tree_name_en: "Water stress",
+            text_en: "Leaf water is low.",
+          })),
+          ...cells.map((cell, i) => ({
+            ...verdict("b2", "t_ndvi", "good", i + 3),
+            id: `g${i}`,
+            cell_id: cell,
+            leaf_node_id: "stop",
+            tree_name_en: "Canopy vigour",
+            text_en: "Canopy vigour is in band.",
+          })),
+        ]),
+      ],
+    };
+    renderPage();
+
+    expect(await screen.findByText("Selected area")).toBeInTheDocument();
+    // Cells, not verdicts: three cells, although six verdicts.
+    expect(screen.getByText(/3 cells · 100% of the block/)).toBeInTheDocument();
+    // Each tree's sentence sits under that tree's name, worst first.
+    const water = screen.getByText("Leaf water is low.").closest("li") as HTMLElement;
+    const vigour = screen.getByText("Canopy vigour is in band.").closest("li") as HTMLElement;
+    expect(within(water).getByText("Water stress")).toBeInTheDocument();
+    expect(within(vigour).getByText("Canopy vigour")).toBeInTheDocument();
+    expect(water.compareDocumentPosition(vigour) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("splits a folding tree's cells by what they found, not by the stop node", async () => {
+    // Every walk of a folding tree ends at `stop`. Grouping on the leaf put
+    // both halves of this block in one area although they found different
+    // things.
+    grid.current = {
+      farm_id: FARM_ID,
+      index_code: "ndvi",
+      blocks: [
+        {
+          block_id: "b2",
+          product_id: "p1",
+          at: null,
+          cells: [
+            gridCell("c00", 0, 0),
+            gridCell("c01", 0, 1),
+            gridCell("c02", 0, 2),
+            gridCell("c10", 1, 0),
+            gridCell("c11", 1, 1),
+            gridCell("c12", 1, 2),
+          ],
+        },
+      ],
+    };
+    const row = (cells: string[], text: string, from: number) =>
+      cells.map((cell, i) => ({
+        ...verdict("b2", "t_fold", "issue", from + i),
+        id: `f${from + i}`,
+        cell_id: cell,
+        leaf_node_id: "stop",
+        text_en: text,
+      }));
+    farmVerdicts.current = {
+      farm_id: FARM_ID,
+      as_of: null,
+      blocks: [
+        farmBlock("b2", [
+          ...row(["c00", "c01", "c02"], "Leaf water is low.", 0),
+          ...row(["c10", "c11", "c12"], "Nitrogen is low.", 3),
+        ]),
+      ],
+    };
+    renderPage();
+
+    expect(await screen.findByText("Selected area")).toBeInTheDocument();
+    expect(screen.getByText("2 areas.", { exact: false })).toBeInTheDocument();
   });
 
   it("names the leaf the tree reached, not its node id", async () => {
@@ -1013,7 +1120,7 @@ describe("FarmHealthViewPage", () => {
         within(picker)
           .getAllByRole("option")
           .map((option) => option.textContent),
-      ).toEqual(["Retired tree", "Water stress"]);
+      ).toEqual(["All trees", "Retired tree", "Water stress"]);
     });
   });
 
@@ -1122,12 +1229,12 @@ describe("FarmHealthViewPage", () => {
     renderPage();
 
     const picker = await screen.findByRole("combobox", { name: "Decision tree" });
-    // Both are offered, Alpha first by name...
+    // Both are offered after "All trees", Alpha first by name...
     await waitFor(() => {
-      expect(within(picker).getAllByRole("option")).toHaveLength(2);
+      expect(within(picker).getAllByRole("option")).toHaveLength(3);
     });
-    // ...and the live one is still the one selected.
-    expect(picker).toHaveValue("t_zulu");
+    // ...and the selection has not moved off the all-trees default.
+    expect(picker).toHaveValue("__all__");
   });
 
   it("keeps an option for the chosen tree when its window stops holding it", async () => {
@@ -1161,7 +1268,7 @@ describe("FarmHealthViewPage", () => {
 
     const picker = await screen.findByRole("combobox", { name: "Decision tree" });
     await waitFor(() => {
-      expect(within(picker).getAllByRole("option")).toHaveLength(2);
+      expect(within(picker).getAllByRole("option")).toHaveLength(3);
     });
     fireEvent.change(picker, { target: { value: "t_retired" } });
 

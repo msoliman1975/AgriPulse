@@ -46,9 +46,11 @@ interface SummaryProps {
   cols: number;
   /** The tree's name, as the picker shows it. Never its code. */
   treeName: string | null;
+  /** True when the picker shows every tree at once. */
+  allTrees?: boolean;
 }
 
-export function BlockSummary({ row, statuses, rows, cols, treeName }: SummaryProps) {
+export function BlockSummary({ row, statuses, rows, cols, treeName, allTrees }: SummaryProps) {
   const { t, i18n } = useTranslation(["farmHealth"]);
   const arabic = i18n.language.startsWith("ar");
   const lookup = new Map(statuses.map((s) => [s.code, s]));
@@ -57,7 +59,9 @@ export function BlockSummary({ row, statuses, rows, cols, treeName }: SummaryPro
     if (!entry) return code ?? "";
     return arabic ? (entry.label_ar ?? entry.label_en) : entry.label_en;
   };
-  const total = row.verdicts.length;
+  // Cells, not verdicts: with every tree shown, one cell holds one verdict
+  // per tree, and "242 cells" on an 11x11 grid is plainly false.
+  const total = new Set(row.verdicts.map((v) => v.cell_id ?? "block")).size;
 
   return (
     <section>
@@ -88,7 +92,9 @@ export function BlockSummary({ row, statuses, rows, cols, treeName }: SummaryPro
           reader already had, in the band the tree's own sentence needs. */}
       {row.didNotRun ? (
         <p className="mt-2 text-sm text-ap-muted">
-          {t("farmHealth:block.didNotRun", { tree: treeName })}
+          {allTrees
+            ? t("farmHealth:block.noTreeRan")
+            : t("farmHealth:block.didNotRun", { tree: treeName })}
         </p>
       ) : null}
     </section>
@@ -173,22 +179,85 @@ export function AreaDetail({ area, statuses, farmId, blockId }: DetailProps) {
         </span>
       </div>
 
-      {/* Full width on purpose. A narrow measure here cost height the
-          reasoning below needs — Mohamed, 2026-09-07. */}
-      <p className="mt-2 text-sm text-ap-ink">{text}</p>
+      {area.verdicts.length > 1 ? (
+        // Every tree at once: each tree's own sentence and its own walk, worst
+        // first. One sentence for the area would pick one tree's words and
+        // hide the rest, which is the opposite of why the view shows them all.
+        <ul className="mt-2 flex flex-col divide-y divide-ap-line">
+          {area.verdicts.map((verdict) => (
+            <TreeVerdict
+              key={verdict.id}
+              verdict={verdict}
+              statuses={statuses}
+              farmId={farmId}
+              blockId={blockId}
+            />
+          ))}
+        </ul>
+      ) : (
+        <>
+          {/* Full width on purpose. A narrow measure here cost height the
+              reasoning below needs — Mohamed, 2026-09-07. */}
+          <p className="mt-2 text-sm text-ap-ink">{text}</p>
 
-      <div className="mt-3 border-t border-ap-line pt-3">
+          <div className="mt-3 border-t border-ap-line pt-3">
+            <Reasoning
+              blockId={blockId}
+              verdictId={area.sample.id}
+              farmId={farmId}
+              leafNodeId={area.leafNodeId}
+              kind={area.sample.kind}
+              statusCode={area.status}
+              statuses={statuses}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** One tree's answer about the cells of an area, in the all-trees view. */
+function TreeVerdict({
+  verdict,
+  statuses,
+  farmId,
+  blockId,
+}: {
+  verdict: Verdict;
+  statuses: StatusDefinition[];
+  farmId: string;
+  blockId: string;
+}) {
+  const { i18n } = useTranslation(["farmHealth"]);
+  const arabic = i18n.language.startsWith("ar");
+  const status = statuses.find((s) => s.code === verdict.status_code);
+  const text = arabic ? (verdict.text_ar ?? verdict.text_en) : verdict.text_en;
+  return (
+    <li className="py-3 first:pt-0">
+      <div className="flex flex-wrap items-baseline gap-3">
+        <span className="text-sm font-semibold text-ap-ink">{treeLabel(verdict, arabic)}</span>
+        <span className="inline-flex items-center gap-1.5 text-sm text-ap-muted">
+          <i
+            className="inline-block h-2.5 w-2.5 rounded-sm"
+            style={{ background: status?.color ?? "#9AA0A6" }}
+          />
+          {status ? (arabic ? (status.label_ar ?? status.label_en) : status.label_en) : ""}
+        </span>
+      </div>
+      <p className="mt-1 text-sm text-ap-ink">{text}</p>
+      <div className="mt-2">
         <Reasoning
           blockId={blockId}
-          verdictId={area.sample.id}
+          verdictId={verdict.id}
           farmId={farmId}
-          leafNodeId={area.leafNodeId}
-          kind={area.sample.kind}
-          statusCode={area.status}
+          leafNodeId={verdict.leaf_node_id}
+          kind={verdict.kind}
+          statusCode={verdict.status_code}
           statuses={statuses}
         />
       </div>
-    </div>
+    </li>
   );
 }
 
