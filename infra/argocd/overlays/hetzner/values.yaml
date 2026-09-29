@@ -3915,9 +3915,22 @@ global:
       #
       #   Rollback is these tags back to 5f5fe82. Migrations 0093 and 0094
       #   only add a table and two settings rows, which the old code ignores.
-      tag: "ab66fa7"
+      # fc0b331 = #734, api and workers. Reads of the latest index, cell,
+      #   weather hour, forecast issuance and scene now stop at app_now(),
+      #   and baselines use only the past of the clock. Live, every bound
+      #   matches all rows, so nothing changes; it is what lets the demo
+      #   replay read each day as it was. Phenology, the water-balance date
+      #   and the active-block lists read the clock instead of the real date.
+      #   The backfill console now passes `thermal` through to the run.
+      #
+      #   New code for demo build tenants only (incidents, hindcast forecast,
+      #   farm team step). DEMO_HISTORY_BUILD_SCHEMA_PREFIX stays unset here,
+      #   so none of it can run from a normal pod.
+      #
+      #   No migration. Rollback is these two tags back to ab66fa7.
+      tag: "fc0b331"
     workers:
-      tag: "ab66fa7"
+      tag: "fc0b331"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
