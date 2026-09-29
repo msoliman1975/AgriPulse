@@ -35,7 +35,7 @@ from app.shared import clock
 
 _log = get_logger(__name__)
 
-__all__ = ["DayResult", "ReplayReport", "StepResult", "replay"]
+__all__ = ["DayResult", "ReplayReport", "StepResult", "ensure_build_tenant", "replay"]
 
 
 class ReplayNotAllowedError(RuntimeError):
@@ -102,7 +102,12 @@ def _days(start: date, end: date) -> Iterator[date]:
         day += timedelta(days=1)
 
 
-def _check_allowed(tenant_schema: str, start: date, end: date) -> None:
+def ensure_build_tenant(tenant_schema: str) -> None:
+    """Refuse unless `tenant_schema` is a build tenant.
+
+    Shared by everything in this package that writes steered history, so
+    the one setting guards all of it.
+    """
     prefix = get_settings().demo_history_build_schema_prefix
     if not prefix:
         raise ReplayNotAllowedError(
@@ -113,6 +118,10 @@ def _check_allowed(tenant_schema: str, start: date, end: date) -> None:
         raise ReplayNotAllowedError(
             f"{tenant_schema!r} is not a build tenant. Its schema must start " f"with {prefix!r}."
         )
+
+
+def _check_allowed(tenant_schema: str, start: date, end: date) -> None:
+    ensure_build_tenant(tenant_schema)
     if start > end:
         raise ReplayNotAllowedError(f"start {start} is after end {end}.")
     today = clock.real_now().date()

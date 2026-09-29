@@ -562,8 +562,8 @@ class IrrigationRepository:
                 text(
                     "SELECT id FROM blocks "
                     "WHERE deleted_at IS NULL "
-                    "  AND active_from <= current_date "
-                    "  AND (active_to IS NULL OR active_to > current_date)"
+                    "  AND active_from <= (public.app_now())::date "
+                    "  AND (active_to IS NULL OR active_to > (public.app_now())::date)"
                 )
             )
         ).all()

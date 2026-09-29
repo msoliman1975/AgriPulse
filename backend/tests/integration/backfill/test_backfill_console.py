@@ -291,6 +291,44 @@ async def test_rejects_a_source_the_farm_has_no_subscriptions_for(
 
 
 @pytest.mark.asyncio
+async def test_thermal_reaches_the_service(
+    sent_tasks: list[dict[str, Any]],
+) -> None:
+    """`thermal` in the body must reach the run, not stop at the router.
+
+    The route once passed `imagery` and `weather` on and dropped `thermal`,
+    so every run was stored with `thermal: false` and no Landsat task was
+    ever queued, whatever the operator ticked. Asked of a farm with no
+    thermal subscription, the service refuses and names the source. That
+    refusal can only happen if the flag arrived.
+    """
+    async with _platform_client() as client:
+        picked = await _first_tenant_and_farm(client)
+        if picked is None:
+            pytest.skip("no tenant with an unoccupied farm in this fixture DB")
+        tenant_id, farm_id = picked
+        window = {
+            "farm_id": farm_id,
+            "window_from": (date.today() - timedelta(days=7)).isoformat(),
+            "window_to": date.today().isoformat(),
+        }
+        est = await client.post(
+            f"/api/v1/admin/backfill/tenants/{tenant_id}:estimate",
+            json={**window, "imagery": True, "weather": True, "thermal": True},
+        )
+        if est.json()["thermal_subscriptions"] > 0:
+            pytest.skip("the picked farm has a thermal subscription")
+
+        r = await client.post(
+            f"/api/v1/admin/backfill/tenants/{tenant_id}/runs",
+            json={**window, "imagery": False, "weather": False, "thermal": True},
+        )
+        assert r.status_code == 422, r.text
+        assert "thermal" in r.json()["detail"]
+        assert sent_tasks == []
+
+
+@pytest.mark.asyncio
 async def test_estimate_reports_the_farms_weather_integration() -> None:
     """The estimate must expose what the farm is actually wired up for."""
     async with _platform_client() as client:

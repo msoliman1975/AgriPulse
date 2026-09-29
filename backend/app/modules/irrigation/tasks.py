@@ -19,6 +19,7 @@ from sqlalchemy import text
 
 from app.core.logging import get_logger
 from app.modules.irrigation.service import get_irrigation_service
+from app.shared import clock
 from app.shared.db.session import (
     AsyncSessionLocal,
     dispose_engine,
@@ -159,7 +160,7 @@ async def _water_balance_for_tenant_async(
     `target_iso` overrides the date so a backfill can walk a window — the
     upsert is idempotent on (block_id, date), so re-running a day is safe.
     """
-    target = date.fromisoformat(target_iso) if target_iso else date.today() - timedelta(days=1)
+    target = date.fromisoformat(target_iso) if target_iso else clock.today() - timedelta(days=1)
 
     factory = AsyncSessionLocal()
     async with factory() as session, session.begin():

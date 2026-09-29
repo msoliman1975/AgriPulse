@@ -2588,7 +2588,7 @@ class FarmServiceImpl:
         a block already on its computed stage is a no-op.
         """
         candidates = await self._repo.list_block_crops_for_advance()
-        today = _date.today()
+        today = clock.today()
         evaluated = 0
         advanced = 0
         no_stages = 0

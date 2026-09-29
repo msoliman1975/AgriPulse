@@ -212,6 +212,7 @@ async def create_run(
             window_to=body.window_to,
             imagery=body.imagery,
             weather=body.weather,
+            thermal=body.thermal,
             kind=body.kind,
             actor_id=getattr(context, "user_id", None),
             actor_email=getattr(context, "email", None),

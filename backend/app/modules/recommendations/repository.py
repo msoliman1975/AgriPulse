@@ -2228,6 +2228,9 @@ class RecommendationsRepository:
                                index_code, time, mean, baseline_deviation
                         FROM block_index_aggregates
                         WHERE block_id = :block_id
+                          -- As of the clock: a replayed day must not read a
+                          -- later scene. Live, this is a no-op.
+                          AND time <= public.app_now()
                         ORDER BY index_code, time DESC
                         """
                     ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
@@ -2279,6 +2282,7 @@ class RecommendationsRepository:
                          AND tstzrange(cfg.effective_from, cfg.effective_to)
                              @> obs.time
                         WHERE obs.block_id = :block_id
+                          AND obs.time <= public.app_now()
                         ORDER BY obs.cell_id, obs.index_code, obs.time DESC
                         """
                     ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
@@ -2319,6 +2323,7 @@ class RecommendationsRepository:
                         WHERE block_id = :block_id
                           AND mean IS NOT NULL
                           AND time >= public.app_now() - make_interval(days => :window_days)
+                          AND time <= public.app_now()
                         ORDER BY index_code, time
                         """
                     ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
@@ -2472,8 +2477,8 @@ class RecommendationsRepository:
                 text(
                     "SELECT id FROM blocks "
                     "WHERE deleted_at IS NULL "
-                    "  AND active_from <= current_date "
-                    "  AND (active_to IS NULL OR active_to > current_date) "
+                    "  AND active_from <= (public.app_now())::date "
+                    "  AND (active_to IS NULL OR active_to > (public.app_now())::date) "
                     "  AND (:farm_id IS NULL OR farm_id = :farm_id) "
                     "ORDER BY code"
                 ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
@@ -2556,8 +2561,8 @@ class RecommendationsRepository:
                      AND bc.is_current = TRUE
                      AND bc.deleted_at IS NULL
                     WHERE b.deleted_at IS NULL
-                      AND b.active_from <= current_date
-                      AND (b.active_to IS NULL OR b.active_to > current_date)
+                      AND b.active_from <= (public.app_now())::date
+                      AND (b.active_to IS NULL OR b.active_to > (public.app_now())::date)
                     ORDER BY f.name, b.code
                     """
                     )

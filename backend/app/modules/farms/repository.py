@@ -1714,7 +1714,7 @@ class FarmsRepository:
         when someone assigns a crop would keep advancing the growth stage of an
         assignment that ended months ago.
         """
-        today = _date.today()
+        today = clock.today()
         rows = (
             (
                 await self._tenant.execute(
