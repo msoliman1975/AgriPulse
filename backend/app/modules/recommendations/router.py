@@ -542,8 +542,11 @@ async def explain_block(
             "role to fall back on. Verified against the block."
         ),
     ),
+    # Its own capability, not `recommendation.read`: seeing how a tree decided
+    # is granted separately from seeing what it decided (2026-09-28). Every
+    # role that reads recommendations holds both today.
     context: RequestContext = Depends(
-        requires_capability("recommendation.read", farm_id_param="farm_id")
+        requires_capability("verdict.reasoning.read", farm_id_param="farm_id")
     ),
     service: RecommendationsServiceImpl = Depends(_service),
 ) -> dict[str, Any]:
@@ -1571,7 +1574,7 @@ async def get_verdict_reasoning(
         ),
     ),
     context: RequestContext = Depends(
-        requires_capability("recommendation.read", farm_id_param="farm_id")
+        requires_capability("verdict.reasoning.read", farm_id_param="farm_id")
     ),
     service: RecommendationsServiceImpl = Depends(_service),
 ) -> dict[str, Any]:

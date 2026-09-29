@@ -101,6 +101,7 @@ export type Capability =
   | "user.field_enrol"
   | "user.invite"
   | "user.read"
+  | "verdict.reasoning.read"
   | "user.suspend"
   | "user.update"
   | "weather.read"
@@ -142,6 +143,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "tenant.read",
     "tenant.read_integration_health",
     "user.read",
+    "verdict.reasoning.read",
     "weather.read",
     "weather_risk.read",
   ]),
@@ -224,6 +226,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "user.read",
     "user.suspend",
     "user.update",
+    "verdict.reasoning.read",
     "weather.read",
     "weather.refresh",
     "weather.subscription.manage",
@@ -306,6 +309,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "user.read",
     "user.suspend",
     "user.update",
+    "verdict.reasoning.read",
     "weather.read",
     "weather.refresh",
     "weather.subscription.manage",
@@ -373,6 +377,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "signal.read",
     "signal.record",
     "user.field_enrol",
+    "verdict.reasoning.read",
     "weather.read",
     "weather.refresh",
     "weather.subscription.manage",
@@ -416,6 +421,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "scouting.visit.read",
     "signal.read",
     "signal.record",
+    "verdict.reasoning.read",
     "weather.read",
     "weather.refresh",
     "weather_risk.read",
@@ -449,6 +455,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "scouting.visit.read",
     "signal.read",
     "signal.record",
+    "verdict.reasoning.read",
     "weather.read",
     "weather_risk.read",
   ]),
@@ -475,6 +482,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "scouting.visit.read",
     "signal.read",
     "signal.record",
+    "verdict.reasoning.read",
     "weather.read",
     "weather_risk.read",
   ]),
@@ -497,6 +505,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "resource.read",
     "scouting.visit.read",
     "signal.read",
+    "verdict.reasoning.read",
     "weather.read",
     "weather_risk.read",
   ]),

@@ -126,7 +126,7 @@ async def list_action_items(
     if raised_from is None and date_range in _RANGES:
         raised_from = clock.now() - timedelta(days=_RANGES[date_range])
 
-    return await service.list_items(
+    listed = await service.list_items(
         farm_id=farm_id,
         status=status_filter,
         kinds=kinds,
@@ -140,6 +140,13 @@ async def list_action_items(
         group_by=group_by,
         limit=limit,
     )
+    # The full walk is reasoning, granted on its own since 2026-09-28. The
+    # one-line `why` stays: it is what a person acts on, not the walk.
+    if not has_capability(context, "verdict.reasoning.read", farm_id=farm_id):
+        for group in listed.groups:
+            for item in group.items:
+                item.tree_path = []
+    return listed
 
 
 @router.get(

@@ -95,7 +95,8 @@
       "recommendation": "توصية",
       "status": "حالة",
       "no_action": "لا إجراء مطلوب"
-    }
+    },
+    "noPermission": "دورك لا يشمل رؤية كيف قررت الشجرة."
   },
   "range": {
     "label": "المدى",

@@ -15,6 +15,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { getVerdictReasoning, type StatusDefinition } from "@/api/farmHealth";
+import { useCapability } from "@/rbac/useCapability";
 import { walkRows } from "../lib/walk";
 
 interface Props {
@@ -45,15 +46,22 @@ export function Reasoning({
   // Closed by default: the paragraph above answers the question, and the
   // grid is for the reader who wants to check a number in it.
   const [stepsOpen, setStepsOpen] = useState(false);
+  // How a tree decided is its own grant since 2026-09-28. Without it the
+  // route 403s, so the walk is not asked for and the panel says why.
+  const canSee = useCapability("verdict.reasoning.read", { farmId });
 
   const query = useQuery({
     queryKey: ["verdict-reasoning", blockId, verdictId],
     queryFn: () => getVerdictReasoning(blockId, verdictId, farmId),
+    enabled: canSee,
     // The walk behind a verdict never changes; only a new sweep makes a new
     // one, and that is a new verdict id.
     staleTime: Infinity,
   });
 
+  if (!canSee) {
+    return <p className="text-sm text-ap-muted">{t("farmHealth:reasoning.noPermission")}</p>;
+  }
   if (query.isPending) {
     return <p className="text-sm text-ap-muted">{t("farmHealth:reasoning.loading")}</p>;
   }
