@@ -113,6 +113,12 @@ class BlockVerdictsResponse(BaseModel):
     # The newest evaluation behind these rows. None when the list is empty.
     last_evaluated_at: datetime | None = None
     verdicts: list[VerdictResponse] = Field(default_factory=list)
+    # How the block's cells make one colour: the block-health rule for this
+    # block's tenant, crop and farm. Sent on the farm read only; the block
+    # read leaves the default.
+    cell_rollup: Literal["worst", "share", "most_common"] = "worst"
+    # The fraction `share` needs. None under the other two rules.
+    cell_share: float | None = None
 
 
 class VerdictReasoningResponse(BaseModel):

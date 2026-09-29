@@ -77,6 +77,10 @@ export interface BlockVerdicts {
   worst_status: StatusCode | null;
   last_evaluated_at: string | null;
   verdicts: Verdict[];
+  /** How the block's cells make one colour. Farm read only; absent means `worst`. */
+  cell_rollup?: "worst" | "share" | "most_common";
+  /** The fraction `share` reads. Null under the other rules. */
+  cell_share?: number | null;
 }
 
 export interface FarmVerdicts {
