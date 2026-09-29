@@ -3894,9 +3894,30 @@ global:
       #   35643704550, 1387 passed.
       #
       #   Rollback is these three tags back to 9bacb61.
-      tag: "5f5fe82"
+      # ab66fa7 = #725-#729, #731, #732, api and workers. The beta decision
+      #   engine can replace the old one, and its output reaches Action
+      #   Center, Farm Health and block health.
+      #
+      #   Two public migrations run in the PreSync job: 0093 adds
+      #   public.decision_engine (one row, engine 'old'), and 0094 adds the
+      #   tenant settings keys health.cell_rollup and health.cell_share_pct.
+      #   The engine stays 'old' after this deploy, so the sweep runs the same
+      #   trees as before until a platform admin flips it.
+      #
+      #   Also in this range: a folded card's status picks alert,
+      #   recommendation or verdict only; workers register the notification
+      #   handlers, so a scheduled sweep sends its digest for the first time
+      #   (tree alerts only, grid alerts stay silent); a new capability
+      #   verdict.reasoning.read gates the reasoning routes.
+      #
+      #   Images were checked in the registry (manifest HEAD on ghcr.io), not
+      #   on the node: SSH times out from the authoring machine.
+      #
+      #   Rollback is these tags back to 5f5fe82. Migrations 0093 and 0094
+      #   only add a table and two settings rows, which the old code ignores.
+      tag: "ab66fa7"
     workers:
-      tag: "5f5fe82"
+      tag: "ab66fa7"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4508,7 +4529,14 @@ global:
       #   folding walk and keeps its flat list for an old-engine one.
       #
       #   Rollback is this tag alone back to 9bacb61.
-      tag: "5f5fe82"
+      # ab66fa7 = the frontend half of the same range. The engine switch card
+      #   on the beta tree list, Farm Health opening on "All trees" and
+      #   colouring blocks by the tenant's rollup rule, the rollup setting on
+      #   the Detection settings page, and the reasoning panel's permission
+      #   message.
+      #
+      #   Rollback is this tag alone back to 5f5fe82.
+      tag: "ab66fa7"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
