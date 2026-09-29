@@ -140,6 +140,9 @@ class IndicesRepository:
                         WHERE block_id = :block_id
                           AND index_code = :index_code
                           AND mean IS NOT NULL
+                          -- A baseline built during a replay may only use
+                          -- the past of the simulated day. Live, a no-op.
+                          AND time <= public.app_now()
                         """
                     ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
                     {"block_id": block_id, "index_code": index_code},
@@ -277,6 +280,10 @@ class IndicesRepository:
                     WHERE r.block_id = :block_id
                       AND r.index_code = :index_code
                       AND r.mean IS NOT NULL
+                      -- Rows after the clock keep the value they were
+                      -- written with until a replay reaches them. Live,
+                      -- a no-op.
+                      AND r.time <= public.app_now()
                 ) sub
                 WHERE a.time = sub.time
                   AND a.block_id = sub.block_id

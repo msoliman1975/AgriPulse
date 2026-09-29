@@ -1047,6 +1047,10 @@ class WeatherRepository:
                           AND index_code = :index_code
                           AND value IS NOT NULL
                           AND NOT is_forecast
+                          -- The past of the clock only, so a replayed
+                          -- baseline never learns from later years. Live,
+                          -- a no-op.
+                          AND date <= (public.app_now())::date
                         ORDER BY date ASC
                         """
                     ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
@@ -1135,6 +1139,7 @@ class WeatherRepository:
                     WHERE r.farm_id = :farm_id
                       AND r.index_code = :index_code
                       AND r.value IS NOT NULL
+                      AND r.date <= (public.app_now())::date
                 ) sub
                 WHERE d.farm_id = sub.farm_id
                   AND d.date = sub.date

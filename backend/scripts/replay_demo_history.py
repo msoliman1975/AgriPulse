@@ -28,6 +28,7 @@ import sys
 from datetime import date
 
 from app.modules.demo_history.runner import ReplayNotAllowedError, replay
+from app.modules.demo_history.steps import DAILY_STEPS, DEMO_BUILD_STEPS
 
 logger = logging.getLogger("replay_demo_history")
 
@@ -55,6 +56,14 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Do not stop at the first failing step. Off by default.",
     )
     parser.add_argument(
+        "--engine-only",
+        action="store_true",
+        help=(
+            "Run the scheduler's steps only. By default a build also writes a "
+            "morning forecast and the farm team's work each day."
+        ),
+    )
+    parser.add_argument(
         "--quiet",
         action="store_true",
         help="Print the summary only, not each day.",
@@ -71,6 +80,7 @@ def main(argv: list[str] | None = None) -> int:
             tenant_schema=args.tenant_schema,
             start=args.start,
             end=args.end,
+            steps=DAILY_STEPS if args.engine_only else DEMO_BUILD_STEPS,
             stop_on_error=not args.keep_going,
         )
     except ReplayNotAllowedError as exc:

@@ -710,6 +710,9 @@ class GridRepository:
                     WHERE obs.block_id   = :block
                       AND obs.product_id = :product
                       AND obs.index_code = :code
+                      -- As of the clock, so a replayed day never judges a
+                      -- scene that had not been taken yet. Live, a no-op.
+                      AND obs.time <= public.app_now()
                       AND EXISTS (
                           SELECT 1
                           FROM grid_cells gc

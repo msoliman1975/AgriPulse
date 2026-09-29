@@ -13,6 +13,11 @@ it has already served and would spend quota for no new data.
 
 Weather fetching is not a step either, for the same reason.
 
+`DEMO_BUILD_STEPS` adds two steps a real tenant must never run: a
+forecast copied from the observed hours, because no past forecast was
+stored, and the farm team acting on what the engine opened. Both are
+demo content and live in this package for that reason.
+
 The hour on each step is not decoration. Rows written by one day all carry
 different times of day, which is what the past looks like when a person
 reads it. It also keeps the order inside a day visible in the data: a
@@ -25,6 +30,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from app.modules.demo_history import hindcast, people
 from app.modules.farms import phenology_tasks
 from app.modules.grid import tasks as grid_tasks
 from app.modules.indices import tasks as indices_tasks
@@ -82,8 +88,8 @@ DAILY_STEPS: tuple[Step, ...] = (
     ),
     Step("weather.compute_risk", 7, weather_tasks.compute_weather_risk_for_tenant),
     Step("weather.compute_spi", 7, weather_tasks.compute_spi_for_tenant),
-    # Yesterday's water balance. The task resolves its own target date from
-    # the clock, so a moved clock moves the row it writes.
+    # Yesterday's water balance. The task takes its target date from the
+    # clock, so a moved clock moves the row it writes.
     Step("irrigation.water_balance", 8, irrigation_tasks.water_balance_for_tenant),
     Step("irrigation.generate", 8, irrigation_tasks.generate_for_tenant),
     Step("grid.detect_anomalies", 9, grid_tasks.detect_anomalies_for_tenant),
@@ -101,3 +107,14 @@ def steps_for(weekday: int, steps: tuple[Step, ...] = DAILY_STEPS) -> list[Step]
     due = [(position, step) for position, step in enumerate(steps) if step.due_on(weekday)]
     due.sort(key=lambda pair: (pair[1].hour, pair[0]))
     return [step for _, step in due]
+
+
+# The build tenant's day: the engine's steps, with the morning forecast
+# before them and the farm team after them. The team works in the
+# afternoon, after the 10:00 evaluation, so a card is never acted on
+# before the sweep that opened it.
+DEMO_BUILD_STEPS: tuple[Step, ...] = (
+    Step("demo.hindcast_forecast", 0, hindcast.hindcast_for_tenant),
+    *DAILY_STEPS,
+    Step("demo.team_work", 16, people.act_for_tenant),
+)

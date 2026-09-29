@@ -286,6 +286,9 @@ async def _load_latest_observation(
                 FROM weather_observations
                 WHERE farm_id = :farm_id
                   AND provider_code = :provider_code
+                  -- As of the clock, so a replayed day never reads an
+                  -- hour that had not happened yet. Live, this is a no-op.
+                  AND time <= public.app_now()
                 ORDER BY time DESC
                 LIMIT 1
                 """
@@ -343,6 +346,10 @@ async def _load_forecast_window(
                       AND provider_code = :provider_code
                       AND time >= :since
                       AND time < :until
+                      -- Only issuances that existed at `now`. Live, every
+                      -- stored issuance qualifies; in a replay this keeps a
+                      -- later forecast out of an earlier day.
+                      AND forecast_issued_at <= :since
                     ORDER BY time ASC, forecast_issued_at DESC
                 ) latest_per_hour
                 """
