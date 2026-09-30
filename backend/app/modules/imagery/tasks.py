@@ -334,6 +334,31 @@ def discover_scenes(subscription_id: str, tenant_schema: str) -> dict[str, int]:
     return _run_task(_discover_scenes_async(UUID(subscription_id), tenant_schema))
 
 
+async def _revive_for_backfill(
+    repo: ImageryRepository,
+    *,
+    subscription_id: UUID,
+    is_backfill: bool,
+    window: tuple[datetime, datetime],
+    farm_path: bool,
+) -> int:
+    """A backfill also retries the scenes the reaper gave up on in its window.
+
+    Re-discovery cannot re-create their rows, so without this a re-run
+    backfill fetched nothing for them and reported success. A live poll
+    revives nothing: it has no explicit window, and a reaped job there is a
+    real failure for the platform alerts to show.
+    """
+    if not is_backfill:
+        return 0
+    return await repo.revive_reaped_jobs(
+        subscription_id=subscription_id,
+        window_start=window[0],
+        window_end=window[1],
+        farm_path=farm_path,
+    )
+
+
 async def _discover_scenes_async(
     subscription_id: UUID,
     tenant_schema: str,
@@ -381,6 +406,14 @@ async def _discover_scenes_async(
         )
 
         cloud_cap = _effective_cloud_cap(subscription, settings)
+
+        revived = await _revive_for_backfill(
+            repo,
+            subscription_id=subscription_id,
+            is_backfill=window_start_override is not None,
+            window=(window_start, window_end),
+            farm_path=False,
+        )
 
         # SentinelHubProvider raises SentinelHubNotConfiguredError from
         # its constructor when credentials are empty, so the factory
@@ -454,8 +487,7 @@ async def _discover_scenes_async(
 
         # Insert pending jobs for new scenes; mark over-cap scenes as
         # skipped_cloud (post-insert, so the audit trail records them).
-        queued = 0
-        skipped_cloud = 0
+        queued, skipped_cloud = 0, 0
         for scene in scenes:
             job_id = uuid7()
             new_id, created = await repo.upsert_pending_ingestion_job(
@@ -518,7 +550,7 @@ async def _discover_scenes_async(
 
     # Enqueue acquisition for every queued job. We do this OUTSIDE the
     # session block so the row is visible to the worker that picks it up.
-    if queued:
+    if queued or revived:
         # Re-query for queued jobs whose status is still 'pending'.
         async with AsyncSessionLocal()() as session2, session2.begin():
             await _set_tenant_context(session2, tenant_schema)
@@ -538,6 +570,7 @@ async def _discover_scenes_async(
         "discovered": len(scenes),
         "queued": queued,
         "skipped_cloud": skipped_cloud,
+        "revived": revived,
     }
 
 
@@ -1974,6 +2007,14 @@ async def _discover_farm_scenes_async(
         )
         cloud_cap = _effective_cloud_cap(subscription, settings)
 
+        revived = await _revive_for_backfill(
+            repo,
+            subscription_id=subscription_id,
+            is_backfill=window_start_override is not None,
+            window=(window_start, window_end),
+            farm_path=True,
+        )
+
         provider: ImageryProvider | None = None
         try:
             try:
@@ -2019,7 +2060,7 @@ async def _discover_farm_scenes_async(
         )
 
     # Outside the transaction, so the rows are visible to the worker.
-    if queued:
+    if queued or revived:
         async with AsyncSessionLocal()() as session2, session2.begin():
             await _set_tenant_context(session2, tenant_schema)
             pending = await ImageryRepository(session2).list_pending_farm_jobs(
@@ -2028,7 +2069,12 @@ async def _discover_farm_scenes_async(
         for job_id in pending:
             acquire_farm_scene.delay(str(job_id), tenant_schema)
 
-    return {"discovered": len(scenes), "queued": queued, "skipped_cloud": skipped_cloud}
+    return {
+        "discovered": len(scenes),
+        "queued": queued,
+        "skipped_cloud": skipped_cloud,
+        "revived": revived,
+    }
 
 
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
@@ -2767,6 +2813,7 @@ def reap_stuck_jobs() -> dict[str, int]:
 async def _reap_stuck_jobs_async() -> dict[str, int]:
     settings = get_settings()
     stuck_hours = settings.imagery_stuck_job_reap_hours
+    pending_hours = settings.imagery_stuck_pending_reap_hours
     max_attempts = settings.imagery_stuck_job_max_attempts
 
     factory = AsyncSessionLocal()
@@ -2799,13 +2846,20 @@ async def _reap_stuck_jobs_async() -> dict[str, int]:
                     failed_out += await repo.fail_exhausted_stuck_jobs(
                         stuck_hours=stuck_hours,
                         max_attempts=max_attempts,
+                        pending_hours=pending_hours,
                         farm_path=farm_path,
                     )
                 block_ids = await repo.reset_stuck_jobs(
-                    stuck_hours=stuck_hours, max_attempts=max_attempts, farm_path=False
+                    stuck_hours=stuck_hours,
+                    max_attempts=max_attempts,
+                    pending_hours=pending_hours,
+                    farm_path=False,
                 )
                 farm_ids = await repo.reset_stuck_jobs(
-                    stuck_hours=stuck_hours, max_attempts=max_attempts, farm_path=True
+                    stuck_hours=stuck_hours,
+                    max_attempts=max_attempts,
+                    pending_hours=pending_hours,
+                    farm_path=True,
                 )
         except Exception:
             _log.exception("imagery_reap_tenant_failed", tenant_schema=tenant_schema)

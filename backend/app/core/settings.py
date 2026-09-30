@@ -494,6 +494,14 @@ class Settings(BaseSettings):
     # rows the page calls healthy.
     imagery_stuck_job_reap_hours: int = 6
 
+    # A `pending` job is waiting in the queue, not stuck, and a large
+    # backfill queues hundreds of them behind a few heavy workers. Measured
+    # from `requested_at`, 6 hours failed the tail of a two-year backfill:
+    # 301 of 490 jobs on 2026-09-30, none of which had started. So a
+    # pending job gets its own, longer limit. It still exists because a
+    # message lost by the broker leaves a pending row nothing re-sends.
+    imagery_stuck_pending_reap_hours: int = 72
+
     # How many times the reaper may reset one job before it gives up and
     # marks it `failed` with `error_code = 'stuck_no_progress'`. Without a
     # cap, a job that can never succeed is reset every sweep for ever. Three
