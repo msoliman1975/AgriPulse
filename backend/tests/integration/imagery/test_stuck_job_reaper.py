@@ -19,6 +19,7 @@ on SQL that Postgres rejects.
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -104,7 +105,9 @@ async def _add_job(
                 "(id, subscription_id, farm_id, product_id, scene_id, scene_datetime, "
                 " requested_at, started_at, status, attempts) "
                 "VALUES (:id, :sub, :fid, :pid, :scene, now(), "
-                "        now() - make_interval(mins => :mins), now(), :st, :att)"
+                "        now() - make_interval(mins => :mins), "
+                "        CASE WHEN :st = 'running' THEN now() - make_interval(mins => :mins) END, "
+                "        :st, :att)"
             ),
             {
                 "id": str(job_id),
@@ -124,7 +127,9 @@ async def _add_job(
                 "(id, subscription_id, block_id, product_id, scene_id, scene_datetime, "
                 " requested_at, started_at, status, attempts) "
                 "VALUES (:id, :sub, :bid, :pid, :scene, now(), "
-                "        now() - make_interval(mins => :mins), now(), :st, :att)"
+                "        now() - make_interval(mins => :mins), "
+                "        CASE WHEN :st = 'running' THEN now() - make_interval(mins => :mins) END, "
+                "        :st, :att)"
             ),
             {
                 "id": str(job_id),
@@ -172,7 +177,9 @@ async def test_a_long_running_job_is_reset_to_pending(admin_session: AsyncSessio
     job_id = await _add_job(admin_session, env, scene_id="S1", status="running", age_hours=575)
 
     repo = await _repo_in(admin_session, env)
-    reset = await repo.reset_stuck_jobs(stuck_hours=6, max_attempts=3, farm_path=False)
+    reset = await repo.reset_stuck_jobs(
+        stuck_hours=6, max_attempts=3, pending_hours=72, farm_path=False
+    )
     await admin_session.commit()
 
     assert reset == (job_id,)
@@ -190,7 +197,9 @@ async def test_a_recent_job_is_left_alone(admin_session: AsyncSession) -> None:
     job_id = await _add_job(admin_session, env, scene_id="S1", status="running", age_hours=1)
 
     repo = await _repo_in(admin_session, env)
-    reset = await repo.reset_stuck_jobs(stuck_hours=6, max_attempts=3, farm_path=False)
+    reset = await repo.reset_stuck_jobs(
+        stuck_hours=6, max_attempts=3, pending_hours=72, farm_path=False
+    )
     await admin_session.commit()
 
     assert reset == ()
@@ -206,7 +215,9 @@ async def test_a_succeeded_job_is_never_touched(admin_session: AsyncSession) -> 
     bad = await _add_job(admin_session, env, scene_id="S2", status="failed", age_hours=999)
 
     repo = await _repo_in(admin_session, env)
-    reset = await repo.reset_stuck_jobs(stuck_hours=6, max_attempts=3, farm_path=False)
+    reset = await repo.reset_stuck_jobs(
+        stuck_hours=6, max_attempts=3, pending_hours=72, farm_path=False
+    )
     await admin_session.commit()
 
     assert reset == ()
@@ -226,8 +237,12 @@ async def test_the_attempt_cap_ends_the_loop(admin_session: AsyncSession) -> Non
     )
 
     repo = await _repo_in(admin_session, env)
-    failed = await repo.fail_exhausted_stuck_jobs(stuck_hours=6, max_attempts=3, farm_path=False)
-    reset = await repo.reset_stuck_jobs(stuck_hours=6, max_attempts=3, farm_path=False)
+    failed = await repo.fail_exhausted_stuck_jobs(
+        stuck_hours=6, max_attempts=3, pending_hours=72, farm_path=False
+    )
+    reset = await repo.reset_stuck_jobs(
+        stuck_hours=6, max_attempts=3, pending_hours=72, farm_path=False
+    )
     await admin_session.commit()
 
     assert failed == 1
@@ -248,7 +263,9 @@ async def test_the_farm_path_is_reaped_too(admin_session: AsyncSession) -> None:
     )
 
     repo = await _repo_in(admin_session, env)
-    reset = await repo.reset_stuck_jobs(stuck_hours=6, max_attempts=3, farm_path=True)
+    reset = await repo.reset_stuck_jobs(
+        stuck_hours=6, max_attempts=3, pending_hours=72, farm_path=True
+    )
     await admin_session.commit()
 
     assert reset == (job_id,)
@@ -270,11 +287,109 @@ async def test_a_stale_pending_job_is_retried(admin_session: AsyncSession) -> No
     `pending` and no discovery run will ever queue it again, because
     re-discovery of the same scene returns created=False."""
     env = await _tenant_with_one_block(admin_session, "reap-pending")
-    job_id = await _add_job(admin_session, env, scene_id="S1", status="pending", age_hours=48)
+    job_id = await _add_job(admin_session, env, scene_id="S1", status="pending", age_hours=100)
 
     repo = await _repo_in(admin_session, env)
-    reset = await repo.reset_stuck_jobs(stuck_hours=6, max_attempts=3, farm_path=False)
+    reset = await repo.reset_stuck_jobs(
+        stuck_hours=6, max_attempts=3, pending_hours=72, farm_path=False
+    )
     await admin_session.commit()
 
     assert reset == (job_id,)
     assert (await _job(admin_session, env, job_id))["attempts"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_pending_job_waiting_in_a_long_queue_is_left_alone(
+    admin_session: AsyncSession,
+) -> None:
+    """A backfill queues hundreds of jobs behind a few heavy workers.
+
+    On 2026-09-30 a two-year backfill lost 301 of 490 jobs: each was
+    `pending`, had never started, and was reaped because it was requested
+    more than 6 hours earlier. Waiting is not being stuck, so a pending job
+    has its own, longer limit.
+    """
+    env = await _tenant_with_one_block(admin_session, "reap-queue")
+    job_id = await _add_job(admin_session, env, scene_id="S1", status="pending", age_hours=48)
+
+    repo = await _repo_in(admin_session, env)
+    failed = await repo.fail_exhausted_stuck_jobs(
+        stuck_hours=6, max_attempts=3, pending_hours=72, farm_path=False
+    )
+    reset = await repo.reset_stuck_jobs(
+        stuck_hours=6, max_attempts=3, pending_hours=72, farm_path=False
+    )
+    await admin_session.commit()
+
+    assert failed == 0
+    assert reset == ()
+    row = await _job(admin_session, env, job_id)
+    assert row["status"] == "pending"
+    assert row["attempts"] == 0
+
+
+@pytest.mark.asyncio
+async def test_a_reset_restarts_the_pending_clock(admin_session: AsyncSession) -> None:
+    """After a reset the job waits again from now. Measured from its first
+    request, it would be stale on the very next sweep and use up its three
+    attempts in thirty minutes, which is how the backfill jobs were lost."""
+    env = await _tenant_with_one_block(admin_session, "reap-clock")
+    job_id = await _add_job(admin_session, env, scene_id="S1", status="running", age_hours=575)
+
+    repo = await _repo_in(admin_session, env)
+    first = await repo.reset_stuck_jobs(
+        stuck_hours=6, max_attempts=3, pending_hours=72, farm_path=False
+    )
+    second = await repo.reset_stuck_jobs(
+        stuck_hours=6, max_attempts=3, pending_hours=72, farm_path=False
+    )
+    await admin_session.commit()
+
+    assert first == (job_id,)
+    assert second == ()
+    assert (await _job(admin_session, env, job_id))["attempts"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_backfill_revives_reaped_jobs_in_its_window(admin_session: AsyncSession) -> None:
+    """Re-discovery cannot re-create a reaped job's row, so without a revive
+    a re-run backfill fetched nothing for those scenes and reported success.
+    Only `stuck_no_progress` comes back, and only inside the window."""
+    env = await _tenant_with_one_block(admin_session, "reap-revive")
+    inside = await _add_job(
+        admin_session, env, scene_id="S1", status="running", age_hours=575, attempts=3
+    )
+    provider_fail = await _add_job(
+        admin_session, env, scene_id="S2", status="failed", age_hours=575
+    )
+    repo = await _repo_in(admin_session, env)
+    await repo.fail_exhausted_stuck_jobs(
+        stuck_hours=6, max_attempts=3, pending_hours=72, farm_path=False
+    )
+    await admin_session.commit()
+    assert (await _job(admin_session, env, inside))["error_code"] == "stuck_no_progress"
+
+    repo = await _repo_in(admin_session, env)
+    now = (await admin_session.execute(text("SELECT now()"))).scalar_one()
+    outside_window = await repo.revive_reaped_jobs(
+        subscription_id=env["sub_id"],
+        window_start=now + timedelta(days=1),
+        window_end=now + timedelta(days=2),
+        farm_path=False,
+    )
+    revived = await repo.revive_reaped_jobs(
+        subscription_id=env["sub_id"],
+        window_start=now - timedelta(days=1),
+        window_end=now + timedelta(days=1),
+        farm_path=False,
+    )
+    await admin_session.commit()
+
+    assert outside_window == 0
+    assert revived == 1
+    row = await _job(admin_session, env, inside)
+    assert row["status"] == "pending"
+    assert row["attempts"] == 0
+    assert row["error_code"] is None
+    assert (await _job(admin_session, env, provider_fail))["status"] == "failed"

@@ -285,6 +285,20 @@ def _due_predicate_sql(prefix: str = "") -> str:
       )"""
 
 
+# What "stuck" means to the reaper. A running job is measured from when it
+# started, so the queue wait before it does not count. A pending job is
+# measured from its request, with a much longer limit, because waiting in
+# the queue is normal during a backfill. `requested` is listed with
+# `pending`; nothing in this module sets it today.
+_STUCK_PREDICATE = """(
+    (status = 'running'
+     AND COALESCE(started_at, requested_at)
+         < public.app_now() - make_interval(hours => :stuck_hours))
+    OR (status IN ('pending', 'requested')
+        AND requested_at < public.app_now() - make_interval(hours => :pending_hours))
+)"""
+
+
 class ImageryRepository:
     """Internal repository — service layer is the only consumer."""
 
@@ -1972,6 +1986,7 @@ class ImageryRepository:
         *,
         stuck_hours: int,
         max_attempts: int,
+        pending_hours: int,
         farm_path: bool,
     ) -> int:
         """Mark stuck jobs that have used up their resets as failed.
@@ -1992,12 +2007,15 @@ class ImageryRepository:
                            'reaped after ' || attempts ||
                            ' attempt(s) with no terminal status',
                        error_code = 'stuck_no_progress'
-                 WHERE status IN ('pending', 'running', 'requested')
-                   AND requested_at < public.app_now() - make_interval(hours => :stuck_hours)
+                 WHERE {_STUCK_PREDICATE}
                    AND attempts >= :max_attempts
                 """  # noqa: S608 - `table` is one of two literals
             ),
-            {"stuck_hours": stuck_hours, "max_attempts": max_attempts},
+            {
+                "stuck_hours": stuck_hours,
+                "pending_hours": pending_hours,
+                "max_attempts": max_attempts,
+            },
         )
         # Same shape as `reset_ingest_watermarks` earlier in this file:
         # SQLAlchemy 2.x only defines `rowcount` on a DML result.
@@ -2008,6 +2026,7 @@ class ImageryRepository:
         *,
         stuck_hours: int,
         max_attempts: int,
+        pending_hours: int,
         farm_path: bool,
     ) -> tuple[UUID, ...]:
         """Return stuck jobs to `pending` and return their ids to re-dispatch.
@@ -2030,20 +2049,66 @@ class ImageryRepository:
                     UPDATE {table}
                        SET status = 'pending',
                            attempts = attempts + 1,
+                           -- The pending clock restarts: the job is waiting
+                           -- again from now, not from its first request.
+                           requested_at = public.app_now(),
                            started_at = NULL,
                            completed_at = NULL,
                            error_message = NULL,
                            error_code = NULL
-                     WHERE status IN ('pending', 'running', 'requested')
-                       AND requested_at < public.app_now() - make_interval(hours => :stuck_hours)
+                     WHERE {_STUCK_PREDICATE}
                        AND attempts < :max_attempts
                     RETURNING id
                     """  # noqa: S608 - `table` is one of two literals
                 ),
-                {"stuck_hours": stuck_hours, "max_attempts": max_attempts},
+                {
+                    "stuck_hours": stuck_hours,
+                    "pending_hours": pending_hours,
+                    "max_attempts": max_attempts,
+                },
             )
         ).all()
         return tuple(UUID(str(r[0])) for r in rows)
+
+    async def revive_reaped_jobs(
+        self,
+        *,
+        subscription_id: UUID,
+        window_start: datetime,
+        window_end: datetime,
+        farm_path: bool,
+    ) -> int:
+        """Return this window's reaper-failed jobs to `pending`.
+
+        A job the reaper gave up on keeps its row, and re-discovery cannot
+        create it again (`ON CONFLICT (subscription_id, scene_id) DO
+        NOTHING`). So without this, re-running a backfill over the same
+        window fetched nothing for those scenes and reported success. Only
+        `stuck_no_progress` is revived: any other failure came from the
+        provider or the data, and a re-run would fail it the same way.
+        """
+        table = "imagery_farm_ingestion_jobs" if farm_path else "imagery_ingestion_jobs"
+        result = await self._session.execute(
+            text(
+                f"""
+                UPDATE {table}
+                   SET status = 'pending',
+                       attempts = 0,
+                       requested_at = public.app_now(),
+                       started_at = NULL,
+                       completed_at = NULL,
+                       error_message = NULL,
+                       error_code = NULL
+                 WHERE subscription_id = :s
+                   AND status = 'failed'
+                   AND error_code = 'stuck_no_progress'
+                   AND scene_datetime >= :start
+                   AND scene_datetime < :end
+                """  # noqa: S608 - `table` is one of two literals
+            ).bindparams(bindparam("s", type_=PG_UUID(as_uuid=True))),
+            {"s": subscription_id, "start": window_start, "end": window_end},
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
 
 
 # ---- Row → dict projections ----------------------------------------------
