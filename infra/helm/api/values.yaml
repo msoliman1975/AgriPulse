@@ -255,6 +255,22 @@ seedTenantJob:
   ownerFullName: ""
   tier: "free"
 
+# One run of scripts.demo_build against a demo build tenant. See
+# templates/demo-build-cronjob.yaml. Off everywhere by default.
+demoBuildJob:
+  enabled: false
+  # New value per run, so a run is a new object.
+  runId: "r1"
+  # One minute of one day, UTC, e.g. "30 14 30 9 *".
+  schedule: "0 0 1 1 *"
+  tenantSchema: ""
+  scenario: ""
+  # incidents-dry-run | incidents | replay | all
+  mode: "incidents-dry-run"
+  from: ""
+  to: ""
+  activeDeadlineSeconds: 172800
+
 serviceMonitor:
   enabled: true
   interval: 30s

@@ -23,11 +23,9 @@ import logging
 import sys
 from typing import Any
 
-from sqlalchemy import text
-
-from app.modules.demo_history.incidents import already_applied, apply_incident
+from app.modules.demo_history.incidents import apply_scenario
 from app.modules.demo_history.runner import ReplayNotAllowedError, ensure_build_tenant
-from app.shared.db.session import AsyncSessionLocal, dispose_engine, sanitize_tenant_schema
+from app.shared.db.session import AsyncSessionLocal, dispose_engine
 
 logger = logging.getLogger("apply_demo_incidents")
 
@@ -45,41 +43,25 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 async def _run(tenant_schema: str, scenario: Any, dry_run: bool) -> int:
-    safe = sanitize_tenant_schema(tenant_schema)
-    factory = AsyncSessionLocal()
-    async with factory() as session, session.begin():
-        await session.execute(text(f"SET LOCAL search_path TO {safe}, public"))
-        farm_id = (
-            await session.execute(
-                text("SELECT id FROM farms WHERE code = :c AND deleted_at IS NULL"),
-                {"c": scenario.FARM_CODE},
-            )
-        ).scalar_one_or_none()
-        if farm_id is None:
-            logger.error("no farm with code %s in %s", scenario.FARM_CODE, tenant_schema)
-            return 2
-        done = await already_applied(session, farm_id)
-
-    for inc in scenario.INCIDENTS:
-        if inc.code in done:
-            logger.info("%-28s already applied, skipped", inc.code)
-            continue
-        async with factory() as session:
-            await session.begin()
-            await session.execute(text(f"SET LOCAL search_path TO {safe}, public"))
-            counts = await apply_incident(session, farm_id, inc)
-            if dry_run:
-                await session.rollback()
-            else:
-                await session.commit()
-        verb = "would move" if dry_run else "moved"
-        logger.info(
-            "%-28s %s %d cell rows, %d block rows",
-            inc.code,
-            verb,
-            counts["cell_rows"],
-            counts["block_rows"],
+    try:
+        results = await apply_scenario(
+            AsyncSessionLocal(), tenant_schema, scenario, dry_run=dry_run
         )
+    except ValueError as exc:
+        logger.error("%s", exc)
+        return 2
+    verb = "would move" if dry_run else "moved"
+    for r in results:
+        if r["skipped"]:
+            logger.info("%-28s already applied, skipped", r["code"])
+        else:
+            logger.info(
+                "%-28s %s %d cell rows, %d block rows",
+                r["code"],
+                verb,
+                r["cell_rows"],
+                r["block_rows"],
+            )
     return 0
 
 

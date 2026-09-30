@@ -39,6 +39,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
+from app.shared.db.session import sanitize_tenant_schema
 
 _log = get_logger(__name__)
 
@@ -369,3 +370,44 @@ def _details_json(inc: Incident, counts: dict[str, int]) -> str:
             **counts,
         }
     )
+
+
+async def apply_scenario(
+    session_factory: Any, tenant_schema: str, scenario: Any, *, dry_run: bool = False
+) -> list[dict[str, Any]]:
+    """Apply every incident of `scenario` that has not been applied yet.
+
+    `scenario` is a module with `FARM_CODE` and `INCIDENTS`. Each incident
+    commits on its own with its audit row, so a failure part way leaves the
+    earlier ones applied and a second call applies only what is left.
+    Returns one entry per incident: its code, whether it was skipped, and
+    the rows it moved.
+    """
+    safe = sanitize_tenant_schema(tenant_schema)
+    async with session_factory() as session, session.begin():
+        await session.execute(text(f"SET LOCAL search_path TO {safe}, public"))
+        farm_id = (
+            await session.execute(
+                text("SELECT id FROM farms WHERE code = :c AND deleted_at IS NULL"),
+                {"c": scenario.FARM_CODE},
+            )
+        ).scalar_one_or_none()
+        if farm_id is None:
+            raise ValueError(f"no farm with code {scenario.FARM_CODE} in {tenant_schema}")
+        done = await already_applied(session, farm_id)
+
+    results: list[dict[str, Any]] = []
+    for inc in scenario.INCIDENTS:
+        if inc.code in done:
+            results.append({"code": inc.code, "skipped": True})
+            continue
+        async with session_factory() as session:
+            await session.begin()
+            await session.execute(text(f"SET LOCAL search_path TO {safe}, public"))
+            counts = await apply_incident(session, farm_id, inc)
+            if dry_run:
+                await session.rollback()
+            else:
+                await session.commit()
+        results.append({"code": inc.code, "skipped": False, **counts})
+    return results

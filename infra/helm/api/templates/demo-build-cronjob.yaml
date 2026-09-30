@@ -1,0 +1,106 @@
+{{- /*
+Demo farm build: one run of scripts.demo_build against a build tenant.
+
+A CronJob, not a Job, on purpose. ArgoCD waits for a Job to become
+healthy, and a Job is Progressing until it ends, so a replay of several
+hours inside the api Application would hold its sync and block the next
+promote. A CronJob is healthy as soon as it exists; the Job it spawns at
+`schedule` is not tracked by the Application.
+
+`schedule` names one minute of one day, so it fires once a year. Set it a
+few minutes ahead of the promote, then set `enabled: false` after the run.
+`runId` goes into the name, so a new run is a new object and never an
+edit of an old one.
+
+DEMO_HISTORY_BUILD_SCHEMA_PREFIX is set here and nowhere else: it is the
+guard that keeps every other pod from writing steered history. It is the
+build tenant's full schema name, so exactly one tenant qualifies.
+
+Progress is reported as audit-archive events on the build tenant, read
+with GET /api/v1/admin/tenants/{id}/sidecar. No log access is needed.
+*/ -}}
+{{- if .Values.demoBuildJob.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "agripulse-api.fullname" . }}-demo-build-{{ .Values.demoBuildJob.runId }}
+  labels:
+    {{- include "agripulse-api.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.demoBuildJob.schedule | quote }}
+  timeZone: "Etc/UTC"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: {{ .Values.demoBuildJob.activeDeadlineSeconds }}
+      template:
+        metadata:
+          # Written out, not the shared helper: the helper carries
+          # `component: api`, and the api Service selects on it, so live
+          # HTTP traffic would be sent to this pod, which serves none.
+          labels:
+            app.kubernetes.io/name: {{ .Chart.Name }}
+            app.kubernetes.io/instance: {{ .Release.Name }}
+            app.kubernetes.io/part-of: agripulse
+            app.kubernetes.io/component: demo-build
+        spec:
+          restartPolicy: Never
+          serviceAccountName: {{ include "agripulse-api.serviceAccountName" . }}
+          nodeSelector:
+            kubernetes.io/arch: amd64
+          containers:
+            - name: demo-build
+              image: {{ include "agripulse-api.imageRef" . | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              workingDir: /app
+              command:
+                - /opt/venv/bin/python
+                - -m
+                - scripts.demo_build
+                - --tenant-schema
+                - {{ .Values.demoBuildJob.tenantSchema | quote }}
+                - --scenario
+                - {{ .Values.demoBuildJob.scenario | quote }}
+                - --mode
+                - {{ .Values.demoBuildJob.mode | quote }}
+                {{- with .Values.demoBuildJob.from }}
+                - --from
+                - {{ . | quote }}
+                {{- end }}
+                {{- with .Values.demoBuildJob.to }}
+                - --to
+                - {{ . | quote }}
+                {{- end }}
+              envFrom:
+                - configMapRef:
+                    name: agripulse-app-config
+                - configMapRef:
+                    name: {{ include "agripulse-api.fullname" . }}
+                {{- if .Values.externalSecret.enabled }}
+                - secretRef:
+                    name: {{ include "agripulse-api.fullname" . }}-secrets
+                {{- end }}
+                {{- range .Values.extraEnvFromSecrets }}
+                - secretRef:
+                    name: {{ . }}
+                {{- end }}
+              env:
+                - name: DATABASE_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.databasePasswordSecret.name }}
+                      key: {{ .Values.databasePasswordSecret.key }}
+                - name: DEMO_HISTORY_BUILD_SCHEMA_PREFIX
+                  value: {{ required "demoBuildJob.tenantSchema is required" .Values.demoBuildJob.tenantSchema | quote }}
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 512Mi
+                limits:
+                  cpu: "1"
+                  memory: 2Gi
+{{- end }}
