@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime, time
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -206,14 +206,36 @@ async def _cells(session: AsyncSession, block_id: UUID, spec: str) -> tuple[list
     return list(chosen), int(total)
 
 
+def _date_params(inc: Incident) -> dict[str, Any]:
+    """The incident's dates as SQL parameters, one name per type.
+
+    asyncpg gives each parameter a single type. The same `:start` used
+    against the `time` column and in the day arithmetic was typed as a
+    timestamp, so `d - :start` became an interval and the cast to numeric
+    failed on the first run. Days are cast to date in the ramp; the row
+    filter gets its own UTC timestamps.
+    """
+    return {
+        "start": inc.start,
+        "full": inc.full,
+        "until": inc.until,
+        "gone": inc.gone,
+        "start_ts": datetime.combine(inc.start, time.min, tzinfo=UTC),
+        "gone_ts": datetime.combine(inc.gone, time.min, tzinfo=UTC),
+    }
+
+
 # Linear ramp in SQL, the same shape as `Incident.weight`. `d` is the UTC
 # day of the row.
 _WEIGHT_SQL = """
     CASE
-        WHEN d < :start OR d >= :gone THEN 0
-        WHEN d < :full THEN (d - :start)::numeric / GREATEST(:full - :start, 1)
-        WHEN d <= :until THEN 1
-        ELSE (:gone - d)::numeric / GREATEST(:gone - :until, 1)
+        WHEN d < CAST(:start AS date) OR d >= CAST(:gone AS date) THEN 0
+        WHEN d < CAST(:full AS date)
+            THEN (d - CAST(:start AS date))::numeric
+                 / GREATEST(CAST(:full AS date) - CAST(:start AS date), 1)
+        WHEN d <= CAST(:until AS date) THEN 1
+        ELSE (CAST(:gone AS date) - d)::numeric
+             / GREATEST(CAST(:gone AS date) - CAST(:until AS date), 1)
     END
 """
 
@@ -251,8 +273,8 @@ async def _shift_cells(
                              WHERE block_id = :block
                                AND index_code = :code
                                AND cell_id = ANY(:cells)
-                               AND time >= :start
-                               AND time < :gone
+                               AND time >= :start_ts
+                               AND time < :gone_ts
                            ) rows
                    ) w
              WHERE g.block_id = :block
@@ -275,10 +297,7 @@ async def _shift_cells(
             "share": 1.0,
             "low": low,
             "high": high,
-            "start": inc.start,
-            "full": inc.full,
-            "until": inc.until,
-            "gone": inc.gone,
+            **_date_params(inc),
         },
     )
     return int(getattr(result, "rowcount", 0) or 0)
@@ -303,8 +322,8 @@ async def _shift_block(
                               FROM block_index_aggregates
                              WHERE block_id = :block
                                AND index_code = :code
-                               AND time >= :start
-                               AND time < :gone
+                               AND time >= :start_ts
+                               AND time < :gone_ts
                            ) rows
                    ) w
              WHERE a.block_id = :block
@@ -323,10 +342,7 @@ async def _shift_block(
             "share": share,
             "low": low,
             "high": high,
-            "start": inc.start,
-            "full": inc.full,
-            "until": inc.until,
-            "gone": inc.gone,
+            **_date_params(inc),
         },
     )
     return int(getattr(result, "rowcount", 0) or 0)
