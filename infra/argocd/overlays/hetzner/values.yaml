@@ -3933,9 +3933,15 @@ global:
       #   so a long backfill queue is no longer failed as stuck. A backfill
       #   over a window revives that window's `stuck_no_progress` jobs.
       #   No migration. Rollback is these two tags back to fc0b331.
-      tag: "38945be"
+      # ccedd76 = #739 + #738, api and workers. One Landsat SAS token per
+      #   worker process instead of one per job, and a 429 from Planetary
+      #   Computer is waited out and retried; a backfill re-run also revives
+      #   jobs that failed on a 429. #738 adds scripts/demo_build.py and the
+      #   api chart's demo-build CronJob, which stays off (demoBuildJob).
+      #   No migration. Rollback is these two tags back to 38945be.
+      tag: "ccedd76"
     workers:
-      tag: "38945be"
+      tag: "ccedd76"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
