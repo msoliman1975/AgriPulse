@@ -3943,9 +3943,12 @@ global:
       #   Ewais Grove scenario is fitted to the farm's readings. Code used
       #   only by the demo-build CronJob below. No migration. Rollback is
       #   these two tags back to ccedd76.
-      tag: "3804c01"
+      # 5530989 = #743, api and workers. The incident SQL types each date
+      #   once: run r1 failed on `cannot cast type interval to numeric`.
+      #   No migration. Rollback is these two tags back to 3804c01.
+      tag: "5530989"
     workers:
-      tag: "3804c01"
+      tag: "5530989"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4830,12 +4833,13 @@ workloads:
 # infra/helm/api/templates/demo-build-cronjob.yaml. Fires once at
 # `schedule` (UTC). Progress is read from
 # GET /api/v1/admin/tenants/01a0eec1-3ae9-703d-bfa8-a7cfafe11675/sidecar.
-# r1 is a dry run: every incident is applied in a transaction, counted,
-# and rolled back. Nothing changes.
+# r1 (2026-09-30 22:13) was a dry run and failed on a date bind, fixed in
+# #743. r2 repeats the dry run: every incident is applied in a
+# transaction, counted, and rolled back. Nothing changes.
 demoBuildJob:
   enabled: true
-  runId: "r1"
-  schedule: "13 22 30 9 *"
+  runId: "r2"
+  schedule: "45 23 30 9 *"
   tenantSchema: "tenant_01a0eec13ae9703dbfa8a7cfafe11675"
   scenario: "ewais_grove"
   mode: "incidents-dry-run"
