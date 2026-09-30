@@ -55,10 +55,21 @@ _DEFAULT_BOUNDS = (-1.0, 1.0)
 
 @dataclass(frozen=True)
 class Shift:
-    """How far one index moves at full strength."""
+    """How one index moves at full strength.
+
+    ``add`` moves every reading by `value`. ``set`` pulls every reading to
+    `value`: at strength k a reading r becomes r + (value - r) * k. Use
+    ``set`` when the tree tests a band rather than a floor, because an
+    added shift carries the reading's own noise into the band.
+    """
 
     index_code: str
-    delta: float
+    value: float
+    mode: str = "add"
+
+    def __post_init__(self) -> None:
+        if self.mode not in ("add", "set"):
+            raise ValueError(f"shift mode must be add or set, got {self.mode!r}")
 
 
 @dataclass(frozen=True)
@@ -207,6 +218,19 @@ _WEIGHT_SQL = """
 """
 
 
+def _moved(column: str) -> str:
+    """SQL for one column after the shift, at strength `w.k` times `:share`.
+
+    `add` adds `:value`; `set` pulls toward `:value`. A block row takes
+    the cell shift times the share of cells the incident covers.
+    """
+    return (
+        f"CASE WHEN :set_mode "
+        f"THEN {column} + (:value - {column}) * w.k * :share "
+        f"ELSE {column} + :value * w.k * :share END"
+    )
+
+
 async def _shift_cells(
     session: AsyncSession, inc: Incident, block_id: UUID, cells: list[UUID], shift: Shift
 ) -> int:
@@ -215,9 +239,9 @@ async def _shift_cells(
         text(
             f"""
             UPDATE block_grid_aggregates g
-               SET mean = LEAST(:high, GREATEST(:low, g.mean + :delta * w.k)),
-                   min  = LEAST(:high, GREATEST(:low, g.min  + :delta * w.k)),
-                   max  = LEAST(:high, GREATEST(:low, g.max  + :delta * w.k))
+               SET mean = LEAST(:high, GREATEST(:low, {_moved("g.mean")})),
+                   min  = LEAST(:high, GREATEST(:low, {_moved("g.min")})),
+                   max  = LEAST(:high, GREATEST(:low, {_moved("g.max")}))
               FROM (
                     SELECT time, cell_id, {_WEIGHT_SQL} AS k
                       FROM (
@@ -246,7 +270,9 @@ async def _shift_cells(
             "block": block_id,
             "code": shift.index_code,
             "cells": cells,
-            "delta": shift.delta,
+            "value": shift.value,
+            "set_mode": shift.mode == "set",
+            "share": 1.0,
             "low": low,
             "high": high,
             "start": inc.start,
@@ -263,7 +289,7 @@ async def _shift_block(
 ) -> int:
     low, high = bounds_for(shift.index_code)
     columns = ("mean", "min", "max", "p10", "p50", "p90")
-    sets = ",\n".join(f"{c} = LEAST(:high, GREATEST(:low, a.{c} + :delta * w.k))" for c in columns)
+    sets = ",\n".join(f"{c} = LEAST(:high, GREATEST(:low, {_moved(f'a.{c}')}))" for c in columns)
     result = await session.execute(
         text(
             f"""
@@ -292,7 +318,9 @@ async def _shift_block(
         {
             "block": block_id,
             "code": shift.index_code,
-            "delta": shift.delta * share,
+            "value": shift.value,
+            "set_mode": shift.mode == "set",
+            "share": share,
             "low": low,
             "high": high,
             "start": inc.start,
@@ -366,7 +394,7 @@ def _details_json(inc: Incident, counts: dict[str, int]) -> str:
             "full": inc.full.isoformat(),
             "until": inc.until.isoformat(),
             "gone": inc.gone.isoformat(),
-            "shifts": {s.index_code: s.delta for s in inc.shifts},
+            "shifts": {s.index_code: [s.mode, s.value] for s in inc.shifts},
             **counts,
         }
     )
