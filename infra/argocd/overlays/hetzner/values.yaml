@@ -4833,13 +4833,17 @@ workloads:
 # infra/helm/api/templates/demo-build-cronjob.yaml. Fires once at
 # `schedule` (UTC). Progress is read from
 # GET /api/v1/admin/tenants/01a0eec1-3ae9-703d-bfa8-a7cfafe11675/sidecar.
-# r1 (2026-09-30 22:13) was a dry run and failed on a date bind, fixed in
-# #743. r2 repeats the dry run: every incident is applied in a
-# transaction, counted, and rolled back. Nothing changes.
+#
+# r1 (2026-09-30 22:13) dry run, failed on a date bind, fixed in #743.
+# r2 (2026-09-30 23:45) dry run, 10 incidents counted, 13 s, rolled back.
+# r3 applies the incidents for real and replays the first week only, so
+# the run time of one simulated week can be measured before the rest.
 demoBuildJob:
   enabled: true
-  runId: "r2"
-  schedule: "45 23 30 9 *"
+  runId: "r3"
+  schedule: "01 00 1 10 *"
   tenantSchema: "tenant_01a0eec13ae9703dbfa8a7cfafe11675"
   scenario: "ewais_grove"
-  mode: "incidents-dry-run"
+  mode: "all"
+  from: "2024-09-29"
+  to: "2024-10-05"
