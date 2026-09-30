@@ -125,6 +125,35 @@ class _CachedSasToken:
     expires_at_epoch: float
 
 
+# One SAS token per worker process, shared by every provider instance.
+# The task layer builds a new provider for every job, so a cache on the
+# instance lasted one job and every Landsat job asked PC for its own
+# token. A 233-scene backfill did exactly that on 2026-09-30, and PC's
+# token endpoint answered 429 to 193 of them. Keyed by token URL.
+_SAS_CACHE: dict[str, _CachedSasToken] = {}
+
+# Retries for a 429. PC names the wait in `Retry-After`; without it the
+# wait doubles from 5 s. Capped so a worker is never parked for long.
+_MAX_RATE_LIMIT_RETRIES = 5
+_RATE_LIMIT_BASE_SECONDS = 5.0
+_RATE_LIMIT_MAX_WAIT_SECONDS = 60.0
+
+
+def _rate_limit_wait(response: httpx.Response, attempt: int) -> float:
+    header = response.headers.get("Retry-After")
+    try:
+        wait = float(header) if header is not None else None
+    except ValueError:
+        wait = None
+    if wait is None:
+        wait = _RATE_LIMIT_BASE_SECONDS * (2**attempt)
+    return min(max(wait, 0.0), _RATE_LIMIT_MAX_WAIT_SECONDS)
+
+
+# Seam for tests, so a retry test does not really wait.
+_sleep = asyncio.sleep
+
+
 @contextmanager
 def _gdal_vsicurl_env() -> Iterator[None]:
     """GDAL settings for reading a signed HTTPS COG via `/vsicurl/`.
@@ -164,8 +193,7 @@ def _gdal_vsicurl_env() -> Iterator[None]:
 class LandsatPlanetaryComputerProvider:
     """`ImageryProvider` impl reading Landsat C2 L2 from Planetary Computer.
 
-    Stateless apart from the cached SAS token, exactly like
-    `SentinelHubProvider`'s OAuth cache: one token per worker process,
+    Stateless. The SAS token lives in `_SAS_CACHE`, one per worker process,
     refreshed 10 minutes before expiry.
     """
 
@@ -193,7 +221,6 @@ class LandsatPlanetaryComputerProvider:
         )
         self._http = http_client or httpx.AsyncClient(timeout=httpx.Timeout(60.0))
         self._owns_http = http_client is None
-        self._sas: _CachedSasToken | None = None
         self._log = get_logger(__name__)
 
     @property
@@ -245,26 +272,31 @@ class LandsatPlanetaryComputerProvider:
         # changed body shape does not demote the probe — connectivity is
         # the signal we are after.
         with suppress(KeyError, ValueError, TypeError):
-            self._sas = _parse_sas_response(response.json())
+            _SAS_CACHE[self._sas_key] = _parse_sas_response(response.json())
         return ProbeResult(status="ok", latency_ms=latency_ms)
 
     # -- SAS token ------------------------------------------------------
 
+    @property
+    def _sas_key(self) -> str:
+        return f"{self._sas_url}/{_SAS_CONTAINER}"
+
     async def _sas_token(self) -> str:
         """Return a non-expired SAS token, refreshing if needed."""
-        now = time.time()
-        if self._sas is None or self._sas.expires_at_epoch - now < _TOKEN_REFRESH_LEAD_SECONDS:
-            await self._refresh_sas_token()
-        assert self._sas is not None  # type narrowing
-        return self._sas.token
+        cached = _SAS_CACHE.get(self._sas_key)
+        if cached is None or cached.expires_at_epoch - time.time() < _TOKEN_REFRESH_LEAD_SECONDS:
+            cached = await self._refresh_sas_token()
+        return cached.token
 
-    async def _refresh_sas_token(self) -> None:
-        response = await self._request_with_retry("GET", f"{self._sas_url}/{_SAS_CONTAINER}")
-        self._sas = _parse_sas_response(response.json())
+    async def _refresh_sas_token(self) -> _CachedSasToken:
+        response = await self._request_with_retry("GET", self._sas_key)
+        cached = _parse_sas_response(response.json())
+        _SAS_CACHE[self._sas_key] = cached
         self._log.info(
             "planetary_computer_sas_refreshed",
-            expires_in=int(self._sas.expires_at_epoch - time.time()),
+            expires_in=int(cached.expires_at_epoch - time.time()),
         )
+        return cached
 
     # -- Discover -------------------------------------------------------
 
@@ -408,14 +440,17 @@ class LandsatPlanetaryComputerProvider:
         *,
         json_body: dict[str, Any] | None = None,
     ) -> httpx.Response:
-        """Request with bounded retries on 5xx + network errors.
+        """Request with bounded retries on 5xx, 429 and network errors.
 
-        Same policy as the Sentinel Hub adapter: 4xx raises immediately
-        because it signals a bad request rather than transient
-        infrastructure.
+        Any other 4xx raises at once, because it signals a bad request
+        rather than transient infrastructure. A 429 is the exception: it
+        says "not now", so it waits as PC asks and tries again, with its
+        own, larger count.
         """
         last_exc: Exception | None = None
-        for attempt in range(_MAX_RETRIES):
+        rate_limited = 0
+        attempt = 0
+        while attempt < _MAX_RETRIES:
             try:
                 response = await self._http.request(method, url, json=json_body)
             except httpx.TransportError as exc:
@@ -427,6 +462,17 @@ class LandsatPlanetaryComputerProvider:
                     attempt=attempt + 1,
                     error=str(exc),
                 )
+                attempt += 1
+                continue
+            if response.status_code == 429 and rate_limited < _MAX_RATE_LIMIT_RETRIES:
+                wait = _rate_limit_wait(response, rate_limited)
+                rate_limited += 1
+                self._log.warning(
+                    "planetary_computer_rate_limited",
+                    attempt=rate_limited,
+                    wait_s=wait,
+                )
+                await _sleep(wait)
                 continue
             if response.status_code >= 500:
                 if attempt == _MAX_RETRIES - 1:
@@ -436,6 +482,7 @@ class LandsatPlanetaryComputerProvider:
                     attempt=attempt + 1,
                     status=response.status_code,
                 )
+                attempt += 1
                 continue
             response.raise_for_status()
             return response

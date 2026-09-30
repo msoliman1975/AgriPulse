@@ -48,6 +48,12 @@ _AOI_UTM = {
 }
 
 
+@pytest.fixture(autouse=True)
+def _empty_sas_cache() -> None:
+    """The token cache is per process, so each test starts without one."""
+    landsat_pc._SAS_CACHE.clear()
+
+
 @pytest.fixture
 def provider() -> LandsatPlanetaryComputerProvider:
     """Cloud masking off, so `bands` in == `band_order` out.
@@ -94,6 +100,62 @@ async def test_sas_token_is_cached_across_calls(
 
     assert first == second == _FAKE_SAS
     assert route.call_count == 1, "second call should reuse the cached token"
+
+
+@pytest.mark.asyncio
+async def test_sas_token_is_shared_by_every_provider_instance() -> None:
+    """The task layer builds a provider per job. Before, each one asked for
+    its own token, and a 233-scene backfill drew 193 answers of 429."""
+    async with respx.mock as router:
+        route = router.get(f"{_SAS}/landsat-c2-l2").mock(
+            return_value=httpx.Response(200, json=_sas_body())
+        )
+        for _ in range(5):
+            job_provider = LandsatPlanetaryComputerProvider(stac_url=_STAC, sas_url=_SAS)
+            assert await job_provider._sas_token() == _FAKE_SAS
+            await job_provider.aclose()
+
+    assert route.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_a_429_waits_as_asked_and_retries(
+    provider: LandsatPlanetaryComputerProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    waits: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        waits.append(seconds)
+
+    monkeypatch.setattr(landsat_pc, "_sleep", fake_sleep)
+    async with respx.mock as router:
+        router.get(f"{_SAS}/landsat-c2-l2").mock(
+            side_effect=[
+                httpx.Response(429, headers={"Retry-After": "7"}),
+                httpx.Response(429),
+                httpx.Response(200, json=_sas_body()),
+            ]
+        )
+        token = await provider._sas_token()
+
+    assert token == _FAKE_SAS
+    assert waits == [7.0, 10.0], "Retry-After first, then the doubling default"
+
+
+@pytest.mark.asyncio
+async def test_a_429_that_never_clears_still_raises(
+    provider: LandsatPlanetaryComputerProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def fake_sleep(seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr(landsat_pc, "_sleep", fake_sleep)
+    async with respx.mock as router:
+        route = router.get(f"{_SAS}/landsat-c2-l2").mock(return_value=httpx.Response(429))
+        with pytest.raises(httpx.HTTPStatusError, match="429"):
+            await provider._sas_token()
+
+    assert route.call_count == landsat_pc._MAX_RATE_LIMIT_RETRIES + 1
 
 
 def test_parse_sas_response_reads_the_expiry() -> None:

@@ -2083,9 +2083,10 @@ class ImageryRepository:
         A job the reaper gave up on keeps its row, and re-discovery cannot
         create it again (`ON CONFLICT (subscription_id, scene_id) DO
         NOTHING`). So without this, re-running a backfill over the same
-        window fetched nothing for those scenes and reported success. Only
-        `stuck_no_progress` is revived: any other failure came from the
-        provider or the data, and a re-run would fail it the same way.
+        window fetched nothing for those scenes and reported success.
+        Revived: `stuck_no_progress`, and a provider error that was a 429
+        rate limit. Any other failure came from the provider or the data,
+        and a re-run would fail it the same way.
         """
         table = "imagery_farm_ingestion_jobs" if farm_path else "imagery_ingestion_jobs"
         result = await self._session.execute(
@@ -2101,12 +2102,23 @@ class ImageryRepository:
                        error_code = NULL
                  WHERE subscription_id = :s
                    AND status = 'failed'
-                   AND error_code = 'stuck_no_progress'
+                   AND (
+                        error_code = 'stuck_no_progress'
+                        -- A 429 is the provider saying "not now". The
+                        -- scene exists and a later request gets it.
+                        OR (error_code = 'provider_error'
+                            AND error_message LIKE :rate_limited)
+                   )
                    AND scene_datetime >= :start
                    AND scene_datetime < :end
                 """  # noqa: S608 - `table` is one of two literals
             ).bindparams(bindparam("s", type_=PG_UUID(as_uuid=True))),
-            {"s": subscription_id, "start": window_start, "end": window_end},
+            {
+                "s": subscription_id,
+                "start": window_start,
+                "end": window_end,
+                "rate_limited": "%429 Too Many Requests%",
+            },
         )
         return int(getattr(result, "rowcount", 0) or 0)
 

@@ -393,3 +393,41 @@ async def test_a_backfill_revives_reaped_jobs_in_its_window(admin_session: Async
     assert row["attempts"] == 0
     assert row["error_code"] is None
     assert (await _job(admin_session, env, provider_fail))["status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_a_backfill_revives_a_rate_limited_job(admin_session: AsyncSession) -> None:
+    """A 429 is the provider saying "not now", so a backfill re-run asks
+    again. Any other provider error stays failed."""
+    env = await _tenant_with_one_block(admin_session, "reap-429")
+    limited = await _add_job(admin_session, env, scene_id="S1", status="failed", age_hours=1)
+    other = await _add_job(admin_session, env, scene_id="S2", status="failed", age_hours=1)
+    await admin_session.execute(
+        text(
+            f'UPDATE "{env["schema"]}".imagery_ingestion_jobs '
+            "SET error_code = 'provider_error', error_message = :msg WHERE id = :id"
+        ),
+        {"id": limited, "msg": "Client error '429 Too Many Requests' for url 'https://x'"},
+    )
+    await admin_session.execute(
+        text(
+            f'UPDATE "{env["schema"]}".imagery_ingestion_jobs '
+            "SET error_code = 'provider_error', error_message = :msg WHERE id = :id"
+        ),
+        {"id": other, "msg": "Client error '404 Not Found' for url 'https://x'"},
+    )
+    await admin_session.commit()
+
+    repo = await _repo_in(admin_session, env)
+    now = (await admin_session.execute(text("SELECT now()"))).scalar_one()
+    revived = await repo.revive_reaped_jobs(
+        subscription_id=env["sub_id"],
+        window_start=now - timedelta(days=1),
+        window_end=now + timedelta(days=1),
+        farm_path=False,
+    )
+    await admin_session.commit()
+
+    assert revived == 1
+    assert (await _job(admin_session, env, limited))["status"] == "pending"
+    assert (await _job(admin_session, env, other))["status"] == "failed"
