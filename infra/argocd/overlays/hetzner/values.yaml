@@ -3928,9 +3928,14 @@ global:
       #   so none of it can run from a normal pod.
       #
       #   No migration. Rollback is these two tags back to ab66fa7.
-      tag: "fc0b331"
+      # 38945be = #736, api and workers. The imagery reaper measures a
+      #   running job from `started_at` and gives a pending job 72 hours,
+      #   so a long backfill queue is no longer failed as stuck. A backfill
+      #   over a window revives that window's `stuck_no_progress` jobs.
+      #   No migration. Rollback is these two tags back to fc0b331.
+      tag: "38945be"
     workers:
-      tag: "fc0b331"
+      tag: "38945be"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
