@@ -106,3 +106,28 @@ def test_the_ewais_scenario_is_well_formed() -> None:
             assert block.startswith("B"), (inc.code, block)
             assert 1 <= int(block[1:]) <= 36, (inc.code, block)
         _cell_filter(inc.cells)
+
+
+def test_an_unknown_shift_mode_is_refused() -> None:
+    with pytest.raises(ValueError, match="add or set"):
+        Shift("smi", 0.0, mode="multiply")
+
+
+def test_the_drip_break_is_applied_after_the_cut_it_deepens() -> None:
+    """The overshoot on B14 is the cut's 0.015 pulled further toward 0.
+
+    Applied the other way round, the cut would pull the break back up
+    into the on-plan band and the critical finding would never fire.
+    """
+    order = [inc.code for inc in ewais_grove.INCIDENTS]
+    assert order.index("cut_ewais_2025") < order.index("drip_break_during_cut_2025")
+    b14_cuts = [
+        inc for inc in ewais_grove.INCIDENTS if inc.code == "cut_ewais_2025" and "B14" in inc.blocks
+    ]
+    assert b14_cuts, "B14 must be in the 2025 Ewais cut"
+
+
+def test_b18_misses_the_2025_cut_only() -> None:
+    by_code = {inc.code: inc for inc in ewais_grove.INCIDENTS}
+    assert "B18" not in by_code["cut_ewais_2025"].blocks
+    assert "B18" in by_code["cut_ewais_2026"].blocks
