@@ -18,6 +18,9 @@ Modes:
 * ``incidents``: apply the incidents. Already-applied ones are skipped.
 * ``replay``: replay the range, in chunks, with the build steps.
 * ``all``: ``incidents`` then ``replay``.
+* ``reset``: delete the tenant's derived history (engine output, team
+  work, hindcasts) and keep its inputs. See `demo_history.reset`.
+* ``rebuild``: ``reset`` then ``replay``.
 
 The replay goes in chunks of ``--chunk-days``, and each chunk writes one
 progress event. A chunk that fails stops the run and its error is the
@@ -44,13 +47,15 @@ from sqlalchemy import text
 
 from app.modules.audit.service import get_audit_service
 from app.modules.demo_history.incidents import apply_scenario
+from app.modules.demo_history.reset import reset_build_tenant
 from app.modules.demo_history.runner import ReplayNotAllowedError, ensure_build_tenant, replay
 from app.modules.demo_history.steps import DEMO_BUILD_STEPS
 from app.shared.db.session import AsyncSessionLocal, dispose_engine
 
 logger = logging.getLogger("demo_build")
 
-_MODES = ("incidents-dry-run", "incidents", "replay", "all")
+_MODES = ("incidents-dry-run", "incidents", "replay", "all", "reset", "rebuild")
+_REPLAYS = ("replay", "all", "rebuild")
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -62,7 +67,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--to", dest="end", type=date.fromisoformat)
     parser.add_argument("--chunk-days", type=int, default=7)
     args = parser.parse_args(argv)
-    if args.mode in ("replay", "all") and (args.start is None or args.end is None):
+    if args.mode in _REPLAYS and (args.start is None or args.end is None):
         parser.error("--from and --to are required to replay")
     return args
 
@@ -181,7 +186,10 @@ def main(argv: list[str] | None = None) -> int:
             _incidents(args, report, dry_run=True)
         if args.mode in ("incidents", "all"):
             _incidents(args, report, dry_run=False)
-        if args.mode in ("replay", "all") and not _replay(args, report):
+        if args.mode in ("reset", "rebuild"):
+            cleared = _run_async(reset_build_tenant(AsyncSessionLocal(), args.tenant_schema))
+            report("reset", cleared=cleared)
+        if args.mode in _REPLAYS and not _replay(args, report):
             return 1
     except Exception as exc:
         report(

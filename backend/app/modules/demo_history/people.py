@@ -245,6 +245,7 @@ async def _active_alerts(session: Any) -> list[dict[str, Any]]:
                    acknowledged_at::date AS acknowledged_on
               FROM alerts
              WHERE status IN ('open', 'acknowledged')
+               AND group_parent_id IS NULL
                AND deleted_at IS NULL
                AND created_at <= public.app_now()
              ORDER BY created_at, id
