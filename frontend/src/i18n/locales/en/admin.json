@@ -15,7 +15,8 @@
     "platformDecisionTrees": "Decision trees",
     "platformDecisionTreesBeta": "Beta designer",
     "platformAlerts": "Platform alerts",
-    "usage": "Product usage"
+    "usage": "Product usage",
+    "healthDefinition": "Block health rule"
   },
   "crops": {
     "title": "Crop catalog",
@@ -1006,7 +1007,8 @@
       "details": "Details",
       "stages": "Stages",
       "sizes": "Size classes",
-      "attributes": "Attributes"
+      "attributes": "Attributes",
+      "health": "Health"
     },
     "level": {
       "crop": "Crop",
@@ -1315,6 +1317,44 @@
       "user": "Person",
       "allTenants": "All tenants",
       "allUsers": "All people"
+    }
+  },
+  "healthDefinition": {
+    "pageTitle": "Block health rule",
+    "pageSubtitle": "The platform default for how a block's health is decided from decision-tree results.",
+    "tiersNote": "Four levels set these values, in this order: this page, the tenant, the crop path, the farm. Each level replaces only the values it sets. Crop paths are set on the Crop catalog, on the Health tab.",
+    "readOnly": "View only",
+    "valuesTitle": "Values",
+    "version": "Version {{version}}",
+    "updatedAt": "Last saved {{when}}",
+    "notes": "Notes",
+    "notesHint": "Why these values. The next person who edits them reads this.",
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Saved. Block health uses the new values on the next map load.",
+    "saveFailed": "Could not save. Nothing was changed.",
+    "loadFailed": "Could not load the block health rule.",
+    "rollupHelp": "The cell rule is the platform default of the setting health.cell_rollup. A tenant can change it in Settings, on the Block health page.",
+    "overrideLabel": "Set {{name}} here",
+    "inheritedFrom": "from {{source}}",
+    "platformSource": "platform default",
+    "hours_one": "{{count}} hour",
+    "hours_other": "{{count}} hours",
+    "cellRollup": "Cell rule",
+    "cellRollupHint": "How the cell results of a cell-level tree make one status for the block.",
+    "setThreshold": "Set a threshold",
+    "nullShare": {
+      "cellCriticalShare": "One critical cell is enough",
+      "recommendationFloor": "Recommendations never change health"
+    },
+    "crop": {
+      "title": "Block health for this crop path",
+      "intro": "A value set here applies to blocks on this path and on every path below it. A value not set here comes from the level above.",
+      "clearAll": "Remove all values",
+      "noOverrides": "Nothing is set here. Every value comes from the level above.",
+      "overrideCount_one": "{{count}} value is set here.",
+      "overrideCount_other": "{{count}} values are set here.",
+      "removed": "Removed. This path now takes every value from the level above."
     }
   }
 }

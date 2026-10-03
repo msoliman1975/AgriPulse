@@ -59,6 +59,9 @@ export function SettingsLayout(): ReactNode {
       show: showIntegrations,
       prefix: "/settings/integrations",
     },
+    // Block health had no entry of its own: its one tenant setting sat on
+    // Integrations → Detection, under a heading about grid z-scores.
+    { to: "/settings/block-health", labelKey: "nav.blockHealth", show: canManageIntegrations },
     { to: "/settings/users", labelKey: "nav.users", show: canUser },
     { to: "/settings/bulk", labelKey: "nav.bulk", show: canBulk },
     { to: "/settings/workers", labelKey: "nav.workers", show: canResources },

@@ -10,7 +10,7 @@ an Apply endpoint, and a lock meaning "blocks may not diverge from me".
 Health has none of that and must never grow it. A block's definition is
 resolved at read time from three tiers:
 
-    PLATFORM_DEFAULT_DEFINITION
+    public.health_definition_platform
       <- public.crop_health_definitions, merged along the crop path
         <- farms.health_definition
 

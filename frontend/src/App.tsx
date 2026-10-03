@@ -66,6 +66,8 @@ import { TenantCreatePage as AdminTenantCreatePage } from "@/modules/admin/pages
 import { TenantAdminDetailPage } from "@/modules/admin/pages/TenantAdminDetailPage";
 import { PlatformCropAttributesPage } from "@/modules/admin/pages/PlatformCropAttributesPage";
 import { PlatformCatalogPage } from "@/modules/admin/pages/PlatformCatalogPage";
+import { PlatformHealthDefinitionPage } from "@/modules/admin/pages/PlatformHealthDefinitionPage";
+import { BlockHealthSettingsPage } from "@/modules/settings/pages/BlockHealthSettingsPage";
 import { PlatformCropsPage } from "@/modules/admin/pages/PlatformCropsPage";
 import { PlatformRolesPage } from "@/modules/admin/pages/PlatformRolesPage";
 import { PlatformUsagePage } from "@/modules/admin/pages/PlatformUsagePage";
@@ -312,6 +314,7 @@ export function App(): ReactNode {
                       }
                     />
                   </Route>
+                  <Route path="block-health" element={<BlockHealthSettingsPage />} />
                   <Route path="users" element={<UsersConfigPage />} />
                   <Route path="bulk" element={<BulkUpdatesPage />} />
                   <Route path="workers" element={<ResourcesWorkersPage />} />
@@ -345,6 +348,7 @@ export function App(): ReactNode {
                 <Route path="tenants/new" element={<AdminTenantCreatePage />} />
                 <Route path="tenants/:tenantId" element={<TenantAdminDetailPage />} />
                 <Route path="defaults" element={<PlatformDefaultsPage />} />
+                <Route path="health-definition" element={<PlatformHealthDefinitionPage />} />
                 <Route path="crops" element={<PlatformCropsPage />} />
                 <Route path="catalog" element={<PlatformCatalogPage />} />
                 <Route path="signals" element={<PlatformSignalsPage />} />

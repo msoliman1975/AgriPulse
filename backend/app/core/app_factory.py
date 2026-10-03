@@ -46,21 +46,9 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     # `public.decision_trees` and are edited in the app; public migration
     # 0085 put the 33 platform trees there once, and the seed files and
     # `sync_from_disk` are gone. Nothing belongs here.
-    # Sync the per-crop health definitions, same idea and same idempotence.
-    #
-    # Logged at ERROR, not WARNING, and named as the consequence: a failed
-    # sync here does not break the app, it silently leaves every crop on the
-    # platform default. A warning in a startup log is not enough to notice
-    # that a knowledge base stopped applying.
-    try:
-        from app.modules.health.loader import sync_from_disk as sync_health_definitions
-        from app.shared.db.session import AsyncSessionLocal as HealthSessionLocal
-
-        health_factory = HealthSessionLocal()
-        async with health_factory() as session:
-            await sync_health_definitions(session)
-    except Exception as exc:
-        log.error("crop_health_definitions_sync_failed", error=str(exc))
+    # Block health definitions are not synced from disk either. Public
+    # migration 0095 put the platform default and the three crop rows in the
+    # database, where /platform/health-definition and the catalogue edit them.
     # PR-Reorg6: cold-start platform-admin bootstrap. Idempotent â€”
     # only fires when zero active PlatformAdmins exist.
     try:
@@ -163,6 +151,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     from app.modules.farms.router import router as farms_router
     from app.modules.field_flags.router import router as field_flags_router
     from app.modules.grid.router import router as grid_router
+    from app.modules.health.admin_router import router as health_definitions_router
     from app.modules.iam.router import router as iam_router
     from app.modules.imagery.router import router as imagery_router
     from app.modules.imagery.subscribers import (
@@ -260,6 +249,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     app.include_router(telemetry_router)
     app.include_router(telemetry_usage_router)
     app.include_router(platform_defaults_router)
+    app.include_router(health_definitions_router)
     app.include_router(platform_admins_router)
     app.include_router(platform_tenant_integrations_router)
     app.include_router(platform_admins_self_router)

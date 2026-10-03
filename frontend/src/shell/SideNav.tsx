@@ -199,6 +199,15 @@ export function SideNav(): ReactNode {
           activePathPrefix="/platform/defaults"
           collapsed={collapsed}
         />
+        {/* The platform default of the block health rule. Crop paths change
+            single values on the catalog's Health tab. */}
+        <SideNavItem
+          to="/platform/health-definition"
+          label={t("nav.healthDefinition")}
+          icon={<GearIcon className="h-4 w-4" />}
+          activePathPrefix="/platform/health-definition"
+          collapsed={collapsed}
+        />
         {/* /platform/catalog is the one crop row in the nav. The older
             /platform/crops tree is delisted but still routed: the catalog's
             attribute panel deep-links to /platform/crops/:id/attributes,

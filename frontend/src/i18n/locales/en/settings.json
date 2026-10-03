@@ -10,7 +10,8 @@
     "rules": "Rules & thresholds",
     "decisionTrees": "Decision trees",
     "bulk": "Bulk Updates",
-    "fieldAccess": "Field access"
+    "fieldAccess": "Field access",
+    "blockHealth": "Block health"
   },
   "noAccess": {
     "title": "Settings",
@@ -37,5 +38,11 @@
       "title": "Integrations",
       "body": "Weather, imagery, email server, and webhook configuration. Coming soon."
     }
+  },
+  "blockHealth": {
+    "title": "Block health",
+    "subtitle": "How a block's status is built from its grid cells, for every farm in this organization.",
+    "loadFailed": "Could not load the block health setting.",
+    "otherTiers": "The other block health values are set by the platform and for each crop. To change them for one farm, open Farm management, select the farm and open its Settings tab."
   }
 }

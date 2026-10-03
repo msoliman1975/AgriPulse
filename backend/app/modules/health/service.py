@@ -12,7 +12,8 @@ when a seed file does.
 
 Four tiers, shallow-merged, deepest winning per key:
 
-    PLATFORM_DEFAULT_DEFINITION
+    public.health_definition_platform, plus the platform's rollup rule
+    from public.platform_defaults                      (public 0095)
       <- the tenant's settings                         (public 0094)
         <- public.crop_health_definitions, merged along the crop path
           <- farms.health_definition                   (the farm override)
@@ -54,11 +55,14 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.shared.health_definition import (
     PLATFORM_DEFAULT_DEFINITION,
     HealthDefinition,
     parse_definition,
 )
+
+_log = get_logger(__name__)
 
 # Which tier had the last word. Rendered beside the class, because "why is
 # my block red" has two halves and this is the other one: the reason says
@@ -81,7 +85,8 @@ class ResolvedDefinition:
 
     Both are None when no crop row applied, whatever ``source`` says: a farm
     override over the platform default is ``source="farm"`` with no crop
-    behind it.
+    behind it. The one exception is ``source="platform"``, where ``version``
+    is the platform row's own version and ``crop_path`` stays None.
     """
 
     definition: HealthDefinition
@@ -98,7 +103,15 @@ class CropHealthDefinitions:
     cache 34 times instead of merging and re-parsing per block.
     """
 
-    __slots__ = ("_by_path", "_cache", "_farm_override", "_tenant_tier", "_versions")
+    __slots__ = (
+        "_by_path",
+        "_cache",
+        "_farm_override",
+        "_platform",
+        "_platform_version",
+        "_tenant_tier",
+        "_versions",
+    )
 
     def __init__(
         self,
@@ -107,8 +120,15 @@ class CropHealthDefinitions:
         versions: Mapping[str, int] | None = None,
         farm_override: Mapping[str, Any] | None = None,
         tenant_tier: Mapping[str, Any] | None = None,
+        platform: Mapping[str, Any] | None = None,
+        platform_version: int | None = None,
     ) -> None:
         self._by_path = dict(by_path)
+        # The platform tier as stored in `public.health_definition_platform`.
+        # None when the row could not be read; the code's own defaults then
+        # stand in, which is what every tier sat on before public 0095.
+        self._platform = dict(platform) if platform is not None else None
+        self._platform_version = platform_version
         self._versions = dict(versions or {})
         # Under the crop tier and over the platform default. Empty when the
         # tenant has not overridden anything, so "platform" stays the source
@@ -139,7 +159,8 @@ class CropHealthDefinitions:
         return resolved
 
     def _resolve(self, crop_path: str | None) -> ResolvedDefinition:
-        merged: dict[str, Any] = dict(self._tenant_tier or {})
+        merged: dict[str, Any] = dict(self._platform or {})
+        merged.update(self._tenant_tier or {})
         matched_path: str | None = None
 
         segments = crop_path.split(".") if crop_path else []
@@ -173,7 +194,11 @@ class CropHealthDefinitions:
             )
         )
         if source == "platform":
-            return ResolvedDefinition(PLATFORM_DEFAULT_DEFINITION, "platform")
+            if self._platform is None:
+                return ResolvedDefinition(PLATFORM_DEFAULT_DEFINITION, "platform")
+            return ResolvedDefinition(
+                parse_definition(merged), "platform", version=self._platform_version
+            )
         # `parse_definition` and not `HealthDefinition(**merged)`: the body
         # comes from the database, and the loader that wrote it may be older
         # than this process. Re-checking costs one dict scan and turns a key
@@ -188,9 +213,10 @@ class CropHealthDefinitions:
 
 
 async def load_health_definitions(session: AsyncSession, *, farm_id: UUID) -> CropHealthDefinitions:
-    """Read the crop catalog and one farm's override. Two statements.
+    """Read every tier for one farm. Four statements: the crop catalog, the
+    farm's override, the tenant's rollup settings and the platform row.
 
-    Always two, whether or not the farm has an override, so a caller's query
+    Always four, whether or not the farm has an override, so a caller's query
     count does not depend on tenant data.
 
     The table is schema-qualified rather than relying on `search_path`. A
@@ -243,11 +269,34 @@ async def load_health_definitions(session: AsyncSession, *, farm_id: UUID) -> Cr
         .all()
     )
 
+    platform_row = (
+        await session.execute(
+            text(
+                """
+                SELECT definition, version
+                FROM public.health_definition_platform
+                WHERE id = 1
+                """
+            )
+        )
+    ).first()
+    platform: dict[str, Any] | None = None
+    platform_version: int | None = None
+    if platform_row is not None:
+        # The platform's rollup rule is a platform_defaults key, not part of
+        # the row, so it is laid over the row here. One value, one place.
+        platform = {**dict(platform_row.definition or {}), **platform_rollup(tenant_rows)}
+        platform_version = int(platform_row.version)
+    else:
+        _log.error("health_definition_platform_row_missing")
+
     return CropHealthDefinitions(
         {r["crop_path"]: dict(r["definition"] or {}) for r in rows},
         versions={r["crop_path"]: int(r["version"]) for r in rows},
         farm_override=farm_override,
         tenant_tier=tenant_tier_from_settings(tenant_rows),
+        platform=platform,
+        platform_version=platform_version,
     )
 
 
@@ -260,6 +309,7 @@ async def load_health_definitions(session: AsyncSession, *, farm_id: UUID) -> Cr
 _TENANT_TIER_SQL = """
 SELECT d.key,
        COALESCE(o.value, d.value) #>> '{}' AS value,
+       d.value #>> '{}'           AS platform_value,
        (o.value IS NOT NULL)      AS overridden
   FROM public.platform_defaults d
   LEFT JOIN public.tenant_settings_overrides o
@@ -283,10 +333,27 @@ def tenant_tier_from_settings(rows: Any) -> dict[str, Any] | None:
     by_key = {str(r["key"]): r for r in rows}
     if not any(bool(r["overridden"]) for r in by_key.values()):
         return None
+    return _rollup_tier(by_key, column="value")
+
+
+def platform_rollup(rows: Any) -> dict[str, Any]:
+    """The definition keys the platform's own two settings stand for.
+
+    The same mapping as the tenant tier, read from the platform's values
+    rather than the tenant's. Empty when the keys are missing, so the row's
+    body and then the code defaults decide.
+    """
+    by_key = {str(r["key"]): r for r in rows}
+    if _ROLLUP_KEY not in by_key:
+        return {}
+    return _rollup_tier(by_key, column="platform_value")
+
+
+def _rollup_tier(by_key: Mapping[str, Any], *, column: str) -> dict[str, Any]:
     rollup_row = by_key.get(_ROLLUP_KEY)
-    rollup = str(rollup_row["value"]) if rollup_row is not None else "worst"
+    rollup = str(rollup_row[column]) if rollup_row is not None else "worst"
     tier: dict[str, Any] = {"cell_rollup": rollup}
     share_row = by_key.get(_SHARE_KEY)
-    if rollup == "share" and share_row is not None and share_row["value"] is not None:
-        tier["cell_critical_share"] = str(Decimal(str(share_row["value"])) / Decimal(100))
+    if rollup == "share" and share_row is not None and share_row[column] is not None:
+        tier["cell_critical_share"] = str(Decimal(str(share_row[column])) / Decimal(100))
     return tier
