@@ -20,7 +20,8 @@ Modes:
 * ``all``: ``incidents`` then ``replay``.
 * ``reset``: delete the tenant's derived history (engine output, team
   work, hindcasts) and keep its inputs. See `demo_history.reset`.
-* ``rebuild``: ``reset`` then ``replay``.
+* ``rebuild``: ``incidents``, ``reset``, then ``replay``. Applied
+  incidents are skipped, so a scenario that gained one applies only that.
 
 The replay goes in chunks of ``--chunk-days``, and each chunk writes one
 progress event. A chunk that fails stops the run and its error is the
@@ -184,7 +185,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.mode == "incidents-dry-run":
             _incidents(args, report, dry_run=True)
-        if args.mode in ("incidents", "all"):
+        if args.mode in ("incidents", "all", "rebuild"):
             _incidents(args, report, dry_run=False)
         if args.mode in ("reset", "rebuild"):
             cleared = _run_async(reset_build_tenant(AsyncSessionLocal(), args.tenant_schema))
