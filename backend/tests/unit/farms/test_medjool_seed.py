@@ -37,7 +37,9 @@ _STAGES = _CATALOGUE.MEDJOOL_STAGES["stages"]
 
 
 def test_calendar_passes_the_perennial_validator() -> None:
-    validate_phenology_payload(_CATALOGUE.MEDJOOL_STAGES, is_perennial=True, has_gdd_base=False)
+    validate_phenology_payload(
+        _CATALOGUE.MEDJOOL_STAGES, is_perennial=True, has_gdd_base=False
+    )
 
 
 def test_every_day_has_exactly_the_manuals_phase() -> None:
@@ -57,7 +59,9 @@ def test_every_day_has_exactly_the_manuals_phase() -> None:
     previous = None
     day = date(2027, 1, 1)
     while day.year == 2027:
-        stage = stage_for_date(_STAGES, is_perennial=True, planting_date=None, today=day)
+        stage = stage_for_date(
+            _STAGES, is_perennial=True, planting_date=None, today=day
+        )
         assert stage is not None, f"{day} resolves to no stage"
         if stage != previous:
             seen[day] = stage
@@ -91,7 +95,8 @@ def test_bearing_rows_anchor_to_medjool_stages() -> None:
 
 def test_bearing_rows_land_on_the_manuals_weeks() -> None:
     starts = {
-        s["code"]: date(2027, *map(int, s["advance"]["start_doy"].split("-"))) for s in _STAGES
+        s["code"]: date(2027, *map(int, s["advance"]["start_doy"].split("-")))
+        for s in _STAGES
     }
     for atype, stage, first, last, *_ in _TEMPLATES.BEARING:
         offset, duration = _TEMPLATES._weeks(stage, first, last)
@@ -103,7 +108,9 @@ def test_bearing_rows_land_on_the_manuals_weeks() -> None:
             first,
         )
         last_day = (
-            date(2027, 12, 31) if last == 52 else date(2027, 1, 1) + timedelta(weeks=last, days=-1)
+            date(2027, 12, 31)
+            if last == 52
+            else date(2027, 1, 1) + timedelta(weeks=last, days=-1)
         )
         assert end == last_day, (atype, stage, last)
 
@@ -125,3 +132,21 @@ def test_inputs_carry_the_certifier_note() -> None:
             "bagging",
         }:
             assert "permitted inputs" in row["notes"], row["notes"][:60]
+
+
+def test_arabic_from_manual_covers_every_seeded_name() -> None:
+    # Public 0100 replaces the 0097-0098 Arabic with the manual's own terms.
+    # A code it misses would keep the earlier translation without any error.
+    arabic = _load("0100_medjool_arabic_from_manual")
+    signals = _load("0098_medjool_scouting_signals")
+    assert set(arabic.STAGE_NAMES) == {s["code"] for s in _STAGES}
+    attributes = {d["code"]: d for _, d in _CATALOGUE._DEFINITIONS}
+    assert set(arabic.ATTRIBUTES) == set(attributes)
+    for code, (_, _, _, options_ar, _) in arabic.ATTRIBUTES.items():
+        seeded = {o["code"] for o in attributes[code].get("options") or []}
+        assert set(options_ar) == seeded, code
+    seeded_signals = {d[0]: d for d in signals.DEFINITIONS}
+    assert set(arabic.SIGNALS) == set(seeded_signals)
+    for code, (_, _, _, values_ar) in arabic.SIGNALS.items():
+        if values_ar is not None:
+            assert len(values_ar) == len(seeded_signals[code][4]), code

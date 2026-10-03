@@ -33,22 +33,22 @@ FINDINGS: list[dict[str, str]] = [
     {
         "code": "rpw_traps_not_serviced",
         "name_en": "Weevil traps not checked",
-        "name_ar": "مصائد السوسة لم تُفحص",
+        "name_ar": "مصائد السوسة لم تُخدم",
         "clause_en": "no weevil trap record in the last 14 days",
-        "clause_ar": "لا يوجد سجل لمصائد السوسة خلال آخر 14 يومًا",
+        "clause_ar": "لا يوجد سجل لخدمة مصائد السوسة خلال آخر 14 يومًا",
         "default_status": "issue",
         "description_en": "Manual 10.1: pheromone traps are serviced every 7-14 days and catches are recorded.",
-        "description_ar": "الدليل 10.1: تُخدم المصائد الفرمونية كل 7-14 يومًا وتُسجَّل الحصيلة.",
+        "description_ar": "الدليل 10.1: تُخدم المصائد الفرمونية كل 7-14 يومًا مع تسجيل أعداد الحشرات الملتقطة.",
     },
     {
         "code": "rpw_infested_palm",
         "name_en": "Weevil-infested palm found",
-        "name_ar": "نخلة مصابة بالسوسة",
+        "name_ar": "نخلة مصابة بسوسة النخيل الحمراء",
         "clause_en": "a palm infested by red palm weevil was found",
         "clause_ar": "وُجدت نخلة مصابة بسوسة النخيل الحمراء",
         "default_status": "alert",
         "description_en": "Manual 10.1: heavily infested palms are removed and disposed of.",
-        "description_ar": "الدليل 10.1: تُزال النخيل شديدة الإصابة ويُتخلَّص منها.",
+        "description_ar": "الدليل 10.1: إزالة النخيل شديد الإصابة والتخلص منه.",
     },
     {
         "code": "date_dust_mite",
@@ -58,7 +58,7 @@ FINDINGS: list[dict[str, str]] = [
         "clause_ar": "وُجد حلم الغبار على العذوق",
         "default_status": "issue",
         "description_en": "Manual 10.3: augmentative release of the predator Stethorus gilvifrons.",
-        "description_ar": "الدليل 10.3: الإطلاق التعزيزي للمفترس ستيثوروس جيلفيفرونس.",
+        "description_ar": "الدليل 10.3: المكافحة الحيوية التعزيزية بإطلاق المفترس Stethorus gilvifrons.",
     },
     {
         "code": "date_fruit_cracking",
@@ -68,17 +68,17 @@ FINDINGS: list[dict[str, str]] = [
         "clause_ar": "ظهر تشقق في الثمار أثناء النضج",
         "default_status": "issue",
         "description_en": "Manual 9.6: abrupt changes in soil moisture are a main cause of cracking.",
-        "description_ar": "الدليل 9.6: التغير المفاجئ في رطوبة التربة سبب رئيسي للتشقق.",
+        "description_ar": "الدليل 9.6: التغيرات المفاجئة في رطوبة التربة وامتلاء الثمار من الأسباب الرئيسية لتشقق الثمار.",
     },
     {
         "code": "date_black_nose",
         "name_en": "Black nose",
-        "name_ar": "اسوداد طرف الثمرة",
+        "name_ar": "الذنب الأسود",
         "clause_en": "black nose was seen on the fruit",
-        "clause_ar": "ظهر اسوداد طرف الثمرة",
+        "clause_ar": "ظهر الذنب الأسود على الثمار",
         "default_status": "issue",
         "description_en": "Manual 9.4: mainly caused by humid weather at Khalal.",
-        "description_ar": "الدليل 9.4: سببه الرئيسي الطقس الرطب في مرحلة الخلال.",
+        "description_ar": "الدليل 9.4: ينتج أساسًا عن الطقس الرطب في طور الخلال.",
     },
     {
         "code": "pollination_not_recorded",
@@ -88,7 +88,7 @@ FINDINGS: list[dict[str, str]] = [
         "clause_ar": "لم تُسجَّل عذوق ملقحة خلال آخر 60 يومًا",
         "default_status": "issue",
         "description_en": "Manual 12.1: record each bunch's pollination date and count thinning and bagging from it.",
-        "description_ar": "الدليل 12.1: سجّل تاريخ تلقيح كل عذق واحسب الخف والتكييس منه.",
+        "description_ar": "الدليل 12.1: سجّل تاريخ تلقيح كل عذق واحسب منه مواعيد الخفّ والتكييس.",
     },
 ]
 
@@ -159,14 +159,14 @@ RED_PALM_WEEVIL = _tree(
     "المجدول — سوسة النخيل الحمراء",
     "Manual 10.1: pheromone traps are serviced every 7-14 days and catches recorded; heavily "
     "infested palms are removed and disposed of. Reads the Medjool scouting signals.",
-    "الدليل 10.1: تُخدم المصائد الفرمونية كل 7-14 يومًا وتُسجَّل الحصيلة، وتُزال النخيل شديدة "
-    "الإصابة. تقرأ إشارات استكشاف المجدول.",
+    "الدليل 10.1: تُخدم المصائد الفرمونية كل 7-14 يومًا مع تسجيل أعداد الحشرات الملتقطة، ويُزال النخيل شديد "
+    "الإصابة ويُتخلص منه. تقرأ إشارات استكشاف المجدول.",
     "n_traps",
     ["rpw_traps_not_serviced", "rpw_infested_palm"],
     {
         "n_traps": {
             "label_en": "Was a weevil trap record made in the last 14 days?",
-            "label_ar": "هل سُجّلت قراءة لمصائد السوسة خلال آخر 14 يومًا؟",
+            "label_ar": "هل سُجّلت خدمة لمصائد السوسة خلال آخر 14 يومًا؟",
             "condition": {
                 "tree": {
                     "op": "ge",
@@ -206,7 +206,7 @@ RED_PALM_WEEVIL = _tree(
             "status": "issue",
             "action_type": "scout",
             "text_en": "No red palm weevil trap record in the last 14 days. Service each pheromone trap - change the food bait and water - and record its catch. The manual says every 7-14 days, all year (section 10.1).",
-            "text_ar": "لا يوجد سجل لمصائد سوسة النخيل الحمراء خلال آخر 14 يومًا. اخدم كل مصيدة فرمونية بتغيير الطعم والماء وسجّل حصيلتها. يقول الدليل كل 7-14 يومًا طوال العام (القسم 10.1).",
+            "text_ar": "لا يوجد سجل لخدمة مصائد سوسة النخيل الحمراء خلال آخر 14 يومًا. اخدم كل مصيدة فرمونية بتغيير الطعم الغذائي والماء وسجّل أعداد الحشرات الملتقطة. يقول الدليل كل 7-14 يومًا طوال العام (القسم 10.1).",
         },
         {
             "code": "rpw_infested",
@@ -214,7 +214,7 @@ RED_PALM_WEEVIL = _tree(
             "status": "alert",
             "action_type": "other",
             "text_en": "A palm infested by red palm weevil was found. The manual says heavily infested palms are removed and disposed of (section 10.1). Record No on the signal once the palm is removed.",
-            "text_ar": "وُجدت نخلة مصابة بسوسة النخيل الحمراء. يقول الدليل إن النخيل شديدة الإصابة تُزال ويُتخلَّص منها (القسم 10.1). سجّل لا على الإشارة بعد إزالة النخلة.",
+            "text_ar": "وُجدت نخلة مصابة بسوسة النخيل الحمراء. يقول الدليل بإزالة النخيل شديد الإصابة والتخلص منه (القسم 10.1). سجّل «لا» على الإشارة بعد إزالة النخلة.",
         },
         {
             "code": "rpw_infested_and_traps_due",
@@ -222,7 +222,7 @@ RED_PALM_WEEVIL = _tree(
             "status": "alert",
             "action_type": "other",
             "text_en": "A weevil-infested palm was found and no trap record was made in 14 days. Remove and dispose of heavily infested palms, and service the pheromone traps every 7-14 days (section 10.1).",
-            "text_ar": "وُجدت نخلة مصابة بالسوسة ولم يُسجَّل فحص للمصائد خلال 14 يومًا. أزل النخيل شديدة الإصابة وتخلّص منها واخدم المصائد الفرمونية كل 7-14 يومًا (القسم 10.1).",
+            "text_ar": "وُجدت نخلة مصابة بالسوسة ولم تُسجَّل خدمة للمصائد خلال 14 يومًا. أزل النخيل شديد الإصابة وتخلّص منه واخدم المصائد الفرمونية كل 7-14 يومًا (القسم 10.1).",
         },
     ],
 )
@@ -234,8 +234,8 @@ BUNCH_HEALTH = _tree(
     "Manual 9.4, 9.6 and 10.3: dust mite on bunches, and fruit cracking and black nose during "
     "Khalal, Rutab and Tamar. Reads the Medjool scouting signals. The manual gives no dust-mite "
     "threshold (section 13), so any record of the mite counts.",
-    "الدليل 9.4 و9.6 و10.3: حلم الغبار على العذوق، وتشقق الثمار واسوداد طرفها في الخلال والرطب "
-    "والتمر. لا يعطي الدليل حدًا لحلم الغبار (القسم 13).",
+    "الدليل 9.4 و9.6 و10.3: حلم الغبار على العذوق، وتشقق الثمار والذنب الأسود في الخلال والرطب "
+    "والتمر. لم يُعثر على حدود تدخل لحلم الغبار (القسم 13).",
     "n_mite",
     ["date_dust_mite", "date_fruit_cracking", "date_black_nose"],
     {
@@ -276,7 +276,7 @@ BUNCH_HEALTH = _tree(
         ),
         "n_black": {
             "label_en": "Was black nose seen?",
-            "label_ar": "هل ظهر اسوداد طرف الثمرة؟",
+            "label_ar": "هل ظهر الذنب الأسود؟",
             "condition": _is_true("date_black_nose_seen"),
             "on_match": "n_reg_black",
             "on_miss": "n_stop",
@@ -285,7 +285,7 @@ BUNCH_HEALTH = _tree(
             "date_black_nose",
             "warning",
             "Black nose seen",
-            "ظهر اسوداد طرف الثمرة",
+            "ظهر الذنب الأسود",
             "n_stop",
         ),
     },
@@ -296,7 +296,7 @@ BUNCH_HEALTH = _tree(
             "status": "issue",
             "action_type": "other",
             "text_en": "Dust mite was found on the bunches. The manual's biological option is to release the predator Stethorus gilvifrons (section 10.3). Check it against the certifying body's list of permitted inputs first.",
-            "text_ar": "وُجد حلم الغبار على العذوق. الخيار الحيوي في الدليل هو إطلاق المفترس ستيثوروس جيلفيفرونس (القسم 10.3). راجعه أولًا مقابل قائمة المدخلات المسموح بها لدى جهة الاعتماد.",
+            "text_ar": "وُجد حلم الغبار على العذوق. الخيار الحيوي في الدليل هو المكافحة الحيوية التعزيزية بإطلاق المفترس Stethorus gilvifrons (القسم 10.3). تحقق منه أولًا مقابل قائمة المدخلات المسموح بها لدى جهة الاعتماد.",
         },
         {
             "code": "bunch_cracking",
@@ -304,7 +304,7 @@ BUNCH_HEALTH = _tree(
             "status": "issue",
             "action_type": "irrigate",
             "text_en": "Fruit cracking was seen during ripening. Abrupt changes in soil moisture are a main cause. Keep soil moisture steady with drip through Khalal, Rutab and Tamar (sections 9.6 and 12.2).",
-            "text_ar": "ظهر تشقق في الثمار أثناء النضج. التغير المفاجئ في رطوبة التربة سبب رئيسي. حافظ على رطوبة ثابتة بالتنقيط خلال الخلال والرطب والتمر (القسمان 9.6 و12.2).",
+            "text_ar": "ظهر تشقق في الثمار أثناء النضج. التغيرات المفاجئة في رطوبة التربة من الأسباب الرئيسية لتشقق الثمار. حافظ على رطوبة تربة ثابتة بالري بالتنقيط خلال الخلال والرطب والتمر (القسمان 9.6 و12.2).",
         },
         {
             "code": "bunch_black_nose",
@@ -312,7 +312,7 @@ BUNCH_HEALTH = _tree(
             "status": "issue",
             "action_type": "other",
             "text_en": "Black nose was seen on the fruit. It is mainly caused by humid weather at Khalal. Bagging with brown wrapping paper was reported to inhibit it (section 9.4).",
-            "text_ar": "ظهر اسوداد طرف الثمرة. سببه الرئيسي الطقس الرطب في مرحلة الخلال. أُفيد بأن التكييس بورق التغليف البني يحد منه (القسم 9.4).",
+            "text_ar": "ظهر الذنب الأسود على الثمار. ينتج أساسًا عن الطقس الرطب في طور الخلال، وأُفيد بأن التكييس بورق التغليف البني يحدّ منه (القسم 9.4).",
         },
     ],
 )
@@ -323,14 +323,14 @@ POLLINATION_RECORD = _tree(
     "المجدول — سجل التلقيح",
     "Manual 12.1: record each bunch's pollination date and count thinning and bagging from it. "
     "During late pollination and Hababouk this checks that pollinated bunches were recorded.",
-    "الدليل 12.1: سجّل تاريخ تلقيح كل عذق واحسب الخف والتكييس منه. تتحقق هذه الشجرة في نهاية "
+    "الدليل 12.1: سجّل تاريخ تلقيح كل عذق واحسب منه مواعيد الخفّ والتكييس. تتحقق هذه الشجرة في مرحلة آخر "
     "التلقيح والحبابوك من تسجيل العذوق الملقحة.",
     "n_stage",
     ["pollination_not_recorded"],
     {
         "n_stage": {
             "label_en": "Is the block in late pollination or Hababouk?",
-            "label_ar": "هل القطعة في نهاية التلقيح أو الحبابوك؟",
+            "label_ar": "هل القطعة في مرحلة آخر التلقيح والحبابوك؟",
             "condition": _stage_in(["fruit_set"]),
             "on_match": "n_recorded",
             "on_miss": "n_stop",
@@ -363,7 +363,7 @@ POLLINATION_RECORD = _tree(
             "status": "issue",
             "action_type": "scout",
             "text_en": "No pollinated bunches were recorded in the last 60 days. Record the pollination date of each bunch: hand thinning is due 3-4 weeks after pollination and bagging at the start of Khalal (sections 9.2 and 12.1).",
-            "text_ar": "لم تُسجَّل عذوق ملقحة خلال آخر 60 يومًا. سجّل تاريخ تلقيح كل عذق: الخف اليدوي بعد 3-4 أسابيع من التلقيح والتكييس في بداية الخلال (القسمان 9.2 و12.1).",
+            "text_ar": "لم تُسجَّل عذوق ملقّحة خلال آخر 60 يومًا. سجّل تاريخ تلقيح كل عذق: يُجرى الخفّ اليدوي بعد 3-4 أسابيع من التلقيح والتكييس في بداية طور الخلال (القسمان 9.2 و12.1).",
         },
     ],
 )

@@ -3,7 +3,7 @@
   "name_en": "Medjool — bunch health",
   "name_ar": "المجدول — صحة العذوق",
   "description_en": "Manual 9.4, 9.6 and 10.3: dust mite on bunches, and fruit cracking and black nose during Khalal, Rutab and Tamar. Reads the Medjool scouting signals. The manual gives no dust-mite threshold (section 13), so any record of the mite counts.",
-  "description_ar": "الدليل 9.4 و9.6 و10.3: حلم الغبار على العذوق، وتشقق الثمار واسوداد طرفها في الخلال والرطب والتمر. لا يعطي الدليل حدًا لحلم الغبار (القسم 13).",
+  "description_ar": "الدليل 9.4 و9.6 و10.3: حلم الغبار على العذوق، وتشقق الثمار والذنب الأسود في الخلال والرطب والتمر. لم يُعثر على حدود تدخل لحلم الغبار (القسم 13).",
   "scope": "block",
   "crop_path": "date_palm.medjool",
   "country_codes": [
@@ -91,7 +91,7 @@
     },
     "n_black": {
       "label_en": "Was black nose seen?",
-      "label_ar": "هل ظهر اسوداد طرف الثمرة؟",
+      "label_ar": "هل ظهر الذنب الأسود؟",
       "condition": {
         "tree": {
           "op": "eq",
@@ -108,7 +108,7 @@
     },
     "n_reg_black": {
       "label_en": "Black nose seen",
-      "label_ar": "ظهر اسوداد طرف الثمرة",
+      "label_ar": "ظهر الذنب الأسود",
       "register": {
         "code": "date_black_nose",
         "severity": "warning"
@@ -130,7 +130,7 @@
       "status": "issue",
       "action_type": "other",
       "text_en": "Dust mite was found on the bunches. The manual's biological option is to release the predator Stethorus gilvifrons (section 10.3). Check it against the certifying body's list of permitted inputs first.",
-      "text_ar": "وُجد حلم الغبار على العذوق. الخيار الحيوي في الدليل هو إطلاق المفترس ستيثوروس جيلفيفرونس (القسم 10.3). راجعه أولًا مقابل قائمة المدخلات المسموح بها لدى جهة الاعتماد."
+      "text_ar": "وُجد حلم الغبار على العذوق. الخيار الحيوي في الدليل هو المكافحة الحيوية التعزيزية بإطلاق المفترس Stethorus gilvifrons (القسم 10.3). تحقق منه أولًا مقابل قائمة المدخلات المسموح بها لدى جهة الاعتماد."
     },
     {
       "code": "bunch_cracking",
@@ -140,7 +140,7 @@
       "status": "issue",
       "action_type": "irrigate",
       "text_en": "Fruit cracking was seen during ripening. Abrupt changes in soil moisture are a main cause. Keep soil moisture steady with drip through Khalal, Rutab and Tamar (sections 9.6 and 12.2).",
-      "text_ar": "ظهر تشقق في الثمار أثناء النضج. التغير المفاجئ في رطوبة التربة سبب رئيسي. حافظ على رطوبة ثابتة بالتنقيط خلال الخلال والرطب والتمر (القسمان 9.6 و12.2)."
+      "text_ar": "ظهر تشقق في الثمار أثناء النضج. التغيرات المفاجئة في رطوبة التربة من الأسباب الرئيسية لتشقق الثمار. حافظ على رطوبة تربة ثابتة بالري بالتنقيط خلال الخلال والرطب والتمر (القسمان 9.6 و12.2)."
     },
     {
       "code": "bunch_black_nose",
@@ -150,7 +150,7 @@
       "status": "issue",
       "action_type": "other",
       "text_en": "Black nose was seen on the fruit. It is mainly caused by humid weather at Khalal. Bagging with brown wrapping paper was reported to inhibit it (section 9.4).",
-      "text_ar": "ظهر اسوداد طرف الثمرة. سببه الرئيسي الطقس الرطب في مرحلة الخلال. أُفيد بأن التكييس بورق التغليف البني يحد منه (القسم 9.4)."
+      "text_ar": "ظهر الذنب الأسود على الثمار. ينتج أساسًا عن الطقس الرطب في طور الخلال، وأُفيد بأن التكييس بورق التغليف البني يحدّ منه (القسم 9.4)."
     }
   ]
 }
