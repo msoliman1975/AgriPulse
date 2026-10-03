@@ -66,11 +66,12 @@ def _service(
     definitions: list[Any] | None = None,
     farm_override: dict[str, Any] | None = None,
     tenant_settings: list[Any] | None = None,
+    platform: dict[str, Any] | None = None,
     with_evidence: bool = True,
 ) -> InsightsService:
     """A service with mocked repos and a session that returns, in order, the
     evidence loader's six statements, then the per-crop health catalog,
-    this farm's override and the tenant's rollup settings.
+    this farm's override, the tenant's rollup settings and the platform row.
 
     Named rather than positional: this file used to pass a bare list of
     lists, and Phase 5's two extra queries shifted every one of them onto
@@ -88,6 +89,7 @@ def _service(
             definitions or [],
             [_Row(health_definition=farm_override)] if farm_override is not None else [],
             tenant_settings or [],
+            [_Row(definition=platform, version=1)] if platform is not None else [],
         ]
         if with_evidence
         else []
@@ -197,9 +199,9 @@ class TestScorecardUnderTheDefinition:
 
         out = await svc.get_farm_health_summary(farm_id=farm_id)
 
-        # Six evidence statements, the crop catalog, the farm override and
-        # the tenant's rollup settings.
-        assert svc._session.execute.await_count == 9  # type: ignore[attr-defined]
+        # Six evidence statements, the crop catalog, the farm override,
+        # the tenant's rollup settings and the platform row.
+        assert svc._session.execute.await_count == 10  # type: ignore[attr-defined]
         by_name = {r.block_name: r for r in out.blocks}
         assert by_name["North"].current_health == "healthy"
         assert by_name["South"].current_health == "healthy"
