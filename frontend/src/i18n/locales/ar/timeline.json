@@ -96,7 +96,9 @@
       "growth_regulator": "منظم نمو",
       "thinning": "خف الثمار",
       "bagging": "تكييس",
-      "hilling": "ترديم"
+      "hilling": "ترديم",
+      "bending": "تقويس العذوق",
+      "trap_service": "خدمة المصائد"
     },
     "alert": {
       "irrigate": "ري",

@@ -1,0 +1,62 @@
+[
+  {
+    "code": "rpw_traps_not_serviced",
+    "name_en": "Weevil traps not checked",
+    "name_ar": "مصائد السوسة لم تُفحص",
+    "clause_en": "no weevil trap record in the last 14 days",
+    "clause_ar": "لا يوجد سجل لمصائد السوسة خلال آخر 14 يومًا",
+    "default_status": "issue",
+    "description_en": "Manual 10.1: pheromone traps are serviced every 7-14 days and catches are recorded.",
+    "description_ar": "الدليل 10.1: تُخدم المصائد الفرمونية كل 7-14 يومًا وتُسجَّل الحصيلة."
+  },
+  {
+    "code": "rpw_infested_palm",
+    "name_en": "Weevil-infested palm found",
+    "name_ar": "نخلة مصابة بالسوسة",
+    "clause_en": "a palm infested by red palm weevil was found",
+    "clause_ar": "وُجدت نخلة مصابة بسوسة النخيل الحمراء",
+    "default_status": "alert",
+    "description_en": "Manual 10.1: heavily infested palms are removed and disposed of.",
+    "description_ar": "الدليل 10.1: تُزال النخيل شديدة الإصابة ويُتخلَّص منها."
+  },
+  {
+    "code": "date_dust_mite",
+    "name_en": "Dust mite on bunches",
+    "name_ar": "حلم الغبار على العذوق",
+    "clause_en": "dust mite was found on the bunches",
+    "clause_ar": "وُجد حلم الغبار على العذوق",
+    "default_status": "issue",
+    "description_en": "Manual 10.3: augmentative release of the predator Stethorus gilvifrons.",
+    "description_ar": "الدليل 10.3: الإطلاق التعزيزي للمفترس ستيثوروس جيلفيفرونس."
+  },
+  {
+    "code": "date_fruit_cracking",
+    "name_en": "Fruit cracking",
+    "name_ar": "تشقق الثمار",
+    "clause_en": "fruit cracking was seen during ripening",
+    "clause_ar": "ظهر تشقق في الثمار أثناء النضج",
+    "default_status": "issue",
+    "description_en": "Manual 9.6: abrupt changes in soil moisture are a main cause of cracking.",
+    "description_ar": "الدليل 9.6: التغير المفاجئ في رطوبة التربة سبب رئيسي للتشقق."
+  },
+  {
+    "code": "date_black_nose",
+    "name_en": "Black nose",
+    "name_ar": "اسوداد طرف الثمرة",
+    "clause_en": "black nose was seen on the fruit",
+    "clause_ar": "ظهر اسوداد طرف الثمرة",
+    "default_status": "issue",
+    "description_en": "Manual 9.4: mainly caused by humid weather at Khalal.",
+    "description_ar": "الدليل 9.4: سببه الرئيسي الطقس الرطب في مرحلة الخلال."
+  },
+  {
+    "code": "pollination_not_recorded",
+    "name_en": "Pollination not recorded",
+    "name_ar": "التلقيح غير مسجّل",
+    "clause_en": "no pollinated bunches were recorded in the last 60 days",
+    "clause_ar": "لم تُسجَّل عذوق ملقحة خلال آخر 60 يومًا",
+    "default_status": "issue",
+    "description_en": "Manual 12.1: record each bunch's pollination date and count thinning and bagging from it.",
+    "description_ar": "الدليل 12.1: سجّل تاريخ تلقيح كل عذق واحسب الخف والتكييس منه."
+  }
+]

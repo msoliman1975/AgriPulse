@@ -19,6 +19,8 @@ const ACTIVITY_TYPES: ActivityType[] = [
   "thinning",
   "bagging",
   "hilling",
+  "bending",
+  "trap_service",
 ];
 
 export interface SelectedCell {

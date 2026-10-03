@@ -1,0 +1,110 @@
+{
+  "code": "medjool_red_palm_weevil",
+  "name_en": "Medjool — red palm weevil",
+  "name_ar": "المجدول — سوسة النخيل الحمراء",
+  "description_en": "Manual 10.1: pheromone traps are serviced every 7-14 days and catches recorded; heavily infested palms are removed and disposed of. Reads the Medjool scouting signals.",
+  "description_ar": "الدليل 10.1: تُخدم المصائد الفرمونية كل 7-14 يومًا وتُسجَّل الحصيلة، وتُزال النخيل شديدة الإصابة. تقرأ إشارات استكشاف المجدول.",
+  "scope": "block",
+  "crop_path": "date_palm.medjool",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_traps",
+  "registers": [
+    "rpw_traps_not_serviced",
+    "rpw_infested_palm"
+  ],
+  "parameters": {},
+  "nodes": {
+    "n_traps": {
+      "label_en": "Was a weevil trap record made in the last 14 days?",
+      "label_ar": "هل سُجّلت قراءة لمصائد السوسة خلال آخر 14 يومًا؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "signals",
+            "code": "date_rpw_trap_catch",
+            "key": "value_numeric"
+          },
+          "right": 1
+        }
+      },
+      "on_match": "n_infested",
+      "on_miss": "n_reg_traps"
+    },
+    "n_reg_traps": {
+      "label_en": "No trap record in 14 days",
+      "label_ar": "لا يوجد سجل للمصائد خلال 14 يومًا",
+      "register": {
+        "code": "rpw_traps_not_serviced",
+        "severity": "warning"
+      },
+      "next": "n_infested"
+    },
+    "n_infested": {
+      "label_en": "Was an infested palm found?",
+      "label_ar": "هل وُجدت نخلة مصابة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_rpw_infested_palm",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "n_reg_infested",
+      "on_miss": "n_stop"
+    },
+    "n_reg_infested": {
+      "label_en": "An infested palm was found",
+      "label_ar": "وُجدت نخلة مصابة",
+      "register": {
+        "code": "rpw_infested_palm",
+        "severity": "critical"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "rpw_traps_due",
+      "codes": [
+        "rpw_traps_not_serviced"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "No red palm weevil trap record in the last 14 days. Service each pheromone trap - change the food bait and water - and record its catch. The manual says every 7-14 days, all year (section 10.1).",
+      "text_ar": "لا يوجد سجل لمصائد سوسة النخيل الحمراء خلال آخر 14 يومًا. اخدم كل مصيدة فرمونية بتغيير الطعم والماء وسجّل حصيلتها. يقول الدليل كل 7-14 يومًا طوال العام (القسم 10.1)."
+    },
+    {
+      "code": "rpw_infested",
+      "codes": [
+        "rpw_infested_palm"
+      ],
+      "status": "alert",
+      "action_type": "other",
+      "text_en": "A palm infested by red palm weevil was found. The manual says heavily infested palms are removed and disposed of (section 10.1). Record No on the signal once the palm is removed.",
+      "text_ar": "وُجدت نخلة مصابة بسوسة النخيل الحمراء. يقول الدليل إن النخيل شديدة الإصابة تُزال ويُتخلَّص منها (القسم 10.1). سجّل لا على الإشارة بعد إزالة النخلة."
+    },
+    {
+      "code": "rpw_infested_and_traps_due",
+      "codes": [
+        "rpw_traps_not_serviced",
+        "rpw_infested_palm"
+      ],
+      "status": "alert",
+      "action_type": "other",
+      "text_en": "A weevil-infested palm was found and no trap record was made in 14 days. Remove and dispose of heavily infested palms, and service the pheromone traps every 7-14 days (section 10.1).",
+      "text_ar": "وُجدت نخلة مصابة بالسوسة ولم يُسجَّل فحص للمصائد خلال 14 يومًا. أزل النخيل شديدة الإصابة وتخلّص منها واخدم المصائد الفرمونية كل 7-14 يومًا (القسم 10.1)."
+    }
+  ]
+}

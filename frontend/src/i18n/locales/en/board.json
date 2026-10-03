@@ -49,7 +49,9 @@
     "growth_regulator": "Growth regulator",
     "thinning": "Thinning",
     "bagging": "Bagging",
-    "hilling": "Hilling"
+    "hilling": "Hilling",
+    "bending": "Bunch bending",
+    "trap_service": "Trap service"
   },
   "status": {
     "scheduled": "Scheduled",

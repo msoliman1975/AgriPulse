@@ -26,6 +26,8 @@ const ACTIVITY_TYPES: ActivityType[] = [
   "thinning",
   "bagging",
   "hilling",
+  "bending",
+  "trap_service",
 ];
 
 interface ActivityDetailDialogProps {

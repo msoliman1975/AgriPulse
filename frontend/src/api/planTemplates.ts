@@ -19,7 +19,9 @@ export type PlanActivityType =
   | "growth_regulator"
   | "thinning"
   | "bagging"
-  | "hilling";
+  | "hilling"
+  | "bending"
+  | "trap_service";
 
 export const ACTIVITY_TYPES: readonly PlanActivityType[] = [
   "planting",
@@ -35,6 +37,8 @@ export const ACTIVITY_TYPES: readonly PlanActivityType[] = [
   "thinning",
   "bagging",
   "hilling",
+  "bending",
+  "trap_service",
 ];
 
 export interface PlanTemplateMilestone {
