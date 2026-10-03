@@ -3946,9 +3946,13 @@ global:
       # 5530989 = #743, api and workers. The incident SQL types each date
       #   once: run r1 failed on `cannot cast type interval to numeric`.
       #   No migration. Rollback is these two tags back to 3804c01.
-      tag: "5530989"
+      # 47bb636 = #746, api and workers. Demo build: a reset mode, the
+      #   team step skips alert group members, and the 2024 cuts. Used
+      #   only by the demo-build CronJob. No migration. Rollback is these
+      #   two tags back to 5530989.
+      tag: "47bb636"
     workers:
-      tag: "5530989"
+      tag: "47bb636"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4836,14 +4840,20 @@ workloads:
 #
 # r1 (2026-09-30 22:13) dry run, failed on a date bind, fixed in #743.
 # r2 (2026-09-30 23:45) dry run, 10 incidents counted, 13 s, rolled back.
-# r3 applies the incidents for real and replays the first week only, so
-# the run time of one simulated week can be measured before the rest.
+# r3 (2026-10-01 00:01) applied 10 incidents, then the replay stopped on
+# 2024-09-30 at the team step (GroupMemberNotActionableError), fixed in
+# #746. One simulated day took about 150 s.
+# r4 rebuilds: applies the 2 new 2024 cuts, deletes every derived row
+# (r3's output, the live sweep's cards and the grid anomaly alerts), then
+# replays from the first index day. About 1006 days, about 42 h, so the
+# deadline is 72 h.
 demoBuildJob:
   enabled: true
-  runId: "r3"
-  schedule: "01 00 1 10 *"
+  runId: "r4"
+  schedule: "45 18 3 10 *"
+  activeDeadlineSeconds: 259200
   tenantSchema: "tenant_01a0eec13ae9703dbfa8a7cfafe11675"
   scenario: "ewais_grove"
-  mode: "all"
-  from: "2024-09-29"
-  to: "2024-10-05"
+  mode: "rebuild"
+  from: "2024-01-01"
+  to: "2026-10-02"
