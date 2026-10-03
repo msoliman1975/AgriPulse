@@ -377,14 +377,14 @@ footer {
     <span>Extended 2026-09-11 &mdash; frost and grid sizing</span>
     <span>Extended 2026-09-11 &mdash; settings, navigation and console revision</span>
     <span>Read against origin/main f26355e6</span>
-    <span>86 items</span>
+    <span>88 items</span>
     <span>Status from the project notes, not re-checked on the server</span>
   </div>
 </header>
 
 <div class="counts">
-  <div class="count"><b>86</b><span>Items</span></div>
-  <div class="count"><b>68</b><span>Not started</span></div>
+  <div class="count"><b>88</b><span>Items</span></div>
+  <div class="count"><b>70</b><span>Not started</span></div>
   <div class="count"><b>6</b><span>Started, unfinished</span></div>
   <div class="count"><b>3</b><span>Merged, not running</span></div>
   <div class="count"><b>4</b><span>Blocked</span></div>
@@ -715,6 +715,22 @@ footer {
   <table>
     <thead><tr><th>Capability</th><th>What it is</th><th>Depends on</th><th>Size</th><th>Status</th><th>Doc</th></tr></thead>
     <tbody>
+      <tr>
+        <td class="name">Input catalogue with an organic-permitted field</td>
+        <td class="desc">Plan template products are free text today, so nothing can check them. The Organic Medjool Manual (section 5) asks that every input be checked against the certifying body's list of permitted inputs. Add a product catalogue with an organic-permitted field per certifier, and check a plan against it when it is applied. Section 13 of the manual says the permitted list under Egyptian Law 12/2020 was not retrieved.</td>
+        <td class="deps">The certifying body's permitted-input list</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">Organic Medjool seeding plan (artifact KaZir7aG457K6hpmtrvMHB)</td>
+      </tr>
+      <tr>
+        <td class="name">Pest catalogue</td>
+        <td class="desc">No table lists pests. Medjool records red palm weevil, lesser date moth and dust mite as one scouting signal per observation, named by code. A catalogue would give each pest names in both languages, its life stages and a link to its treatments.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">Organic Medjool seeding plan (artifact KaZir7aG457K6hpmtrvMHB)</td>
+      </tr>
       <tr>
         <td class="name">Phenology spine and stage-aware planning</td>
         <td class="desc">Phenology stages become a validated model owned by the crop taxonomy, canopy size becomes a taxonomy lookup, growth stage advances daily with a per-block lock, and plan template activities anchor to stage codes instead of week numbers.</td>

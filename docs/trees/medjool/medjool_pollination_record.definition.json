@@ -1,0 +1,80 @@
+{
+  "code": "medjool_pollination_record",
+  "name_en": "Medjool — pollination record",
+  "name_ar": "المجدول — سجل التلقيح",
+  "description_en": "Manual 12.1: record each bunch's pollination date and count thinning and bagging from it. During late pollination and Hababouk this checks that pollinated bunches were recorded.",
+  "description_ar": "الدليل 12.1: سجّل تاريخ تلقيح كل عذق واحسب الخف والتكييس منه. تتحقق هذه الشجرة في نهاية التلقيح والحبابوك من تسجيل العذوق الملقحة.",
+  "scope": "block",
+  "crop_path": "date_palm.medjool",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_stage",
+  "registers": [
+    "pollination_not_recorded"
+  ],
+  "parameters": {},
+  "nodes": {
+    "n_stage": {
+      "label_en": "Is the block in late pollination or Hababouk?",
+      "label_ar": "هل القطعة في نهاية التلقيح أو الحبابوك؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "fruit_set"
+          ]
+        }
+      },
+      "on_match": "n_recorded",
+      "on_miss": "n_stop"
+    },
+    "n_recorded": {
+      "label_en": "Were pollinated bunches recorded in the last 60 days?",
+      "label_ar": "هل سُجّلت عذوق ملقحة خلال آخر 60 يومًا؟",
+      "condition": {
+        "tree": {
+          "op": "gt",
+          "left": {
+            "source": "signals",
+            "code": "date_bunches_pollinated",
+            "key": "value_numeric"
+          },
+          "right": 0
+        }
+      },
+      "on_match": "n_stop",
+      "on_miss": "n_reg_missing"
+    },
+    "n_reg_missing": {
+      "label_en": "No pollination recorded",
+      "label_ar": "لم يُسجَّل تلقيح",
+      "register": {
+        "code": "pollination_not_recorded",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "pollination_record_missing",
+      "codes": [
+        "pollination_not_recorded"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "No pollinated bunches were recorded in the last 60 days. Record the pollination date of each bunch: hand thinning is due 3-4 weeks after pollination and bagging at the start of Khalal (sections 9.2 and 12.1).",
+      "text_ar": "لم تُسجَّل عذوق ملقحة خلال آخر 60 يومًا. سجّل تاريخ تلقيح كل عذق: الخف اليدوي بعد 3-4 أسابيع من التلقيح والتكييس في بداية الخلال (القسمان 9.2 و12.1)."
+    }
+  ]
+}

@@ -25,6 +25,8 @@ const TYPE_TINT: Record<ActivityType, string> = {
   thinning: "bg-ap-prune/10 text-ap-prune border-ap-prune/30",
   bagging: "bg-ap-harv/10 text-ap-harv border-ap-harv/30",
   hilling: "bg-ap-bg text-ap-ink border-ap-line",
+  bending: "bg-ap-prune/10 text-ap-prune border-ap-prune/30",
+  trap_service: "bg-ap-accent/10 text-ap-accent border-ap-accent/30",
 };
 
 const TYPE_ICON: Record<ActivityType, string> = {
@@ -41,6 +43,8 @@ const TYPE_ICON: Record<ActivityType, string> = {
   thinning: "🍃",
   bagging: "🛍",
   hilling: "⛰",
+  bending: "🪢",
+  trap_service: "🪤",
 };
 
 interface ActivityChipProps {

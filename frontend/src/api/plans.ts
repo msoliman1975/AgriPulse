@@ -17,7 +17,9 @@ export type ActivityType =
   | "growth_regulator"
   | "thinning"
   | "bagging"
-  | "hilling";
+  | "hilling"
+  | "bending"
+  | "trap_service";
 
 export interface Plan {
   id: string;

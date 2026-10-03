@@ -28,6 +28,10 @@ ActivityType = Literal[
     "thinning",
     "bagging",
     "hilling",
+    # Organic Medjool (public 0099): bunch bending and red palm weevil
+    # pheromone trap servicing.
+    "bending",
+    "trap_service",
 ]
 
 
