@@ -3950,9 +3950,20 @@ global:
       #   team step skips alert group members, and the 2024 cuts. Used
       #   only by the demo-build CronJob. No migration. Rollback is these
       #   two tags back to 5530989.
-      tag: "47bb636"
+      # 7a6fbe2 = #748, api, workers and frontend. The platform default and
+      #   the per-crop block health values become rows a platform admin
+      #   edits in the app. Public migration 0095 runs in the PreSync job:
+      #   it adds public.health_definition_platform with the values the code
+      #   used, so no block changes class, and opens crop_health_definitions
+      #   to edits. The api no longer copies the crop YAML at start.
+      #   Watch: /platform/health-definition loads, the crop catalog has a
+      #   Health tab, and Settings > Block health shows the cell rule.
+      #   Rollback is these three tags back to 47bb636 / 47bb636 / ab66fa7.
+      #   0095 needs no downgrade for a rollback: the old api ignores the
+      #   new table.
+      tag: "7a6fbe2"
     workers:
-      tag: "47bb636"
+      tag: "7a6fbe2"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4571,7 +4582,12 @@ global:
       #   message.
       #
       #   Rollback is this tag alone back to 5f5fe82.
-      tag: "ab66fa7"
+      # 7a6fbe2 = the frontend half of #748: /platform/health-definition,
+      #   the crop catalog's Health tab, and Settings > Block health, which
+      #   takes the cell rule off the Detection page.
+      #
+      #   Rollback is this tag alone back to ab66fa7.
+      tag: "7a6fbe2"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
