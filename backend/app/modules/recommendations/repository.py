@@ -12,7 +12,7 @@ Two sessions:
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, cast
@@ -29,6 +29,7 @@ from app.modules.indices.trends import compute_trend
 from app.modules.recommendations.models import DecisionTree, DecisionTreeVersion
 from app.shared import clock
 from app.shared.action_items import REC_SQL, TENANT_TODAY_SQL
+from app.shared.imagery_lookback import LATEST_LOOKBACK_DAYS
 
 
 def _rowcount(result: Any) -> int:
@@ -2260,12 +2261,37 @@ class RecommendationsRepository:
         Only cells of a non-retired grid config are included. Drives the
         per-cell evaluation path for ``scope='cell'`` trees (PR-C3); empty when
         the block has no grid, so cell-scoped trees simply don't fire there.
+
+        Reads the last ``LATEST_LOOKBACK_DAYS`` first, and the whole history
+        only when that window holds nothing. ``DISTINCT ON`` has to read
+        every row it is given, and the block's whole history grows by one
+        scene every few days: 7 ms on 2024-03-01 and 187 ms on 2026-09-20,
+        measured on the demo farm. The window keeps it near 33 ms. A cell
+        with no reading in the window while its neighbours have one then
+        falls back to the block value, as a cell with no reading at all does.
         """
-        rows = (
+        rows = await self._latest_cell_rows(block_id=block_id, lookback=True)
+        if not rows:
+            rows = await self._latest_cell_rows(block_id=block_id, lookback=False)
+        out: dict[UUID, dict[str, dict[str, Any]]] = {}
+        for row in rows:
+            out.setdefault(row["cell_id"], {})[row["index_code"]] = {
+                "time": row["time"],
+                "mean": row["mean"],
+            }
+        return out
+
+    async def _latest_cell_rows(self, *, block_id: UUID, lookback: bool) -> Sequence[Any]:
+        window = (
+            "AND obs.time > public.app_now() - make_interval(days => :lookback_days)"
+            if lookback
+            else ""
+        )
+        return (
             (
                 await self._tenant.execute(
                     text(
-                        """
+                        f"""
                         SELECT DISTINCT ON (obs.cell_id, obs.index_code)
                                obs.cell_id, obs.index_code, obs.time, obs.mean
                         FROM block_grid_aggregates obs
@@ -2283,22 +2309,20 @@ class RecommendationsRepository:
                              @> obs.time
                         WHERE obs.block_id = :block_id
                           AND obs.time <= public.app_now()
+                          {window}
                         ORDER BY obs.cell_id, obs.index_code, obs.time DESC
                         """
                     ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
-                    {"block_id": block_id},
+                    (
+                        {"block_id": block_id, "lookback_days": LATEST_LOOKBACK_DAYS}
+                        if lookback
+                        else {"block_id": block_id}
+                    ),
                 )
             )
             .mappings()
             .all()
         )
-        out: dict[UUID, dict[str, dict[str, Any]]] = {}
-        for row in rows:
-            out.setdefault(row["cell_id"], {})[row["index_code"]] = {
-                "time": row["time"],
-                "mean": row["mean"],
-            }
-        return out
 
     async def get_index_trends(
         self, *, block_id: UUID, window_days: int = 30

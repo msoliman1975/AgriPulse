@@ -280,17 +280,12 @@ class IndicesServiceImpl:
             (HistoryRow(time=r["time"], mean=r["mean"]) for r in history),
             window_days=window_days,
         )
-        for row in rows:
-            await self._repo.upsert_baseline(
-                block_id=block_id,
-                index_code=index_code,
-                day_of_year=row.day_of_year,
-                baseline_mean=row.baseline_mean,
-                baseline_std=row.baseline_std,
-                sample_count=row.sample_count,
-                window_days=window_days,
-                years_observed=row.years_observed,
-            )
+        await self._repo.upsert_baselines(
+            block_id=block_id,
+            index_code=index_code,
+            window_days=window_days,
+            rows=rows,
+        )
         return len(rows)
 
     async def recompute_block_index_deviations(
