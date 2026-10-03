@@ -8,6 +8,9 @@ migrations in the same pull request are deployed.
    Tenant-owned trees are not touched.
 2. ``create``: post the 6 Medjool finding codes, then the 3 Medjool trees as
    beta drafts. Nothing is published.
+3. ``update``: replace the 6 finding codes (PATCH, full replace) and post the
+   current definitions as a new draft version of each Medjool tree. Used
+   after the Arabic edition of the manual replaced the first Arabic text.
 
 Both steps need a platform-admin bearer token in ``AGRIPULSE_TOKEN`` and the
 API base in ``AGRIPULSE_API`` (for example https://api.agripulse.cloud/api/v1).
@@ -17,6 +20,7 @@ text is not re-encoded on the way.
     python scripts/create_medjool_trees.py archive-old --dry-run
     python scripts/create_medjool_trees.py archive-old
     python scripts/create_medjool_trees.py create
+    python scripts/create_medjool_trees.py update
 """
 
 from __future__ import annotations
@@ -93,6 +97,45 @@ def create() -> int:
     return 1 if failed else 0
 
 
+def update() -> int:
+    failed = 0
+    for finding in json.loads((TREES / "findings.json").read_text(encoding="utf-8")):
+        fields = {k: v for k, v in finding.items() if k != "code"}
+        body = json.dumps(fields, ensure_ascii=False).encode("utf-8")
+        status, text = _call(
+            "PATCH", f"/decision-tree-findings/{finding['code']}", body
+        )
+        print(f"{status} finding {finding['code']}")
+        failed += status != 200
+    status, text = _call("GET", "/platform/decision-trees/beta")
+    if status != 200:
+        print(f"list failed: {status} {text}")
+        return 1
+    ids = {t["code"]: t["id"] for t in json.loads(text)}
+    for path in sorted(TREES.glob("*.definition.json")):
+        definition = json.loads(path.read_text(encoding="utf-8"))
+        tree_id = ids.get(definition["code"])
+        if tree_id is None:
+            print(f"missing tree {definition['code']}")
+            failed += 1
+            continue
+        body = json.dumps(
+            {
+                "definition": definition,
+                "notes": "Arabic from the manual's Arabic edition. Draft, not published.",
+            },
+            ensure_ascii=False,
+        ).encode("utf-8")
+        status, text = _call(
+            "POST", f"/platform/decision-trees/beta/{tree_id}/versions", body
+        )
+        print(f"{status} tree {definition['code']}")
+        if status not in (200, 201):
+            print(text)
+            failed += 1
+    return 1 if failed else 0
+
+
 def main() -> int:
     if not API or not TOKEN:
         print("Set AGRIPULSE_API and AGRIPULSE_TOKEN.")
@@ -102,6 +145,8 @@ def main() -> int:
         return archive_old(dry_run="--dry-run" in sys.argv)
     if command == "create":
         return create()
+    if command == "update":
+        return update()
     print(__doc__)
     return 2
 
