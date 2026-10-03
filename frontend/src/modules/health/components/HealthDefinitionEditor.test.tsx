@@ -58,12 +58,12 @@ describe("HealthDefinitionEditor", () => {
       />,
     );
     await userEvent.click(await screen.findByRole("checkbox", { name: /Set Alert severity/ }));
-    const body = onChange.mock.calls[0]![0];
+    const body = onChange.mock.calls[0][0];
     expect(body).toEqual({
       severity_map: { critical: "critical", warning: "watch", info: "healthy" },
     });
     // A copy: editing the body must never edit the inherited object.
-    expect(body.severity_map).not.toBe(INHERITED.severity_map!.value);
+    expect(body.severity_map).not.toBe(INHERITED.severity_map.value);
   });
 
   it("drops a key when its switch goes off", async () => {

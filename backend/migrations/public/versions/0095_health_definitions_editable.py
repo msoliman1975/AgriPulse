@@ -106,7 +106,9 @@ def upgrade() -> None:
             "updated_at",
             sa.DateTime(timezone=True),
             nullable=False,
-            server_default=sa.text("now()"),
+            # `public.app_now()`, not `now()`: a demo-history replay moves the
+            # SQL clock, and a column on the real clock would disagree with it.
+            server_default=sa.text("public.app_now()"),
         ),
         sa.Column("updated_by", postgresql.UUID(as_uuid=True), nullable=True),
         sa.CheckConstraint("id = 1", name="single_row"),
