@@ -98,7 +98,7 @@ def test_thermal_indices_stay_in_their_unit_range() -> None:
 def test_the_ewais_scenario_is_well_formed() -> None:
     codes = [inc.code for inc in ewais_grove.INCIDENTS]
     assert len(codes) == len(set(codes)), "incident codes must be unique"
-    span_start, span_end = date(2024, 9, 29), date(2026, 9, 28)
+    span_start, span_end = date(2024, 1, 1), date(2026, 9, 28)
     for inc in ewais_grove.INCIDENTS:
         assert span_start <= inc.start, inc.code
         assert inc.gone <= span_end + timedelta(days=1), inc.code
@@ -131,3 +131,28 @@ def test_b18_misses_the_2025_cut_only() -> None:
     by_code = {inc.code: inc for inc in ewais_grove.INCIDENTS}
     assert "B18" not in by_code["cut_ewais_2025"].blocks
     assert "B18" in by_code["cut_ewais_2026"].blocks
+
+
+def test_every_harvest_in_the_span_has_its_cut() -> None:
+    """Without a cut, the water tree reads "cut missing" on every block.
+
+    Ewais matures 1 July to 15 September and Keitt 16 August to
+    31 October. B18 missing the 2025 cut is the one planned exception.
+    """
+    for year in (2024, 2025, 2026):
+        for blocks, opens, closes in (
+            (ewais_grove._EWAIS, date(year, 7, 1), date(year, 9, 15)),
+            (ewais_grove._KEITT, date(year, 8, 16), min(date(year, 10, 31), date(2026, 9, 27))),
+        ):
+            for block in blocks:
+                if (year, block) == (2025, "B18"):
+                    continue
+                covering = [
+                    inc
+                    for inc in ewais_grove.INCIDENTS
+                    if inc.code.startswith("cut_")
+                    and block in inc.blocks
+                    and inc.start <= opens
+                    and inc.until >= closes
+                ]
+                assert covering, (year, block)

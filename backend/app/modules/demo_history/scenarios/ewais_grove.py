@@ -1,6 +1,7 @@
 """Ewais Grove: two seasons of a drip-irrigated mango farm near Ismailia.
 
-The span is 2024-09-29 to 2026-09-28. The farm is 36 blocks, B01 in the
+The span is 2024-01-01, the first index data and the day mango was
+assigned, to 2026-09-28. The farm is 36 blocks, B01 in the
 north-west to B36 in the south-east: Ewais on B01-B24, Keitt on B25-B36.
 All trees are small (NDVI 0.12 to 0.26 over the whole span) and bearing.
 
@@ -74,6 +75,13 @@ def _cut(code: str, blocks: tuple[str, ...], start: date, until: date) -> Incide
 INCIDENTS: tuple[Incident, ...] = (
     # --- the cut, every harvest in the span ---------------------------
     _cut("cut_keitt_2024", _KEITT, date(2024, 9, 29), date(2024, 10, 31)),
+    # The span first started on 2024-09-29, so the 2024 cuts above began
+    # there. They were applied to prod under these codes, and an applied
+    # code is never applied again, so the full 2024 cuts are new codes.
+    # On Keitt the two overlap: a `set` shift on a value already at 0.015
+    # leaves it there.
+    _cut("cut_ewais_2024", _EWAIS, date(2024, 7, 1), date(2024, 9, 15)),
+    _cut("cut_keitt_2024_full", _KEITT, date(2024, 8, 16), date(2024, 10, 31)),
     _cut(
         "cut_ewais_2025",
         tuple(b for b in _EWAIS if b != "B18"),
