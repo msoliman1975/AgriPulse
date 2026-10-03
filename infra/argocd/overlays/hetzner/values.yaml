@@ -3961,9 +3961,21 @@ global:
       #   Rollback is these three tags back to 47bb636 / 47bb636 / ab66fa7.
       #   0095 needs no downgrade for a rollback: the old api ignores the
       #   new table.
-      tag: "7a6fbe2"
+      # b8e4bec = #750, api, workers and frontend. Organic Medjool from the
+      #   Organic Medjool Manual. Public migrations 0096-0099 and tenant 0097
+      #   run in the PreSync job: 0096 deletes the 7 date palm templates,
+      #   clears the date palm variety calendars and sets date_palm to
+      #   variety depth (0 date palm blocks in production); 0097-0099 add
+      #   the Medjool calendar, attributes, 15 signals, 2 forms and 2
+      #   templates; tenant 0097 allows the bending and trap_service types.
+      #   Watch: the crop catalog shows 9 Medjool stages, and the plan
+      #   templates list shows the two medjool-organic templates.
+      #   Rollback is these three tags back to 7a6fbe2. The migrations are
+      #   not rolled back by that, and the old api cannot read a template
+      #   activity of type bending or trap_service.
+      tag: "b8e4bec"
     workers:
-      tag: "7a6fbe2"
+      tag: "b8e4bec"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4587,7 +4599,11 @@ global:
       #   takes the cell rule off the Detection page.
       #
       #   Rollback is this tag alone back to ab66fa7.
-      tag: "7a6fbe2"
+      # b8e4bec = the frontend half of #750: labels and icons for the
+      #   bending and trap_service activity types.
+      #
+      #   Rollback is this tag alone back to 7a6fbe2.
+      tag: "b8e4bec"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
