@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { useAuth } from "react-oidc-context";
 
 import { getConfig, type ConfigResponse } from "@/api/config";
+import { decodeJwt } from "@/rbac/jwt";
 
 // Lazy-loaded once on first child mount that needs it. Cached for the
 // session — config doesn't change between requests in MVP. Tests can
@@ -56,6 +57,9 @@ export function ConfigProvider({ children, value }: ConfigProviderProps): JSX.El
     // through signinRedirect on every page reload — looking like an
     // auth-server flicker loop.
     if (!accessToken) return;
+    // /v1/config is a tenant route. A platform admin with no tenant gets a
+    // 403 for it on every page, and no /platform page reads the config.
+    if (!decodeJwt(accessToken)?.tenant_id) return;
     void load();
   }, [accessToken, config, load, value]);
 

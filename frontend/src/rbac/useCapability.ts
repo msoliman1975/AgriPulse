@@ -19,6 +19,17 @@ export function useClaims(): JwtClaims | null {
 }
 
 /**
+ * True when the signed-in token names a tenant.
+ *
+ * Every tenant route answers 403 "Tenant context required" without the
+ * `tenant_id` claim, which is the same claim the backend reads. A platform
+ * admin with no tenant must not call them, or each platform page logs 403s.
+ */
+export function useHasTenant(): boolean {
+  return Boolean(useClaims()?.tenant_id);
+}
+
+/**
  * Live grants from `/v1/me`, or `null` before the first response.
  *
  * The roles themselves still come from the JWT — only the role -> capability
