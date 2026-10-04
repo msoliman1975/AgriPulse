@@ -16,9 +16,9 @@ from app.modules.demo_history.steps import DAILY_STEPS, DEMO_BUILD_STEPS, steps_
 def test_the_build_day_wraps_the_engine_steps() -> None:
     names = [s.name for s in steps_for(0, DEMO_BUILD_STEPS)]
     assert names[0] == "demo.hindcast_forecast"
-    assert names[-1] == "demo.team_work"
+    assert names[-2:] == ["demo.team_work", "demo.irrigation_work"]
     engine = [s.name for s in steps_for(0, DAILY_STEPS)]
-    assert names[1:-1] == engine
+    assert names[1:-2] == engine
 
 
 def test_the_team_works_after_the_sweep() -> None:

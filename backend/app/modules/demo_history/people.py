@@ -26,6 +26,7 @@ import hashlib
 from collections.abc import Coroutine
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -33,6 +34,7 @@ from sqlalchemy import text
 
 from app.core.logging import get_logger
 from app.modules.alerts.service import get_alerts_service
+from app.modules.irrigation.service import get_irrigation_service
 from app.modules.plans.service import get_plans_service
 from app.modules.recommendations.service import get_recommendations_service
 from app.shared import clock
@@ -99,6 +101,74 @@ class Team:
     @property
     def complete(self) -> bool:
         return None not in (self.manager, self.agronomist, self.operator)
+
+
+_IRRIGATION_SKIP_SHARE = 0.04
+_IRRIGATION_SKIP_NOTE = "Well maintenance this evening. Next cycle tomorrow."
+
+
+def irrigate_for_tenant(tenant_schema: str) -> dict[str, int]:
+    """The field operator logs the day's irrigation, in the evening.
+
+    Every schedule the engine wrote for today is applied at its
+    recommended volume, give or take a tenth, or skipped about one day in
+    twenty-five. Without this every schedule stays pending for ever, the
+    water balance never sees a drop of irrigation, and the water-balance
+    report shows a farm nobody waters.
+    """
+    return _run(_irrigate_async(tenant_schema))
+
+
+async def _irrigate_async(tenant_schema: str) -> dict[str, int]:
+    counts = {"applied": 0, "skipped": 0}
+    today = clock.today()
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await _begin(session, tenant_schema)
+        team = await _load_team(session, tenant_schema)
+        due = [
+            dict(r)
+            for r in (
+                await session.execute(
+                    text(
+                        """
+                        SELECT id, recommended_mm
+                          FROM irrigation_schedules
+                         WHERE status = 'pending' AND scheduled_for = :today
+                         ORDER BY id
+                        """
+                    ),
+                    {"today": today},
+                )
+            ).mappings()
+        ]
+    if team.operator is None:
+        raise RuntimeError("demo team incomplete: the tenant needs a FieldOperator")
+
+    for row in due:
+        sid = row["id"]
+        skip = _roll(sid, "skip") < _IRRIGATION_SKIP_SHARE
+        with clock.simulate(_at(today, (sid, "irrigate"), 17, 19)):
+            async with factory() as session, session.begin():
+                await _begin(session, tenant_schema)
+                async with factory() as public_session:
+                    svc = get_irrigation_service(
+                        tenant_session=session, public_session=public_session
+                    )
+                    volume = None
+                    if not skip:
+                        factor = Decimal(str(round(0.9 + _roll(sid, "volume") * 0.2, 3)))
+                        volume = (Decimal(row["recommended_mm"]) * factor).quantize(Decimal("0.01"))
+                    await svc.transition(
+                        schedule_id=sid,
+                        action="skip" if skip else "apply",
+                        applied_volume_mm=volume,
+                        notes=_IRRIGATION_SKIP_NOTE if skip else None,
+                        actor_user_id=team.operator,
+                        tenant_schema=tenant_schema,
+                    )
+        counts["skipped" if skip else "applied"] += 1
+    return counts
 
 
 def act_for_tenant(tenant_schema: str) -> dict[str, int]:

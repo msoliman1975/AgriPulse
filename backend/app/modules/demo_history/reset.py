@@ -44,6 +44,28 @@ _CLEARED: tuple[tuple[str, str], ...] = (
 )
 
 
+async def clear_irrigation(
+    session_factory: Any, tenant_schema: str, start: Any, end: Any
+) -> dict[str, int]:
+    """Delete one window's irrigation schedules, so the window can be redone.
+
+    The schedule generator skips a day that already has a pending row, so
+    schedules written while the daily weather was missing (0 mm each) would
+    stand for ever. The water balance needs no clearing: it upserts.
+    """
+    ensure_build_tenant(tenant_schema)
+    safe = sanitize_tenant_schema(tenant_schema)
+    async with session_factory() as session, session.begin():
+        result = await session.execute(
+            text(
+                f"DELETE FROM {safe}.irrigation_schedules "  # noqa: S608 - constant
+                "WHERE scheduled_for BETWEEN :start AND :end"
+            ),
+            {"start": start, "end": end},
+        )
+    return {"irrigation_schedules": int(getattr(result, "rowcount", 0) or 0)}
+
+
 async def reset_build_tenant(session_factory: Any, tenant_schema: str) -> dict[str, int]:
     """Delete the build tenant's derived history. Returns rows per table."""
     ensure_build_tenant(tenant_schema)

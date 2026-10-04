@@ -117,4 +117,14 @@ DEMO_BUILD_STEPS: tuple[Step, ...] = (
     Step("demo.hindcast_forecast", 0, hindcast.hindcast_for_tenant),
     *DAILY_STEPS,
     Step("demo.team_work", 16, people.act_for_tenant),
+    # The evening irrigation log, after the 08:00 schedule was written.
+    Step("demo.irrigation_work", 18, people.irrigate_for_tenant),
+)
+
+# Irrigation alone, for redoing its history over days that are already
+# replayed: yesterday's balance, today's schedule, the evening log.
+IRRIGATION_STEPS: tuple[Step, ...] = tuple(
+    step
+    for step in DEMO_BUILD_STEPS
+    if step.name in ("irrigation.water_balance", "irrigation.generate", "demo.irrigation_work")
 )
