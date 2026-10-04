@@ -22,6 +22,10 @@ Modes:
   work, hindcasts) and keep its inputs. See `demo_history.reset`.
 * ``rebuild``: ``incidents``, ``reset``, then ``replay``. Applied
   incidents are skipped, so a scenario that gained one applies only that.
+* ``irrigation``: redo the irrigation history over the range: clear its
+  schedules, then replay only yesterday's water balance, the day's
+  schedule and the operator's evening log. For days replayed while the
+  daily weather was missing.
 
 The replay goes in chunks of ``--chunk-days``, and each chunk writes one
 progress event. A chunk that fails stops the run and its error is the
@@ -48,15 +52,23 @@ from sqlalchemy import text
 
 from app.modules.audit.service import get_audit_service
 from app.modules.demo_history.incidents import apply_scenario
-from app.modules.demo_history.reset import reset_build_tenant
+from app.modules.demo_history.reset import clear_irrigation, reset_build_tenant
 from app.modules.demo_history.runner import ReplayNotAllowedError, ensure_build_tenant, replay
-from app.modules.demo_history.steps import DEMO_BUILD_STEPS
+from app.modules.demo_history.steps import DEMO_BUILD_STEPS, IRRIGATION_STEPS, Step
 from app.shared.db.session import AsyncSessionLocal, dispose_engine
 
 logger = logging.getLogger("demo_build")
 
-_MODES = ("incidents-dry-run", "incidents", "replay", "all", "reset", "rebuild")
-_REPLAYS = ("replay", "all", "rebuild")
+_MODES = (
+    "incidents-dry-run",
+    "incidents",
+    "replay",
+    "all",
+    "reset",
+    "rebuild",
+    "irrigation",
+)
+_REPLAYS = ("replay", "all", "rebuild", "irrigation")
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -131,7 +143,11 @@ def _incidents(args: argparse.Namespace, report: Reporter, *, dry_run: bool) -> 
     report("incidents_dry_run" if dry_run else "incidents_applied", results=results)
 
 
-def _replay(args: argparse.Namespace, report: Reporter) -> bool:
+def _replay(
+    args: argparse.Namespace,
+    report: Reporter,
+    steps: tuple[Step, ...] = DEMO_BUILD_STEPS,
+) -> bool:
     """Replay in chunks. Returns False when a chunk failed."""
     chunk = timedelta(days=args.chunk_days)
     day = args.start
@@ -142,7 +158,7 @@ def _replay(args: argparse.Namespace, report: Reporter) -> bool:
             tenant_schema=args.tenant_schema,
             start=day,
             end=last,
-            steps=DEMO_BUILD_STEPS,
+            steps=steps,
         )
         for name, counts in result.totals().items():
             bucket = totals.setdefault(name, {})
@@ -190,7 +206,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.mode in ("reset", "rebuild"):
             cleared = _run_async(reset_build_tenant(AsyncSessionLocal(), args.tenant_schema))
             report("reset", cleared=cleared)
-        if args.mode in _REPLAYS and not _replay(args, report):
+        if args.mode == "irrigation":
+            cleared = _run_async(
+                clear_irrigation(AsyncSessionLocal(), args.tenant_schema, args.start, args.end)
+            )
+            report("irrigation_cleared", cleared=cleared)
+            if not _replay(args, report, IRRIGATION_STEPS):
+                return 1
+        elif args.mode in _REPLAYS and not _replay(args, report):
             return 1
     except Exception as exc:
         report(
