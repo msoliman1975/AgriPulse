@@ -4617,7 +4617,12 @@ global:
       #   bending activity type is «تدلية العذوق».
       #
       #   Rollback is this tag alone back to b8e4bec.
-      tag: "7fa9da3"
+      # 4056f34 = #755, frontend only. The old tree viewer sends a beta tree
+      #   (versions with a definition and no YAML) to the beta designer, so
+      #   the Medjool trees no longer show "Tree has no nodes to display yet."
+      #
+      #   Rollback is this tag alone back to 7fa9da3.
+      tag: "4056f34"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
