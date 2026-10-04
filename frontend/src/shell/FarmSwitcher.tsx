@@ -5,7 +5,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { listFarms } from "@/api/farms";
 import { localizedName } from "@/lib/localizedField";
-import { useCapability } from "@/rbac/useCapability";
+import { useCapability, useHasTenant } from "@/rbac/useCapability";
 import { ChevronIcon } from "./icons";
 
 // Farm creation happens inside the Farm Console (map-native draw/upload), not
@@ -31,8 +31,16 @@ const PINNED_PREFIXES = [
 /**
  * Breadcrumb-anchored farm switcher. Keeps the user on the current view
  * but swaps the `:farmId` segment when they pick a different farm.
+ *
+ * Renders nothing without a tenant. The /platform pages share this header,
+ * and `/v1/farms` answers a platform admin with no tenant with a 403.
  */
 export function FarmSwitcher(): ReactNode {
+  const hasTenant = useHasTenant();
+  return hasTenant ? <TenantFarmSwitcher /> : null;
+}
+
+function TenantFarmSwitcher(): ReactNode {
   const { farmId } = useParams<{ farmId?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
