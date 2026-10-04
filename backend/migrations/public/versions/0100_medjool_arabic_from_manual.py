@@ -234,9 +234,7 @@ def upgrade() -> None:
 
     override = _json(
         conn.execute(
-            sa.text(
-                "SELECT phenology_stages_override FROM public.crop_varieties WHERE path = :p"
-            ),
+            sa.text("SELECT phenology_stages_override FROM public.crop_varieties WHERE path = :p"),
             {"p": _PATH},
         ).scalar()
     )

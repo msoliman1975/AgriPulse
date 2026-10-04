@@ -37,9 +37,7 @@ _STAGES = _CATALOGUE.MEDJOOL_STAGES["stages"]
 
 
 def test_calendar_passes_the_perennial_validator() -> None:
-    validate_phenology_payload(
-        _CATALOGUE.MEDJOOL_STAGES, is_perennial=True, has_gdd_base=False
-    )
+    validate_phenology_payload(_CATALOGUE.MEDJOOL_STAGES, is_perennial=True, has_gdd_base=False)
 
 
 def test_every_day_has_exactly_the_manuals_phase() -> None:
@@ -59,9 +57,7 @@ def test_every_day_has_exactly_the_manuals_phase() -> None:
     previous = None
     day = date(2027, 1, 1)
     while day.year == 2027:
-        stage = stage_for_date(
-            _STAGES, is_perennial=True, planting_date=None, today=day
-        )
+        stage = stage_for_date(_STAGES, is_perennial=True, planting_date=None, today=day)
         assert stage is not None, f"{day} resolves to no stage"
         if stage != previous:
             seen[day] = stage
@@ -95,8 +91,7 @@ def test_bearing_rows_anchor_to_medjool_stages() -> None:
 
 def test_bearing_rows_land_on_the_manuals_weeks() -> None:
     starts = {
-        s["code"]: date(2027, *map(int, s["advance"]["start_doy"].split("-")))
-        for s in _STAGES
+        s["code"]: date(2027, *map(int, s["advance"]["start_doy"].split("-"))) for s in _STAGES
     }
     for atype, stage, first, last, *_ in _TEMPLATES.BEARING:
         offset, duration = _TEMPLATES._weeks(stage, first, last)
@@ -108,9 +103,7 @@ def test_bearing_rows_land_on_the_manuals_weeks() -> None:
             first,
         )
         last_day = (
-            date(2027, 12, 31)
-            if last == 52
-            else date(2027, 1, 1) + timedelta(weeks=last, days=-1)
+            date(2027, 12, 31) if last == 52 else date(2027, 1, 1) + timedelta(weeks=last, days=-1)
         )
         assert end == last_day, (atype, stage, last)
 
