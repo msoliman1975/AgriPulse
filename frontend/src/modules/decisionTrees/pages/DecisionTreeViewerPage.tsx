@@ -28,6 +28,7 @@ import { formatDistanceToNow, parseISO, type Locale } from "date-fns";
 
 import { Card } from "@/components/Card";
 import { ErrorState } from "@/components/ErrorState";
+import { betaTreePath } from "@/modules/decisionTrees/beta/lib/betaRoutes";
 import { Modal } from "@/components/Modal";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
@@ -139,6 +140,17 @@ export function DecisionTreeViewerPage(): ReactNode {
   const [copyOpen, setCopyOpen] = useState(false);
   const navigate = useNavigate();
   const detail = useDecisionTree(code);
+  // A beta tree's versions hold a JSON definition and no YAML, so this page
+  // would draw an empty canvas ("Tree has no nodes to display yet."). Links
+  // that know only a code, such as the signal references drawer, land here
+  // for beta trees too. Send them to the beta designer instead.
+  const isBetaTree = useMemo(
+    () => (detail.data?.versions ?? []).some((v) => v.definition != null && !v.tree_yaml),
+    [detail.data],
+  );
+  useEffect(() => {
+    if (isBetaTree) navigate(betaTreePath(scope, code), { replace: true });
+  }, [isBetaTree, navigate, scope, code]);
   const append = useAppendDecisionTreeVersion();
   const publish = usePublishDecisionTreeVersion();
   const discard = useDiscardDecisionTreeVersion();
