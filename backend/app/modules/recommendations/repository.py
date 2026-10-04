@@ -284,6 +284,55 @@ class VERDICT_SQL:  # named after REC_SQL / ALERT_SQL in shared.action_items
            AND v.block_id = CAST(:block_id AS uuid)
     """
 
+    # The same verdict, with the walk of the latest check on or before
+    # `:at` instead of the latest check of all. A verdict whose answer did
+    # not change stands for weeks, and every sweep in between re-checked
+    # it. Read for a past day, the last walk is from after that day: its
+    # readings come from a later image than the one on the map, and its
+    # "Checked on" date is later than the day the reader chose.
+    #
+    # A trace belongs to this verdict when its run lies between the
+    # verdict's first and last runs. Matching on time instead does not
+    # work: the trace is written during the walk and `valid_from` a moment
+    # later in the same sweep, so the first check falls just outside the
+    # interval and, at a change, the next verdict's first trace falls
+    # inside the old one.
+    REASONING_AT = """
+        SELECT v.id AS verdict_id, v.block_id, v.cell_id, v.scope,
+               v.tree_id, v.tree_code, v.tree_version, v.leaf_node_id,
+               v.kind, v.status_code, v.severity,
+               v.text_en, v.text_ar,
+               v.valid_from, v.last_evaluated_at, v.last_run_id,
+               t.id AS trace_id, t.evaluated_at, t.status AS trace_status,
+               t.node_path, t.resolved_values, t.param_overrides,
+               dt.name_en AS tree_name_en, dt.name_ar AS tree_name_ar,
+               c.row_idx AS cell_row, c.col_idx AS cell_col
+          FROM decision_tree_block_verdicts v
+          LEFT JOIN public.decision_trees dt ON dt.id = v.tree_id
+          LEFT JOIN decision_tree_eval_runs r_first ON r_first.id = v.run_id
+          LEFT JOIN decision_tree_eval_runs r_last ON r_last.id = v.last_run_id
+          LEFT JOIN LATERAL (
+                SELECT tr.id, tr.evaluated_at, tr.status, tr.node_path,
+                       tr.resolved_values, tr.param_overrides
+                  FROM decision_tree_eval_traces tr
+                  JOIN decision_tree_eval_runs r ON r.id = tr.run_id
+                 WHERE tr.block_id = v.block_id
+                   AND tr.tree_id = v.tree_id
+                   AND tr.cell_id IS NOT DISTINCT FROM v.cell_id
+                   AND tr.evaluated_at <= CAST(:at AS timestamptz)
+                   -- A pruned first run leaves no lower run to compare
+                   -- with; its traces were pruned with it, so the
+                   -- verdict's start is a close enough floor.
+                   AND r.started_at >= COALESCE(r_first.started_at, v.valid_from)
+                   AND r.started_at <= COALESCE(r_last.started_at, v.last_evaluated_at)
+                 ORDER BY tr.evaluated_at DESC, tr.id DESC
+                 LIMIT 1
+          ) t ON TRUE
+          LEFT JOIN grid_cells c ON c.id = v.cell_id
+         WHERE v.id = CAST(:verdict_id AS uuid)
+           AND v.block_id = CAST(:block_id AS uuid)
+    """
+
     @classmethod
     def insert_new(cls) -> str:
         """Everything with no open row: the ones just closed, and the new ones."""
@@ -3069,7 +3118,7 @@ class RecommendationsRepository:
         return [dict(r) for r in rows]
 
     async def get_verdict_reasoning(
-        self, *, block_id: UUID, verdict_id: UUID
+        self, *, block_id: UUID, verdict_id: UUID, at: datetime | None = None
     ) -> dict[str, Any] | None:
         """One verdict with the node walk that produced it.
 
@@ -3080,12 +3129,20 @@ class RecommendationsRepository:
         Returns None when there is no such verdict on this block. A verdict
         whose trace has been pruned returns a row with the trace columns
         null — see ``VERDICT_SQL.REASONING``.
+
+        With ``at``, the walk is the latest check on or before that instant
+        rather than the latest of all — see ``VERDICT_SQL.REASONING_AT``.
         """
+        params: dict[str, Any] = {"verdict_id": verdict_id, "block_id": block_id}
+        sql = VERDICT_SQL.REASONING
+        if at is not None:
+            sql = VERDICT_SQL.REASONING_AT
+            params["at"] = at
         row = (
             (
                 await self._tenant.execute(
-                    text(VERDICT_SQL.REASONING),
-                    {"verdict_id": verdict_id, "block_id": block_id},
+                    text(sql),
+                    params,
                 )
             )
             .mappings()

@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Polygon } from "geojson";
-import {
-  areaBounds,
-  boundsOfPolygon,
-  farmBounds,
-  padBounds,
-  toLngLatBounds,
-} from "./fit";
+import { areaBounds, boundsOfPolygon, farmBounds, padBounds, toLngLatBounds } from "./fit";
 
 function square(west: number, south: number, size = 0.01): Polygon {
   return {

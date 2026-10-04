@@ -81,7 +81,8 @@ function keyOf(cell: AreaCell): string {
 export interface AreaName {
   kind: "whole" | "most" | "direction" | "centre" | "scattered";
   /** One of the eight compass names, when the kind carries one. */
-  direction?: "north-west" | "north" | "north-east" | "west" | "east" | "south-west" | "south" | "south-east";
+  direction?:
+    "north-west" | "north" | "north-east" | "west" | "east" | "south-west" | "south" | "south-east";
 }
 
 const STATUS_RANK: Record<StatusCode, number> = {
@@ -142,9 +143,7 @@ function nameOf(members: AreaCell[], rows: number, cols: number, total: number):
   const ns = fr < 0.34 ? "north" : fr > 0.66 ? "south" : "";
   const ew = fc < 0.34 ? "west" : fc > 0.66 ? "east" : "";
 
-  const direction = (
-    ns && ew ? `${ns}-${ew}` : ns ? ns : ew ? ew : ""
-  ) as AreaName["direction"];
+  const direction = (ns && ew ? `${ns}-${ew}` : ns ? ns : ew ? ew : "") as AreaName["direction"];
 
   if (members.length / total >= 0.45) {
     return direction ? { kind: "most", direction } : { kind: "most" };

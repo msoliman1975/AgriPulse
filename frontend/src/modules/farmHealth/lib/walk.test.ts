@@ -35,7 +35,11 @@ describe("testText", () => {
     const condition = {
       tree: {
         all_of: [
-          { op: "eq", left: { source: "crop_attribute", code: "bearing_status" }, right: "bearing" },
+          {
+            op: "eq",
+            left: { source: "crop_attribute", code: "bearing_status" },
+            right: "bearing",
+          },
           { op: "in", left: { source: "block", field: "growth_stage" }, values: ["maturation"] },
         ],
       },

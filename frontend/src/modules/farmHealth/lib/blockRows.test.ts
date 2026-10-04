@@ -94,7 +94,12 @@ describe("buildBlockRows", () => {
   it("keeps a block the tree never ran on, and marks it", () => {
     // The farm read omits such a block entirely. Dropping it from the rail
     // too would hide the state this screen exists to show.
-    const rows = buildBlockRows(BLOCKS, [farmBlock("b1", [verdict("b1", "cwsi", "good")])], "cwsi", STATUSES);
+    const rows = buildBlockRows(
+      BLOCKS,
+      [farmBlock("b1", [verdict("b1", "cwsi", "good")])],
+      "cwsi",
+      STATUSES,
+    );
 
     expect(rows).toHaveLength(3);
     const missing = rows.filter((r) => r.didNotRun).map((r) => r.code);

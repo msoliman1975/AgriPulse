@@ -369,3 +369,154 @@ async def test_a_verdict_id_from_another_block_does_not_resolve(
         )
 
     assert response.status_code == 404, response.text
+
+
+async def _run_with_trace(
+    session: AsyncSession,
+    *,
+    farm_id: str,
+    block_id: str,
+    tree_id: UUID,
+    at: datetime,
+    cwsi: str,
+) -> UUID:
+    """One sweep run and its trace for the block, reading `cwsi`.
+
+    The trace is stamped a few milliseconds before the run's verdict write,
+    as a live sweep stamps it: the walk happens first, the verdict after.
+    """
+    run_id = uuid4()
+    await session.execute(
+        text(
+            "INSERT INTO decision_tree_eval_runs (id, kind, started_at, finished_at) "
+            "VALUES (:r, 'sweep', :at, :at)"
+        ),
+        {"r": run_id, "at": at},
+    )
+    await session.execute(
+        text(
+            """
+            INSERT INTO decision_tree_eval_traces (
+                run_id, evaluated_at, farm_id, block_id, cell_id,
+                tree_id, tree_code, tree_version, scope, status,
+                node_path, resolved_values
+            ) VALUES (
+                :r, :t, :farm_id, :block_id, NULL,
+                :tree_id, 't_cwsi_irrigation_stress', 1, 'block', 'fired',
+                CAST(:node_path AS jsonb), CAST(:resolved AS jsonb)
+            )
+            """
+        ),
+        {
+            "r": run_id,
+            "t": at - timedelta(milliseconds=5),
+            "farm_id": farm_id,
+            "block_id": block_id,
+            "tree_id": tree_id,
+            "node_path": json.dumps(NODE_PATH),
+            "resolved": json.dumps({"indices.cwsi.mean": cwsi}),
+        },
+    )
+    return run_id
+
+
+@pytest.mark.asyncio
+async def test_a_past_day_reads_the_check_of_that_day(admin_session: AsyncSession) -> None:
+    """A verdict that stood for days was re-checked by every sweep.
+
+    Read for one of those days, the walk must be that day's check: its
+    readings come from the image on the map that day, and its "Checked on"
+    date is that day. The last check of all is from a later image.
+    """
+    tenant, context, farm_id, block_id = await _bootstrap(admin_session, f"rd-{uuid4().hex[:8]}")
+    schema = str(tenant.schema_name)
+    day1 = datetime(2025, 3, 1, 10, tzinfo=UTC)
+    day5, day10, day12 = (day1 + timedelta(days=n) for n in (4, 9, 11))
+    tree_id = uuid4()
+    await admin_session.execute(text(f'SET search_path TO "{schema}", public'))
+    first = await _run_with_trace(
+        admin_session, farm_id=farm_id, block_id=block_id, tree_id=tree_id, at=day1, cwsi="0.41"
+    )
+    await _run_with_trace(
+        admin_session, farm_id=farm_id, block_id=block_id, tree_id=tree_id, at=day5, cwsi="0.45"
+    )
+    last = await _run_with_trace(
+        admin_session, farm_id=farm_id, block_id=block_id, tree_id=tree_id, at=day10, cwsi="0.47"
+    )
+    # The next answer, from day 12. Its trace must never be read for the
+    # verdict it replaced.
+    nxt = await _run_with_trace(
+        admin_session, farm_id=farm_id, block_id=block_id, tree_id=tree_id, at=day12, cwsi="0.20"
+    )
+    verdict_ids = []
+    for run_from, run_last, valid_from, valid_to in (
+        (first, last, day1, day12),
+        (nxt, nxt, day12, None),
+    ):
+        verdict_ids.append(
+            (
+                await admin_session.execute(
+                    text(
+                        """
+                        INSERT INTO decision_tree_block_verdicts (
+                            farm_id, block_id, cell_id, scope, tree_id, tree_code,
+                            tree_version, leaf_node_id, kind, status_code, severity,
+                            text_en, run_id, last_run_id, valid_from, valid_to,
+                            last_evaluated_at
+                        ) VALUES (
+                            :farm_id, :block_id, NULL, 'block', :tree_id,
+                            't_cwsi_irrigation_stress', 1, 'leaf_above', 'recommendation',
+                            'issue', 'warning', 'Add one irrigation set.',
+                            :run_from, :run_last, :vf, :vt, :vf
+                        )
+                        RETURNING id
+                        """
+                    ),
+                    {
+                        "farm_id": farm_id,
+                        "block_id": block_id,
+                        "tree_id": tree_id,
+                        "run_from": run_from,
+                        "run_last": run_last,
+                        "vf": valid_from,
+                        "vt": valid_to,
+                    },
+                )
+            ).scalar_one()
+        )
+    await admin_session.commit()
+    old_verdict = verdict_ids[0]
+    app = _build_app(context)
+
+    async def read(at: datetime | None) -> dict[str, Any]:
+        params: dict[str, Any] = {"farm_id": farm_id}
+        if at is not None:
+            params["at"] = at.isoformat()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            response = await c.get(
+                f"/api/v1/blocks/{block_id}/verdicts/{old_verdict}/reasoning", params=params
+            )
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    def end_of(day: datetime) -> datetime:
+        return day.replace(hour=23, minute=59, second=59)
+
+    on_day5 = await read(end_of(day5))
+    assert on_day5["resolved_values"] == {"indices.cwsi.mean": "0.45"}
+    assert on_day5["evaluated_at"].startswith("2025-03-05")
+    assert "Checked on 2025-03-05" in on_day5["narrative_en"]
+
+    # The first check is stamped just before the verdict's valid_from and
+    # must still be found.
+    on_day1 = await read(end_of(day1))
+    assert on_day1["resolved_values"] == {"indices.cwsi.mean": "0.41"}
+
+    # Past the verdict's end, the latest check that belongs to it, never
+    # the next verdict's.
+    on_day13 = await read(end_of(day12 + timedelta(days=1)))
+    assert on_day13["resolved_values"] == {"indices.cwsi.mean": "0.47"}
+
+    # No day: the latest check, as before.
+    latest = await read(None)
+    assert latest["resolved_values"] == {"indices.cwsi.mean": "0.47"}

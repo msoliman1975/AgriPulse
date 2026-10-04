@@ -71,8 +71,7 @@ export function BlockList({ rows, statuses, selectedBlockId, onSelect }: BlockLi
                   <span
                     className="block w-full"
                     style={{
-                      background:
-                        "repeating-linear-gradient(45deg,#9aa0a6 0 3px,#d6d2c4 3px 7px)",
+                      background: "repeating-linear-gradient(45deg,#9aa0a6 0 3px,#d6d2c4 3px 7px)",
                     }}
                   />
                 ) : (

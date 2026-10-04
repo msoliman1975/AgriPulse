@@ -83,7 +83,8 @@
       "status": "status",
       "no_action": "no action needed"
     },
-    "noPermission": "Your role does not include seeing how the tree decided."
+    "noPermission": "Your role does not include seeing how the tree decided.",
+    "olderThanDay": "No check has run on {{day}} yet. This is the latest check before it, from {{checked}}."
   },
   "range": {
     "label": "Range",

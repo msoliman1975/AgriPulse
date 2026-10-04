@@ -200,10 +200,12 @@ export async function getVerdictReasoning(
   blockId: string,
   verdictId: string,
   farmId: string,
+  /** ISO instant. The walk returned is the latest check on or before it. */
+  at?: string,
 ): Promise<VerdictReasoning> {
   const { data } = await apiClient.get<VerdictReasoning>(
     `/v1/blocks/${blockId}/verdicts/${verdictId}/reasoning`,
-    { params: { farm_id: farmId } },
+    { params: at ? { farm_id: farmId, at } : { farm_id: farmId } },
   );
   return data;
 }
@@ -235,9 +237,8 @@ export async function getFarmVerdictHistory(
   to: string,
   treeCode?: string | null,
 ): Promise<FarmVerdictHistory> {
-  const { data } = await apiClient.get<FarmVerdictHistory>(
-    `/v1/farms/${farmId}/verdict-history`,
-    { params: { from, to, ...(treeCode ? { tree_code: treeCode } : {}) } },
-  );
+  const { data } = await apiClient.get<FarmVerdictHistory>(`/v1/farms/${farmId}/verdict-history`, {
+    params: { from, to, ...(treeCode ? { tree_code: treeCode } : {}) },
+  });
   return data;
 }

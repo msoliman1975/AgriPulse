@@ -1573,6 +1573,14 @@ async def get_verdict_reasoning(
             "role to fall back on."
         ),
     ),
+    at: datetime | None = Query(
+        default=None,
+        description=(
+            "The instant the reader is looking at, usually the end of the day "
+            "picked on the map. The walk returned is the latest check on or "
+            "before it. Omitted, the latest check of all."
+        ),
+    ),
     context: RequestContext = Depends(
         requires_capability("verdict.reasoning.read", farm_id_param="farm_id")
     ),
@@ -1595,7 +1603,7 @@ async def get_verdict_reasoning(
     _ensure_tenant(context)
     from app.core.errors import APIError
 
-    row = await service.verdict_reasoning(block_id=block_id, verdict_id=verdict_id)
+    row = await service.verdict_reasoning(block_id=block_id, verdict_id=verdict_id, at=at)
     if row is None:
         raise APIError(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -139,42 +139,38 @@ function blockFeatures(
 ): FeatureCollection {
   return {
     type: "FeatureCollection",
-    features: blocks.map(
-      (block): Feature => ({
-        type: "Feature",
-        id: block.blockId,
-        geometry: block.boundary,
-        properties: {
-          block_id: block.blockId,
-          code: block.code,
-          selected: block.selected,
-          // Resolved here rather than in a paint expression: the colours are
-          // the platform's own list, served by the API, and a `match` on
-          // status codes in the style would be a second copy of it.
-          color: block.status === null ? "#9aa0a6" : colorOf(block.status),
-          // A block the tree never ran on is not grey-because-unassessed, it
-          // is absent. It draws hollow so the two cannot be confused.
-          didNotRun: block.status === null,
-          // In the whole-farm view nothing is dimmed: the point of that view
-          // is to compare the blocks, not to focus one.
-          showAll: showAll,
-        },
-      }),
-    ),
+    features: blocks.map((block): Feature => ({
+      type: "Feature",
+      id: block.blockId,
+      geometry: block.boundary,
+      properties: {
+        block_id: block.blockId,
+        code: block.code,
+        selected: block.selected,
+        // Resolved here rather than in a paint expression: the colours are
+        // the platform's own list, served by the API, and a `match` on
+        // status codes in the style would be a second copy of it.
+        color: block.status === null ? "#9aa0a6" : colorOf(block.status),
+        // A block the tree never ran on is not grey-because-unassessed, it
+        // is absent. It draws hollow so the two cannot be confused.
+        didNotRun: block.status === null,
+        // In the whole-farm view nothing is dimmed: the point of that view
+        // is to compare the blocks, not to focus one.
+        showAll: showAll,
+      },
+    })),
   };
 }
 
 function cellFeatures(cells: MapCell[]): FeatureCollection {
   return {
     type: "FeatureCollection",
-    features: cells.map(
-      (cell): Feature => ({
-        type: "Feature",
-        id: cell.cellId,
-        geometry: { type: "Polygon", coordinates: [cell.ring] },
-        properties: { cell_id: cell.cellId },
-      }),
-    ),
+    features: cells.map((cell): Feature => ({
+      type: "Feature",
+      id: cell.cellId,
+      geometry: { type: "Polygon", coordinates: [cell.ring] },
+      properties: { cell_id: cell.cellId },
+    })),
   };
 }
 
@@ -183,13 +179,11 @@ function outlineFeatures(cells: MapCell[], highlighted: Set<string>): FeatureCol
   const segments = outlineSegments(chosen);
   return {
     type: "FeatureCollection",
-    features: segments.map(
-      (segment): Feature => ({
-        type: "Feature",
-        geometry: { type: "LineString", coordinates: segment },
-        properties: {},
-      }),
-    ),
+    features: segments.map((segment): Feature => ({
+      type: "Feature",
+      geometry: { type: "LineString", coordinates: segment },
+      properties: {},
+    })),
   };
 }
 

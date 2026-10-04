@@ -67,12 +67,15 @@ export function farmBounds(polygons: (Polygon | null | undefined)[]): Bounds | n
   for (const polygon of polygons) {
     const one = boundsOfPolygon(polygon);
     if (one === null) continue;
-    box = box === null ? one : {
-      west: Math.min(box.west, one.west),
-      south: Math.min(box.south, one.south),
-      east: Math.max(box.east, one.east),
-      north: Math.max(box.north, one.north),
-    };
+    box =
+      box === null
+        ? one
+        : {
+            west: Math.min(box.west, one.west),
+            south: Math.min(box.south, one.south),
+            east: Math.max(box.east, one.east),
+            north: Math.max(box.north, one.north),
+          };
   }
   return box;
 }
