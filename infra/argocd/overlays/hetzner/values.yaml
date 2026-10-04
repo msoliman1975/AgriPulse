@@ -3987,9 +3987,15 @@ global:
       #   takes `at` and returns the latest check on or before it, matched by
       #   run; a closed Action Center item gets no due bucket. No migration.
       #   Rollback is these two tags back to 7fa9da3.
-      tag: "f5f9778"
+      # 6fc2b97 = #760, #761, api and workers. The zone-anomaly report reads
+      #   only the latest scene's cells: one call had run 10 to 18 minutes
+      #   and starved the api pod's pool, so every report answered 500. The
+      #   demo team logs the day's irrigation, and the demo build gains an
+      #   `irrigation` mode. No migration. Rollback is these two tags back
+      #   to f5f9778.
+      tag: "6fc2b97"
     workers:
-      tag: "f5f9778"
+      tag: "6fc2b97"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
