@@ -205,9 +205,24 @@ function withCells() {
     as_of: null,
     blocks: [
       farmBlock("b2", [
-        { ...verdict("b2", "t_cwsi", "alert", 0), id: "v1", cell_id: "c00", leaf_node_id: "leaf_dry" },
-        { ...verdict("b2", "t_cwsi", "alert", 1), id: "v2", cell_id: "c01", leaf_node_id: "leaf_dry" },
-        { ...verdict("b2", "t_cwsi", "alert", 2), id: "v3", cell_id: "c02", leaf_node_id: "leaf_dry" },
+        {
+          ...verdict("b2", "t_cwsi", "alert", 0),
+          id: "v1",
+          cell_id: "c00",
+          leaf_node_id: "leaf_dry",
+        },
+        {
+          ...verdict("b2", "t_cwsi", "alert", 1),
+          id: "v2",
+          cell_id: "c01",
+          leaf_node_id: "leaf_dry",
+        },
+        {
+          ...verdict("b2", "t_cwsi", "alert", 2),
+          id: "v3",
+          cell_id: "c02",
+          leaf_node_id: "leaf_dry",
+        },
       ]),
     ],
   };
@@ -236,7 +251,14 @@ describe("FarmHealthViewPage", () => {
     historyReads.n = 0;
     gridCalls.mockClear();
     grid.current = { farm_id: FARM_ID, index_code: "ndvi", blocks: [] };
-    history.current = { farm_id: FARM_ID, from_at: "", to_at: "", tree_code: null, truncated: false, verdicts: [] };
+    history.current = {
+      farm_id: FARM_ID,
+      from_at: "",
+      to_at: "",
+      tree_code: null,
+      truncated: false,
+      verdicts: [],
+    };
     reasoning.current = {
       verdict_id: "v1",
       block_id: "b2",
@@ -292,10 +314,7 @@ describe("FarmHealthViewPage", () => {
       as_of: null,
       blocks: [
         farmBlock("b1", [verdict("b1", "t_cwsi", "good")]),
-        farmBlock("b2", [
-          verdict("b2", "t_cwsi", "alert", 1),
-          verdict("b2", "t_cwsi", "good", 2),
-        ]),
+        farmBlock("b2", [verdict("b2", "t_cwsi", "alert", 1), verdict("b2", "t_cwsi", "good", 2)]),
       ],
     };
   });
@@ -367,7 +386,9 @@ describe("FarmHealthViewPage", () => {
     renderPage();
 
     const picker = await screen.findByRole("combobox", { name: "Decision tree" });
-    const options = within(picker).getAllByRole("option").map((o) => o.textContent);
+    const options = within(picker)
+      .getAllByRole("option")
+      .map((o) => o.textContent);
     expect(options).toEqual(["All trees", "t_cwsi", "t_ndvi"]);
   });
 
@@ -586,9 +607,7 @@ describe("FarmHealthViewPage", () => {
     withCells();
     renderPage();
 
-    expect(
-      await screen.findByText(/The tree checked 2 things, in this order/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/The tree checked 2 things, in this order/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /how this was decided/i })).toBeNull();
     expect(screen.queryByText("Steps the tree took, root to leaf")).not.toBeInTheDocument();
   });
@@ -599,9 +618,7 @@ describe("FarmHealthViewPage", () => {
 
     // The paragraph is what the card leads with now; the grid moved behind
     // its own toggle, for the reader auditing a threshold.
-    expect(
-      await screen.findByText(/The tree checked 2 things, in this order/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/The tree checked 2 things, in this order/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Show the checks as a table" }));
 
     expect(await screen.findByText("Steps the tree took, root to leaf")).toBeInTheDocument();
@@ -725,9 +742,7 @@ describe("FarmHealthViewPage", () => {
     };
     renderPage();
 
-    expect(
-      await screen.findByText(/more history than the replay can draw/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/more history than the replay can draw/)).toBeInTheDocument();
   });
 
   it("frames the selected block by default", async () => {
@@ -1107,9 +1122,7 @@ describe("FarmHealthViewPage", () => {
       farm_id: FARM_ID,
       as_of: null,
       blocks: [
-        farmBlock("b1", [
-          { ...verdict("b1", "t_cwsi", "good"), tree_name_en: "Water stress" },
-        ]),
+        farmBlock("b1", [{ ...verdict("b1", "t_cwsi", "good"), tree_name_en: "Water stress" }]),
       ],
     };
     renderPage();
@@ -1132,9 +1145,7 @@ describe("FarmHealthViewPage", () => {
     farmVerdicts.current = {
       farm_id: FARM_ID,
       as_of: null,
-      blocks: [
-        farmBlock("b2", [{ ...verdict("b2", "t_cwsi", "alert", 0), cell_id: "cell-1" }]),
-      ],
+      blocks: [farmBlock("b2", [{ ...verdict("b2", "t_cwsi", "alert", 0), cell_id: "cell-1" }])],
     };
     renderPage();
 
@@ -1156,9 +1167,7 @@ describe("FarmHealthViewPage", () => {
     await waitFor(() => {
       expect(scrubber).toBeDisabled();
     });
-    expect(
-      screen.getByText(/The history for this range could not be read/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/The history for this range could not be read/)).toBeInTheDocument();
     // Today's answers are unaffected, and the screen still shows them.
     expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("AG-R01-C02");
   });

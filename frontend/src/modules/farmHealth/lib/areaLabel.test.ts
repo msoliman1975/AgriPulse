@@ -17,9 +17,7 @@ describe("areaLabel", () => {
   });
 
   it("counts the spots of a scattered area", () => {
-    expect(areaLabel(t, { kind: "scattered" }, 3)).toBe(
-      'farmHealth:area.scattered({"count":3})',
-    );
+    expect(areaLabel(t, { kind: "scattered" }, 3)).toBe('farmHealth:area.scattered({"count":3})');
   });
 
   it("puts the direction inside the sentence for a large area", () => {

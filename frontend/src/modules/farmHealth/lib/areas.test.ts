@@ -176,7 +176,14 @@ describe("buildAreas", () => {
     // Neighbouring cells with different leaves are different areas, however
     // adjacent they are.
     const areas = buildAreas(
-      [cell(0, 0, "good"), cell(0, 1, "good"), cell(0, 2, "good"), cell(1, 0, "alert"), cell(1, 1, "alert"), cell(1, 2, "alert")],
+      [
+        cell(0, 0, "good"),
+        cell(0, 1, "good"),
+        cell(0, 2, "good"),
+        cell(1, 0, "alert"),
+        cell(1, 1, "alert"),
+        cell(1, 2, "alert"),
+      ],
       2,
       3,
     );
@@ -212,7 +219,14 @@ describe("buildAreas", () => {
 
 describe("pickArea", () => {
   const areas = buildAreas(
-    [cell(0, 0, "alert"), cell(0, 1, "alert"), cell(0, 2, "alert"), cell(1, 0, "good"), cell(1, 1, "good"), cell(1, 2, "good")],
+    [
+      cell(0, 0, "alert"),
+      cell(0, 1, "alert"),
+      cell(0, 2, "alert"),
+      cell(1, 0, "good"),
+      cell(1, 1, "good"),
+      cell(1, 2, "good"),
+    ],
     2,
     3,
   );

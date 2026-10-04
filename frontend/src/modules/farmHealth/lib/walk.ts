@@ -76,7 +76,8 @@ export function testText(condition: unknown): string | null {
   }
   const op = typeof tree.op === "string" ? tree.op : null;
   if (op === null) return null;
-  const right = sideText(tree.right) ?? (Array.isArray(tree.values) ? tree.values.join(", ") : null);
+  const right =
+    sideText(tree.right) ?? (Array.isArray(tree.values) ? tree.values.join(", ") : null);
   const symbol = OPERATOR_TEXT[op] ?? op;
   return right === null ? symbol : `${symbol} ${right}`;
 }

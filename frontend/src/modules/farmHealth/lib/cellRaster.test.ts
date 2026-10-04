@@ -13,7 +13,11 @@ import {
 } from "./cellRaster";
 
 /** A unit square cell at grid position (row, col), one thousandth wide. */
-function cell(row: number, col: number, status: StatusCode = "good"): PaintCell & {
+function cell(
+  row: number,
+  col: number,
+  status: StatusCode = "good",
+): PaintCell & {
   row: number;
   col: number;
 } {
@@ -36,7 +40,10 @@ function cell(row: number, col: number, status: StatusCode = "good"): PaintCell 
 }
 
 /** Records what was drawn, so the maths can be checked without a canvas. */
-function fakeContext(width = 100, height = 100): PaintContext & {
+function fakeContext(
+  width = 100,
+  height = 100,
+): PaintContext & {
   ops: string[];
   points: [number, number][];
   fills: string[];

@@ -83,10 +83,13 @@ export function Transport({
   // The play loop lives here so the page does not re-arm it on every render.
   useEffect(() => {
     if (!playing) return undefined;
-    const id = window.setInterval(() => {
-      onDayIndex(dayIndex >= last ? last : dayIndex + 1);
-      if (dayIndex >= last) onStop();
-    }, frameMs(days, speed));
+    const id = window.setInterval(
+      () => {
+        onDayIndex(dayIndex >= last ? last : dayIndex + 1);
+        if (dayIndex >= last) onStop();
+      },
+      frameMs(days, speed),
+    );
     timer.current = id;
     return () => {
       window.clearInterval(id);

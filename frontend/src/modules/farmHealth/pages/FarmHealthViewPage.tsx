@@ -53,6 +53,7 @@ import { MapDate } from "../components/MapDate";
 import { Transport } from "../components/Transport";
 import { buildAreas, cellGroupKey, pickArea, type AreaCell } from "../lib/areas";
 import { usePanelSize } from "../lib/panelSize";
+import { ReasoningDayContext } from "../lib/reasoningDay";
 import {
   DEFAULT_RANGE,
   byBlock,
@@ -523,86 +524,87 @@ export function FarmHealthViewPage(): ReactNode {
             }).format(dateOf(currentDay));
 
             return (
-              <div className="flex min-h-0 flex-1 flex-col">
-                {data.truncated ? (
-                  <p className="border-b border-ap-line bg-ap-warn-soft px-4 py-2 text-sm text-ap-warn">
-                    {t("farmHealth:range.truncated")}
-                  </p>
-                ) : null}
+              <ReasoningDayContext.Provider value={currentDay}>
+                <div className="flex min-h-0 flex-1 flex-col">
+                  {data.truncated ? (
+                    <p className="border-b border-ap-line bg-ap-warn-soft px-4 py-2 text-sm text-ap-warn">
+                      {t("farmHealth:range.truncated")}
+                    </p>
+                  ) : null}
 
-                <div className="flex min-h-0 flex-1">
-                  {/* Collapsible, like Farm Management's land-unit rail. Its
+                  <div className="flex min-h-0 flex-1">
+                    {/* Collapsible, like Farm Management's land-unit rail. Its
                       header keeps the chevron when collapsed, so the way back
                       is in the place the rail was. */}
-                  <aside
-                    className="flex min-h-0 shrink-0 flex-col overflow-y-auto border-e border-ap-line bg-ap-panel"
-                    style={{ width: railCollapsed ? `${RAIL_COLLAPSED}px` : `${railWidth}px` }}
-                  >
-                    <div className="flex flex-none items-center gap-2 border-b border-ap-line px-3 py-2.5">
-                      {railCollapsed ? null : (
-                        <span className="flex-1 truncate text-meta font-semibold uppercase tracking-wide text-ap-muted">
-                          {t("farmHealth:rail.heading")}
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setRailCollapsed((was) => !was)}
-                        className="grid h-6 w-6 flex-none place-items-center rounded-md text-ap-muted hover:bg-ap-primary-soft"
-                        title={
-                          railCollapsed
-                            ? t("farmHealth:rail.expand")
-                            : t("farmHealth:rail.collapse")
-                        }
-                        aria-label={
-                          railCollapsed
-                            ? t("farmHealth:rail.expand")
-                            : t("farmHealth:rail.collapse")
-                        }
-                        aria-expanded={!railCollapsed}
-                      >
-                        {/* The rail sits on the inline-start edge, so the
+                    <aside
+                      className="flex min-h-0 shrink-0 flex-col overflow-y-auto border-e border-ap-line bg-ap-panel"
+                      style={{ width: railCollapsed ? `${RAIL_COLLAPSED}px` : `${railWidth}px` }}
+                    >
+                      <div className="flex flex-none items-center gap-2 border-b border-ap-line px-3 py-2.5">
+                        {railCollapsed ? null : (
+                          <span className="flex-1 truncate text-meta font-semibold uppercase tracking-wide text-ap-muted">
+                            {t("farmHealth:rail.heading")}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setRailCollapsed((was) => !was)}
+                          className="grid h-6 w-6 flex-none place-items-center rounded-md text-ap-muted hover:bg-ap-primary-soft"
+                          title={
+                            railCollapsed
+                              ? t("farmHealth:rail.expand")
+                              : t("farmHealth:rail.collapse")
+                          }
+                          aria-label={
+                            railCollapsed
+                              ? t("farmHealth:rail.expand")
+                              : t("farmHealth:rail.collapse")
+                          }
+                          aria-expanded={!railCollapsed}
+                        >
+                          {/* The rail sits on the inline-start edge, so the
                             chevron points at that edge — which flips under
                             Arabic. */}
-                        {railCollapsed ? (arabic ? "‹" : "›") : arabic ? "›" : "‹"}
-                      </button>
-                    </div>
-                    {railCollapsed ? null : (
-                      <BlockList
-                        rows={rows}
-                        statuses={data.statuses}
-                        selectedBlockId={selectedBlockId}
-                        onSelect={(id) => {
-                          setBlockId(id);
-                          setAreaKey(null);
-                          setFitMode("block");
-                        }}
-                      />
-                    )}
-                  </aside>
+                          {railCollapsed ? (arabic ? "‹" : "›") : arabic ? "›" : "‹"}
+                        </button>
+                      </div>
+                      {railCollapsed ? null : (
+                        <BlockList
+                          rows={rows}
+                          statuses={data.statuses}
+                          selectedBlockId={selectedBlockId}
+                          onSelect={(id) => {
+                            setBlockId(id);
+                            setAreaKey(null);
+                            setFitMode("block");
+                          }}
+                        />
+                      )}
+                    </aside>
 
-                  {/* A collapsed rail has no width to drag. Leaving the
+                    {/* A collapsed rail has no width to drag. Leaving the
                       handle would let a reader widen a list that is not
                       there. */}
-                  {railCollapsed ? null : (
-                    <Resizer
-                      orientation="vertical"
-                      value={railWidth}
-                      min={RAIL_MIN}
-                      max={RAIL_MAX}
-                      onChange={setRailWidth}
-                      label={t("farmHealth:resize.rail")}
-                      // Under RTL the rail sits on the right, so the drag that
-                      // widens it is the one going left.
-                      reversed={arabic}
-                    />
-                  )}
+                    {railCollapsed ? null : (
+                      <Resizer
+                        orientation="vertical"
+                        value={railWidth}
+                        min={RAIL_MIN}
+                        max={RAIL_MAX}
+                        onChange={setRailWidth}
+                        label={t("farmHealth:resize.rail")}
+                        // Under RTL the rail sits on the right, so the drag that
+                        // widens it is the one going left.
+                        reversed={arabic}
+                      />
+                    )}
 
-                  <section className="flex min-h-0 min-w-0 flex-1 flex-col">
-                    <div
-                      className="relative shrink-0 border-b border-ap-line"
-                      style={{ height: `${mapHeight}px` }}
-                    >
-                      {/* Physical `left`, not logical `start`. MapLibre's own
+                    <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+                      <div
+                        className="relative shrink-0 border-b border-ap-line"
+                        style={{ height: `${mapHeight}px` }}
+                      >
+                        {/* Physical `left`, not logical `start`. MapLibre's own
                           controls do not mirror, and neither does the date
                           caption in the opposite corner — so a logical inset
                           here put these three buttons underneath the date
@@ -614,180 +616,181 @@ export function FarmHealthViewPage(): ReactNode {
                           29px buttons and its borders, 70px to its bottom
                           edge. The row is horizontal, so three buttons cost
                           one band of map rather than three. */}
-                      <div className="absolute left-[10px] top-[4.75rem] z-10 flex flex-wrap items-start gap-1.5">
-                        {(
-                          [
-                            ["block", "farmHealth:map.fitBlock"],
-                            ["area", "farmHealth:map.fitArea"],
-                            ["farm", "farmHealth:map.fitFarm"],
-                          ] as [FitMode, string][]
-                        ).map(([mode, key]) => (
-                          <button
-                            key={mode}
-                            type="button"
-                            aria-pressed={fitMode === mode}
-                            onClick={() => setFitMode(mode)}
-                            className={[
-                              "rounded border px-2.5 py-1 text-meta shadow-sm",
-                              fitMode === mode
-                                ? "border-ap-primary bg-ap-primary text-white"
-                                : "border-ap-line bg-ap-panel text-ap-ink",
-                            ].join(" ")}
-                          >
-                            {t(key)}
-                          </button>
-                        ))}
+                        <div className="absolute left-[10px] top-[4.75rem] z-10 flex flex-wrap items-start gap-1.5">
+                          {(
+                            [
+                              ["block", "farmHealth:map.fitBlock"],
+                              ["area", "farmHealth:map.fitArea"],
+                              ["farm", "farmHealth:map.fitFarm"],
+                            ] as [FitMode, string][]
+                          ).map(([mode, key]) => (
+                            <button
+                              key={mode}
+                              type="button"
+                              aria-pressed={fitMode === mode}
+                              onClick={() => setFitMode(mode)}
+                              className={[
+                                "rounded border px-2.5 py-1 text-meta shadow-sm",
+                                fitMode === mode
+                                  ? "border-ap-primary bg-ap-primary text-white"
+                                  : "border-ap-line bg-ap-panel text-ap-ink",
+                              ].join(" ")}
+                            >
+                              {t(key)}
+                            </button>
+                          ))}
+                        </div>
+                        <MapDate text={dateText} dayKey={currentDay} />
+                        <HealthMap
+                          blocks={mapBlocks}
+                          cells={mapCells}
+                          highlighted={highlighted}
+                          colorOf={colorOf}
+                          onSelectBlock={(id) => {
+                            setBlockId(id);
+                            setAreaKey(null);
+                            // Clicking a block in the whole-farm view is a
+                            // request to look at that block.
+                            setFitMode("block");
+                          }}
+                          onSelectCell={(cellId) => {
+                            const found = areas.find((area) =>
+                              area.cells.some((cell) => cell.cellId === cellId),
+                            );
+                            if (found) setAreaKey(found.key);
+                          }}
+                          fitMode={fitMode}
+                          fitKey={`${selectedBlockId ?? ""}|${activeArea?.key ?? ""}`}
+                        />
                       </div>
-                      <MapDate text={dateText} dayKey={currentDay} />
-                      <HealthMap
-                        blocks={mapBlocks}
-                        cells={mapCells}
-                        highlighted={highlighted}
-                        colorOf={colorOf}
-                        onSelectBlock={(id) => {
-                          setBlockId(id);
-                          setAreaKey(null);
-                          // Clicking a block in the whole-farm view is a
-                          // request to look at that block.
-                          setFitMode("block");
-                        }}
-                        onSelectCell={(cellId) => {
-                          const found = areas.find((area) =>
-                            area.cells.some((cell) => cell.cellId === cellId),
-                          );
-                          if (found) setAreaKey(found.key);
-                        }}
-                        fitMode={fitMode}
-                        fitKey={`${selectedBlockId ?? ""}|${activeArea?.key ?? ""}`}
-                      />
-                    </div>
 
-                    {/* Directly under the map, so the control and the picture
+                      {/* Directly under the map, so the control and the picture
                         it moves are next to each other. */}
-                    <Transport
-                      win={win}
-                      dayIndex={dayIndex}
-                      rangeId={rangeId}
-                      today={today}
-                      playing={playing}
-                      speed={speed}
-                      ready={data.historyReady}
-                      failed={data.historyFailed}
-                      onDayIndex={setDayIndex}
-                      onRange={(next) => {
-                        setPlaying(false);
-                        setRangeId(next);
-                        if (next !== "custom") {
-                          const w = rangeWindow(next, today);
+                      <Transport
+                        win={win}
+                        dayIndex={dayIndex}
+                        rangeId={rangeId}
+                        today={today}
+                        playing={playing}
+                        speed={speed}
+                        ready={data.historyReady}
+                        failed={data.historyFailed}
+                        onDayIndex={setDayIndex}
+                        onRange={(next) => {
+                          setPlaying(false);
+                          setRangeId(next);
+                          if (next !== "custom") {
+                            const w = rangeWindow(next, today);
+                            setWin(w);
+                            // A new window always opens on its newest day.
+                            setDayIndex(windowLength(w) - 1);
+                          }
+                        }}
+                        onCustom={(fromIso, toIso) => {
+                          const w = customWindow(fromIso, toIso, today);
+                          if (!w) return;
+                          setPlaying(false);
+                          setRangeId("custom");
                           setWin(w);
-                          // A new window always opens on its newest day.
                           setDayIndex(windowLength(w) - 1);
-                        }
-                      }}
-                      onCustom={(fromIso, toIso) => {
-                        const w = customWindow(fromIso, toIso, today);
-                        if (!w) return;
-                        setPlaying(false);
-                        setRangeId("custom");
-                        setWin(w);
-                        setDayIndex(windowLength(w) - 1);
-                      }}
-                      onPlay={() => setPlaying(true)}
-                      onStop={() => setPlaying(false)}
-                      onSpeed={setSpeed}
-                    />
+                        }}
+                        onPlay={() => setPlaying(true)}
+                        onStop={() => setPlaying(false)}
+                        onSpeed={setSpeed}
+                      />
 
-                    <Resizer
-                      orientation="horizontal"
-                      value={mapHeight}
-                      min={MAP_MIN}
-                      max={MAP_MAX}
-                      onChange={setMapHeight}
-                      label={t("farmHealth:resize.map")}
-                    />
+                      <Resizer
+                        orientation="horizontal"
+                        value={mapHeight}
+                        min={MAP_MIN}
+                        max={MAP_MAX}
+                        onChange={setMapHeight}
+                        label={t("farmHealth:resize.map")}
+                      />
 
-                    <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                      {selected === null ? (
-                        <p className="text-sm text-ap-muted">{t("farmHealth:empty.noBlock")}</p>
-                      ) : (
-                        // One frame around the whole answer: what the block
-                        // reads as, what the tree said about it, and the area
-                        // in focus. They were three cards until 2026-09-10.
-                        <PanelSections>
-                          <BlockSummary
-                            row={selected}
-                            statuses={data.statuses}
-                            rows={gridRows}
-                            cols={gridCols}
-                            treeName={activeTreeName}
-                            allTrees={activeTree === ALL_TREES}
-                          />
+                      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                        {selected === null ? (
+                          <p className="text-sm text-ap-muted">{t("farmHealth:empty.noBlock")}</p>
+                        ) : (
+                          // One frame around the whole answer: what the block
+                          // reads as, what the tree said about it, and the area
+                          // in focus. They were three cards until 2026-09-10.
+                          <PanelSections>
+                            <BlockSummary
+                              row={selected}
+                              statuses={data.statuses}
+                              rows={gridRows}
+                              cols={gridCols}
+                              treeName={activeTreeName}
+                              allTrees={activeTree === ALL_TREES}
+                            />
 
-                          {/* A block tree writes one verdict with no cell, so
+                            {/* A block tree writes one verdict with no cell, so
                               it makes no areas. Without this the panel showed
                               a colour and a count and never the sentence the
                               tree wrote, on the screen whose whole job is to
                               say why. */}
-                          {blockVerdicts.map((verdict) => (
-                            <BlockVerdictDetail
-                              key={verdict.id}
-                              verdict={verdict}
-                              statuses={data.statuses}
-                              farmId={farmId}
-                              blockId={selected.blockId}
-                            />
-                          ))}
+                            {blockVerdicts.map((verdict) => (
+                              <BlockVerdictDetail
+                                key={verdict.id}
+                                verdict={verdict}
+                                statuses={data.statuses}
+                                farmId={farmId}
+                                blockId={selected.blockId}
+                              />
+                            ))}
 
-                          {areas.length === 0 ? (
-                            cellsPending ? (
+                            {areas.length === 0 ? (
+                              cellsPending ? (
+                                <section>
+                                  <p className="text-sm text-ap-muted">
+                                    {t("farmHealth:area.loading")}
+                                  </p>
+                                </section>
+                              ) : // Nothing. A block tree answers for the whole
+                              // block and never makes areas, so "this block has
+                              // no cell verdicts" fired on the normal path and
+                              // read as a fault. The whole-block card above
+                              // already says what the tree concluded, and the
+                              // summary says it when the tree did not run.
+                              // Mohamed, 2026-09-14.
+                              null
+                            ) : (
                               <section>
-                                <p className="text-sm text-ap-muted">
-                                  {t("farmHealth:area.loading")}
-                                </p>
+                                <div className="flex flex-wrap items-baseline gap-3">
+                                  <span className="text-meta font-semibold uppercase tracking-wide text-ap-muted">
+                                    {t("farmHealth:area.heading")}
+                                  </span>
+                                  <span className="text-meta text-ap-muted">
+                                    {t("farmHealth:area.hint", { count: areas.length })}
+                                  </span>
+                                </div>
+                                <div className="mt-2">
+                                  <AreaChips
+                                    areas={areas}
+                                    statuses={data.statuses}
+                                    selectedKey={activeArea?.key ?? null}
+                                    onSelect={setAreaKey}
+                                    onHover={setHoveredKey}
+                                  />
+                                </div>
+                                {activeArea ? (
+                                  <AreaDetail
+                                    area={activeArea}
+                                    statuses={data.statuses}
+                                    farmId={farmId}
+                                    blockId={selected.blockId}
+                                  />
+                                ) : null}
                               </section>
-                            ) : // Nothing. A block tree answers for the whole
-                            // block and never makes areas, so "this block has
-                            // no cell verdicts" fired on the normal path and
-                            // read as a fault. The whole-block card above
-                            // already says what the tree concluded, and the
-                            // summary says it when the tree did not run.
-                            // Mohamed, 2026-09-14.
-                            null
-                          ) : (
-                            <section>
-                              <div className="flex flex-wrap items-baseline gap-3">
-                                <span className="text-meta font-semibold uppercase tracking-wide text-ap-muted">
-                                  {t("farmHealth:area.heading")}
-                                </span>
-                                <span className="text-meta text-ap-muted">
-                                  {t("farmHealth:area.hint", { count: areas.length })}
-                                </span>
-                              </div>
-                              <div className="mt-2">
-                                <AreaChips
-                                  areas={areas}
-                                  statuses={data.statuses}
-                                  selectedKey={activeArea?.key ?? null}
-                                  onSelect={setAreaKey}
-                                  onHover={setHoveredKey}
-                                />
-                              </div>
-                              {activeArea ? (
-                                <AreaDetail
-                                  area={activeArea}
-                                  statuses={data.statuses}
-                                  farmId={farmId}
-                                  blockId={selected.blockId}
-                                />
-                              ) : null}
-                            </section>
-                          )}
-                        </PanelSections>
-                      )}
-                    </div>
-                  </section>
+                            )}
+                          </PanelSections>
+                        )}
+                      </div>
+                    </section>
+                  </div>
                 </div>
-              </div>
+              </ReasoningDayContext.Provider>
             );
           }}
         </AsyncBoundary>
