@@ -3,7 +3,7 @@
   "name_en": "Medjool — pollination record",
   "name_ar": "المجدول — سجل التلقيح",
   "description_en": "Manual 12.1: record each bunch's pollination date and count thinning and bagging from it. During late pollination and Hababouk this checks that pollinated bunches were recorded.",
-  "description_ar": "الدليل 12.1: سجّل تاريخ تلقيح كل عذق واحسب الخف والتكييس منه. تتحقق هذه الشجرة في نهاية التلقيح والحبابوك من تسجيل العذوق الملقحة.",
+  "description_ar": "الدليل 12.1: سجّل تاريخ تلقيح كل عذق واحسب منه مواعيد الخفّ والتكييس. تتحقق هذه الشجرة في مرحلة آخر التلقيح والحبابوك من تسجيل العذوق الملقحة.",
   "scope": "block",
   "crop_path": "date_palm.medjool",
   "country_codes": [
@@ -17,7 +17,7 @@
   "nodes": {
     "n_stage": {
       "label_en": "Is the block in late pollination or Hababouk?",
-      "label_ar": "هل القطعة في نهاية التلقيح أو الحبابوك؟",
+      "label_ar": "هل القطعة في مرحلة آخر التلقيح والحبابوك؟",
       "condition": {
         "tree": {
           "op": "in",
@@ -74,7 +74,7 @@
       "status": "issue",
       "action_type": "scout",
       "text_en": "No pollinated bunches were recorded in the last 60 days. Record the pollination date of each bunch: hand thinning is due 3-4 weeks after pollination and bagging at the start of Khalal (sections 9.2 and 12.1).",
-      "text_ar": "لم تُسجَّل عذوق ملقحة خلال آخر 60 يومًا. سجّل تاريخ تلقيح كل عذق: الخف اليدوي بعد 3-4 أسابيع من التلقيح والتكييس في بداية الخلال (القسمان 9.2 و12.1)."
+      "text_ar": "لم تُسجَّل عذوق ملقّحة خلال آخر 60 يومًا. سجّل تاريخ تلقيح كل عذق: يُجرى الخفّ اليدوي بعد 3-4 أسابيع من التلقيح والتكييس في بداية طور الخلال (القسمان 9.2 و12.1)."
     }
   ]
 }

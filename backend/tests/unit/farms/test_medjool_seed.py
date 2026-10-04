@@ -125,3 +125,21 @@ def test_inputs_carry_the_certifier_note() -> None:
             "bagging",
         }:
             assert "permitted inputs" in row["notes"], row["notes"][:60]
+
+
+def test_arabic_from_manual_covers_every_seeded_name() -> None:
+    # Public 0100 replaces the 0097-0098 Arabic with the manual's own terms.
+    # A code it misses would keep the earlier translation without any error.
+    arabic = _load("0100_medjool_arabic_from_manual")
+    signals = _load("0098_medjool_scouting_signals")
+    assert set(arabic.STAGE_NAMES) == {s["code"] for s in _STAGES}
+    attributes = {d["code"]: d for _, d in _CATALOGUE._DEFINITIONS}
+    assert set(arabic.ATTRIBUTES) == set(attributes)
+    for code, (_, _, _, options_ar, _) in arabic.ATTRIBUTES.items():
+        seeded = {o["code"] for o in attributes[code].get("options") or []}
+        assert set(options_ar) == seeded, code
+    seeded_signals = {d[0]: d for d in signals.DEFINITIONS}
+    assert set(arabic.SIGNALS) == set(seeded_signals)
+    for code, (_, _, _, values_ar) in arabic.SIGNALS.items():
+        if values_ar is not None:
+            assert len(values_ar) == len(seeded_signals[code][4]), code

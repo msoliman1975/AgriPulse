@@ -62,6 +62,10 @@ async def test_only_medjool_keeps_a_calendar(admin_session: AsyncSession) -> Non
         "post_harvest",
     ]
     assert all(pheno is None for code, pheno in overrides.items() if code != "medjool")
+    # Public 0100: names from the manual's Arabic edition, section 12.2.
+    names_ar = {s["code"]: s["name_ar"] for s in overrides["medjool"]["stages"]}
+    assert names_ar["pollination"] == "ظهور الطلع والتلقيح"
+    assert names_ar["post_harvest"] == "ما بعد الحصاد والزراعة الخريفية"
 
 
 @pytest.mark.asyncio
@@ -114,6 +118,8 @@ async def test_medjool_signals_and_forms(admin_session: AsyncSession) -> None:
         ).all()
     )
     assert members == {"medjool_bearing": 13, "medjool_new_planting": 4}
+    black_nose = next(r for r in rows if r.code == "date_black_nose_seen")
+    assert black_nose.name_ar == "ظهور الذنب الأسود"
 
 
 @pytest.mark.asyncio
