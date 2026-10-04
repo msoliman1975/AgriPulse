@@ -3983,9 +3983,13 @@ global:
       #   Watch: the Medjool stage "ظهور الطلع والتلقيح" in the crop catalog,
       #   and the next demo-build week's wall_ms.
       #   Rollback is these three tags back to b8e4bec.
-      tag: "7fa9da3"
+      # f5f9778 = #758, #759, api and workers. The verdict reasoning route
+      #   takes `at` and returns the latest check on or before it, matched by
+      #   run; a closed Action Center item gets no due bucket. No migration.
+      #   Rollback is these two tags back to 7fa9da3.
+      tag: "f5f9778"
     workers:
-      tag: "7fa9da3"
+      tag: "f5f9778"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4622,7 +4626,12 @@ global:
       #   the Medjool trees no longer show "Tree has no nodes to display yet."
       #
       #   Rollback is this tag alone back to 7fa9da3.
-      tag: "4056f34"
+      # f5f9778 = #756, #758, #759, frontend. The Farm Health reasoning panel
+      #   reads the check of the selected day and says when that check is
+      #   older than the day; a closed Action Center item shows no due date;
+      #   a platform admin with no tenant stops calling /config and /farms.
+      #   Rollback is this tag alone back to 4056f34.
+      tag: "f5f9778"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
