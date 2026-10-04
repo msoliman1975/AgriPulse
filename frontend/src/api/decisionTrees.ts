@@ -88,6 +88,9 @@ export interface DecisionTreeVersion {
   tree_id: string;
   version: number;
   tree_yaml: string;
+  // Set on a beta (folding) tree's versions, which carry a JSON definition
+  // and a null `tree_yaml`. The old viewer cannot draw those.
+  definition?: Record<string, unknown> | null;
   tree_compiled: Record<string, unknown>;
   compiled_hash: string;
   published_at: string | null;
