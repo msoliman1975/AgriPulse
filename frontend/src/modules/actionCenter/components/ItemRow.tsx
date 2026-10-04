@@ -108,8 +108,7 @@ export function ItemRow({
   const confidence = confidencePercent(item.confidence);
   const ordinal = item.cell === null ? null : cellOrdinal(item.cell);
   // Same _ar-or-_en choice the rest of this row makes.
-  const treeDescription =
-    (isAr ? item.tree_description_ar : item.tree_description_en) || null;
+  const treeDescription = (isAr ? item.tree_description_ar : item.tree_description_en) || null;
   const detail = itemDetail(item, isAr);
   const {
     is_group: isGroup,
@@ -248,18 +247,26 @@ export function ItemRow({
               <span>{t("row.lastSeen", { when: ago(recurrence.last_seen_at) })}</span>
             </>
           ) : null}
-          <span>·</span>
-          <span
-            className={
-              item.due_bucket === "overdue"
-                ? "font-semibold text-ap-crit"
-                : item.due_bucket === "today"
-                  ? "font-semibold text-ap-warn"
-                  : ""
-            }
-          >
-            {t(`due.${item.due_bucket}`)}
-          </span>
+          {/* A finished item has nothing due: the server sends it with no
+              bucket, and "No deadline" next to "resolved" reads as a
+              question still open. Deferred and snoozed keep their date. */}
+          {item.due_bucket === "none" &&
+          (item.status === "done" || item.status === "dismissed") ? null : (
+            <>
+              <span>·</span>
+              <span
+                className={
+                  item.due_bucket === "overdue"
+                    ? "font-semibold text-ap-crit"
+                    : item.due_bucket === "today"
+                      ? "font-semibold text-ap-warn"
+                      : ""
+                }
+              >
+                {t(`due.${item.due_bucket}`)}
+              </span>
+            </>
+          )}
           {item.scheduled_date === null ? null : (
             <>
               <span>·</span>

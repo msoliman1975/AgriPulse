@@ -79,7 +79,15 @@ _DUE_LABELS = {
 }
 
 
-def derive_due(  # noqa: PLR0911 - a priority ladder; each rung is one return
+# Native states that end an item for good. Deferred and snoozed come back
+# on their own, so they keep a date; these never do.
+_CLOSED_NATIVE: dict[str, frozenset[str]] = {
+    "recommendation": frozenset({"applied", "dismissed", "expired"}),
+    "alert": frozenset({"resolved"}),
+}
+
+
+def derive_due(  # noqa: PLR0911, PLR0912 - a priority ladder; each rung is one return
     row: dict[str, Any], *, now: datetime
 ) -> tuple[str, date_type | None]:
     """Bucket + concrete date for the "action date" grouping.
@@ -88,7 +96,14 @@ def derive_due(  # noqa: PLR0911 - a priority ladder; each rung is one return
     beats a horizon, a horizon beats severity. Anything already past its
     deadline is overdue regardless of what the horizon claims — a monitoring
     item with an expired window is still late.
+
+    A closed item has no due date at all. An alert has no deadline of its
+    own and falls to its severity, so a critical alert resolved a year ago
+    read "Due today" for ever — on every tenant, not only a replayed one.
     """
+    if row.get("native_status") in _CLOSED_NATIVE.get(row.get("kind", ""), frozenset()):
+        return "none", None
+
     valid_until = row.get("valid_until")
     if valid_until is not None and valid_until < now:
         return "overdue", valid_until.date()
