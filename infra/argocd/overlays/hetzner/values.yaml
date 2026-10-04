@@ -3973,9 +3973,19 @@ global:
       #   Rollback is these three tags back to 7a6fbe2. The migrations are
       #   not rolled back by that, and the old api cannot read a template
       #   activity of type bending or trap_service.
-      tag: "b8e4bec"
+      # 7fa9da3 = #753 and #751, api, workers and frontend.
+      #   #753: public migration 0100 replaces the Medjool Arabic with the
+      #   terms of the manual's Arabic edition (stage names, attributes,
+      #   signals, templates). Text only.
+      #   #751: replay performance; latest cell and index reads look at the
+      #   last 180 days first, baseline rows are written in one statement.
+      #   No migration.
+      #   Watch: the Medjool stage "ظهور الطلع والتلقيح" in the crop catalog,
+      #   and the next demo-build week's wall_ms.
+      #   Rollback is these three tags back to b8e4bec.
+      tag: "7fa9da3"
     workers:
-      tag: "b8e4bec"
+      tag: "7fa9da3"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4603,7 +4613,11 @@ global:
       #   bending and trap_service activity types.
       #
       #   Rollback is this tag alone back to 7a6fbe2.
-      tag: "b8e4bec"
+      # 7fa9da3 = the frontend half of #753: the Arabic label of the
+      #   bending activity type is «تدلية العذوق».
+      #
+      #   Rollback is this tag alone back to b8e4bec.
+      tag: "7fa9da3"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
