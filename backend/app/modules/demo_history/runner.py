@@ -23,6 +23,7 @@ timestamps into real tables and the damage is not obvious afterwards.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
@@ -50,6 +51,10 @@ class StepResult:
     at: datetime
     counts: Mapping[str, Any] | None
     error: str | None = None
+    # Real elapsed time. Every row the step writes carries the simulated
+    # instant, so `decision_tree_eval_runs.duration_ms` reads 0 during a
+    # replay, and this is the only record of where the time went.
+    wall_ms: int = 0
 
     @property
     def failed(self) -> bool:
@@ -92,6 +97,8 @@ class ReplayReport:
                 for key, value in (step.counts or {}).items():
                     if isinstance(value, int) and not isinstance(value, bool):
                         bucket[key] = bucket.get(key, 0) + value
+                if step.wall_ms:
+                    bucket["wall_ms"] = bucket.get("wall_ms", 0) + step.wall_ms
         return summed
 
 
@@ -186,6 +193,7 @@ def _run_step(step: Step, at: datetime, tenant_schema: str) -> StepResult:
     written when that transaction begins. Moving the clock after a
     transaction has started moves the Python side alone, with no error.
     """
+    started = time.perf_counter()
     with clock.simulate(at):
         try:
             counts = step.run(tenant_schema)
@@ -197,7 +205,22 @@ def _run_step(step: Step, at: datetime, tenant_schema: str) -> StepResult:
                 error=str(exc),
             )
             return StepResult(
-                name=step.name, at=at, counts=None, error=f"{type(exc).__name__}: {exc}"
+                name=step.name,
+                at=at,
+                counts=None,
+                error=f"{type(exc).__name__}: {exc}",
+                wall_ms=_elapsed_ms(started),
             )
-    _log.info("demo_history_step_done", step=step.name, at=at.isoformat(), counts=dict(counts))
-    return StepResult(name=step.name, at=at, counts=counts)
+    wall_ms = _elapsed_ms(started)
+    _log.info(
+        "demo_history_step_done",
+        step=step.name,
+        at=at.isoformat(),
+        counts=dict(counts),
+        wall_ms=wall_ms,
+    )
+    return StepResult(name=step.name, at=at, counts=counts, wall_ms=wall_ms)
+
+
+def _elapsed_ms(started: float) -> int:
+    return round((time.perf_counter() - started) * 1000)

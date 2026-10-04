@@ -14,6 +14,7 @@ Two operations:
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, cast
@@ -179,24 +180,30 @@ class IndicesRepository:
         )
         return dict(row) if row is not None else None
 
-    async def upsert_baseline(
+    async def upsert_baselines(
         self,
         *,
         block_id: UUID,
         index_code: str,
-        day_of_year: int,
-        baseline_mean: Decimal,
-        baseline_std: Decimal,
-        sample_count: int,
         window_days: int,
-        years_observed: int,
+        rows: Sequence[Any],
     ) -> None:
-        """Insert or replace one baseline row.
+        """Insert or replace every baseline row of one (block, index) pair.
+
+        ``rows`` carry ``day_of_year``, ``baseline_mean``, ``baseline_std``,
+        ``sample_count`` and ``years_observed``.
+
+        One statement for the whole pair. A pair holds up to 366 rows, and
+        one round trip per row made the weekly sweep the slowest step of
+        the demo replay: 113,780 calls in one simulated week, measured on
+        2026-10-03.
 
         ``ON CONFLICT (block_id, index_code, day_of_year) DO UPDATE``
         — the recompute task overwrites the previous values, including
         when the smoothing window changes.
         """
+        if not rows:
+            return
         await self._session.execute(
             text(
                 """
@@ -205,12 +212,18 @@ class IndicesRepository:
                     baseline_mean, baseline_std,
                     sample_count, window_days, years_observed,
                     computed_at
-                ) VALUES (
-                    :block_id, :index_code, :doy,
-                    :mean, :std,
-                    :sample_count, :window_days, :years_observed,
-                    public.app_now()
                 )
+                SELECT :block_id, :index_code, r.doy,
+                       r.mean, r.std,
+                       r.sample_count, :window_days, r.years_observed,
+                       public.app_now()
+                  FROM unnest(
+                      CAST(:doys AS int[]),
+                      CAST(:means AS numeric[]),
+                      CAST(:stds AS numeric[]),
+                      CAST(:sample_counts AS int[]),
+                      CAST(:years_observed AS int[])
+                  ) AS r(doy, mean, std, sample_count, years_observed)
                 ON CONFLICT (block_id, index_code, day_of_year) DO UPDATE SET
                     baseline_mean = EXCLUDED.baseline_mean,
                     baseline_std = EXCLUDED.baseline_std,
@@ -223,12 +236,12 @@ class IndicesRepository:
             {
                 "block_id": block_id,
                 "index_code": index_code,
-                "doy": day_of_year,
-                "mean": baseline_mean,
-                "std": baseline_std,
-                "sample_count": sample_count,
                 "window_days": window_days,
-                "years_observed": years_observed,
+                "doys": [r.day_of_year for r in rows],
+                "means": [r.baseline_mean for r in rows],
+                "stds": [r.baseline_std for r in rows],
+                "sample_counts": [r.sample_count for r in rows],
+                "years_observed": [r.years_observed for r in rows],
             },
         )
 

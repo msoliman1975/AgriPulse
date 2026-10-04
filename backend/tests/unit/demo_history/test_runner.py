@@ -15,7 +15,13 @@ from typing import Any
 import pytest
 
 from app.core.settings import get_settings
-from app.modules.demo_history.runner import ReplayNotAllowedError, replay
+from app.modules.demo_history.runner import (
+    DayResult,
+    ReplayNotAllowedError,
+    ReplayReport,
+    StepResult,
+    replay,
+)
 from app.modules.demo_history.steps import Step, steps_for
 from app.shared import clock
 
@@ -232,3 +238,26 @@ def test_the_weekly_steps_are_absent_on_other_days() -> None:
     assert "indices.recompute_baselines" not in names
     assert "weather.recompute_baselines" not in names
     assert "recommendations.evaluate" in names
+
+
+def test_totals_sum_the_real_time_of_each_step() -> None:
+    """Rows carry the simulated instant, so a run's own duration reads 0.
+
+    The real elapsed time per step is summed per chunk instead, so the
+    progress events show which step a slow week spent its time in.
+    """
+    at = datetime(2024, 1, 1, 10, tzinfo=UTC)
+    rep = ReplayReport(tenant_schema="tenant_x", start=date(2024, 1, 1), end=date(2024, 1, 2))
+    for day in (1, 2):
+        rep.days.append(
+            DayResult(
+                day=date(2024, 1, day),
+                steps=(
+                    StepResult(
+                        name="recommendations.evaluate", at=at, counts={"n": 1}, wall_ms=1500
+                    ),
+                ),
+            )
+        )
+
+    assert rep.totals() == {"recommendations.evaluate": {"n": 2, "wall_ms": 3000}}
