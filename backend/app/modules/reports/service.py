@@ -1196,12 +1196,22 @@ async def _select_zone_anomaly_stats(
     sql = text(
         """
         -- Observations are tied to a config through `grid_cells`, not by
-        -- (block_id, product_id): those two columns are stable across a
-        -- rezone, so pairing on them would let a retired geometry's rows
-        -- be scored against the current geometry's threshold. Valid time
-        -- (tenant migration 0054) selects the geometry that actually
+        -- (block_id, product_id) alone: those two columns are stable across
+        -- a rezone, so pairing on them only would let a retired geometry's
+        -- rows be scored against the current geometry's threshold. Valid
+        -- time (tenant migration 0054) selects the geometry that actually
         -- produced each scene.
-        WITH cfg AS (
+        --
+        -- The report needs one scene per block, the latest in the window.
+        -- It is found first, newest-first with LIMIT 1 per config, and
+        -- only that scene's cells are read. The older form read every cell
+        -- of the index for all time and filtered afterwards; with
+        -- Postgres's one-row estimate for a CTE it also re-ran the
+        -- latest-scene sort once per observation. On 2026-10-04 that made
+        -- one call run 10 to 18 minutes, and seven of them held two
+        -- connections each and starved the api pod's pool, so every
+        -- request on the pod failed with a 500.
+        WITH cfg AS MATERIALIZED (
             SELECT gc.id AS config_id, gc.block_id, gc.product_id,
                    gc.effective_from, gc.effective_to,
                    COALESCE(gc.anomaly_z_threshold, CAST(:default_k AS numeric)) AS z_thr
@@ -1211,32 +1221,47 @@ async def _select_zone_anomaly_stats(
               AND gc.deleted_at IS NULL
               AND gc.superseded_at IS NULL
         ),
-        obs AS (
-            SELECT a.block_id, a.product_id, a.time, a.mean,
-                   gcell.area_m2, cfg.z_thr
-            FROM block_grid_aggregates a
-            JOIN grid_cells gcell ON gcell.id = a.cell_id
-            JOIN cfg
-              ON cfg.config_id = gcell.grid_config_id
-             AND tstzrange(cfg.effective_from, cfg.effective_to) @> a.time
-            WHERE a.index_code = :index_code AND a.mean IS NOT NULL
+        config_scene AS MATERIALIZED (
+            SELECT cfg.config_id, cfg.block_id, cfg.product_id, cfg.z_thr,
+                   s.time AS scene_time
+            FROM cfg
+            CROSS JOIN LATERAL (
+                SELECT a.time
+                FROM block_grid_aggregates a
+                JOIN grid_cells gcell
+                  ON gcell.id = a.cell_id
+                 AND gcell.grid_config_id = cfg.config_id
+                WHERE a.block_id = cfg.block_id
+                  AND a.product_id = cfg.product_id
+                  AND a.index_code = :index_code
+                  AND a.mean IS NOT NULL
+                  AND a.time >= :since AND a.time <= :until
+                  AND a.time >= cfg.effective_from
+                  AND (cfg.effective_to IS NULL OR a.time < cfg.effective_to)
+                ORDER BY a.time DESC
+                LIMIT 1
+            ) s
         ),
-        latest_scene AS (
+        latest_scene AS MATERIALIZED (
             SELECT DISTINCT ON (block_id)
-                   block_id, product_id, time AS scene_time, z_thr
-            FROM obs
-            WHERE time >= :since AND time <= :until
-            ORDER BY block_id, time DESC
+                   config_id, block_id, product_id, z_thr, scene_time
+            FROM config_scene
+            ORDER BY block_id, scene_time DESC
         ),
-        cells AS (
-            SELECT o.block_id, o.mean, o.area_m2, ls.scene_time, ls.z_thr
-            FROM obs o
-            JOIN latest_scene ls
-              ON ls.block_id = o.block_id
-             AND ls.product_id = o.product_id
-             AND ls.scene_time = o.time
+        cells AS MATERIALIZED (
+            SELECT ls.block_id, a.mean, gcell.area_m2, ls.scene_time, ls.z_thr
+            FROM latest_scene ls
+            JOIN block_grid_aggregates a
+              ON a.block_id = ls.block_id
+             AND a.product_id = ls.product_id
+             AND a.time = ls.scene_time
+             AND a.index_code = :index_code
+             AND a.mean IS NOT NULL
+            JOIN grid_cells gcell
+              ON gcell.id = a.cell_id
+             AND gcell.grid_config_id = ls.config_id
         ),
-        stats AS (
+        stats AS MATERIALIZED (
             SELECT block_id, scene_time, z_thr,
                    avg(mean) AS bmean, stddev_pop(mean) AS bstd, count(*) AS cell_count
             FROM cells GROUP BY block_id, scene_time, z_thr
