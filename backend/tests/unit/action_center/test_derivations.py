@@ -70,6 +70,31 @@ def test_an_unknown_native_state_does_not_vanish():
 # ---------- due buckets ---------------------------------------------------
 
 
+def test_a_closed_item_has_no_due_date() -> None:
+    """Reported 2026-10-04: a pest alert raised, acknowledged and resolved
+    eleven months earlier read "Due today". Severity was the only rung an
+    alert reached, whatever its state."""
+    for kind, native in (
+        ("alert", "resolved"),
+        ("recommendation", "applied"),
+        ("recommendation", "dismissed"),
+        ("recommendation", "expired"),
+    ):
+        row = _row(kind=kind, native_status=native, severity="critical")
+        row["valid_until"] = NOW + timedelta(hours=2)
+        assert derive_due(row, now=NOW) == ("none", None), (kind, native)
+
+
+def test_deferred_and_snoozed_items_keep_their_date() -> None:
+    """They come back on their own, so they are not closed."""
+    assert (
+        derive_due(_row(kind="alert", native_status="snoozed", severity="critical"), now=NOW)[0]
+        == "today"
+    )
+    deferred = _row(native_status="deferred", valid_until=NOW + timedelta(hours=2))
+    assert derive_due(deferred, now=NOW)[0] == "today"
+
+
 def _row(**over):
     base = {
         "kind": "recommendation",
