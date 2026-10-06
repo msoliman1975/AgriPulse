@@ -239,8 +239,8 @@ async def test_investor_is_found_by_keycloak_subject(
     body = await _login(env, investor["id"])
     subject = (
         await admin_session.execute(
-            text("SELECT keycloak_subject FROM public.users WHERE id = CAST(:id AS uuid)"),
-            {"id": body["investor"]["user_id"]},
+            text("SELECT keycloak_subject FROM public.users WHERE id = :id"),
+            {"id": UUID(body["investor"]["user_id"])},
         )
     ).scalar_one()
     me = dataclasses.replace(
