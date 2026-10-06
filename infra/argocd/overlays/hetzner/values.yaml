@@ -4016,9 +4016,15 @@ global:
       #   block page no longer shows a Holdings card.
       #   Rollback is these three tags back to cf9113c. 0101 needs no
       #   downgrade for a rollback: the old api ignores the two roles.
-      tag: "7675a60"
+      # e46c56d = #769, api, workers and frontend. The signed-in investor is
+      #   found through public.users.keycloak_subject: every /investor/* read
+      #   answered 404 because the token's sub is not the users.id. The three
+      #   investor maps resize and fit after load. No migration.
+      #   Watch: an Investor user's My holdings page lists their holdings.
+      #   Rollback is these three tags back to 7675a60.
+      tag: "e46c56d"
     workers:
-      tag: "7675a60"
+      tag: "e46c56d"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4667,7 +4673,9 @@ global:
       # 7675a60 = #767, frontend. The Investments menu group, its three
       #   pages, the investor login card and the My holdings page. Needs the
       #   api at 7675a60 or later. Rollback is this tag alone back to cf9113c.
-      tag: "7675a60"
+      # e46c56d = #769, frontend. The investor maps measure their box and fit
+      #   after load. Rollback is this tag alone back to 7675a60.
+      tag: "e46c56d"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
