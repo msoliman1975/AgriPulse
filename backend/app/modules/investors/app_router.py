@@ -49,7 +49,9 @@ async def investor_me(
     context: RequestContext = Depends(requires_capability("investor_app.use")),
     service: InvestorsService = Depends(_service),
 ) -> dict[str, Any]:
-    return await service.app_me(user_id=context.user_id, keycloak_subject=context.keycloak_subject)
+    return await service.app_me(
+        user_id=context.user_id, keycloak_subject=context.keycloak_subject, email=context.email
+    )
 
 
 @router.get("/holdings", response_model=list[InvestorAppHoldingResponse])
@@ -58,7 +60,7 @@ async def investor_holdings(
     service: InvestorsService = Depends(_service),
 ) -> list[dict[str, Any]]:
     return await service.app_holdings(
-        user_id=context.user_id, keycloak_subject=context.keycloak_subject
+        user_id=context.user_id, keycloak_subject=context.keycloak_subject, email=context.email
     )
 
 
@@ -71,5 +73,6 @@ async def investor_holding(
     return await service.app_holding(
         user_id=context.user_id,
         keycloak_subject=context.keycloak_subject,
+        email=context.email,
         holding_id=holding_id,
     )

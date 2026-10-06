@@ -224,32 +224,96 @@ async def test_farm_map_returns_blocks_and_holdings(scouting_env: ScoutingFixtur
     assert [h["code"] for h in body["holdings"]] == [sold["code"]]
 
 
-@pytest.mark.asyncio
-async def test_investor_is_found_by_keycloak_subject(
-    scouting_env: ScoutingFixture, admin_session: Any
-) -> None:
-    """Production shape: the token's `sub` is the Keycloak id, which differs
-    from the `public.users` id that `investors.user_id` stores."""
+async def _rekey(admin_session: Any, *, old_id: UUID, sub: UUID) -> None:
+    """What `/me` does on the first sign-in: `public.users.id := sub`."""
+    from sqlalchemy import text
+
+    await admin_session.execute(
+        text("UPDATE public.users SET id = :new, keycloak_subject = :sub WHERE id = :old"),
+        {"new": sub, "sub": str(sub), "old": old_id},
+    )
+    await admin_session.commit()
+
+
+async def _users_row(admin_session: Any, email: str) -> tuple[UUID, str]:
+    from sqlalchemy import text
+
+    row = (
+        await admin_session.execute(
+            text("SELECT id, keycloak_subject FROM public.users WHERE email = :e"), {"e": email}
+        )
+    ).one()
+    return row[0], row[1]
+
+
+def _investor_context(env: ScoutingFixture, sub: UUID, email: str) -> Any:
+    """A real token's shape: user_id and keycloak_subject are both the sub."""
     import dataclasses
 
+    base = make_context(user_id=sub, tenant_id=env.tenant_id, tenant_role=TenantRole.INVESTOR)
+    return dataclasses.replace(base, keycloak_subject=str(sub), email=email)
+
+
+@pytest.mark.asyncio
+async def test_login_link_survives_the_first_sign_in_rekey(
+    scouting_env: ScoutingFixture, admin_session: Any
+) -> None:
+    """The bug found in production: /me re-keys public.users.id to the sub,
+    and the investor's link must still resolve afterwards."""
+    env = scouting_env
+    mine, investor = await _sold_holding(env)
+    body = await _login(env, investor["id"])
+    old_id, subject = await _users_row(admin_session, investor["email"])
+    sub = UUID(subject)
+    # The link is the Keycloak id, which the re-key does not change.
+    assert body["investor"]["user_id"] == str(sub)
+
+    me = _investor_context(env, sub, investor["email"])
+    async with _client(me) as c:
+        before = await c.get("/api/v1/investor/me")
+    assert before.status_code == 200, before.text
+
+    await _rekey(admin_session, old_id=old_id, sub=sub)
+    async with _client(me) as c:
+        after = await c.get("/api/v1/investor/holdings")
+    assert after.status_code == 200, after.text
+    assert [h["code"] for h in after.json()] == [mine["code"]]
+
+    # Staff actions find the users row behind the link after the re-key too.
+    async with _client(env.admin_context) as c:
+        resend = await c.post(f"/api/v1/investors/{investor['id']}:resend-login")
+        off = await c.post(f"/api/v1/investors/{investor['id']}:disable-login")
+    assert resend.status_code == 200, resend.text
+    assert off.status_code == 200, off.text
+
+
+@pytest.mark.asyncio
+async def test_a_link_left_dangling_by_an_old_rekey_is_repaired(
+    scouting_env: ScoutingFixture, admin_session: Any
+) -> None:
+    """Links made before the fix stored the pre-re-key users id. The
+    investor is found by email and the link is rewritten to the sub."""
     from sqlalchemy import text
 
     env = scouting_env
     mine, investor = await _sold_holding(env)
-    body = await _login(env, investor["id"])
-    subject = (
-        await admin_session.execute(
-            text("SELECT keycloak_subject FROM public.users WHERE id = :id"),
-            {"id": UUID(body["investor"]["user_id"])},
-        )
-    ).scalar_one()
-    me = dataclasses.replace(
-        make_context(user_id=uuid4(), tenant_id=env.tenant_id, tenant_role=TenantRole.INVESTOR),
-        keycloak_subject=subject,
+    await _login(env, investor["id"])
+    old_id, subject = await _users_row(admin_session, investor["email"])
+    sub = UUID(subject)
+    await admin_session.execute(
+        text(f'UPDATE "{env.schema}".investors SET user_id = :old WHERE id = :id'),
+        {"old": old_id, "id": UUID(investor["id"])},
     )
+    await admin_session.commit()
+    await _rekey(admin_session, old_id=old_id, sub=sub)
+
+    me = _investor_context(env, sub, investor["email"])
     async with _client(me) as c:
         who = await c.get("/api/v1/investor/me")
         listed = await c.get("/api/v1/investor/holdings")
     assert who.status_code == 200, who.text
-    assert who.json()["code"] == investor["code"]
     assert [h["code"] for h in listed.json()] == [mine["code"]]
+
+    async with _client(env.admin_context) as c:
+        after = (await c.get(f"/api/v1/investors/{investor['id']}")).json()
+    assert after["user_id"] == str(sub)

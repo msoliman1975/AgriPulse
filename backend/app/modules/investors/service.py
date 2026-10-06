@@ -570,10 +570,15 @@ class InvestorsService:
             tenant_schema=self._schema or "",
             actor_user_id=actor_user_id,
         )
+        # Link by the Keycloak id when Keycloak gave one. `/me` re-keys
+        # `public.users.id` to it on the first sign-in, and the token's `sub`
+        # is that same id, so this link survives the re-key. A pending
+        # provisioning has no real subject yet; fall back to the users id.
+        link = _uuid_or_none(result.get("keycloak_subject")) or result["user_id"]
         await self._repo.update_investor(
             investor_id=investor_id,
             changes={
-                "user_id": result["user_id"],
+                "user_id": link,
                 "status": "invited",
                 "invited_at": clock.now(),
             },
@@ -589,9 +594,14 @@ class InvestorsService:
         return self._login_result(await self.get_investor(investor_id=investor_id), result)
 
     async def _linked(self, investor_id: UUID) -> dict[str, Any]:
+        """The investor, with `login_user_id`: the current users id behind the link."""
         investor = await self.get_investor(investor_id=investor_id)
         if investor["user_id"] is None:
             raise InvestorConflictError("This investor has no app login yet.")
+        current = await self._repo.resolve_login_user_id(stored=investor["user_id"])
+        if current is None:
+            raise InvestorConflictError("The app login user for this investor no longer exists.")
+        investor["login_user_id"] = current
         return investor
 
     async def resend_login(
@@ -604,7 +614,7 @@ class InvestorsService:
     ) -> dict[str, Any]:
         investor = await self._linked(investor_id)
         result = await users.resend_invite(
-            user_id=investor["user_id"],
+            user_id=investor["login_user_id"],
             tenant_id=tenant_id,
             actor_user_id=actor_user_id,
             tenant_schema=self._schema or "",
@@ -629,7 +639,7 @@ class InvestorsService:
         investor = await self._linked(investor_id)
         if enabled:
             await users.reactivate_user(
-                user_id=investor["user_id"],
+                user_id=investor["login_user_id"],
                 tenant_id=tenant_id,
                 actor_user_id=actor_user_id,
                 tenant_schema=self._schema or "",
@@ -637,7 +647,7 @@ class InvestorsService:
             status = "active" if investor["last_app_seen_at"] is not None else "invited"
         else:
             await users.suspend_user(
-                user_id=investor["user_id"],
+                user_id=investor["login_user_id"],
                 tenant_id=tenant_id,
                 actor_user_id=actor_user_id,
                 tenant_schema=self._schema or "",
@@ -682,19 +692,32 @@ class InvestorsService:
 
     # ---- Investor app (the signed-in investor's own rows) -----------------
 
-    async def _me(self, *, user_id: UUID | None, keycloak_subject: str | None) -> dict[str, Any]:
+    async def _me(
+        self, *, user_id: UUID | None, keycloak_subject: str | None, email: str | None
+    ) -> dict[str, Any]:
         if user_id is None:
             raise InvestorNotFoundError(UUID(int=0))
         investor = await self._repo.get_investor_by_user(
-            user_id=user_id, keycloak_subject=keycloak_subject
+            user_id=user_id, keycloak_subject=keycloak_subject, email=email
         )
         if investor is None or investor["archived_at"] is not None:
             raise InvestorNotFoundError(UUID(int=0))
+        if investor["user_id"] != user_id:
+            # Repair an old link to the stable Keycloak id, so the next
+            # lookup is a direct match and survives any later re-key.
+            await self._repo.update_investor(
+                investor_id=investor["id"],
+                changes={"user_id": user_id},
+                actor_user_id=user_id,
+            )
+            investor["user_id"] = user_id
         return investor
 
-    async def app_me(self, *, user_id: UUID | None, keycloak_subject: str | None) -> dict[str, Any]:
+    async def app_me(
+        self, *, user_id: UUID | None, keycloak_subject: str | None, email: str | None = None
+    ) -> dict[str, Any]:
         """The signed-in investor. Also marks that they used the app."""
-        investor = await self._me(user_id=user_id, keycloak_subject=keycloak_subject)
+        investor = await self._me(user_id=user_id, keycloak_subject=keycloak_subject, email=email)
         changes: dict[str, Any] = {"last_app_seen_at": clock.now()}
         if investor["status"] == "invited":
             changes["status"] = "active"
@@ -706,15 +729,20 @@ class InvestorsService:
         return investor
 
     async def app_holdings(
-        self, *, user_id: UUID | None, keycloak_subject: str | None
+        self, *, user_id: UUID | None, keycloak_subject: str | None, email: str | None = None
     ) -> list[dict[str, Any]]:
-        investor = await self._me(user_id=user_id, keycloak_subject=keycloak_subject)
+        investor = await self._me(user_id=user_id, keycloak_subject=keycloak_subject, email=email)
         return await self._repo.investor_app_holdings(investor_id=investor["id"])
 
     async def app_holding(
-        self, *, user_id: UUID | None, keycloak_subject: str | None, holding_id: UUID
+        self,
+        *,
+        user_id: UUID | None,
+        keycloak_subject: str | None,
+        holding_id: UUID,
+        email: str | None = None,
     ) -> dict[str, Any]:
-        investor = await self._me(user_id=user_id, keycloak_subject=keycloak_subject)
+        investor = await self._me(user_id=user_id, keycloak_subject=keycloak_subject, email=email)
         rows = await self._repo.investor_app_holdings(
             investor_id=investor["id"], holding_id=holding_id
         )
@@ -722,6 +750,13 @@ class InvestorsService:
             # Someone else's holding answers exactly like a missing one.
             raise HoldingNotFoundError(holding_id)
         return rows[0]
+
+
+def _uuid_or_none(value: Any) -> UUID | None:
+    try:
+        return UUID(str(value)) if value else None
+    except ValueError:
+        return None
 
 
 def _ineligible_reason(block: dict[str, Any]) -> str | None:
