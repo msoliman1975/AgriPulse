@@ -8,11 +8,11 @@ import { setupTestI18n } from "@/i18n/testing";
 
 import { InvestorsPage } from "./InvestorsPage";
 
-const listInvestors = vi.fn();
+const listFarmInvestors = vi.fn();
 const createInvestor = vi.fn();
 
 vi.mock("@/api/investors", () => ({
-  listInvestors: (...a: unknown[]) => listInvestors(...a),
+  listFarmInvestors: (...a: unknown[]) => listFarmInvestors(...a),
   createInvestor: (...a: unknown[]) => createInvestor(...a),
 }));
 
@@ -43,6 +43,10 @@ const NOUR = {
   archived_at: null,
   current_holdings_count: 2,
   current_area_m2: "16803.32",
+  holdings_in_farm: 2,
+  area_in_farm_m2: "16803.32",
+  other_farms: 1,
+  other_farm_holdings: 3,
   created_at: "2026-10-06T00:00:00Z",
   updated_at: "2026-10-06T00:00:00Z",
 };
@@ -51,10 +55,10 @@ function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/investments/investors"]}>
+      <MemoryRouter initialEntries={["/investments/investors/farm-1"]}>
         <Routes>
-          <Route path="/investments/investors" element={<InvestorsPage />} />
-          <Route path="/investments/investors/:id" element={<p>detail page</p>} />
+          <Route path="/investments/investors/:farmId" element={<InvestorsPage />} />
+          <Route path="/investments/investors/:farmId/:id" element={<p>detail page</p>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -68,17 +72,20 @@ describe("InvestorsPage", () => {
   });
 
   it("lists investors with their holdings count", async () => {
-    listInvestors.mockResolvedValue([NOUR]);
+    listFarmInvestors.mockResolvedValue([NOUR]);
     renderPage();
     expect(await screen.findByText("INV-0001")).toBeInTheDocument();
     const table = within(screen.getByRole("table"));
     expect(table.getByText("Nour Hassan")).toBeInTheDocument();
     expect(table.getByText("Not invited")).toBeInTheDocument();
     expect(table.getByText("2")).toBeInTheDocument();
+    // Holdings on other farms are a note, not rows.
+    expect(table.getByText("+3 on other farms")).toBeInTheDocument();
+    expect(listFarmInvestors.mock.calls[0][0]).toBe("farm-1");
   });
 
   it("creates an investor and opens their page", async () => {
-    listInvestors.mockResolvedValue([]);
+    listFarmInvestors.mockResolvedValue([]);
     createInvestor.mockResolvedValue({ ...NOUR, id: "inv-9" });
     renderPage();
     const user = userEvent.setup();

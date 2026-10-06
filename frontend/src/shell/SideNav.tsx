@@ -444,15 +444,16 @@ export function SideNav(): ReactNode {
           {showWorkspace ? <NavGroupHeading label={ti("nav.group")} collapsed={collapsed} /> : null}
           {canHoldings ? (
             <SideNavItem
-              to="/investments"
+              to={hasFarm ? `/investments/overview/${farmSegment}` : "/investments"}
               label={ti("nav.overview")}
               icon={<InvestmentsIcon className="h-4 w-4" />}
+              activePathPrefix="/investments/overview"
               collapsed={collapsed}
             />
           ) : null}
           {canHoldings ? (
             <SideNavItem
-              to="/investments/holdings"
+              to={hasFarm ? `/investments/holdings/${farmSegment}` : "/investments/holdings"}
               label={ti("nav.holdings")}
               icon={<BlockIcon className="h-4 w-4" />}
               activePathPrefix="/investments/holdings"
@@ -461,7 +462,7 @@ export function SideNav(): ReactNode {
           ) : null}
           {canInvestors ? (
             <SideNavItem
-              to="/investments/investors"
+              to={hasFarm ? `/investments/investors/${farmSegment}` : "/investments/investors"}
               label={ti("nav.investors")}
               icon={<UsersIcon className="h-4 w-4" />}
               activePathPrefix="/investments/investors"

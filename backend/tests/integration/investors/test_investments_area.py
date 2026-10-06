@@ -185,7 +185,7 @@ async def test_a_staff_token_has_no_investor_reads(scouting_env: ScoutingFixture
 
 
 @pytest.mark.asyncio
-async def test_overview_counts_and_areas(scouting_env: ScoutingFixture) -> None:
+async def test_overview_counts_and_areas_for_one_farm(scouting_env: ScoutingFixture) -> None:
     env = scouting_env
     sold, _ = await _sold_holding(env, _LON0)
     async with _client(env.admin_context) as c:
@@ -198,17 +198,83 @@ async def test_overview_counts_and_areas(scouting_env: ScoutingFixture) -> None:
             },
         )
         assert unsold.status_code == 201, unsold.text
-        ov = await c.get("/api/v1/investments/overview")
+        ov = await c.get(f"/api/v1/farms/{env.farm_id}/investments/overview")
     assert ov.status_code == 200, ov.text
     o = ov.json()
+    farm = o["farm"]
+    assert farm["farm_id"] == env.farm_id
     assert o["investors"] == 1
-    assert (o["holdings"], o["sold"], o["for_sale"], o["draft"]) == (2, 1, 1, 0)
-    assert float(o["area_sold_m2"]) == pytest.approx(float(sold["area_m2"]), abs=0.01)
-    farm = next(f for f in o["farms"] if f["farm_id"] == env.farm_id)
+    assert (farm["holdings"], farm["sold"], farm["for_sale"], farm["draft"]) == (2, 1, 1, 0)
+    assert float(farm["area_sold_m2"]) == pytest.approx(float(sold["area_m2"]), abs=0.01)
     assert float(farm["area_not_sold_m2"]) == pytest.approx(
         float(farm["block_area_m2"]) - float(sold["area_m2"]), abs=0.01
     )
     assert o["recent"][0]["holding_code"] == sold["code"]
+    assert o["all_farms"]["farms"] == 1
+    assert o["all_farms"]["sold"] == 1
+
+
+async def _second_farm(env: ScoutingFixture) -> tuple[str, str]:
+    """Another farm with one block, east of the fixture's farm."""
+    from tests.integration.farms.test_blocks_unit_type import _polygon
+    from tests.integration.farms.test_farms_crud import _square
+
+    async with _client(env.admin_context) as c:
+        farm = await c.post(
+            "/api/v1/farms",
+            json={
+                "code": "SC-FARM-2",
+                "name": "Second farm",
+                "boundary": _square(31.70, 30.60),
+                "farm_type": "commercial",
+                "tags": [],
+            },
+        )
+        assert farm.status_code == 201, farm.text
+        block = await c.post(
+            f"/api/v1/farms/{farm.json()['id']}/blocks",
+            json={"code": "SB2", "boundary": _polygon(31.701, 30.601)},
+        )
+        assert block.status_code == 201, block.text
+    return farm.json()["id"], block.json()["id"]
+
+
+@pytest.mark.asyncio
+async def test_farm_views_count_holdings_on_other_farms(scouting_env: ScoutingFixture) -> None:
+    """Seen from one farm, an investor's holdings elsewhere are a count, not rows."""
+    env = scouting_env
+    here, investor = await _sold_holding(env)
+    farm2, block2 = await _second_farm(env)
+    async with _client(env.admin_context) as c:
+        there = await c.post(
+            f"/api/v1/farms/{farm2}/blocks/{block2}/holdings",
+            json={"name": "Over there", "boundary": _rect(31.7015, 30.6015)},
+        )
+        assert there.status_code == 201, there.text
+        owned = await c.post(
+            f"/api/v1/farms/{farm2}/holdings/{there.json()['id']}/ownerships",
+            json={"investor_id": investor["id"], "start_date": date.today().isoformat()},
+        )
+        assert owned.status_code == 201, owned.text
+        fresh = await c.post(
+            "/api/v1/investors",
+            json={"full_name": "No holdings yet", "email": f"{uuid4().hex[:8]}@example.com"},
+        )
+        assert fresh.status_code == 201, fresh.text
+
+        listed = await c.get(f"/api/v1/farms/{env.farm_id}/investors")
+        holdings = await c.get(f"/api/v1/farms/{env.farm_id}/holdings")
+
+    assert listed.status_code == 200, listed.text
+    rows = {r["code"]: r for r in listed.json()}
+    # The investor with land here, and the one with no land anywhere yet.
+    assert set(rows) == {investor["code"], fresh.json()["code"]}
+    me = rows[investor["code"]]
+    assert (me["holdings_in_farm"], me["other_farms"], me["other_farm_holdings"]) == (1, 1, 1)
+    assert rows[fresh.json()["code"]]["holdings_in_farm"] == 0
+
+    owner = next(h for h in holdings.json() if h["code"] == here["code"])["current_owner"]
+    assert owner["other_farm_holdings"] == 1
 
 
 @pytest.mark.asyncio

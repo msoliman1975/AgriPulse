@@ -27,9 +27,9 @@ import { InvestorFormDialog } from "../components/InvestorFormDialog";
 import { InvestorLoginCard } from "../components/InvestorLoginCard";
 import { INVESTOR_STATUS_PILL, errorText } from "../lib";
 
-/** /investments/investors/:investorId — one investor: profile, app login, holdings. */
+/** /investments/investors/:farmId/:investorId — one investor, holdings on the top-bar farm. */
 export function InvestorDetailPage(): JSX.Element {
-  const { investorId = "" } = useParams<{ investorId: string }>();
+  const { farmId = "", investorId = "" } = useParams<{ farmId: string; investorId: string }>();
   const { t, i18n } = useTranslation("investors");
   const queryClient = useQueryClient();
   const canManage = useCapability("investor.manage");
@@ -62,8 +62,20 @@ export function InvestorDetailPage(): JSX.Element {
   const inv = q.data;
   const archived = inv.archived_at !== null;
   const editable = canManage && !archived;
-  const current = inv.ownerships.filter((o) => o.period !== "past");
-  const past = inv.ownerships.filter((o) => o.period === "past");
+  // The top-bar farm decides what is listed; other farms are one note.
+  const here = inv.ownerships.filter((o) => o.farm_id === farmId);
+  const current = here.filter((o) => o.period !== "past");
+  const past = here.filter((o) => o.period === "past");
+  const elsewhere = new Map<string, { name: string; count: number }>();
+  for (const o of inv.ownerships) {
+    if (o.farm_id === farmId || o.period === "past") continue;
+    const prev = elsewhere.get(o.farm_id);
+    elsewhere.set(o.farm_id, {
+      name: localizedName(i18n.language, o.farm_name ?? "", o.farm_name_ar),
+      count: (prev?.count ?? 0) + 1,
+    });
+  }
+  const elsewhereCount = [...elsewhere.values()].reduce((n, f) => n + f.count, 0);
 
   const row = (label: string, value: ReactNode) => (
     <div className="flex flex-col">
@@ -77,7 +89,10 @@ export function InvestorDetailPage(): JSX.Element {
       <PageHeader
         above={
           <Breadcrumb
-            items={[{ label: t("detail.back"), to: "/investments/investors" }, { label: inv.code }]}
+            items={[
+              { label: t("detail.back"), to: `/investments/investors/${farmId}` },
+              { label: inv.code },
+            ]}
           />
         }
         title={
@@ -128,7 +143,7 @@ export function InvestorDetailPage(): JSX.Element {
           {row(t("form.country"), [inv.city, inv.country].filter(Boolean).join(", "))}
           {row(t("form.language"), t(`language.${inv.preferred_language}`))}
           {row(
-            t("detail.totalArea"),
+            t("farmContext.totalAreaAll"),
             <AreaDisplay areaM2={Number(inv.current_area_m2)} fractionDigits={2} />,
           )}
           {inv.notes_internal ? row(t("form.notes"), inv.notes_internal) : null}
@@ -137,10 +152,27 @@ export function InvestorDetailPage(): JSX.Element {
 
       <InvestorLoginCard investor={inv} />
 
-      <Card title={t("detail.current")} noPadding>
+      {elsewhereCount > 0 ? (
+        <p className="text-sm text-ap-muted">
+          {t("farmContext.otherFarmsTitle", { count: elsewhereCount })}:{" "}
+          {[...elsewhere.entries()].map(([id, f], i) => (
+            <span key={id}>
+              {i > 0 ? ", " : ""}
+              <Link
+                className="text-ap-primary hover:underline"
+                to={`/investments/investors/${id}/${inv.id}`}
+              >
+                {f.name} ({f.count})
+              </Link>
+            </span>
+          ))}
+        </p>
+      ) : null}
+
+      <Card title={t("farmContext.holdingsHere")} noPadding>
         <OwnershipTable rows={current} empty={t("detail.noCurrent")} />
       </Card>
-      <Card title={t("detail.past")} noPadding>
+      <Card title={t("farmContext.pastHere")} noPadding>
         <OwnershipTable rows={past} empty={t("detail.noPast")} />
       </Card>
 

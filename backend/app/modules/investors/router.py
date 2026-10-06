@@ -12,7 +12,8 @@ Mounted under /api/v1:
   POST   /investors/{id}:disable-login                investor.invite
   POST   /investors/{id}:enable-login                 investor.invite
 
-  GET    /investments/overview                        holding.read
+  GET    /farms/{farm_id}/investments/overview        holding.read
+  GET    /farms/{farm_id}/investors                   investor.read
   GET    /farms/{farm_id}/holdings-map                holding.read
 
   GET    /farms/{farm_id}/holdings                    holding.read
@@ -46,6 +47,7 @@ from app.modules.iam.users_service import TenantUsersService, get_tenant_users_s
 from app.modules.investors.schemas import (
     BlockHoldingsContextResponse,
     FarmHoldingsMapResponse,
+    FarmInvestorResponse,
     HoldingCreateRequest,
     HoldingDetailResponse,
     HoldingResponse,
@@ -384,12 +386,27 @@ async def enable_investor_login(
 # ---- Investments overview and farm map ----------------------------------
 
 
-@router.get("/investments/overview", response_model=InvestmentsOverviewResponse)
+@router.get("/farms/{farm_id}/investments/overview", response_model=InvestmentsOverviewResponse)
 async def investments_overview(
-    _: RequestContext = Depends(requires_capability("holding.read")),
+    farm_id: UUID,
+    _: RequestContext = Depends(requires_capability("holding.read", farm_id_param="farm_id")),
     service: InvestorsService = Depends(_service),
 ) -> dict[str, Any]:
-    return await service.overview()
+    return await service.overview(farm_id=farm_id)
+
+
+@router.get("/farms/{farm_id}/investors", response_model=list[FarmInvestorResponse])
+async def list_farm_investors(
+    farm_id: UUID,
+    status_filter: InvestorStatus | None = Query(default=None, alias="status"),
+    q: str | None = Query(default=None, max_length=100),
+    include_archived: bool = Query(default=False),
+    _: RequestContext = Depends(requires_capability("investor.read")),
+    service: InvestorsService = Depends(_service),
+) -> list[dict[str, Any]]:
+    return await service.list_investors_for_farm(
+        farm_id=farm_id, status=status_filter, query=q, include_archived=include_archived
+    )
 
 
 @router.get("/farms/{farm_id}/holdings-map", response_model=FarmHoldingsMapResponse)

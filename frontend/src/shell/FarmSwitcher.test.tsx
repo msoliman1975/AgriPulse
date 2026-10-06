@@ -58,3 +58,45 @@ describe("<FarmSwitcher> without a tenant", () => {
     expect(listFarms).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("<FarmSwitcher> on Investments pages", () => {
+  it("keeps the section and drops the holding when the farm changes", async () => {
+    const { fireEvent, screen } = await import("@testing-library/react");
+    const { Route, Routes, useLocation } = await import("react-router-dom");
+    mockUseAuth.mockReturnValue({
+      user: { access_token: jwt({ tenant_id: "t-1", tenant_role: "TenantOwner" }) },
+    });
+    listFarms.mockResolvedValue({
+      items: [
+        { id: "f1", code: "F1", name: "Farm one", name_ar: null },
+        { id: "f2", code: "F2", name: "Farm two", name_ar: null },
+      ],
+      next_cursor: null,
+    });
+    function Where(): JSX.Element {
+      return <p data-testid="where">{useLocation().pathname}</p>;
+    }
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/investments/holdings/f1/h-123"]}>
+          <Routes>
+            <Route
+              path="/investments/holdings/:farmId/:holdingId"
+              element={
+                <>
+                  <FarmSwitcher />
+                  <Where />
+                </>
+              }
+            />
+            <Route path="*" element={<Where />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { expanded: false }));
+    fireEvent.click(await screen.findByRole("option", { name: /Farm two/ }));
+    expect(screen.getByTestId("where")).toHaveTextContent("/investments/holdings/f2");
+  });
+});

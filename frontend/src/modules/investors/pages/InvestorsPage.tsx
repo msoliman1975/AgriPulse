@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { createInvestor, listInvestors, type InvestorStatus } from "@/api/investors";
+import { createInvestor, listFarmInvestors, type InvestorStatus } from "@/api/investors";
 import { AsyncBoundary } from "@/components/AsyncBoundary";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
@@ -23,8 +23,9 @@ import { INVESTOR_STATUS_PILL, errorText } from "../lib";
 
 const STATUSES: InvestorStatus[] = ["not_invited", "invited", "active", "suspended"];
 
-/** /investments/investors — the investor master file. */
+/** /investments/investors/:farmId — investors seen from the top-bar farm. */
 export function InvestorsPage(): JSX.Element {
+  const { farmId = "" } = useParams<{ farmId: string }>();
   const { t, i18n } = useTranslation("investors");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -36,9 +37,9 @@ export function InvestorsPage(): JSX.Element {
   const [formError, setFormError] = useState<string | null>(null);
 
   const listQ = useQuery({
-    queryKey: ["investors", "list", q, status, includeArchived],
+    queryKey: ["investors", "list", farmId, q, status, includeArchived],
     queryFn: () =>
-      listInvestors({
+      listFarmInvestors(farmId, {
         q: q.trim() || undefined,
         status: status || undefined,
         include_archived: includeArchived,
@@ -51,7 +52,7 @@ export function InvestorsPage(): JSX.Element {
       setAdding(false);
       setFormError(null);
       await queryClient.invalidateQueries({ queryKey: ["investors"] });
-      navigate(`/investments/investors/${investor.id}`);
+      navigate(`/investments/investors/${farmId}/${investor.id}`);
     },
     onError: (err) => setFormError(errorText(err)),
   });
@@ -124,8 +125,8 @@ export function InvestorsPage(): JSX.Element {
                   <Th>{t("col.email")}</Th>
                   <Th>{t("col.phone")}</Th>
                   <Th>{t("col.status")}</Th>
-                  <Th>{t("col.holdings")}</Th>
-                  <Th>{t("col.area")}</Th>
+                  <Th>{t("farmContext.colHere")}</Th>
+                  <Th>{t("farmContext.colAreaHere")}</Th>
                 </Tr>
               </Thead>
               <Tbody>
@@ -134,13 +135,16 @@ export function InvestorsPage(): JSX.Element {
                     <Td>
                       <Link
                         className="font-mono text-ap-primary hover:underline"
-                        to={`/investments/investors/${r.id}`}
+                        to={`/investments/investors/${farmId}/${r.id}`}
                       >
                         {r.code}
                       </Link>
                     </Td>
                     <Td>
-                      <Link className="hover:underline" to={`/investments/investors/${r.id}`}>
+                      <Link
+                        className="hover:underline"
+                        to={`/investments/investors/${farmId}/${r.id}`}
+                      >
                         {localizedName(i18n.language, r.full_name, r.full_name_ar)}
                       </Link>
                     </Td>
@@ -150,10 +154,17 @@ export function InvestorsPage(): JSX.Element {
                     <Td>
                       <Pill kind={INVESTOR_STATUS_PILL[r.status]}>{t(`status.${r.status}`)}</Pill>
                     </Td>
-                    <Td>{r.current_holdings_count}</Td>
                     <Td>
-                      {r.current_holdings_count > 0 ? (
-                        <AreaDisplay areaM2={Number(r.current_area_m2)} fractionDigits={2} />
+                      {r.holdings_in_farm}
+                      {r.other_farm_holdings > 0 ? (
+                        <span className="ms-2 text-xs text-ap-muted">
+                          {t("farmContext.otherFarmsShort", { count: r.other_farm_holdings })}
+                        </span>
+                      ) : null}
+                    </Td>
+                    <Td>
+                      {r.holdings_in_farm > 0 ? (
+                        <AreaDisplay areaM2={Number(r.area_in_farm_m2)} fractionDigits={2} />
                       ) : (
                         "—"
                       )}

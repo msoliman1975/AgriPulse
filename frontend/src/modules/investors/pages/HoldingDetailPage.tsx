@@ -166,7 +166,7 @@ export function HoldingDetailPage(): JSX.Element {
         above={
           <Breadcrumb
             items={[
-              { label: t("nav.holdings"), to: `/investments/holdings?farm=${farmId}` },
+              { label: t("nav.holdings"), to: `/investments/holdings/${farmId}` },
               {
                 label: `${localizedName(i18n.language, holding.farm_name ?? "", holding.farm_name_ar)} · ${holding.block_code ?? ""}`,
               },
@@ -306,7 +306,7 @@ export function HoldingDetailPage(): JSX.Element {
                   <Td>
                     <Link
                       className="text-ap-primary hover:underline"
-                      to={`/investments/investors/${o.investor_id}`}
+                      to={`/investments/investors/${farmId}/${o.investor_id}`}
                     >
                       {o.investor_code} ·{" "}
                       {localizedName(i18n.language, o.investor_name, o.investor_name_ar)}
