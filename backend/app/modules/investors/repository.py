@@ -172,17 +172,18 @@ class InvestorsRepository:
         if uuid_params:
             stmt = stmt.bindparams(*(bindparam(p, type_=_UUID) for p in uuid_params))
         result = await self._session.execute(stmt, params)
-        # INSERT and UPDATE without RETURNING give a closed result; reading
-        # rows from it raises ResourceClosedError.
-        if not result.returns_rows:
-            return []
         return [dict(r) for r in result.mappings()]
 
     async def _write(
         self, sql: str, params: dict[str, Any], uuid_params: tuple[str, ...] = ()
-    ) -> list[dict[str, Any]]:
+    ) -> None:
+        """Run an INSERT or UPDATE. No write here uses RETURNING, so no rows
+        are read: reading a closed result raises ResourceClosedError."""
+        stmt = text(sql)
+        if uuid_params:
+            stmt = stmt.bindparams(*(bindparam(p, type_=_UUID) for p in uuid_params))
         try:
-            return await self._rows(sql, params, uuid_params)
+            await self._session.execute(stmt, params)
         except DBAPIError as exc:
             _map_db_error(exc)
             raise
