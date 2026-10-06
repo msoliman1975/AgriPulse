@@ -696,26 +696,52 @@ class InvestorsRepository:
     # ---- Investor app (read-only, the investor's own rows) ----------------
 
     async def get_investor_by_user(
-        self, *, user_id: UUID, keycloak_subject: str | None
+        self, *, user_id: UUID, keycloak_subject: str | None, email: str | None
     ) -> dict[str, Any] | None:
-        """The investor linked to the caller.
+        """The investor linked to the caller, by any of three links.
 
-        `investors.user_id` holds the `public.users` id, while a request's
-        `user_id` is the token's `sub`, the Keycloak id. The two differ for an
-        invited user, so the match goes through `public.users.keycloak_subject`.
-        A direct id match is kept for callers whose two ids are the same.
+        A request's `user_id` is the token's `sub`, the Keycloak id. On the
+        first sign-in `/me` re-keys `public.users.id` to that same id, and the
+        foreign keys into `public.users` follow by ON UPDATE CASCADE. But
+        `investors.user_id` lives in the tenant schema with no foreign key, so
+        an id stored before the re-key is left pointing at nothing.
+
+        1. `i.user_id = sub`: links made since the fix store the Keycloak id,
+           which the re-key does not change.
+        2. `i.user_id` is the caller's `public.users.id` before the re-key.
+        3. `i.user_id` no longer exists in `public.users` (a re-key left it
+           behind) and the investor's email is the token's email. The service
+           repairs the link on this match.
         """
         rows = await self._rows(
             f"SELECT {_INVESTOR_COLUMNS} FROM {_INVESTOR_FROM} "
-            "WHERE i.deleted_at IS NULL AND ("
-            "  i.user_id = :uid OR i.user_id IN ("
+            "WHERE i.deleted_at IS NULL AND i.user_id IS NOT NULL AND ("
+            "  i.user_id = :uid"
+            "  OR i.user_id IN ("
             "    SELECT u.id FROM public.users u"
-            "     WHERE u.keycloak_subject = :sub AND u.deleted_at IS NULL)) "
-            "ORDER BY i.created_at DESC LIMIT 1",
-            {"uid": user_id, "sub": keycloak_subject or ""},
+            "     WHERE u.keycloak_subject = :sub AND u.deleted_at IS NULL)"
+            "  OR (:email <> '' AND lower(i.email) = lower(:email)"
+            "      AND NOT EXISTS (SELECT 1 FROM public.users u2 WHERE u2.id = i.user_id))) "
+            "ORDER BY (i.user_id = :uid) DESC, i.created_at DESC LIMIT 1",
+            {"uid": user_id, "sub": keycloak_subject or "", "email": email or ""},
             ("uid",),
         )
         return rows[0] if rows else None
+
+    async def resolve_login_user_id(self, *, stored: UUID) -> UUID | None:
+        """The current `public.users.id` behind an investor's stored link.
+
+        The link may be the Keycloak id or a users id from before the re-key;
+        IAM calls (resend, suspend, reactivate) need the current users id.
+        """
+        rows = await self._rows(
+            "SELECT u.id FROM public.users u"
+            " WHERE (u.id = :x OR u.keycloak_subject = :xs) AND u.deleted_at IS NULL"
+            " ORDER BY (u.id = :x) DESC LIMIT 1",
+            {"x": stored, "xs": str(stored)},
+            ("x",),
+        )
+        return rows[0]["id"] if rows else None
 
     async def company_name(self) -> str | None:
         rows = await self._rows(
