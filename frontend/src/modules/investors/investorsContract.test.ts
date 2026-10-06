@@ -43,7 +43,9 @@ describe("investors i18n", () => {
     ["IdType", "idType"],
     ["InvestorType", "type"],
   ])("labels every value of the backend's %s", (literalName, section) => {
-    const labelled = Object.keys((en as Record<string, Record<string, string>>)[section]).sort();
+    const labelled = Object.keys(
+      (en as unknown as Record<string, Record<string, string>>)[section],
+    ).sort();
     expect(labelled).toEqual(literal(literalName));
   });
 });
