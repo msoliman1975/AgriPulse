@@ -96,7 +96,15 @@ def role_tier(role: str) -> str:
 #   tenant tier -> public.tenant_role_assignments (applies to every farm)
 #   farm tier   -> public.farm_scopes             (one row per farm)
 PLATFORM_TIER_ROLES: tuple[str, ...] = tuple(r.value for r in PlatformRole)
-TENANT_TIER_ROLES: tuple[str, ...] = tuple(r.value for r in TenantRole)
+
+#: Tenant roles a tenant administrator may NOT hand out from Settings > Team.
+#: `Investor` is granted only by the investors module, when staff create an
+#: investor's app login, so the account is always tied to an investor record.
+RESERVED_TENANT_ROLES: tuple[str, ...] = (TenantRole.INVESTOR.value,)
+
+TENANT_TIER_ROLES: tuple[str, ...] = tuple(
+    r.value for r in TenantRole if r.value not in RESERVED_TENANT_ROLES
+)
 FARM_TIER_ROLES: tuple[str, ...] = tuple(r.value for r in FarmRole)
 
 #: Every role a TenantOwner / TenantAdmin may grant, in authority order.
@@ -127,7 +135,7 @@ def assignment_tier(role: str) -> str:
     with no capabilities. Routing Viewer through farm_scopes is what makes
     the role actually resolve.
     """
-    if role in TENANT_TIER_ROLES:
+    if role in TENANT_TIER_ROLES or role in RESERVED_TENANT_ROLES:
         return "tenant"
     if role in FARM_TIER_ROLES:
         return "farm"

@@ -220,45 +220,42 @@ async def test_r7_block_with_an_owned_holding_cannot_be_inactivated(
 
 
 @pytest.mark.asyncio
-async def test_r8_redraw_of_a_sold_holding_needs_its_own_capability(
+async def test_an_investment_manager_runs_holdings_end_to_end(
     scouting_env: ScoutingFixture,
 ) -> None:
-    from uuid import UUID
-
-    from app.shared.auth.context import FarmRole, FarmScope
+    """The new staff role: draws, sells, and redraws a sold holding."""
+    from app.shared.auth.context import TenantRole
     from tests.integration.farms.conftest import make_context
 
     env = scouting_env
-    holding = (await _holding(env, _rect(_LON0, _LAT0))).json()
-    investor = await _investor(env)
-    async with _client(env.admin_context) as c:
-        await c.post(
-            f"/api/v1/farms/{env.farm_id}/holdings/{holding['id']}/ownerships",
-            json={"investor_id": investor["id"], "start_date": date.today().isoformat()},
-        )
     manager = make_context(
-        user_id=uuid4(),
-        tenant_id=env.tenant_id,
-        farm_scopes=(FarmScope(farm_id=UUID(env.farm_id), role=FarmRole.FARM_MANAGER),),
+        user_id=uuid4(), tenant_id=env.tenant_id, tenant_role=TenantRole.INVESTMENT_MANAGER
     )
-    url = f"/api/v1/farms/{env.farm_id}/holdings/{holding['id']}"
     async with _client(manager) as c:
-        refused = await c.patch(url, json={"boundary": _rect(_LON0, _LAT0, 0.0008, 0.0008)})
-        renamed = await c.patch(url, json={"name": "Renamed by the manager"})
-    assert refused.status_code == 409, refused.text
-    assert refused.json()["type"].endswith("holding-owned")
-    assert renamed.status_code == 200, renamed.text
-
-    async with _client(env.admin_context) as c:
-        allowed = await c.patch(url, json={"boundary": _rect(_LON0, _LAT0, 0.0008, 0.0008)})
-    assert allowed.status_code == 200, allowed.text
-    assert float(allowed.json()["area_m2"]) < float(holding["area_m2"])
+        created = await c.post(
+            f"/api/v1/farms/{env.farm_id}/blocks/{env.block_id}/holdings",
+            json={"name": "Manager strip", "boundary": _rect(_LON0, _LAT0)},
+        )
+        assert created.status_code == 201, created.text
+        inv = await c.post(
+            "/api/v1/investors",
+            json={"full_name": "Owner", "email": f"{uuid4().hex[:8]}@example.com"},
+        )
+        assert inv.status_code == 201, inv.text
+        url = f"/api/v1/farms/{env.farm_id}/holdings/{created.json()['id']}"
+        sold = await c.post(
+            f"{url}/ownerships",
+            json={"investor_id": inv.json()["id"], "start_date": date.today().isoformat()},
+        )
+        assert sold.status_code == 201, sold.text
+        redrawn = await c.patch(url, json={"boundary": _rect(_LON0, _LAT0, 0.0008, 0.0008)})
+    assert redrawn.status_code == 200, redrawn.text
+    assert float(redrawn.json()["area_m2"]) < float(created.json()["area_m2"])
 
 
 @pytest.mark.asyncio
-async def test_an_agronomist_reads_holdings_but_cannot_draw_them(
-    scouting_env: ScoutingFixture,
-) -> None:
+async def test_farm_roles_have_no_holding_rights(scouting_env: ScoutingFixture) -> None:
+    """Investments is separate from farm work: an agronomist sees none of it."""
     env = scouting_env
     created = await _holding(env, _rect(_LON0, _LAT0))
     assert created.status_code == 201, created.text
@@ -269,11 +266,11 @@ async def test_an_agronomist_reads_holdings_but_cannot_draw_them(
             json={"name": "Nope", "boundary": _rect(_LON0 + 0.001, _LAT0)},
         )
         investors = await c.get("/api/v1/investors")
-    assert listed.status_code == 200, listed.text
-    assert [h["code"] for h in listed.json()] == [created.json()["code"]]
+        overview = await c.get("/api/v1/investments/overview")
+    assert listed.status_code == 403, listed.text
     assert drawn.status_code == 403, drawn.text
-    # Investor contact details are not an agronomist's business.
     assert investors.status_code == 403, investors.text
+    assert overview.status_code == 403, overview.text
 
 
 @pytest.mark.asyncio

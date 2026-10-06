@@ -9,6 +9,7 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { FilterChip } from "@/components/FilterChip";
+import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
@@ -22,7 +23,7 @@ import { INVESTOR_STATUS_PILL, errorText } from "../lib";
 
 const STATUSES: InvestorStatus[] = ["not_invited", "invited", "active", "suspended"];
 
-/** /settings/investors — the investor master list. */
+/** /investments/investors — the investor master file. */
 export function InvestorsPage(): JSX.Element {
   const { t, i18n } = useTranslation("investors");
   const navigate = useNavigate();
@@ -50,7 +51,7 @@ export function InvestorsPage(): JSX.Element {
       setAdding(false);
       setFormError(null);
       await queryClient.invalidateQueries({ queryKey: ["investors"] });
-      navigate(`/settings/investors/${investor.id}`);
+      navigate(`/investments/investors/${investor.id}`);
     },
     onError: (err) => setFormError(errorText(err)),
   });
@@ -58,7 +59,7 @@ export function InvestorsPage(): JSX.Element {
   const filtered = Boolean(q.trim() || status || includeArchived);
 
   return (
-    <div className="flex flex-col gap-6">
+    <Page>
       <PageHeader
         title={t("list.title")}
         subtitle={t("list.subtitle")}
@@ -133,13 +134,13 @@ export function InvestorsPage(): JSX.Element {
                     <Td>
                       <Link
                         className="font-mono text-ap-primary hover:underline"
-                        to={`/settings/investors/${r.id}`}
+                        to={`/investments/investors/${r.id}`}
                       >
                         {r.code}
                       </Link>
                     </Td>
                     <Td>
-                      <Link className="hover:underline" to={`/settings/investors/${r.id}`}>
+                      <Link className="hover:underline" to={`/investments/investors/${r.id}`}>
                         {localizedName(i18n.language, r.full_name, r.full_name_ar)}
                       </Link>
                     </Td>
@@ -176,6 +177,6 @@ export function InvestorsPage(): JSX.Element {
           onSubmit={(payload) => create.mutate(payload)}
         />
       ) : null}
-    </div>
+    </Page>
   );
 }

@@ -91,7 +91,6 @@ export interface InvestorPayload {
   city?: string | null;
   preferred_language?: InvestorLanguage;
   notes_internal?: string | null;
-  status?: "not_invited" | "suspended";
 }
 
 export interface HoldingOwnerSummary {
@@ -291,4 +290,150 @@ export async function endOwnership(
 
 export async function deleteOwnership(farmId: string, ownershipId: string): Promise<void> {
   await apiClient.delete(`/v1/farms/${farmId}/ownerships/${ownershipId}`);
+}
+
+// ---- App login ------------------------------------------------------------
+
+export interface InvestorLoginResult {
+  investor: Investor;
+  /** False when the set-password email could not be sent. */
+  email_sent: boolean;
+  temporary_password: string | null;
+  provisioning: string | null;
+}
+
+export async function createInvestorLogin(investorId: string): Promise<InvestorLoginResult> {
+  const { data } = await apiClient.post<InvestorLoginResult>(
+    `/v1/investors/${investorId}:create-login`,
+  );
+  return data;
+}
+
+export async function resendInvestorLogin(investorId: string): Promise<InvestorLoginResult> {
+  const { data } = await apiClient.post<InvestorLoginResult>(
+    `/v1/investors/${investorId}:resend-login`,
+  );
+  return data;
+}
+
+export async function setInvestorLoginEnabled(
+  investorId: string,
+  enabled: boolean,
+): Promise<Investor> {
+  const action = enabled ? "enable-login" : "disable-login";
+  const { data } = await apiClient.post<Investor>(`/v1/investors/${investorId}:${action}`);
+  return data;
+}
+
+// ---- Investments overview and farm map ------------------------------------
+
+export interface OverviewFarmRow {
+  farm_id: string;
+  farm_name: string;
+  farm_name_ar: string | null;
+  holdings: number;
+  sold: number;
+  for_sale: number;
+  draft: number;
+  area_sold_m2: string;
+  block_area_m2: string;
+  area_not_sold_m2: string;
+}
+
+export interface OverviewRecentRow {
+  id: string;
+  start_date: string;
+  acquired_by: AcquiredBy;
+  created_at: string;
+  holding_id: string;
+  holding_code: string;
+  farm_id: string;
+  investor_id: string;
+  investor_code: string;
+  investor_name: string;
+  investor_name_ar: string | null;
+  previous_investor_code: string | null;
+  previous_ended_by: EndedBy | null;
+}
+
+export interface InvestmentsOverview {
+  investors: number;
+  holdings: number;
+  sold: number;
+  for_sale: number;
+  draft: number;
+  area_sold_m2: string;
+  area_not_sold_m2: string;
+  farms: OverviewFarmRow[];
+  recent: OverviewRecentRow[];
+}
+
+export async function getInvestmentsOverview(): Promise<InvestmentsOverview> {
+  const { data } = await apiClient.get<InvestmentsOverview>("/v1/investments/overview");
+  return data;
+}
+
+export interface FarmMapBlock {
+  id: string;
+  code: string;
+  name: string | null;
+  name_ar: string | null;
+  boundary: Polygon;
+  area_m2: string;
+  eligible: boolean;
+}
+
+export interface FarmHoldingsMap {
+  farm_id: string;
+  blocks: FarmMapBlock[];
+  holdings: Holding[];
+}
+
+export async function getFarmHoldingsMap(farmId: string): Promise<FarmHoldingsMap> {
+  const { data } = await apiClient.get<FarmHoldingsMap>(`/v1/farms/${farmId}/holdings-map`);
+  return data;
+}
+
+// ---- The signed-in investor -----------------------------------------------
+
+export interface InvestorAppMe {
+  code: string;
+  full_name: string;
+  full_name_ar: string | null;
+  preferred_language: InvestorLanguage;
+  company_name: string | null;
+}
+
+export interface InvestorAppHolding {
+  holding_id: string;
+  code: string;
+  name: string;
+  name_ar: string | null;
+  farm_name: string | null;
+  farm_name_ar: string | null;
+  block_code: string | null;
+  block_name: string | null;
+  block_name_ar: string | null;
+  area_m2: string;
+  tree_count: number | null;
+  crop_name_en: string | null;
+  crop_name_ar: string | null;
+  variety_name_en: string | null;
+  variety_name_ar: string | null;
+  planting_date: string | null;
+  start_date: string;
+  end_date: string | null;
+  period: OwnershipPeriod;
+  boundary: Polygon;
+  block_boundary: Polygon;
+}
+
+export async function getInvestorMe(): Promise<InvestorAppMe> {
+  const { data } = await apiClient.get<InvestorAppMe>("/v1/investor/me");
+  return data;
+}
+
+export async function listMyHoldings(): Promise<InvestorAppHolding[]> {
+  const { data } = await apiClient.get<InvestorAppHolding[]>("/v1/investor/holdings");
+  return data;
 }

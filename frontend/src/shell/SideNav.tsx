@@ -3,9 +3,11 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useParams } from "react-router-dom";
 
-import { useCapability } from "@/rbac/useCapability";
+import { useCapability, useClaims } from "@/rbac/useCapability";
 
 import {
+  BlockIcon,
+  InvestmentsIcon,
   AlertsIcon,
   GearIcon,
   InsightsIcon,
@@ -123,6 +125,19 @@ function BetaBadge({ children }: { children: string }): ReactNode {
   );
 }
 
+/**
+ * A second group heading inside one NavShell, for the Investments group.
+ * Collapsed, the heading becomes a thin rule so the two groups stay apart.
+ */
+function NavGroupHeading({ label, collapsed }: { label: string; collapsed: boolean }): ReactNode {
+  if (collapsed) return <div role="separator" className="mx-2 my-2 border-t border-ap-line" />;
+  return (
+    <div className="px-1 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-ap-muted">
+      {label}
+    </div>
+  );
+}
+
 interface NavShellProps {
   heading: string;
   collapsed: boolean;
@@ -176,8 +191,22 @@ export function SideNav(): ReactNode {
   const hasFarm = Boolean(farmId);
   const isPlatformAdmin = useCapability("platform.manage_tenants");
   const { t } = useTranslation(["admin", "common"]);
+  const { t: ti } = useTranslation("investors");
   const [collapsed, toggleCollapsed] = useCollapsed();
   const farmSegment = farmId ?? "";
+  // Farm work and Investments are separate areas. A user who cannot read a
+  // farm plan (an Investment Manager) sees no Workspace group at all, and a
+  // farm role sees no Investments group.
+  // A farm-scoped user holds plan.read only on their farms, so the tenant
+  // check alone would hide Workspace whenever no farm is in the URL.
+  const claims = useClaims();
+  const tenantFarmWork = useCapability("plan.read");
+  const canHoldings = useCapability("holding.read");
+  const canInvestors = useCapability("investor.read");
+  const canInvestments = canHoldings || canInvestors;
+  // Workspace stays for everyone except an investments-only user, so a role
+  // with neither (e.g. Billing Admin) keeps the menu it had.
+  const showWorkspace = tenantFarmWork || (claims?.farm_scopes?.length ?? 0) > 0 || !canInvestments;
 
   // Persona separation (portal-restructure Q8): PlatformAdmin sees
   // ONLY the Platform Management Portal nav. Tenant users see the
@@ -316,19 +345,21 @@ export function SideNav(): ReactNode {
     // weather, Custom signals, Settings hub) moved to the top-bar Configs
     // menu, so the left nav is purely the operational surfaces.
     <NavShell
-      heading={t("common:workspaceNav.workspace")}
+      heading={showWorkspace ? t("common:workspaceNav.workspace") : ti("nav.group")}
       collapsed={collapsed}
       onToggle={toggleCollapsed}
     >
-      <SideNavItem
-        to={hasFarm ? `/insights/${farmSegment}` : "#"}
-        label={t("common:workspaceNav.insights")}
-        icon={<InsightsIcon className="h-4 w-4" />}
-        disabled={!hasFarm}
-        activePathPrefix="/insights/"
-        collapsed={collapsed}
-      />
-      {/* Farm Console v2 (/labs/map-v2) is the one Farm-management row in the
+      {showWorkspace ? (
+        <>
+          <SideNavItem
+            to={hasFarm ? `/insights/${farmSegment}` : "#"}
+            label={t("common:workspaceNav.insights")}
+            icon={<InsightsIcon className="h-4 w-4" />}
+            disabled={!hasFarm}
+            activePathPrefix="/insights/"
+            collapsed={collapsed}
+          />
+          {/* Farm Console v2 (/labs/map-v2) is the one Farm-management row in the
           nav. It carried a BETA badge while it ran beside the older console
           at /labs/map; the badge went with the second row, since "beta" says
           nothing to a user who has no other console to choose.
@@ -340,72 +371,105 @@ export function SideNav(): ReactNode {
               parity in the console.
           TODO(nuke-legacy-farms): delete /labs/map, /labs/map-legacy and
           /farms/* once AoI-edit lands in the console. */}
-      <SideNavItem
-        to={hasFarm ? `/labs/map-v2/${farmSegment}` : "/labs/map-v2"}
-        label={t("common:workspaceNav.farmManagement")}
-        icon={<LandUnitsIcon className="h-4 w-4" />}
-        activePathPrefix={hasFarm ? `/labs/map-v2/${farmSegment}` : undefined}
-        collapsed={collapsed}
-      />
-      <SideNavItem
-        to={hasFarm ? `/board/${farmSegment}` : "#"}
-        label={t("common:workspaceNav.plan")}
-        icon={<PlanIcon className="h-4 w-4" />}
-        disabled={!hasFarm}
-        activePathPrefix="/board/"
-        collapsed={collapsed}
-      />
-      {/* The replay surface. Sits after Plan because it is read-only
+          <SideNavItem
+            to={hasFarm ? `/labs/map-v2/${farmSegment}` : "/labs/map-v2"}
+            label={t("common:workspaceNav.farmManagement")}
+            icon={<LandUnitsIcon className="h-4 w-4" />}
+            activePathPrefix={hasFarm ? `/labs/map-v2/${farmSegment}` : undefined}
+            collapsed={collapsed}
+          />
+          <SideNavItem
+            to={hasFarm ? `/board/${farmSegment}` : "#"}
+            label={t("common:workspaceNav.plan")}
+            icon={<PlanIcon className="h-4 w-4" />}
+            disabled={!hasFarm}
+            activePathPrefix="/board/"
+            collapsed={collapsed}
+          />
+          {/* The replay surface. Sits after Plan because it is read-only
           history — you plan forward here and look backward there. */}
-      <SideNavItem
-        to={hasFarm ? `/timeline/${farmSegment}` : "#"}
-        label={t("common:workspaceNav.timeline")}
-        icon={<TimelineIcon className="h-4 w-4" />}
-        disabled={!hasFarm}
-        activePathPrefix="/timeline/"
-        collapsed={collapsed}
-      />
-      {/* Farm Health View. Next to the replay because both are read-only
+          <SideNavItem
+            to={hasFarm ? `/timeline/${farmSegment}` : "#"}
+            label={t("common:workspaceNav.timeline")}
+            icon={<TimelineIcon className="h-4 w-4" />}
+            disabled={!hasFarm}
+            activePathPrefix="/timeline/"
+            collapsed={collapsed}
+          />
+          {/* Farm Health View. Next to the replay because both are read-only
           history; this one answers "what does the tree say", the other
           "what happened". */}
-      <SideNavItem
-        to={hasFarm ? `/farm-health/${farmSegment}` : "#"}
-        label={t("common:workspaceNav.farmHealth")}
-        icon={<HealthIcon className="h-4 w-4" />}
-        disabled={!hasFarm}
-        activePathPrefix="/farm-health/"
-        collapsed={collapsed}
-      />
-      <SideNavItem
-        to={hasFarm ? `/signals/${farmSegment}` : "#"}
-        label={t("common:workspaceNav.signals")}
-        icon={<SignalsIcon className="h-4 w-4" />}
-        disabled={!hasFarm}
-        activePathPrefix="/signals/"
-        collapsed={collapsed}
-      />
-      {/* The one queue over recommendations and alerts. /recommendations and
+          <SideNavItem
+            to={hasFarm ? `/farm-health/${farmSegment}` : "#"}
+            label={t("common:workspaceNav.farmHealth")}
+            icon={<HealthIcon className="h-4 w-4" />}
+            disabled={!hasFarm}
+            activePathPrefix="/farm-health/"
+            collapsed={collapsed}
+          />
+          <SideNavItem
+            to={hasFarm ? `/signals/${farmSegment}` : "#"}
+            label={t("common:workspaceNav.signals")}
+            icon={<SignalsIcon className="h-4 w-4" />}
+            disabled={!hasFarm}
+            activePathPrefix="/signals/"
+            collapsed={collapsed}
+          />
+          {/* The one queue over recommendations and alerts. /recommendations and
           /alerts are delisted: everything they did is here — acknowledge,
           resolve, apply, dismiss, defer, the four-horizon guidance and the
           decision path — and this screen also filters, groups and dispatches.
           Both stay routed, because notification links point at them.
           TODO: repoint those links, then delete the two pages. */}
-      <SideNavItem
-        to={hasFarm ? `/action-center/${farmSegment}` : "#"}
-        label={t("common:workspaceNav.actionCenter")}
-        icon={<RecommendationsIcon className="h-4 w-4" />}
-        disabled={!hasFarm}
-        activePathPrefix="/action-center/"
-        collapsed={collapsed}
-      />
-      <SideNavItem
-        to={hasFarm ? `/reports/${farmSegment}` : "#"}
-        label={t("common:workspaceNav.reports")}
-        icon={<ReportsIcon className="h-4 w-4" />}
-        disabled={!hasFarm}
-        activePathPrefix="/reports/"
-        collapsed={collapsed}
-      />
+          <SideNavItem
+            to={hasFarm ? `/action-center/${farmSegment}` : "#"}
+            label={t("common:workspaceNav.actionCenter")}
+            icon={<RecommendationsIcon className="h-4 w-4" />}
+            disabled={!hasFarm}
+            activePathPrefix="/action-center/"
+            collapsed={collapsed}
+          />
+          <SideNavItem
+            to={hasFarm ? `/reports/${farmSegment}` : "#"}
+            label={t("common:workspaceNav.reports")}
+            icon={<ReportsIcon className="h-4 w-4" />}
+            disabled={!hasFarm}
+            activePathPrefix="/reports/"
+            collapsed={collapsed}
+          />
+        </>
+      ) : null}
+      {canInvestments ? (
+        <>
+          {showWorkspace ? <NavGroupHeading label={ti("nav.group")} collapsed={collapsed} /> : null}
+          {canHoldings ? (
+            <SideNavItem
+              to="/investments"
+              label={ti("nav.overview")}
+              icon={<InvestmentsIcon className="h-4 w-4" />}
+              collapsed={collapsed}
+            />
+          ) : null}
+          {canHoldings ? (
+            <SideNavItem
+              to="/investments/holdings"
+              label={ti("nav.holdings")}
+              icon={<BlockIcon className="h-4 w-4" />}
+              activePathPrefix="/investments/holdings"
+              collapsed={collapsed}
+            />
+          ) : null}
+          {canInvestors ? (
+            <SideNavItem
+              to="/investments/investors"
+              label={ti("nav.investors")}
+              icon={<UsersIcon className="h-4 w-4" />}
+              activePathPrefix="/investments/investors"
+              collapsed={collapsed}
+            />
+          ) : null}
+        </>
+      ) : null}
     </NavShell>
   );
 }

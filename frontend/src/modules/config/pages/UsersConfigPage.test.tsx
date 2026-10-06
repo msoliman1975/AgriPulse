@@ -123,6 +123,7 @@ describe("UsersConfigPage roles", () => {
       "Tenant Owner",
       "Tenant Admin",
       "Billing Admin",
+      "Investment Manager",
       "Farm Manager",
       "Agronomist",
       "Field Operator",

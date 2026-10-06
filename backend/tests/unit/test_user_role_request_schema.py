@@ -84,3 +84,12 @@ def test_role_change_defaults_are_not_silently_valid() -> None:
     """
     with pytest.raises(ValidationError, match="granted per farm"):
         UserRoleAssignRequest()
+
+
+@pytest.mark.parametrize("model", [UserInviteRequest, UserRoleAssignRequest])
+def test_the_investor_role_is_refused_from_team(model: type) -> None:
+    """Investor is granted only by "Create app login" in Investments, so the
+    account is always tied to an investor record."""
+    body = {**_INVITE_BASE} if model is UserInviteRequest else {}
+    with pytest.raises(ValidationError, match="granted from Investments"):
+        model(**body, role="Investor")

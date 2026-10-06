@@ -53,6 +53,9 @@ INVESTOR_WRITABLE = (
     "notes_internal",
     "status",
     "archived_at",
+    "user_id",
+    "invited_at",
+    "last_app_seen_at",
 )
 HOLDING_WRITABLE = ("name", "name_ar", "tree_count", "status", "notes_internal", "archived_at")
 
@@ -273,8 +276,9 @@ class InvestorsRepository:
         sets = [f"{c} = :{c}" for c in changes]
         sets.append("updated_by = :actor")
         uuid_params = ["id", "actor"]
-        if "relationship_manager_id" in changes:
-            uuid_params.append("relationship_manager_id")
+        for col in ("relationship_manager_id", "user_id"):
+            if col in changes:
+                uuid_params.append(col)
         await self._write(
             f"UPDATE investors SET {', '.join(sets)} WHERE id = :id",
             {"id": investor_id, "actor": actor_user_id, **changes},
@@ -582,4 +586,183 @@ class InvestorsRepository:
             "updated_by = :actor WHERE id = :id",
             {"id": ownership_id, "actor": actor_user_id},
             ("id", "actor"),
+        )
+
+    # ---- Investments overview and farm map -------------------------------
+
+    async def overview_farms(self) -> list[dict[str, Any]]:
+        """One row per active farm: holdings by state and area sold vs not.
+
+        "Not sold" is the area of the farm's active leaf blocks minus the area
+        of holdings with a current owner, so unsold land with no holding drawn
+        on it counts as not sold too.
+        """
+        return await self._rows(
+            f"""
+            SELECT f.id AS farm_id, f.name AS farm_name, f.name_ar AS farm_name_ar,
+                   count(h.id)::int AS holdings,
+                   count(h.id) FILTER (WHERE cur.id IS NOT NULL)::int AS sold,
+                   count(h.id) FILTER (
+                     WHERE cur.id IS NULL AND h.status = 'available')::int AS for_sale,
+                   count(h.id) FILTER (
+                     WHERE cur.id IS NULL AND h.status = 'draft')::int AS draft,
+                   coalesce(sum(h.area_m2) FILTER (WHERE cur.id IS NOT NULL), 0)
+                     AS area_sold_m2,
+                   (SELECT coalesce(round(sum(ST_Area(b2.boundary_utm))::numeric, 2), 0)
+                      FROM blocks b2
+                     WHERE b2.farm_id = f.id
+                       AND b2.deleted_at IS NULL
+                       AND (b2.active_to IS NULL OR b2.active_to > {_TODAY})
+                       AND NOT EXISTS (
+                         SELECT 1 FROM blocks c
+                          WHERE c.parent_unit_id = b2.id AND c.deleted_at IS NULL)
+                   ) AS block_area_m2
+              FROM farms f
+              LEFT JOIN blocks b ON b.farm_id = f.id AND b.deleted_at IS NULL
+              LEFT JOIN holdings h
+                ON h.block_id = b.id AND h.deleted_at IS NULL AND h.archived_at IS NULL
+              LEFT JOIN LATERAL (
+                SELECT o.id FROM holding_ownerships o
+                 WHERE o.holding_id = h.id AND {_CURRENT_OWNERSHIP}
+                 LIMIT 1
+              ) cur ON true
+             WHERE f.deleted_at IS NULL
+               AND (f.active_to IS NULL OR f.active_to > {_TODAY})
+             GROUP BY f.id, f.name, f.name_ar
+             ORDER BY f.name
+            """,
+            {},
+        )
+
+    async def count_live_investors(self) -> int:
+        rows = await self._rows(
+            "SELECT count(*)::int AS n FROM investors "
+            "WHERE deleted_at IS NULL AND archived_at IS NULL",
+            {},
+        )
+        return int(rows[0]["n"]) if rows else 0
+
+    async def recent_ownerships(self, *, limit: int = 10) -> list[dict[str, Any]]:
+        """Newest ownership entries, each with the owner it replaced, if any."""
+        return await self._rows(
+            """
+            SELECT o.id, o.start_date, o.acquired_by, o.created_at,
+                   h.id AS holding_id, h.code AS holding_code, b.farm_id,
+                   i.id AS investor_id, i.code AS investor_code,
+                   i.full_name AS investor_name, i.full_name_ar AS investor_name_ar,
+                   prev.investor_code AS previous_investor_code,
+                   prev.ended_by AS previous_ended_by
+              FROM holding_ownerships o
+              JOIN holdings h ON h.id = o.holding_id AND h.deleted_at IS NULL
+              JOIN blocks b ON b.id = h.block_id
+              JOIN investors i ON i.id = o.investor_id
+              LEFT JOIN LATERAL (
+                SELECT pi.code AS investor_code, p.ended_by
+                  FROM holding_ownerships p
+                  JOIN investors pi ON pi.id = p.investor_id
+                 WHERE p.holding_id = o.holding_id
+                   AND p.deleted_at IS NULL
+                   AND p.end_date = o.start_date - 1
+                 LIMIT 1
+              ) prev ON true
+             WHERE o.deleted_at IS NULL
+             ORDER BY o.created_at DESC, o.id DESC
+             LIMIT :limit
+            """,
+            {"limit": limit},
+        )
+
+    async def farm_blocks(self, *, farm_id: UUID) -> list[dict[str, Any]]:
+        """Active blocks of a farm, as the Holdings map draws them."""
+        return await self._rows(
+            f"""
+            SELECT b.id, b.code, b.name, b.name_ar,
+                   ST_AsGeoJSON(b.boundary)::jsonb AS boundary,
+                   round(ST_Area(b.boundary_utm)::numeric, 2) AS area_m2,
+                   NOT EXISTS (
+                     SELECT 1 FROM blocks c
+                      WHERE c.parent_unit_id = b.id AND c.deleted_at IS NULL
+                   ) AS eligible
+              FROM blocks b
+             WHERE b.farm_id = :farm_id
+               AND b.deleted_at IS NULL
+               AND (b.active_to IS NULL OR b.active_to > {_TODAY})
+             ORDER BY b.code
+            """,
+            {"farm_id": farm_id},
+            ("farm_id",),
+        )
+
+    # ---- Investor app (read-only, the investor's own rows) ----------------
+
+    async def get_investor_by_user(self, *, user_id: UUID) -> dict[str, Any] | None:
+        rows = await self._rows(
+            f"SELECT {_INVESTOR_COLUMNS} FROM {_INVESTOR_FROM} "
+            "WHERE i.user_id = :uid AND i.deleted_at IS NULL "
+            "ORDER BY i.created_at DESC LIMIT 1",
+            {"uid": user_id},
+            ("uid",),
+        )
+        return rows[0] if rows else None
+
+    async def company_name(self) -> str | None:
+        rows = await self._rows(
+            "SELECT t.name FROM public.tenants t WHERE t.schema_name = current_schema()",
+            {},
+        )
+        return str(rows[0]["name"]) if rows else None
+
+    async def investor_app_holdings(
+        self, *, investor_id: UUID, holding_id: UUID | None = None
+    ) -> list[dict[str, Any]]:
+        """The investor's ownerships with what the investor app may show.
+
+        Deliberately narrow: no share, no other holdings, no notes, no
+        contract numbers. The response schema is a second allowlist.
+        """
+        clauses = ["o.investor_id = :investor_id", "o.deleted_at IS NULL", "h.deleted_at IS NULL"]
+        params: dict[str, Any] = {"investor_id": investor_id}
+        uuid_params = ["investor_id"]
+        if holding_id is not None:
+            clauses.append("h.id = :holding_id")
+            params["holding_id"] = holding_id
+            uuid_params.append("holding_id")
+        return await self._rows(
+            f"""
+            SELECT o.id AS ownership_id, o.start_date, o.end_date,
+                   CASE
+                     WHEN o.end_date IS NOT NULL AND o.end_date < {_TODAY} THEN 'past'
+                     WHEN o.start_date > {_TODAY} THEN 'future'
+                     ELSE 'current'
+                   END AS period,
+                   h.id AS holding_id, h.code, h.name, h.name_ar, h.area_m2, h.tree_count,
+                   ST_AsGeoJSON(h.boundary)::jsonb AS boundary,
+                   b.code AS block_code, b.name AS block_name, b.name_ar AS block_name_ar,
+                   ST_AsGeoJSON(b.boundary)::jsonb AS block_boundary,
+                   f.name AS farm_name, f.name_ar AS farm_name_ar,
+                   crop.crop_name_en, crop.crop_name_ar,
+                   crop.variety_name_en, crop.variety_name_ar, crop.planting_date
+              FROM holding_ownerships o
+              JOIN holdings h ON h.id = o.holding_id
+              JOIN blocks b ON b.id = h.block_id
+              JOIN farms f ON f.id = b.farm_id
+              LEFT JOIN LATERAL (
+                SELECT c.name_en AS crop_name_en, c.name_ar AS crop_name_ar,
+                       v.name_en AS variety_name_en, v.name_ar AS variety_name_ar,
+                       bc.planting_date
+                  FROM block_crops bc
+                  JOIN public.crops c ON c.id = bc.crop_id
+                  LEFT JOIN public.crop_varieties v ON v.id = bc.crop_variety_id
+                 WHERE bc.block_id = b.id
+                   AND bc.deleted_at IS NULL
+                   AND bc.effective_from <= {_TODAY}
+                   AND (bc.effective_to IS NULL OR bc.effective_to > {_TODAY})
+                 ORDER BY bc.effective_from DESC
+                 LIMIT 1
+              ) crop ON true
+             WHERE {" AND ".join(clauses)}
+             ORDER BY (o.end_date IS NULL) DESC, o.start_date DESC
+            """,
+            params,
+            tuple(uuid_params),
         )

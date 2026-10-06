@@ -51,10 +51,10 @@ function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/settings/investors"]}>
+      <MemoryRouter initialEntries={["/investments/investors"]}>
         <Routes>
-          <Route path="/settings/investors" element={<InvestorsPage />} />
-          <Route path="/settings/investors/:id" element={<p>detail page</p>} />
+          <Route path="/investments/investors" element={<InvestorsPage />} />
+          <Route path="/investments/investors/:id" element={<p>detail page</p>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,

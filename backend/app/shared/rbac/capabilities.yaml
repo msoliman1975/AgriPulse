@@ -402,6 +402,14 @@ capabilities:
     description: Give a holding an owner, transfer it, or end an ownership.
     scope: farm
     status: active
+  investor.invite:
+    description: Create, resend, disable, or enable an investor's app login.
+    scope: tenant
+    status: active
+  investor_app.use:
+    description: An investor reads their own holdings. Held only by the Investor role.
+    scope: tenant
+    status: active
 
   # --- Irrigation schedules --------------------------------------------
   irrigation.schedule.read:

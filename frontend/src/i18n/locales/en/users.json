@@ -81,7 +81,8 @@
     "Agronomist": "Agronomist",
     "FieldOperator": "Field Operator",
     "Scout": "Scout",
-    "Viewer": "Viewer"
+    "Viewer": "Viewer",
+    "InvestmentManager": "Investment Manager"
   },
   "roleHints": {
     "TenantOwner": "Full control of the tenant, on every farm. Only an owner can transfer ownership.",
@@ -91,7 +92,8 @@
     "Agronomist": "Reviews and acts on recommendations and alerts for the farms you choose below.",
     "FieldOperator": "Records work done in the field on the farms you choose below.",
     "Scout": "Files scouting visits and observations on the farms you choose below.",
-    "Viewer": "Read-only access to the farms you choose below."
+    "Viewer": "Read-only access to the farms you choose below.",
+    "InvestmentManager": "Investments area only: investors, holdings and ownership. Reads farms and blocks to draw holdings."
   },
   "role": {
     "title": "Role",

@@ -30,6 +30,11 @@ class TenantRole(StrEnum):
     TENANT_OWNER = "TenantOwner"
     TENANT_ADMIN = "TenantAdmin"
     BILLING_ADMIN = "BillingAdmin"
+    # Staff who run the Investments area: investors, holdings, ownership.
+    INVESTMENT_MANAGER = "InvestmentManager"
+    # An outside owner of holdings. Reads only their own holdings; granted
+    # by the investors module, never from Settings > Team.
+    INVESTOR = "Investor"
 
 
 class FarmRole(StrEnum):

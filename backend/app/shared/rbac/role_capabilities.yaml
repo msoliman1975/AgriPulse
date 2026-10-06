@@ -148,6 +148,7 @@ roles:
       - holding.manage
       - holding.redraw_sold
       - holding.assign_owner
+      - investor.invite
 
   TenantAdmin:
     description: Tenant admin; everything in the tenant except billing changes
@@ -239,6 +240,7 @@ roles:
       - holding.manage
       - holding.redraw_sold
       - holding.assign_owner
+      - investor.invite
 
   BillingAdmin:
     description: Subscription and billing only.
@@ -248,6 +250,31 @@ roles:
       - subscription.manage
       - notification.read_inbox
       - notification.write_inbox
+
+  InvestmentManager:
+    description: >-
+      Runs the Investments area. Defines investors and holdings, assigns and
+      transfers ownership, and creates investor app logins. Reads farms and
+      blocks only to draw holdings on them; has no farm work rights.
+    capabilities:
+      - farm.read
+      - block.read
+      - investor.read
+      - investor.manage
+      - investor.invite
+      - holding.read
+      - holding.manage
+      - holding.redraw_sold
+      - holding.assign_owner
+      - notification.read_inbox
+      - notification.write_inbox
+
+  Investor:
+    description: >-
+      An outside owner of holdings. Reads only their own holdings. Granted by
+      the investors module when staff create the investor's app login.
+    capabilities:
+      - investor_app.use
 
   # ---- Farm-scoped ----------------------------------------------------
 
@@ -311,8 +338,6 @@ roles:
       - analytics.export
       - notification.read_inbox
       - notification.write_inbox
-      - holding.read
-      - holding.manage
 
   Agronomist:
     description: Agronomic decisions on an assigned farm; no geometry edits.
@@ -357,7 +382,6 @@ roles:
       - analytics.export
       - notification.read_inbox
       - notification.write_inbox
-      - holding.read
 
   FieldOperator:
     description: Field operations and observation logging on an assigned farm.
@@ -444,4 +468,3 @@ roles:
       - analytics.read
       - notification.read_inbox
       - notification.write_inbox
-      - holding.read

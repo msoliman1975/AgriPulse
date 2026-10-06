@@ -18,7 +18,7 @@ import { MapDraw, type MapDrawReference } from "@/modules/farms/components/MapDr
 import { HoldingFields, type HoldingFieldValues } from "../components/HoldingFields";
 import { blockHoldingsKey, errorText, formatPct } from "../lib";
 
-/** /farms/:farmId/blocks/:blockId/holdings/new — draw one holding inside a block. */
+/** /investments/holdings/:farmId/blocks/:blockId/new — draw one holding in a block. */
 export function HoldingCreatePage(): JSX.Element {
   const { farmId = "", blockId = "" } = useParams<{ farmId: string; blockId: string }>();
   const { t, i18n } = useTranslation("investors");
@@ -63,7 +63,7 @@ export function HoldingCreatePage(): JSX.Element {
     },
     onSuccess: async (holding) => {
       await queryClient.invalidateQueries({ queryKey: ["holdings"] });
-      navigate(`/farms/${farmId}/holdings/${holding.id}`);
+      navigate(`/investments/holdings/${farmId}/${holding.id}`);
     },
     onError: (err) => setError(errorText(err)),
   });
@@ -82,7 +82,8 @@ export function HoldingCreatePage(): JSX.Element {
           above={
             <Breadcrumb
               items={[
-                { label: blockLabel, to: `/farms/${farmId}/blocks/${blockId}` },
+                { label: t("nav.holdings"), to: `/investments/holdings?farm=${farmId}` },
+                { label: blockLabel },
                 { label: t("block.add") },
               ]}
             />
@@ -134,7 +135,7 @@ export function HoldingCreatePage(): JSX.Element {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => navigate(`/farms/${farmId}/blocks/${blockId}`)}
+                onClick={() => navigate(`/investments/holdings?farm=${farmId}`)}
               >
                 {t("holding.cancel")}
               </Button>

@@ -126,6 +126,7 @@ from pydantic import AliasChoices, EmailStr, Field, model_validator  # noqa: E40
 
 from app.shared.rbac import (  # noqa: E402
     FARM_TIER_ROLES,
+    RESERVED_TENANT_ROLES,
     TENANT_ASSIGNABLE_ROLES,
     RoleNotAssignableError,
     assignment_tier,
@@ -215,6 +216,11 @@ class RoleAssignmentMixin(BaseModel):
 
     @model_validator(mode="after")
     def _check_role_and_farms(self) -> RoleAssignmentMixin:
+        if self.role in RESERVED_TENANT_ROLES:
+            raise ValueError(
+                f"role {self.role!r} is granted from Investments, when staff "
+                "create an investor's app login"
+            )
         try:
             tier = assignment_tier(self.role)
         except RoleNotAssignableError as exc:

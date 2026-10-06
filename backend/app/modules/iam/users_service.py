@@ -193,6 +193,13 @@ class TenantUsersService:
                     WHERE m.tenant_id = :tid
                       AND m.deleted_at IS NULL
                       AND u.deleted_at IS NULL
+                      -- Investors are managed from Investments, not Team.
+                      AND NOT EXISTS (
+                          SELECT 1 FROM public.tenant_role_assignments inv
+                           WHERE inv.membership_id = m.id
+                             AND inv.revoked_at IS NULL
+                             AND inv.role = 'Investor'
+                      )
                     ORDER BY u.full_name
                     """
                     ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
