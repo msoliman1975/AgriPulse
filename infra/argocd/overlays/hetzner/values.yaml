@@ -4031,9 +4031,18 @@ global:
       #   Watch: an Investor's My holdings lists their holdings after they
       #   sign in through the browser.
       #   Rollback is these three tags back to e46c56d.
-      tag: "9526842"
+      # c6c318c = #774 and #770, api, workers and frontend.
+      #   #774: the investor login subject matches in either UUID text form.
+      #   #770: Investments pages follow the top-bar farm (Overview, Holdings
+      #   and Investors carry :farmId); new routes GET /farms/{id}/investors
+      #   and /farms/{id}/investments/overview replace /investments/overview.
+      #   No migration.
+      #   Watch: switching farm in the top bar on an Investments page keeps
+      #   the section and shows that farm's holdings.
+      #   Rollback is these three tags back to 9526842.
+      tag: "c6c318c"
     workers:
-      tag: "9526842"
+      tag: "c6c318c"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4686,7 +4695,10 @@ global:
       #   after load. Rollback is this tag alone back to 7675a60.
       # 9526842 = #772, frontend. No frontend change of its own; moves with
       #   the api. Rollback is this tag alone back to e46c56d.
-      tag: "9526842"
+      # c6c318c = #770, frontend. Investments pages follow the top-bar farm.
+      #   Needs the api at c6c318c (new farm-scoped routes). Rollback is this
+      #   tag together with the api back to 9526842.
+      tag: "c6c318c"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
