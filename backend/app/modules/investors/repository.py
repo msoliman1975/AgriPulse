@@ -172,6 +172,10 @@ class InvestorsRepository:
         if uuid_params:
             stmt = stmt.bindparams(*(bindparam(p, type_=_UUID) for p in uuid_params))
         result = await self._session.execute(stmt, params)
+        # INSERT and UPDATE without RETURNING give a closed result; reading
+        # rows from it raises ResourceClosedError.
+        if not result.returns_rows:
+            return []
         return [dict(r) for r in result.mappings()]
 
     async def _write(

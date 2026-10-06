@@ -52,7 +52,7 @@ async def _investor(env: ScoutingFixture, name: str = "Nour Hassan") -> dict[str
     async with _client(env.admin_context) as c:
         resp = await c.post(
             "/api/v1/investors",
-            json={"full_name": name, "email": f"{uuid4().hex[:8]}@investor.test"},
+            json={"full_name": name, "email": f"{uuid4().hex[:8]}@example.com"},
         )
     assert resp.status_code == 201, resp.text
     return resp.json()
@@ -300,10 +300,10 @@ async def test_block_context_reports_sold_and_unsold_area(scouting_env: Scouting
 async def test_duplicate_investor_email_is_refused(scouting_env: ScoutingFixture) -> None:
     async with _client(scouting_env.admin_context) as c:
         one = await c.post(
-            "/api/v1/investors", json={"full_name": "One", "email": "same@investor.test"}
+            "/api/v1/investors", json={"full_name": "One", "email": "same@example.com"}
         )
         two = await c.post(
-            "/api/v1/investors", json={"full_name": "Two", "email": "SAME@investor.test"}
+            "/api/v1/investors", json={"full_name": "Two", "email": "SAME@example.com"}
         )
     assert one.status_code == 201, one.text
     assert one.json()["code"] == "INV-0001"
