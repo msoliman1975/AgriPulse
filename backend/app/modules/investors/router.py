@@ -7,6 +7,13 @@ Mounted under /api/v1:
   GET    /investors/{id}                              investor.read
   PATCH  /investors/{id}                              investor.manage
   POST   /investors/{id}:archive                      investor.manage
+  POST   /investors/{id}:create-login                 investor.invite
+  POST   /investors/{id}:resend-login                 investor.invite
+  POST   /investors/{id}:disable-login                investor.invite
+  POST   /investors/{id}:enable-login                 investor.invite
+
+  GET    /investments/overview                        holding.read
+  GET    /farms/{farm_id}/holdings-map                holding.read
 
   GET    /farms/{farm_id}/holdings                    holding.read
   GET    /farms/{farm_id}/blocks/{block_id}/holdings  holding.read   (draw-screen context)
@@ -22,8 +29,8 @@ Mounted under /api/v1:
 Investors are tenant-wide, so their routes take no farm. Holdings belong to a
 block, so their routes are farm-scoped and a farm-scoped grant works.
 
-The investor app gets its own router in a later stage. Nothing here is meant
-for an investor token: the Investor role holds none of these capabilities.
+The investor reads through `app_router.py`. Nothing here is meant for an
+investor token: the Investor role holds none of these capabilities.
 """
 
 from __future__ import annotations
@@ -35,14 +42,18 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import APIError
+from app.modules.iam.users_service import TenantUsersService, get_tenant_users_service
 from app.modules.investors.schemas import (
     BlockHoldingsContextResponse,
+    FarmHoldingsMapResponse,
     HoldingCreateRequest,
     HoldingDetailResponse,
     HoldingResponse,
     HoldingUpdateRequest,
+    InvestmentsOverviewResponse,
     InvestorCreateRequest,
     InvestorDetailResponse,
+    InvestorLoginResponse,
     InvestorResponse,
     InvestorStatus,
     InvestorUpdateRequest,
@@ -52,7 +63,7 @@ from app.modules.investors.schemas import (
 from app.modules.investors.service import InvestorsService, get_investors_service
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
-from app.shared.db.session import get_db_session
+from app.shared.db.session import get_admin_db_session, get_db_session
 from app.shared.rbac.check import has_capability, requires_capability
 
 router = APIRouter(prefix="/api/v1", tags=["investors"])
@@ -76,6 +87,20 @@ def _service(
 ) -> InvestorsService:
     _ensure_tenant(context)
     return get_investors_service(tenant_session=tenant_session, tenant_schema=context.tenant_schema)
+
+
+def _users(
+    admin_session: AsyncSession = Depends(get_admin_db_session),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> TenantUsersService:
+    return get_tenant_users_service(admin_session, tenant_session=tenant_session)
+
+
+def _tenant_id(context: RequestContext) -> UUID:
+    if context.tenant_id is None:
+        _ensure_tenant(context)
+        raise AssertionError("unreachable")
+    return context.tenant_id
 
 
 # ---- Investors ----------------------------------------------------------
@@ -292,3 +317,85 @@ async def delete_ownership(
         farm_id=farm_id, ownership_id=ownership_id, actor_user_id=context.user_id
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---- App login ----------------------------------------------------------
+
+
+@router.post("/investors/{investor_id}:create-login", response_model=InvestorLoginResponse)
+async def create_investor_login(
+    investor_id: UUID,
+    context: RequestContext = Depends(requires_capability("investor.invite")),
+    service: InvestorsService = Depends(_service),
+    users: TenantUsersService = Depends(_users),
+) -> dict[str, Any]:
+    return await service.create_login(
+        investor_id=investor_id, users=users, actor_user_id=context.user_id
+    )
+
+
+@router.post("/investors/{investor_id}:resend-login", response_model=InvestorLoginResponse)
+async def resend_investor_login(
+    investor_id: UUID,
+    context: RequestContext = Depends(requires_capability("investor.invite")),
+    service: InvestorsService = Depends(_service),
+    users: TenantUsersService = Depends(_users),
+) -> dict[str, Any]:
+    return await service.resend_login(
+        investor_id=investor_id,
+        users=users,
+        tenant_id=_tenant_id(context),
+        actor_user_id=context.user_id,
+    )
+
+
+@router.post("/investors/{investor_id}:disable-login", response_model=InvestorResponse)
+async def disable_investor_login(
+    investor_id: UUID,
+    context: RequestContext = Depends(requires_capability("investor.invite")),
+    service: InvestorsService = Depends(_service),
+    users: TenantUsersService = Depends(_users),
+) -> dict[str, Any]:
+    return await service.set_login_enabled(
+        investor_id=investor_id,
+        enabled=False,
+        users=users,
+        tenant_id=_tenant_id(context),
+        actor_user_id=context.user_id,
+    )
+
+
+@router.post("/investors/{investor_id}:enable-login", response_model=InvestorResponse)
+async def enable_investor_login(
+    investor_id: UUID,
+    context: RequestContext = Depends(requires_capability("investor.invite")),
+    service: InvestorsService = Depends(_service),
+    users: TenantUsersService = Depends(_users),
+) -> dict[str, Any]:
+    return await service.set_login_enabled(
+        investor_id=investor_id,
+        enabled=True,
+        users=users,
+        tenant_id=_tenant_id(context),
+        actor_user_id=context.user_id,
+    )
+
+
+# ---- Investments overview and farm map ----------------------------------
+
+
+@router.get("/investments/overview", response_model=InvestmentsOverviewResponse)
+async def investments_overview(
+    _: RequestContext = Depends(requires_capability("holding.read")),
+    service: InvestorsService = Depends(_service),
+) -> dict[str, Any]:
+    return await service.overview()
+
+
+@router.get("/farms/{farm_id}/holdings-map", response_model=FarmHoldingsMapResponse)
+async def farm_holdings_map(
+    farm_id: UUID,
+    _: RequestContext = Depends(requires_capability("holding.read", farm_id_param="farm_id")),
+    service: InvestorsService = Depends(_service),
+) -> dict[str, Any]:
+    return await service.farm_map(farm_id=farm_id)

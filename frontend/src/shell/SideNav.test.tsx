@@ -130,3 +130,48 @@ describe("<SideNav> collapse", () => {
     expect(screen.getByRole("button", { name: "common:workspaceNav.expand" })).toBeInTheDocument();
   });
 });
+
+describe("<SideNav> Investments group", () => {
+  it("gives an Investment Manager only the Investments group", () => {
+    mockUseAuth.mockReturnValue({
+      user: { access_token: jwt({ tenant_role: "InvestmentManager" }) },
+    });
+    renderNav();
+    expect(screen.queryByText("admin,common:common:workspaceNav.insights")).not.toBeInTheDocument();
+    expect(screen.getByText("investors:nav.group")).toBeInTheDocument();
+    expect(screen.getByText("investors:nav.holdings").closest("a")).toHaveAttribute(
+      "href",
+      "/investments/holdings",
+    );
+    expect(screen.getByText("investors:nav.investors").closest("a")).toHaveAttribute(
+      "href",
+      "/investments/investors",
+    );
+  });
+
+  it("gives a tenant admin both groups, Workspace first", () => {
+    mockUseAuth.mockReturnValue({
+      user: { access_token: jwt({ tenant_role: "TenantAdmin" }) },
+    });
+    renderNav();
+    expect(screen.getByText("admin,common:common:workspaceNav.workspace")).toBeInTheDocument();
+    expect(screen.getByText("investors:nav.group")).toBeInTheDocument();
+    expect(screen.getByText("investors:nav.overview").closest("a")).toHaveAttribute(
+      "href",
+      "/investments",
+    );
+  });
+
+  it("gives a farm role no Investments group", () => {
+    mockUseAuth.mockReturnValue({
+      user: {
+        access_token: jwt({
+          farm_scopes: [{ farm_id: "f1", role: "FarmManager" }],
+        }),
+      },
+    });
+    renderNav();
+    expect(screen.queryByText("investors:nav.group")).not.toBeInTheDocument();
+    expect(screen.queryByText("investors:nav.holdings")).not.toBeInTheDocument();
+  });
+});

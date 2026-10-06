@@ -14,6 +14,7 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { ErrorState } from "@/components/ErrorState";
+import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
@@ -23,9 +24,10 @@ import { ArchiveButton } from "@/modules/farms/components/ArchiveButton";
 import { AreaDisplay } from "@/modules/farms/components/AreaDisplay";
 import { useCapability } from "@/rbac/useCapability";
 import { InvestorFormDialog } from "../components/InvestorFormDialog";
+import { InvestorLoginCard } from "../components/InvestorLoginCard";
 import { INVESTOR_STATUS_PILL, errorText } from "../lib";
 
-/** /settings/investors/:investorId — one investor, their profile and holdings. */
+/** /investments/investors/:investorId — one investor: profile, app login, holdings. */
 export function InvestorDetailPage(): JSX.Element {
   const { investorId = "" } = useParams<{ investorId: string }>();
   const { t, i18n } = useTranslation("investors");
@@ -71,11 +73,11 @@ export function InvestorDetailPage(): JSX.Element {
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    <Page>
       <PageHeader
         above={
           <Breadcrumb
-            items={[{ label: t("detail.back"), to: "/settings/investors" }, { label: inv.code }]}
+            items={[{ label: t("detail.back"), to: "/investments/investors" }, { label: inv.code }]}
           />
         }
         title={
@@ -90,17 +92,6 @@ export function InvestorDetailPage(): JSX.Element {
             <>
               <Button variant="ghost" onClick={() => setEditing(true)}>
                 {t("detail.edit")}
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={update.isPending}
-                onClick={() =>
-                  update.mutate({
-                    status: inv.status === "suspended" ? "not_invited" : "suspended",
-                  })
-                }
-              >
-                {inv.status === "suspended" ? t("detail.unsuspend") : t("detail.suspend")}
               </Button>
               <ArchiveButton
                 label={t("detail.archive")}
@@ -140,10 +131,11 @@ export function InvestorDetailPage(): JSX.Element {
             t("detail.totalArea"),
             <AreaDisplay areaM2={Number(inv.current_area_m2)} fractionDigits={2} />,
           )}
-          {row(t("detail.appAccess"), t("detail.appAccessNote"))}
           {inv.notes_internal ? row(t("form.notes"), inv.notes_internal) : null}
         </dl>
       </Card>
+
+      <InvestorLoginCard investor={inv} />
 
       <Card title={t("detail.current")} noPadding>
         <OwnershipTable rows={current} empty={t("detail.noCurrent")} />
@@ -164,7 +156,7 @@ export function InvestorDetailPage(): JSX.Element {
           onSubmit={(payload) => update.mutate(payload)}
         />
       ) : null}
-    </div>
+    </Page>
   );
 }
 
@@ -190,7 +182,7 @@ function OwnershipTable({ rows, empty }: { rows: Ownership[]; empty: string }): 
             <Td>
               <Link
                 className="text-ap-primary hover:underline"
-                to={`/farms/${o.farm_id}/holdings/${o.holding_id}`}
+                to={`/investments/holdings/${o.farm_id}/${o.holding_id}`}
               >
                 <span className="font-mono">{o.holding_code}</span> ·{" "}
                 {localizedName(i18n.language, o.holding_name, o.holding_name_ar)}

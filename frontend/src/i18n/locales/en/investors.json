@@ -1,5 +1,10 @@
 {
-  "nav": "Investors",
+  "nav": {
+    "group": "Investments",
+    "overview": "Overview",
+    "holdings": "Holdings",
+    "investors": "Investors"
+  },
   "list": {
     "title": "Investors",
     "subtitle": "People and companies who own holdings. They have no say in farm work.",
@@ -82,17 +87,13 @@
   "detail": {
     "back": "Investors",
     "edit": "Edit",
-    "suspend": "Suspend",
-    "unsuspend": "Remove suspension",
     "archive": "Archive investor",
     "profile": "Profile",
     "current": "Current and future holdings",
     "past": "Past holdings",
     "noCurrent": "This investor owns no holding today.",
     "noPast": "No past holdings.",
-    "totalArea": "Total area owned today",
-    "appAccess": "App access",
-    "appAccessNote": "Invitations to the investor app come in the next release."
+    "totalArea": "Total area owned today"
   },
   "period": {
     "past": "Past",
@@ -175,5 +176,80 @@
   },
   "error": {
     "load": "Could not load this page."
+  },
+  "overview": {
+    "title": "Investments",
+    "subtitle": "Holdings sold to investors, and for sale, across all farms.",
+    "kpiInvestors": "Investors",
+    "kpiSold": "Holdings sold",
+    "kpiForSale": "For sale",
+    "kpiAreaSold": "Area sold",
+    "kpiAreaNotSold": "Area not sold",
+    "farmsTitle": "By farm",
+    "colFarm": "Farm",
+    "colHoldings": "Holdings",
+    "colSold": "Sold",
+    "colForSale": "For sale",
+    "colAreaSold": "Area sold",
+    "colAreaNotSold": "Area not sold",
+    "recentTitle": "Recent ownership changes",
+    "recentEmpty": "No ownership changes yet.",
+    "recentNew": "{{holding}} to {{investor}}",
+    "recentTransfer": "{{holding}}: {{from}} to {{to}}",
+    "empty": "No active farms yet."
+  },
+  "holdingsPage": {
+    "title": "Holdings",
+    "subtitle": "Parts of blocks sold, or for sale, to investors.",
+    "farm": "Farm",
+    "new": "New holding",
+    "pickBlockTitle": "Choose a block",
+    "pickBlockHelp": "Click a block on the map, or choose it from the list.",
+    "block": "Block",
+    "allBlocks": "All blocks",
+    "allStatuses": "All statuses",
+    "allInvestors": "All owners",
+    "empty": "No holdings on this farm yet.",
+    "emptyFiltered": "No holdings match these filters.",
+    "noFarms": "There are no farms to draw holdings on.",
+    "mapHelp": "Click a holding to open it.",
+    "blockNotEligible": "This block is split into sectors. Choose one of its sectors.",
+    "continue": "Draw in this block",
+    "cancel": "Cancel"
+  },
+  "login": {
+    "title": "App login",
+    "none": "No app login yet. This investor cannot sign in.",
+    "create": "Create app login",
+    "createHelp": "Creates a user with the Investor role and sends a set-password email to {{email}}.",
+    "invited": "Invited {{date}}",
+    "lastSeen": "Last used {{date}}",
+    "neverSeen": "Not used yet",
+    "resend": "Resend email",
+    "disable": "Disable login",
+    "enable": "Enable login",
+    "sent": "Email sent to {{email}}.",
+    "emailFailed": "The email could not be sent. Give the investor this temporary password: {{password}}",
+    "disabled": "Login disabled. This investor cannot sign in."
+  },
+  "my": {
+    "title": "My holdings",
+    "empty": "You have no holdings yet.",
+    "current": "Current",
+    "past": "Previous",
+    "future": "Starts later",
+    "area": "Area",
+    "trees": "Trees",
+    "crop": "Crop",
+    "planted": "Planted",
+    "ownedSince": "Owned since",
+    "ownedUntil": "Owned until",
+    "farm": "Farm",
+    "block": "Block",
+    "signOut": "Sign out",
+    "note": "Read only. For any question, contact {{company}}.",
+    "loadFailed": "Could not load your holdings.",
+    "notLinked": "This account is not linked to an investor record. Contact the company.",
+    "mapLegend": "Yellow: your holding. Green dashed line: the block."
   }
 }

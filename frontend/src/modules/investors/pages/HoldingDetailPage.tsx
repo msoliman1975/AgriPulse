@@ -45,7 +45,7 @@ function toValues(h: HoldingDetail): HoldingFieldValues {
   };
 }
 
-/** /farms/:farmId/holdings/:holdingId — one holding, its details and its owners. */
+/** /investments/holdings/:farmId/:holdingId — one holding, its details and owners. */
 export function HoldingDetailPage(): JSX.Element {
   const { farmId = "", holdingId = "" } = useParams<{ farmId: string; holdingId: string }>();
   const { t, i18n } = useTranslation("investors");
@@ -166,13 +166,9 @@ export function HoldingDetailPage(): JSX.Element {
         above={
           <Breadcrumb
             items={[
+              { label: t("nav.holdings"), to: `/investments/holdings?farm=${farmId}` },
               {
-                label: localizedName(i18n.language, holding.farm_name ?? "", holding.farm_name_ar),
-                to: `/farms/${farmId}`,
-              },
-              {
-                label: holding.block_code ?? "",
-                to: `/farms/${farmId}/blocks/${holding.block_id}`,
+                label: `${localizedName(i18n.language, holding.farm_name ?? "", holding.farm_name_ar)} · ${holding.block_code ?? ""}`,
               },
               { label: holding.code },
             ]}
@@ -219,7 +215,7 @@ export function HoldingDetailPage(): JSX.Element {
             holdings={blockQ.data.holdings}
             highlightId={holding.id}
             onSelect={(id) => {
-              if (id !== holdingId) navigate(`/farms/${farmId}/holdings/${id}`);
+              if (id !== holdingId) navigate(`/investments/holdings/${farmId}/${id}`);
             }}
           />
         ) : (
@@ -310,7 +306,7 @@ export function HoldingDetailPage(): JSX.Element {
                   <Td>
                     <Link
                       className="text-ap-primary hover:underline"
-                      to={`/settings/investors/${o.investor_id}`}
+                      to={`/investments/investors/${o.investor_id}`}
                     >
                       {o.investor_code} ·{" "}
                       {localizedName(i18n.language, o.investor_name, o.investor_name_ar)}

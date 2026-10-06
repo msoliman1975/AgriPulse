@@ -78,6 +78,8 @@ class FakeKeycloakClient:
             "TenantAdmin",
             "BillingAdmin",
             "Viewer",
+            "InvestmentManager",
+            "Investor",
         }
 
     def _maybe_fail(self, name: str) -> None:

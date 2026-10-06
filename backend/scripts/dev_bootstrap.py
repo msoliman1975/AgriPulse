@@ -90,7 +90,13 @@ DEV_USER_EMAIL = os.getenv("DEV_USER_EMAIL", "dev@agripulse.local")
 DEV_TENANT_SLUG = os.getenv("DEV_TENANT_SLUG", "dev-tenant")
 CLIENT_ID = "agripulse-api"
 
-VALID_TENANT_ROLES = {"TenantOwner", "TenantAdmin", "BillingAdmin"}
+VALID_TENANT_ROLES = {
+    "TenantOwner",
+    "TenantAdmin",
+    "BillingAdmin",
+    "InvestmentManager",
+    "Investor",
+}
 VALID_FARM_ROLES = {"FarmManager", "Agronomist", "FieldOperator", "Scout", "Viewer"}
 
 
@@ -179,6 +185,8 @@ APP_REALM_ROLES: tuple[str, ...] = (
     "TenantAdmin",
     "BillingAdmin",
     "Viewer",
+    "InvestmentManager",
+    "Investor",
 )
 
 

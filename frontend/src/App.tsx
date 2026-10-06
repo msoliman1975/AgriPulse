@@ -1,11 +1,20 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
+import {
+  BrowserRouter,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useParams,
+} from "react-router-dom";
 
 import { AuthCallback } from "@/auth/AuthCallback";
 import { AuthProvider } from "@/auth/AuthProvider";
 import { AuthSync } from "@/auth/AuthSync";
 import { ProtectedRoute } from "@/auth/ProtectedRoute";
+import { useCapability } from "@/rbac/useCapability";
 import { ConfigProvider } from "@/config/ConfigContext";
 import { PrefsProvider } from "@/prefs/PrefsContext";
 import { AppShell } from "@/shell/AppShell";
@@ -20,10 +29,14 @@ import { BlockCreatePage } from "@/modules/farms/pages/BlockCreatePage";
 import { BlockAutoGridPage } from "@/modules/farms/pages/BlockAutoGridPage";
 import { BlockDetailPage } from "@/modules/farms/pages/BlockDetailPage";
 import { BlockEditPage } from "@/modules/farms/pages/BlockEditPage";
+import { InvestorShell } from "@/modules/investors/components/InvestorShell";
 import { HoldingCreatePage } from "@/modules/investors/pages/HoldingCreatePage";
 import { HoldingDetailPage } from "@/modules/investors/pages/HoldingDetailPage";
+import { HoldingsPage } from "@/modules/investors/pages/HoldingsPage";
+import { InvestmentsOverviewPage } from "@/modules/investors/pages/InvestmentsOverviewPage";
 import { InvestorDetailPage } from "@/modules/investors/pages/InvestorDetailPage";
 import { InvestorsPage } from "@/modules/investors/pages/InvestorsPage";
+import { MyHoldingsPage } from "@/modules/investors/pages/MyHoldingsPage";
 import { InsightsPage } from "@/modules/insights/pages/InsightsPage";
 import { BoardPage } from "@/modules/board/pages/BoardPage";
 import { FarmHealthViewPage } from "@/modules/farmHealth/pages/FarmHealthViewPage";
@@ -116,6 +129,21 @@ function RedirectPlanToBoard(): ReactNode {
   return <Navigate to={`/board/${farmId}${search}`} replace />;
 }
 
+/**
+ * Staff get the full app frame. An Investor gets a minimal one: no side
+ * menu, no farm picker, no alerts. The role never changes within a session.
+ */
+function PersonaShell(): ReactNode {
+  const isInvestor = useCapability("investor_app.use");
+  return isInvestor ? <InvestorShell /> : <AppShell />;
+}
+
+/** /my-holdings is the Investor's page only; staff land on their home. */
+function InvestorOnlyGuard(): ReactNode {
+  const isInvestor = useCapability("investor_app.use");
+  return isInvestor ? <Outlet /> : <Navigate to="/" replace />;
+}
+
 export function App(): ReactNode {
   return (
     <AuthProvider>
@@ -144,7 +172,7 @@ export function App(): ReactNode {
                       shared across every farm-scoped page. */}
                   <ConfigProvider>
                     <QueryClientProvider client={queryClient}>
-                      <AppShell />
+                      <PersonaShell />
                     </QueryClientProvider>
                   </ConfigProvider>
                 </ProtectedRoute>
@@ -153,6 +181,10 @@ export function App(): ReactNode {
               {/* AgriPulseGuard bounces PlatformAdmin to /platform so
                   Platform staff don't see the AgriPulse tree at all
                   (persona-separation rule from the portal-restructure). */}
+              {/* An Investor user sees only their own holdings. */}
+              <Route element={<InvestorOnlyGuard />}>
+                <Route path="/my-holdings" element={<MyHoldingsPage />} />
+              </Route>
               <Route element={<AgriPulseGuard />}>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/tenants/:tenantId" element={<TenantDetailPage />} />
@@ -170,11 +202,21 @@ export function App(): ReactNode {
                 <Route path="/farms/:farmId/blocks/auto-grid" element={<BlockAutoGridPage />} />
                 <Route path="/farms/:farmId/blocks/:blockId" element={<BlockDetailPage />} />
                 <Route path="/farms/:farmId/blocks/:blockId/edit" element={<BlockEditPage />} />
+                {/* Investments: a separate area from farm work. Investors,
+                    holdings and ownership, for Investment Managers and
+                    tenant admins. */}
+                <Route path="/investments" element={<InvestmentsOverviewPage />} />
+                <Route path="/investments/holdings" element={<HoldingsPage />} />
                 <Route
-                  path="/farms/:farmId/blocks/:blockId/holdings/new"
+                  path="/investments/holdings/:farmId/blocks/:blockId/new"
                   element={<HoldingCreatePage />}
                 />
-                <Route path="/farms/:farmId/holdings/:holdingId" element={<HoldingDetailPage />} />
+                <Route
+                  path="/investments/holdings/:farmId/:holdingId"
+                  element={<HoldingDetailPage />}
+                />
+                <Route path="/investments/investors" element={<InvestorsPage />} />
+                <Route path="/investments/investors/:investorId" element={<InvestorDetailPage />} />
                 {/* AgriPulse new IA â€” farm-scoped routes (UX_SPEC Â§3 +
                   IMPLEMENTATION_PLAN Â§3). */}
                 {/* Labs: experimental map-first surface for live validation.
@@ -329,8 +371,6 @@ export function App(): ReactNode {
                   <Route path="workers" element={<ResourcesWorkersPage />} />
                   <Route path="field-access" element={<FieldAccessPage />} />
                   <Route path="equipment" element={<ResourcesEquipmentPage />} />
-                  <Route path="investors" element={<InvestorsPage />} />
-                  <Route path="investors/:investorId" element={<InvestorDetailPage />} />
                   <Route path="rules" element={<RulesConfigPage />} />
                   {/* Decision Trees moved to the top-level /decision-trees
                       surface — keep old Settings deep links working. */}

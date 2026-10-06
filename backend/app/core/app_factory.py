@@ -163,6 +163,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     from app.modules.integrations_health.router import (
         router as integrations_health_router,
     )
+    from app.modules.investors.app_router import router as investor_app_router
     from app.modules.investors.router import router as investors_router
     from app.modules.irrigation.router import router as irrigation_router
     from app.modules.notifications.router import router as notifications_router
@@ -237,6 +238,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     app.include_router(plan_templates_router)
     app.include_router(resources_router)
     app.include_router(investors_router)
+    app.include_router(investor_app_router)
     app.include_router(irrigation_router)
     app.include_router(notifications_router)
     app.include_router(recommendations_router)

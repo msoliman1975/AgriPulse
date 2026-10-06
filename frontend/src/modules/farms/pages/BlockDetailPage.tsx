@@ -17,7 +17,6 @@ import { Skeleton } from "@/components/Skeleton";
 import { ImageryPanel } from "@/modules/imagery/components/ImageryPanel";
 import { SubscriptionsTab } from "@/modules/imagery/components/SubscriptionsTab";
 import { IndexTrendChart } from "@/modules/indices/components/IndexTrendChart";
-import { BlockHoldingsCard } from "@/modules/investors/components/BlockHoldingsCard";
 import { WeatherForecastPanel } from "@/modules/weather/components/WeatherForecastPanel";
 import { WeatherSubscriptionsTab } from "@/modules/weather/components/WeatherSubscriptionsTab";
 import { localizedName } from "@/lib/localizedField";
@@ -253,8 +252,6 @@ export function BlockDetailPage(): JSX.Element {
           </ul>
         )}
       </Card>
-
-      <BlockHoldingsCard farmId={farmId} blockId={block.id} />
 
       <AttachmentsTab ownerKind="block" ownerId={block.id} farmId={farmId} />
 

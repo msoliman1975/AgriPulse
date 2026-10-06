@@ -79,7 +79,8 @@ class InvestorCreateRequest(_InvestorFields):
 
 
 class InvestorUpdateRequest(_InvestorFields):
-    status: Literal["not_invited", "suspended"] | None = None
+    """Profile fields only. Status follows the app login: see the
+    :create-login, :resend-login, :disable-login and :enable-login actions."""
 
 
 class InvestorResponse(BaseModel):
@@ -264,3 +265,115 @@ class BlockHoldingsContextResponse(BaseModel):
     holdings: list[HoldingResponse]
     sold_area_m2: Decimal
     unsold_area_m2: Decimal
+
+
+# ---- App login -----------------------------------------------------------
+
+
+class InvestorLoginResponse(BaseModel):
+    investor: InvestorResponse
+    # False when the set-password email could not be sent. Staff then hand
+    # over `temporary_password` themselves.
+    email_sent: bool
+    temporary_password: str | None = None
+    provisioning: str | None = None
+
+
+# ---- Investments overview and farm map -----------------------------------
+
+
+class OverviewFarmRow(BaseModel):
+    farm_id: UUID
+    farm_name: str
+    farm_name_ar: str | None = None
+    holdings: int
+    sold: int
+    for_sale: int
+    draft: int
+    area_sold_m2: Decimal
+    block_area_m2: Decimal
+    area_not_sold_m2: Decimal
+
+
+class OverviewRecentRow(BaseModel):
+    id: UUID
+    start_date: date
+    acquired_by: AcquiredBy
+    created_at: datetime
+    holding_id: UUID
+    holding_code: str
+    farm_id: UUID
+    investor_id: UUID
+    investor_code: str
+    investor_name: str
+    investor_name_ar: str | None = None
+    previous_investor_code: str | None = None
+    previous_ended_by: EndedBy | None = None
+
+
+class InvestmentsOverviewResponse(BaseModel):
+    investors: int
+    holdings: int
+    sold: int
+    for_sale: int
+    draft: int
+    area_sold_m2: Decimal
+    area_not_sold_m2: Decimal
+    farms: list[OverviewFarmRow]
+    recent: list[OverviewRecentRow]
+
+
+class FarmMapBlock(BaseModel):
+    id: UUID
+    code: str
+    name: str | None = None
+    name_ar: str | None = None
+    boundary: dict[str, Any]
+    area_m2: Decimal
+    # False for a pivot split into sectors: draw on a sector instead.
+    eligible: bool
+
+
+class FarmHoldingsMapResponse(BaseModel):
+    farm_id: UUID
+    blocks: list[FarmMapBlock]
+    holdings: list[HoldingResponse]
+
+
+# ---- Investor app (what the investor sees about themselves) ---------------
+#
+# Allowlists. Nothing here may carry a share, another holding, an internal
+# note, a contract number, or anything about farm health. A test asserts the
+# exact field sets.
+
+
+class InvestorAppMeResponse(BaseModel):
+    code: str
+    full_name: str
+    full_name_ar: str | None = None
+    preferred_language: Language
+    company_name: str | None = None
+
+
+class InvestorAppHoldingResponse(BaseModel):
+    holding_id: UUID
+    code: str
+    name: str
+    name_ar: str | None = None
+    farm_name: str | None = None
+    farm_name_ar: str | None = None
+    block_code: str | None = None
+    block_name: str | None = None
+    block_name_ar: str | None = None
+    area_m2: Decimal
+    tree_count: int | None = None
+    crop_name_en: str | None = None
+    crop_name_ar: str | None = None
+    variety_name_en: str | None = None
+    variety_name_ar: str | None = None
+    planting_date: date | None = None
+    start_date: date
+    end_date: date | None = None
+    period: Literal["past", "current", "future"]
+    boundary: dict[str, Any]
+    block_boundary: dict[str, Any]

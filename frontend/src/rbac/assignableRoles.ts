@@ -25,6 +25,7 @@ export const TENANT_TIER_ROLES: readonly TenantRole[] = [
   "TenantOwner",
   "TenantAdmin",
   "BillingAdmin",
+  "InvestmentManager",
 ];
 
 /**

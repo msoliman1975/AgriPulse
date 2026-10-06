@@ -3,6 +3,7 @@
 from app.shared.rbac.check import (
     FARM_TIER_ROLES,
     PLATFORM_TIER_ROLES,
+    RESERVED_TENANT_ROLES,
     TENANT_ASSIGNABLE_ROLES,
     TENANT_TIER_ROLES,
     CapabilityRegistry,
@@ -18,6 +19,7 @@ from app.shared.rbac.check import (
 __all__ = [
     "FARM_TIER_ROLES",
     "PLATFORM_TIER_ROLES",
+    "RESERVED_TENANT_ROLES",
     "TENANT_ASSIGNABLE_ROLES",
     "TENANT_TIER_ROLES",
     "CapabilityRegistry",

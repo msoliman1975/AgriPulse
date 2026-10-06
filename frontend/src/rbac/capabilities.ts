@@ -47,8 +47,10 @@ export type Capability =
   | "imagery.subscription.manage"
   | "index.compute_custom"
   | "index.read"
+  | "investor.invite"
   | "investor.manage"
   | "investor.read"
+  | "investor_app.use"
   | "irrigation.record"
   | "irrigation.schedule.manage"
   | "irrigation.schedule.read"
@@ -116,7 +118,12 @@ export type Capability =
   | "weather_risk.read";
 
 export type PlatformRole = "PlatformAdmin" | "PlatformSupport";
-export type TenantRole = "TenantOwner" | "TenantAdmin" | "BillingAdmin";
+export type TenantRole =
+  | "TenantOwner"
+  | "TenantAdmin"
+  | "BillingAdmin"
+  | "InvestmentManager"
+  | "Investor";
 export type FarmRole = "FarmManager" | "Agronomist" | "FieldOperator" | "Scout" | "Viewer";
 
 /** Role -> the capabilities it grants. `*` is PlatformAdmin only. */
@@ -245,6 +252,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "holding.manage",
     "holding.redraw_sold",
     "holding.assign_owner",
+    "investor.invite",
   ]),
   /** Tenant admin; everything in the tenant except billing changes and ownership transfer. */
   TenantAdmin: new Set<Capability>([
@@ -334,6 +342,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "holding.manage",
     "holding.redraw_sold",
     "holding.assign_owner",
+    "investor.invite",
   ]),
   /** Subscription and billing only. */
   BillingAdmin: new Set<Capability>([
@@ -343,6 +352,22 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "subscription.read",
     "tenant.read",
   ]),
+  /** Runs the Investments area: investors, holdings, ownership. */
+  InvestmentManager: new Set<Capability>([
+    "farm.read",
+    "block.read",
+    "investor.read",
+    "investor.manage",
+    "investor.invite",
+    "holding.read",
+    "holding.manage",
+    "holding.redraw_sold",
+    "holding.assign_owner",
+    "notification.read_inbox",
+    "notification.write_inbox",
+  ]),
+  /** Outside owner of holdings. Reads only their own holdings. */
+  Investor: new Set<Capability>(["investor_app.use"]),
   /** Full management of an assigned farm (granted per farm). */
   FarmManager: new Set<Capability>([
     "alert.acknowledge",
@@ -402,8 +427,6 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "weather.refresh",
     "weather.subscription.manage",
     "weather_risk.read",
-    "holding.read",
-    "holding.manage",
   ]),
   /** Agronomic decisions on an assigned farm; no geometry edits. */
   Agronomist: new Set<Capability>([
@@ -447,7 +470,6 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "weather.read",
     "weather.refresh",
     "weather_risk.read",
-    "holding.read",
   ]),
   /** Field operations and observation logging on an assigned farm. */
   FieldOperator: new Set<Capability>([
@@ -531,7 +553,6 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "verdict.reasoning.read",
     "weather.read",
     "weather_risk.read",
-    "holding.read",
   ]),
 };
 

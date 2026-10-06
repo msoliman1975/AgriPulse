@@ -168,6 +168,8 @@ def ensure_tenant_roles(c: httpx.Client, token: str) -> None:
         "TenantAdmin": "Tenant administrator.",
         "BillingAdmin": "Tenant billing administrator.",
         "Viewer": "Read-only tenant member (default invite role).",
+        "InvestmentManager": "Runs the Investments area: investors, holdings, ownership.",
+        "Investor": "Outside owner of holdings. Reads only their own holdings.",
     }
     r = c.get(f"{KC_BASE}/admin/realms/{REALM}/roles", headers=h)
     r.raise_for_status()

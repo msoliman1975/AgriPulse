@@ -25,6 +25,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.service import AuditService, get_audit_service
+from app.modules.iam.users_service import TenantUsersService
 from app.modules.investors.errors import (
     BlockHasHoldingsError,
     BlockNotEligibleError,
@@ -39,6 +40,7 @@ from app.modules.investors.errors import (
 )
 from app.modules.investors.repository import InvestorsRepository
 from app.shared import clock
+from app.shared.auth.context import TenantRole
 from app.shared.db.ids import uuid7
 
 _MAX_VERTICES = 2000
@@ -531,6 +533,190 @@ class InvestorsService:
             },
         )
 
+    # ---- App login (the investor's user account) ---------------------------
+
+    def _login_result(self, investor: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "investor": investor,
+            "email_sent": bool(result.get("keycloak_email_sent")),
+            "temporary_password": result.get("temporary_password"),
+            "provisioning": result.get("keycloak_provisioning"),
+        }
+
+    async def create_login(
+        self,
+        *,
+        investor_id: UUID,
+        users: TenantUsersService,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Create the investor's user, with the Investor role, and link it.
+
+        The IAM invite flow creates the Keycloak user, the public.users row,
+        the membership and the role, and sends the set-password email. This
+        is the only place the Investor role is granted.
+        """
+        investor = await self.get_investor(investor_id=investor_id)
+        if investor["archived_at"] is not None:
+            raise InvestorConflictError("An archived investor cannot get an app login.")
+        if investor["user_id"] is not None:
+            raise InvestorConflictError("This investor already has an app login.")
+        result = await users.invite_user(
+            email=investor["email"],
+            full_name=investor["full_name"],
+            full_name_ar=investor["full_name_ar"],
+            phone=investor["phone"],
+            tenant_role=TenantRole.INVESTOR.value,
+            tenant_schema=self._schema or "",
+            actor_user_id=actor_user_id,
+        )
+        await self._repo.update_investor(
+            investor_id=investor_id,
+            changes={
+                "user_id": result["user_id"],
+                "status": "invited",
+                "invited_at": clock.now(),
+            },
+            actor_user_id=actor_user_id,
+        )
+        await self._record(
+            "investors.login_created",
+            actor_user_id=actor_user_id,
+            subject_kind="investor",
+            subject_id=investor_id,
+            details={"user_id": str(result["user_id"])},
+        )
+        return self._login_result(await self.get_investor(investor_id=investor_id), result)
+
+    async def _linked(self, investor_id: UUID) -> dict[str, Any]:
+        investor = await self.get_investor(investor_id=investor_id)
+        if investor["user_id"] is None:
+            raise InvestorConflictError("This investor has no app login yet.")
+        return investor
+
+    async def resend_login(
+        self,
+        *,
+        investor_id: UUID,
+        users: TenantUsersService,
+        tenant_id: UUID,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        investor = await self._linked(investor_id)
+        result = await users.resend_invite(
+            user_id=investor["user_id"],
+            tenant_id=tenant_id,
+            actor_user_id=actor_user_id,
+            tenant_schema=self._schema or "",
+        )
+        await self._repo.update_investor(
+            investor_id=investor_id,
+            changes={"invited_at": clock.now()},
+            actor_user_id=actor_user_id,
+        )
+        return self._login_result(await self.get_investor(investor_id=investor_id), result)
+
+    async def set_login_enabled(
+        self,
+        *,
+        investor_id: UUID,
+        enabled: bool,
+        users: TenantUsersService,
+        tenant_id: UUID,
+        actor_user_id: UUID | None,
+    ) -> dict[str, Any]:
+        """Disable signs the investor out and blocks sign-in; enable undoes it."""
+        investor = await self._linked(investor_id)
+        if enabled:
+            await users.reactivate_user(
+                user_id=investor["user_id"],
+                tenant_id=tenant_id,
+                actor_user_id=actor_user_id,
+                tenant_schema=self._schema or "",
+            )
+            status = "active" if investor["last_app_seen_at"] is not None else "invited"
+        else:
+            await users.suspend_user(
+                user_id=investor["user_id"],
+                tenant_id=tenant_id,
+                actor_user_id=actor_user_id,
+                tenant_schema=self._schema or "",
+            )
+            status = "suspended"
+        await self._repo.update_investor(
+            investor_id=investor_id, changes={"status": status}, actor_user_id=actor_user_id
+        )
+        await self._record(
+            "investors.login_enabled" if enabled else "investors.login_disabled",
+            actor_user_id=actor_user_id,
+            subject_kind="investor",
+            subject_id=investor_id,
+            details={},
+        )
+        return await self.get_investor(investor_id=investor_id)
+
+    # ---- Investments overview and farm map -------------------------------
+
+    async def overview(self) -> dict[str, Any]:
+        farms = await self._repo.overview_farms()
+        for f in farms:
+            f["area_not_sold_m2"] = max(
+                Decimal(f["block_area_m2"]) - Decimal(f["area_sold_m2"]), Decimal("0")
+            )
+        return {
+            "investors": await self._repo.count_live_investors(),
+            "holdings": sum(f["holdings"] for f in farms),
+            "sold": sum(f["sold"] for f in farms),
+            "for_sale": sum(f["for_sale"] for f in farms),
+            "draft": sum(f["draft"] for f in farms),
+            "area_sold_m2": sum((Decimal(f["area_sold_m2"]) for f in farms), Decimal("0")),
+            "area_not_sold_m2": sum((f["area_not_sold_m2"] for f in farms), Decimal("0")),
+            "farms": farms,
+            "recent": await self._repo.recent_ownerships(limit=10),
+        }
+
+    async def farm_map(self, *, farm_id: UUID) -> dict[str, Any]:
+        blocks = await self._repo.farm_blocks(farm_id=farm_id)
+        holdings = await self.list_holdings(farm_id=farm_id)
+        return {"farm_id": farm_id, "blocks": blocks, "holdings": holdings}
+
+    # ---- Investor app (the signed-in investor's own rows) -----------------
+
+    async def _me(self, *, user_id: UUID | None) -> dict[str, Any]:
+        if user_id is None:
+            raise InvestorNotFoundError(UUID(int=0))
+        investor = await self._repo.get_investor_by_user(user_id=user_id)
+        if investor is None or investor["archived_at"] is not None:
+            raise InvestorNotFoundError(UUID(int=0))
+        return investor
+
+    async def app_me(self, *, user_id: UUID | None) -> dict[str, Any]:
+        """The signed-in investor. Also marks that they used the app."""
+        investor = await self._me(user_id=user_id)
+        changes: dict[str, Any] = {"last_app_seen_at": clock.now()}
+        if investor["status"] == "invited":
+            changes["status"] = "active"
+        await self._repo.update_investor(
+            investor_id=investor["id"], changes=changes, actor_user_id=user_id
+        )
+        investor = await self.get_investor(investor_id=investor["id"])
+        investor["company_name"] = await self._repo.company_name()
+        return investor
+
+    async def app_holdings(self, *, user_id: UUID | None) -> list[dict[str, Any]]:
+        investor = await self._me(user_id=user_id)
+        return await self._repo.investor_app_holdings(investor_id=investor["id"])
+
+    async def app_holding(self, *, user_id: UUID | None, holding_id: UUID) -> dict[str, Any]:
+        investor = await self._me(user_id=user_id)
+        rows = await self._repo.investor_app_holdings(
+            investor_id=investor["id"], holding_id=holding_id
+        )
+        if not rows:
+            # Someone else's holding answers exactly like a missing one.
+            raise HoldingNotFoundError(holding_id)
+        return rows[0]
+
 
 def _ineligible_reason(block: dict[str, Any]) -> str | None:
     if block["deleted_at"] is not None or not block["is_active"]:
@@ -572,7 +758,7 @@ async def block_holding_conflicts(
             raise BlockHasHoldingsError(
                 "The new boundary leaves these holdings outside the block: "
                 + ", ".join(codes)
-                + ". Redraw or archive them first.",
+                + ". Redraw or archive them in Investments > Holdings first.",
                 holding_codes=codes,
             )
     if inactivating:
@@ -581,6 +767,7 @@ async def block_holding_conflicts(
             raise BlockHasHoldingsError(
                 "Investors own these holdings in this block: "
                 + ", ".join(codes)
-                + ". End their ownership before you inactivate the block.",
+                + ". End their ownership in Investments > Holdings before you "
+                "inactivate the block.",
                 holding_codes=codes,
             )

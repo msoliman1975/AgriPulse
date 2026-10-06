@@ -19,6 +19,8 @@
       { "name": "TenantOwner", "description": "Tenant super-admin; exactly one per tenant." },
       { "name": "TenantAdmin", "description": "Tenant admin; all tenant capabilities except billing and ownership transfer." },
       { "name": "BillingAdmin", "description": "Subscription and billing only." },
+      { "name": "InvestmentManager", "description": "Runs the Investments area: investors, holdings, ownership." },
+      { "name": "Investor", "description": "Outside owner of holdings. Reads only their own holdings." },
       { "name": "Viewer", "description": "Read-only tenant access." }
     ]
   },

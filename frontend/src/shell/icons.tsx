@@ -99,7 +99,10 @@ export function InsightsIcon(props: IconProps): ReactNode {
 export function HealthIcon(props: IconProps): ReactNode {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" {...props}>
-      <path d="M12 3l7 3v5.5c0 4.3-2.9 7.7-7 9.5-4.1-1.8-7-5.2-7-9.5V6l7-3z" strokeLinejoin="round" />
+      <path
+        d="M12 3l7 3v5.5c0 4.3-2.9 7.7-7 9.5-4.1-1.8-7-5.2-7-9.5V6l7-3z"
+        strokeLinejoin="round"
+      />
       <path d="M12 15c0-3 1.6-4.8 3.6-5.2C15.6 12.4 14.2 15 12 15z" strokeLinejoin="round" />
       <path d="M12 15v2.5" strokeLinecap="round" />
     </svg>
@@ -163,6 +166,17 @@ export function ReportsIcon(props: IconProps): ReactNode {
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
       <path d="M14 2v6h6" />
       <path d="M9 13h6M9 17h6" />
+    </svg>
+  );
+}
+
+/** Investments: stacked coins. */
+export function InvestmentsIcon(props: IconProps): ReactNode {
+  return (
+    <svg {...base(props)}>
+      <ellipse cx="12" cy="6" rx="7" ry="3" />
+      <path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6" />
+      <path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
     </svg>
   );
 }
