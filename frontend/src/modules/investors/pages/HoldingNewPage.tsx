@@ -403,6 +403,13 @@ export function HoldingNewPage(): JSX.Element {
                             ) : (
                               "—"
                             )}
+                            {r.status === "sold" &&
+                            investorsQ.isSuccess &&
+                            investorsQ.data.length === 0 ? (
+                              <p className="mt-1 text-xs text-ap-warn">
+                                {t("newHolding.noInvestors")}
+                              </p>
+                            ) : null}
                           </Td>
                           <Td className="text-sm">
                             {r.created ? (

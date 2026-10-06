@@ -281,7 +281,7 @@
     "colStatus": "Status",
     "colInvestor": "Investor",
     "colResult": "Result",
-    "createAll": "Create {{count}} holdings",
+    "createAll": "Create holdings ({{count}})",
     "created": "Created {{code}}",
     "skipped": "Not created",
     "doneSummary": "{{created}} created, {{failed}} not created.",
@@ -290,6 +290,7 @@
     "ownerSince": "Owner since",
     "pickInvestor": "Choose an investor",
     "soldNeedsInvestor": "Choose the investor who bought it.",
+    "noInvestors": "No investors yet. Add one on the Investors page first.",
     "defaultName": "Holding {{n}}"
   }
 }
