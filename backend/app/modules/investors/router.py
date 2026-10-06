@@ -19,6 +19,8 @@ Mounted under /api/v1:
   GET    /farms/{farm_id}/holdings                    holding.read
   GET    /farms/{farm_id}/blocks/{block_id}/holdings  holding.read   (draw-screen context)
   POST   /farms/{farm_id}/blocks/{block_id}/holdings  holding.manage
+  POST   /farms/{farm_id}/holdings                    holding.manage (block found)
+  POST   /farms/{farm_id}/holdings:check              holding.read   (dry run)
   GET    /farms/{farm_id}/holdings/{id}               holding.read
   PATCH  /farms/{farm_id}/holdings/{id}               holding.manage (+ holding.redraw_sold)
   POST   /farms/{farm_id}/holdings/{id}:archive       holding.manage
@@ -48,6 +50,8 @@ from app.modules.investors.schemas import (
     BlockHoldingsContextResponse,
     FarmHoldingsMapResponse,
     FarmInvestorResponse,
+    HoldingCheckRequest,
+    HoldingCheckResult,
     HoldingCreateRequest,
     HoldingDetailResponse,
     HoldingResponse,
@@ -213,6 +217,39 @@ async def create_holding(
         payload=payload.model_dump(),
         actor_user_id=context.user_id,
     )
+
+
+@router.post(
+    "/farms/{farm_id}/holdings",
+    response_model=HoldingResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_farm_holding(
+    farm_id: UUID,
+    payload: HoldingCreateRequest,
+    context: RequestContext = Depends(
+        requires_capability("holding.manage", farm_id_param="farm_id")
+    ),
+    service: InvestorsService = Depends(_service),
+) -> dict[str, Any]:
+    """Create a holding from a drawn or uploaded shape; the block is found."""
+    return await service.create_holding(
+        farm_id=farm_id,
+        block_id=payload.block_id,
+        payload=payload.model_dump(),
+        actor_user_id=context.user_id,
+    )
+
+
+@router.post("/farms/{farm_id}/holdings:check", response_model=list[HoldingCheckResult])
+async def check_holding_shapes(
+    farm_id: UUID,
+    payload: HoldingCheckRequest,
+    _: RequestContext = Depends(requires_capability("holding.read", farm_id_param="farm_id")),
+    service: InvestorsService = Depends(_service),
+) -> list[dict[str, Any]]:
+    """For each shape: the block that fully contains it, or why none does."""
+    return [await service.check_shape(farm_id=farm_id, boundary=b) for b in payload.boundaries]
 
 
 @router.get("/farms/{farm_id}/holdings/{holding_id}", response_model=HoldingDetailResponse)

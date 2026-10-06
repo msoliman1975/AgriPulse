@@ -1,4 +1,5 @@
 import type { HoldingStatus, InvestorStatus } from "@/api/investors";
+import type { HoldingFieldValues } from "./components/HoldingFields";
 import { isApiError } from "@/api/errors";
 import type { PillKind } from "@/components/Pill";
 
@@ -54,4 +55,16 @@ export function isoDay(d: Date = new Date()): string {
 export function dayBefore(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   return isoDay(new Date(y, m - 1, d - 1));
+}
+
+/** The payload fields the form adds for a sale. */
+export function saleFields(values: HoldingFieldValues): {
+  investor_id?: string;
+  owner_since?: string;
+} {
+  if (values.status !== "sold") return {};
+  return {
+    investor_id: values.investor_id || undefined,
+    owner_since: values.owner_since || undefined,
+  };
 }

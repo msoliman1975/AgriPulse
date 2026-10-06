@@ -305,3 +305,100 @@ async def test_duplicate_investor_email_is_refused(scouting_env: ScoutingFixture
     assert one.status_code == 201, one.text
     assert one.json()["code"] == "INV-0001"
     assert two.status_code == 409, two.text
+
+
+# ---- Shapes from files or drawings: the block is found ---------------------
+
+
+@pytest.mark.asyncio
+async def test_check_finds_the_block_or_names_the_problem(scouting_env: ScoutingFixture) -> None:
+    env = scouting_env
+    async with _client(env.admin_context) as c:
+        existing = await c.post(
+            f"/api/v1/farms/{env.farm_id}/blocks/{env.block_id}/holdings",
+            json={"name": "Taken", "boundary": _rect(_LON0, _LAT0)},
+        )
+        assert existing.status_code == 201, existing.text
+        resp = await c.post(
+            f"/api/v1/farms/{env.farm_id}/holdings:check",
+            json={
+                "boundaries": [
+                    _rect(_LON0 + 0.001, _LAT0),  # inside, free
+                    _rect(31.612, _LAT0, dlon=0.003),  # runs past the block's east edge
+                    _rect(31.70, 30.70),  # nowhere near the farm
+                    _rect(_LON0 + 0.0005, _LAT0),  # overlaps "Taken"
+                ]
+            },
+        )
+    assert resp.status_code == 200, resp.text
+    ok, edge, away, overlap = resp.json()
+    assert ok["block_id"] == env.block_id
+    assert ok["problem"] is None
+    assert 5 < float(ok["share_pct"]) < 15
+    assert edge["problem"] == "outside_block"
+    assert away["problem"] == "outside_farm"
+    assert overlap["problem"] == "overlaps_holding"
+    assert existing.json()["code"] in overlap["detail"]
+
+
+@pytest.mark.asyncio
+async def test_farm_level_create_finds_the_block_and_can_sell(
+    scouting_env: ScoutingFixture,
+) -> None:
+    env = scouting_env
+    async with _client(env.admin_context) as c:
+        inv = await c.post(
+            "/api/v1/investors",
+            json={"full_name": "Buyer", "email": f"{uuid4().hex[:8]}@example.com"},
+        )
+        assert inv.status_code == 201, inv.text
+        refused = await c.post(
+            f"/api/v1/farms/{env.farm_id}/holdings",
+            json={"name": "No buyer", "boundary": _rect(_LON0, _LAT0), "status": "sold"},
+        )
+        outside = await c.post(
+            f"/api/v1/farms/{env.farm_id}/holdings",
+            json={"name": "Away", "boundary": _rect(31.70, 30.70)},
+        )
+        sold = await c.post(
+            f"/api/v1/farms/{env.farm_id}/holdings",
+            json={
+                "name": "Sold at once",
+                "boundary": _rect(_LON0, _LAT0),
+                "status": "sold",
+                "investor_id": inv.json()["id"],
+                "owner_since": "2026-01-01",
+            },
+        )
+    assert refused.status_code == 422, refused.text
+    assert outside.status_code == 422, outside.text
+    assert outside.json()["type"].endswith("holding-block-not-eligible")
+    assert sold.status_code == 201, sold.text
+    body = sold.json()
+    assert body["block_id"] == env.block_id
+    assert body["status"] == "sold"
+    assert body["current_owner"]["investor_id"] == inv.json()["id"]
+    assert body["current_owner"]["since"] == "2026-01-01"
+
+
+@pytest.mark.asyncio
+async def test_status_sold_on_edit_gives_the_holding_an_owner(
+    scouting_env: ScoutingFixture,
+) -> None:
+    env = scouting_env
+    holding = (await _holding(env, _rect(_LON0, _LAT0))).json()
+    url = f"/api/v1/farms/{env.farm_id}/holdings/{holding['id']}"
+    async with _client(env.admin_context) as c:
+        inv = await c.post(
+            "/api/v1/investors",
+            json={"full_name": "Later buyer", "email": f"{uuid4().hex[:8]}@example.com"},
+        )
+        no_investor = await c.patch(url, json={"status": "sold"})
+        sold = await c.patch(url, json={"status": "sold", "investor_id": inv.json()["id"]})
+        back = await c.patch(url, json={"status": "draft"})
+    assert no_investor.status_code == 409, no_investor.text
+    assert sold.status_code == 200, sold.text
+    assert sold.json()["status"] == "sold"
+    assert sold.json()["current_owner"]["investor_id"] == inv.json()["id"]
+    # An owned holding's status changes through its ownership, not the form.
+    assert back.status_code == 409, back.text

@@ -881,3 +881,61 @@ class InvestorsRepository:
             params,
             tuple(uuid_params),
         )
+
+    # ---- Block detection ---------------------------------------------------
+
+    async def blocks_touching(self, *, farm_id: UUID, boundary_ewkt: str) -> list[dict[str, Any]]:
+        """Active blocks of a farm that the shape touches, with how it sits in each.
+
+        Measured in each block's own UTM zone, with the same 0.5 m tolerance
+        as the holdings trigger, so "covers" here agrees with what an insert
+        will accept.
+        """
+        return await self._rows(
+            f"""
+            WITH g AS (SELECT ST_GeomFromEWKT(:b) AS g)
+            SELECT b.id, b.code,
+                   ST_CoveredBy(ST_Transform(g.g, ST_SRID(b.boundary_utm)),
+                                ST_Buffer(b.boundary_utm, 0.5)) AS covers,
+                   round(ST_Area(ST_Transform(g.g, ST_SRID(b.boundary_utm)))::numeric, 2)
+                     AS area_m2,
+                   round(ST_Area(b.boundary_utm)::numeric, 2) AS block_area_m2,
+                   ST_Area(ST_Intersection(ST_Transform(g.g, ST_SRID(b.boundary_utm)),
+                                           b.boundary_utm)) AS inside_m2,
+                   EXISTS (SELECT 1 FROM blocks c
+                            WHERE c.parent_unit_id = b.id AND c.deleted_at IS NULL)
+                     AS has_children
+              FROM blocks b, g
+             WHERE b.farm_id = :farm_id
+               AND b.deleted_at IS NULL
+               AND (b.active_to IS NULL OR b.active_to > {_TODAY})
+               AND b.boundary && g.g
+               AND ST_Intersects(b.boundary, g.g)
+             ORDER BY inside_m2 DESC
+            """,
+            {"farm_id": farm_id, "b": boundary_ewkt},
+            ("farm_id",),
+        )
+
+    async def overlapping_holding_codes(
+        self, *, block_id: UUID, boundary_ewkt: str, exclude_id: UUID | None = None
+    ) -> list[str]:
+        """Live holdings in the block that the shape overlaps by more than 1 m2."""
+        rows = await self._rows(
+            """
+            WITH g AS (SELECT ST_GeomFromEWKT(:b) AS g),
+                 blk AS (SELECT ST_SRID(boundary_utm) AS srid FROM blocks WHERE id = :block)
+            SELECT h.code
+              FROM holdings h, g, blk
+             WHERE h.block_id = :block
+               AND h.deleted_at IS NULL AND h.archived_at IS NULL
+               AND (CAST(:exclude AS uuid) IS NULL OR h.id <> :exclude)
+               AND h.boundary && g.g
+               AND ST_Area(ST_Intersection(ST_Transform(h.boundary, blk.srid),
+                                           ST_Transform(g.g, blk.srid))) > 1.0
+             ORDER BY h.code
+            """,
+            {"block": block_id, "b": boundary_ewkt, "exclude": exclude_id},
+            ("block", "exclude"),
+        )
+        return [r["code"] for r in rows]

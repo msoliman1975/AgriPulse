@@ -35,6 +35,7 @@ export const ROUTE_MANIFEST: RouteObject[] = [
   { path: "/investments/investors" },
   { path: "/investments/overview/:farmId" },
   { path: "/investments/holdings/:farmId" },
+  { path: "/investments/holdings/:farmId/new" },
   { path: "/investments/holdings/:farmId/blocks/:blockId/new" },
   { path: "/investments/holdings/:farmId/:holdingId" },
   { path: "/investments/investors/:farmId" },

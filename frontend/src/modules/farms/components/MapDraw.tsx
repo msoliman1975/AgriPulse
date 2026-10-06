@@ -3,6 +3,7 @@ import maplibregl from "maplibre-gl";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import type { Feature, FeatureCollection, Polygon } from "geojson";
 
+import { DRAW_STYLES } from "@/lib/drawStyles";
 import { bboxOfGeometry, centerOfBbox } from "@/lib/geometry";
 
 const DEFAULT_CENTER: [number, number] = [31.2357, 30.0444]; // Cairo
@@ -36,6 +37,8 @@ interface Props {
   mode?: "draw_polygon" | "simple_select";
   onChange?: (polygon: Polygon | null) => void;
   references?: MapDrawReference[];
+  /** Label for the button that removes the shape and starts drawing again. */
+  clearLabel?: string;
   className?: string;
 }
 
@@ -50,6 +53,7 @@ export function MapDraw({
   mode = "draw_polygon",
   onChange,
   references,
+  clearLabel,
   className,
 }: Props): JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -72,10 +76,17 @@ export function MapDraw({
       displayControlsDefault: false,
       controls: { polygon: true, trash: true },
       defaultMode: mode,
+      styles: DRAW_STYLES,
     });
     drawRef.current = draw;
 
+    // The box can still be settling when the map is built; measure again on
+    // load and on every resize, or the canvas fills one corner.
+    const resize = new ResizeObserver(() => map.resize());
+    resize.observe(containerRef.current);
+
     map.on("load", () => {
+      map.resize();
       if (references && references.length > 0) {
         const data: FeatureCollection = {
           type: "FeatureCollection",
@@ -100,7 +111,7 @@ export function MapDraw({
           paint: {
             "line-color": ["match", ["get", "kind"], "frame", "#16a34a", "#475569"],
             "line-width": ["match", ["get", "kind"], "frame", 3, 1.5],
-            "line-dasharray": [2, 1],
+            "line-dasharray": ["literal", [2, 1]],
           },
         });
         if (!initial) {
@@ -128,11 +139,21 @@ export function MapDraw({
       const f = fc.features.find((feat) => feat.geometry?.type === "Polygon");
       onChange(f ? (f.geometry as Polygon) : null);
     };
-    map.on("draw.create", emit);
+    // One shape at a time: a new shape replaces the previous one.
+    map.on("draw.create", (e: { features: Feature[] }) => {
+      const keep = new Set(e.features.map((f) => String(f.id)));
+      const stale = draw
+        .getAll()
+        .features.map((f) => String(f.id))
+        .filter((id) => !keep.has(id));
+      if (stale.length > 0) draw.delete(stale);
+      emit();
+    });
     map.on("draw.update", emit);
     map.on("draw.delete", emit);
 
     return () => {
+      resize.disconnect();
       map.remove();
       mapRef.current = null;
       drawRef.current = null;
@@ -141,11 +162,30 @@ export function MapDraw({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const clear = (): void => {
+    const draw = drawRef.current;
+    if (!draw) return;
+    draw.deleteAll();
+    draw.changeMode("draw_polygon");
+    onChange?.(null);
+  };
+
   return (
-    <div
-      ref={containerRef}
-      data-testid="map-draw"
-      className={className ?? "h-96 w-full overflow-hidden rounded-md border border-ap-line"}
-    />
+    <div className="relative">
+      <div
+        ref={containerRef}
+        data-testid="map-draw"
+        className={className ?? "h-96 w-full overflow-hidden rounded-md border border-ap-line"}
+      />
+      {clearLabel ? (
+        <button
+          type="button"
+          onClick={clear}
+          className="absolute end-2 top-2 rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-xs font-medium text-ap-ink shadow-sm hover:bg-ap-line/40"
+        >
+          {clearLabel}
+        </button>
+      ) : null}
+    </div>
   );
 }
