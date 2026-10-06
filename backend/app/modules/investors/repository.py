@@ -695,12 +695,24 @@ class InvestorsRepository:
 
     # ---- Investor app (read-only, the investor's own rows) ----------------
 
-    async def get_investor_by_user(self, *, user_id: UUID) -> dict[str, Any] | None:
+    async def get_investor_by_user(
+        self, *, user_id: UUID, keycloak_subject: str | None
+    ) -> dict[str, Any] | None:
+        """The investor linked to the caller.
+
+        `investors.user_id` holds the `public.users` id, while a request's
+        `user_id` is the token's `sub`, the Keycloak id. The two differ for an
+        invited user, so the match goes through `public.users.keycloak_subject`.
+        A direct id match is kept for callers whose two ids are the same.
+        """
         rows = await self._rows(
             f"SELECT {_INVESTOR_COLUMNS} FROM {_INVESTOR_FROM} "
-            "WHERE i.user_id = :uid AND i.deleted_at IS NULL "
+            "WHERE i.deleted_at IS NULL AND ("
+            "  i.user_id = :uid OR i.user_id IN ("
+            "    SELECT u.id FROM public.users u"
+            "     WHERE u.keycloak_subject = :sub AND u.deleted_at IS NULL)) "
             "ORDER BY i.created_at DESC LIMIT 1",
-            {"uid": user_id},
+            {"uid": user_id, "sub": keycloak_subject or ""},
             ("uid",),
         )
         return rows[0] if rows else None

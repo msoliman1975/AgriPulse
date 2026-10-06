@@ -222,3 +222,34 @@ async def test_farm_map_returns_blocks_and_holdings(scouting_env: ScoutingFixtur
     assert [b["id"] for b in body["blocks"]] == [env.block_id]
     assert body["blocks"][0]["eligible"] is True
     assert [h["code"] for h in body["holdings"]] == [sold["code"]]
+
+
+@pytest.mark.asyncio
+async def test_investor_is_found_by_keycloak_subject(
+    scouting_env: ScoutingFixture, admin_session: Any
+) -> None:
+    """Production shape: the token's `sub` is the Keycloak id, which differs
+    from the `public.users` id that `investors.user_id` stores."""
+    import dataclasses
+
+    from sqlalchemy import text
+
+    env = scouting_env
+    mine, investor = await _sold_holding(env)
+    body = await _login(env, investor["id"])
+    subject = (
+        await admin_session.execute(
+            text("SELECT keycloak_subject FROM public.users WHERE id = :id"),
+            {"id": UUID(body["investor"]["user_id"])},
+        )
+    ).scalar_one()
+    me = dataclasses.replace(
+        make_context(user_id=uuid4(), tenant_id=env.tenant_id, tenant_role=TenantRole.INVESTOR),
+        keycloak_subject=subject,
+    )
+    async with _client(me) as c:
+        who = await c.get("/api/v1/investor/me")
+        listed = await c.get("/api/v1/investor/holdings")
+    assert who.status_code == 200, who.text
+    assert who.json()["code"] == investor["code"]
+    assert [h["code"] for h in listed.json()] == [mine["code"]]

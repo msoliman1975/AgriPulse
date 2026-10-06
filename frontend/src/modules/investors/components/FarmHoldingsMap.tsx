@@ -79,7 +79,14 @@ export function FarmHoldingsMap({
         geometry: h.boundary,
       })),
     };
+    // The box can still be settling when the map is built (the page swaps a
+    // skeleton for content), so measure again on load and on every resize,
+    // and fit after the first real measurement.
+    const resize = new ResizeObserver(() => map.resize());
+    resize.observe(ref.current);
     map.on("load", () => {
+      map.resize();
+      map.fitBounds(bounds, { padding: 30, duration: 0 });
       map.addSource("blocks", { type: "geojson", data: blockData });
       map.addLayer({
         id: "blocks-fill",
@@ -131,7 +138,10 @@ export function FarmHoldingsMap({
         map.getCanvas().style.cursor = n > 0 ? "pointer" : "";
       });
     });
-    return () => map.remove();
+    return () => {
+      resize.disconnect();
+      map.remove();
+    };
   }, [blocks, holdings, selectedBlockId]);
 
   return (

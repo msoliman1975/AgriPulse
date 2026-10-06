@@ -44,7 +44,17 @@ function HoldingMap({ holding }: { holding: InvestorAppHolding }): JSX.Element {
       ],
       fitBoundsOptions: { padding: 30 },
     });
+    const resize = new ResizeObserver(() => map.resize());
+    resize.observe(ref.current);
     map.on("load", () => {
+      map.resize();
+      map.fitBounds(
+        [
+          [minX, minY],
+          [maxX, maxY],
+        ],
+        { padding: 30, duration: 0 },
+      );
       map.addSource("block", {
         type: "geojson",
         data: { type: "Feature", properties: {}, geometry: holding.block_boundary },
@@ -72,7 +82,10 @@ function HoldingMap({ holding }: { holding: InvestorAppHolding }): JSX.Element {
         paint: { "line-color": "#a16207", "line-width": 2 },
       });
     });
-    return () => map.remove();
+    return () => {
+      resize.disconnect();
+      map.remove();
+    };
   }, [holding]);
   return (
     <div
