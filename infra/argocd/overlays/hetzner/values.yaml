@@ -4040,9 +4040,16 @@ global:
       #   Watch: switching farm in the top bar on an Investments page keeps
       #   the section and shows that farm's holdings.
       #   Rollback is these three tags back to 9526842.
-      tag: "c6c318c"
+      # 6fd0a10 = #776, api, workers and frontend. New holding from a drawing
+      #   or AOI files; the block is found by POST /farms/{id}/holdings:check
+      #   and created by POST /farms/{id}/holdings. Status Sold with an
+      #   investor. Drawing fixed (MapLibre-safe mapbox-gl-draw styles). No
+      #   migration.
+      #   Watch: drawing a holding shows its edges and the detected block.
+      #   Rollback is these three tags back to c6c318c.
+      tag: "6fd0a10"
     workers:
-      tag: "c6c318c"
+      tag: "6fd0a10"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4698,7 +4705,11 @@ global:
       # c6c318c = #770, frontend. Investments pages follow the top-bar farm.
       #   Needs the api at c6c318c (new farm-scoped routes). Rollback is this
       #   tag together with the api back to 9526842.
-      tag: "c6c318c"
+      # 6fd0a10 = #776, frontend. New-holding page (draw or upload AOI),
+      #   Sold status with an investor, drawing styles that MapLibre accepts
+      #   (also fixes block and farm drawing). Needs the api at 6fd0a10.
+      #   Rollback is this tag together with the api back to c6c318c.
+      tag: "6fd0a10"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
