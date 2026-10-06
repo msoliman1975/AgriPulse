@@ -735,10 +735,13 @@ class InvestorsRepository:
         IAM calls (resend, suspend, reactivate) need the current users id.
         """
         rows = await self._rows(
+            # Compared as bare hex: a stored UUID prints with hyphens, while a
+            # subject may be kept in either form.
             "SELECT u.id FROM public.users u"
-            " WHERE (u.id = :x OR u.keycloak_subject = :xs) AND u.deleted_at IS NULL"
+            " WHERE (u.id = :x OR lower(replace(u.keycloak_subject, '-', '')) = :xhex)"
+            "   AND u.deleted_at IS NULL"
             " ORDER BY (u.id = :x) DESC LIMIT 1",
-            {"x": stored, "xs": str(stored)},
+            {"x": stored, "xhex": stored.hex},
             ("x",),
         )
         return rows[0]["id"] if rows else None
