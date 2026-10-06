@@ -682,17 +682,19 @@ class InvestorsService:
 
     # ---- Investor app (the signed-in investor's own rows) -----------------
 
-    async def _me(self, *, user_id: UUID | None) -> dict[str, Any]:
+    async def _me(self, *, user_id: UUID | None, keycloak_subject: str | None) -> dict[str, Any]:
         if user_id is None:
             raise InvestorNotFoundError(UUID(int=0))
-        investor = await self._repo.get_investor_by_user(user_id=user_id)
+        investor = await self._repo.get_investor_by_user(
+            user_id=user_id, keycloak_subject=keycloak_subject
+        )
         if investor is None or investor["archived_at"] is not None:
             raise InvestorNotFoundError(UUID(int=0))
         return investor
 
-    async def app_me(self, *, user_id: UUID | None) -> dict[str, Any]:
+    async def app_me(self, *, user_id: UUID | None, keycloak_subject: str | None) -> dict[str, Any]:
         """The signed-in investor. Also marks that they used the app."""
-        investor = await self._me(user_id=user_id)
+        investor = await self._me(user_id=user_id, keycloak_subject=keycloak_subject)
         changes: dict[str, Any] = {"last_app_seen_at": clock.now()}
         if investor["status"] == "invited":
             changes["status"] = "active"
@@ -703,12 +705,16 @@ class InvestorsService:
         investor["company_name"] = await self._repo.company_name()
         return investor
 
-    async def app_holdings(self, *, user_id: UUID | None) -> list[dict[str, Any]]:
-        investor = await self._me(user_id=user_id)
+    async def app_holdings(
+        self, *, user_id: UUID | None, keycloak_subject: str | None
+    ) -> list[dict[str, Any]]:
+        investor = await self._me(user_id=user_id, keycloak_subject=keycloak_subject)
         return await self._repo.investor_app_holdings(investor_id=investor["id"])
 
-    async def app_holding(self, *, user_id: UUID | None, holding_id: UUID) -> dict[str, Any]:
-        investor = await self._me(user_id=user_id)
+    async def app_holding(
+        self, *, user_id: UUID | None, keycloak_subject: str | None, holding_id: UUID
+    ) -> dict[str, Any]:
+        investor = await self._me(user_id=user_id, keycloak_subject=keycloak_subject)
         rows = await self._repo.investor_app_holdings(
             investor_id=investor["id"], holding_id=holding_id
         )
