@@ -140,6 +140,16 @@ class OwnershipResponse(BaseModel):
     created_at: datetime
 
 
+class FarmInvestorResponse(InvestorResponse):
+    """An investor as seen from one farm."""
+
+    holdings_in_farm: int = 0
+    area_in_farm_m2: Decimal = Decimal("0")
+    # Distinct other farms, and holdings on them, current or starting later.
+    other_farms: int = 0
+    other_farm_holdings: int = 0
+
+
 class InvestorDetailResponse(InvestorResponse):
     ownerships: list[OwnershipResponse] = []
 
@@ -216,6 +226,9 @@ class HoldingOwnerSummary(BaseModel):
     investor_name: str
     investor_name_ar: str | None = None
     since: date
+    # Current holdings the same investor has on other farms. The holdings
+    # screen shows only one farm, so this is the hint that there is more.
+    other_farm_holdings: int = 0
 
 
 class HoldingResponse(BaseModel):
@@ -311,16 +324,21 @@ class OverviewRecentRow(BaseModel):
     previous_ended_by: EndedBy | None = None
 
 
-class InvestmentsOverviewResponse(BaseModel):
-    investors: int
-    holdings: int
+class OverviewAllFarms(BaseModel):
+    farms: int
     sold: int
-    for_sale: int
-    draft: int
     area_sold_m2: Decimal
     area_not_sold_m2: Decimal
-    farms: list[OverviewFarmRow]
+
+
+class InvestmentsOverviewResponse(BaseModel):
+    """One farm's investments, and a short total across all farms."""
+
+    farm: OverviewFarmRow
+    # Distinct investors who own a holding on this farm today.
+    investors: int
     recent: list[OverviewRecentRow]
+    all_farms: OverviewAllFarms
 
 
 class FarmMapBlock(BaseModel):

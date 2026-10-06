@@ -1,24 +1,27 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import { getInvestmentsOverview } from "@/api/investors";
 import { AsyncBoundary } from "@/components/AsyncBoundary";
 import { Card } from "@/components/Card";
-import { EmptyState } from "@/components/EmptyState";
 import { KPICard } from "@/components/KPICard";
 import { KPIRow } from "@/components/KPIRow";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
-import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { queryState } from "@/components/asyncState";
 import { localizedName } from "@/lib/localizedField";
 import { AreaDisplay } from "@/modules/farms/components/AreaDisplay";
 
-/** /investments — counts and areas across all farms, and the latest sales. */
+/** /investments/overview/:farmId — the selected farm's investments. */
 export function InvestmentsOverviewPage(): JSX.Element {
+  const { farmId = "" } = useParams<{ farmId: string }>();
   const { t, i18n } = useTranslation("investors");
-  const q = useQuery({ queryKey: ["investments", "overview"], queryFn: getInvestmentsOverview });
+  const q = useQuery({
+    queryKey: ["investments", "overview", farmId],
+    queryFn: () => getInvestmentsOverview(farmId),
+    enabled: Boolean(farmId),
+  });
 
   return (
     <Page>
@@ -26,8 +29,8 @@ export function InvestmentsOverviewPage(): JSX.Element {
       <AsyncBoundary
         state={queryState(q)}
         errorMessage={t("error.load")}
-        isEmpty={(o) => o.farms.length === 0}
-        empty={<EmptyState message={t("overview.empty")} action={null} />}
+        isEmpty={() => false}
+        empty={null}
       >
         {(o) => (
           <div className="flex flex-col gap-6">
@@ -35,56 +38,27 @@ export function InvestmentsOverviewPage(): JSX.Element {
               <KPICard title={t("overview.kpiInvestors")} value={o.investors} />
               <KPICard
                 title={t("overview.kpiSold")}
-                value={o.sold}
-                hint={`${t("overview.kpiForSale")}: ${o.for_sale}`}
+                value={o.farm.sold}
+                hint={`${t("overview.kpiForSale")}: ${o.farm.for_sale}`}
               />
               <KPICard
                 title={t("overview.kpiAreaSold")}
-                value={<AreaDisplay areaM2={Number(o.area_sold_m2)} />}
+                value={<AreaDisplay areaM2={Number(o.farm.area_sold_m2)} />}
               />
               <KPICard
                 title={t("overview.kpiAreaNotSold")}
-                value={<AreaDisplay areaM2={Number(o.area_not_sold_m2)} />}
+                value={<AreaDisplay areaM2={Number(o.farm.area_not_sold_m2)} />}
               />
             </KPIRow>
-
-            <Card title={t("overview.farmsTitle")} noPadding>
-              <Table>
-                <Thead>
-                  <Tr>
-                    <Th>{t("overview.colFarm")}</Th>
-                    <Th>{t("overview.colHoldings")}</Th>
-                    <Th>{t("overview.colSold")}</Th>
-                    <Th>{t("overview.colForSale")}</Th>
-                    <Th>{t("overview.colAreaSold")}</Th>
-                    <Th>{t("overview.colAreaNotSold")}</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {o.farms.map((f) => (
-                    <Tr key={f.farm_id}>
-                      <Td>
-                        <Link
-                          className="text-ap-primary hover:underline"
-                          to={`/investments/holdings?farm=${f.farm_id}`}
-                        >
-                          {localizedName(i18n.language, f.farm_name, f.farm_name_ar)}
-                        </Link>
-                      </Td>
-                      <Td>{f.holdings}</Td>
-                      <Td>{f.sold}</Td>
-                      <Td>{f.for_sale}</Td>
-                      <Td>
-                        <AreaDisplay areaM2={Number(f.area_sold_m2)} />
-                      </Td>
-                      <Td>
-                        <AreaDisplay areaM2={Number(f.area_not_sold_m2)} />
-                      </Td>
-                    </Tr>
-                  ))}
-                </Tbody>
-              </Table>
-            </Card>
+            {o.all_farms.farms > 1 ? (
+              <p className="text-sm text-ap-muted">
+                {t("farmContext.allFarms", {
+                  farms: o.all_farms.farms,
+                  sold: o.all_farms.sold,
+                })}{" "}
+                · <AreaDisplay areaM2={Number(o.all_farms.area_sold_m2)} />
+              </p>
+            ) : null}
 
             <Card title={t("overview.recentTitle")}>
               {o.recent.length === 0 ? (

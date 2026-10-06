@@ -251,5 +251,16 @@
     "loadFailed": "Could not load your holdings.",
     "notLinked": "This account is not linked to an investor record. Contact the company.",
     "mapLegend": "Yellow: your holding. Green dashed line: the block."
+  },
+  "farmContext": {
+    "otherFarmsShort": "+{{count}} on other farms",
+    "allFarms": "All {{farms}} farms: {{sold}} holdings sold",
+    "noFarms": "There are no farms yet.",
+    "colHere": "On this farm",
+    "colAreaHere": "Area on this farm",
+    "otherFarmsTitle": "Also holds {{count}} holdings on other farms",
+    "totalAreaAll": "Total area owned today, all farms",
+    "holdingsHere": "Holdings on this farm",
+    "pastHere": "Past holdings on this farm"
   }
 }

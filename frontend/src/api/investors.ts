@@ -72,6 +72,14 @@ export interface Ownership {
   created_at: string;
 }
 
+/** An investor as seen from one farm. */
+export interface FarmInvestor extends Investor {
+  holdings_in_farm: number;
+  area_in_farm_m2: string;
+  other_farms: number;
+  other_farm_holdings: number;
+}
+
 export interface InvestorDetail extends Investor {
   ownerships: Ownership[];
 }
@@ -100,6 +108,8 @@ export interface HoldingOwnerSummary {
   investor_name: string;
   investor_name_ar: string | null;
   since: string;
+  /** Current holdings the same investor has on other farms. */
+  other_farm_holdings: number;
 }
 
 export interface Holding {
@@ -180,6 +190,16 @@ export async function listInvestors(
   params: { status?: InvestorStatus; q?: string; include_archived?: boolean } = {},
 ): Promise<Investor[]> {
   const { data } = await apiClient.get<Investor[]>("/v1/investors", { params });
+  return data;
+}
+
+export async function listFarmInvestors(
+  farmId: string,
+  params: { status?: InvestorStatus; q?: string; include_archived?: boolean } = {},
+): Promise<FarmInvestor[]> {
+  const { data } = await apiClient.get<FarmInvestor[]>(`/v1/farms/${farmId}/investors`, {
+    params,
+  });
   return data;
 }
 
@@ -357,19 +377,22 @@ export interface OverviewRecentRow {
 }
 
 export interface InvestmentsOverview {
+  farm: OverviewFarmRow;
+  /** Distinct investors who own a holding on this farm today. */
   investors: number;
-  holdings: number;
-  sold: number;
-  for_sale: number;
-  draft: number;
-  area_sold_m2: string;
-  area_not_sold_m2: string;
-  farms: OverviewFarmRow[];
   recent: OverviewRecentRow[];
+  all_farms: {
+    farms: number;
+    sold: number;
+    area_sold_m2: string;
+    area_not_sold_m2: string;
+  };
 }
 
-export async function getInvestmentsOverview(): Promise<InvestmentsOverview> {
-  const { data } = await apiClient.get<InvestmentsOverview>("/v1/investments/overview");
+export async function getInvestmentsOverview(farmId: string): Promise<InvestmentsOverview> {
+  const { data } = await apiClient.get<InvestmentsOverview>(
+    `/v1/farms/${farmId}/investments/overview`,
+  );
   return data;
 }
 

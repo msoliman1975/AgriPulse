@@ -82,7 +82,7 @@ export function HoldingCreatePage(): JSX.Element {
           above={
             <Breadcrumb
               items={[
-                { label: t("nav.holdings"), to: `/investments/holdings?farm=${farmId}` },
+                { label: t("nav.holdings"), to: `/investments/holdings/${farmId}` },
                 { label: blockLabel },
                 { label: t("block.add") },
               ]}
@@ -135,7 +135,7 @@ export function HoldingCreatePage(): JSX.Element {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => navigate(`/investments/holdings?farm=${farmId}`)}
+                onClick={() => navigate(`/investments/holdings/${farmId}`)}
               >
                 {t("holding.cancel")}
               </Button>

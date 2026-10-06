@@ -36,8 +36,7 @@ export function ConfigsMenu(): ReactNode {
     };
   }, [open]);
 
-  const itemClass =
-    "flex items-center gap-2 px-3 py-2 text-sm text-ap-ink hover:bg-ap-line/50";
+  const itemClass = "flex items-center gap-2 px-3 py-2 text-sm text-ap-ink hover:bg-ap-line/50";
 
   return (
     <div className="relative" ref={rootRef}>
@@ -94,12 +93,7 @@ export function ConfigsMenu(): ReactNode {
               {t("shell.configDecisionTreesBeta")}
             </Link>
           ) : null}
-          <Link
-            to="/settings"
-            role="menuitem"
-            onClick={() => setOpen(false)}
-            className={itemClass}
-          >
+          <Link to="/settings" role="menuitem" onClick={() => setOpen(false)} className={itemClass}>
             <RulesIcon className="h-4 w-4" />
             {t("shell.configTenantSettings")}
           </Link>

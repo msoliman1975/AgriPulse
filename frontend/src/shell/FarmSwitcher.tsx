@@ -76,6 +76,15 @@ function TenantFarmSwitcher(): ReactNode {
     // If the current pathname has a farm segment we recognise, swap it.
     // Otherwise default to /insights/<id>.
     let nextPath = `/insights/${id}`;
+    // Investments pages keep their section. A holding or investor page goes
+    // to its section's list: that holding or investor may not be on the new
+    // farm.
+    const investments = /^\/investments\/(overview|holdings|investors)\b/.exec(location.pathname);
+    if (investments) {
+      setOpen(false);
+      navigate(`/investments/${investments[1]}/${id}`);
+      return;
+    }
     for (const prefix of PINNED_PREFIXES) {
       if (location.pathname.startsWith(prefix)) {
         // Replace the segment after the prefix (handles /config/rules/<id>).

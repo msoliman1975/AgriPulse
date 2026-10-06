@@ -99,7 +99,16 @@ _HOLDING_COLUMNS = """
     cur.id AS current_ownership_id, cur.investor_id AS current_investor_id,
     cur.start_date AS current_since,
     ci.code AS current_investor_code, ci.full_name AS current_investor_name,
-    ci.full_name_ar AS current_investor_name_ar
+    ci.full_name_ar AS current_investor_name_ar,
+    (SELECT count(*)::int
+       FROM holding_ownerships o2
+       JOIN holdings h2 ON h2.id = o2.holding_id AND h2.deleted_at IS NULL
+       JOIN blocks b2 ON b2.id = h2.block_id
+      WHERE o2.investor_id = cur.investor_id
+        AND o2.deleted_at IS NULL
+        AND o2.start_date <= (public.app_now())::date
+        AND (o2.end_date IS NULL OR o2.end_date >= (public.app_now())::date)
+        AND b2.farm_id <> b.farm_id) AS current_investor_other_farm_holdings
 """
 
 _HOLDING_FROM = f"""
@@ -240,6 +249,61 @@ class InvestorsRepository:
             f"WHERE {' AND '.join(clauses)} ORDER BY i.code"
         )
         return await self._rows(sql, params)
+
+    async def list_investors_for_farm(
+        self,
+        *,
+        farm_id: UUID,
+        status: str | None,
+        query: str | None,
+        include_archived: bool,
+    ) -> list[dict[str, Any]]:
+        """Investors seen from one farm.
+
+        Those with a current or future holding on this farm, plus those with
+        no current or future holding anywhere, so a new investor can still be
+        found and given a holding. Each row says how much they hold here and
+        how many holdings they have on other farms.
+        """
+        clauses = ["i.deleted_at IS NULL", "(fs.in_farm > 0 OR fs.open_total = 0)"]
+        params: dict[str, Any] = {"farm_id": farm_id}
+        if not include_archived:
+            clauses.append("i.archived_at IS NULL")
+        if status is not None:
+            clauses.append("i.status = :status")
+            params["status"] = status
+        if query:
+            clauses.append(
+                "(i.full_name ILIKE :q OR i.full_name_ar ILIKE :q "
+                "OR i.email ILIKE :q OR i.code ILIKE :q)"
+            )
+            params["q"] = f"%{query}%"
+        sql = f"""
+            SELECT {_INVESTOR_COLUMNS},
+                   fs.in_farm AS holdings_in_farm,
+                   fs.area_in_farm AS area_in_farm_m2,
+                   fs.other_farms AS other_farms,
+                   fs.other_holdings AS other_farm_holdings
+              FROM {_INVESTOR_FROM}
+              LEFT JOIN LATERAL (
+                SELECT count(*) FILTER (WHERE b.farm_id = :farm_id)::int AS in_farm,
+                       coalesce(sum(h.area_m2) FILTER (WHERE b.farm_id = :farm_id), 0)
+                         AS area_in_farm,
+                       count(DISTINCT b.farm_id) FILTER (WHERE b.farm_id <> :farm_id)::int
+                         AS other_farms,
+                       count(*) FILTER (WHERE b.farm_id <> :farm_id)::int AS other_holdings,
+                       count(*)::int AS open_total
+                  FROM holding_ownerships o
+                  JOIN holdings h ON h.id = o.holding_id AND h.deleted_at IS NULL
+                  JOIN blocks b ON b.id = h.block_id
+                 WHERE o.investor_id = i.id
+                   AND o.deleted_at IS NULL
+                   AND (o.end_date IS NULL OR o.end_date >= {_TODAY})
+              ) fs ON true
+             WHERE {" AND ".join(clauses)}
+             ORDER BY i.code
+        """
+        return await self._rows(sql, params, ("farm_id",))
 
     async def get_investor(self, *, investor_id: UUID) -> dict[str, Any] | None:
         rows = await self._rows(
@@ -590,7 +654,7 @@ class InvestorsRepository:
 
     # ---- Investments overview and farm map -------------------------------
 
-    async def overview_farms(self) -> list[dict[str, Any]]:
+    async def overview_farms(self, *, farm_id: UUID | None = None) -> list[dict[str, Any]]:
         """One row per active farm: holdings by state and area sold vs not.
 
         "Not sold" is the area of the farm's active leaf blocks minus the area
@@ -628,21 +692,30 @@ class InvestorsRepository:
               ) cur ON true
              WHERE f.deleted_at IS NULL
                AND (f.active_to IS NULL OR f.active_to > {_TODAY})
+               {"AND f.id = :farm_id" if farm_id is not None else ""}
              GROUP BY f.id, f.name, f.name_ar
              ORDER BY f.name
             """,
-            {},
+            {"farm_id": farm_id} if farm_id is not None else {},
+            ("farm_id",) if farm_id is not None else (),
         )
 
-    async def count_live_investors(self) -> int:
+    async def count_investors_in_farm(self, *, farm_id: UUID) -> int:
+        """Distinct investors who own a holding on this farm today."""
         rows = await self._rows(
-            "SELECT count(*)::int AS n FROM investors "
-            "WHERE deleted_at IS NULL AND archived_at IS NULL",
-            {},
+            f"""
+            SELECT count(DISTINCT o.investor_id)::int AS n
+              FROM holding_ownerships o
+              JOIN holdings h ON h.id = o.holding_id AND h.deleted_at IS NULL
+              JOIN blocks b ON b.id = h.block_id
+             WHERE b.farm_id = :farm_id AND {_CURRENT_OWNERSHIP}
+            """,
+            {"farm_id": farm_id},
+            ("farm_id",),
         )
         return int(rows[0]["n"]) if rows else 0
 
-    async def recent_ownerships(self, *, limit: int = 10) -> list[dict[str, Any]]:
+    async def recent_ownerships(self, *, farm_id: UUID, limit: int = 10) -> list[dict[str, Any]]:
         """Newest ownership entries, each with the owner it replaced, if any."""
         return await self._rows(
             """
@@ -665,11 +738,12 @@ class InvestorsRepository:
                    AND p.end_date = o.start_date - 1
                  LIMIT 1
               ) prev ON true
-             WHERE o.deleted_at IS NULL
+             WHERE o.deleted_at IS NULL AND b.farm_id = :farm_id
              ORDER BY o.created_at DESC, o.id DESC
              LIMIT :limit
             """,
-            {"limit": limit},
+            {"limit": limit, "farm_id": farm_id},
+            ("farm_id",),
         )
 
     async def farm_blocks(self, *, farm_id: UUID) -> list[dict[str, Any]]:

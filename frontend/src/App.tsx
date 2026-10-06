@@ -29,6 +29,7 @@ import { BlockCreatePage } from "@/modules/farms/pages/BlockCreatePage";
 import { BlockAutoGridPage } from "@/modules/farms/pages/BlockAutoGridPage";
 import { BlockDetailPage } from "@/modules/farms/pages/BlockDetailPage";
 import { BlockEditPage } from "@/modules/farms/pages/BlockEditPage";
+import { InvestmentsFarmRedirect } from "@/modules/investors/components/InvestmentsFarmRedirect";
 import { InvestorShell } from "@/modules/investors/components/InvestorShell";
 import { HoldingCreatePage } from "@/modules/investors/pages/HoldingCreatePage";
 import { HoldingDetailPage } from "@/modules/investors/pages/HoldingDetailPage";
@@ -205,8 +206,27 @@ export function App(): ReactNode {
                 {/* Investments: a separate area from farm work. Investors,
                     holdings and ownership, for Investment Managers and
                     tenant admins. */}
-                <Route path="/investments" element={<InvestmentsOverviewPage />} />
-                <Route path="/investments/holdings" element={<HoldingsPage />} />
+                {/* Like every Workspace page, each Investments page carries the
+                    farm picked in the top bar as its :farmId. The bare paths
+                    send you to the first farm. */}
+                <Route
+                  path="/investments"
+                  element={<InvestmentsFarmRedirect section="overview" />}
+                />
+                <Route
+                  path="/investments/overview"
+                  element={<InvestmentsFarmRedirect section="overview" />}
+                />
+                <Route
+                  path="/investments/holdings"
+                  element={<InvestmentsFarmRedirect section="holdings" />}
+                />
+                <Route
+                  path="/investments/investors"
+                  element={<InvestmentsFarmRedirect section="investors" />}
+                />
+                <Route path="/investments/overview/:farmId" element={<InvestmentsOverviewPage />} />
+                <Route path="/investments/holdings/:farmId" element={<HoldingsPage />} />
                 <Route
                   path="/investments/holdings/:farmId/blocks/:blockId/new"
                   element={<HoldingCreatePage />}
@@ -215,8 +235,11 @@ export function App(): ReactNode {
                   path="/investments/holdings/:farmId/:holdingId"
                   element={<HoldingDetailPage />}
                 />
-                <Route path="/investments/investors" element={<InvestorsPage />} />
-                <Route path="/investments/investors/:investorId" element={<InvestorDetailPage />} />
+                <Route path="/investments/investors/:farmId" element={<InvestorsPage />} />
+                <Route
+                  path="/investments/investors/:farmId/:investorId"
+                  element={<InvestorDetailPage />}
+                />
                 {/* AgriPulse new IA â€” farm-scoped routes (UX_SPEC Â§3 +
                   IMPLEMENTATION_PLAN Â§3). */}
                 {/* Labs: experimental map-first surface for live validation.

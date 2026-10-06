@@ -266,7 +266,7 @@ async def test_farm_roles_have_no_holding_rights(scouting_env: ScoutingFixture) 
             json={"name": "Nope", "boundary": _rect(_LON0 + 0.001, _LAT0)},
         )
         investors = await c.get("/api/v1/investors")
-        overview = await c.get("/api/v1/investments/overview")
+        overview = await c.get(f"/api/v1/farms/{env.farm_id}/investments/overview")
     assert listed.status_code == 403, listed.text
     assert drawn.status_code == 403, drawn.text
     assert investors.status_code == 403, investors.text

@@ -98,6 +98,7 @@ def _shape_holding(row: dict[str, Any]) -> dict[str, Any]:
             "investor_name": row["current_investor_name"],
             "investor_name_ar": row["current_investor_name_ar"],
             "since": row["current_since"],
+            "other_farm_holdings": row.get("current_investor_other_farm_holdings") or 0,
         }
         if row["current_ownership_id"] is not None
         else None
@@ -146,6 +147,18 @@ class InvestorsService:
     ) -> list[dict[str, Any]]:
         return await self._repo.list_investors(
             status=status, query=query, include_archived=include_archived
+        )
+
+    async def list_investors_for_farm(
+        self,
+        *,
+        farm_id: UUID,
+        status: str | None,
+        query: str | None,
+        include_archived: bool,
+    ) -> list[dict[str, Any]]:
+        return await self._repo.list_investors_for_farm(
+            farm_id=farm_id, status=status, query=query, include_archived=include_archived
         )
 
     async def get_investor(self, *, investor_id: UUID) -> dict[str, Any]:
@@ -667,22 +680,32 @@ class InvestorsService:
 
     # ---- Investments overview and farm map -------------------------------
 
-    async def overview(self) -> dict[str, Any]:
-        farms = await self._repo.overview_farms()
-        for f in farms:
-            f["area_not_sold_m2"] = max(
-                Decimal(f["block_area_m2"]) - Decimal(f["area_sold_m2"]), Decimal("0")
-            )
+    async def overview(self, *, farm_id: UUID) -> dict[str, Any]:
+        """One farm's investments, and a one-line total across all farms."""
+
+        def not_sold(f: dict[str, Any]) -> Decimal:
+            return max(Decimal(f["block_area_m2"]) - Decimal(f["area_sold_m2"]), Decimal("0"))
+
+        everything = await self._repo.overview_farms()
+        for f in everything:
+            f["area_not_sold_m2"] = not_sold(f)
+        here = next((f for f in everything if f["farm_id"] == farm_id), None)
+        if here is None:
+            rows = await self._repo.overview_farms(farm_id=farm_id)
+            if not rows:
+                raise BlockNotEligibleError("This farm does not exist or is not active.")
+            here = rows[0]
+            here["area_not_sold_m2"] = not_sold(here)
         return {
-            "investors": await self._repo.count_live_investors(),
-            "holdings": sum(f["holdings"] for f in farms),
-            "sold": sum(f["sold"] for f in farms),
-            "for_sale": sum(f["for_sale"] for f in farms),
-            "draft": sum(f["draft"] for f in farms),
-            "area_sold_m2": sum((Decimal(f["area_sold_m2"]) for f in farms), Decimal("0")),
-            "area_not_sold_m2": sum((f["area_not_sold_m2"] for f in farms), Decimal("0")),
-            "farms": farms,
-            "recent": await self._repo.recent_ownerships(limit=10),
+            "farm": here,
+            "investors": await self._repo.count_investors_in_farm(farm_id=farm_id),
+            "recent": await self._repo.recent_ownerships(farm_id=farm_id, limit=10),
+            "all_farms": {
+                "farms": len(everything),
+                "sold": sum(f["sold"] for f in everything),
+                "area_sold_m2": sum((Decimal(f["area_sold_m2"]) for f in everything), Decimal("0")),
+                "area_not_sold_m2": sum((f["area_not_sold_m2"] for f in everything), Decimal("0")),
+            },
         }
 
     async def farm_map(self, *, farm_id: UUID) -> dict[str, Any]:
