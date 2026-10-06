@@ -3993,9 +3993,21 @@ global:
       #   demo team logs the day's irrigation, and the demo build gains an
       #   `irrigation` mode. No migration. Rollback is these two tags back
       #   to f5f9778.
-      tag: "6fc2b97"
+      # cf9113c = #765, api, workers and frontend. Investor holdings,
+      #   stage 1: investors, holdings (drawn areas inside a block) and
+      #   dated ownership, staff side only. Tenant migration 0098 runs in
+      #   the PreSync job: it adds investors, holdings and
+      #   holding_ownerships, two triggers on holdings and one on blocks
+      #   (a block redraw that cuts a holding is refused). Nothing reads
+      #   the new tables until someone draws a holding.
+      #   Watch: Settings > Investors loads, and a block page shows the
+      #   Holdings card.
+      #   Rollback is these three tags back to 6fc2b97 / 6fc2b97 / f5f9778.
+      #   0098 needs no downgrade for a rollback: the old api ignores the
+      #   new tables, and the blocks trigger only fires when holdings exist.
+      tag: "cf9113c"
     workers:
-      tag: "6fc2b97"
+      tag: "cf9113c"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4637,7 +4649,11 @@ global:
       #   older than the day; a closed Action Center item shows no due date;
       #   a platform admin with no tenant stops calling /config and /farms.
       #   Rollback is this tag alone back to 4056f34.
-      tag: "f5f9778"
+      # cf9113c = #765, frontend. Settings > Investors, the Holdings card on
+      #   the block page, the draw-a-holding page and the holding page.
+      #   Needs the api at cf9113c or later.
+      #   Rollback is this tag alone back to f5f9778.
+      tag: "cf9113c"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
