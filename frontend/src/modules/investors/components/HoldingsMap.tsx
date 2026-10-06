@@ -66,7 +66,10 @@ export function HoldingsMap({
         geometry: h.boundary,
       })),
     };
+    const resize = new ResizeObserver(() => map.resize());
+    resize.observe(ref.current);
     map.on("load", () => {
+      map.resize();
       const [minX, minY, maxX, maxY] = bboxOfGeometry(block);
       map.fitBounds(
         [
@@ -114,7 +117,10 @@ export function HoldingsMap({
         });
       }
     });
-    return () => map.remove();
+    return () => {
+      resize.disconnect();
+      map.remove();
+    };
   }, [block, holdings, highlightId, selectable]);
 
   return (
