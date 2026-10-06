@@ -96,6 +96,7 @@ from app.modules.farms.validity import (
     find_conflict,
     open_assignment_to_close,
 )
+from app.modules.investors.service import block_holding_conflicts
 from app.modules.weather.snapshot import load_gdd_since
 from app.shared import clock
 from app.shared.db.ids import uuid7
@@ -930,6 +931,11 @@ class FarmServiceImpl:
         if (await self._repo.get_farm_by_id(farm_id, with_boundary=False)) is None:
             raise FarmNotFoundError(farm_id)
         block_ids = await self._repo.list_active_block_ids_for_farm(farm_id=farm_id)
+        # R7, for every block the farm takes with it.
+        for bid in block_ids:
+            await block_holding_conflicts(
+                tenant_session=self._tenant_session, block_id=bid, inactivating=True
+            )
 
         # Apply the cascade BEFORE flipping the farm/block rows — the
         # cascade reads from those tables, so doing it last would let
@@ -1537,6 +1543,11 @@ class FarmServiceImpl:
         if new_boundary is not None:
             _geometry.validate_polygon_geojson(new_boundary)
             ewkt = _geometry.geojson_to_ewkt_polygon(new_boundary)
+            # R6: a redraw must not cut an investor's holding. Checked here so
+            # the error names the holdings; a trigger backs it up.
+            await block_holding_conflicts(
+                tenant_session=self._tenant_session, block_id=block_id, new_boundary_ewkt=ewkt
+            )
 
         block, prev_aoi_hash = await self._repo.update_block(
             block_id=block_id,
@@ -1592,6 +1603,10 @@ class FarmServiceImpl:
         block = await self._repo.get_block_by_id(block_id, with_boundary=False)
         if block is None:
             raise BlockNotFoundError(block_id)
+        # R7: investors own part of this block.
+        await block_holding_conflicts(
+            tenant_session=self._tenant_session, block_id=block_id, inactivating=True
+        )
 
         counts = await _cascade.apply_block_cascade(
             session=self._tenant_session,
