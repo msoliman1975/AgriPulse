@@ -132,3 +132,21 @@ export const DRAW_STYLES: object[] = [
     paint: { "circle-radius": 5, "circle-color": ORANGE },
   },
 ];
+
+/**
+ * Give mapbox-gl-draw's buttons MapLibre's control classes.
+ *
+ * Draw tags its button group `mapboxgl-ctrl mapboxgl-ctrl-group`. MapLibre's
+ * corner container is `pointer-events: none` and turns events back on only
+ * for `.maplibregl-ctrl` children, so with Draw's own names the canvas takes
+ * every click: the polygon and trash buttons show but cannot be pressed.
+ * Draw reads these names when it builds its controls, so this must run
+ * before `new MapboxDraw(...)`.
+ */
+export function applyMapLibreClassesToDraw(draw: { constants?: unknown }): void {
+  const classes = (draw.constants as { classes?: Record<string, string> } | undefined)?.classes;
+  if (!classes) return;
+  classes.CONTROL_BASE = "maplibregl-ctrl";
+  classes.CONTROL_PREFIX = "maplibregl-ctrl-";
+  classes.CONTROL_GROUP = "maplibregl-ctrl-group";
+}

@@ -19,3 +19,16 @@ describe("DRAW_STYLES", () => {
     expect(ids).toContain("gl-draw-polygon-and-line-vertex-inactive");
   });
 });
+
+describe("applyMapLibreClassesToDraw", () => {
+  it("renames Draw's control classes to MapLibre's, so its buttons take clicks", async () => {
+    const { default: MapboxDraw } = await import("@mapbox/mapbox-gl-draw");
+    const { applyMapLibreClassesToDraw } = await import("./drawStyles");
+    applyMapLibreClassesToDraw(MapboxDraw);
+    const classes = (MapboxDraw as unknown as { constants: { classes: Record<string, string> } })
+      .constants.classes;
+    expect(classes.CONTROL_BASE).toBe("maplibregl-ctrl");
+    expect(classes.CONTROL_GROUP).toBe("maplibregl-ctrl-group");
+    expect(classes.CONTROL_PREFIX).toBe("maplibregl-ctrl-");
+  });
+});

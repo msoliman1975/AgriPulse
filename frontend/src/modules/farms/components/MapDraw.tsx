@@ -3,7 +3,7 @@ import maplibregl from "maplibre-gl";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import type { Feature, FeatureCollection, Polygon } from "geojson";
 
-import { DRAW_STYLES } from "@/lib/drawStyles";
+import { DRAW_STYLES, applyMapLibreClassesToDraw } from "@/lib/drawStyles";
 import { bboxOfGeometry, centerOfBbox } from "@/lib/geometry";
 
 const DEFAULT_CENTER: [number, number] = [31.2357, 30.0444]; // Cairo
@@ -72,6 +72,7 @@ export function MapDraw({
     });
     mapRef.current = map;
 
+    applyMapLibreClassesToDraw(MapboxDraw);
     const draw = new MapboxDraw({
       displayControlsDefault: false,
       controls: { polygon: true, trash: true },
@@ -115,8 +116,15 @@ export function MapDraw({
           },
         });
         if (!initial) {
-          const frame = references.find((r) => r.kind === "frame") ?? references[0];
-          const [minX, minY, maxX, maxY] = bboxOfGeometry(frame.geometry);
+          // Fit every frame (all blocks of a farm), not only the first one.
+          const frames = references.filter((r) => r.kind === "frame");
+          const boxes = (frames.length > 0 ? frames : references).map((r) =>
+            bboxOfGeometry(r.geometry),
+          );
+          const minX = Math.min(...boxes.map((b) => b[0]));
+          const minY = Math.min(...boxes.map((b) => b[1]));
+          const maxX = Math.max(...boxes.map((b) => b[2]));
+          const maxY = Math.max(...boxes.map((b) => b[3]));
           map.fitBounds(
             [
               [minX, minY],
