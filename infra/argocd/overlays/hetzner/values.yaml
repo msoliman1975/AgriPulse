@@ -4022,9 +4022,18 @@ global:
       #   investor maps resize and fit after load. No migration.
       #   Watch: an Investor user's My holdings page lists their holdings.
       #   Rollback is these three tags back to 7675a60.
-      tag: "e46c56d"
+      # 9526842 = #772, api, workers and frontend. The investor link
+      #   survives the first sign-in: /me re-keys public.users.id to the
+      #   token's sub, and investors.user_id (no FK) kept the old id, so
+      #   every investor read answered 404 after a browser sign-in. New
+      #   links store the Keycloak id; old ones are found by email and
+      #   rewritten on the next call. No migration.
+      #   Watch: an Investor's My holdings lists their holdings after they
+      #   sign in through the browser.
+      #   Rollback is these three tags back to e46c56d.
+      tag: "9526842"
     workers:
-      tag: "e46c56d"
+      tag: "9526842"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4675,7 +4684,9 @@ global:
       #   api at 7675a60 or later. Rollback is this tag alone back to cf9113c.
       # e46c56d = #769, frontend. The investor maps measure their box and fit
       #   after load. Rollback is this tag alone back to 7675a60.
-      tag: "e46c56d"
+      # 9526842 = #772, frontend. No frontend change of its own; moves with
+      #   the api. Rollback is this tag alone back to e46c56d.
+      tag: "9526842"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
