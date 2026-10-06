@@ -31,20 +31,19 @@ _WITHOUT_VIEWER = "role IN ('TenantOwner','TenantAdmin','BillingAdmin')"
 
 
 def upgrade() -> None:
+    # NOT VALID (added with public 0101): on a replay, rows written by later
+    # roles (InvestmentManager, Investor) already exist, and validating them
+    # against this older list would fail. 0101 re-adds the full CHECK.
     op.execute(f"ALTER TABLE public.tenant_role_assignments DROP CONSTRAINT IF EXISTS {_REAL_NAME}")
-    op.create_check_constraint(
-        "ck_tenant_role_assignments_role",
-        "tenant_role_assignments",
-        _WITH_VIEWER,
-        schema="public",
+    op.execute(
+        f"ALTER TABLE public.tenant_role_assignments ADD CONSTRAINT {_REAL_NAME} "
+        f"CHECK ({_WITH_VIEWER}) NOT VALID"
     )
 
 
 def downgrade() -> None:
     op.execute(f"ALTER TABLE public.tenant_role_assignments DROP CONSTRAINT IF EXISTS {_REAL_NAME}")
-    op.create_check_constraint(
-        "ck_tenant_role_assignments_role",
-        "tenant_role_assignments",
-        _WITHOUT_VIEWER,
-        schema="public",
+    op.execute(
+        f"ALTER TABLE public.tenant_role_assignments ADD CONSTRAINT {_REAL_NAME} "
+        f"CHECK ({_WITHOUT_VIEWER}) NOT VALID"
     )
