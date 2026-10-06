@@ -37,8 +37,6 @@ export function HoldingsPage(): JSX.Element {
   const [blockFilter, setBlockFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<HoldingStatus | "">("");
   const [ownerFilter, setOwnerFilter] = useState("");
-  const [picking, setPicking] = useState(false);
-  const [pickedBlock, setPickedBlock] = useState<string | null>(null);
 
   const owners = useMemo(() => {
     const seen = new Map<string, string>();
@@ -66,7 +64,6 @@ export function HoldingsPage(): JSX.Element {
   );
 
   const blocks = mapQ.data?.blocks ?? [];
-  const picked = blocks.find((b) => b.id === pickedBlock) ?? null;
   const filtered = Boolean(blockFilter || statusFilter || ownerFilter);
 
   return (
@@ -76,12 +73,7 @@ export function HoldingsPage(): JSX.Element {
         subtitle={t("holdingsPage.subtitle")}
         actions={
           canManage && farmId ? (
-            <Button
-              onClick={() => {
-                setPicking(true);
-                setPickedBlock(null);
-              }}
-            >
+            <Button onClick={() => navigate(`/investments/holdings/${farmId}/new`)}>
               {t("holdingsPage.new")}
             </Button>
           ) : null
@@ -95,53 +87,13 @@ export function HoldingsPage(): JSX.Element {
       >
         {(data) => (
           <div className="flex flex-col gap-4">
-            {picking ? (
-              <Card title={t("holdingsPage.pickBlockTitle")}>
-                <p className="text-sm text-ap-muted">{t("holdingsPage.pickBlockHelp")}</p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <select
-                    aria-label={t("holdingsPage.block")}
-                    className={SELECT_CLASS}
-                    value={pickedBlock ?? ""}
-                    onChange={(e) => setPickedBlock(e.target.value || null)}
-                  >
-                    <option value="">{t("holdingsPage.block")}</option>
-                    {blocks.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.code}
-                        {b.name ? ` · ${localizedName(i18n.language, b.name, b.name_ar)}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <Button
-                    disabled={!picked || !picked.eligible}
-                    onClick={() =>
-                      navigate(`/investments/holdings/${data.farm_id}/blocks/${picked?.id}/new`)
-                    }
-                  >
-                    {t("holdingsPage.continue")}
-                  </Button>
-                  <Button variant="ghost" onClick={() => setPicking(false)}>
-                    {t("holdingsPage.cancel")}
-                  </Button>
-                </div>
-                {picked && !picked.eligible ? (
-                  <p className="mt-2 text-sm text-ap-warn">{t("holdingsPage.blockNotEligible")}</p>
-                ) : null}
-              </Card>
-            ) : null}
-
             <Card>
               <FarmHoldingsMap
                 blocks={data.blocks}
                 holdings={data.holdings}
-                selectedBlockId={picking ? pickedBlock : blockFilter || null}
-                onBlockClick={(id) => (picking ? setPickedBlock(id) : setBlockFilter(id))}
-                onHoldingClick={
-                  picking
-                    ? undefined
-                    : (id) => navigate(`/investments/holdings/${data.farm_id}/${id}`)
-                }
+                selectedBlockId={blockFilter || null}
+                onBlockClick={setBlockFilter}
+                onHoldingClick={(id) => navigate(`/investments/holdings/${data.farm_id}/${id}`)}
               />
               <p className="mt-2 text-xs text-ap-muted">{t("holdingsPage.mapHelp")}</p>
             </Card>

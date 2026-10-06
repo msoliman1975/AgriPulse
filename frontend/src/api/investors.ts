@@ -14,6 +14,8 @@ export type IdType = "national_id" | "passport" | "commercial_register" | "other
 /** `sold` is derived (has a current owner); `archived` goes through `:archive`. */
 export type HoldingStatus = "draft" | "available" | "sold" | "archived";
 export type HoldingWritableStatus = "draft" | "available";
+/** What a form may choose. "sold" needs an investor and gives the holding an owner. */
+export type HoldingFormStatus = "draft" | "available" | "sold";
 export type AcquiredBy = "purchase" | "transfer" | "inheritance" | "other";
 export type EndedBy = "resale" | "buyback" | "contract_end" | "correction" | "other";
 export type OwnershipPeriod = "past" | "current" | "future";
@@ -163,8 +165,12 @@ export interface HoldingCreatePayload {
   name_ar?: string | null;
   boundary: Polygon;
   tree_count?: number | null;
-  status?: HoldingWritableStatus;
+  status?: HoldingFormStatus;
   notes_internal?: string | null;
+  investor_id?: string | null;
+  owner_since?: string | null;
+  /** Farm-level create only; found from the boundary when empty. */
+  block_id?: string | null;
 }
 
 export interface HoldingUpdatePayload {
@@ -172,8 +178,27 @@ export interface HoldingUpdatePayload {
   name_ar?: string | null;
   boundary?: Polygon;
   tree_count?: number | null;
-  status?: HoldingWritableStatus;
+  status?: HoldingFormStatus;
   notes_internal?: string | null;
+  investor_id?: string | null;
+  owner_since?: string | null;
+}
+
+/** The block that fully contains a shape, or why none does. */
+export interface HoldingCheckResult {
+  block_id: string | null;
+  block_code: string | null;
+  area_m2: string | null;
+  share_pct: string | null;
+  problem:
+    | null
+    | "outside_farm"
+    | "crosses_blocks"
+    | "outside_block"
+    | "block_not_eligible"
+    | "overlaps_holding"
+    | "invalid_shape";
+  detail: string | null;
 }
 
 export interface OwnershipCreatePayload {
@@ -254,6 +279,27 @@ export async function createHolding(
   const { data } = await apiClient.post<Holding>(
     `/v1/farms/${farmId}/blocks/${blockId}/holdings`,
     payload,
+  );
+  return data;
+}
+
+/** Create a holding on a farm; the server finds the block from the boundary. */
+export async function createFarmHolding(
+  farmId: string,
+  payload: HoldingCreatePayload,
+): Promise<Holding> {
+  const { data } = await apiClient.post<Holding>(`/v1/farms/${farmId}/holdings`, payload);
+  return data;
+}
+
+/** Dry run: for each shape, the block that fully contains it, or the problem. */
+export async function checkHoldingShapes(
+  farmId: string,
+  boundaries: Polygon[],
+): Promise<HoldingCheckResult[]> {
+  const { data } = await apiClient.post<HoldingCheckResult[]>(
+    `/v1/farms/${farmId}/holdings:check`,
+    { boundaries },
   );
   return data;
 }

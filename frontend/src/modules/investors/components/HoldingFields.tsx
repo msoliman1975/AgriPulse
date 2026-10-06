@@ -1,7 +1,9 @@
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
-import type { HoldingWritableStatus } from "@/api/investors";
+import { listInvestors, type HoldingFormStatus } from "@/api/investors";
 import { FIELD_CONTROL_CLASS, Field } from "@/components/Field";
+import { localizedName } from "@/lib/localizedField";
 
 export interface HoldingFieldValues {
   code: string;
@@ -9,7 +11,10 @@ export interface HoldingFieldValues {
   name_ar: string;
   /** Kept as text so an empty box means "unknown", not 0. */
   tree_count: string;
-  status: HoldingWritableStatus;
+  status: HoldingFormStatus;
+  /** Used when status is "sold". */
+  investor_id: string;
+  owner_since: string;
   notes_internal: string;
 }
 
@@ -18,20 +23,30 @@ interface Props {
   onChange: (values: HoldingFieldValues) => void;
   /** The code can be chosen on create only. */
   showCode?: boolean;
-  /** A sold holding's stored status is not shown; "sold" is derived. */
-  showStatus?: boolean;
+  /**
+   * The holding already has an owner. Status then reads "Sold" with the
+   * owner's name; a change of owner goes through the Ownership card.
+   */
+  currentOwner?: string | null;
 }
 
-/** The text fields of a holding, shared by the create and detail pages. */
+/** The fields of a holding, shared by the new-holding and holding pages. */
 export function HoldingFields({
   values,
   onChange,
   showCode = false,
-  showStatus = true,
+  currentOwner = null,
 }: Props): JSX.Element {
-  const { t } = useTranslation("investors");
+  const { t, i18n } = useTranslation("investors");
   const set = <K extends keyof HoldingFieldValues>(key: K, value: HoldingFieldValues[K]) =>
     onChange({ ...values, [key]: value });
+  const selling = currentOwner === null && values.status === "sold";
+
+  const investors = useQuery({
+    queryKey: ["investors", "list", "picker"],
+    queryFn: () => listInvestors(),
+    enabled: selling,
+  });
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -85,20 +100,62 @@ export function HoldingFields({
           />
         )}
       </Field>
-      {showStatus ? (
-        <Field label={t("holding.status")}>
-          {(p) => (
+      <Field label={t("holding.status")}>
+        {(p) =>
+          currentOwner !== null ? (
+            <input
+              {...p}
+              readOnly
+              className={FIELD_CONTROL_CLASS}
+              value={`${t("holdingStatus.sold")} · ${currentOwner}`}
+            />
+          ) : (
             <select
               {...p}
               className={FIELD_CONTROL_CLASS}
               value={values.status}
-              onChange={(e) => set("status", e.target.value as HoldingWritableStatus)}
+              onChange={(e) => set("status", e.target.value as HoldingFormStatus)}
             >
               <option value="draft">{t("holdingStatus.draft")}</option>
               <option value="available">{t("holdingStatus.available")}</option>
+              <option value="sold">{t("holdingStatus.sold")}</option>
             </select>
-          )}
-        </Field>
+          )
+        }
+      </Field>
+      {selling ? (
+        <>
+          <Field label={t("newHolding.investor")} required>
+            {(p) => (
+              <select
+                {...p}
+                required
+                className={FIELD_CONTROL_CLASS}
+                value={values.investor_id}
+                onChange={(e) => set("investor_id", e.target.value)}
+              >
+                <option value="">{t("newHolding.pickInvestor")}</option>
+                {(investors.data ?? []).map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.code} · {localizedName(i18n.language, i.full_name, i.full_name_ar)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+          <Field label={t("newHolding.ownerSince")} required>
+            {(p) => (
+              <input
+                {...p}
+                type="date"
+                required
+                className={FIELD_CONTROL_CLASS}
+                value={values.owner_since}
+                onChange={(e) => set("owner_since", e.target.value)}
+              />
+            )}
+          </Field>
+        </>
       ) : null}
       <Field label={t("holding.notes")} help={t("holding.notesHelp")} className="sm:col-span-2">
         {(p) => (

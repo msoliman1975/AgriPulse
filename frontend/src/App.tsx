@@ -31,7 +31,7 @@ import { BlockDetailPage } from "@/modules/farms/pages/BlockDetailPage";
 import { BlockEditPage } from "@/modules/farms/pages/BlockEditPage";
 import { InvestmentsFarmRedirect } from "@/modules/investors/components/InvestmentsFarmRedirect";
 import { InvestorShell } from "@/modules/investors/components/InvestorShell";
-import { HoldingCreatePage } from "@/modules/investors/pages/HoldingCreatePage";
+import { HoldingNewPage } from "@/modules/investors/pages/HoldingNewPage";
 import { HoldingDetailPage } from "@/modules/investors/pages/HoldingDetailPage";
 import { HoldingsPage } from "@/modules/investors/pages/HoldingsPage";
 import { InvestmentsOverviewPage } from "@/modules/investors/pages/InvestmentsOverviewPage";
@@ -227,9 +227,10 @@ export function App(): ReactNode {
                 />
                 <Route path="/investments/overview/:farmId" element={<InvestmentsOverviewPage />} />
                 <Route path="/investments/holdings/:farmId" element={<HoldingsPage />} />
+                <Route path="/investments/holdings/:farmId/new" element={<HoldingNewPage />} />
                 <Route
                   path="/investments/holdings/:farmId/blocks/:blockId/new"
-                  element={<HoldingCreatePage />}
+                  element={<HoldingNewPage />}
                 />
                 <Route
                   path="/investments/holdings/:farmId/:holdingId"

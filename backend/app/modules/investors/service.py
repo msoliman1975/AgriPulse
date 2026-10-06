@@ -305,14 +305,84 @@ class InvestorsService:
             raise HoldingGeometryError(f"The polygon is not valid: {problem}.")
         return ewkt
 
+    async def check_shape(self, *, farm_id: UUID, boundary: dict[str, Any]) -> dict[str, Any]:
+        """Which block fully contains this shape, or why none does.
+
+        Never raises for a bad shape: the upload screen checks many shapes at
+        once and shows each one's problem in its own row.
+        """
+        try:
+            ewkt = await self._checked_ewkt(boundary)
+        except HoldingGeometryError as exc:
+            return {"problem": "invalid_shape", "detail": exc.detail}
+        touching = await self._repo.blocks_touching(farm_id=farm_id, boundary_ewkt=ewkt)
+        if not touching:
+            return {
+                "problem": "outside_farm",
+                "detail": "The shape is outside every block of this farm.",
+            }
+        # A pivot split into sectors covers its sectors' land; the sector is
+        # the leaf that takes the holding, so leaves win.
+        covering = [b for b in touching if b["covers"]]
+        leaf = next((b for b in covering if not b["has_children"]), None)
+        if leaf is None:
+            if covering:
+                return {
+                    "problem": "block_not_eligible",
+                    "detail": f"Block {covering[0]['code']} is split into sectors. "
+                    "Draw the holding inside one sector.",
+                }
+            inside = [b for b in touching if b["inside_m2"] > 1.0]
+            if len(inside) > 1:
+                codes = ", ".join(b["code"] for b in inside)
+                return {
+                    "problem": "crosses_blocks",
+                    "detail": f"The shape crosses blocks {codes}. A holding must sit in one block.",
+                }
+            return {
+                "problem": "outside_block",
+                "detail": f"The shape goes outside block {touching[0]['code']}.",
+            }
+        result: dict[str, Any] = {
+            "block_id": leaf["id"],
+            "block_code": leaf["code"],
+            "area_m2": leaf["area_m2"],
+            "share_pct": (
+                (Decimal(leaf["area_m2"]) * 100 / Decimal(leaf["block_area_m2"])).quantize(
+                    Decimal("0.01")
+                )
+                if leaf["block_area_m2"]
+                else None
+            ),
+        }
+        overlaps = await self._repo.overlapping_holding_codes(
+            block_id=leaf["id"], boundary_ewkt=ewkt
+        )
+        if overlaps:
+            result["problem"] = "overlaps_holding"
+            result["detail"] = "The shape overlaps holding " + ", ".join(overlaps) + "."
+        return result
+
     async def create_holding(
         self,
         *,
         farm_id: UUID,
-        block_id: UUID,
+        block_id: UUID | None,
         payload: dict[str, Any],
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
+        """Create a holding; find its block from the shape when none is given.
+
+        Status "sold" stores the holding as available and gives it an owner
+        from `owner_since` (default today) in the same transaction.
+        """
+        if block_id is None:
+            found = await self.check_shape(farm_id=farm_id, boundary=payload["boundary"])
+            if found.get("block_id") is None:
+                if found.get("problem") == "invalid_shape":
+                    raise HoldingGeometryError(found["detail"])
+                raise BlockNotEligibleError(found["detail"])
+            block_id = found["block_id"]
         await self._eligible_block(block_id=block_id, farm_id=farm_id)
         ewkt = await self._checked_ewkt(payload["boundary"])
         code = payload.get("code")
@@ -330,7 +400,11 @@ class InvestorsService:
             name_ar=payload.get("name_ar"),
             boundary_ewkt=ewkt,
             tree_count=payload.get("tree_count"),
-            status=payload.get("status") or "draft",
+            status=(
+                "available"
+                if payload.get("status") == "sold"
+                else (payload.get("status") or "draft")
+            ),
             notes_internal=payload.get("notes_internal"),
             actor_user_id=actor_user_id,
         )
@@ -342,6 +416,17 @@ class InvestorsService:
             farm_id=farm_id,
             details={"code": code, "block_id": str(block_id)},
         )
+        if payload.get("status") == "sold":
+            await self.assign_owner(
+                farm_id=farm_id,
+                holding_id=holding_id,
+                payload={
+                    "investor_id": payload["investor_id"],
+                    "start_date": payload.get("owner_since") or clock.today(),
+                    "acquired_by": "purchase",
+                },
+                actor_user_id=actor_user_id,
+            )
         return await self.get_holding(farm_id=farm_id, holding_id=holding_id)
 
     async def update_holding(
@@ -358,10 +443,24 @@ class InvestorsService:
             raise HoldingOwnedError("An archived holding cannot be edited.")
         changes = dict(changes)
         boundary = changes.pop("boundary", None)
+        investor_id = changes.pop("investor_id", None)
+        owner_since = changes.pop("owner_since", None)
         if changes.get("name") is None:
             changes.pop("name", None)
         if changes.get("status") is None:
             changes.pop("status", None)
+        sell = False
+        if changes.get("status") == "sold":
+            # "sold" is not stored: it means "give this holding an owner".
+            changes.pop("status")
+            if current["current_owner"] is None:
+                if investor_id is None:
+                    raise OwnershipConflictError("A sold holding needs an investor.")
+                sell = True
+        elif "status" in changes and current["current_owner"] is not None:
+            raise HoldingOwnedError(
+                "This holding has an owner. End the ownership before you change its status."
+            )
         ewkt: str | None = None
         if boundary is not None:
             if not can_redraw_sold and await self._repo.holding_has_open_ownership(
@@ -391,6 +490,17 @@ class InvestorsService:
             farm_id=farm_id,
             details=details,
         )
+        if sell:
+            await self.assign_owner(
+                farm_id=farm_id,
+                holding_id=holding_id,
+                payload={
+                    "investor_id": investor_id,
+                    "start_date": owner_since or clock.today(),
+                    "acquired_by": "purchase",
+                },
+                actor_user_id=actor_user_id,
+            )
         return await self.get_holding(farm_id=farm_id, holding_id=holding_id)
 
     async def archive_holding(

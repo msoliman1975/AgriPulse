@@ -32,7 +32,14 @@ import { useCapability } from "@/rbac/useCapability";
 import { HoldingFields, type HoldingFieldValues } from "../components/HoldingFields";
 import { HoldingsMap } from "../components/HoldingsMap";
 import { AssignOwnerDialog, EndOwnershipDialog } from "../components/OwnerDialogs";
-import { HOLDING_STATUS_PILL, blockHoldingsKey, errorText, formatPct } from "../lib";
+import {
+  HOLDING_STATUS_PILL,
+  blockHoldingsKey,
+  errorText,
+  formatPct,
+  isoDay,
+  saleFields,
+} from "../lib";
 
 function toValues(h: HoldingDetail): HoldingFieldValues {
   return {
@@ -40,7 +47,9 @@ function toValues(h: HoldingDetail): HoldingFieldValues {
     name: h.name,
     name_ar: h.name_ar ?? "",
     tree_count: h.tree_count === null ? "" : String(h.tree_count),
-    status: h.status === "draft" ? "draft" : "available",
+    status: h.status === "draft" ? "draft" : h.status === "sold" ? "sold" : "available",
+    investor_id: "",
+    owner_since: isoDay(),
     notes_internal: h.notes_internal ?? "",
   };
 }
@@ -91,9 +100,8 @@ export function HoldingDetailPage(): JSX.Element {
         name_ar: values.name_ar.trim() || null,
         tree_count: values.tree_count === "" ? null : Number(values.tree_count),
         notes_internal: values.notes_internal.trim() || null,
-        ...(holding?.status === "draft" || holding?.status === "available"
-          ? { status: values.status }
-          : {}),
+        // An owned holding's status follows its ownership, not this form.
+        ...(holding?.current_owner ? {} : { status: values.status, ...saleFields(values) }),
         ...(redrawing && newBoundary ? { boundary: newBoundary } : {}),
       });
     },
@@ -252,7 +260,15 @@ export function HoldingDetailPage(): JSX.Element {
             <HoldingFields
               values={values}
               onChange={setValues}
-              showStatus={holding.status === "draft" || holding.status === "available"}
+              currentOwner={
+                holding.current_owner
+                  ? `${holding.current_owner.investor_code} · ${localizedName(
+                      i18n.language,
+                      holding.current_owner.investor_name,
+                      holding.current_owner.investor_name_ar,
+                    )}`
+                  : null
+              }
             />
             {formError ? (
               <p role="alert" className="text-sm text-ap-crit">
@@ -261,7 +277,14 @@ export function HoldingDetailPage(): JSX.Element {
             ) : null}
             {editable ? (
               <div>
-                <Button type="submit" disabled={save.isPending || !values.name.trim()}>
+                <Button
+                  type="submit"
+                  disabled={
+                    save.isPending ||
+                    !values.name.trim() ||
+                    (!holding.current_owner && values.status === "sold" && !values.investor_id)
+                  }
+                >
                   {t("holding.save")}
                 </Button>
               </div>

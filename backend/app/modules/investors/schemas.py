@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 InvestorType = Literal["person", "company"]
 InvestorStatus = Literal["not_invited", "invited", "active", "suspended", "archived"]
@@ -186,6 +186,11 @@ class OwnershipEndRequest(BaseModel):
 # ---- Holdings ------------------------------------------------------------
 
 
+# What a form may ask for. "sold" is not stored: it gives the holding an
+# owner from `owner_since`, so it needs `investor_id`.
+HoldingFormStatus = Literal["draft", "available", "sold"]
+
+
 class HoldingCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -194,13 +199,25 @@ class HoldingCreateRequest(BaseModel):
     name_ar: str | None = Field(default=None, max_length=200)
     boundary: dict[str, Any]
     tree_count: int | None = Field(default=None, ge=0, le=10_000_000)
-    status: HoldingWritableStatus = "draft"
+    status: HoldingFormStatus = "draft"
     notes_internal: str | None = Field(default=None, max_length=4000)
+    # Required with status "sold".
+    investor_id: UUID | None = None
+    owner_since: date | None = None
+    # On the farm-level create, the block is found from the boundary when
+    # this is empty. The block-level route sets it from the path.
+    block_id: UUID | None = None
 
     @field_validator("code", "name_ar", "notes_internal", mode="before")
     @classmethod
     def _strip(cls, value: Any) -> Any:
         return _blank_to_none(value)
+
+    @model_validator(mode="after")
+    def _sold_needs_investor(self) -> HoldingCreateRequest:
+        if self.status == "sold" and self.investor_id is None:
+            raise ValueError("A sold holding needs an investor.")
+        return self
 
 
 class HoldingUpdateRequest(BaseModel):
@@ -210,8 +227,12 @@ class HoldingUpdateRequest(BaseModel):
     name_ar: str | None = Field(default=None, max_length=200)
     boundary: dict[str, Any] | None = None
     tree_count: int | None = Field(default=None, ge=0, le=10_000_000)
-    status: HoldingWritableStatus | None = None
+    status: HoldingFormStatus | None = None
     notes_internal: str | None = Field(default=None, max_length=4000)
+    # With status "sold" on a holding that has no owner: who buys it, and
+    # from when (default today).
+    investor_id: UUID | None = None
+    owner_since: date | None = None
 
     @field_validator("name_ar", "notes_internal", mode="before")
     @classmethod
@@ -395,3 +416,25 @@ class InvestorAppHoldingResponse(BaseModel):
     period: Literal["past", "current", "future"]
     boundary: dict[str, Any]
     block_boundary: dict[str, Any]
+
+
+# ---- Block detection for drawn or uploaded shapes -------------------------
+
+
+class HoldingCheckRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    boundaries: list[dict[str, Any]] = Field(min_length=1, max_length=200)
+
+
+class HoldingCheckResult(BaseModel):
+    """One shape: the block that fully contains it, or why there is none."""
+
+    block_id: UUID | None = None
+    block_code: str | None = None
+    area_m2: Decimal | None = None
+    share_pct: Decimal | None = None
+    # outside_farm | crosses_blocks | outside_block | block_not_eligible |
+    # overlaps_holding | invalid_shape
+    problem: str | None = None
+    detail: str | None = None

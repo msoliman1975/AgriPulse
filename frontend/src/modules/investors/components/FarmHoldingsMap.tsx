@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import maplibregl from "maplibre-gl";
-import type { FeatureCollection } from "geojson";
+import type { FeatureCollection, Polygon } from "geojson";
 
 import type { FarmMapBlock, Holding } from "@/api/investors";
 import { HOLDING_STATUS_COLOR } from "../lib";
@@ -25,6 +25,8 @@ interface Props {
   selectedBlockId?: string | null;
   onBlockClick?: (blockId: string) => void;
   onHoldingClick?: (holdingId: string) => void;
+  /** Uploaded shapes not saved yet: green when they fit a block, red when not. */
+  previews?: { geometry: Polygon; ok: boolean }[];
   className?: string;
 }
 
@@ -38,6 +40,7 @@ export function FarmHoldingsMap({
   selectedBlockId,
   onBlockClick,
   onHoldingClick,
+  previews,
   className,
 }: Props): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -120,6 +123,31 @@ export function FarmHoldingsMap({
         source: "holdings",
         paint: { "line-color": "#0f172a", "line-width": 1 },
       });
+      if (previews && previews.length > 0) {
+        map.addSource("previews", {
+          type: "geojson",
+          data: {
+            type: "FeatureCollection",
+            features: previews.map((p) => ({
+              type: "Feature",
+              properties: { color: p.ok ? "#16a34a" : "#dc2626" },
+              geometry: p.geometry,
+            })),
+          },
+        });
+        map.addLayer({
+          id: "previews-fill",
+          type: "fill",
+          source: "previews",
+          paint: { "fill-color": ["get", "color"], "fill-opacity": 0.35 },
+        });
+        map.addLayer({
+          id: "previews-line",
+          type: "line",
+          source: "previews",
+          paint: { "line-color": ["get", "color"], "line-width": 2 },
+        });
+      }
       map.on("click", (e) => {
         const hit = map.queryRenderedFeatures(e.point, { layers: ["holdings-fill"] })[0];
         const holdingId: unknown = hit?.properties?.id;
@@ -142,7 +170,7 @@ export function FarmHoldingsMap({
       resize.disconnect();
       map.remove();
     };
-  }, [blocks, holdings, selectedBlockId]);
+  }, [blocks, holdings, selectedBlockId, previews]);
 
   return (
     <div
