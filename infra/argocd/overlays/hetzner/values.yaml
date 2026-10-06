@@ -4005,9 +4005,20 @@ global:
       #   Rollback is these three tags back to 6fc2b97 / 6fc2b97 / f5f9778.
       #   0098 needs no downgrade for a rollback: the old api ignores the
       #   new tables, and the blocks trigger only fires when holdings exist.
-      tag: "cf9113c"
+      # 7675a60 = #767, api, workers and frontend. Investments becomes its
+      #   own area: a left-menu group (Overview, Holdings, Investors), two
+      #   tenant roles (InvestmentManager, Investor), investor app logins,
+      #   and a read-only My holdings page for an Investor user. Public
+      #   migration 0101 runs in the PreSync job: it widens the role CHECK on
+      #   tenant_role_assignments. The two Keycloak realm roles were created
+      #   by hand on 2026-10-06 (kcadm in keycloak-0), not by the chart.
+      #   Watch: the left menu shows Investments for a tenant owner, and the
+      #   block page no longer shows a Holdings card.
+      #   Rollback is these three tags back to cf9113c. 0101 needs no
+      #   downgrade for a rollback: the old api ignores the two roles.
+      tag: "7675a60"
     workers:
-      tag: "cf9113c"
+      tag: "7675a60"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4653,7 +4664,10 @@ global:
       #   the block page, the draw-a-holding page and the holding page.
       #   Needs the api at cf9113c or later.
       #   Rollback is this tag alone back to f5f9778.
-      tag: "cf9113c"
+      # 7675a60 = #767, frontend. The Investments menu group, its three
+      #   pages, the investor login card and the My holdings page. Needs the
+      #   api at 7675a60 or later. Rollback is this tag alone back to cf9113c.
+      tag: "7675a60"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
