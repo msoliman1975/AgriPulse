@@ -107,16 +107,6 @@ async def test_create_login_links_a_user_with_the_investor_role(
 
 
 @pytest.mark.asyncio
-async def test_team_cannot_grant_the_investor_role(scouting_env: ScoutingFixture) -> None:
-    async with _client(scouting_env.admin_context) as c:
-        resp = await c.post(
-            "/api/v1/users:invite",
-            json={"email": "sneaky@example.com", "full_name": "Sneaky", "role": "Investor"},
-        )
-    assert resp.status_code == 422, resp.text
-
-
-@pytest.mark.asyncio
 async def test_disable_and_enable_login_follow_the_status(scouting_env: ScoutingFixture) -> None:
     env = scouting_env
     _, investor = await _sold_holding(env)

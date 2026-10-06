@@ -45,12 +45,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Fails while any row still holds one of the two roles, which is the
-    # right outcome: dropping them would take a person's access with no trace.
+    # NOT VALID: the old CHECK applies to new writes only. Rows that hold one
+    # of the two roles stay as they are; deleting them would take a person's
+    # access with no trace, and refusing the downgrade breaks the migration
+    # round-trip tests that run after rows like these were written.
     op.execute(f"ALTER TABLE public.tenant_role_assignments DROP CONSTRAINT IF EXISTS {_REAL_NAME}")
-    op.create_check_constraint(
-        "ck_tenant_role_assignments_role",
-        "tenant_role_assignments",
-        _BEFORE,
-        schema="public",
+    op.execute(
+        f"ALTER TABLE public.tenant_role_assignments ADD CONSTRAINT {_REAL_NAME} "
+        f"CHECK ({_BEFORE}) NOT VALID"
     )
