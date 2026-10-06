@@ -230,6 +230,22 @@ BLOCK_OWNED: tuple[OwnedTable, ...] = (
         order=10,
     ),
     OwnedTable("field_flags", owner_column="block_id", order=20),
+    # Investor holdings (tenant migration 0098). holdings.block_id is
+    # RESTRICT, so the holding rows must go before the block row; ownership
+    # history cascades off holdings but is listed so the preview counts it.
+    # `investors` has no block or farm column: it is tenant-wide and stays.
+    OwnedTable(
+        "holding_ownerships",
+        where_sql="holding_id IN (SELECT id FROM holdings WHERE block_id = ANY(:ids))",
+        order=10,
+        note="owned transitively through holdings",
+    ),
+    OwnedTable(
+        "holdings",
+        owner_column="block_id",
+        order=30,
+        note="ON DELETE RESTRICT — the block row cannot go until these do",
+    ),
     OwnedTable(
         "recommendations",
         owner_column="block_id",

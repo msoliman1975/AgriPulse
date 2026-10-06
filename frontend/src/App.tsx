@@ -20,6 +20,10 @@ import { BlockCreatePage } from "@/modules/farms/pages/BlockCreatePage";
 import { BlockAutoGridPage } from "@/modules/farms/pages/BlockAutoGridPage";
 import { BlockDetailPage } from "@/modules/farms/pages/BlockDetailPage";
 import { BlockEditPage } from "@/modules/farms/pages/BlockEditPage";
+import { HoldingCreatePage } from "@/modules/investors/pages/HoldingCreatePage";
+import { HoldingDetailPage } from "@/modules/investors/pages/HoldingDetailPage";
+import { InvestorDetailPage } from "@/modules/investors/pages/InvestorDetailPage";
+import { InvestorsPage } from "@/modules/investors/pages/InvestorsPage";
 import { InsightsPage } from "@/modules/insights/pages/InsightsPage";
 import { BoardPage } from "@/modules/board/pages/BoardPage";
 import { FarmHealthViewPage } from "@/modules/farmHealth/pages/FarmHealthViewPage";
@@ -166,6 +170,11 @@ export function App(): ReactNode {
                 <Route path="/farms/:farmId/blocks/auto-grid" element={<BlockAutoGridPage />} />
                 <Route path="/farms/:farmId/blocks/:blockId" element={<BlockDetailPage />} />
                 <Route path="/farms/:farmId/blocks/:blockId/edit" element={<BlockEditPage />} />
+                <Route
+                  path="/farms/:farmId/blocks/:blockId/holdings/new"
+                  element={<HoldingCreatePage />}
+                />
+                <Route path="/farms/:farmId/holdings/:holdingId" element={<HoldingDetailPage />} />
                 {/* AgriPulse new IA â€” farm-scoped routes (UX_SPEC Â§3 +
                   IMPLEMENTATION_PLAN Â§3). */}
                 {/* Labs: experimental map-first surface for live validation.
@@ -320,6 +329,8 @@ export function App(): ReactNode {
                   <Route path="workers" element={<ResourcesWorkersPage />} />
                   <Route path="field-access" element={<FieldAccessPage />} />
                   <Route path="equipment" element={<ResourcesEquipmentPage />} />
+                  <Route path="investors" element={<InvestorsPage />} />
+                  <Route path="investors/:investorId" element={<InvestorDetailPage />} />
                   <Route path="rules" element={<RulesConfigPage />} />
                   {/* Decision Trees moved to the top-level /decision-trees
                       surface — keep old Settings deep links working. */}

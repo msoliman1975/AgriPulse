@@ -52,6 +52,8 @@ roles:
       # "Is this customer still using the product" is a support question
       # before it is a product one. Read-only; no capability here writes.
       - platform.read_usage
+      - investor.read
+      - holding.read
 
   # ---- Tenant-scoped --------------------------------------------------
 
@@ -140,6 +142,12 @@ roles:
       - audit.read
       - tenant.manage_integrations
       - tenant.read_integration_health
+      - investor.read
+      - investor.manage
+      - holding.read
+      - holding.manage
+      - holding.redraw_sold
+      - holding.assign_owner
 
   TenantAdmin:
     description: Tenant admin; everything in the tenant except billing changes
@@ -225,6 +233,12 @@ roles:
       - audit.read
       - tenant.manage_integrations
       - tenant.read_integration_health
+      - investor.read
+      - investor.manage
+      - holding.read
+      - holding.manage
+      - holding.redraw_sold
+      - holding.assign_owner
 
   BillingAdmin:
     description: Subscription and billing only.
@@ -297,6 +311,8 @@ roles:
       - analytics.export
       - notification.read_inbox
       - notification.write_inbox
+      - holding.read
+      - holding.manage
 
   Agronomist:
     description: Agronomic decisions on an assigned farm; no geometry edits.
@@ -341,6 +357,7 @@ roles:
       - analytics.export
       - notification.read_inbox
       - notification.write_inbox
+      - holding.read
 
   FieldOperator:
     description: Field operations and observation logging on an assigned farm.
@@ -427,3 +444,4 @@ roles:
       - analytics.read
       - notification.read_inbox
       - notification.write_inbox
+      - holding.read

@@ -377,6 +377,32 @@ capabilities:
     scope: farm
     status: active
 
+  # --- Investors and holdings (tenant migration 0098) ------------------
+  investor.read:
+    description: View investors, their contact details, and what they own.
+    scope: tenant
+    status: active
+  investor.manage:
+    description: Create, edit, suspend, or archive investors.
+    scope: tenant
+    status: active
+  holding.read:
+    description: View holdings (parts of blocks sold to investors) and their owners.
+    scope: farm
+    status: active
+  holding.manage:
+    description: Draw, edit, or archive holdings that have no owner.
+    scope: farm
+    status: active
+  holding.redraw_sold:
+    description: Change the boundary of a holding that an investor owns.
+    scope: farm
+    status: active
+  holding.assign_owner:
+    description: Give a holding an owner, transfer it, or end an ownership.
+    scope: farm
+    status: active
+
   # --- Irrigation schedules --------------------------------------------
   irrigation.schedule.read:
     description: View model-driven irrigation recommendations.

@@ -149,6 +149,7 @@ ignore = [
 "app/modules/iam/users_service.py" = ["S608"]
 "app/modules/integrations_health/providers_service.py" = ["S608"]
 "app/modules/integrations_health/service.py" = ["S608"]
+"app/modules/investors/repository.py" = ["S608"]
 "app/modules/signals/repository.py" = ["S608"]
 "app/modules/weather/repository.py" = ["S608"]
 "scripts/reacquire_imagery.py" = ["S608"]
@@ -372,6 +373,7 @@ name = "farms internals are private"
 type = "forbidden"
 source_modules = [
   "app.modules.tenancy",
+  "app.modules.investors",
   "app.modules.iam",
   "app.modules.audit",
   "app.modules.imagery",

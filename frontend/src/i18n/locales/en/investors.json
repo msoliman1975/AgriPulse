@@ -1,0 +1,179 @@
+{
+  "nav": "Investors",
+  "list": {
+    "title": "Investors",
+    "subtitle": "People and companies who own holdings. They have no say in farm work.",
+    "add": "Add investor",
+    "search": "Search name, email, or code",
+    "includeArchived": "Show archived",
+    "empty": "No investors yet.",
+    "emptyFiltered": "No investors match these filters.",
+    "allStatuses": "All statuses"
+  },
+  "col": {
+    "code": "Code",
+    "name": "Name",
+    "type": "Type",
+    "email": "Email",
+    "phone": "Phone",
+    "status": "Status",
+    "holdings": "Holdings",
+    "area": "Area",
+    "share": "Share of block",
+    "owner": "Owner",
+    "block": "Block",
+    "farm": "Farm",
+    "holding": "Holding",
+    "investor": "Investor",
+    "from": "From",
+    "to": "To",
+    "how": "How",
+    "contract": "Contract",
+    "trees": "Trees"
+  },
+  "type": {
+    "person": "Person",
+    "company": "Company"
+  },
+  "status": {
+    "not_invited": "Not invited",
+    "invited": "Invited",
+    "active": "Active",
+    "suspended": "Suspended",
+    "archived": "Archived"
+  },
+  "idType": {
+    "national_id": "National ID",
+    "passport": "Passport",
+    "commercial_register": "Commercial register",
+    "other": "Other"
+  },
+  "language": {
+    "ar": "Arabic",
+    "en": "English"
+  },
+  "form": {
+    "createTitle": "Add investor",
+    "editTitle": "Edit investor",
+    "code": "Code",
+    "codeHelp": "Leave empty to get the next free code, for example INV-0007.",
+    "type": "Investor type",
+    "fullName": "Full name (English)",
+    "fullNameAr": "Full name (Arabic)",
+    "contactPerson": "Contact person",
+    "contactPersonHelp": "For a company investor: the person staff talk to.",
+    "email": "Email",
+    "emailHelp": "The investor signs in to the app with this email.",
+    "phone": "Phone",
+    "idType": "Identity document",
+    "idLast4": "Last 4 characters",
+    "idLast4Help": "Store only the last 4. The full document stays in the contract file.",
+    "nationality": "Nationality",
+    "country": "Country",
+    "city": "City",
+    "language": "Language for messages",
+    "notes": "Internal notes",
+    "notesHelp": "Staff only. Never shown to the investor.",
+    "save": "Save",
+    "create": "Add investor",
+    "cancel": "Cancel",
+    "none": "—"
+  },
+  "detail": {
+    "back": "Investors",
+    "edit": "Edit",
+    "suspend": "Suspend",
+    "unsuspend": "Remove suspension",
+    "archive": "Archive investor",
+    "profile": "Profile",
+    "current": "Current and future holdings",
+    "past": "Past holdings",
+    "noCurrent": "This investor owns no holding today.",
+    "noPast": "No past holdings.",
+    "totalArea": "Total area owned today",
+    "appAccess": "App access",
+    "appAccessNote": "Invitations to the investor app come in the next release."
+  },
+  "period": {
+    "past": "Past",
+    "current": "Current",
+    "future": "Starts later"
+  },
+  "acquiredBy": {
+    "purchase": "Purchase",
+    "transfer": "Transfer",
+    "inheritance": "Inheritance",
+    "other": "Other"
+  },
+  "endedBy": {
+    "resale": "Resale",
+    "buyback": "Bought back by the company",
+    "contract_end": "Contract ended",
+    "correction": "Correction",
+    "other": "Other"
+  },
+  "holdingStatus": {
+    "draft": "Draft",
+    "available": "For sale",
+    "sold": "Sold",
+    "archived": "Archived"
+  },
+  "block": {
+    "title": "Holdings",
+    "subtitle": "Parts of this block sold to investors.",
+    "add": "Draw a holding",
+    "empty": "No holdings in this block.",
+    "sold": "Sold",
+    "unsold": "Not sold",
+    "count": "{{count}} holdings"
+  },
+  "holding": {
+    "createTitle": "Draw a holding in block {{block}}",
+    "drawHelp": "Draw the holding inside the green dashed outline. Grey areas are other holdings; do not cover them.",
+    "noShape": "Draw the holding on the map first.",
+    "liveArea": "Area {{area}} · {{share}}% of the block",
+    "code": "Code",
+    "codeHelp": "Leave empty to get the next free code, for example H-0012.",
+    "name": "Name (English)",
+    "nameAr": "Name (Arabic)",
+    "trees": "Number of trees",
+    "status": "Status",
+    "notes": "Internal notes",
+    "notesHelp": "Staff only. Never shown to the investor.",
+    "create": "Save holding",
+    "save": "Save changes",
+    "cancel": "Cancel",
+    "editBoundary": "Redraw boundary",
+    "stopEditBoundary": "Keep the old boundary",
+    "redrawBlocked": "This holding has an owner. Only a tenant admin can change its boundary.",
+    "archive": "Archive holding",
+    "details": "Details",
+    "ownership": "Ownership",
+    "noOwner": "No owner. This holding is not sold.",
+    "assign": "Give an owner",
+    "transfer": "Transfer to a new owner",
+    "end": "End ownership",
+    "delete": "Delete entry",
+    "deleteConfirm": "Delete this ownership entry? Use this only for a mistake. To record a sale, use Transfer.",
+    "shareNote": "Share = holding area ÷ block area. Staff only; investors do not see it."
+  },
+  "owner": {
+    "assignTitle": "Give holding {{code}} an owner",
+    "transferTitle": "Transfer holding {{code}}",
+    "investor": "Investor",
+    "pickInvestor": "Choose an investor",
+    "startDate": "First day of ownership",
+    "acquiredBy": "How they got it",
+    "contract": "Contract number",
+    "previousEnd": "Why the current owner leaves",
+    "transferNote": "The ownership of {{name}} ends on {{date}}.",
+    "save": "Save",
+    "cancel": "Cancel",
+    "endTitle": "End ownership of {{name}}",
+    "endDate": "Last day of ownership",
+    "endedBy": "Reason"
+  },
+  "error": {
+    "load": "Could not load this page."
+  }
+}
