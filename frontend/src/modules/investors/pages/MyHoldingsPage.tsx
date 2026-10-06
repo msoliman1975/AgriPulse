@@ -188,11 +188,14 @@ export function MyHoldingsPage(): JSX.Element {
                   )}
                   {fact(
                     t("my.block"),
+                    // A block named after its own code would read "009 · 009".
                     [
-                      selected.block_code,
-                      selected.block_name
-                        ? localizedName(lang, selected.block_name, selected.block_name_ar)
-                        : null,
+                      ...new Set([
+                        selected.block_code,
+                        selected.block_name
+                          ? localizedName(lang, selected.block_name, selected.block_name_ar)
+                          : null,
+                      ]),
                     ]
                       .filter(Boolean)
                       .join(" · "),
