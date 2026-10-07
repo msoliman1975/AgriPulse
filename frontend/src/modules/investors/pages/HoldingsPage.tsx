@@ -15,6 +15,7 @@ import { queryState } from "@/components/asyncState";
 import { localizedName } from "@/lib/localizedField";
 import { AreaDisplay } from "@/modules/farms/components/AreaDisplay";
 import { useCapability } from "@/rbac/useCapability";
+import { DeleteHoldingButton } from "../components/DeleteHoldingButton";
 import { FarmHoldingsMap } from "../components/FarmHoldingsMap";
 import { HOLDING_STATUS_PILL, formatPct } from "../lib";
 
@@ -156,6 +157,7 @@ export function HoldingsPage(): JSX.Element {
                       <Th>{t("col.share")}</Th>
                       <Th>{t("col.status")}</Th>
                       <Th>{t("col.owner")}</Th>
+                      {canManage ? <Th>{t("holdingsPage.actions")}</Th> : null}
                     </Tr>
                   </Thead>
                   <Tbody>
@@ -204,6 +206,20 @@ export function HoldingsPage(): JSX.Element {
                             </span>
                           ) : null}
                         </Td>
+                        {canManage ? (
+                          <Td>
+                            {h.has_ownership_history ? (
+                              <span
+                                className="text-xs text-ap-muted"
+                                title={t("holdingsPage.cannotDelete")}
+                              >
+                                —
+                              </span>
+                            ) : (
+                              <DeleteHoldingButton farmId={farmId} holdingId={h.id} code={h.code} />
+                            )}
+                          </Td>
+                        ) : null}
                       </Tr>
                     ))}
                   </Tbody>

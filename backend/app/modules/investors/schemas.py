@@ -275,6 +275,9 @@ class HoldingResponse(BaseModel):
     status: HoldingStatus
     notes_internal: str | None = None
     current_owner: HoldingOwnerSummary | None = None
+    # Any ownership entry, past, current or future. A holding without one
+    # was never sold and can be deleted.
+    has_ownership_history: bool = False
     archived_at: datetime | None = None
     created_at: datetime
     updated_at: datetime

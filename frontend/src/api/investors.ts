@@ -135,6 +135,8 @@ export interface Holding {
   status: HoldingStatus;
   notes_internal: string | null;
   current_owner: HoldingOwnerSummary | null;
+  /** Any ownership entry, past, current or future. Without one it can be deleted. */
+  has_ownership_history: boolean;
   archived_at: string | null;
   created_at: string;
   updated_at: string;
@@ -326,6 +328,11 @@ export async function archiveHolding(farmId: string, holdingId: string): Promise
     `/v1/farms/${farmId}/holdings/${holdingId}:archive`,
   );
   return data;
+}
+
+/** Delete a holding that never had an owner. The server refuses one with history. */
+export async function deleteHolding(farmId: string, holdingId: string): Promise<void> {
+  await apiClient.delete(`/v1/farms/${farmId}/holdings/${holdingId}`);
 }
 
 // ---- Ownership ------------------------------------------------------------
