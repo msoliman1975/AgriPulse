@@ -402,3 +402,48 @@ async def test_status_sold_on_edit_gives_the_holding_an_owner(
     assert sold.json()["current_owner"]["investor_id"] == inv.json()["id"]
     # An owned holding's status changes through its ownership, not the form.
     assert back.status_code == 409, back.text
+
+
+@pytest.mark.asyncio
+async def test_an_unused_holding_can_be_deleted_and_its_shape_reused(
+    scouting_env: ScoutingFixture,
+) -> None:
+    env = scouting_env
+    holding = (await _holding(env, _rect(_LON0, _LAT0))).json()
+    assert holding["has_ownership_history"] is False
+    async with _client(env.admin_context) as c:
+        gone = await c.delete(f"/api/v1/farms/{env.farm_id}/holdings/{holding['id']}")
+        read = await c.get(f"/api/v1/farms/{env.farm_id}/holdings/{holding['id']}")
+        listed = await c.get(f"/api/v1/farms/{env.farm_id}/holdings-map")
+    assert gone.status_code == 204, gone.text
+    assert read.status_code == 404, read.text
+    assert holding["id"] not in [h["id"] for h in listed.json()["holdings"]]
+    # The deleted shape no longer blocks the same land.
+    again = await _holding(env, _rect(_LON0, _LAT0), name="Redrawn")
+    assert again.status_code == 201, again.text
+
+
+@pytest.mark.asyncio
+async def test_a_holding_with_ownership_history_cannot_be_deleted(
+    scouting_env: ScoutingFixture,
+) -> None:
+    env = scouting_env
+    holding = (await _holding(env, _rect(_LON0, _LAT0))).json()
+    investor = await _investor(env)
+    async with _client(env.admin_context) as c:
+        owned = await c.post(
+            f"/api/v1/farms/{env.farm_id}/holdings/{holding['id']}/ownerships",
+            json={"investor_id": investor["id"], "start_date": date.today().isoformat()},
+        )
+        assert owned.status_code == 201, owned.text
+        refused = await c.delete(f"/api/v1/farms/{env.farm_id}/holdings/{holding['id']}")
+        flag = await c.get(f"/api/v1/farms/{env.farm_id}/holdings/{holding['id']}")
+        # An entry deleted as a mistake is not history.
+        ownership_id = owned.json()["ownerships"][0]["id"]
+        undone = await c.delete(f"/api/v1/farms/{env.farm_id}/ownerships/{ownership_id}")
+        allowed = await c.delete(f"/api/v1/farms/{env.farm_id}/holdings/{holding['id']}")
+    assert refused.status_code == 409, refused.text
+    assert "Archive it instead" in refused.json()["detail"]
+    assert flag.json()["has_ownership_history"] is True
+    assert undone.status_code in (200, 204), undone.text
+    assert allowed.status_code == 204, allowed.text

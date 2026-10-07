@@ -108,7 +108,11 @@ _HOLDING_COLUMNS = """
         AND o2.deleted_at IS NULL
         AND o2.start_date <= (public.app_now())::date
         AND (o2.end_date IS NULL OR o2.end_date >= (public.app_now())::date)
-        AND b2.farm_id <> b.farm_id) AS current_investor_other_farm_holdings
+        AND b2.farm_id <> b.farm_id) AS current_investor_other_farm_holdings,
+    EXISTS (
+      SELECT 1 FROM holding_ownerships o3
+       WHERE o3.holding_id = h.id AND o3.deleted_at IS NULL
+    ) AS has_ownership_history
 """
 
 _HOLDING_FROM = f"""
@@ -538,6 +542,27 @@ class InvestorsRepository:
         await self._write(
             f"UPDATE holdings SET {', '.join(sets)} WHERE id = :id",
             params,
+            ("id", "actor"),
+        )
+
+    async def holding_has_ownership_history(self, *, holding_id: UUID) -> bool:
+        """Any ownership row, past, current or future. An entry deleted as a
+        mistake does not count: it was never a real owner."""
+        rows = await self._rows(
+            "SELECT 1 FROM holding_ownerships o "
+            "WHERE o.holding_id = :id AND o.deleted_at IS NULL LIMIT 1",
+            {"id": holding_id},
+            ("id",),
+        )
+        return bool(rows)
+
+    async def soft_delete_holding(self, *, holding_id: UUID, actor_user_id: UUID | None) -> None:
+        """Hide the holding everywhere. The row stays for the audit trail, and
+        its code becomes free again (the code index is on live rows only)."""
+        await self._write(
+            "UPDATE holdings SET deleted_at = public.app_now(), updated_by = :actor "
+            "WHERE id = :id AND deleted_at IS NULL",
+            {"id": holding_id, "actor": actor_user_id},
             ("id", "actor"),
         )
 

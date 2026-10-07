@@ -24,6 +24,7 @@ Mounted under /api/v1:
   GET    /farms/{farm_id}/holdings/{id}               holding.read
   PATCH  /farms/{farm_id}/holdings/{id}               holding.manage (+ holding.redraw_sold)
   POST   /farms/{farm_id}/holdings/{id}:archive       holding.manage
+  DELETE /farms/{farm_id}/holdings/{id}               holding.manage  (no ownership history)
 
   POST   /farms/{farm_id}/holdings/{id}/ownerships    holding.assign_owner
   POST   /farms/{farm_id}/ownerships/{id}:end         holding.assign_owner
@@ -291,6 +292,24 @@ async def archive_holding(
     service: InvestorsService = Depends(_service),
 ) -> dict[str, Any]:
     return await service.archive_holding(
+        farm_id=farm_id, holding_id=holding_id, actor_user_id=context.user_id
+    )
+
+
+@router.delete(
+    "/farms/{farm_id}/holdings/{holding_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
+async def delete_holding(
+    farm_id: UUID,
+    holding_id: UUID,
+    context: RequestContext = Depends(
+        requires_capability("holding.manage", farm_id_param="farm_id")
+    ),
+    service: InvestorsService = Depends(_service),
+) -> None:
+    await service.delete_holding(
         farm_id=farm_id, holding_id=holding_id, actor_user_id=context.user_id
     )
 

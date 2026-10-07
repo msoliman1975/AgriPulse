@@ -249,7 +249,14 @@
     "mapHelp": "Click a holding to open it.",
     "blockNotEligible": "This block is split into sectors. Choose one of its sectors.",
     "continue": "Draw in this block",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "actions": "Actions",
+    "delete": "Delete",
+    "deleteAria": "Delete {{code}}",
+    "deleteConfirm": "Delete {{code}}? This cannot be undone.",
+    "deleteYes": "Yes, delete",
+    "deleteNo": "No",
+    "cannotDelete": "This holding has ownership history. Archive it from its page instead."
   },
   "login": {
     "title": "App login",

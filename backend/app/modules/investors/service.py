@@ -533,6 +533,30 @@ class InvestorsService:
         )
         return await self.get_holding(farm_id=farm_id, holding_id=holding_id)
 
+    async def delete_holding(
+        self, *, farm_id: UUID, holding_id: UUID, actor_user_id: UUID | None
+    ) -> None:
+        """Delete a holding that was never used: no owner, past or present.
+
+        A holding with any ownership entry is part of an investor's history,
+        so it can only be archived.
+        """
+        current = await self.get_holding(farm_id=farm_id, holding_id=holding_id)
+        if await self._repo.holding_has_ownership_history(holding_id=holding_id):
+            raise HoldingOwnedError(
+                "This holding has ownership history, so it cannot be deleted. "
+                "Archive it instead."
+            )
+        await self._repo.soft_delete_holding(holding_id=holding_id, actor_user_id=actor_user_id)
+        await self._record(
+            "investors.holding_deleted",
+            actor_user_id=actor_user_id,
+            subject_kind="holding",
+            subject_id=holding_id,
+            farm_id=farm_id,
+            details={"code": current["code"], "name": current["name"]},
+        )
+
     # ---- Ownership --------------------------------------------------------
 
     async def assign_owner(
