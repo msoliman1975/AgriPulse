@@ -4723,7 +4723,10 @@ global:
       #   in corner-edit mode it deleted only picked corners, so it did
       #   nothing. Rollback is this tag alone back to d4ad550.
       # 87c9807 = #782, frontend. See the api note. Rollback to c7b4a59.
-      tag: "87c9807"
+      # 8f8afb5 = #784, frontend only. Investors overview shows investors,
+      #   holdings by block, land by status, and holdings for sale. Reads
+      #   existing routes. Rollback is this tag alone back to 87c9807.
+      tag: "8f8afb5"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
