@@ -4709,7 +4709,11 @@ global:
       #   Sold status with an investor, drawing styles that MapLibre accepts
       #   (also fixes block and farm drawing). Needs the api at 6fd0a10.
       #   Rollback is this tag together with the api back to c6c318c.
-      tag: "6fd0a10"
+      # d4ad550 = #778, frontend only. The draw polygon and trash buttons sat
+      #   under the map canvas and took no clicks; the draw map fits all
+      #   blocks; a Sold row says when there are no investors. Works with the
+      #   api at 6fd0a10. Rollback is this tag alone back to 6fd0a10.
+      tag: "d4ad550"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
