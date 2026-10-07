@@ -4047,9 +4047,15 @@ global:
       #   migration.
       #   Watch: drawing a holding shows its edges and the detected block.
       #   Rollback is these three tags back to c6c318c.
-      tag: "6fd0a10"
+      # 87c9807 = #782, api, workers and frontend. Create login for an
+      #   investor whose email already has a user returns a 409 with a
+      #   message (was a 500, shown as "Network Error"). New holding takes
+      #   several AOI files and says "Created successfully". Menu group
+      #   "Investments" renamed "Investors". No migration.
+      #   Rollback: api and workers to 6fd0a10, frontend to c7b4a59.
+      tag: "87c9807"
     workers:
-      tag: "6fd0a10"
+      tag: "87c9807"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4716,7 +4722,8 @@ global:
       # c7b4a59 = #780, frontend only. The trash deletes a selected shape:
       #   in corner-edit mode it deleted only picked corners, so it did
       #   nothing. Rollback is this tag alone back to d4ad550.
-      tag: "c7b4a59"
+      # 87c9807 = #782, frontend. See the api note. Rollback to c7b4a59.
+      tag: "87c9807"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
