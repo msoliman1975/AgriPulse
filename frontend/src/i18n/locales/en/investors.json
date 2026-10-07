@@ -229,7 +229,8 @@
     "blocksWithout": "Blocks with no holding: {{count}}.",
     "forSaleTitle": "Holdings for sale",
     "forSaleEmpty": "No holding is for sale on this farm.",
-    "draftNote": "Draft holdings, not yet for sale: {{count}}."
+    "draftNote": "Draft holdings, not yet for sale: {{count}}.",
+    "treesNone": "No tree counts typed on sold holdings yet."
   },
   "holdingsPage": {
     "title": "Holdings",
