@@ -4713,7 +4713,10 @@ global:
       #   under the map canvas and took no clicks; the draw map fits all
       #   blocks; a Sold row says when there are no investors. Works with the
       #   api at 6fd0a10. Rollback is this tag alone back to 6fd0a10.
-      tag: "d4ad550"
+      # c7b4a59 = #780, frontend only. The trash deletes a selected shape:
+      #   in corner-edit mode it deleted only picked corners, so it did
+      #   nothing. Rollback is this tag alone back to d4ad550.
+      tag: "c7b4a59"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
