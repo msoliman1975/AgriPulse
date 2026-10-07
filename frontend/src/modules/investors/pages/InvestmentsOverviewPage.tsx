@@ -59,7 +59,8 @@ export interface OverviewFigures {
     investor: FarmInvestor;
     holdings: Holding[];
     area: number;
-    trees: number;
+    /** Null when none of the owner's holdings has a tree count. */
+    trees: number | null;
     since: string | null;
   }>;
   withoutHolding: FarmInvestor[];
@@ -103,7 +104,7 @@ export function overviewFigures(map: FarmHoldingsMap, investors: FarmInvestor[])
         investor,
         holdings: own,
         area: sumArea(own),
-        trees: sumTrees(own).trees,
+        trees: sumTrees(own).unknown === own.length ? null : sumTrees(own).trees,
         since: since ?? null,
       };
     })
@@ -218,13 +219,17 @@ export function InvestmentsOverviewPage(): JSX.Element {
                 />
                 <KPICard
                   title={t("overview.kpiTreesSold")}
-                  value={soldTrees ? soldTrees.trees : "—"}
+                  value={
+                    soldTrees && f && soldTrees.unknown < f.sold.length ? soldTrees.trees : "—"
+                  }
                   hint={
-                    allTrees
-                      ? t("overview.kpiTreesHint", { total: allTrees.trees }) +
-                        (soldTrees && soldTrees.unknown > 0
-                          ? ` · ${t("overview.treesUnknown", { count: soldTrees.unknown })}`
-                          : "")
+                    f && allTrees && soldTrees
+                      ? soldTrees.unknown === f.sold.length
+                        ? t("overview.treesNone")
+                        : t("overview.kpiTreesHint", { total: allTrees.trees }) +
+                          (soldTrees.unknown > 0
+                            ? ` · ${t("overview.treesUnknown", { count: soldTrees.unknown })}`
+                            : "")
                       : undefined
                   }
                 />
@@ -288,11 +293,13 @@ export function InvestmentsOverviewPage(): JSX.Element {
                                   {r.holdings.map((h) => h.code).join(", ")}
                                 </span>
                               </Td>
-                              <Td>
+                              <Td className="whitespace-nowrap">
                                 <AreaDisplay areaM2={r.area} fractionDigits={2} />
                               </Td>
-                              <Td>{formatPct(pct(r.area, f.areaSold).toFixed(1), lang)}%</Td>
-                              <Td>{r.trees}</Td>
+                              <Td className="whitespace-nowrap">
+                                {formatPct(pct(r.area, f.areaSold).toFixed(1), lang)}%
+                              </Td>
+                              <Td>{r.trees ?? "—"}</Td>
                               <Td className="whitespace-nowrap">{r.since ?? "—"}</Td>
                               <Td>
                                 <Pill kind={INVESTOR_STATUS_PILL[r.investor.status]}>
@@ -359,10 +366,12 @@ export function InvestmentsOverviewPage(): JSX.Element {
                                     )
                                   </span>
                                 </Td>
-                                <Td>
+                                <Td className="whitespace-nowrap">
                                   <AreaDisplay areaM2={b.areaSold} fractionDigits={2} />
                                 </Td>
-                                <Td>{formatPct(pct(b.areaSold, b.area).toFixed(1), lang)}%</Td>
+                                <Td className="whitespace-nowrap">
+                                  {formatPct(pct(b.areaSold, b.area).toFixed(1), lang)}%
+                                </Td>
                               </Tr>
                             ))}
                           </Tbody>
@@ -404,7 +413,7 @@ export function InvestmentsOverviewPage(): JSX.Element {
                                   </Td>
                                   <Td>{localizedName(lang, h.name, h.name_ar)}</Td>
                                   <Td className="font-mono">{h.block_code ?? "—"}</Td>
-                                  <Td>
+                                  <Td className="whitespace-nowrap">
                                     <AreaDisplay areaM2={Number(h.area_m2)} fractionDigits={2} />
                                   </Td>
                                   <Td>{h.tree_count ?? "—"}</Td>
