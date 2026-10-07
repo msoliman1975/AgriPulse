@@ -4053,9 +4053,13 @@ global:
       #   several AOI files and says "Created successfully". Menu group
       #   "Investments" renamed "Investors". No migration.
       #   Rollback: api and workers to 6fd0a10, frontend to c7b4a59.
-      tag: "87c9807"
+      # 2ad3420 = #788, api, workers and frontend. DELETE a holding that has
+      #   no ownership entry (soft delete, audited); holdings carry
+      #   has_ownership_history; Delete button on the Holdings list. No
+      #   migration. Rollback: api and workers to 87c9807, frontend to a7d36e3.
+      tag: "2ad3420"
     workers:
-      tag: "87c9807"
+      tag: "2ad3420"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4728,7 +4732,8 @@ global:
       #   existing routes. Rollback is this tag alone back to 87c9807.
       # a7d36e3 = #786, frontend only. Overview trees read "—" when no
       #   count is typed; area cells do not wrap. Rollback to 8f8afb5.
-      tag: "a7d36e3"
+      # 2ad3420 = #788, frontend. See the api note. Rollback to a7d36e3.
+      tag: "2ad3420"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
