@@ -281,7 +281,7 @@
     "colStatus": "الحالة",
     "colInvestor": "المستثمر",
     "colResult": "النتيجة",
-    "createAll": "إنشاء {{count}} حيازة",
+    "createAll": "إنشاء الحيازات ({{count}})",
     "created": "أُنشئت {{code}}",
     "skipped": "لم تُنشأ",
     "doneSummary": "أُنشئت {{created}}، ولم تُنشأ {{failed}}.",
@@ -290,6 +290,7 @@
     "ownerSince": "مالك منذ",
     "pickInvestor": "اختر مستثمرًا",
     "soldNeedsInvestor": "اختر المستثمر الذي اشتراها.",
+    "noInvestors": "لا يوجد مستثمرون بعد. أضف مستثمرًا من صفحة المستثمرين أولًا.",
     "defaultName": "حيازة {{n}}"
   }
 }

@@ -143,6 +143,9 @@ export function HoldingFields({
               </select>
             )}
           </Field>
+          {investors.isSuccess && investors.data.length === 0 ? (
+            <p className="text-xs text-ap-warn sm:col-span-2">{t("newHolding.noInvestors")}</p>
+          ) : null}
           <Field label={t("newHolding.ownerSince")} required>
             {(p) => (
               <input
