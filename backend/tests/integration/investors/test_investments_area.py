@@ -14,6 +14,8 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from app.core.errors import install_exception_handlers
 from app.modules.farms.router import router as farms_router
@@ -104,6 +106,48 @@ async def test_create_login_links_a_user_with_the_investor_role(
     # Investors are managed from Investments, never listed on Team.
     assert team.status_code == 200, team.text
     assert investor["email"] not in [u["email"] for u in team.json()]
+
+
+@pytest.mark.asyncio
+async def test_create_login_for_a_taken_email_is_a_409_not_a_500(
+    scouting_env: ScoutingFixture, admin_session: Any
+) -> None:
+    """The invite flow's "user exists" error used to escape as a 500, which
+    the browser showed as "Network Error"."""
+    env = scouting_env
+    email = f"{uuid4().hex[:8]}@example.com"
+    async with _client(env.admin_context) as c:
+        inv = await c.post("/api/v1/investors", json={"full_name": "Same Email", "email": email})
+    assert inv.status_code == 201, inv.text
+
+    # A staff user of this company already has the address.
+    staff_id = uuid4()
+    await admin_session.execute(
+        text(
+            "INSERT INTO public.users (id, keycloak_subject, email, full_name) "
+            "VALUES (:id, :sub, :email, 'Staff Member')"
+        ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+        {"id": staff_id, "sub": f"kc-{staff_id}", "email": email},
+    )
+    await admin_session.execute(
+        text(
+            "INSERT INTO public.tenant_memberships (id, user_id, tenant_id, status) "
+            "VALUES (:mid, :uid, :tid, 'active')"
+        ).bindparams(
+            bindparam("mid", type_=PG_UUID(as_uuid=True)),
+            bindparam("uid", type_=PG_UUID(as_uuid=True)),
+            bindparam("tid", type_=PG_UUID(as_uuid=True)),
+        ),
+        {"mid": uuid4(), "uid": staff_id, "tid": env.tenant_id},
+    )
+    await admin_session.commit()
+
+    async with _client(env.admin_context) as c:
+        resp = await c.post(f"/api/v1/investors/{inv.json()['id']}:create-login")
+        after = await c.get(f"/api/v1/investors/{inv.json()['id']}")
+    assert resp.status_code == 409, resp.text
+    assert "already belongs to a user of this company" in resp.json()["detail"]
+    assert after.json()["user_id"] is None
 
 
 @pytest.mark.asyncio

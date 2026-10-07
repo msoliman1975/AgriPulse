@@ -21,6 +21,7 @@ import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { Skeleton } from "@/components/Skeleton";
+import { StatusBanner } from "@/components/StatusBanner";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import type { PolygonalFeature } from "@/lib/aoi/parse";
 import { localizedName } from "@/lib/localizedField";
@@ -152,7 +153,7 @@ export function HoldingNewPage(): JSX.Element {
       }),
     onSuccess: async (holding) => {
       await queryClient.invalidateQueries({ queryKey: ["holdings"] });
-      navigate(`/investments/holdings/${farmId}/${holding.id}`);
+      navigate(`/investments/holdings/${farmId}/${holding.id}`, { state: { created: true } });
     },
     onError: (err) => setError(errorText(err)),
   });
@@ -222,6 +223,9 @@ export function HoldingNewPage(): JSX.Element {
   };
   const createdCount = rows.filter((r) => r.created).length;
   const failedCount = rows.filter((r) => r.error).length;
+  // Every shape that could be created was: the Create button has nothing
+  // left to do, so it gives way to the result and the next steps.
+  const finished = createdCount > 0 && ready.length === 0 && !running;
 
   if (mapQ.isError) return <ErrorState message={errorText(mapQ.error)} />;
   if (!mapQ.data) return <Skeleton className="h-64 w-full rounded-xl" />;
@@ -313,7 +317,7 @@ export function HoldingNewPage(): JSX.Element {
         <div className="flex flex-col gap-4">
           <Card>
             <p className="mb-2 text-sm text-ap-muted">{t("newHolding.uploadHelp")}</p>
-            <AoiUploader onFeaturesParsed={(f) => void onFeatures(f)} />
+            <AoiUploader multiple onFeaturesParsed={(f) => void onFeatures(f)} />
             {uploadError ? (
               <p role="alert" className="mt-2 text-sm text-ap-crit">
                 {uploadError}
@@ -432,21 +436,51 @@ export function HoldingNewPage(): JSX.Element {
                   </Tbody>
                 </Table>
               </Card>
-              <div className="flex flex-wrap items-center gap-3">
-                <Button disabled={ready.length === 0 || running} onClick={() => void createAll()}>
-                  {t("newHolding.createAll", { count: ready.length })}
-                </Button>
-                {createdCount + failedCount > 0 ? (
-                  <span className="text-sm text-ap-muted">
-                    {t("newHolding.doneSummary", { created: createdCount, failed: failedCount })}
-                  </span>
-                ) : null}
-                <Link
-                  className="text-sm text-ap-primary hover:underline"
-                  to={`/investments/holdings/${farmId}`}
+              {finished ? (
+                <StatusBanner
+                  detail={
+                    failedCount > 0
+                      ? t("newHolding.doneSummary", { created: createdCount, failed: failedCount })
+                      : undefined
+                  }
                 >
-                  {t("newHolding.backToList")}
-                </Link>
+                  {t("newHolding.createdOkCount", { count: createdCount })}
+                </StatusBanner>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-3">
+                {finished ? (
+                  <>
+                    <Button onClick={() => navigate(`/investments/holdings/${farmId}`)}>
+                      {t("newHolding.viewHoldings")}
+                    </Button>
+                    <Button variant="ghost" onClick={() => setRows([])}>
+                      {t("newHolding.uploadMore")}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      disabled={ready.length === 0 || running}
+                      onClick={() => void createAll()}
+                    >
+                      {t("newHolding.createAll", { count: ready.length })}
+                    </Button>
+                    {createdCount + failedCount > 0 ? (
+                      <span className="text-sm text-ap-muted">
+                        {t("newHolding.doneSummary", {
+                          created: createdCount,
+                          failed: failedCount,
+                        })}
+                      </span>
+                    ) : null}
+                    <Link
+                      className="text-sm text-ap-primary hover:underline"
+                      to={`/investments/holdings/${farmId}`}
+                    >
+                      {t("newHolding.backToList")}
+                    </Link>
+                  </>
+                )}
               </div>
             </>
           ) : null}
