@@ -4726,7 +4726,9 @@ global:
       # 8f8afb5 = #784, frontend only. Investors overview shows investors,
       #   holdings by block, land by status, and holdings for sale. Reads
       #   existing routes. Rollback is this tag alone back to 87c9807.
-      tag: "8f8afb5"
+      # a7d36e3 = #786, frontend only. Overview trees read "—" when no
+      #   count is typed; area cells do not wrap. Rollback to 8f8afb5.
+      tag: "a7d36e3"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
