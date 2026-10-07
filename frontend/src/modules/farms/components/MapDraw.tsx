@@ -135,6 +135,21 @@ export function MapDraw({
         }
       }
       map.addControl(draw as unknown as maplibregl.IControl, "top-left");
+      // In corner-edit mode Draw's trash deletes only the selected corners, so
+      // with a shape selected and no corner picked it did nothing. Then the
+      // trash deletes the whole shape and drawing starts again.
+      containerRef.current?.querySelector(".mapbox-gl-draw_trash")?.addEventListener(
+        "click",
+        (ev) => {
+          if (draw.getMode() !== "direct_select") return;
+          if (draw.getSelectedPoints().features.length > 0) return;
+          ev.stopImmediatePropagation();
+          draw.deleteAll();
+          draw.changeMode("draw_polygon");
+          onChange?.(null);
+        },
+        true,
+      );
       if (initial) {
         const feature: Feature = { type: "Feature", properties: {}, geometry: initial };
         draw.add(feature);
