@@ -107,6 +107,29 @@ async def test_create_login_links_a_user_with_the_investor_role(
 
 
 @pytest.mark.asyncio
+async def test_create_login_for_a_taken_email_is_a_409_not_a_500(
+    scouting_env: ScoutingFixture,
+) -> None:
+    """The invite flow's "user exists" error used to escape as a 500, which
+    the browser showed as "Network Error"."""
+    env = scouting_env
+    email = f"{uuid4().hex[:8]}@example.com"
+    async with _client(env.admin_context) as c:
+        staff = await c.post(
+            "/api/v1/users:invite",
+            json={"email": email, "full_name": "Staff Member", "role": "TenantAdmin"},
+        )
+        assert staff.status_code in (200, 201), staff.text
+        inv = await c.post("/api/v1/investors", json={"full_name": "Same Email", "email": email})
+        assert inv.status_code == 201, inv.text
+        resp = await c.post(f"/api/v1/investors/{inv.json()['id']}:create-login")
+        after = await c.get(f"/api/v1/investors/{inv.json()['id']}")
+    assert resp.status_code == 409, resp.text
+    assert "already belongs to a user of this company" in resp.json()["detail"]
+    assert after.json()["user_id"] is None
+
+
+@pytest.mark.asyncio
 async def test_disable_and_enable_login_follow_the_status(scouting_env: ScoutingFixture) -> None:
     env = scouting_env
     _, investor = await _sold_holding(env)

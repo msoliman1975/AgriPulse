@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import type { Polygon } from "geojson";
 
 import {
@@ -23,6 +23,7 @@ import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
+import { StatusBanner } from "@/components/StatusBanner";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { localizedName } from "@/lib/localizedField";
 import { ArchiveButton } from "@/modules/farms/components/ArchiveButton";
@@ -59,6 +60,9 @@ export function HoldingDetailPage(): JSX.Element {
   const { farmId = "", holdingId = "" } = useParams<{ farmId: string; holdingId: string }>();
   const { t, i18n } = useTranslation("investors");
   const navigate = useNavigate();
+  const location = useLocation();
+  // Set by the new-holding page, so a fresh holding says it was created.
+  const justCreated = Boolean((location.state as { created?: boolean } | null)?.created);
   const queryClient = useQueryClient();
   const canManage = useCapability("holding.manage", { farmId });
   const canRedrawSold = useCapability("holding.redraw_sold", { farmId });
@@ -208,6 +212,8 @@ export function HoldingDetailPage(): JSX.Element {
           ) : null
         }
       />
+
+      {justCreated ? <StatusBanner>{t("newHolding.createdOk")}</StatusBanner> : null}
 
       <Card>
         {redrawing ? (

@@ -1,6 +1,6 @@
 {
   "nav": {
-    "group": "Investments",
+    "group": "Investors",
     "overview": "Overview",
     "holdings": "Holdings",
     "investors": "Investors"
@@ -178,7 +178,7 @@
     "load": "Could not load this page."
   },
   "overview": {
-    "title": "Investments",
+    "title": "Investors overview",
     "subtitle": "Holdings sold to investors, and for sale, across all farms.",
     "kpiInvestors": "Investors",
     "kpiSold": "Holdings sold",
@@ -273,7 +273,7 @@
     "noShape": "No shape yet.",
     "checking": "Checking…",
     "detected": "Block {{block}} · {{share}}% of the block",
-    "uploadHelp": "GeoJSON, KML or zipped shapefile. A file may hold several shapes; each becomes a holding.",
+    "uploadHelp": "GeoJSON, KML or zipped shapefile. You can choose several files at once, and a file may hold several shapes. Each shape becomes a holding.",
     "colShape": "#",
     "colName": "Name",
     "colBlock": "Block",
@@ -290,6 +290,10 @@
     "ownerSince": "Owner since",
     "pickInvestor": "Choose an investor",
     "soldNeedsInvestor": "Choose the investor who bought it.",
+    "createdOk": "Created successfully.",
+    "createdOkCount": "Created successfully. Holdings created: {{count}}.",
+    "viewHoldings": "View holdings",
+    "uploadMore": "Upload more files",
     "noInvestors": "No investors yet. Add one on the Investors page first.",
     "defaultName": "Holding {{n}}"
   }

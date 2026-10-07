@@ -25,7 +25,11 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.service import AuditService, get_audit_service
-from app.modules.iam.users_service import TenantUsersService
+from app.modules.iam.users_service import (
+    AlreadyInAnotherTenantError,
+    TenantUserAlreadyExistsError,
+    TenantUsersService,
+)
 from app.modules.investors.errors import (
     BlockHasHoldingsError,
     BlockNotEligibleError,
@@ -684,15 +688,30 @@ class InvestorsService:
             raise InvestorConflictError("An archived investor cannot get an app login.")
         if investor["user_id"] is not None:
             raise InvestorConflictError("This investor already has an app login.")
-        result = await users.invite_user(
-            email=investor["email"],
-            full_name=investor["full_name"],
-            full_name_ar=investor["full_name_ar"],
-            phone=investor["phone"],
-            tenant_role=TenantRole.INVESTOR.value,
-            tenant_schema=self._schema or "",
-            actor_user_id=actor_user_id,
-        )
+        # The invite flow raises plain exceptions for an email that already
+        # has a user. Left alone they became a 500 with no CORS headers, which
+        # the browser shows as "Network Error".
+        try:
+            result = await users.invite_user(
+                email=investor["email"],
+                full_name=investor["full_name"],
+                full_name_ar=investor["full_name_ar"],
+                phone=investor["phone"],
+                tenant_role=TenantRole.INVESTOR.value,
+                tenant_schema=self._schema or "",
+                actor_user_id=actor_user_id,
+            )
+        except TenantUserAlreadyExistsError as exc:
+            raise InvestorConflictError(
+                f"{investor['email']} already belongs to a user of this company. "
+                "An investor login needs an email that no other user has. "
+                "Change the investor's email, then try again."
+            ) from exc
+        except AlreadyInAnotherTenantError as exc:
+            raise InvestorConflictError(
+                f"{investor['email']} already has an AgriPulse account with another "
+                "organisation. Change the investor's email, then try again."
+            ) from exc
         # Link by the Keycloak id when Keycloak gave one. `/me` re-keys
         # `public.users.id` to it on the first sign-in, and the token's `sub`
         # is that same id, so this link survives the re-key. A pending
