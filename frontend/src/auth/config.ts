@@ -29,6 +29,9 @@ export const oidcConfig: AuthProviderProps = {
   automaticSilentRenew: true,
   // Strip the `code` and `state` query params from the URL after
   // sign-in; otherwise a refresh re-runs the redirect flow.
+  // /investor-app/callback carries a code for the Android investor app. The
+  // web session must not exchange it or strip it from the URL.
+  skipSigninCallback: window.location.pathname.startsWith("/investor-app/"),
   onSigninCallback: () => {
     window.history.replaceState({}, document.title, window.location.pathname);
   },

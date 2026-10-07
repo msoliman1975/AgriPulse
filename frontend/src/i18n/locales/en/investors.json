@@ -330,5 +330,10 @@
     "uploadMore": "Upload more files",
     "noInvestors": "No investors yet. Add one on the Investors page first.",
     "defaultName": "Holding {{n}}"
+  },
+  "appCallback": {
+    "title": "Opening AgriPulse Investor…",
+    "body": "Your sign-in is finishing in the app. If the app does not open, tap the button.",
+    "open": "Open the app"
   }
 }

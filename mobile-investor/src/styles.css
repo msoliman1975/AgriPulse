@@ -1,0 +1,333 @@
+/* AgriPulse Investor. A light theme: investors read this indoors, unlike
+   Scout's field use. Colours follow the AgriPulse palette. */
+@import "./fonts.css";
+
+:root {
+  --bg: #f6f7f4;
+  --panel: #ffffff;
+  --ink: #1f2a1f;
+  --muted: #5b6b5b;
+  --line: #e2e6de;
+  --primary: #1f7a3a;
+  --primary-soft: #e3f1e6;
+  --crit: #b42318;
+  --warn-soft: #fff4d6;
+  --top-inset: env(safe-area-inset-top);
+  --bottom-inset: env(safe-area-inset-bottom);
+}
+/* From targetSdk 35 Android draws edge to edge; some WebViews report a zero
+   inset, so the native build keeps a floor under the status bar. */
+.native {
+  --top-inset: max(env(safe-area-inset-top), 28px);
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+body {
+  font-family: "Cairo", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-tap-highlight-color: transparent;
+}
+h1 {
+  font-size: 1.35rem;
+  margin: 0;
+}
+h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+p {
+  margin: 0;
+}
+
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 0.85rem;
+}
+.block {
+  display: block;
+}
+.center {
+  text-align: center;
+  margin: 12px 0;
+}
+.pad {
+  padding: 4px 16px;
+}
+.error {
+  color: var(--crit);
+}
+.code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  color: var(--muted);
+  direction: ltr;
+}
+
+.splash {
+  height: 100%;
+  background: var(--bg);
+}
+
+/* Sign in, not-investor and update screens */
+.signin {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: calc(16px + var(--top-inset)) 20px calc(24px + var(--bottom-inset));
+}
+.signin-body {
+  margin: auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: center;
+}
+.signin-logo {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto;
+}
+.lead {
+  font-size: 1.1rem;
+}
+.lang-switch {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+.btn-block {
+  width: 100%;
+}
+.btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.btn-danger {
+  color: var(--crit);
+}
+.chip {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.chip-on {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 600;
+}
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  color: var(--ink);
+  border-radius: 50%;
+}
+.icon-btn:disabled {
+  opacity: 0.5;
+}
+.spin {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* The back arrow points the reading direction's "back". */
+[dir="rtl"] .back-arrow {
+  display: inline-block;
+  transform: scaleX(-1);
+}
+
+/* Main shell: header, content, tab bar */
+.shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: calc(12px + var(--top-inset)) 16px 8px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.banner {
+  background: var(--warn-soft);
+  padding: 8px 16px;
+  font-size: 0.85rem;
+}
+.content {
+  flex: 1;
+  overflow-y: auto;
+}
+.tabbar {
+  display: flex;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  padding-bottom: var(--bottom-inset);
+}
+.tabbar-item {
+  flex: 1;
+  min-height: 56px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: var(--muted);
+}
+.tabbar-on {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.screen {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.empty {
+  padding: 32px 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.group-title {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+.holding-card {
+  width: 100%;
+  text-align: start;
+  font: inherit;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.row-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+/* Holding screen */
+.holding-screen {
+  padding: 0;
+  min-height: 100%;
+  gap: 0;
+}
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: calc(8px + var(--top-inset)) 8px 8px;
+  background: var(--panel);
+}
+.bar-title {
+  display: flex;
+  flex-direction: column;
+}
+.tabs {
+  display: flex;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.tab {
+  flex: 1;
+  min-height: 48px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  font: inherit;
+  color: var(--muted);
+}
+.tab-on {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 700;
+}
+.map-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: calc(12px + var(--bottom-inset));
+}
+.map {
+  width: 100%;
+  height: 62vh;
+}
+.details {
+  margin: 12px 16px;
+}
+.details-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.details-row:last-child {
+  border-bottom: none;
+}
+.details-row dt {
+  color: var(--muted);
+}
+.details-row dd {
+  margin: 0;
+  text-align: end;
+}

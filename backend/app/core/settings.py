@@ -563,6 +563,14 @@ class Settings(BaseSettings):
     # Trailing slashes are stripped when the link is built.
     app_base_url: str = "http://localhost:5173"
 
+    # --- AgriPulse Investor app (Android) --------------------------------
+    # A direct APK does not update itself, so the app asks for these at
+    # start. Below the minimum it shows "Update required"; the link is where
+    # the APK is downloaded. Empty link: no download place chosen yet.
+    investor_app_min_version: str = "0.1.0"
+    investor_app_latest_version: str = "0.1.0"
+    investor_app_download_url: str = ""
+
     # --- FCM (notifications push channel, scout app S2) ------------------
     # Off by default so a dev environment without Firebase credentials records
     # `skipped` dispatch rows rather than failing every send. Cluster envs

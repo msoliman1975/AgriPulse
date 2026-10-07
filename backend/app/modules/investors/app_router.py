@@ -5,6 +5,7 @@ Mounted under /api/v1:
   GET /investor/me                       investor_app.use
   GET /investor/holdings                 investor_app.use
   GET /investor/holdings/{holding_id}    investor_app.use
+  GET /investor/app-version              investor_app.use
 
 The caller never names an investor: the row is found from the token's user.
 A holding the investor does not own answers 404, the same as a missing one.
@@ -22,10 +23,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.settings import get_settings
 from app.modules.investors.router import _ensure_tenant
 from app.modules.investors.schemas import (
     InvestorAppHoldingResponse,
     InvestorAppMeResponse,
+    InvestorAppVersionResponse,
 )
 from app.modules.investors.service import InvestorsService, get_investors_service
 from app.shared.auth.context import RequestContext
@@ -76,3 +79,16 @@ async def investor_holding(
         email=context.email,
         holding_id=holding_id,
     )
+
+
+@router.get("/app-version", response_model=InvestorAppVersionResponse)
+async def investor_app_version(
+    _context: RequestContext = Depends(requires_capability("investor_app.use")),
+) -> dict[str, Any]:
+    """The Android app's minimum and latest version, and where to get it."""
+    cfg = get_settings()
+    return {
+        "min_version": cfg.investor_app_min_version,
+        "latest_version": cfg.investor_app_latest_version,
+        "download_url": cfg.investor_app_download_url or None,
+    }
