@@ -4061,9 +4061,12 @@ global:
       #   for the Android investor app; the public web page
       #   /investor-app/callback hands its sign-in code to the app. No
       #   migration. Rollback: all three back to 2ad3420.
-      tag: "980e321"
+      # 7395f79 = #793, api, workers and frontend. Investor API sends the
+      #   block crop's stage name, stage start and expected end, and the
+      #   farm's current season. No migration. Rollback: all three to 980e321.
+      tag: "7395f79"
     workers:
-      tag: "980e321"
+      tag: "7395f79"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4738,7 +4741,8 @@ global:
       #   count is typed; area cells do not wrap. Rollback to 8f8afb5.
       # 2ad3420 = #788, frontend. See the api note. Rollback to a7d36e3.
       # 980e321 = #789, frontend. See the api note. Rollback to 2ad3420.
-      tag: "980e321"
+      # 7395f79 = #793, frontend. No web change; moves with the api.
+      tag: "7395f79"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
