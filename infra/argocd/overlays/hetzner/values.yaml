@@ -4057,9 +4057,13 @@ global:
       #   no ownership entry (soft delete, audited); holdings carry
       #   has_ownership_history; Delete button on the Holdings list. No
       #   migration. Rollback: api and workers to 87c9807, frontend to a7d36e3.
-      tag: "2ad3420"
+      # 980e321 = #789, api, workers and frontend. GET /investor/app-version
+      #   for the Android investor app; the public web page
+      #   /investor-app/callback hands its sign-in code to the app. No
+      #   migration. Rollback: all three back to 2ad3420.
+      tag: "980e321"
     workers:
-      tag: "2ad3420"
+      tag: "980e321"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4733,7 +4737,8 @@ global:
       # a7d36e3 = #786, frontend only. Overview trees read "—" when no
       #   count is typed; area cells do not wrap. Rollback to 8f8afb5.
       # 2ad3420 = #788, frontend. See the api note. Rollback to a7d36e3.
-      tag: "2ad3420"
+      # 980e321 = #789, frontend. See the api note. Rollback to 2ad3420.
+      tag: "980e321"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
