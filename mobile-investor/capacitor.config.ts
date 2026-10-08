@@ -16,6 +16,9 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: false,
   },
+  // Capacitor's debug builds log every plugin call to logcat, and the token
+  // response passes through CapacitorHttp. The pilot ships a debug APK.
+  loggingBehavior: "none",
 };
 
 export default config;
