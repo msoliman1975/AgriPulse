@@ -330,4 +330,6 @@ p {
 .details-row dd {
   margin: 0;
   text-align: end;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
