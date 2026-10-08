@@ -414,6 +414,15 @@ class InvestorAppHoldingResponse(BaseModel):
     variety_name_en: str | None = None
     variety_name_ar: str | None = None
     planting_date: date | None = None
+    # The block crop's current stage, by name only.
+    stage_name_en: str | None = None
+    stage_name_ar: str | None = None
+    # The day the block entered that stage, and the day it is expected to end
+    # (None when the stage has no fixed end, such as a manual one).
+    stage_started_on: date | None = None
+    stage_expected_end: date | None = None
+    # The farm's active plan's season, for example "2026".
+    current_season: str | None = None
     start_date: date
     end_date: date | None = None
     period: Literal["past", "current", "future"]

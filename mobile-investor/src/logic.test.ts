@@ -50,3 +50,15 @@ describe("formatting", () => {
     expect(Object.keys(ar).sort()).toEqual(Object.keys(en).sort());
   });
 });
+
+describe("blockWithoutHolding", () => {
+  it("cuts the holding out of the block as a hole", async () => {
+    const { blockWithoutHolding } = await import("@/components/HoldingMap");
+    const block = { type: "Polygon", coordinates: [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]] };
+    const holding = { type: "Polygon", coordinates: [[[2, 2], [3, 2], [3, 3], [2, 3], [2, 2]]] };
+    const f = blockWithoutHolding(block, holding);
+    const polys = (f.geometry as { coordinates: number[][][][] }).coordinates;
+    expect(polys).toHaveLength(1);
+    expect(polys[0]).toEqual([block.coordinates[0], holding.coordinates[0]]);
+  });
+});

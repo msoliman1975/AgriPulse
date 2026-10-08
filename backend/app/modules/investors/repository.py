@@ -881,7 +881,10 @@ class InvestorsRepository:
                    ST_AsGeoJSON(b.boundary)::jsonb AS block_boundary,
                    f.name AS farm_name, f.name_ar AS farm_name_ar,
                    crop.crop_name_en, crop.crop_name_ar,
-                   crop.variety_name_en, crop.variety_name_ar, crop.planting_date
+                   crop.variety_name_en, crop.variety_name_ar, crop.planting_date,
+                   crop.stage_name_en, crop.stage_name_ar,
+                   crop.stage_started_on, crop.stage_advance,
+                   season.season_label AS current_season
               FROM holding_ownerships o
               JOIN holdings h ON h.id = o.holding_id
               JOIN blocks b ON b.id = h.block_id
@@ -889,10 +892,27 @@ class InvestorsRepository:
               LEFT JOIN LATERAL (
                 SELECT c.name_en AS crop_name_en, c.name_ar AS crop_name_ar,
                        v.name_en AS variety_name_en, v.name_ar AS variety_name_ar,
-                       bc.planting_date
+                       bc.planting_date,
+                       -- The stage's name from the variety's own stage list,
+                       -- else the crop's. Only the name: never the code.
+                       stage.s ->> 'name_en' AS stage_name_en,
+                       stage.s ->> 'name_ar' AS stage_name_ar,
+                       -- Read by the service to work out the expected end;
+                       -- never sent to the investor.
+                       stage.s -> 'advance' AS stage_advance,
+                       (bc.growth_stage_updated_at)::date AS stage_started_on
                   FROM block_crops bc
                   JOIN public.crops c ON c.id = bc.crop_id
                   LEFT JOIN public.crop_varieties v ON v.id = bc.crop_variety_id
+                  LEFT JOIN LATERAL (
+                    SELECT s
+                      FROM jsonb_array_elements(
+                             COALESCE(v.phenology_stages_override, c.phenology_stages)
+                               -> 'stages'
+                           ) s
+                     WHERE s ->> 'code' = bc.growth_stage
+                     LIMIT 1
+                  ) stage ON true
                  WHERE bc.block_id = b.id
                    AND bc.deleted_at IS NULL
                    AND bc.effective_from <= {_TODAY}
@@ -900,6 +920,16 @@ class InvestorsRepository:
                  ORDER BY bc.effective_from DESC
                  LIMIT 1
               ) crop ON true
+              -- The farm's current season: its active plan's season.
+              LEFT JOIN LATERAL (
+                SELECT vp.season_label
+                  FROM vegetation_plans vp
+                 WHERE vp.farm_id = f.id
+                   AND vp.deleted_at IS NULL
+                   AND vp.status = 'active'
+                 ORDER BY vp.season_year DESC, vp.created_at DESC
+                 LIMIT 1
+              ) season ON true
              WHERE {" AND ".join(clauses)}
              ORDER BY (o.end_date IS NULL) DESC, o.start_date DESC
             """,
