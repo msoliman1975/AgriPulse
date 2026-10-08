@@ -43,6 +43,7 @@ from app.modules.investors.errors import (
     OwnershipNotFoundError,
 )
 from app.modules.investors.repository import InvestorsRepository
+from app.modules.investors.stage_dates import stage_expected_end
 from app.shared import clock
 from app.shared.auth.context import TenantRole
 from app.shared.db.ids import uuid7
@@ -908,7 +909,8 @@ class InvestorsService:
         self, *, user_id: UUID | None, keycloak_subject: str | None, email: str | None = None
     ) -> list[dict[str, Any]]:
         investor = await self._me(user_id=user_id, keycloak_subject=keycloak_subject, email=email)
-        return await self._repo.investor_app_holdings(investor_id=investor["id"])
+        rows = await self._repo.investor_app_holdings(investor_id=investor["id"])
+        return [_with_stage_end(r) for r in rows]
 
     async def app_holding(
         self,
@@ -925,7 +927,19 @@ class InvestorsService:
         if not rows:
             # Someone else's holding answers exactly like a missing one.
             raise HoldingNotFoundError(holding_id)
-        return rows[0]
+        return _with_stage_end(rows[0])
+
+
+def _with_stage_end(row: dict[str, Any]) -> dict[str, Any]:
+    """Swap the stage's advance rule for the date it is expected to end."""
+    out = dict(row)
+    advance = out.pop("stage_advance", None)
+    out["stage_expected_end"] = (
+        stage_expected_end(advance, planting_date=out.get("planting_date"), today=clock.today())
+        if out.get("stage_name_en") or out.get("stage_name_ar")
+        else None
+    )
+    return out
 
 
 def _uuid_or_none(value: Any) -> UUID | None:

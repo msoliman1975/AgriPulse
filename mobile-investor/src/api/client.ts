@@ -47,6 +47,11 @@ export interface Holding {
   variety_name_en: string | null;
   variety_name_ar: string | null;
   planting_date: string | null;
+  stage_name_en: string | null;
+  stage_name_ar: string | null;
+  stage_started_on: string | null;
+  stage_expected_end: string | null;
+  current_season: string | null;
   start_date: string;
   end_date: string | null;
   period: "past" | "current" | "future";

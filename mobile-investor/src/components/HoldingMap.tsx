@@ -7,6 +7,29 @@ import type { Geometry } from "@/api/client";
 const IMAGERY =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 
+/** The outer rings of a Polygon or MultiPolygon. */
+function outerRings(g: Geometry): number[][][] {
+  if (g.type === "Polygon") return [(g.coordinates as number[][][])[0]];
+  if (g.type === "MultiPolygon") return (g.coordinates as number[][][][]).map((p) => p[0]);
+  return [];
+}
+
+/**
+ * The block with the holding cut out: what the map dims. Each block ring is
+ * an outer ring, and every holding ring is a hole in the first of them. The
+ * holding always sits inside its block, so the holes fall inside.
+ */
+export function blockWithoutHolding(block: Geometry, holding: Geometry): GeoJSON.Feature {
+  const blockRings = outerRings(block);
+  const holes = outerRings(holding);
+  const polygons = blockRings.map((ring, i) => (i === 0 ? [ring, ...holes] : [ring]));
+  return {
+    type: "Feature",
+    properties: {},
+    geometry: { type: "MultiPolygon", coordinates: polygons },
+  };
+}
+
 /** Every [lon, lat] pair in a GeoJSON coordinates array. */
 function positions(coords: unknown, out: number[][] = []): number[][] {
   if (Array.isArray(coords) && typeof coords[0] === "number") out.push(coords as number[]);
@@ -40,10 +63,18 @@ export function HoldingMap({ holding, block }: { holding: Geometry; block: Geome
             attribution: "Esri World Imagery",
           },
           block: { type: "geojson", data: feature(block) },
+          dim: { type: "geojson", data: blockWithoutHolding(block, holding) },
           holding: { type: "geojson", data: feature(holding) },
         },
         layers: [
           { id: "imagery", type: "raster", source: "imagery" },
+          // The rest of the block, dimmed, so the holding stands out.
+          {
+            id: "block-dim",
+            type: "fill",
+            source: "dim",
+            paint: { "fill-color": "#000000", "fill-opacity": 0.5 },
+          },
           {
             id: "block-line",
             type: "line",
@@ -53,12 +84,6 @@ export function HoldingMap({ holding, block }: { holding: Geometry; block: Geome
               "line-width": 2,
               "line-dasharray": ["literal", [2, 2]],
             },
-          },
-          {
-            id: "holding-fill",
-            type: "fill",
-            source: "holding",
-            paint: { "fill-color": "#facc15", "fill-opacity": 0.3 },
           },
           {
             id: "holding-line",
@@ -71,8 +96,8 @@ export function HoldingMap({ holding, block }: { holding: Geometry; block: Geome
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
-    // Fit the block, so the holding is seen in its place.
-    const pts = positions(block.coordinates, positions(holding.coordinates));
+    // Open on the holding; the dimmed block around it shows where it sits.
+    const pts = positions(holding.coordinates);
     if (pts.length > 0) {
       const xs = pts.map((p) => p[0]);
       const ys = pts.map((p) => p[1]);
@@ -81,7 +106,7 @@ export function HoldingMap({ holding, block }: { holding: Geometry; block: Geome
           [Math.min(...xs), Math.min(...ys)],
           [Math.max(...xs), Math.max(...ys)],
         ],
-        { padding: 32, duration: 0, maxZoom: 18 },
+        { padding: 56, duration: 0, maxZoom: 19 },
       );
     }
     const resize = new ResizeObserver(() => map.resize());
