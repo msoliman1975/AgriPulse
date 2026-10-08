@@ -17,7 +17,11 @@ from uuid import uuid4
 import pytest
 
 from app.modules.investors.errors import HoldingOwnedError
-from app.modules.investors.schemas import InvestorAppHoldingResponse, InvestorAppMeResponse
+from app.modules.investors.schemas import (
+    InvestorAppHoldingResponse,
+    InvestorAppMeResponse,
+    InvestorAppVersionResponse,
+)
 from app.modules.investors.service import InvestorsService
 
 _FARM = uuid4()
@@ -132,4 +136,12 @@ def test_investor_app_me_fields_are_pinned() -> None:
         "full_name_ar",
         "preferred_language",
         "company_name",
+    }
+
+
+def test_investor_app_version_fields_are_pinned() -> None:
+    assert set(InvestorAppVersionResponse.model_fields) == {
+        "min_version",
+        "latest_version",
+        "download_url",
     }

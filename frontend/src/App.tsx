@@ -11,6 +11,7 @@ import {
 } from "react-router-dom";
 
 import { AuthCallback } from "@/auth/AuthCallback";
+import { InvestorAppCallbackPage } from "@/modules/investors/pages/InvestorAppCallbackPage";
 import { AuthProvider } from "@/auth/AuthProvider";
 import { AuthSync } from "@/auth/AuthSync";
 import { ProtectedRoute } from "@/auth/ProtectedRoute";
@@ -161,6 +162,9 @@ export function App(): ReactNode {
                 signinRedirect to Keycloak, Keycloak would round-trip
                 back to /auth/callback â€” a redirect loop. */}
             <Route path="/auth/callback" element={<AuthCallback />} />
+            {/* The Android investor app's sign-in return. Public: the code
+                belongs to the app, not to this web session. */}
+            <Route path="/investor-app/callback" element={<InvestorAppCallbackPage />} />
             <Route
               element={
                 <ProtectedRoute>

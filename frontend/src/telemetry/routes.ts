@@ -18,6 +18,7 @@ import { matchRoutes, type RouteObject } from "react-router-dom";
 export const ROUTE_MANIFEST: RouteObject[] = [
   { path: "/login" },
   { path: "/auth/callback" },
+  { path: "/investor-app/callback" },
   { path: "/" },
   { path: "/tenants/:tenantId" },
   { path: "/farms" },

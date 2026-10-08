@@ -421,6 +421,14 @@ class InvestorAppHoldingResponse(BaseModel):
     block_boundary: dict[str, Any]
 
 
+class InvestorAppVersionResponse(BaseModel):
+    """What the Android app compares its own version with at start."""
+
+    min_version: str
+    latest_version: str
+    download_url: str | None = None
+
+
 # ---- Block detection for drawn or uploaded shapes -------------------------
 
 

@@ -93,6 +93,7 @@ runs/
 # same backend — the alternative is a hand-typed .env that silently ships a
 # handset pointed at somebody's laptop.
 !mobile/.env.production
+!mobile-investor/.env.production
 *.pem
 *.key
 *.crt
