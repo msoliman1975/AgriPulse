@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Investor Holdings Design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+<style>
+:root {
+  --ground: #f3f4f0;
+  --surface: #ffffff;
+  --surface-2: #eceee8;
+  --ink: #191d18;
+  --ink-2: #4b554b;
+  --ink-3: #788276;
+  --line: #d7dbd3;
+  --accent: #356b30;
+  --accent-soft: #e2ebdf;
+  --amber: #8a6212;
+  --amber-soft: #f2e9d5;
+  --red: #963232;
+  --red-soft: #f3dedd;
+  --blue: #2f5a72;
+  --blue-soft: #dde8ee;
+  --sat-1: #6f7a52;
+  --sat-2: #8a8a5c;
+  --sat-3: #5c6a45;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #12160f; --surface: #1a1f18; --surface-2: #222820;
+    --ink: #e7ebe2; --ink-2: #a9b3a5; --ink-3: #7d8879; --line: #333b30;
+    --accent: #8bbd7f; --accent-soft: #26331f;
+    --amber: #d9b268; --amber-soft: #33290f;
+    --red: #d99490; --red-soft: #351f1e;
+    --blue: #94bdd3; --blue-soft: #1c2b33;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #12160f; --surface: #1a1f18; --surface-2: #222820;
+  --ink: #e7ebe2; --ink-2: #a9b3a5; --ink-3: #7d8879; --line: #333b30;
+  --accent: #8bbd7f; --accent-soft: #26331f;
+  --amber: #d9b268; --amber-soft: #33290f;
+  --red: #d99490; --red-soft: #351f1e;
+  --blue: #94bdd3; --blue-soft: #1c2b33;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.wrap { max-width: 1080px; margin: 0 auto; padding: 40px 16px 96px; }
+h1, h2, h3 { font-family: "Archivo", system-ui, sans-serif; line-height: 1.25; }
+h1 { font-size: 34px; margin: 0 0 8px; }
+h2 { font-size: 24px; margin: 56px 0 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+h3 { font-size: 18px; margin: 28px 0 8px; }
+p, li { max-width: 78ch; }
+.lede { color: var(--ink-2); font-size: 18px; }
+.meta { color: var(--ink-3); font-size: 14px; }
+code, .mono { font-family: "IBM Plex Mono", monospace; font-size: 0.88em; }
+code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+.ar { font-family: "IBM Plex Sans Arabic", sans-serif; }
+nav.toc { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 20px; margin: 24px 0; }
+nav.toc ol { margin: 4px 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+nav.toc a { color: var(--accent); text-decoration: none; }
+.table-scroll { overflow-x: auto; margin: 12px 0 20px; }
+table { border-collapse: collapse; width: 100%; background: var(--surface); font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border: 1px solid var(--line); }
+th { background: var(--surface-2); font-weight: 600; }
+td.k { white-space: nowrap; font-family: "IBM Plex Mono", monospace; font-size: 13px; }
+.tag { display: inline-block; font-size: 12px; padding: 1px 7px; border-radius: 10px; font-weight: 600; }
+.tag.new { background: var(--accent-soft); color: var(--accent); }
+.tag.chg { background: var(--blue-soft); color: var(--blue); }
+.tag.later { background: var(--amber-soft); color: var(--amber); }
+.callout { border-left: 4px solid var(--blue); background: var(--blue-soft); padding: 10px 16px; border-radius: 0 6px 6px 0; margin: 16px 0; }
+.callout.caution { border-color: var(--amber); background: var(--amber-soft); }
+.callout.warning { border-color: var(--red); background: var(--red-soft); }
+.callout p { margin: 4px 0; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px; }
+.card h3 { margin-top: 4px; }
+pre { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+
+/* phone mockups */
+.phones { display: flex; flex-wrap: wrap; gap: 20px; justify-content: flex-start; margin: 16px 0; }
+.phone { width: 236px; border: 8px solid #222; border-radius: 28px; background: #fafaf7; color: #1b1f1a; overflow: hidden; font-size: 12px; line-height: 1.4; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.phone .bar { background: #356b30; color: #fff; padding: 10px 12px; font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; }
+.phone .body { padding: 10px; min-height: 380px; }
+.phone .cap { text-align: center; font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+.phone .row { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 8px; margin-bottom: 8px; }
+.phone .row b { display: block; font-size: 12.5px; }
+.phone .muted { color: #6b7469; font-size: 11px; }
+.phone .pill { display: inline-block; background: #e2ebdf; color: #2a5626; border-radius: 8px; padding: 0 6px; font-size: 10.5px; }
+.phone .tabs { display: flex; border-bottom: 1px solid #ddd; margin: -10px -10px 8px; }
+.phone .tabs span { flex: 1; text-align: center; padding: 7px 0; font-size: 11px; color: #6b7469; }
+.phone .tabs span.on { color: #356b30; border-bottom: 2px solid #356b30; font-weight: 600; }
+.phone .map { height: 230px; border-radius: 8px; position: relative; overflow: hidden;
+  background: repeating-linear-gradient(45deg, var(--sat-1) 0 10px, var(--sat-3) 10px 20px); }
+.phone .map .blk { position: absolute; left: 14%; top: 12%; width: 72%; height: 74%; border: 2px dashed #fff; }
+.phone .map .hld { position: absolute; left: 22%; top: 40%; width: 34%; height: 30%; border: 3px solid #ffd54a; background: rgba(255,213,74,.25); }
+.phone .map .lbl { position: absolute; left: 6px; bottom: 6px; background: rgba(0,0,0,.6); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10.5px; }
+.phone .big { font-size: 22px; font-weight: 700; font-family: "Archivo", sans-serif; }
+.phone .nav { display: flex; border-top: 1px solid #ddd; background: #fff; }
+.phone .nav span { flex: 1; text-align: center; padding: 8px 0; font-size: 10.5px; color: #6b7469; }
+.phone .nav span.on { color: #356b30; font-weight: 600; }
+.phone[dir="rtl"] { font-family: "IBM Plex Sans Arabic", sans-serif; }
+@media (max-width: 640px) {
+  nav.toc ol { columns: 1; }
+  h1 { font-size: 27px; }
+  .phones { justify-content: center; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Investor holdings</h1>
+<p class="lede">A design for farms that an investment company runs and sells in parts to investors. Part A covers the web app. Part B covers the new Android app, AgriPulse Investor.</p>
+<p class="meta">Status: Written, not built. Date: 2026-10-06. Based on 17 questions answered by Mohamed on the same day.</p>
+
+<nav class="toc">
+<strong>Contents</strong>
+<ol>
+<li><a href="#decisions">The 10 decisions</a></li>
+<li><a href="#terms">Names and terms</a></li>
+<li><a href="#model">Data model and master data</a></li>
+<li><a href="#rules">Rules the system enforces</a></li>
+<li><a href="#access">Access and security</a></li>
+<li><a href="#web">Part A: web app changes</a></li>
+<li><a href="#mobile">Part B: Android app</a></li>
+<li><a href="#phases">Build phases</a></li>
+<li><a href="#risks">Risks and open questions</a></li>
+</ol>
+</nav>
+
+<h2 id="decisions">1. The 10 decisions</h2>
+<div class="table-scroll"><table>
+<tr><th>#</th><th>Question</th><th>Decision</th><th>What it means for the build</th></tr>
+<tr><td>1</td><td>Can one investor own holdings in more than one company?</td><td>No, one company only</td><td>The investor is a user inside one tenant, like other users today. No cross-tenant reads.</td></tr>
+<tr><td>2</td><td>How is a holding defined?</td><td>A drawn area. Share = holding area ÷ block area.</td><td>Share is computed, never typed. Staff use it to get a suggested harvest number. The investor never sees the share (decision 12).</td></tr>
+<tr><td>3</td><td>Overlap and co-owners?</td><td>No overlap. One owner at a time.</td><td>The database refuses overlapping holdings in a block. Land not sold stays with the company.</td></tr>
+<tr><td>4</td><td>Can a holding change owner?</td><td>Yes, with dated history</td><td>Ownership rows have start and end dates. A harvest goes to the owner on the harvest date.</td></tr>
+<tr><td>5</td><td>What does the investor map show?</td><td>Outline on the latest true-colour satellite image</td><td>No health colours, no index layers, no findings. AgriPulse has no true-colour image today, so this is new work (see <a href="#risks">section 9</a>).</td></tr>
+<tr><td>6</td><td>How are key events created?</td><td>Staff write a draft. A manager publishes.</td><td>Two capabilities: write and publish. Push is sent only on publish.</td></tr>
+<tr><td>7</td><td>Which datapoints?</td><td>Harvest quantity, tree count, tree age (see decision 12)</td><td>No money, no costs. A new harvest record is needed; AgriPulse has none today.</td></tr>
+<tr><td>8</td><td>How does an investor get an account?</td><td>Company invites by email</td><td>Reuse the existing invite flow (Keycloak "execute actions" email).</td></tr>
+<tr><td>9</td><td>Distribution and language?</td><td>Direct APK now, Google Play soon. Arabic and English.</td><td>Sign the APK with the key that Google Play will use later. Arabic first, right-to-left.</td></tr>
+<tr><td>10</td><td>Name for "Piece"?</td><td>Holding / <span class="ar">حيازة</span></td><td>Used in code, API, and both languages.</td></tr>
+</table></div>
+<p>A second round of 7 questions settled the open points:</p>
+<div class="table-scroll"><table>
+<tr><th>#</th><th>Question</th><th>Decision</th><th>What it means for the build</th></tr>
+<tr><td>11</td><td>Where does the tree count come from?</td><td>Staff type it per holding</td><td>No tree count on blocks.</td></tr>
+<tr><td>12</td><td>What harvest number does the investor see?</td><td>Only the final number for their holding, entered and kept by farm management. The web app suggests block total × area share, and staff confirm or change it.</td><td>The app shows no share %, no block total, and no other holding. Staff can correct a number after publish.</td></tr>
+<tr><td>13</td><td>Digits in the Arabic app?</td><td>Western 0–9</td><td>Format numbers with the <code>ar-u-nu-latn</code> locale.</td></tr>
+<tr><td>14</td><td>Yearly PDF statement?</td><td>Not in the first release</td><td>No PDF work.</td></tr>
+<tr><td>15</td><td>Logins for a company investor?</td><td>One login per investor</td><td>One email and one user per investor record.</td></tr>
+<tr><td>16</td><td>Branding in the app?</td><td>Company logo inside AgriPulse</td><td>One app for all companies. The home screen shows the investment company's logo and name.</td></tr>
+<tr><td>17</td><td>App name?</td><td>AgriPulse Investor / <span class="ar">أجري بلس للمستثمر</span></td><td>App id stays <code>cloud.agripulse.investor</code>.</td></tr>
+</table></div>
+
+<h2 id="terms">2. Names and terms</h2>
+<p>Each term below means one thing everywhere: in the database, the API, the web app, and the Android app.</p>
+<div class="table-scroll"><table>
+<tr><th>English</th><th>Arabic</th><th>Code name</th><th>Meaning</th></tr>
+<tr><td>Holding</td><td class="ar">حيازة</td><td class="k">holding</td><td>A drawn area inside one block that an investor owns.</td></tr>
+<tr><td>Investor</td><td class="ar">مستثمر</td><td class="k">investor</td><td>A person or company that owns one or more holdings. Has no say in farm work.</td></tr>
+<tr><td>Ownership</td><td class="ar">ملكية</td><td class="k">holding_ownership</td><td>One investor owning one holding between two dates.</td></tr>
+<tr><td>Share</td><td class="ar">نسبة الحيازة</td><td class="k">share_pct</td><td>Holding area ÷ block area, as a percentage. Computed. Staff see it; the investor does not.</td></tr>
+<tr><td>Investor update</td><td class="ar">تحديث للمستثمر</td><td class="k">investor_update</td><td>A key event on a block, written for investors. Example: "Harvest started".</td></tr>
+<tr><td>Harvest record</td><td class="ar">سجل الحصاد</td><td class="k">harvest_record</td><td>The quantity harvested from one block on one date.</td></tr>
+<tr><td>Harvest share</td><td class="ar">حصة الحصاد</td><td class="k">harvest_allocation</td><td>The final harvest number for one holding. The web app suggests 200 t × 10% = 20 t; staff confirm or change it.</td></tr>
+</table></div>
+<p class="callout"><strong>Note:</strong> I use "investor update" and not "event" in the product. The code already has alert events, signal events, and audit events. A separate word avoids a mix-up.</p>
+
+<h2 id="model">3. Data model and master data</h2>
+<p>All new tables live in the tenant schema, next to <code>farms</code> and <code>blocks</code>. This follows decision 1. The next tenant migration is <code>0073</code>.</p>
+
+<h3>3.1 Holding master <span class="tag new">new table <code>holdings</code></span></h3>
+<div class="table-scroll"><table>
+<tr><th>Field</th><th>Type</th><th>Source</th><th>Why it is needed</th></tr>
+<tr><td class="k">id</td><td>uuid</td><td>system</td><td>Primary key.</td></tr>
+<tr><td class="k">code</td><td>text, unique</td><td>system, editable</td><td>Short reference for contracts and phone calls. Example <code>H-0042</code>.</td></tr>
+<tr><td class="k">block_id</td><td>uuid → blocks</td><td>staff</td><td>The block that contains the holding. Cannot change after the first ownership.</td></tr>
+<tr><td class="k">name_en, name_ar</td><td>text</td><td>staff</td><td>Display name in both languages. Example "North strip 3".</td></tr>
+<tr><td class="k">boundary</td><td>Polygon, SRID 4326</td><td>staff draws</td><td>The area. Same type as <code>blocks.boundary</code>.</td></tr>
+<tr><td class="k">area_m2</td><td>numeric(14,2)</td><td>computed</td><td>Shown in feddan by default, like blocks.</td></tr>
+<tr><td class="k">tree_count</td><td>integer, nullable</td><td>staff</td><td>Decision 7. Blocks have no tree count today, so staff type it per holding.</td></tr>
+<tr><td class="k">status</td><td>enum</td><td>system</td><td><code>draft</code> → <code>available</code> → <code>sold</code> → <code>archived</code>. "Sold" means it has a current owner.</td></tr>
+<tr><td class="k">contract_ref</td><td>text, nullable</td><td>staff</td><td>The company's sale contract number. Shown to staff only.</td></tr>
+<tr><td class="k">notes_internal</td><td>text</td><td>staff</td><td>Never sent to the investor app.</td></tr>
+<tr><td class="k">created_at/by, updated_at/by, archived_at</td><td></td><td>system</td><td>Audit. New timestamps default to <code>public.app_now()</code>, as with other new tables.</td></tr>
+</table></div>
+<p>The investor app shows crop, variety, and tree age, but these are not stored on the holding. They come from the block's current <code>block_crops</code> row: <code>crop_id</code>, <code>crop_variety_id</code>, and <code>planting_date</code>. Tree age is today minus <code>planting_date</code>. If staff change the block's crop, every holding in it follows.</p>
+
+<h3>3.2 Investor master <span class="tag new">new table <code>investors</code></span></h3>
+<div class="table-scroll"><table>
+<tr><th>Field</th><th>Type</th><th>Why it is needed</th></tr>
+<tr><td class="k">id</td><td>uuid</td><td>Primary key.</td></tr>
+<tr><td class="k">code</td><td>text, unique</td><td>Short reference, example <code>INV-0107</code>.</td></tr>
+<tr><td class="k">investor_type</td><td>enum <code>person | company</code></td><td>A company investor needs a contact person. It changes which identity fields apply.</td></tr>
+<tr><td class="k">full_name_en, full_name_ar</td><td>text</td><td>Arabic name for contracts and the app greeting.</td></tr>
+<tr><td class="k">contact_person</td><td>text, nullable</td><td>For company investors.</td></tr>
+<tr><td class="k">email</td><td>text, unique in tenant</td><td>Login and invite address (decision 8).</td></tr>
+<tr><td class="k">phone</td><td>text, E.164</td><td>For the company to call. Not used to log in.</td></tr>
+<tr><td class="k">national_id_type, national_id_last4</td><td>enum, text</td><td>Identity check on support calls. Store the last 4 digits only. The full ID stays in the company's contract files.</td></tr>
+<tr><td class="k">nationality, country, city</td><td>text</td><td>Contracts and reporting.</td></tr>
+<tr><td class="k">preferred_language</td><td>enum <code>ar | en</code></td><td>Language for the invite email and push messages.</td></tr>
+<tr><td class="k">user_id</td><td>uuid → public.users, nullable</td><td>Empty until the investor accepts the invite.</td></tr>
+<tr><td class="k">status</td><td>enum</td><td><code>not_invited</code> → <code>invited</code> → <code>active</code>; also <code>suspended</code>, <code>archived</code>. Suspended blocks app login but keeps all data.</td></tr>
+<tr><td class="k">relationship_manager_id</td><td>uuid → users, nullable</td><td>The staff member who handles this investor. Shown in the app as "Your contact".</td></tr>
+<tr><td class="k">notes_internal</td><td>text</td><td>Never sent to the app.</td></tr>
+<tr><td class="k">last_app_seen_at</td><td>timestamptz</td><td>Lets staff see whether the investor uses the app.</td></tr>
+</table></div>
+<p class="callout caution"><strong>Caution:</strong> This table holds personal data. Only roles with <code>investor.read</code> can see it. Bank details are out of scope, because decision 7 excludes money.</p>
+
+<h3>3.3 Ownership history <span class="tag new">new table <code>holding_ownerships</code></span></h3>
+<div class="table-scroll"><table>
+<tr><th>Field</th><th>Type</th><th>Meaning</th></tr>
+<tr><td class="k">holding_id, investor_id</td><td>uuid</td><td>Who owns what.</td></tr>
+<tr><td class="k">start_date</td><td>date</td><td>First day of ownership.</td></tr>
+<tr><td class="k">end_date</td><td>date, nullable</td><td>Last day. Empty means "still owns".</td></tr>
+<tr><td class="k">acquired_by</td><td>enum</td><td><code>purchase | transfer | inheritance | other</code>.</td></tr>
+<tr><td class="k">ended_by</td><td>enum, nullable</td><td><code>resale | buyback | contract_end | correction</code>.</td></tr>
+<tr><td class="k">contract_ref</td><td>text</td><td>Contract for this ownership period.</td></tr>
+</table></div>
+<p>A database exclusion constraint stops two ownership periods of one holding from overlapping:</p>
+<pre>EXCLUDE USING gist (holding_id WITH =, daterange(start_date, end_date, '[]') WITH &amp;&amp;)</pre>
+<p>This needs the <code>btree_gist</code> extension. A transfer ends the current row on day D−1 and starts the new row on day D, in one transaction.</p>
+
+<h3>3.4 Investor updates <span class="tag new">new tables <code>investor_updates</code>, <code>investor_inbox</code></span></h3>
+<div class="table-scroll"><table>
+<tr><th>Field</th><th>Meaning</th></tr>
+<tr><td class="k">block_id</td><td>The update is about a block. Every owner of a holding in that block receives it.</td></tr>
+<tr><td class="k">update_type</td><td><code>harvest_started | harvest_finished | flowering | fruit_set | planting | pruning | irrigation_work | general</code>. Picks the icon and the default text.</td></tr>
+<tr><td class="k">title_en, title_ar, body_en, body_ar</td><td>Both languages are required before publish.</td></tr>
+<tr><td class="k">event_date</td><td>The day it happened. Decides who receives it (owners on that date).</td></tr>
+<tr><td class="k">status</td><td><code>draft → published</code>; <code>published → withdrawn</code>. A withdrawn update disappears from the app.</td></tr>
+<tr><td class="k">created_by, published_by, published_at</td><td>Audit.</td></tr>
+</table></div>
+<p><code>investor_inbox</code> holds one row per investor per update: <code>investor_id</code>, <code>holding_id</code>, <code>update_id</code> or <code>harvest_record_id</code>, <code>push_sent_at</code>, <code>read_at</code>. The publish step writes these rows. So the list of receivers is fixed at publish time and does not change if ownership changes later.</p>
+
+<h3>3.5 Harvest records <span class="tag new">new tables <code>harvest_records</code>, <code>harvest_allocations</code></span></h3>
+<div class="table-scroll"><table>
+<tr><th>Table</th><th>Fields</th></tr>
+<tr><td class="k">harvest_records</td><td><code>block_id</code>, <code>block_crop_id</code>, <code>season_label</code> (text, example "2026"), <code>harvest_date</code>, <code>quantity_kg</code>, <code>status</code> (<code>draft | published | corrected</code>), <code>notes_internal</code>, audit fields.</td></tr>
+<tr><td class="k">harvest_allocations</td><td><code>harvest_record_id</code>, <code>holding_id</code>, <code>investor_id</code>, <code>holding_area_m2</code>, <code>block_area_m2</code>, <code>share_pct</code>, <code>suggested_kg</code>, <code>final_quantity</code>, <code>final_unit</code> (<code>kg | t</code>), <code>final_kg</code>, <code>changed_reason</code>, <code>confirmed_by</code>, <code>confirmed_at</code>. Status <code>draft | published | corrected</code>.</td></tr>
+</table></div>
+<p>The flow follows decision 12:</p>
+<ol>
+<li>Staff enter the block total in <code>harvest_records</code>.</li>
+<li>The web app fills <code>suggested_kg</code> for each holding: block total × area share. It stores both areas and the share as they were at that moment.</li>
+<li>Staff confirm each number or type a different one. A change from the suggestion needs a short reason, kept for audit.</li>
+<li>Publish sends each investor only <code>final_quantity</code> and <code>final_unit</code>, exactly as staff entered them.</li>
+</ol>
+<p>Example: block 20 feddan, holding 2 feddan, share 10.00%, block harvest 200 t. The web app suggests 20 t. Staff change it to 19.5 t, because the edge rows are young trees. The investor sees "19.5 t" and nothing else.</p>
+<p>Farm management maintains the number after publish. A correction writes a new row with status <code>published</code> and marks the old one <code>corrected</code>. The app shows the new number with a "Corrected" label and sends no push.</p>
+<p class="callout"><strong>Note:</strong> "Season as an entity" is designed but not built. Until it is, <code>season_label</code> is free text. When seasons exist, a migration replaces it with a foreign key.</p>
+
+<h2 id="rules">4. Rules the system enforces</h2>
+<div class="table-scroll"><table>
+<tr><th>#</th><th>Rule</th><th>Where it is enforced</th></tr>
+<tr><td>R1</td><td>A holding lies inside its block. A tolerance of 0.5 m lets a vertex sit on the block border.</td><td>Database trigger with <code>ST_CoveredBy(holding, ST_Buffer(block::geography, 0.5))</code>. The API also checks it, so the web app can show the error before save.</td></tr>
+<tr><td>R2</td><td>Holdings in one block do not overlap. Touching edges are allowed.</td><td>Trigger: refuse when <code>ST_Relate(a, b, 'T********')</code> is true for another live holding in the block.</td></tr>
+<tr><td>R3</td><td>A holding is valid and simple: no self-crossing, no holes in the first release.</td><td>Reuse <code>farms/geometry.py</code> validation.</td></tr>
+<tr><td>R4</td><td>A holding sits on a leaf unit only. It cannot sit on a pivot that has sectors.</td><td>API check on <code>unit_type</code> and child units. This stops one harvest from being counted twice.</td></tr>
+<tr><td>R5</td><td>Area for share uses one method for both shapes: <code>ST_Area(boundary::geography)</code>.</td><td>Service code. This keeps the share correct even when a farm uses a different UTM zone.</td></tr>
+<tr><td>R6</td><td>A block edit that leaves a holding outside the new border is refused. The error lists the holdings.</td><td>Block update service, plus the R1 trigger on the block side.</td></tr>
+<tr><td>R7</td><td>A block with a current owner on any holding cannot be archived or deleted.</td><td>Block service.</td></tr>
+<tr><td>R8</td><td>A holding's boundary cannot change while it has a current owner, unless the user has <code>holding.redraw_sold</code>. Each redraw writes an audit row.</td><td>Holding service.</td></tr>
+<tr><td>R9</td><td>Ownership periods of one holding do not overlap.</td><td>Exclusion constraint (section 3.3).</td></tr>
+<tr><td>R10</td><td>An investor update or harvest record cannot be published without both Arabic and English text.</td><td>API.</td></tr>
+<tr><td>R11</td><td>A published holding harvest number is never overwritten. To fix it, staff publish a correction (section 3.5). The history stays.</td><td>Harvest service.</td></tr>
+<tr><td>R12</td><td>The sum of final numbers in a block may differ from the block total. The web app shows the difference to staff but does not block publish.</td><td>Web app warning only.</td></tr>
+</table></div>
+
+<h2 id="access">5. Access and security</h2>
+<h3>5.1 A new role: Investor</h3>
+<p>Add <code>Investor</code> to <code>backend/app/shared/rbac/role_capabilities.yaml</code>. It has one capability, <code>investor_app.use</code>. It has none of the existing capabilities, so every existing route refuses an investor token through <code>requires_capability</code>.</p>
+<p>All investor reads go through a separate router, <code>/api/v1/investor/…</code>. Each query filters by the investor row linked to the caller's user id. The caller never passes an investor id.</p>
+
+<h3>5.2 Mobile only</h3>
+<ul>
+<li>Keycloak gets a new public client, <code>agripulse-investor</code>. The investor router accepts a token only when its <code>azp</code> claim is <code>agripulse-investor</code>.</li>
+<li>The web app checks the role after login. For an investor, it shows one page: "This account works in the AgriPulse Investor app" with a download link. It loads no other data.</li>
+<li>Staff users cannot log in to the investor app. The investor client allows only users with the Investor role.</li>
+</ul>
+<p class="callout warning"><strong>Warning:</strong> Add the new client to <code>agripulse-realm.json</code> with known fields only. An unknown field in that file crashed every Keycloak pod in the past. Also note that the Scout client <code>agripulse-mobile</code> is missing from both realm files today.</p>
+
+<h3>5.3 What the investor API never returns</h3>
+<p>The investor API uses its own response schemas. Each one lists allowed fields. It never returns these:</p>
+<ul>
+<li>Other holdings in the same block, or other investors.</li>
+<li>The share %, the block total harvest, the suggested number, or the reason for a change.</li>
+<li>Block health, decision tree verdicts, findings, alerts, index values, scout visits.</li>
+<li>Internal notes, contract references, staff names other than the relationship manager.</li>
+<li>Farm boundary or other blocks.</li>
+</ul>
+<p>A test asserts the exact field set of every investor response. A new field then fails the test until someone adds it on purpose.</p>
+
+<h3>5.4 New web capabilities</h3>
+<div class="table-scroll"><table>
+<tr><th>Capability</th><th>TenantOwner, TenantAdmin</th><th>FarmManager</th><th>Agronomist</th><th>Viewer</th></tr>
+<tr><td class="k">investor.read</td><td>yes</td><td>yes</td><td>no</td><td>no</td></tr>
+<tr><td class="k">investor.manage</td><td>yes</td><td>no</td><td>no</td><td>no</td></tr>
+<tr><td class="k">investor.invite</td><td>yes</td><td>no</td><td>no</td><td>no</td></tr>
+<tr><td class="k">holding.read</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td></tr>
+<tr><td class="k">holding.manage</td><td>yes</td><td>yes</td><td>no</td><td>no</td></tr>
+<tr><td class="k">holding.redraw_sold</td><td>yes</td><td>no</td><td>no</td><td>no</td></tr>
+<tr><td class="k">holding.assign_owner</td><td>yes</td><td>no</td><td>no</td><td>no</td></tr>
+<tr><td class="k">investor_update.write</td><td>yes</td><td>yes</td><td>yes</td><td>no</td></tr>
+<tr><td class="k">investor_update.publish</td><td>yes</td><td>yes</td><td>no</td><td>no</td></tr>
+<tr><td class="k">harvest.record</td><td>yes</td><td>yes</td><td>yes</td><td>no</td></tr>
+<tr><td class="k">harvest.publish</td><td>yes</td><td>yes</td><td>no</td><td>no</td></tr>
+</table></div>
+<p>These are proposed defaults. The Roles &amp; permissions page lets each company change them.</p>
+
+<h2 id="web">6. Part A: web app changes</h2>
+
+<h3>6.1 New and changed screens</h3>
+<div class="grid2">
+<div class="card">
+<h3>Investors page <span class="tag new">new</span></h3>
+<p>New item in the main menu, shown only with <code>investor.read</code>.</p>
+<ul>
+<li>Table: code, name, status, number of holdings, total area, last app use.</li>
+<li>Filters: status, farm, "not invited", "never opened the app".</li>
+<li>Create investor form with the fields in section 3.2.</li>
+<li>Invite button. It sends the email and sets status to <code>invited</code>. A Resend button appears after 24 hours.</li>
+</ul>
+</div>
+<div class="card">
+<h3>Investor detail <span class="tag new">new</span></h3>
+<ul>
+<li>Profile and status, with Suspend and Archive.</li>
+<li>Current holdings, with a small map of each.</li>
+<li>Past holdings, with ownership dates.</li>
+<li>Inbox log: each update and harvest sent, push time, read time.</li>
+<li>Audit log of changes to this investor.</li>
+</ul>
+</div>
+<div class="card">
+<h3>Holdings layer on the farm map <span class="tag chg">changed</span></h3>
+<p>Add to Farm Console v2 (<code>/labs/map-v2</code>), which already has drawing tools.</p>
+<ul>
+<li>Layer toggle "Holdings". Fill colour by status: available, sold, draft.</li>
+<li>Draw tool inside a selected block. While drawing, a panel shows area in feddan and the share in %. Red outline and a message when rule R1 or R2 fails.</li>
+<li>"Split block" helper: divide a block into N strips of equal area, along a direction the user picks. This creates N draft holdings for review. <span class="tag later">phase 2</span></li>
+<li>Block panel gets a "Holdings" section: total sold area, unsold area, number of investors.</li>
+</ul>
+</div>
+<div class="card">
+<h3>Holding detail and owner dialog <span class="tag new">new</span></h3>
+<ul>
+<li>Fields from section 3.1, with Edit boundary (respects rule R8).</li>
+<li>"Assign owner" dialog: pick investor, start date, contract reference.</li>
+<li>"Transfer" dialog: new investor and transfer date. Shows "Ownership of X ends on D−1".</li>
+<li>Ownership timeline for the holding.</li>
+<li>"Preview as investor" button: shows the exact screens the investor sees.</li>
+</ul>
+</div>
+<div class="card">
+<h3>Investor updates on a block <span class="tag new">new</span></h3>
+<ul>
+<li>Block page tab "Investor updates": list of drafts, published, and withdrawn.</li>
+<li>Compose form: type, date, Arabic and English text side by side. The type fills in default text.</li>
+<li>Before Publish, a confirm dialog states: "This sends a push message to 7 investors who own 9 holdings in Block 12."</li>
+<li>Withdraw button on published updates.</li>
+</ul>
+</div>
+<div class="card">
+<h3>Harvest records on a block <span class="tag new">new</span></h3>
+<ul>
+<li>Block page tab "Harvest": records by season.</li>
+<li>Form: date, quantity, unit (kg or t), season, crop (current crop selected).</li>
+<li>After save, an editable table lists each holding: owner, share, suggested number, and final number. The final number starts equal to the suggestion.</li>
+<li>A changed number needs a reason. The table shows the total of final numbers next to the block total, and the company's unsold part.</li>
+<li>Publish sends "Harvest recorded: 19.5 t from North strip 3".</li>
+<li>"Correct" on a published row opens the same editor for that holding only.</li>
+</ul>
+</div>
+</div>
+
+<h3>6.2 Backend</h3>
+<div class="table-scroll"><table>
+<tr><th>Item</th><th>Change</th></tr>
+<tr><td>New module</td><td><code>backend/app/modules/investors/</code> with <code>models.py</code>, <code>repository.py</code>, <code>service.py</code>, <code>schemas.py</code>, <code>admin_router.py</code> (web), <code>app_router.py</code> (investor app).</td></tr>
+<tr><td>Tenant migration 0073</td><td>Tables from section 3, triggers R1 and R2, exclusion constraint R9, <code>btree_gist</code>.</td></tr>
+<tr><td>Public migration 0056</td><td>Push templates <code>investor_update_published</code> and <code>harvest_published</code>, in Arabic and English. New capabilities and the Investor role.</td></tr>
+<tr><td>Farms module</td><td>Rules R6 and R7 in the block update and archive paths.</td></tr>
+<tr><td>Invite</td><td>Reuse <code>KeycloakAdminClient.invite_user</code>. Add an investor email text with the APK download link. Create the <code>tenant_memberships</code> row with role Investor.</td></tr>
+<tr><td>Push</td><td>Reuse <code>notifications/push.py</code> (FCM, data-only messages) and the <code>device_tokens</code> table. Add <code>app = 'investor'</code> to the token row so Scout and Investor tokens stay apart.</td></tr>
+<tr><td>Imagery</td><td>New true-colour product. See section 6.4.</td></tr>
+<tr><td>Purge manifest</td><td>Add the new tenant tables, or CI fails, as it did for Observer.</td></tr>
+</table></div>
+
+<h3>6.3 Investor app API</h3>
+<div class="table-scroll"><table>
+<tr><th>Method and path</th><th>Returns</th></tr>
+<tr><td class="k">GET /investor/me</td><td>Name, language, company name and logo, relationship manager name and phone.</td></tr>
+<tr><td class="k">GET /investor/holdings</td><td>Current and past holdings: code, name, farm name, block name, area, crop, variety, tree count, tree age, ownership dates, unread count.</td></tr>
+<tr><td class="k">GET /investor/holdings/{id}</td><td>Detail plus GeoJSON of the holding and its block outline, and the latest true-colour image: tile URL, image date, cloud %.</td></tr>
+<tr><td class="k">GET /investor/holdings/{id}/harvests</td><td>Final harvest numbers by season (date, quantity, unit, corrected flag), only for dates inside the investor's ownership.</td></tr>
+<tr><td class="k">GET /investor/inbox</td><td>Updates and harvest messages, newest first, with paging.</td></tr>
+<tr><td class="k">POST /investor/inbox/{id}:read</td><td>Marks a message as read.</td></tr>
+<tr><td class="k">POST /investor/devices</td><td>Registers an FCM token for push.</td></tr>
+<tr><td class="k">GET /investor/app-version</td><td>Minimum and latest APK version and download URL. Needed because a direct APK does not update by itself.</td></tr>
+</table></div>
+<p>A past owner keeps read access to their past holding. They see harvests and updates dated inside their ownership period only.</p>
+
+<h3>6.4 True-colour image</h3>
+<p>AgriPulse stores index images only (NDVI and others). It has no true-colour image. Two ways to meet decision 5:</p>
+<div class="grid2">
+<div class="card">
+<h3>Option 1: basemap first</h3>
+<p>Show the outline on a commercial satellite basemap. Resolution is about 0.5 m, so a 2-feddan holding is clear. The image has no date and can be 1 to 3 years old.</p>
+<p>Work: about 2 days.</p>
+</div>
+<div class="card">
+<h3>Option 2: AgriPulse true colour</h3>
+<p>Add a true-colour product (bands B04, B03, B02) to the imagery pipeline. Store one image per block per clear scene, and show its date. Resolution is 10 m, so a 2-feddan holding covers about 84 pixels and looks blurred.</p>
+<p>Work: about 5 to 8 days.</p>
+</div>
+</div>
+<p><strong>Recommendation:</strong> ship option 1 in the first release, and add option 2 later as a "Latest image (date)" switch. Investors then get a sharp map now and a dated image later.</p>
+
+<h3>6.5 Translations</h3>
+<p>New namespace <code>investors.json</code> in <code>frontend/src/i18n/locales/en</code> and <code>ar</code>. Changes in <code>farms.json</code> for the holdings layer and the block tabs.</p>
+
+<h2 id="mobile">7. Part B: Android app</h2>
+
+<h3>7.1 Stack</h3>
+<div class="table-scroll"><table>
+<tr><th>Choice</th><th>Decision</th><th>Reason</th></tr>
+<tr><td>Framework</td><td>Capacitor 8 + React 18 + Vite, as Scout uses</td><td>One stack for both apps. The team already builds Scout APKs this way.</td></tr>
+<tr><td>Folder</td><td>New folder <code>mobile-investor/</code></td><td>Separate app id and release cycle. Shared code (API client, push, i18n helper) moves to a small shared package once both apps use it.</td></tr>
+<tr><td>App id</td><td><code>cloud.agripulse.investor</code></td><td>Cannot change after the Google Play release. Choose it before the first APK.</td></tr>
+<tr><td>Map</td><td>maplibre-gl</td><td>The web app already uses it. Scout has no map library today.</td></tr>
+<tr><td>Login</td><td>Keycloak login page in the system browser, with PKCE and a deep link back to the app</td><td>Investors use email and password. The Keycloak page gives forgot-password and email checks without new code. Scout uses phone and PIN through direct grant, which does not fit here.</td></tr>
+<tr><td>Session</td><td><code>offline_access</code> refresh token in Android secure storage</td><td>The investor logs in once.</td></tr>
+<tr><td>Push</td><td>FCM, as Scout uses</td><td>Works for a direct APK and for Google Play. Android 13 and later asks the user for permission.</td></tr>
+<tr><td>Name</td><td>AgriPulse Investor / <span class="ar">أجري بلس للمستثمر</span></td><td>Decision 17. The home screen also shows the investment company's logo and name (decision 16). No company logo field exists today. It is out of scope here and will be designed later. Until then, the home screen shows the company name only.</td></tr>
+<tr><td>Language</td><td>Arabic first, English second, switch in Settings</td><td>Right-to-left layout for Arabic. Western digits 0–9 in both languages (decision 13).</td></tr>
+<tr><td>Offline</td><td>Cache the last holdings list, inbox, and map tiles seen</td><td>The app opens and shows the last data with no network, plus a "Last updated" time.</td></tr>
+</table></div>
+
+<h3>7.2 Screens</h3>
+<div class="table-scroll"><table>
+<tr><th>Screen</th><th>Content</th></tr>
+<tr><td>Welcome and sign in</td><td>Company logo, language switch, "Sign in" button that opens the Keycloak page.</td></tr>
+<tr><td>My holdings (home)</td><td>Company logo and name at the top. One card per holding: name, farm › block, area, crop and variety, unread count. Past holdings in a separate "Previous" section.</td></tr>
+<tr><td>Holding: Map tab</td><td>Holding outline over the block outline, on the satellite image. Image date when option 2 is built. Pinch to zoom.</td></tr>
+<tr><td>Holding: Updates tab</td><td>Investor updates for this holding, newest first.</td></tr>
+<tr><td>Holding: Harvest tab</td><td>Total per season and each harvest: date and final quantity. A "Corrected" label where staff changed it.</td></tr>
+<tr><td>Holding: Details tab</td><td>Code, area, tree count, crop, variety, planting year, tree age, ownership start date.</td></tr>
+<tr><td>Inbox</td><td>All messages across holdings. Tapping one opens the holding.</td></tr>
+<tr><td>Account</td><td>Name, language, push on or off, "Your contact" with a call button, app version, sign out.</td></tr>
+<tr><td>Update required</td><td>Shown when <code>/investor/app-version</code> says the APK is too old. Download button.</td></tr>
+</table></div>
+
+<h3>7.3 Mockups</h3>
+<p>Low-detail layouts. Colours and fonts come in a later design pass.</p>
+<div class="phones">
+<div>
+<div class="phone" dir="rtl">
+<div class="bar"><span>حيازاتي</span><span>🔔 2</span></div>
+<div class="body">
+<div class="row" style="text-align:center"><b>[شعار الشركة]</b><span class="muted">شركة النخبة للاستثمار الزراعي</span></div>
+<div class="row"><b>الشريط الشمالي 3</b><span class="muted">مزرعة الإسماعيلية › بلوك 12</span><br>
+2.0 فدان · <span class="pill">2 رسائل جديدة</span><br><span class="muted">مانجو · كيت · 412 شجرة · 6 سنوات</span></div>
+<div class="row"><b>الشريط الجنوبي 1</b><span class="muted">مزرعة الإسماعيلية › بلوك 7</span><br>
+1.5 فدان<br><span class="muted">مانجو · عويسي · 300 شجرة · 9 سنوات</span></div>
+<p class="muted">السابقة</p>
+<div class="row" style="opacity:.6"><b>H-0011</b><span class="muted">حتى 2025-12-31</span></div>
+</div>
+<div class="nav"><span class="on">حيازاتي</span><span>الرسائل</span><span>حسابي</span></div>
+</div>
+<div class="cap">Home, Arabic</div>
+</div>
+
+<div>
+<div class="phone">
+<div class="bar"><span>‹ North strip 3</span><span>H-0042</span></div>
+<div class="body">
+<div class="tabs"><span class="on">Map</span><span>Updates</span><span>Harvest</span><span>Details</span></div>
+<div class="map"><div class="blk"></div><div class="hld"></div><div class="lbl">Image: 2026-10-02 · 0% cloud</div></div>
+<p class="muted">Yellow: your holding (2.0 feddan). Dashed: Block 12.</p>
+</div>
+<div class="nav"><span class="on">Holdings</span><span>Inbox</span><span>Account</span></div>
+</div>
+<div class="cap">Holding map, English</div>
+</div>
+
+<div>
+<div class="phone">
+<div class="bar"><span>‹ North strip 3</span><span>H-0042</span></div>
+<div class="body">
+<div class="tabs"><span>Map</span><span>Updates</span><span class="on">Harvest</span><span>Details</span></div>
+<div class="row"><span class="muted">Season 2026 · your holding</span><div class="big">19.5 t</div></div>
+<div class="row"><b>2026-07-14 · 12 t</b></div>
+<div class="row"><b>2026-07-28 · 7.5 t</b><span class="muted">Corrected</span></div>
+<div class="row"><span class="muted">Season 2025 · your holding</span><div class="big">16.4 t</div></div>
+</div>
+<div class="nav"><span class="on">Holdings</span><span>Inbox</span><span>Account</span></div>
+</div>
+<div class="cap">Harvest tab</div>
+</div>
+
+<div>
+<div class="phone">
+<div class="bar"><span>Inbox</span><span></span></div>
+<div class="body">
+<div class="row"><b>🧺 Harvest recorded</b>7.5 t from North strip 3.<br><span class="muted">North strip 3 · 2026-07-28</span></div>
+<div class="row"><b>🌾 Harvest started</b>Picking started in Block 12 and takes about 3 weeks.<br><span class="muted">North strip 3 · 2026-07-10</span></div>
+<div class="row" style="opacity:.7"><b>🌸 Flowering</b>Trees in Block 7 are in full flower.<br><span class="muted">South strip 1 · 2026-02-20</span></div>
+</div>
+<div class="nav"><span>Holdings</span><span class="on">Inbox</span><span>Account</span></div>
+</div>
+<div class="cap">Inbox</div>
+</div>
+</div>
+
+<h3>7.4 Push messages</h3>
+<p>The server sends data-only FCM messages, as for Scout. The app builds the visible message in the investor's language. A tap opens the holding and the matching tab. When an investor has 2 or more holdings in one block, they get one message that names all of them, not one message per holding.</p>
+
+<h3>7.5 Distribution</h3>
+<ul>
+<li><strong>Now:</strong> a signed APK, downloaded from a company page. The invite email has the link.</li>
+<li>Sign the APK with an upload key kept in the team's secret store. Google Play App Signing accepts this key later, so installed users can update from the store.</li>
+<li>The app checks <code>/investor/app-version</code> at start and shows "Update required" when the APK is too old.</li>
+<li><strong>Later, Google Play:</strong> needs a privacy policy URL, a data safety form (email, name, push token), a store listing in Arabic and English, and a test account for review.</li>
+<li>Add an APK build job to CI. Scout has none today, so every Scout APK is built by hand.</li>
+</ul>
+
+<h2 id="phases">8. Build phases</h2>
+<p>Each phase is one pull request or a few. The estimates are days for one developer and are rough.</p>
+<div class="table-scroll"><table>
+<tr><th>Phase</th><th>Content</th><th>Days</th><th>Result a user can see</th></tr>
+<tr><td>1</td><td>Tables, rules R1–R9, capabilities, Investors page, holdings layer and draw tool, owner and transfer dialogs.</td><td>8–10</td><td>Staff create investors and holdings and assign owners in the web app.</td></tr>
+<tr><td>2</td><td>Keycloak client, Investor role, invite email, investor API, web "use the app" page.</td><td>4–5</td><td>An invited investor can log in and call the API.</td></tr>
+<tr><td>3</td><td>Android app: sign in, holdings list, details, map on basemap, account, update check, APK build.</td><td>8–10</td><td>First APK for a pilot with 3 to 5 investors.</td></tr>
+<tr><td>4</td><td>Investor updates: web compose and publish, inbox, push.</td><td>5–6</td><td>"Harvest started" reaches investor phones.</td></tr>
+<tr><td>5</td><td>Harvest records: block total, suggested numbers, staff confirm or change, publish, corrections, app Harvest tab, push.</td><td>6–7</td><td>The investor sees "19.5 t" for their holding.</td></tr>
+<tr><td>6</td><td>True-colour image product and the dated image in the app.</td><td>5–8</td><td>Map shows the latest clear image and its date.</td></tr>
+<tr><td>7</td><td>Split-block helper, Google Play release.</td><td>4–5</td><td>Store install and automatic updates.</td></tr>
+</table></div>
+<p>Total: about 40 to 51 days.</p>
+
+<h2 id="risks">9. Risks and open questions</h2>
+<h3>9.1 Risks</h3>
+<ul>
+<li><strong>Manual numbers can drift from the suggestion.</strong> Staff can change any harvest number (decision 12). The reason field and the audit row are the only record of why. A monthly report of changed numbers helps managers review them.</li>
+<li><strong>Block redraws.</strong> When staff redraw a block, every suggested number in it changes for future harvests. Rule R6 stops a redraw that cuts a holding, but a larger block lowers every share. The web app must warn: "This changes the share of 9 holdings".</li>
+<li><strong>Data leaks to investors.</strong> The investor API is the only gate. The field-set test in section 5.3 is the main guard.</li>
+<li><strong>Health data at the edges.</strong> Decision 5 hides health. The true-colour image still shows bare or yellow patches. Staff should expect questions about them.</li>
+<li><strong>Two apps, one Firebase project.</strong> Scout and Investor tokens must stay apart, or an investor could get a scout's visit message. The <code>app</code> column on <code>device_tokens</code> handles this.</li>
+</ul>
+
+<h3>9.2 Open questions</h3>
+<p>None. Decisions 11 to 17 in section 1 answered the 7 earlier open questions.</p>
+
+</div>
+</body>
+</html>
