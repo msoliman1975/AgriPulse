@@ -1,0 +1,65 @@
+{
+  "code": "mango_record_check",
+  "name_en": "Mango — records and readings",
+  "name_ar": "المانجو — السجلات والقراءات",
+  "description_en": "One question: is the tree size recorded for this block? Every index band in the other three trees is keyed by tree size, so a block without it is judged by nothing and says nothing. This tree is why that silence is visible.",
+  "description_ar": "سؤال واحد: هل حجم الشجرة مسجّل لهذه القطعة؟ كل نطاقات المؤشرات في الأشجار الثلاث الأخرى مبنية على حجم الشجرة، فالقطعة بلا حجم لا يحكم عليها شيء ولا تقول شيئاً. هذه الشجرة هي ما يجعل ذلك الصمت مرئياً.",
+  "scope": "cell",
+  "crop_path": "mango",
+  "country_codes": [
+    "EG"
+  ],
+  "registers": [
+    "size_missing"
+  ],
+  "parameters": {},
+  "combinations": [
+    {
+      "codes": [
+        "size_missing"
+      ],
+      "action_type": "other",
+      "status": "na",
+      "text_en": "Tree size is not recorded for this block, so no index band could be checked. Record it once and the water, canopy and feed checks all start answering.",
+      "text_ar": "حجم الشجرة غير مسجّل لهذه القطعة فلا يوجد نطاق مؤشر يمكن فحصه. سجّله مرة واحدة وتبدأ فحوص الماء والمجموع والتغذية كلها في الإجابة."
+    }
+  ],
+  "root": "n_size_recorded",
+  "nodes": {
+    "n_size_recorded": {
+      "label_en": "Is the tree size class recorded for this block?",
+      "label_ar": "هل فئة حجم الشجرة مسجّلة لهذه القطعة؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "values": [
+            "small",
+            "medium",
+            "large"
+          ]
+        }
+      },
+      "on_match": "n_stop",
+      "on_miss": "n_reg_size_missing"
+    },
+    "n_reg_size_missing": {
+      "label_en": "Tree size is not recorded",
+      "label_ar": "حجم الشجرة غير مسجّل",
+      "register": {
+        "code": "size_missing",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End and fold",
+      "label_ar": "النهاية والطيّ",
+      "stop": true
+    }
+  }
+}

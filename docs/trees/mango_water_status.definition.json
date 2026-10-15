@@ -1,0 +1,836 @@
+{
+  "code": "mango_water_status",
+  "name_en": "Mango — water and irrigation",
+  "name_ar": "المانجو — الماء والري",
+  "description_en": "Reads leaf water, soil moisture and canopy temperature against this tree size's bands and says whether the cell is short of water. Two of the three readings must agree before it says so. Inside the pre-harvest deficit window it uses the wider bands that window expects.",
+  "description_ar": "يقرأ ماء الورقة ورطوبة التربة وحرارة المجموع مقابل نطاقات حجم الشجرة ويقول إن كانت الخلية تعاني نقص ماء. يجب أن تتفق قراءتان من ثلاث قبل أن يقول ذلك. وداخل نافذة الريّ الناقص قبل الحصاد يستخدم النطاقات الأوسع التي تتوقعها تلك النافذة.",
+  "scope": "cell",
+  "crop_path": "mango",
+  "country_codes": [
+    "EG"
+  ],
+  "registers": [
+    "dry",
+    "dry_unconfirmed"
+  ],
+  "parameters": {
+    "small_ndmi_floor": {
+      "type": "number",
+      "default": -0.15,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "medium_ndmi_floor": {
+      "type": "number",
+      "default": 0.0,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "large_ndmi_floor": {
+      "type": "number",
+      "default": 0.11,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "small_msi_ceiling": {
+      "type": "number",
+      "default": 1.3,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "medium_msi_ceiling": {
+      "type": "number",
+      "default": 0.9,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "large_msi_ceiling": {
+      "type": "number",
+      "default": 0.45,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "ndmi_present_floor": {
+      "type": "number",
+      "default": -1.0,
+      "min": -2.0,
+      "max": 0.0
+    },
+    "small_smi_floor": {
+      "type": "number",
+      "default": 0.35,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "medium_smi_floor": {
+      "type": "number",
+      "default": 0.4,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "large_smi_floor": {
+      "type": "number",
+      "default": 0.45,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "small_smi_floor_deficit": {
+      "type": "number",
+      "default": 0.27,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "medium_smi_floor_deficit": {
+      "type": "number",
+      "default": 0.31,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "large_smi_floor_deficit": {
+      "type": "number",
+      "default": 0.35,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "small_cwsi_ceiling": {
+      "type": "number",
+      "default": 0.35,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "medium_cwsi_ceiling": {
+      "type": "number",
+      "default": 0.3,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "large_cwsi_ceiling": {
+      "type": "number",
+      "default": 0.25,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "small_cwsi_ceiling_deficit": {
+      "type": "number",
+      "default": 0.63,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "medium_cwsi_ceiling_deficit": {
+      "type": "number",
+      "default": 0.54,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "large_cwsi_ceiling_deficit": {
+      "type": "number",
+      "default": 0.45,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "saturation_guard": {
+      "type": "number",
+      "default": 0.99,
+      "min": 0.0,
+      "max": 1.0
+    }
+  },
+  "combinations": [
+    {
+      "codes": [
+        "dry"
+      ],
+      "action_type": "irrigate",
+      "status": "alert",
+      "text_en": "Two of the three water readings say this cell is dry. Irrigate. Check the line and the emitters on the way: a cell that is dry while its neighbours are not is usually a blockage rather than a schedule.",
+      "text_ar": "قراءتان من ثلاث قراءات للماء تقولان إن هذه الخلية جافة. اروِ القطعة. وافحص الخط والنقّاطات أثناء ذلك: الخلية الجافة بين خلايا غير جافة يكون سببها عادةً انسداد لا برنامج ريّ."
+    },
+    {
+      "codes": [
+        "dry_unconfirmed"
+      ],
+      "action_type": "scout",
+      "status": "issue",
+      "text_en": "One water reading says dry and the other two do not. That is not enough to act on. Look at the cell on the next visit and read it again before changing the irrigation.",
+      "text_ar": "قراءة ماء واحدة تقول جفاف والقراءتان الأخريان لا. هذا لا يكفي للتصرّف. عاين الخلية في الزيارة القادمة واقرأها مرة أخرى قبل تغيير الريّ."
+    }
+  ],
+  "root": "n_deficit_window",
+  "nodes": {
+    "n_deficit_window": {
+      "label_en": "Is this a bearing block inside its pre-harvest deficit window?",
+      "label_ar": "هل هذه قطعة مثمرة داخل نافذة الريّ الناقص قبل الحصاد؟",
+      "condition": {
+        "tree": {
+          "all_of": [
+            {
+              "op": "eq",
+              "left": {
+                "source": "crop_attribute",
+                "code": "bearing_status",
+                "key": "value"
+              },
+              "right": "bearing"
+            },
+            {
+              "op": "in",
+              "left": {
+                "source": "block",
+                "field": "growth_stage"
+              },
+              "values": [
+                "maturation"
+              ]
+            }
+          ]
+        }
+      },
+      "on_match": "n_d_size_small",
+      "on_miss": "n_n_size_small"
+    },
+    "n_n_size_small": {
+      "label_en": "Are the trees in the small size class?",
+      "label_ar": "هل الأشجار في فئة الحجم صغيرة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "small"
+        }
+      },
+      "on_match": "n_bands_small",
+      "on_miss": "n_n_size_medium"
+    },
+    "n_n_size_medium": {
+      "label_en": "Are the trees in the medium size class?",
+      "label_ar": "هل الأشجار في فئة الحجم متوسطة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "medium"
+        }
+      },
+      "on_match": "n_bands_medium",
+      "on_miss": "n_n_size_large"
+    },
+    "n_n_size_large": {
+      "label_en": "Are the trees in the large size class?",
+      "label_ar": "هل الأشجار في فئة الحجم كبيرة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "large"
+        }
+      },
+      "on_match": "n_bands_large",
+      "on_miss": "n_stop"
+    },
+    "n_d_size_small": {
+      "label_en": "Are the trees in the small size class?",
+      "label_ar": "هل الأشجار في فئة الحجم صغيرة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "small"
+        }
+      },
+      "on_match": "n_bands_small_deficit",
+      "on_miss": "n_d_size_medium"
+    },
+    "n_d_size_medium": {
+      "label_en": "Are the trees in the medium size class?",
+      "label_ar": "هل الأشجار في فئة الحجم متوسطة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "medium"
+        }
+      },
+      "on_match": "n_bands_medium_deficit",
+      "on_miss": "n_d_size_large"
+    },
+    "n_d_size_large": {
+      "label_en": "Are the trees in the large size class?",
+      "label_ar": "هل الأشجار في فئة الحجم كبيرة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "large"
+        }
+      },
+      "on_match": "n_bands_large_deficit",
+      "on_miss": "n_stop"
+    },
+    "n_bands_small": {
+      "label_en": "Load the small-tree bands",
+      "label_ar": "حمّل نطاقات الشجرة الصغيرة",
+      "set": {
+        "size_class": "small",
+        "deficit_window": "no",
+        "ndmi_floor": {
+          "source": "params",
+          "name": "small_ndmi_floor"
+        },
+        "msi_ceiling": {
+          "source": "params",
+          "name": "small_msi_ceiling"
+        },
+        "smi_floor": {
+          "source": "params",
+          "name": "small_smi_floor"
+        },
+        "cwsi_ceiling": {
+          "source": "params",
+          "name": "small_cwsi_ceiling"
+        }
+      },
+      "next": "n_water_src"
+    },
+    "n_bands_medium": {
+      "label_en": "Load the medium-tree bands",
+      "label_ar": "حمّل نطاقات الشجرة المتوسطة",
+      "set": {
+        "size_class": "medium",
+        "deficit_window": "no",
+        "ndmi_floor": {
+          "source": "params",
+          "name": "medium_ndmi_floor"
+        },
+        "msi_ceiling": {
+          "source": "params",
+          "name": "medium_msi_ceiling"
+        },
+        "smi_floor": {
+          "source": "params",
+          "name": "medium_smi_floor"
+        },
+        "cwsi_ceiling": {
+          "source": "params",
+          "name": "medium_cwsi_ceiling"
+        }
+      },
+      "next": "n_water_src"
+    },
+    "n_bands_large": {
+      "label_en": "Load the large-tree bands",
+      "label_ar": "حمّل نطاقات الشجرة الكبيرة",
+      "set": {
+        "size_class": "large",
+        "deficit_window": "no",
+        "ndmi_floor": {
+          "source": "params",
+          "name": "large_ndmi_floor"
+        },
+        "msi_ceiling": {
+          "source": "params",
+          "name": "large_msi_ceiling"
+        },
+        "smi_floor": {
+          "source": "params",
+          "name": "large_smi_floor"
+        },
+        "cwsi_ceiling": {
+          "source": "params",
+          "name": "large_cwsi_ceiling"
+        }
+      },
+      "next": "n_water_src"
+    },
+    "n_bands_small_deficit": {
+      "label_en": "Load the small-tree bands, deficit window",
+      "label_ar": "حمّل نطاقات الشجرة الصغيرة في نافذة الريّ الناقص",
+      "set": {
+        "size_class": "small",
+        "deficit_window": "yes",
+        "ndmi_floor": {
+          "source": "params",
+          "name": "small_ndmi_floor"
+        },
+        "msi_ceiling": {
+          "source": "params",
+          "name": "small_msi_ceiling"
+        },
+        "smi_floor": {
+          "source": "params",
+          "name": "small_smi_floor_deficit"
+        },
+        "cwsi_ceiling": {
+          "source": "params",
+          "name": "small_cwsi_ceiling_deficit"
+        }
+      },
+      "next": "n_water_src"
+    },
+    "n_bands_medium_deficit": {
+      "label_en": "Load the medium-tree bands, deficit window",
+      "label_ar": "حمّل نطاقات الشجرة المتوسطة في نافذة الريّ الناقص",
+      "set": {
+        "size_class": "medium",
+        "deficit_window": "yes",
+        "ndmi_floor": {
+          "source": "params",
+          "name": "medium_ndmi_floor"
+        },
+        "msi_ceiling": {
+          "source": "params",
+          "name": "medium_msi_ceiling"
+        },
+        "smi_floor": {
+          "source": "params",
+          "name": "medium_smi_floor_deficit"
+        },
+        "cwsi_ceiling": {
+          "source": "params",
+          "name": "medium_cwsi_ceiling_deficit"
+        }
+      },
+      "next": "n_water_src"
+    },
+    "n_bands_large_deficit": {
+      "label_en": "Load the large-tree bands, deficit window",
+      "label_ar": "حمّل نطاقات الشجرة الكبيرة في نافذة الريّ الناقص",
+      "set": {
+        "size_class": "large",
+        "deficit_window": "yes",
+        "ndmi_floor": {
+          "source": "params",
+          "name": "large_ndmi_floor"
+        },
+        "msi_ceiling": {
+          "source": "params",
+          "name": "large_msi_ceiling"
+        },
+        "smi_floor": {
+          "source": "params",
+          "name": "large_smi_floor_deficit"
+        },
+        "cwsi_ceiling": {
+          "source": "params",
+          "name": "large_cwsi_ceiling_deficit"
+        }
+      },
+      "next": "n_water_src"
+    },
+    "n_water_src": {
+      "label_en": "Does NDMI have a reading for this scene?",
+      "label_ar": "هل لدى NDMI قراءة في هذا المشهد؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "indices",
+            "index_code": "ndmi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "params",
+            "name": "ndmi_present_floor"
+          }
+        }
+      },
+      "on_match": "n_ndmi_check",
+      "on_miss": "n_msi_check"
+    },
+    "n_ndmi_check": {
+      "label_en": "Is leaf water below its band for this tree size?",
+      "label_ar": "هل ماء الأوراق دون نطاقه لهذا الحجم؟",
+      "condition": {
+        "tree": {
+          "op": "lt",
+          "left": {
+            "source": "indices",
+            "index_code": "ndmi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "vars",
+            "name": "ndmi_floor"
+          }
+        }
+      },
+      "on_match": "n_set_lw_dry_ndmi",
+      "on_miss": "n_set_lw_ok_ndmi"
+    },
+    "n_msi_check": {
+      "label_en": "NDMI is missing — is MSI above its band instead?",
+      "label_ar": "NDMI غير متاح — هل MSI فوق نطاقه بدلًا منه؟",
+      "condition": {
+        "tree": {
+          "op": "gt",
+          "left": {
+            "source": "indices",
+            "index_code": "msi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "vars",
+            "name": "msi_ceiling"
+          }
+        }
+      },
+      "on_match": "n_set_lw_dry_msi",
+      "on_miss": "n_set_lw_ok_msi"
+    },
+    "n_set_lw_dry_ndmi": {
+      "label_en": "Leaf water votes dry, read from NDMI",
+      "label_ar": "صوت ماء الأوراق جفاف، من NDMI",
+      "set": {
+        "leaf_water": "dry",
+        "leaf_water_source": "ndmi",
+        "leaf_water_now": {
+          "source": "indices",
+          "index_code": "ndmi",
+          "key": "mean"
+        }
+      },
+      "next": "n_smi_check"
+    },
+    "n_set_lw_ok_ndmi": {
+      "label_en": "Leaf water votes normal, read from NDMI",
+      "label_ar": "صوت ماء الأوراق طبيعي، من NDMI",
+      "set": {
+        "leaf_water": "ok",
+        "leaf_water_source": "ndmi",
+        "leaf_water_now": {
+          "source": "indices",
+          "index_code": "ndmi",
+          "key": "mean"
+        }
+      },
+      "next": "n_smi_check"
+    },
+    "n_set_lw_dry_msi": {
+      "label_en": "Leaf water votes dry, read from MSI",
+      "label_ar": "صوت ماء الأوراق جفاف، من MSI",
+      "set": {
+        "leaf_water": "dry",
+        "leaf_water_source": "msi",
+        "leaf_water_now": {
+          "source": "indices",
+          "index_code": "msi",
+          "key": "mean"
+        }
+      },
+      "next": "n_smi_check"
+    },
+    "n_set_lw_ok_msi": {
+      "label_en": "Leaf water votes normal, read from MSI",
+      "label_ar": "صوت ماء الأوراق طبيعي، من MSI",
+      "set": {
+        "leaf_water": "ok",
+        "leaf_water_source": "msi",
+        "leaf_water_now": {
+          "source": "indices",
+          "index_code": "msi",
+          "key": "mean"
+        }
+      },
+      "next": "n_smi_check"
+    },
+    "n_smi_check": {
+      "label_en": "Is soil moisture below its band for this tree size?",
+      "label_ar": "هل رطوبة التربة دون نطاقها لهذا الحجم؟",
+      "condition": {
+        "tree": {
+          "op": "lt",
+          "left": {
+            "source": "indices",
+            "index_code": "smi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "vars",
+            "name": "smi_floor"
+          }
+        }
+      },
+      "on_match": "n_set_soil_dry",
+      "on_miss": "n_set_soil_ok"
+    },
+    "n_set_soil_dry": {
+      "label_en": "Soil moisture votes dry",
+      "label_ar": "صوتت رطوبة التربة جفاف",
+      "set": {
+        "soil_water": "dry"
+      },
+      "next": "n_cwsi_usable"
+    },
+    "n_set_soil_ok": {
+      "label_en": "Soil moisture votes normal",
+      "label_ar": "صوتت رطوبة التربة طبيعي",
+      "set": {
+        "soil_water": "ok"
+      },
+      "next": "n_cwsi_usable"
+    },
+    "n_cwsi_usable": {
+      "label_en": "Is the thermal reading clipped at the index ceiling?",
+      "label_ar": "هل القراءة الحرارية ملتصقة بسقف المؤشر؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "indices",
+            "index_code": "cwsi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "params",
+            "name": "saturation_guard"
+          }
+        }
+      },
+      "on_match": "n_set_canopy_unreadable",
+      "on_miss": "n_cwsi_check"
+    },
+    "n_cwsi_check": {
+      "label_en": "Is canopy temperature above its band for this tree size?",
+      "label_ar": "هل حرارة المجموع فوق نطاقها لهذا الحجم؟",
+      "condition": {
+        "tree": {
+          "op": "gt",
+          "left": {
+            "source": "indices",
+            "index_code": "cwsi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "vars",
+            "name": "cwsi_ceiling"
+          }
+        }
+      },
+      "on_match": "n_set_canopy_hot",
+      "on_miss": "n_set_canopy_ok"
+    },
+    "n_set_canopy_hot": {
+      "label_en": "Canopy temperature votes dry",
+      "label_ar": "صوتت حرارة المجموع جفاف",
+      "set": {
+        "canopy_temp": "hot"
+      },
+      "next": "n_vote_three"
+    },
+    "n_set_canopy_ok": {
+      "label_en": "Canopy temperature votes normal",
+      "label_ar": "صوتت حرارة المجموع طبيعي",
+      "set": {
+        "canopy_temp": "ok"
+      },
+      "next": "n_vote_three"
+    },
+    "n_set_canopy_unreadable": {
+      "label_en": "Canopy temperature does not vote — the reading is clipped",
+      "label_ar": "لا تصوّت حرارة المجموع — القراءة ملتصقة بالسقف",
+      "set": {
+        "canopy_temp": "unreadable"
+      },
+      "next": "n_vote_three"
+    },
+    "n_vote_three": {
+      "label_en": "Do all three readings say dry?",
+      "label_ar": "هل تقول القراءات الثلاث جفاف؟",
+      "condition": {
+        "tree": {
+          "all_of": [
+            {
+              "op": "eq",
+              "left": {
+                "source": "vars",
+                "name": "leaf_water"
+              },
+              "right": "dry"
+            },
+            {
+              "op": "eq",
+              "left": {
+                "source": "vars",
+                "name": "soil_water"
+              },
+              "right": "dry"
+            },
+            {
+              "op": "eq",
+              "left": {
+                "source": "vars",
+                "name": "canopy_temp"
+              },
+              "right": "hot"
+            }
+          ]
+        }
+      },
+      "on_match": "n_reg_dry_critical",
+      "on_miss": "n_vote_two"
+    },
+    "n_vote_two": {
+      "label_en": "Do any two of the three agree?",
+      "label_ar": "هل تتفق أي قراءتين من الثلاث؟",
+      "condition": {
+        "tree": {
+          "any_of": [
+            {
+              "all_of": [
+                {
+                  "op": "eq",
+                  "left": {
+                    "source": "vars",
+                    "name": "leaf_water"
+                  },
+                  "right": "dry"
+                },
+                {
+                  "op": "eq",
+                  "left": {
+                    "source": "vars",
+                    "name": "soil_water"
+                  },
+                  "right": "dry"
+                }
+              ]
+            },
+            {
+              "all_of": [
+                {
+                  "op": "eq",
+                  "left": {
+                    "source": "vars",
+                    "name": "leaf_water"
+                  },
+                  "right": "dry"
+                },
+                {
+                  "op": "eq",
+                  "left": {
+                    "source": "vars",
+                    "name": "canopy_temp"
+                  },
+                  "right": "hot"
+                }
+              ]
+            },
+            {
+              "all_of": [
+                {
+                  "op": "eq",
+                  "left": {
+                    "source": "vars",
+                    "name": "soil_water"
+                  },
+                  "right": "dry"
+                },
+                {
+                  "op": "eq",
+                  "left": {
+                    "source": "vars",
+                    "name": "canopy_temp"
+                  },
+                  "right": "hot"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "on_match": "n_reg_dry_warning",
+      "on_miss": "n_vote_one"
+    },
+    "n_vote_one": {
+      "label_en": "Does any single reading say dry?",
+      "label_ar": "هل تقول أي قراءة منفردة جفاف؟",
+      "condition": {
+        "tree": {
+          "any_of": [
+            {
+              "op": "eq",
+              "left": {
+                "source": "vars",
+                "name": "leaf_water"
+              },
+              "right": "dry"
+            },
+            {
+              "op": "eq",
+              "left": {
+                "source": "vars",
+                "name": "soil_water"
+              },
+              "right": "dry"
+            },
+            {
+              "op": "eq",
+              "left": {
+                "source": "vars",
+                "name": "canopy_temp"
+              },
+              "right": "hot"
+            }
+          ]
+        }
+      },
+      "on_match": "n_reg_dry_unconfirmed",
+      "on_miss": "n_stop"
+    },
+    "n_reg_dry_critical": {
+      "label_en": "All three water readings agree",
+      "label_ar": "تتفق قراءات الماء الثلاث",
+      "register": {
+        "code": "dry",
+        "severity": "critical"
+      },
+      "next": "n_stop"
+    },
+    "n_reg_dry_warning": {
+      "label_en": "Two of three water readings agree",
+      "label_ar": "تتفق قراءتان من ثلاث",
+      "register": {
+        "code": "dry",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_reg_dry_unconfirmed": {
+      "label_en": "One water reading only",
+      "label_ar": "قراءة ماء واحدة فقط",
+      "register": {
+        "code": "dry_unconfirmed",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  }
+}

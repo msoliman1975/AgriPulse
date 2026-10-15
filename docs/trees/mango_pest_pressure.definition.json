@@ -1,0 +1,290 @@
+{
+  "code": "mango_pest_pressure",
+  "name_en": "Mango — pest and disease pressure",
+  "name_ar": "المانجو — ضغط الآفات والأمراض",
+  "description_en": "Reads the live anthracnose, powdery mildew and fruit fly risk scores, each only in the growth stage where it can do damage, and says how hard the weather is pushing them. It does not look at the canopy at all: pressure is worth knowing before the trees show it.",
+  "description_ar": "يقرأ درجات خطر الأنثراكنوز والبياض الدقيقي وذبابة الفاكهة الحيّة، كلًّا في الطور الذي يمكن أن تضر فيه فقط، ويقول إلى أي حد يدفعها الطقس. ولا ينظر إلى المجموع الخضري إطلاقاً: معرفة الضغط تفيد قبل أن تُظهره الأشجار.",
+  "scope": "cell",
+  "crop_path": "mango",
+  "country_codes": [
+    "EG"
+  ],
+  "registers": [
+    "pest_high",
+    "pest_med",
+    "mildew_high",
+    "mildew_med",
+    "fly_high",
+    "fly_med"
+  ],
+  "parameters": {
+    "warn_score": {
+      "type": "number",
+      "default": 40,
+      "min": 0,
+      "max": 100
+    },
+    "high_score": {
+      "type": "number",
+      "default": 70,
+      "min": 0,
+      "max": 100
+    },
+    "score_floor": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 100
+    }
+  },
+  "combinations": [
+    {
+      "codes": [
+        "pest_high",
+        "mildew_high"
+      ],
+      "action_type": "spray",
+      "status": "alert",
+      "text_en": "Anthracnose and powdery mildew pressure are both high while the block is in bloom. One visit covers both. Spray outside peak pollinator hours — mango sets its crop through flies and bees, and fruit lost to a badly timed spray does not come back.",
+      "text_ar": "ضغط الأنثراكنوز والبياض الدقيقي مرتفع معًا والقطعة في التزهير. زيارة واحدة تكفي للاثنين. رُشّ خارج ساعات نشاط الملقّحات — تعقد المانجو محصولها بالذباب والنحل، والثمار التي تُفقد برشّ سيئ التوقيت لا تعود."
+    }
+  ],
+  "root": "n_anth_stage",
+  "nodes": {
+    "n_anth_stage": {
+      "label_en": "Is the block carrying tissue anthracnose can reach?",
+      "label_ar": "هل تحمل القطعة أنسجة يصلها الأنثراكنوز؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "flowering",
+            "fruit_set",
+            "fruit_development",
+            "maturation"
+          ]
+        }
+      },
+      "on_match": "n_anth_switch",
+      "on_miss": "n_mildew_stage"
+    },
+    "n_anth_switch": {
+      "label_en": "How strongly do conditions favour anthracnose?",
+      "label_ar": "إلى أي حد ترجّح الظروف الأنثراكنوز؟",
+      "switch": {
+        "on": {
+          "source": "weather_risk",
+          "risk_code": "anthracnose",
+          "field": "score"
+        },
+        "cases": [
+          {
+            "ge": {
+              "source": "params",
+              "name": "high_score"
+            },
+            "go": "n_reg_pest_high"
+          },
+          {
+            "ge": {
+              "source": "params",
+              "name": "warn_score"
+            },
+            "go": "n_reg_pest_med"
+          },
+          {
+            "ge": {
+              "source": "params",
+              "name": "score_floor"
+            },
+            "go": "n_mildew_stage"
+          }
+        ],
+        "default": "n_mildew_stage"
+      }
+    },
+    "n_reg_pest_high": {
+      "label_en": "Anthracnose pressure is high",
+      "label_ar": "ضغط الأنثراكنوز مرتفع",
+      "register": {
+        "code": "pest_high",
+        "severity": "critical"
+      },
+      "next": "n_mildew_stage"
+    },
+    "n_reg_pest_med": {
+      "label_en": "Anthracnose pressure is rising",
+      "label_ar": "ضغط الأنثراكنوز يرتفع",
+      "register": {
+        "code": "pest_med",
+        "severity": "warning"
+      },
+      "next": "n_mildew_stage"
+    },
+    "n_mildew_stage": {
+      "label_en": "Is this block flowering or setting fruit?",
+      "label_ar": "هل القطعة في التزهير أو العقد؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "flowering",
+            "fruit_set"
+          ]
+        }
+      },
+      "on_match": "n_mildew_switch",
+      "on_miss": "n_fly_window"
+    },
+    "n_mildew_switch": {
+      "label_en": "How strongly do conditions favour powdery mildew?",
+      "label_ar": "إلى أي حد ترجّح الظروف البياض الدقيقي؟",
+      "switch": {
+        "on": {
+          "source": "weather_risk",
+          "risk_code": "powdery_mildew",
+          "field": "score"
+        },
+        "cases": [
+          {
+            "ge": {
+              "source": "params",
+              "name": "high_score"
+            },
+            "go": "n_reg_mildew_high"
+          },
+          {
+            "ge": {
+              "source": "params",
+              "name": "warn_score"
+            },
+            "go": "n_reg_mildew_med"
+          },
+          {
+            "ge": {
+              "source": "params",
+              "name": "score_floor"
+            },
+            "go": "n_fly_window"
+          }
+        ],
+        "default": "n_fly_window"
+      }
+    },
+    "n_reg_mildew_high": {
+      "label_en": "Powdery mildew pressure is high during bloom",
+      "label_ar": "ضغط البياض الدقيقي مرتفع أثناء التزهير",
+      "register": {
+        "code": "mildew_high",
+        "severity": "critical"
+      },
+      "next": "n_fly_window"
+    },
+    "n_reg_mildew_med": {
+      "label_en": "Powdery mildew pressure is rising during bloom",
+      "label_ar": "ضغط البياض الدقيقي يرتفع أثناء التزهير",
+      "register": {
+        "code": "mildew_med",
+        "severity": "warning"
+      },
+      "next": "n_fly_window"
+    },
+    "n_fly_window": {
+      "label_en": "Is this a bearing block with ripening fruit on the tree?",
+      "label_ar": "هل هذه قطعة مثمرة تحمل ثمارًا ناضجة؟",
+      "condition": {
+        "tree": {
+          "all_of": [
+            {
+              "op": "eq",
+              "left": {
+                "source": "crop_attribute",
+                "code": "bearing_status",
+                "key": "value"
+              },
+              "right": "bearing"
+            },
+            {
+              "op": "in",
+              "left": {
+                "source": "block",
+                "field": "growth_stage"
+              },
+              "values": [
+                "maturation"
+              ]
+            }
+          ]
+        }
+      },
+      "on_match": "n_fly_switch",
+      "on_miss": "n_stop"
+    },
+    "n_fly_switch": {
+      "label_en": "How strongly do conditions favour fruit fly activity?",
+      "label_ar": "إلى أي حد ترجّح الظروف نشاط ذبابة الفاكهة؟",
+      "switch": {
+        "on": {
+          "source": "weather_risk",
+          "risk_code": "fruit_fly",
+          "field": "score"
+        },
+        "cases": [
+          {
+            "ge": {
+              "source": "params",
+              "name": "high_score"
+            },
+            "go": "n_reg_fly_high"
+          },
+          {
+            "ge": {
+              "source": "params",
+              "name": "warn_score"
+            },
+            "go": "n_reg_fly_med"
+          },
+          {
+            "ge": {
+              "source": "params",
+              "name": "score_floor"
+            },
+            "go": "n_stop"
+          }
+        ],
+        "default": "n_stop"
+      }
+    },
+    "n_reg_fly_high": {
+      "label_en": "Fruit fly pressure is high on ripening fruit",
+      "label_ar": "ضغط ذبابة الفاكهة مرتفع على ثمار ناضجة",
+      "register": {
+        "code": "fly_high",
+        "severity": "critical"
+      },
+      "next": "n_stop"
+    },
+    "n_reg_fly_med": {
+      "label_en": "Fruit fly pressure is rising on ripening fruit",
+      "label_ar": "ضغط ذبابة الفاكهة يرتفع على ثمار ناضجة",
+      "register": {
+        "code": "fly_med",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  }
+}
