@@ -354,7 +354,22 @@
       "combination_unknown_code": "قاعدة التركيب {{position}} تسمّي \"{{code}}\" وهو ما لا تسجّله هذه الشجرة أبدًا.",
       "combination_empty": "قاعدة التركيب {{position}} لا تسمّي أي نتيجة.",
       "duplicate_combination": "قاعدة التركيب {{position}} تطابق المجموعة نفسها التي تطابقها القاعدة {{first}}."
-    }
+    },
+    "expand": "إظهار فحوص النشر",
+    "collapse": "إخفاء فحوص النشر",
+    "toggleErrors_zero": "لا أخطاء",
+    "toggleErrors_one": "خطأ واحد",
+    "toggleErrors_two": "خطآن",
+    "toggleErrors_few": "{{count}} أخطاء",
+    "toggleErrors_many": "{{count}} خطأ",
+    "toggleErrors_other": "{{count}} خطأ",
+    "toggleHints_zero": "لا ملاحظات",
+    "toggleHints_one": "ملاحظة واحدة",
+    "toggleHints_two": "ملاحظتان",
+    "toggleHints_few": "{{count}} ملاحظات",
+    "toggleHints_many": "{{count}} ملاحظة",
+    "toggleHints_other": "{{count}} ملاحظة",
+    "toggleClean": "لا مشاكل"
   },
   "catalogue": {
     "title": "فهرس النتائج",
