@@ -1,0 +1,114 @@
+[
+  {
+    "code": "soil_dry",
+    "name_en": "Soil moisture below the band",
+    "name_ar": "رطوبة التربة دون النطاق",
+    "clause_en": "soil moisture is below the band for this tree size",
+    "clause_ar": "رطوبة التربة دون النطاق لهذا الحجم",
+    "default_status": "issue"
+  },
+  {
+    "code": "canopy_hot",
+    "name_en": "Canopy hotter than usual",
+    "name_ar": "المجموع أسخن من المعتاد",
+    "clause_en": "the canopy is warmer than the air by more than usual",
+    "clause_ar": "المجموع الخضري أسخن من الهواء بأكثر من المعتاد",
+    "default_status": "issue"
+  },
+  {
+    "code": "deficit_confirmed",
+    "name_en": "Pre-harvest cut on plan",
+    "name_ar": "خفض ما قبل الحصاد على الخطة",
+    "clause_en": "soil moisture has fallen into the reduced band the pre-harvest cut is meant to produce",
+    "clause_ar": "هبطت رطوبة التربة إلى النطاق المخفّض المقصود من خفض ما قبل الحصاد",
+    "default_status": "good"
+  },
+  {
+    "code": "deficit_missing",
+    "name_en": "Pre-harvest cut not done",
+    "name_ar": "لم يتم خفض ما قبل الحصاد",
+    "clause_en": "the block is in its maturity window and the water has not been cut",
+    "clause_ar": "القطعة في نافذة النضج ولم تُخفض المياه",
+    "default_status": "issue"
+  },
+  {
+    "code": "deficit_overshot",
+    "name_en": "Pre-harvest cut too deep",
+    "name_ar": "خفض ما قبل الحصاد أعمق من اللازم",
+    "clause_en": "the pre-harvest cut has gone deeper than intended and is costing fruit size",
+    "clause_ar": "تجاوز خفض ما قبل الحصاد الحدّ المقصود وصار يكلّف حجم الثمار",
+    "default_status": "alert"
+  },
+  {
+    "code": "post_harvest_feed_due",
+    "name_en": "Post-harvest recovery feed due",
+    "name_ar": "تغذية التعافي بعد الحصاد مستحقّة",
+    "clause_en": "the block is in the post-harvest flush and the recovery feed is due",
+    "clause_ar": "القطعة في دفعة ما بعد الحصاد وتغذية التعافي مستحقّة",
+    "default_status": "issue"
+  },
+  {
+    "code": "flush_active",
+    "name_en": "Vegetative flush still running",
+    "name_ar": "دفعة النمو الخضري ما زالت مستمرة",
+    "clause_en": "the canopy is still growing and the flush has not hardened off",
+    "clause_ar": "ما زال المجموع ينمو ولم تنضج الدفعة بعد",
+    "default_status": "good"
+  },
+  {
+    "code": "induction_ready",
+    "name_en": "Ready for the induction dry period",
+    "name_ar": "جاهزة لفترة التصويم",
+    "clause_en": "the flush has stopped and the induction dry period can start",
+    "clause_ar": "توقفت الدفعة ويمكن بدء فترة التصويم",
+    "default_status": "issue"
+  },
+  {
+    "code": "wet_and_cool",
+    "name_en": "Wet canopy in a cool window",
+    "name_ar": "مجموع مُروى في نافذة باردة",
+    "clause_en": "canopy moisture is high while the forecast is cool",
+    "clause_ar": "رطوبة المجموع مرتفعة والتوقع بارد",
+    "default_status": "issue"
+  },
+  {
+    "code": "fruit_program_early_due",
+    "name_en": "Early fruit program due",
+    "name_ar": "برنامج الثمار المبكر مستحقّ",
+    "clause_en": "the first KNO3 spray and fruit thinning are due",
+    "clause_ar": "الرشة الأولى من نترات البوتاسيوم وخفّ الثمار مستحقّان",
+    "default_status": "issue"
+  },
+  {
+    "code": "fruit_program_late_due",
+    "name_en": "Late fruit program due",
+    "name_ar": "برنامج الثمار المتأخر مستحقّ",
+    "clause_en": "the second KNO3 spray and the bulking irrigation are due",
+    "clause_ar": "الرشة الثانية من نترات البوتاسيوم وريّة التحجيم مستحقّتان",
+    "default_status": "issue"
+  },
+  {
+    "code": "picking_due",
+    "name_en": "Selective picking passes due",
+    "name_ar": "مرورات الجني الانتقائي مستحقّة",
+    "clause_en": "the fruit is in its maturity window and needs repeated selective picking passes",
+    "clause_ar": "الثمار في نافذة النضج وتحتاج مرورات جني انتقائي متكرّرة",
+    "default_status": "issue"
+  },
+  {
+    "code": "post_harvest_care_due",
+    "name_en": "Post-harvest care due",
+    "name_ar": "رعاية ما بعد الحصاد مستحقّة",
+    "clause_en": "post-harvest pruning and recovery work are due",
+    "clause_ar": "أعمال التقليم والتعافي بعد الحصاد مستحقّة",
+    "default_status": "issue"
+  },
+  {
+    "code": "size_mismatch",
+    "name_en": "Recorded tree size disagrees with the imagery",
+    "name_ar": "حجم الشجرة المسجّل لا يتفق مع الصور",
+    "clause_en": "the recorded tree size does not match what the imagery shows",
+    "clause_ar": "حجم الشجرة المسجّل لا يطابق ما تُظهره الصور",
+    "default_status": "issue"
+  }
+]

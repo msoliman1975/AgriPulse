@@ -1,0 +1,265 @@
+{
+  "code": "mango_records",
+  "name_en": "Mango — record check",
+  "name_ar": "المانجو — فحص السجلات",
+  "description_en": "Are the records the other six trees depend on set, and are they right? The size-aware mango rules compare a reading against a band keyed on the block's recorded tree size, and a missing size makes all of them stop with no finding and no visible reason. This tree makes that visible, and it also checks the recorded size against what NDVI and BSI actually show. Data quality, not agronomy.",
+  "description_ar": "هل السجلات التي تعتمد عليها الأشجار الست الأخرى مضبوطة، وهل هي صحيحة؟ تقارن قواعد المانجو المعتمدة على الحجم قراءةً بنطاق مرتبط بحجم الشجرة المسجّل للقطعة، وغياب الحجم يجعلها كلها تتوقف بلا نتيجة وبلا سبب ظاهر. تُظهر هذه الشجرة ذلك، وتفحص كذلك الحجم المسجّل مقابل ما تُظهره NDVI وBSI فعلًا. جودة بيانات لا زراعة.",
+  "scope": "block",
+  "crop_path": "mango",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_size_known",
+  "registers": [
+    "size_missing",
+    "size_mismatch"
+  ],
+  "parameters": {
+    "small_ndvi_top": {
+      "type": "number",
+      "default": 0.22,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "medium_ndvi_floor": {
+      "type": "number",
+      "default": 0.25,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "medium_ndvi_top": {
+      "type": "number",
+      "default": 0.4,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "large_ndvi_floor": {
+      "type": "number",
+      "default": 0.65,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "small_bsi_floor": {
+      "type": "number",
+      "default": 0.35,
+      "min": -1.0,
+      "max": 1.0
+    },
+    "large_bsi_top": {
+      "type": "number",
+      "default": 0.14,
+      "min": -1.0,
+      "max": 1.0
+    }
+  },
+  "nodes": {
+    "n_size_known": {
+      "label_en": "Is a tree size recorded for this block?",
+      "label_ar": "هل يوجد حجم شجرة مسجّل لهذه القطعة؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "values": [
+            "small",
+            "medium",
+            "large"
+          ]
+        }
+      },
+      "on_match": "n_recorded_small",
+      "on_miss": "n_reg_size_missing"
+    },
+    "n_reg_size_missing": {
+      "label_en": "No tree size is recorded on the crop assignment",
+      "label_ar": "لا يوجد حجم شجرة مسجّل على تخصيص المحصول",
+      "register": {
+        "code": "size_missing",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_recorded_small": {
+      "label_en": "Is the block recorded as small trees?",
+      "label_ar": "هل القطعة مسجّلة كأشجار صغيرة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "small"
+        }
+      },
+      "on_match": "n_small_reads_bigger",
+      "on_miss": "n_recorded_large"
+    },
+    "n_small_reads_bigger": {
+      "label_en": "Does the imagery read as a larger size class?",
+      "label_ar": "هل تُقرأ الصور كفئة حجم أكبر؟",
+      "condition": {
+        "tree": {
+          "all_of": [
+            {
+              "op": "ge",
+              "left": {
+                "source": "indices",
+                "index_code": "ndvi",
+                "key": "mean"
+              },
+              "right": {
+                "source": "params",
+                "name": "medium_ndvi_floor"
+              }
+            },
+            {
+              "op": "lt",
+              "left": {
+                "source": "indices",
+                "index_code": "bsi",
+                "key": "mean"
+              },
+              "right": {
+                "source": "params",
+                "name": "small_bsi_floor"
+              }
+            }
+          ]
+        }
+      },
+      "on_match": "n_reg_size_mismatch",
+      "on_miss": "n_stop"
+    },
+    "n_recorded_large": {
+      "label_en": "Is the block recorded as large trees?",
+      "label_ar": "هل القطعة مسجّلة كأشجار كبيرة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "crop_attribute",
+            "code": "tree_size_class",
+            "key": "value"
+          },
+          "right": "large"
+        }
+      },
+      "on_match": "n_large_reads_smaller",
+      "on_miss": "n_medium_out_of_band"
+    },
+    "n_large_reads_smaller": {
+      "label_en": "Does the imagery read as a smaller size class?",
+      "label_ar": "هل تُقرأ الصور كفئة حجم أصغر؟",
+      "condition": {
+        "tree": {
+          "all_of": [
+            {
+              "op": "lt",
+              "left": {
+                "source": "indices",
+                "index_code": "ndvi",
+                "key": "mean"
+              },
+              "right": {
+                "source": "params",
+                "name": "large_ndvi_floor"
+              }
+            },
+            {
+              "op": "gt",
+              "left": {
+                "source": "indices",
+                "index_code": "bsi",
+                "key": "mean"
+              },
+              "right": {
+                "source": "params",
+                "name": "large_bsi_top"
+              }
+            }
+          ]
+        }
+      },
+      "on_match": "n_reg_size_mismatch",
+      "on_miss": "n_stop"
+    },
+    "n_medium_out_of_band": {
+      "label_en": "Does the imagery sit outside the medium band in either direction?",
+      "label_ar": "هل تقع الصور خارج نطاق الحجم المتوسط في أي من الاتجاهين؟",
+      "condition": {
+        "tree": {
+          "any_of": [
+            {
+              "op": "gt",
+              "left": {
+                "source": "indices",
+                "index_code": "ndvi",
+                "key": "mean"
+              },
+              "right": {
+                "source": "params",
+                "name": "medium_ndvi_top"
+              }
+            },
+            {
+              "op": "lt",
+              "left": {
+                "source": "indices",
+                "index_code": "ndvi",
+                "key": "mean"
+              },
+              "right": {
+                "source": "params",
+                "name": "small_ndvi_top"
+              }
+            }
+          ]
+        }
+      },
+      "on_match": "n_reg_size_mismatch",
+      "on_miss": "n_stop"
+    },
+    "n_reg_size_mismatch": {
+      "label_en": "The recorded tree size disagrees with the imagery",
+      "label_ar": "حجم الشجرة المسجّل لا يتفق مع الصور",
+      "register": {
+        "code": "size_mismatch",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "record_size_missing",
+      "codes": [
+        "size_missing"
+      ],
+      "status": "na",
+      "action_type": "no_action",
+      "text_en": "No tree size is recorded for this block. Every size-aware mango rule stops without an answer until it is set, and none of them can say why. Set the Tree size attribute on the crop assignment.",
+      "text_ar": "لا يوجد حجم شجرة مسجّل لهذه القطعة. تتوقف كل قاعدة مانجو تعتمد على الحجم بلا إجابة حتى يُضبط، ولا تستطيع أي منها أن تقول السبب. اضبط خاصية حجم الشجرة على تخصيص المحصول."
+    },
+    {
+      "code": "record_size_mismatch",
+      "codes": [
+        "size_mismatch"
+      ],
+      "status": "issue",
+      "action_type": "no_action",
+      "text_en": "The recorded tree size does not match what the imagery shows. A wrong size makes every size-aware mango rule compare against the wrong band at once, in the same direction, with no other warning. Check the record against the block.",
+      "text_ar": "حجم الشجرة المسجّل لا يطابق ما تُظهره الصور. الحجم الخطأ يجعل كل قاعدة مانجو تعتمد على الحجم تقارن بالنطاق الخطأ دفعة واحدة وفي الاتجاه نفسه بلا أي تنبيه آخر. راجع السجل مقابل القطعة."
+    }
+  ]
+}

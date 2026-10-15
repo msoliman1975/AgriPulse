@@ -1,0 +1,401 @@
+{
+  "code": "mango_pest_disease",
+  "name_en": "Mango — pest and disease pressure",
+  "name_ar": "المانجو — ضغط الآفات والأمراض",
+  "description_en": "How hard is the weather pushing pests and disease on this block now? Reads the three weather-driven pressure scores the platform computes — anthracnose, powdery mildew and fruit fly — and gates each on the growth stage where it matters. The fold writes one visit instead of three cards. Block scope, because the weather score is keyed to the farm and every cell would read the same number.",
+  "description_ar": "إلى أي حد يدفع الطقس الآفات والأمراض على هذه القطعة الآن؟ يقرأ درجات الضغط الثلاث التي تحسبها المنصة من الطقس — الأنثراكنوز والبياض الدقيقي وذبابة الفاكهة — ويقيّد كلًّا منها بمرحلة النمو التي تهمّها. يكتب الدمج زيارة واحدة بدل ثلاث بطاقات. على مستوى القطعة، لأن درجة الطقس مرتبطة بالمزرعة وكل خلية ستقرأ الرقم نفسه.",
+  "scope": "block",
+  "crop_path": "mango",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_anth_stage",
+  "registers": [
+    "pest_high",
+    "pest_med",
+    "mildew_high",
+    "mildew_med",
+    "fly_high",
+    "fly_med"
+  ],
+  "parameters": {
+    "warn_score": {
+      "type": "number",
+      "default": 40,
+      "min": 0,
+      "max": 100
+    },
+    "high_score": {
+      "type": "number",
+      "default": 70,
+      "min": 0,
+      "max": 100
+    }
+  },
+  "nodes": {
+    "n_anth_stage": {
+      "label_en": "Is the block carrying tissue anthracnose can reach?",
+      "label_ar": "هل تحمل القطعة أنسجة يصلها الأنثراكنوز؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "flowering",
+            "fruit_set",
+            "fruit_development",
+            "maturation"
+          ]
+        }
+      },
+      "on_match": "n_anth_switch",
+      "on_miss": "n_mildew_stage"
+    },
+    "n_anth_switch": {
+      "label_en": "How strongly do conditions favour anthracnose infection?",
+      "label_ar": "إلى أي حد ترجّح الظروف إصابة الأنثراكنوز؟",
+      "switch": {
+        "on": {
+          "source": "weather_risk",
+          "risk_code": "anthracnose",
+          "field": "score"
+        },
+        "cases": [
+          {
+            "ge": {
+              "source": "params",
+              "name": "high_score"
+            },
+            "go": "n_reg_pest_high"
+          },
+          {
+            "ge": {
+              "source": "params",
+              "name": "warn_score"
+            },
+            "go": "n_reg_pest_med"
+          }
+        ],
+        "default": "n_mildew_stage"
+      }
+    },
+    "n_reg_pest_high": {
+      "label_en": "Anthracnose pressure is high",
+      "label_ar": "ضغط الأنثراكنوز مرتفع",
+      "register": {
+        "code": "pest_high",
+        "severity": "critical"
+      },
+      "next": "n_mildew_stage"
+    },
+    "n_reg_pest_med": {
+      "label_en": "Anthracnose pressure is building",
+      "label_ar": "ضغط الأنثراكنوز يتصاعد",
+      "register": {
+        "code": "pest_med",
+        "severity": "warning"
+      },
+      "next": "n_mildew_stage"
+    },
+    "n_mildew_stage": {
+      "label_en": "Is the block in bloom or setting fruit?",
+      "label_ar": "هل القطعة في التزهير أو عقد الثمار؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "flowering",
+            "fruit_set"
+          ]
+        }
+      },
+      "on_match": "n_mildew_switch",
+      "on_miss": "n_fly_stage"
+    },
+    "n_mildew_switch": {
+      "label_en": "How strongly do conditions favour powdery mildew?",
+      "label_ar": "إلى أي حد ترجّح الظروف البياض الدقيقي؟",
+      "switch": {
+        "on": {
+          "source": "weather_risk",
+          "risk_code": "powdery_mildew",
+          "field": "score"
+        },
+        "cases": [
+          {
+            "ge": {
+              "source": "params",
+              "name": "high_score"
+            },
+            "go": "n_reg_mildew_high"
+          },
+          {
+            "ge": {
+              "source": "params",
+              "name": "warn_score"
+            },
+            "go": "n_reg_mildew_med"
+          }
+        ],
+        "default": "n_fly_stage"
+      }
+    },
+    "n_reg_mildew_high": {
+      "label_en": "Powdery mildew pressure is high",
+      "label_ar": "ضغط البياض الدقيقي مرتفع",
+      "register": {
+        "code": "mildew_high",
+        "severity": "critical"
+      },
+      "next": "n_fly_stage"
+    },
+    "n_reg_mildew_med": {
+      "label_en": "Powdery mildew pressure is rising while the block is in bloom",
+      "label_ar": "ضغط البياض الدقيقي يرتفع والقطعة في التزهير",
+      "register": {
+        "code": "mildew_med",
+        "severity": "warning"
+      },
+      "next": "n_fly_stage"
+    },
+    "n_fly_stage": {
+      "label_en": "Is this a bearing block with ripening fruit on the tree?",
+      "label_ar": "هل هذه قطعة مثمرة تحمل ثمارًا ناضجة؟",
+      "condition": {
+        "tree": {
+          "all_of": [
+            {
+              "op": "eq",
+              "left": {
+                "source": "crop_attribute",
+                "code": "bearing_status",
+                "key": "value"
+              },
+              "right": "bearing"
+            },
+            {
+              "op": "in",
+              "left": {
+                "source": "block",
+                "field": "growth_stage"
+              },
+              "values": [
+                "maturation"
+              ]
+            }
+          ]
+        }
+      },
+      "on_match": "n_fly_switch",
+      "on_miss": "n_stop"
+    },
+    "n_fly_switch": {
+      "label_en": "How strongly do conditions favour fruit fly activity?",
+      "label_ar": "إلى أي حد ترجّح الظروف نشاط ذبابة الفاكهة؟",
+      "switch": {
+        "on": {
+          "source": "weather_risk",
+          "risk_code": "fruit_fly",
+          "field": "score"
+        },
+        "cases": [
+          {
+            "ge": {
+              "source": "params",
+              "name": "high_score"
+            },
+            "go": "n_reg_fly_high"
+          },
+          {
+            "ge": {
+              "source": "params",
+              "name": "warn_score"
+            },
+            "go": "n_reg_fly_med"
+          }
+        ],
+        "default": "n_stop"
+      }
+    },
+    "n_reg_fly_high": {
+      "label_en": "Fruit fly pressure is high",
+      "label_ar": "ضغط ذبابة الفاكهة مرتفع",
+      "register": {
+        "code": "fly_high",
+        "severity": "critical"
+      },
+      "next": "n_stop"
+    },
+    "n_reg_fly_med": {
+      "label_en": "Fruit fly pressure is rising on ripening fruit",
+      "label_ar": "ضغط ذبابة الفاكهة يرتفع على ثمار ناضجة",
+      "register": {
+        "code": "fly_med",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "mildew_high",
+      "codes": [
+        "mildew_high"
+      ],
+      "status": "alert",
+      "action_type": "spray",
+      "text_en": "Powdery mildew pressure is high while the block is in bloom. Treat with sulfur, and time the spray away from peak pollinator hours. Mango is insect pollinated, so a spray at the wrong hour costs more fruit than the disease it prevents.",
+      "text_ar": "ضغط البياض الدقيقي مرتفع والقطعة في التزهير. عالج بالكبريت، ووقّت الرش بعيدًا عن ساعات ذروة الملقّحات. المانجو يُلقّح بالحشرات، والرش في الساعة الخطأ يكلّف من الثمار أكثر مما يمنعه المرض."
+    },
+    {
+      "code": "mildew_med",
+      "codes": [
+        "mildew_med"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Powdery mildew pressure is rising while the block is in bloom. Check the inflorescences and be ready to treat.",
+      "text_ar": "ضغط البياض الدقيقي يرتفع والقطعة في التزهير. افحص النورات وكن مستعدًا للعلاج."
+    },
+    {
+      "code": "anth_high",
+      "codes": [
+        "pest_high"
+      ],
+      "status": "alert",
+      "action_type": "spray",
+      "text_en": "Anthracnose pressure is high. Send someone in with instructions for anthracnose and for mango mealybug on the same visit: the mealybug has no model on this platform and is checked here rather than not at all.",
+      "text_ar": "ضغط الأنثراكنوز مرتفع. أرسل من يفحص القطعة بتعليمات للأنثراكنوز ولبقّ المانجو الدقيقي في الزيارة نفسها: البقّ الدقيقي بلا نموذج على هذه المنصة، ويُفحص هنا بدل ألّا يُفحص."
+    },
+    {
+      "code": "anth_med",
+      "codes": [
+        "pest_med"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Anthracnose pressure is building. Check the fruit and the young leaves, and look for mealybug on the same visit.",
+      "text_ar": "ضغط الأنثراكنوز يتصاعد. افحص الثمار والأوراق الحديثة، وابحث عن البقّ الدقيقي في الزيارة نفسها."
+    },
+    {
+      "code": "fly_high",
+      "codes": [
+        "fly_high"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "Fruit fly pressure is high on ripening fruit. Check the traps and make a control decision now, while the fruit is still on the tree.",
+      "text_ar": "ضغط ذبابة الفاكهة مرتفع على ثمار ناضجة. افحص المصايد واتخذ قرار المكافحة الآن، والثمار ما زالت على الشجرة."
+    },
+    {
+      "code": "fly_med",
+      "codes": [
+        "fly_med"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Fruit fly pressure is rising on ripening fruit. Check the traps.",
+      "text_ar": "ضغط ذبابة الفاكهة يرتفع على ثمار ناضجة. افحص المصايد."
+    },
+    {
+      "code": "anth_high_mildew_high",
+      "codes": [
+        "mildew_high",
+        "pest_high"
+      ],
+      "status": "alert",
+      "action_type": "spray",
+      "text_en": "Anthracnose and powdery mildew pressure are both high in the same bloom window. One visit covers both. Time the sulfur away from peak pollinator hours.",
+      "text_ar": "ضغط الأنثراكنوز والبياض الدقيقي مرتفع في نافذة التزهير نفسها. زيارة واحدة تغطي الاثنين. وقّت الكبريت بعيدًا عن ساعات ذروة الملقّحات."
+    },
+    {
+      "code": "anth_high_mildew_med",
+      "codes": [
+        "mildew_med",
+        "pest_high"
+      ],
+      "status": "alert",
+      "action_type": "spray",
+      "text_en": "Anthracnose pressure is high and mildew is rising in the same bloom window. Treat for anthracnose and check the inflorescences on the same visit.",
+      "text_ar": "ضغط الأنثراكنوز مرتفع والبياض الدقيقي يتصاعد في نافذة التزهير نفسها. عالج الأنثراكنوز وافحص النورات في الزيارة نفسها."
+    },
+    {
+      "code": "anth_med_mildew_high",
+      "codes": [
+        "mildew_high",
+        "pest_med"
+      ],
+      "status": "alert",
+      "action_type": "spray",
+      "text_en": "Mildew pressure is high and anthracnose is building in the same bloom window. Treat with sulfur away from peak pollinator hours and check the fruitlets.",
+      "text_ar": "ضغط البياض الدقيقي مرتفع والأنثراكنوز يتصاعد في نافذة التزهير نفسها. عالج بالكبريت بعيدًا عن ساعات ذروة الملقّحات وافحص العُقد الصغيرة."
+    },
+    {
+      "code": "anth_med_mildew_med",
+      "codes": [
+        "mildew_med",
+        "pest_med"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Both anthracnose and mildew pressure are building in the bloom window. One scouting visit covers both.",
+      "text_ar": "ضغط الأنثراكنوز والبياض الدقيقي يتصاعد في نافذة التزهير. زيارة فحص واحدة تغطي الاثنين."
+    },
+    {
+      "code": "anth_high_fly_high",
+      "codes": [
+        "fly_high",
+        "pest_high"
+      ],
+      "status": "alert",
+      "action_type": "spray",
+      "text_en": "Anthracnose and fruit fly pressure are both high on ripening fruit. One visit covers the spray decision and the trap check.",
+      "text_ar": "ضغط الأنثراكنوز وذبابة الفاكهة مرتفع على ثمار ناضجة. زيارة واحدة تغطي قرار الرش وفحص المصايد."
+    },
+    {
+      "code": "anth_high_fly_med",
+      "codes": [
+        "fly_med",
+        "pest_high"
+      ],
+      "status": "alert",
+      "action_type": "spray",
+      "text_en": "Anthracnose pressure is high and fruit fly is rising on ripening fruit. Treat, and check the traps on the same visit.",
+      "text_ar": "ضغط الأنثراكنوز مرتفع وذبابة الفاكهة تتصاعد على ثمار ناضجة. عالج، وافحص المصايد في الزيارة نفسها."
+    },
+    {
+      "code": "anth_med_fly_high",
+      "codes": [
+        "fly_high",
+        "pest_med"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "Fruit fly pressure is high and anthracnose is building on ripening fruit. Check the traps and the fruit on one visit.",
+      "text_ar": "ضغط ذبابة الفاكهة مرتفع والأنثراكنوز يتصاعد على ثمار ناضجة. افحص المصايد والثمار في زيارة واحدة."
+    },
+    {
+      "code": "anth_med_fly_med",
+      "codes": [
+        "fly_med",
+        "pest_med"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Anthracnose and fruit fly pressure are both building on ripening fruit. One scouting visit covers both.",
+      "text_ar": "ضغط الأنثراكنوز وذبابة الفاكهة يتصاعد على ثمار ناضجة. زيارة فحص واحدة تغطي الاثنين."
+    }
+  ]
+}
