@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Create a farm · AgriPulse docs</title>
+<meta name="description" content="A farm is the outer boundary of everything you manage in one place. Imagery and weather subscriptions attach to the farm, not to the blocks inside it, so this is the first record y" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+<header class="site">
+  <div class="site-inner">
+    <a class="brand" href="index.html">
+      <span class="mark">A</span>
+      <span>AgriPulse<small>documentation</small></span>
+    </a>
+    <nav class="main">
+      <a href="index.html#processes" class="on">Processes</a>
+      <a href="kb.html">Knowledge Base</a>
+      <a href="concepts.html">Concepts</a>
+      <a href="support.html">Support</a>
+    </nav>
+    <span class="site-spacer"></span>
+    <button class="hbtn" id="lang" type="button" title="Arabic pages are planned">العربية</button>
+    <button class="hbtn" id="theme" type="button">Theme</button>
+  </div>
+</header>
+
+<section class="hero compact">
+  <img class="bg" src="img/p01-map.jpg" alt="" />
+  <div class="inner">
+    <div class="crumbs"><a href="index.html">Docs</a> → <a href="index.html#processes">Processes</a>
+      → <a href="process-map-the-farm.html">Map the farm</a></div>
+    <span class="eyebrow">Guide · Process 01</span>
+    <h1>Create a farm</h1>
+    <p class="lede">A farm is the outer boundary of everything you manage in one place. Imagery and weather subscriptions attach to the farm, not to the blocks inside it, so this is the first record you create and the one everything else hangs off.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="cards c3">
+      <div class="card"><h4>Who does this</h4><p>Tenant admin, farm manager</p></div>
+      <div class="card"><h4>How long it takes</h4><p>5 minutes, once you know where the boundary runs</p></div>
+      <div class="card"><h4>Steps</h4><p>6 steps</p></div>
+    </div>
+
+    <h3>Watch it in the system</h3>
+    <div class="clip">
+      <video controls preload="metadata" poster="img/guide-farm-clip-poster.jpg" playsinline>
+        <source src="media/farm-creation.mp4" type="video/mp4" />
+        Your browser cannot play this video. Download it at
+        <a href="media/farm-creation.mp4">media/farm-creation.mp4</a>.
+      </video>
+      <div class="bar">
+        <span><b>Create a farm — walkthrough.</b> Silent screen capture of the real app, 1 minute 38 seconds. It covers steps 1 to 5 and stops before Create farm. The narrated version replaces it once it is recorded.</span>
+        <span class="chip live">Draft capture</span>
+      </div>
+    </div>
+
+
+    <h3>Before you start</h3>
+    <ul><li>A tenant account and a sign-in that can create farms.</li><li>The boundary: either you know where it runs on the map, or you have a KML, GeoJSON or zipped Shapefile of it.</li><li>A code and a name your team already uses for this farm.</li></ul>
+
+  </div>
+</section>
+
+<section class="band tint">
+  <div class="wrap">
+    <p class="kicker">Step by step</p>
+    <h2 class="section">Create a farm</h2>
+    <div class="stages" style="margin-top:1.6rem">
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Open the new farm flow</h3>
+          <ul class="steps"><li>On a new account the workspace opens on <b>No farms yet</b>. Click <b>Create your first farm</b>.</li><li>If the account already has farms, go to <b>Farm management</b> and start a new farm from there. Both routes open the same two-screen flow at <code>/labs/map?create=farm</code>.</li><li>Until a farm exists, Insights, Plan, Signals, Action Center, Recommendations, Alerts and Reports are greyed out. They all need a farm to point at.</li></ul>
+          <figure class="shot-fig"><img src="img/guide-farm-01-empty.jpg" alt="" loading="lazy" /><figcaption>The workspace before any farm exists.</figcaption></figure>
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Step 1 of 2 — draw or upload the boundary</h3>
+          <ul class="steps"><li><b>Draw boundary</b> lets you click each corner of the farm on the map. Click once per corner, then double-click the last corner to close the shape.</li><li><b>Upload file</b> takes a KML, a GeoJSON, or a Shapefile in a zip. Use this when a surveyor already gave you the boundary.</li><li>Draw the <b>outer</b> boundary only. Blocks come later, inside it.</li><li>Include the roads, buildings and canals that sit inside the farm. You mark them as land units afterwards so they stop counting towards crop numbers.</li></ul>
+          <figure class="shot-fig"><img src="img/guide-farm-02-step1.jpg" alt="" loading="lazy" /><figcaption>Step 1. The map opens on satellite imagery so you can trace field edges.</figcaption></figure>
+          <div class="note"><span class="lab">Note</span><p>Zoom in before you start drawing. A boundary traced at low zoom is off by tens of metres, and every index number for this farm is computed inside that line.</p></div>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Check the area before you go on</h3>
+          <ul class="steps"><li>As soon as the shape closes, the panel header shows the area, for example <b>185.5 feddan</b>. The unit follows the tenant unit setting: feddan, acre or hectare.</li><li>Compare that figure with what you know the farm to be. A number that is far out means the shape is wrong, and it is much cheaper to fix now.</li><li><b>Boundary</b> takes you back to redraw. <b>Cancel</b>, at the top right, throws the whole thing away.</li></ul>
+          <figure class="shot-fig"><img src="img/guide-farm-03-step2.jpg" alt="" loading="lazy" /><figcaption>Step 2. The panel header shows the area of the shape you drew.</figcaption></figure>
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Fill the two required fields</h3>
+          <ul class="steps"><li><b>Code</b> is the short identifier your team uses, for example <code>GV-01</code>. It appears in lists, exports and reports.</li><li><b>Name</b> is the readable name, for example <code>Green Valley North</code>.</li><li><b>Create farm</b> stays disabled until both Code and Name are filled. Nothing else on the form is required.</li><li>Set <b>Country</b> even though it is optional. Decision trees can be written for a region, and a farm with no country matches none of them.</li></ul>
+          
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Open More details if you have the answers</h3>
+          <ul class="steps"><li>Everything under <b>More details</b> is optional. Skip it if you are recording the farm quickly, and come back later.</li><li><b>Primary water source</b> and <b>Farm type</b> are worth setting now. They describe the farm in reports and give context to anyone reading it later.</li><li><b>Tags</b> are free text. Use them if you group farms by region or by client.</li></ul>
+          <figure class="shot-fig"><img src="img/guide-farm-04-details.jpg" alt="" loading="lazy" /><figcaption>More details. Every field here is optional and editable later.</figcaption></figure>
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Create the farm</h3>
+          <ul class="steps"><li>Click <b>Create farm</b>.</li><li>The farm appears in the farm picker at the top of the workspace, and the workspace pages stop being greyed out.</li><li>Everything except the boundary can be changed later in Farm settings.</li></ul>
+          
+          
+        </div>
+      </div>
+    </div>
+
+    <div class="note"><span class="lab">Check it worked</span>
+      <ul style="margin:.3rem 0 0"><li>The farm shows in the farm picker at the top of the workspace.</li><li>The area in Farm settings matches what you know the farm to be.</li><li>The workspace pages are no longer greyed out.</li></ul>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <p class="kicker">Reference</p>
+    <h2 class="section">Every field on the form</h2>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Required</th><th>What it is for</th></tr></thead><tbody><tr><td>Boundary</td><td>yes</td><td>The outer edge of the farm. Drawn on the map, or uploaded as KML, GeoJSON or zipped Shapefile.</td></tr><tr><td>Code</td><td>yes</td><td>Short identifier, for example GV-01. Shows in lists, exports and reports.</td></tr><tr><td>Name</td><td>yes</td><td>Readable name, for example Green Valley North. Shows in the farm picker.</td></tr><tr><td>Country</td><td>no</td><td>One of 18 countries. Decision trees can target a region, so a farm with no country matches none of them.</td></tr><tr><td>Description</td><td>no</td><td>Free text about the farm.</td></tr><tr><td>Governorate, District</td><td>no</td><td>Administrative location.</td></tr><tr><td>Nearest city, Address</td><td>no</td><td>Where the farm is, in words.</td></tr><tr><td>Farm type</td><td>no</td><td>Commercial, Research or Contract. Starts on Commercial.</td></tr><tr><td>Ownership</td><td>no</td><td>Owned, Leased, Partnership or Other.</td></tr><tr><td>Primary water source</td><td>no</td><td>Well, Canal, Nile, Desalinated, Rainfed or Mixed.</td></tr><tr><td>Established date</td><td>no</td><td>When the farm started.</td></tr><tr><td>Tags</td><td>no</td><td>Free text labels for grouping farms.</td></tr></tbody></table></div>
+
+    <h3>When it does not work</h3>
+<div class="table-wrap"><table><thead><tr><th>What you see</th><th>What to do</th></tr></thead><tbody><tr><td>Create farm is greyed out</td><td>Code or Name is empty. Both are required. Everything else is optional.</td></tr><tr><td>The area looks wrong</td><td>The shape is wrong, not the calculation. Click Boundary and redraw at a higher zoom.</td></tr><tr><td>The boundary cuts through a field</td><td>Redraw before you create blocks. Blocks and grid cells are all computed inside this line.</td></tr><tr><td>No country set</td><td>The farm still works, but a decision tree written for a region will skip it. Set it in Farm settings.</td></tr><tr><td>The upload is rejected</td><td>The file must be KML, GeoJSON, or a Shapefile inside a zip. A bare .shp will not do, a Shapefile needs its sidecar files.</td></tr></tbody></table></div>
+  </div>
+</section>
+
+  <section class="band tint">
+    <div class="wrap">
+      <p class="kicker">Related</p>
+      <h2 class="section">Read next</h2>
+      <div class="cards c3" style="margin-top:1.2rem"><a class="card" href="process-map-the-farm.html"><h4>Back to Map the farm</h4><p>Open the page</p></a><a class="card" href="process-plan-the-season.html"><h4>Plan the season</h4><p>Open the page</p></a><a class="card" href="concepts.html"><h4>Key concepts</h4><p>Open the page</p></a></div>
+    </div>
+  </section>
+
+
+  <section class="band">
+    <div class="wrap">
+      <p class="kicker">Support</p>
+      <h2 class="section">Still stuck?</h2>
+      <p class="big" style="max-width:60ch">Three channels beside the documentation. All three
+         pages are placeholders for now and will be designed next.</p>
+      <div class="support"><a href="support.html#faq"><div class="ico">❓</div><h4>FAQs</h4><p>The questions we answer most often, grouped by process.</p><p style="margin-top:.6rem"><span class="chip">To be designed</span></p></a><a href="support.html#ask"><div class="ico">💬</div><h4>Ask the AgriPulse team</h4><p>Send a question to the people who build and run the platform.</p><p style="margin-top:.6rem"><span class="chip">To be designed</span></p></a><a href="support.html#feature"><div class="ico">✨</div><h4>Request a feature</h4><p>Tell us what is missing. Requests are read and answered.</p><p style="margin-top:.6rem"><span class="chip">To be designed</span></p></a></div>
+    </div>
+  </section>
+
+
+<footer class="site">
+  <div class="inner">
+    <div>
+      <a class="brand" href="index.html"><span class="mark">A</span><span>AgriPulse<small>documentation</small></span></a>
+      <p>Farm intelligence for Egypt and the region. Satellite, weather and field
+         observation in one record, with a dated action at the end of it.</p>
+    </div>
+    <div>
+      <h5>Processes</h5>
+      <a href="process-map-the-farm.html">Map the farm</a>
+      <a href="process-plan-the-season.html">Plan the season</a>
+      <a href="process-connect-the-data.html">Connect the data</a>
+      <a href="process-read-the-field.html">Read the field</a>
+      <a href="process-author-the-agronomy.html">Write the agronomy</a>
+      <a href="process-run-the-field-team.html">Run the field team</a>
+      <a href="process-close-the-loop.html">Close the loop</a>
+      <a href="process-operate-the-platform.html">Run the platform</a>
+    </div>
+    <div>
+      <h5>Knowledge Base</h5>
+      <a href="kb.html">All catalogs</a>
+      <a href="kb-crop-mango.html">Mango</a>
+      <a href="kb-crop-date-palm.html">Date palm</a>
+      <a href="kb-crop-potato.html">Potato</a>
+      <a href="kb-indices.html">Imagery indices</a>
+      <a href="kb-weather.html">Weather</a>
+      <a href="kb-trees.html">Decision trees</a>
+      <a href="concepts.html">Key concepts</a>
+    </div>
+    <div>
+      <h5>Support</h5>
+      <a href="support.html#faq">FAQs</a>
+      <a href="support.html#ask">Ask the AgriPulse team</a>
+      <a href="support.html#feature">Request a feature</a>
+      <a href="credits.html">Photo credits</a>
+      <a href="https://app.agripulse.cloud">Sign in to the app</a>
+    </div>
+  </div>
+  <div class="legal">
+    <div class="inner">
+      <span>AgriPulse documentation · docs.agripulse.cloud · draft, 18 August 2026</span>
+      <span>Photographs are used under the licences listed on the credits page.</span>
+    </div>
+  </div>
+</footer>
+<script>
+  (function () {
+    var order = ["light", "dark", ""];
+    document.getElementById("theme").addEventListener("click", function () {
+      var cur = document.documentElement.getAttribute("data-theme") || "";
+      var next = order[(order.indexOf(cur) + 1) % order.length];
+      if (next) { document.documentElement.setAttribute("data-theme", next); }
+      else { document.documentElement.removeAttribute("data-theme"); }
+    });
+    var lang = document.getElementById("lang");
+    lang.addEventListener("click", function () {
+      var rtl = document.documentElement.dir === "rtl";
+      document.documentElement.dir = rtl ? "ltr" : "rtl";
+      lang.textContent = rtl ? "العربية" : "English";
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Key concepts · AgriPulse docs</title>
+<meta name="description" content="The vocabulary the AgriPulse documentation uses." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+<header class="site">
+  <div class="site-inner">
+    <a class="brand" href="index.html">
+      <span class="mark">A</span>
+      <span>AgriPulse<small>documentation</small></span>
+    </a>
+    <nav class="main">
+      <a href="index.html#processes">Processes</a>
+      <a href="kb.html">Knowledge Base</a>
+      <a href="concepts.html" class="on">Concepts</a>
+      <a href="support.html">Support</a>
+    </nav>
+    <span class="site-spacer"></span>
+    <button class="hbtn" id="lang" type="button" title="Arabic pages are planned">العربية</button>
+    <button class="hbtn" id="theme" type="button">Theme</button>
+  </div>
+</header>
+
+<section class="hero compact">
+  <img class="bg" src="img/p04-read.jpg" alt="" />
+  <div class="inner">
+    <div class="crumbs"><a href="index.html">Docs</a></div>
+    <span class="eyebrow">Reference</span>
+    <h1>Key concepts</h1>
+    <p class="lede">One short definition each. These are the words every process page and every
+       Knowledge Base page uses, so they mean the same thing everywhere on this site.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+<h3>Farm shape</h3><div class="table-wrap"><table><thead><tr><th>Term</th><th>What it means</th></tr></thead><tbody><tr><td>Tenant</td><td>One customer account. Its own data, its own users, separate from every other tenant.</td></tr><tr><td>Farm</td><td>A named boundary. Imagery and weather subscriptions attach here, not to blocks.</td></tr><tr><td>Block</td><td>A managed area inside a farm. It carries the crop, the plan and the responsible person.</td></tr><tr><td>Grid cell</td><td>A fixed size square inside a block, used to see variation within the block. Cell size is set once per farm.</td></tr><tr><td>Land unit</td><td>An area that is not crop: a road, a building, a canal. Excluded from crop numbers.</td></tr><tr><td>Farm surface</td><td>Whole farm imagery. At the boundary a pixel counts only if its centre falls inside the farm.</td></tr></tbody></table></div><h3>Data</h3><div class="table-wrap"><table><thead><tr><th>Term</th><th>What it means</th></tr></thead><tbody><tr><td>Pass</td><td>One satellite acquisition over the farm on one date. A chart point is a pass, not a day.</td></tr><tr><td>Index</td><td>A number computed from satellite bands, for example NDVI. Twelve ship seeded.</td></tr><tr><td>Aggregate</td><td>The mean, minimum, maximum and percentiles of an index over a block or a cell, per pass.</td></tr><tr><td>Baseline</td><td>What this block usually reads at this time of year. An anomaly is measured against it.</td></tr><tr><td>Weather derived signal</td><td>A daily number computed from the weather feed, for example ET₀ or growing degree days.</td></tr><tr><td>Forecast</td><td>Weather days after today. Marked as forecast and excluded from baselines and summaries.</td></tr><tr><td>Signal</td><td>A value recorded in the field or imported from a laboratory, on a block, on a date.</td></tr></tbody></table></div><h3>Logic</h3><div class="table-wrap"><table><thead><tr><th>Term</th><th>What it means</th></tr></thead><tbody><tr><td>Decision tree</td><td>A versioned flow of nodes that reads data and opens recommendations or alerts.</td></tr><tr><td>Condition source</td><td>What a condition may read: an index, a weather value, a field signal, the crop stage, or a block attribute.</td></tr><tr><td>Parameter</td><td>A named threshold with a default, declared by the tree author and changeable per tenant.</td></tr><tr><td>Scope</td><td>Whether the tree runs once per block or once per grid cell.</td></tr><tr><td>Dry run</td><td>Running a draft against real data without opening anything.</td></tr><tr><td>Evaluation trace</td><td>The stored record of why a tree fired or did not fire on a block.</td></tr></tbody></table></div><h3>Action</h3><div class="table-wrap"><table><thead><tr><th>Term</th><th>What it means</th></tr></thead><tbody><tr><td>Recommendation</td><td>A dated suggested action on a block or a cell, with the reason it opened.</td></tr><tr><td>Alert</td><td>A dated warning that needs attention. Same origin as a recommendation.</td></tr><tr><td>Action horizon</td><td>How soon the action is due. Four horizons, from immediate to seasonal.</td></tr><tr><td>Dispatch</td><td>Sending an item to a worker or a scout, in the app and as a push notice.</td></tr><tr><td>Visit</td><td>A scouting job on a block, with a form to fill and photographs to attach.</td></tr><tr><td>Plan and activity</td><td>The season calendar for a block, and the jobs on it.</td></tr></tbody></table></div><h3>Crop</h3><div class="table-wrap"><table><thead><tr><th>Term</th><th>What it means</th></tr></thead><tbody><tr><td>Crop path</td><td>A dotted name such as mango.sukkary. A rule can target any level of it.</td></tr><tr><td>Variety</td><td>The cultivar planted on a block. It can carry its own plan template.</td></tr><tr><td>Growth stage</td><td>Where the crop is in its cycle today, from the phenology model.</td></tr><tr><td>Crop attribute</td><td>A field recorded once at establishment, for example rootstock or seed grade.</td></tr><tr><td>Size class</td><td>Small, medium or large canopy, used for tree crops.</td></tr><tr><td>Growing degree day</td><td>A daily heat sum above a base temperature, used to track development.</td></tr></tbody></table></div><h3>People and access</h3><div class="table-wrap"><table><thead><tr><th>Term</th><th>What it means</th></tr></thead><tbody><tr><td>Membership and role</td><td>A user's place in a tenant, and what they are allowed to do.</td></tr><tr><td>Capability</td><td>One single permission, for example open a recommendation. A role is a set of them.</td></tr><tr><td>Farm scope</td><td>Limiting a member to named farms.</td></tr><tr><td>Resource</td><td>A person or a machine on the farm roster that work can be given to.</td></tr><tr><td>Platform admin</td><td>Operates AgriPulse across tenants: catalogs, defaults, backfills, Observer.</td></tr></tbody></table></div>
+  </div>
+</section>
+
+  <section class="band">
+    <div class="wrap">
+      <p class="kicker">Support</p>
+      <h2 class="section">Need something else?</h2>
+      <p class="big" style="max-width:60ch">Three channels beside the documentation. All three
+         pages are placeholders for now and will be designed next.</p>
+      <div class="support"><a href="support.html#faq"><div class="ico">❓</div><h4>FAQs</h4><p>The questions we answer most often, grouped by process.</p><p style="margin-top:.6rem"><span class="chip">To be designed</span></p></a><a href="support.html#ask"><div class="ico">💬</div><h4>Ask the AgriPulse team</h4><p>Send a question to the people who build and run the platform.</p><p style="margin-top:.6rem"><span class="chip">To be designed</span></p></a><a href="support.html#feature"><div class="ico">✨</div><h4>Request a feature</h4><p>Tell us what is missing. Requests are read and answered.</p><p style="margin-top:.6rem"><span class="chip">To be designed</span></p></a></div>
+    </div>
+  </section>
+
+
+<footer class="site">
+  <div class="inner">
+    <div>
+      <a class="brand" href="index.html"><span class="mark">A</span><span>AgriPulse<small>documentation</small></span></a>
+      <p>Farm intelligence for Egypt and the region. Satellite, weather and field
+         observation in one record, with a dated action at the end of it.</p>
+    </div>
+    <div>
+      <h5>Processes</h5>
+      <a href="process-map-the-farm.html">Map the farm</a>
+      <a href="process-plan-the-season.html">Plan the season</a>
+      <a href="process-connect-the-data.html">Connect the data</a>
+      <a href="process-read-the-field.html">Read the field</a>
+      <a href="process-author-the-agronomy.html">Write the agronomy</a>
+      <a href="process-run-the-field-team.html">Run the field team</a>
+      <a href="process-close-the-loop.html">Close the loop</a>
+      <a href="process-operate-the-platform.html">Run the platform</a>
+    </div>
+    <div>
+      <h5>Knowledge Base</h5>
+      <a href="kb.html">All catalogs</a>
+      <a href="kb-crop-mango.html">Mango</a>
+      <a href="kb-crop-date-palm.html">Date palm</a>
+      <a href="kb-crop-potato.html">Potato</a>
+      <a href="kb-indices.html">Imagery indices</a>
+      <a href="kb-weather.html">Weather</a>
+      <a href="kb-trees.html">Decision trees</a>
+      <a href="concepts.html">Key concepts</a>
+    </div>
+    <div>
+      <h5>Support</h5>
+      <a href="support.html#faq">FAQs</a>
+      <a href="support.html#ask">Ask the AgriPulse team</a>
+      <a href="support.html#feature">Request a feature</a>
+      <a href="credits.html">Photo credits</a>
+      <a href="https://app.agripulse.cloud">Sign in to the app</a>
+    </div>
+  </div>
+  <div class="legal">
+    <div class="inner">
+      <span>AgriPulse documentation · docs.agripulse.cloud · draft, 18 August 2026</span>
+      <span>Photographs are used under the licences listed on the credits page.</span>
+    </div>
+  </div>
+</footer>
+<script>
+  (function () {
+    var order = ["light", "dark", ""];
+    document.getElementById("theme").addEventListener("click", function () {
+      var cur = document.documentElement.getAttribute("data-theme") || "";
+      var next = order[(order.indexOf(cur) + 1) % order.length];
+      if (next) { document.documentElement.setAttribute("data-theme", next); }
+      else { document.documentElement.removeAttribute("data-theme"); }
+    });
+    var lang = document.getElementById("lang");
+    lang.addEventListener("click", function () {
+      var rtl = document.documentElement.dir === "rtl";
+      document.documentElement.dir = rtl ? "ltr" : "rtl";
+      lang.textContent = rtl ? "العربية" : "English";
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Set the grid cell size · AgriPulse docs</title>
+<meta name="description" content="A block tells you the average. The grid tells you which corner of the block is dragging that average down. Cell size decides how small that corner can be, and it is set once for th" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+<header class="site">
+  <div class="site-inner">
+    <a class="brand" href="index.html">
+      <span class="mark">A</span>
+      <span>AgriPulse<small>documentation</small></span>
+    </a>
+    <nav class="main">
+      <a href="index.html#processes" class="on">Processes</a>
+      <a href="kb.html">Knowledge Base</a>
+      <a href="concepts.html">Concepts</a>
+      <a href="support.html">Support</a>
+    </nav>
+    <span class="site-spacer"></span>
+    <button class="hbtn" id="lang" type="button" title="Arabic pages are planned">العربية</button>
+    <button class="hbtn" id="theme" type="button">Theme</button>
+  </div>
+</header>
+
+<section class="hero compact">
+  <img class="bg" src="img/p04-read.jpg" alt="" />
+  <div class="inner">
+    <div class="crumbs"><a href="index.html">Docs</a> → <a href="index.html#processes">Processes</a>
+      → <a href="process-map-the-farm.html">Map the farm</a></div>
+    <span class="eyebrow">Guide · Process 01</span>
+    <h1>Set the grid cell size</h1>
+    <p class="lede">A block tells you the average. The grid tells you which corner of the block is dragging that average down. Cell size decides how small that corner can be, and it is set once for the farm, not per block.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="cards c3">
+      <div class="card"><h4>Who does this</h4><p>Farm manager, tenant admin</p></div>
+      <div class="card"><h4>How long it takes</h4><p>5 minutes, plus reprocessing time if you change it later</p></div>
+      <div class="card"><h4>Steps</h4><p>6 steps</p></div>
+    </div>
+
+    <h3>Watch it in the system</h3>
+    <div class="clip">
+      <video controls preload="metadata" poster="img/guide-grid-clip-poster.jpg" playsinline>
+        <source src="media/grid-cell-size.mp4" type="video/mp4" />
+        Your browser cannot play this video. Download it at
+        <a href="media/grid-cell-size.mp4">media/grid-cell-size.mp4</a>.
+      </video>
+      <div class="bar">
+        <span><b>Set the grid cell size — walkthrough.</b> Silent screen capture of the real app, 1 minute 8 seconds. It opens Farm settings, walks the Zones section, and runs a preview without committing the change.</span>
+        <span class="chip live">Draft capture</span>
+      </div>
+    </div>
+
+
+    <h3>Before you start</h3>
+    <ul><li>A farm with blocks. See Add the blocks.</li><li>At least one imagery product turned on for the farm. Blocks with no imagery are skipped, so the grid is built for nothing.</li><li>A view on how small an area you would actually act on.</li></ul>
+
+  </div>
+</section>
+
+<section class="band tint">
+  <div class="wrap">
+    <p class="kicker">Step by step</p>
+    <h2 class="section">Set the grid cell size</h2>
+    <div class="stages" style="margin-top:1.6rem">
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Open Farm settings</h3>
+          <ul class="steps"><li>Open the farm in <b>Farm management</b> and click the gear on the map toolbar.</li><li>The panel has three tabs: <b>Farm</b>, <b>Block defaults</b> and <b>Members</b>. Stay on Farm.</li><li>Scroll to <b>Zones (sub-block grid)</b>. The section says it plainly: cell size and sensitivity are set for the farm and applied to every block that has imagery.</li></ul>
+          <figure class="shot-fig"><img src="img/guide-grid-01-panel.jpg" alt="" loading="lazy" /><figcaption>Farm settings, Farm tab. Zones sits under Satellite imagery and Weather.</figcaption></figure>
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Turn imagery on first, if it is off</h3>
+          <ul class="steps"><li>Just above Zones is <b>Satellite imagery</b>, with the products you can turn on.</li><li>A block with no imagery subscription has nothing to draw a grid from. The preview counts those blocks as skipped.</li><li>Turning a product on subscribes the whole farm. There is no separate step to apply it to blocks.</li></ul>
+          
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Choose the cell size</h3>
+          <ul class="steps"><li>Type a size in metres in <b>Cell size (m)</b>.</li><li>Smaller cells show more variation inside a block and cost more to compute on every pass. Larger cells are cheaper and blur the thing you are looking for.</li><li>Pick the smallest area you would actually send someone to. A cell you would never act on alone is detail you are paying for and ignoring.</li></ul>
+          
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Preview before you commit</h3>
+          <ul class="steps"><li>Click <b>Preview changes</b>. Nothing is changed yet.</li><li>The answer is exact, for example: <i>0 blocks would change — 0 new grids, 0 rezoned, 10 skipped</i>.</li><li><b>New grid</b> means a block that had none. <b>Rezoned</b> means a block whose cells are redrawn. <b>Skipped</b> usually means the block has no imagery.</li><li>If the numbers are not what you expected, the cell size or the imagery subscription is wrong, not the preview.</li></ul>
+          <figure class="shot-fig"><img src="img/guide-grid-02-preview.jpg" alt="" loading="lazy" /><figcaption>The preview counts the work before you agree to it.</figcaption></figure>
+          <div class="note"><span class="lab">Note</span><p>Changing cell size redraws the zones. Scenes already processed keep their old zones until they are reprocessed, so a farm can hold two grid generations at once. That is why the change asks for confirmation and states the cost first.</p></div>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Set the anomaly sensitivity</h3>
+          <ul class="steps"><li><b>Anomaly sensitivity (z)</b> is how far below the field average a cell must fall before it is flagged.</li><li>Lower is more sensitive, so more cells are flagged.</li><li>Leave it empty to inherit the tenant default.</li><li>It takes effect on the next detection sweep and reprocesses nothing, so it is cheap to tune.</li></ul>
+          
+          
+        </div>
+      </div>
+      <div class="stage">
+        <div class="badge"></div>
+        <div>
+          <h3>Undo a per-block override</h3>
+          <ul class="steps"><li><b>Reset blocks to the inherited default</b> puts every block in this farm back on the farm setting.</li><li>Use it when blocks have drifted apart and you want one rule again.</li></ul>
+          
+          
+        </div>
+      </div>
+    </div>
+
+    <div class="note"><span class="lab">Check it worked</span>
+      <ul style="margin:.3rem 0 0"><li>The preview reports the number of blocks you expected, not zero and not all of them.</li><li>After the next pass, opening a block shows cells at the size you set.</li><li>A single weak corner of a block stands out instead of being averaged away.</li></ul>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <p class="kicker">Reference</p>
+    <h2 class="section">Every field on the form</h2>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Scope</th><th>What it does</th></tr></thead><tbody><tr><td>Cell size (m)</td><td>the whole farm</td><td>The size of each grid cell. Applied to every block that has imagery.</td></tr><tr><td>Preview changes</td><td>read only</td><td>Counts new grids, rezoned blocks and skipped blocks before anything is written.</td></tr><tr><td>Anomaly sensitivity (z)</td><td>the whole farm</td><td>How far below the field average a cell must fall before it is flagged. Lower is more sensitive. Empty inherits the tenant default.</td></tr><tr><td>Reset blocks to the inherited default</td><td>the whole farm</td><td>Clears per-block overrides so every block follows the farm setting again.</td></tr></tbody></table></div>
+
+    <h3>When it does not work</h3>
+<div class="table-wrap"><table><thead><tr><th>What you see</th><th>What it means</th></tr></thead><tbody><tr><td>Every block skipped</td><td>The blocks have no imagery subscription. Turn a product on in Satellite imagery first.</td></tr><tr><td>Nothing would change</td><td>The blocks already use this cell size. Nothing to do.</td></tr><tr><td>The old grid is still on the map</td><td>Scenes already processed keep their old zones. New zones appear as scenes are reprocessed.</td></tr><tr><td>Too many cells flagged</td><td>The sensitivity is too low. Raise it. It takes effect on the next sweep and costs nothing to change.</td></tr></tbody></table></div>
+  </div>
+</section>
+
+  <section class="band tint">
+    <div class="wrap">
+      <p class="kicker">Related</p>
+      <h2 class="section">Read next</h2>
+      <div class="cards c3" style="margin-top:1.2rem"><a class="card" href="guide-add-the-blocks.html"><h4>Add the blocks</h4><p>Open the page</p></a><a class="card" href="guide-attach-the-people.html"><h4>Attach the people</h4><p>Open the page</p></a><a class="card" href="process-connect-the-data.html"><h4>Connect the data</h4><p>Open the page</p></a></div>
+    </div>
+  </section>
+
+
+  <section class="band">
+    <div class="wrap">
+      <p class="kicker">Support</p>
+      <h2 class="section">Still stuck?</h2>
+      <p class="big" style="max-width:60ch">Three channels beside the documentation. All three
+         pages are placeholders for now and will be designed next.</p>
+      <div class="support"><a href="support.html#faq"><div class="ico">❓</div><h4>FAQs</h4><p>The questions we answer most often, grouped by process.</p><p style="margin-top:.6rem"><span class="chip">To be designed</span></p></a><a href="support.html#ask"><div class="ico">💬</div><h4>Ask the AgriPulse team</h4><p>Send a question to the people who build and run the platform.</p><p style="margin-top:.6rem"><span class="chip">To be designed</span></p></a><a href="support.html#feature"><div class="ico">✨</div><h4>Request a feature</h4><p>Tell us what is missing. Requests are read and answered.</p><p style="margin-top:.6rem"><span class="chip">To be designed</span></p></a></div>
+    </div>
+  </section>
+
+
+<footer class="site">
+  <div class="inner">
+    <div>
+      <a class="brand" href="index.html"><span class="mark">A</span><span>AgriPulse<small>documentation</small></span></a>
+      <p>Farm intelligence for Egypt and the region. Satellite, weather and field
+         observation in one record, with a dated action at the end of it.</p>
+    </div>
+    <div>
+      <h5>Processes</h5>
+      <a href="process-map-the-farm.html">Map the farm</a>
+      <a href="process-plan-the-season.html">Plan the season</a>
+      <a href="process-connect-the-data.html">Connect the data</a>
+      <a href="process-read-the-field.html">Read the field</a>
+      <a href="process-author-the-agronomy.html">Write the agronomy</a>
+      <a href="process-run-the-field-team.html">Run the field team</a>
+      <a href="process-close-the-loop.html">Close the loop</a>
+      <a href="process-operate-the-platform.html">Run the platform</a>
+    </div>
+    <div>
+      <h5>Knowledge Base</h5>
+      <a href="kb.html">All catalogs</a>
+      <a href="kb-crop-mango.html">Mango</a>
+      <a href="kb-crop-date-palm.html">Date palm</a>
+      <a href="kb-crop-potato.html">Potato</a>
+      <a href="kb-indices.html">Imagery indices</a>
+      <a href="kb-weather.html">Weather</a>
+      <a href="kb-trees.html">Decision trees</a>
+      <a href="concepts.html">Key concepts</a>
+    </div>
+    <div>
+      <h5>Support</h5>
+      <a href="support.html#faq">FAQs</a>
+      <a href="support.html#ask">Ask the AgriPulse team</a>
+      <a href="support.html#feature">Request a feature</a>
+      <a href="credits.html">Photo credits</a>
+      <a href="https://app.agripulse.cloud">Sign in to the app</a>
+    </div>
+  </div>
+  <div class="legal">
+    <div class="inner">
+      <span>AgriPulse documentation · docs.agripulse.cloud · draft, 18 August 2026</span>
+      <span>Photographs are used under the licences listed on the credits page.</span>
+    </div>
+  </div>
+</footer>
+<script>
+  (function () {
+    var order = ["light", "dark", ""];
+    document.getElementById("theme").addEventListener("click", function () {
+      var cur = document.documentElement.getAttribute("data-theme") || "";
+      var next = order[(order.indexOf(cur) + 1) % order.length];
+      if (next) { document.documentElement.setAttribute("data-theme", next); }
+      else { document.documentElement.removeAttribute("data-theme"); }
+    });
+    var lang = document.getElementById("lang");
+    lang.addEventListener("click", function () {
+      var rtl = document.documentElement.dir === "rtl";
+      document.documentElement.dir = rtl ? "ltr" : "rtl";
+      lang.textContent = rtl ? "العربية" : "English";
+    });
+  })();
+</script>
+</body>
+</html>
