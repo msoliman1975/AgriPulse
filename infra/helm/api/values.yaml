@@ -118,6 +118,13 @@ env:
   KEYCLOAK_BASE_URL: "https://keycloak.{{ .Values.global.envHost }}"
   KEYCLOAK_REALM: agripulse
   KEYCLOAK_ADMIN_CLIENT_ID: agripulse-tenancy
+  # Where an invited user lands after the welcome email's
+  # UPDATE_PASSWORD screen succeeds. Must be a registered redirect
+  # URI of KEYCLOAK_INVITE_CLIENT_ID in agripulse-realm.json;
+  # https://app.<envHost>/* is already listed there. Without it KC
+  # leaves the user on its own Keycloak account console.
+  KEYCLOAK_INVITE_REDIRECT_URL: "https://app.{{ .Values.global.envHost }}/"
+  KEYCLOAK_INVITE_CLIENT_ID: agripulse-api
   # S3 (object storage) — in-cluster defaults override the dev-machine
   # MinIO values that ship in backend/app/core/settings.py. The empty
   # endpoint_url tells boto3 to talk to real AWS S3; empty creds tell
