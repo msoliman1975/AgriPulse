@@ -1,0 +1,54 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Al-Ashraf — Siwa, Zone 1",
+        "name_ar": "شركة الاشراف لتقسيم واستصلاح الاراضي — منطقة سيوة، المنطقة ١",
+        "source": "Egyptian Countryside Development Co. — handover annex, points 11–17",
+        "declared_area_feddan": 1502.05,
+        "computed_area_feddan": 1507.66
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              25.8575553,
+              29.2989069
+            ],
+            [
+              25.8424986,
+              29.298175
+            ],
+            [
+              25.8420419,
+              29.3353914
+            ],
+            [
+              25.8472275,
+              29.3368194
+            ],
+            [
+              25.8526344,
+              29.3382947
+            ],
+            [
+              25.8559675,
+              29.3391683
+            ],
+            [
+              25.8570639,
+              29.3394467
+            ],
+            [
+              25.8575553,
+              29.2989069
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}
