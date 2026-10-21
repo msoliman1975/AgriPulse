@@ -453,3 +453,39 @@ The container could not download any of these because of network policy. Downloa
 | Olive fly trap insecticides | not covered | deltamethrin or λ-cyhalothrin allowed in traps only (6.6) |
 | National production | IOC balance only | MALR 2021/22: 1.13 Mt from 269 k feddan; yield −16 % 2018–22 (6.3) |
 | Organic vs conventional yield | not covered | 7.3 vs 10.2 t/ha table olives, 2009 (6.2) |
+
+---
+
+## 8. FAO sources (dedicated search)
+
+**Bottom line:** FAO has **no current organic olive manual**. What it has falls into four groups:
+- the FAO/WHO **Codex standards** for organic food, table olives and olive oil;
+- the FAO **irrigation papers**;
+- one old **regional olive-pest publication** (1992);
+- a **new FAO–Egypt olive value-chain agreement** (10 Sep 2026), whose outputs are not yet published.
+
+The download table uses the same priority scale as Section 4 (A = essential). I fetched none of these files; please download and upload them.
+
+| # | P | FAO document | Why it matters | Link |
+|---|---|---|---|---|
+| 66 | A | **Codex CXG 32-1999**, Guidelines for organically produced foods (rev. 2007, amended 2008–2009) | The international organic baseline that national laws, Egypt's included, are built on. Covers conversion, input lists (Annex 2) and inspection | https://www.fao.org/fileadmin/user_upload/livestockgov/documents/cxg_032e.pdf |
+| 67 | A | **Codex CXS 66-1981**, Standard for table olives (2024 version) | The Codex counterpart of the IOC standard, used for export compliance | https://www.fao.org/fao-who-codexalimentarius/codex-texts/list-standards/en/ (search "66-1981"; the French PDF is at https://www.fao.org/input/download/standards/243/CXS_066f.pdf) |
+| 68 | A | **Codex CXS 33-1981**, Standard for olive oils and olive-pomace oils (2024 version) | Quality grades and limits for olive oil | Same list page (search "33-1981"); English copy rev. 2017/2021: https://bsti.portal.gov.bd/sites/default/files/files/bsti.portal.gov.bd/notices/cea2a2df_9c32_4ddc_bb3b_f10024e7f0ac/2023-01-19-08-36-1f0f3cdd942461b6a91c362dada016cf.pdf |
+| 69 | A | **FAO I&D Paper 56**, Crop evapotranspiration (1998) | Olive Kc table and the method for adjusting it to ground cover (see 2.5) | https://www.fao.org/4/x0490e/x0490e00.htm |
+| 70 | A | **FAO I&D Paper 66**, Crop yield response to water (2012). Chapter "Fruit trees and vines" by Fereres, Goldhamer and Sadras, pp. 246–295 | Deficit-irrigation response of olive; main reference for RDI | https://www.fao.org/3/i2800e/i2800e00.htm |
+| 71 | B | **FAO I&D Paper 29**, Water quality for agriculture | Salinity and SAR limits for well water such as N. Sinai's EC 6.6 dS/m, SAR 10 (see 6.3) | https://www.fao.org/4/t0234e/t0234e00.htm |
+| 72 | B | **FAO Plant Production & Protection Paper 115**, *Olive pests and their control in the Near East* (1992, about 180 pp.) | The only FAO olive-IPM book for the region. Old, but describes the regional pest complex | No online PDF found. Try FAO Open Knowledge (https://openknowledge.fao.org, search "Olive pests Near East"), the ARC library or a university library |
+| 73 | B | FAO Regional Symposium on Fruit Flies in the Near East (Hammamet, 2012), proceedings | Surveillance, semiochemicals, sanitation and SIT; *B. oleae* listed among the main regional fruit flies | https://www.fao.org/fileadmin/templates/agphome/documents/Pests_Pesticides/fruitflies/fruitflies.pdf |
+| 74 | B | FAO, *Fats, Oils and Related Products* (Codex volume) | Older consolidated text of the olive-oil standard | https://www.fao.org/4/y2774e/y2774e00.htm |
+| 75 | B | FAOSTAT crop data: Egypt, olives (area harvested and production) | Official area and yield series to cross-check MALR | https://www.fao.org/faostat/en/#data/QCL |
+| 76 | — | FAO–Egypt olive value-chain framework (MoU signed 10 Sep 2026) | Will produce a national olive strategy covering production through marketing, with a push for oil varieties. Nothing is published yet; watch FAO Egypt | News: https://english.ahram.org.eg/News/576406.aspx |
+
+**FAO AGRIS records worth pulling** (abstracts on AGRIS; full texts with the publishers):
+- Olive-mill-by-product compost in olive groves: https://agris.fao.org/search/en/records/65df31a863b8185d9cab9822
+- Compost and irrigation strategy in olive groves: https://agris.fao.org/search/ru/records/6765396550e69ae818388dff
+- Pomace compost and soil fauna: https://agris.fao.org/search/en/records/6765396e50e69ae818388fce
+- Aggezi and Koroneiki with organic and bio-fertilisers, Egypt (#35): https://agris.fao.org/search/en/records/67598a42c7a957febdfb7aea
+
+**Non-FAO but close in kind:** an Arabic national olive guide from Jordan's NARC (2nd ed., 2024) has the same chapter structure our manual needs. It is a good template for Arabic terminology: https://www.narc.gov.jo/ebv4.0/root_storage/ar/eb_list_page/olive.pdf
+
+**Evidence from the AGRIS compost records:** pomace (alperujo) compost consistently raises soil carbon, available P and K, and soil fauna. Its yield effect is inconsistent: no change in rainfed groves over 3 years, but +30–41 % in an irrigated hedgerow system. The manual should present compost as a **soil-building practice** rather than a guaranteed yield booster.
