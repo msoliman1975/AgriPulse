@@ -76,6 +76,10 @@ class QueueEntry(BaseModel):
     subscription_id: UUID
     block_id: UUID
     farm_id: UUID | None
+    # The block's readable labels. The queue list used to print the raw uuid,
+    # which an operator cannot match to anything on the map.
+    block_code: str | None = None
+    block_name: str | None = None
     provider_code: str | None
     # For overdue: last_successful_ingest_at (may be null on never-synced).
     # For running/stuck: the attempt/job's started_at.

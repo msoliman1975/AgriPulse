@@ -1,5 +1,6 @@
 import type { FarmMember } from "@/api/farmMembers";
 import type { TenantUser } from "@/api/users";
+import { displayUser } from "@/lib/userDisplay";
 
 export interface AssigneeOption {
   membershipId: string;
@@ -37,9 +38,12 @@ export function buildAssigneeOptions(
   const list: AssigneeOption[] = users.map((u) => ({
     membershipId: u.membership_id,
     role: roleByMembership.get(u.membership_id) ?? null,
-    // name → email → short id. A blank option cannot be told from its
-    // neighbours and reads as a broken list.
-    name: u.full_name || u.email || u.membership_id.slice(0, 8),
+    // `displayUser` decides which handle is real: a field worker's email is
+    // synthesised from their phone, so `full_name || email` used to render a
+    // scout as `+20…@scouts.agripulse.cloud`. A blank option cannot be told
+    // from its neighbours and reads as a broken list, so it still ends in a
+    // short id.
+    name: displayUser(u, u.membership_id),
   }));
 
   if (ensureId !== "" && !list.some((o) => o.membershipId === ensureId)) {

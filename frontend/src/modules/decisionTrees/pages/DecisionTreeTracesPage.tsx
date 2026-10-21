@@ -336,7 +336,13 @@ function TraceDetailModal({
                 value={`${trace.tree_code} v${trace.tree_version}`}
                 mono
               />
-              <Row label={t("traces.detail.block")} value={trace.block_name ?? trace.block_id} />
+              {/* `block_name` is COALESCE(name, code) server-side, so it is
+                  null only when the block row is gone. Truncate the id the
+                  same way the table does rather than printing a full uuid. */}
+              <Row
+                label={t("traces.detail.block")}
+                value={trace.block_name ?? `${trace.block_id.slice(0, 8)}…`}
+              />
               {cellLabel(trace.cell_row, trace.cell_col) ? (
                 <Row
                   label={t("traces.detail.zone")}

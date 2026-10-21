@@ -15,11 +15,14 @@ import {
   updateTenantUser,
 } from "@/api/users";
 
-export function useTenantUsers() {
+export function useTenantUsers(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["tenant_users", "list"] as const,
     queryFn: listTenantUsers,
     staleTime: 30_000,
+    // Callers that only need names for display pass `enabled: false` when the
+    // viewer lacks `user.read`, so the list is not requested just to 403.
+    enabled: options?.enabled ?? true,
   });
 }
 

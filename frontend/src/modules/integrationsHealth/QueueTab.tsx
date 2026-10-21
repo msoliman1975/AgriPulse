@@ -94,7 +94,9 @@ function QueueSection({
                 <span className="font-mono text-ap-muted">{r.provider_code ?? "—"}</span>
               </div>
               <div className="mt-0.5 flex items-center justify-between gap-2 text-ap-muted">
-                <span className="truncate font-mono">{r.block_id}</span>
+                <span className="truncate">
+                  {r.block_name?.trim() || r.block_code || `${r.block_id.slice(0, 8)}…`}
+                </span>
                 <span>
                   {r.since
                     ? formatDistanceToNow(parseISO(r.since), {

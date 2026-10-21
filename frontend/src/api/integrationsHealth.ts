@@ -110,6 +110,8 @@ export interface QueueEntry {
   subscription_id: string;
   block_id: string;
   farm_id: string | null;
+  block_code: string | null;
+  block_name: string | null;
   provider_code: string | null;
   since: string | null;
   attempt_id: string | null;

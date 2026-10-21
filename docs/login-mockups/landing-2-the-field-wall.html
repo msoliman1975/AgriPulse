@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Farm health overview — Direction 2 · The Field Wall</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f7f6f1; --panel:#ffffff; --line:#e8e5db;
+  --ink:#1f2420; --muted:#6c7268;
+  --primary:#356b30; --primary-soft:#dceadb;
+  --good:#4f8e4a; --accent:#1f6f9a;
+  --warn:#c98a18; --warn-soft:#f7e7c2;
+  --crit:#b24430; --crit-soft:#f3d2c9;
+  --unknown:#cfd1ca;
+  --text:"Inter",ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
+  --num:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--text);-webkit-font-smoothing:antialiased}
+
+.app{display:grid;grid-template-rows:auto auto 1fr auto;height:100vh;min-height:640px}
+
+/* -------------------------------------------------------------- header */
+.head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:14px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
+.mark{width:34px;height:34px;flex:none}
+.who b{display:block;font-size:15px;font-weight:600;letter-spacing:-.01em}
+.who span{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+.crops{display:flex;gap:6px;margin-inline-start:auto;flex-wrap:wrap}
+.crops button{min-height:34px;padding:0 12px;cursor:pointer;
+  border:1px solid var(--line);background:var(--bg);border-radius:999px;
+  font:500 13px/1 var(--text);color:var(--muted)}
+.crops button[aria-pressed="true"]{background:var(--primary-soft);border-color:#bcd5ba;color:var(--primary);font-weight:600}
+.crops button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+/* ------------------------------------------------- counters, no boxes */
+.counters{display:flex;overflow-x:auto;border-bottom:1px solid var(--line);background:var(--panel)}
+.counters a{flex:1 0 auto;min-width:132px;padding:12px 20px;text-decoration:none;color:inherit;
+  border-inline-start:1px solid var(--line);white-space:nowrap}
+.counters a:first-child{border-inline-start:0}
+.counters a:hover{background:var(--bg)}
+.counters a:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.counters .n{display:block;font:600 21px/1 var(--num);letter-spacing:-.01em}
+.counters .n.crit{color:var(--crit)} .counters .n.warn{color:var(--warn)}
+.counters .k{display:block;margin-top:6px;font-size:11.5px;color:var(--muted)}
+
+/* ---------------------------------------------------------- the wall */
+.body{display:grid;grid-template-columns:1fr 330px;min-height:0}
+.wall{position:relative;overflow:auto;padding:20px 24px}
+.wall-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.wall-head h2{margin:0;font:600 11px/1 var(--text);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.key{display:flex;gap:14px;flex-wrap:wrap;margin-inline-start:auto;font-size:12px;color:var(--muted)}
+.key i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:6px;vertical-align:-1px}
+
+/* cells are sized by area: a big block takes more of the wall */
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;grid-auto-rows:34px;grid-auto-flow:dense}
+.cell{border:0;border-radius:5px;cursor:pointer;padding:0;position:relative;
+  font:600 10px/1 var(--num);color:rgba(31,36,32,.82);
+  display:flex;align-items:flex-end;justify-content:flex-start}
+.cell span{padding:4px 5px}
+.cell.healthy{background:#cfe3cd}
+.cell.watch{background:var(--warn-soft)}
+.cell.critical{background:var(--crit-soft)}
+.cell.unknown{background:var(--unknown)}
+.cell:hover{outline:2px solid var(--ink);outline-offset:-2px}
+.cell:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.cell[aria-pressed="true"]{outline:2.5px solid var(--ink);outline-offset:-2px}
+.cell.critical::after{content:"";position:absolute;inset-inline-end:5px;top:5px;
+  width:6px;height:6px;border-radius:50%;background:var(--crit)}
+
+/* --------------------------------------------------------- side panel */
+.side{border-inline-start:1px solid var(--line);background:var(--panel);
+  overflow:auto;padding:20px}
+.side h3{margin:0;font:600 17px/1.25 var(--text);letter-spacing:-.01em}
+.chip{display:inline-flex;align-items:center;border-radius:999px;padding:3px 10px;
+  font:600 11px/1.5 var(--text);letter-spacing:.03em;margin-top:10px}
+.chip.critical{background:var(--crit-soft);color:#7a2a1c}
+.chip.watch{background:var(--warn-soft);color:#7a560a}
+.chip.healthy{background:var(--primary-soft);color:#2a5526}
+.chip.unknown{background:var(--unknown);color:#40453e}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:18px 0 0}
+.stats div{background:var(--panel);padding:11px 12px}
+.stats dt{margin:0;font-size:11px;color:var(--muted)}
+.stats dd{margin:5px 0 0;font:600 17px/1 var(--num)}
+.why{margin:18px 0 0;font-size:14px;color:var(--muted);line-height:1.6}
+.why b{color:var(--ink);font-weight:600}
+.trace{margin:14px 0 0;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.trace p{margin:0;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.trace ol{margin:9px 0 0;padding-inline-start:18px;font-size:13px;color:var(--ink);line-height:1.75}
+.trace ol li::marker{color:var(--muted)}
+.acts{display:flex;gap:8px;margin:18px 0 0;flex-wrap:wrap}
+.acts button{min-height:40px;padding:0 15px;border-radius:8px;cursor:pointer;
+  font:600 13.5px/1 var(--text);border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.acts button.go{background:var(--primary);border-color:var(--primary);color:#fff}
+.acts button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.empty{color:var(--muted);font-size:14px;line-height:1.6}
+
+/* ------------------------------------------------------ time scrubber */
+.scrub{display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:12px 24px;border-top:1px solid var(--line);background:var(--panel)}
+.scrub label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.scrub input[type=range]{flex:1;min-width:180px;accent-color:var(--primary);height:34px}
+.scrub .date{font:600 13px/1 var(--num);min-width:104px}
+.spans{display:flex;gap:2px}
+.spans button{min-height:34px;padding:0 12px;border:1px solid var(--line);background:var(--bg);
+  border-radius:8px;cursor:pointer;font:500 13px/1 var(--text);color:var(--muted)}
+.spans button[aria-pressed="true"]{background:var(--primary-soft);border-color:#bcd5ba;color:var(--primary);font-weight:600}
+.spans button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+@media (max-width:1000px){
+  .app{height:auto;min-height:0}
+  .body{grid-template-columns:1fr}
+  .side{border-inline-start:0;border-top:1px solid var(--line)}
+  .grid{grid-template-columns:repeat(8,1fr);grid-auto-rows:30px}
+  .head,.scrub{padding-inline:16px}
+  .wall{padding:16px}
+  .crops{margin-inline-start:0;width:100%;overflow-x:auto}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="head">
+    <svg class="mark" viewBox="0 0 200 200" aria-hidden="true">
+      <defs><linearGradient id="lf2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#a7d2b9"/><stop offset="55%" stop-color="#4f8e4a"/><stop offset="100%" stop-color="#356b30"/>
+      </linearGradient></defs>
+      <circle cx="100" cy="100" r="92" fill="none" stroke="#356b30" stroke-width="6"/>
+      <path d="M100 22 Q122 42 132 64 Q142 86 140 108 Q137 128 126 144 Q115 156 100 164 Q85 156 74 144 Q63 128 60 108 Q58 86 68 64 Q78 42 100 22Z" fill="url(#lf2)"/>
+      <path d="M22 102 L62 102 L72 86 L82 116 L100 76 L118 112 L126 96 L140 102 L178 100" fill="none" stroke="#b24430" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="who">
+      <b>Bashayer El Kheir</b>
+      <span>Farm health overview · 412.6 ha · Thursday, September 11</span>
+    </div>
+    <div class="crops" role="group" aria-label="Filter the overview by crop">
+      <button type="button" aria-pressed="true">All · 108</button>
+      <button type="button" aria-pressed="false">Mango · 64</button>
+      <button type="button" aria-pressed="false">Citrus · 31</button>
+      <button type="button" aria-pressed="false">Olive · 13</button>
+    </div>
+  </header>
+
+  <nav class="counters" aria-label="Farm counters">
+    <a href="#"><span class="n">108</span><span class="k">Land units</span></a>
+    <a href="#"><span class="n crit">7</span><span class="k">Active alerts</span></a>
+    <a href="#"><span class="n warn">12</span><span class="k">Open recommendations</span></a>
+    <a href="#"><span class="n">9</span><span class="k">Upcoming activities</span></a>
+    <a href="#"><span class="n">34 mm</span><span class="k">Irrigation due</span></a>
+    <a href="#"><span class="n">2h</span><span class="k">Latest signal</span></a>
+  </nav>
+
+  <div class="body">
+    <main class="wall">
+      <div class="wall-head">
+        <h2>Every block, sized by area</h2>
+        <div class="key">
+          <span><i style="background:#cfe3cd"></i>Healthy 82</span>
+          <span><i style="background:#f7e7c2"></i>Watch 23</span>
+          <span><i style="background:#f3d2c9"></i>Critical 3</span>
+          <span><i style="background:#cfd1ca"></i>Unknown 0</span>
+        </div>
+      </div>
+      <div class="grid" id="grid" role="group" aria-label="Block health wall"></div>
+    </main>
+
+    <aside class="side" id="side" aria-live="polite"></aside>
+  </div>
+
+  <div class="scrub">
+    <label for="day">As of</label>
+    <span class="date" id="dateOut">11 Sep 2026</span>
+    <input id="day" type="range" min="0" max="29" value="29" aria-label="Day within the selected span" />
+    <div class="spans" role="group" aria-label="Time span">
+      <button type="button" aria-pressed="false">7d</button>
+      <button type="button" aria-pressed="true">30d</button>
+      <button type="button" aria-pressed="false">90d</button>
+      <button type="button" aria-pressed="false">Season</button>
+      <button type="button" aria-pressed="false">All</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---- 108 blocks. Area drives the cell size; health drives the colour.
+  const CROPS = ['Mango, Keitt', 'Mango, Zebda', 'Citrus, Valencia', 'Olive, Picual'];
+  const CRIT = [16, 11, 2];              // block indexes that are critical
+  const WATCH = new Set([3, 8, 14, 21, 27, 30, 36, 41, 47, 52, 58, 63, 69, 74, 79, 85, 90, 95, 99, 101, 104, 106, 44]);
+
+  const blocks = Array.from({ length: 108 }, (_, i) => {
+    const health = CRIT.includes(i) ? 'critical' : WATCH.has(i) ? 'watch' : 'healthy';
+    const w = 1 + ((i * 5) % 3);         // 1..3 columns
+    const h = 1 + ((i * 7) % 2);         // 1..2 rows
+    return {
+      i,
+      name: 'Block ' + (i + 1),
+      crop: CROPS[i % CROPS.length],
+      health,
+      w, h,
+      area: (1.4 + ((i * 13) % 70) / 10).toFixed(1),
+      ndvi: (health === 'critical' ? 0.28 + (i % 5) / 50
+            : health === 'watch' ? 0.49 + (i % 7) / 60
+            : 0.60 + (i % 9) / 70).toFixed(2),
+      trend: health === 'critical' ? '−0.14' : health === 'watch' ? '−0.03' : '+0.01',
+      alerts: health === 'critical' ? 3 : health === 'watch' ? 1 : 0,
+      last: (i % 4) + 1
+    };
+  });
+
+  const grid = document.getElementById('grid');
+  grid.innerHTML = blocks.map((b) => `
+    <button class="cell ${b.health}" type="button" data-i="${b.i}" aria-pressed="false"
+            style="grid-column:span ${b.w};grid-row:span ${b.h}"
+            aria-label="${b.name}, ${b.crop}, ${b.health}, NDVI ${b.ndvi}">
+      <span>${b.i + 1}</span>
+    </button>`).join('');
+
+  const WHY = {
+    critical: 'NDVI is <b>{v}</b>, which is 2.4 standard deviations below this block’s own 30-day baseline. It has fallen on 6 of the last 7 passes.',
+    watch: 'Growth pace is behind its peer blocks. Nothing has breached a threshold yet, so no alert fired.',
+    healthy: 'Inside its own normal on every index the farm subscribes to. Last checked on this morning’s sweep.'
+  };
+  const TRACE = {
+    critical: ['Crop is Mango → rule set T_MANGO applies', 'NDVI z-score −2.4 → below −2.0', 'No rain in 7-day forecast', 'Leaf: <b>Pull fertigation forward 48h</b>'],
+    watch: ['Crop matches the peer group', 'Growth pace 9 days behind peers', 'No threshold breached → no alert', 'Leaf: <b>Scout, do not act yet</b>'],
+    healthy: ['All 14 rules evaluated', 'No condition matched', 'Leaf: <b>No action</b>']
+  };
+
+  const side = document.getElementById('side');
+  function blank() {
+    side.innerHTML = `<p class="empty">Pick a block on the wall to see why it is that colour,
+      which rule decided it, and what to do about it.<br><br>
+      3 blocks are critical. They carry a dot in the corner.</p>`;
+  }
+  function show(b) {
+    side.innerHTML = `
+      <h3>${b.name}</h3>
+      <div style="font-size:13px;color:var(--muted);margin-top:3px">${b.crop} · ${b.area} ha</div>
+      <span class="chip ${b.health}">${b.health[0].toUpperCase() + b.health.slice(1)}</span>
+      <dl class="stats">
+        <div><dt>NDVI</dt><dd>${b.ndvi}</dd></div>
+        <div><dt>30d trend</dt><dd>${b.trend}</dd></div>
+        <div><dt>Alerts</dt><dd>${b.alerts}</dd></div>
+        <div><dt>Last obs</dt><dd>${b.last}d</dd></div>
+      </dl>
+      <p class="why">${WHY[b.health].replace('{v}', b.ndvi)}</p>
+      <div class="trace">
+        <p>How this was decided</p>
+        <ol>${TRACE[b.health].map((s) => '<li>' + s + '</li>').join('')}</ol>
+      </div>
+      <div class="acts">
+        ${b.health === 'healthy' ? '' : '<button class="go" type="button">Apply</button><button type="button">Defer</button>'}
+        <button type="button">Open block</button>
+      </div>`;
+  }
+  blank();
+
+  grid.addEventListener('click', (e) => {
+    const cell = e.target.closest('.cell');
+    if (!cell) return;
+    grid.querySelectorAll('.cell').forEach((c) => c.setAttribute('aria-pressed', 'false'));
+    cell.setAttribute('aria-pressed', 'true');
+    show(blocks[Number(cell.dataset.i)]);
+  });
+
+  // ---- the scrubber recolours the wall: the farm as it was that day ----
+  const day = document.getElementById('day');
+  const dateOut = document.getElementById('dateOut');
+  const MONTH = ['Aug', 'Sep'];
+  day.addEventListener('input', () => {
+    const n = Number(day.value);
+    const d = 13 + n;                       // 13 Aug .. 11 Sep
+    dateOut.textContent = (d > 31 ? d - 31 : d) + ' ' + MONTH[d > 31 ? 1 : 0] + ' 2026';
+    // Earlier in the window, fewer blocks had drifted.
+    grid.querySelectorAll('.cell').forEach((c) => {
+      const b = blocks[Number(c.dataset.i)];
+      const drifted = n > (b.health === 'critical' ? 18 : b.health === 'watch' ? 9 : 99);
+      c.className = 'cell ' + (drifted ? b.health : 'healthy');
+    });
+  });
+
+  document.querySelectorAll('.spans button, .crops button').forEach((b) => {
+    b.addEventListener('click', () => {
+      b.parentElement.querySelectorAll('button').forEach((o) => o.setAttribute('aria-pressed', 'false'));
+      b.setAttribute('aria-pressed', 'true');
+    });
+  });
+</script>
+</body>
+</html>

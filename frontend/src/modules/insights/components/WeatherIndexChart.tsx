@@ -7,6 +7,7 @@ import {
   ComposedChart,
   Legend,
   Line,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -17,6 +18,9 @@ import { getWeatherIndexTimeseries } from "@/api/weatherIndices";
 import { Skeleton } from "@/components/Skeleton";
 import { makeDateLabelFmt, makeDateTickFmt } from "@/lib/chartFormat";
 
+import { splitForecastSeries } from "../lib/forecastSeries";
+import { FORECAST_LOOKAHEAD_DAYS } from "../lib/timeRange";
+
 interface Props {
   farmId: string;
   indexCode: string;
@@ -25,18 +29,23 @@ interface Props {
   unit: string;
 }
 
-interface ChartPoint {
+interface RawPoint {
   date: string;
-  value: number | null;
+  isForecast: boolean;
+  raw: number | null;
   mean: number | null;
   /** [mean - std, mean + std] band, or null when no baseline that day. */
   band: [number, number] | null;
 }
 
 /**
- * Farm-level weather-index series for the last 90 days with a climatology
- * band (seasonal normal ±1σ). Weather is farm-centroid data, so this is a
- * temporal chart — not a per-cell map overlay.
+ * Farm-level weather-index series — 90 days of observed history plus the
+ * forecast horizon — with a climatology band (seasonal normal ±1σ). Weather
+ * is farm-centroid data, so this is a temporal chart, not a per-cell overlay.
+ *
+ * The climatology band and normal line extend across the forecast days too,
+ * and should: the seasonal normal for a day is a property of the calendar,
+ * not of whether that day has happened. Only the measured line stops.
  */
 export function WeatherIndexChart({ farmId, indexCode, name, unit }: Props): ReactNode {
   const { t, i18n } = useTranslation("weatherIndices");
@@ -47,9 +56,13 @@ export function WeatherIndexChart({ farmId, indexCode, name, unit }: Props): Rea
     const now = new Date();
     const start = new Date(now);
     start.setDate(start.getDate() - 90);
+    // The upper bound reaches past the forecast horizon, not just past today
+    // — the endpoint's `to` is exclusive, so "tomorrow" would clip the whole
+    // forward half back off the chart.
+    const end = new Date(now.getTime() + FORECAST_LOOKAHEAD_DAYS * 86_400_000);
     return {
       from: start.toISOString().slice(0, 10),
-      to: new Date(now.getTime() + 86_400_000).toISOString().slice(0, 10),
+      to: end.toISOString().slice(0, 10),
     };
   }, []);
 
@@ -60,14 +73,20 @@ export function WeatherIndexChart({ farmId, indexCode, name, unit }: Props): Rea
     staleTime: 60_000,
   });
 
-  const data = useMemo<ChartPoint[]>(() => {
-    return (q.data?.points ?? []).map((p) => {
+  const { data, boundary, hasForecast } = useMemo(() => {
+    const points: RawPoint[] = (q.data?.points ?? []).map((p) => {
       const mean = _toNum(p.baseline_mean);
       const std = _toNum(p.baseline_std);
       const band: [number, number] | null =
         mean !== null && std !== null ? [mean - std, mean + std] : null;
-      return { date: p.date, value: _toNum(p.value), mean, band };
+      return { date: p.date, isForecast: p.is_forecast, raw: _toNum(p.value), mean, band };
     });
+    const split = splitForecastSeries(points, (p) => p.raw);
+    return {
+      data: split.rows,
+      boundary: split.lastObservedDate,
+      hasForecast: split.hasForecast,
+    };
   }, [q.data]);
 
   if (q.isLoading) {
@@ -82,7 +101,9 @@ export function WeatherIndexChart({ farmId, indexCode, name, unit }: Props): Rea
 
   return (
     <div className="mt-3">
-      <h4 className="mb-1 text-[11px] font-medium text-ap-muted">{t("chart.title", { name })}</h4>
+      <h4 className="mb-1 text-[11px] font-medium text-ap-muted">
+        {hasForecast ? t("chart.titleWithForecast", { name }) : t("chart.title", { name })}
+      </h4>
       <ResponsiveContainer width="100%" height={220}>
         <ComposedChart data={data} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
           <CartesianGrid stroke="#e2e8f0" strokeDasharray="2 2" />
@@ -124,6 +145,14 @@ export function WeatherIndexChart({ farmId, indexCode, name, unit }: Props): Rea
             connectNulls
             isAnimationActive={false}
           />
+          {boundary === null ? null : (
+            <ReferenceLine
+              x={boundary}
+              stroke="#94a3b8"
+              strokeDasharray="2 2"
+              label={{ value: t("forecast.boundary"), fontSize: 10, fill: "#64748b" }}
+            />
+          )}
           <Line
             type="monotone"
             dataKey="value"
@@ -134,6 +163,22 @@ export function WeatherIndexChart({ farmId, indexCode, name, unit }: Props): Rea
             connectNulls
             isAnimationActive={false}
           />
+          {/* Same hue as the observed line — same quantity, still unmeasured.
+              Only drawn when there is a forecast half, so the legend does not
+              advertise a series that is not on the chart. */}
+          {hasForecast ? (
+            <Line
+              type="monotone"
+              dataKey="forecast"
+              name={t("forecast.line")}
+              stroke="#0f766e"
+              strokeWidth={1.75}
+              strokeDasharray="3 3"
+              dot={false}
+              connectNulls
+              isAnimationActive={false}
+            />
+          ) : null}
         </ComposedChart>
       </ResponsiveContainer>
     </div>

@@ -873,8 +873,9 @@ function SimpleApplyPanel({
       <ul className="mt-2 max-h-40 divide-y divide-amber-200 overflow-y-auto text-[11px]">
         {preview.blocks.map((d) => (
           <li key={d.block_id} className="flex items-center gap-2 py-1">
-            <span className="flex-1 truncate font-mono text-[10px] text-slate-700">
-              {d.block_id.slice(0, 8)}…
+            <span className="flex-1 truncate text-[10px] text-slate-700">
+              <span className="font-semibold">{d.block_code}</span>
+              {d.block_name ? <span className="ms-2 text-slate-500">{d.block_name}</span> : null}
             </span>
             <span className={"text-[10px] " + (d.matches ? "text-emerald-700" : "text-amber-800")}>
               {d.matches ? "matches" : "will change"}
@@ -948,8 +949,11 @@ function ApplyPreviewPanel({
                 onChange={() => onToggle(blockId)}
                 disabled={matches}
               />
-              <span className="flex-1 truncate font-mono text-[10px] text-slate-700">
-                {blockId.slice(0, 8)}…
+              <span className="flex-1 truncate text-[10px] text-slate-700">
+                <span className="font-semibold">{i?.block_code ?? w?.block_code}</span>
+                {(i?.block_name ?? w?.block_name) ? (
+                  <span className="ms-2 text-slate-500">{i?.block_name ?? w?.block_name}</span>
+                ) : null}
               </span>
               {matches ? (
                 <span className="text-[10px] text-emerald-700">matches</span>

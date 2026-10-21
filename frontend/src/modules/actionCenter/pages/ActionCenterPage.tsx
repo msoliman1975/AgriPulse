@@ -23,6 +23,7 @@ import { DispatchDialog } from "@/modules/actionCenter/components/DispatchDialog
 import { ItemRow } from "@/modules/actionCenter/components/ItemRow";
 import { useActionItems } from "@/queries/actionCenter";
 import { useTenantUsers } from "@/queries/users";
+import { displayUser } from "@/lib/userDisplay";
 import { useCapability } from "@/rbac/useCapability";
 
 const TABS: ReadonlyArray<UnifiedStatus | "all"> = [
@@ -115,7 +116,12 @@ export function ActionCenterPage(): ReactNode {
       allItems.map((i) => i.assigned_membership_id).filter((id): id is string => id !== null),
     ),
   ]
-    .map((id) => ({ id, name: userByMembership.get(id)?.full_name ?? id.slice(0, 8) }))
+    .map((id) => {
+      const u = userByMembership.get(id);
+      // `full_name` alone left every unnamed person as 8 hex characters, even
+      // when their phone or email was right there on the record.
+      return { id, name: u ? displayUser(u, id) : `${id.slice(0, 8)}…` };
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const anyFilterActive =

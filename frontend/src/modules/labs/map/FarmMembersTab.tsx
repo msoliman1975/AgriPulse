@@ -17,6 +17,7 @@ import {
 import { isApiError } from "@/api/errors";
 import { useCapability } from "@/rbac/useCapability";
 import { useTenantUsers } from "@/queries/users";
+import { displayUser, displayUserHandle } from "@/lib/userDisplay";
 import { MembersList } from "@/modules/farms/components/MembersList";
 
 const ROLES: FarmMemberRole[] = ["FarmManager", "Agronomist", "FieldOperator", "Scout", "Viewer"];
@@ -94,7 +95,9 @@ export function FarmMembersTab({ farmId }: Props): JSX.Element {
           className="grid grid-cols-1 gap-2 rounded border border-slate-200 bg-slate-50 p-2 md:grid-cols-[1fr_auto_auto] md:items-end"
         >
           <label className="block text-[11px]">
-            <span className="text-slate-500">{t("members.membershipId")}</span>
+            <span className="text-slate-500">
+              {canReadUsers ? t("members.person") : t("members.membershipId")}
+            </span>
             {canReadUsers && tenantUsers.data && tenantUsers.data.length > 0 ? (
               <select
                 className="mt-0.5 w-full rounded border border-slate-300 bg-white px-2 py-1 text-[12px]"
@@ -109,7 +112,8 @@ export function FarmMembersTab({ farmId }: Props): JSX.Element {
                   .filter((u) => !members.some((m) => m.membership_id === u.membership_id))
                   .map((u) => (
                     <option key={u.membership_id} value={u.membership_id}>
-                      {u.full_name} — {u.email}
+                      {displayUser(u, u.membership_id)}
+                      {displayUserHandle(u) ? ` — ${displayUserHandle(u)}` : ""}
                     </option>
                   ))}
               </select>

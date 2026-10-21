@@ -420,6 +420,9 @@ class WeatherIndexDayRow(BaseModel):
     value_max: float | None
     value_aux: dict[str, Any]
     baseline_deviation: float | None
+    # Projected from `weather_forecasts` rather than observed hours, so
+    # `source_hours` is legitimately 0 rather than evidence of a gap.
+    is_forecast: bool = False
     computed_at: datetime
     # How many hours this day's value was actually computed from.
     source_hours: int

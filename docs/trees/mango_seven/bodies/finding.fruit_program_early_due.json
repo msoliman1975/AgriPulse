@@ -1,0 +1,8 @@
+{
+  "code": "fruit_program_early_due",
+  "name_en": "Early fruit program due",
+  "name_ar": "برنامج الثمار المبكر مستحقّ",
+  "clause_en": "the first KNO3 spray and fruit thinning are due",
+  "clause_ar": "الرشة الأولى من نترات البوتاسيوم وخفّ الثمار مستحقّان",
+  "default_status": "issue"
+}

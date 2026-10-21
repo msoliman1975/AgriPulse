@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AgriPulse sign-in — Proposal A · Field Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0f2a1f; --ink-soft:#2e4a3d; --muted:#54695c; --line:#dcd8cc;
+  --paper:#ffffff;
+  --mint-50:#f1faf3; --mint-100:#dfeee5; --mint-200:#c5e1cf; --mint-300:#a7d2b9;
+  --green-500:#1D9E75; --green-600:#168661; --green-700:#0F6E56; --green-900:#04342C;
+  --pulse:#E24B4A;
+  --display:"Fraunces",Georgia,"Times New Roman",serif;
+  --text:"Inter",-apple-system,"Segoe UI",Roboto,system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--paper); color:var(--ink);
+  font:16px/1.55 var(--text);
+  -webkit-font-smoothing:antialiased;
+}
+.stage{display:grid;grid-template-columns:1.1fr 1fr;min-height:100vh}
+
+/* ---------------------------------------------- HERO : the plot ledger */
+.hero{
+  position:relative;overflow:hidden;
+  background:var(--mint-50);
+  border-right:1px solid var(--line);
+  padding:48px 56px;
+  display:flex;flex-direction:column;
+}
+/* ruled baselines — a land register, not a gradient blob */
+.hero::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:repeating-linear-gradient(to bottom,
+    rgba(15,110,86,.09) 0 1px, transparent 1px 32px);
+}
+/* the block grid: plots, a few of them scored */
+.plots{
+  position:absolute;inset:0;pointer-events:none;
+  display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(10,1fr);
+  opacity:.55;
+}
+.plots i{border-right:1px solid rgba(15,110,86,.10);border-bottom:1px solid rgba(15,110,86,.10)}
+.plots i.on{background:var(--mint-200);animation:breathe 18s ease-in-out infinite}
+.plots i.warm{background:#f3e3bd;animation:breathe 22s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:.45}50%{opacity:1}}
+
+.brand{display:flex;align-items:center;gap:14px;position:relative;z-index:1}
+.brand-mark{width:74px;height:74px;flex:none}
+.brand-name{font:600 27px/1 var(--text);letter-spacing:-.4px;color:var(--green-900)}
+.brand-name .pulse-word{color:var(--green-500)}
+
+.hero-body{flex:1;display:flex;flex-direction:column;justify-content:center;
+  position:relative;z-index:1;margin:40px 0}
+.hero h1{
+  font:400 clamp(34px,4.4vw,58px)/1.06 var(--display);
+  letter-spacing:-.015em;color:var(--green-900);margin:0;
+}
+.hero h1 span{display:block;max-width:13ch}
+.hero h1 .beat{padding-bottom:12px;border-bottom:1px solid rgba(15,110,86,.25);margin-bottom:12px}
+.hero h1 .accent{color:var(--green-600);font-style:italic}
+.hero p.lead{
+  font-size:15px;line-height:1.6;color:var(--ink-soft);
+  max-width:46ch;margin:28px 0 0;
+}
+.hero-foot{position:relative;z-index:1;display:flex;gap:20px;
+  font-size:11px;letter-spacing:.09em;color:var(--muted);text-transform:uppercase}
+
+/* ---------------------------------------------- FORM : paper */
+.form-side{display:flex;align-items:center;justify-content:center;padding:48px 40px;background:var(--paper)}
+.form-wrap{width:100%;max-width:368px}
+.form-title{font:400 34px/1.1 var(--display);letter-spacing:-.01em;margin:0;color:var(--green-900)}
+.sub{margin:8px 0 34px;color:var(--muted);font-size:15px}
+
+.form-label{display:block;font-size:11px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.field{position:relative;margin:0 0 22px}
+/* underline fields: the ledger rule continues into the form */
+.field input{
+  width:100%;height:46px;padding:0 56px 0 2px;
+  font:16px/1 var(--text);color:var(--ink);
+  background:transparent;border:0;border-bottom:1px solid var(--line);
+  border-radius:0;outline:none;transition:border-color .15s ease;
+}
+.field input::placeholder{color:#a9b4ac}
+.field input:focus{border-bottom-color:var(--green-500)}
+.field input:focus-visible{outline:2px solid var(--green-500);outline-offset:4px;border-radius:2px}
+.reveal{position:absolute;right:0;top:0;height:46px;min-width:44px;
+  background:none;border:0;cursor:pointer;color:var(--muted);
+  font:600 11px/1 var(--text);letter-spacing:.09em;text-transform:uppercase}
+.reveal:hover{color:var(--green-700)}
+.reveal:focus-visible{outline:2px solid var(--green-500);outline-offset:2px;border-radius:4px}
+
+.field-row{display:flex;align-items:center;justify-content:space-between;
+  gap:16px;margin:0 0 24px;font-size:14px}
+.checkbox{display:inline-flex;align-items:center;gap:9px;color:var(--ink-soft);
+  cursor:pointer;min-height:44px}
+.checkbox input{width:17px;height:17px;accent-color:var(--green-600);margin:0}
+a{color:var(--green-700);text-decoration:none;border-bottom:1px solid rgba(15,110,86,.32)}
+a:hover{border-bottom-color:var(--green-700)}
+a:focus-visible{outline:2px solid var(--green-500);outline-offset:3px;border-radius:2px}
+
+.btn-primary{
+  width:100%;min-height:50px;border:0;border-radius:6px;cursor:pointer;
+  background:var(--green-700);color:#fff;
+  font:600 16px/1 var(--text);letter-spacing:.01em;
+  transition:background .15s ease;
+}
+.btn-primary:hover{background:var(--green-900)}
+.btn-primary:focus-visible{outline:2px solid var(--green-500);outline-offset:3px}
+
+.divider{display:flex;align-items:center;gap:12px;margin:32px 0 14px;
+  font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.divider::before,.divider::after{content:"";height:1px;flex:1;background:var(--line)}
+.help{margin:0;font-size:14px;color:var(--muted);text-align:center}
+.footnote{margin:38px 0 0;font-size:12px;color:#93a09a;text-align:center}
+
+@media (max-width:900px){
+  .stage{grid-template-columns:1fr}
+  .hero{padding:28px 20px 32px;border-right:0;border-bottom:1px solid var(--line)}
+  .hero-body{margin:24px 0 0}
+  .hero h1{font-size:clamp(28px,8vw,40px)}
+  .hero p.lead{display:none}
+  .hero-foot{display:none}
+  .plots{grid-template-rows:repeat(5,1fr)}
+  .form-side{padding:32px 20px 48px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <section class="hero">
+    <div class="plots" aria-hidden="true"></div>
+
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="a-leaf" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#a7d2b9"/><stop offset="55%" stop-color="#3FB58A"/><stop offset="100%" stop-color="#0F6E56"/>
+          </linearGradient>
+          <filter id="a-glow" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="1.3"/></filter>
+        </defs>
+        <polygon points="100.00,4.00 111.23,14.74 124.85,7.27 132.91,20.55 148.00,16.86 152.35,31.77 167.88,32.12 168.23,47.65 183.14,52.00 179.45,67.09 192.73,75.15 185.26,88.77 196.00,100.00 185.26,111.23 192.73,124.85 179.45,132.91 183.14,148.00 168.23,152.35 167.88,167.88 152.35,168.23 148.00,183.14 132.91,179.45 124.85,192.73 111.23,185.26 100.00,196.00 88.77,185.26 75.15,192.73 67.09,179.45 52.00,183.14 47.65,168.23 32.12,167.88 31.77,152.35 16.86,148.00 20.55,132.91 7.27,124.85 14.74,111.23 4.00,100.00 14.74,88.77 7.27,75.15 20.55,67.09 16.86,52.00 31.77,47.65 32.12,32.12 47.65,31.77 52.00,16.86 67.09,20.55 75.15,7.27 88.77,14.74"
+          fill="none" stroke="#1D9E75" stroke-width="1.8" stroke-linejoin="round"/>
+        <path filter="url(#a-glow)" opacity=".55" d="M22 102 L62 102 L72 86 L82 116 L100 76 L118 112 L126 96 L140 102 L178 100" fill="none" stroke="#E24B4A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M22 102 L62 102 L72 86 L82 116 L100 76 L118 112 L126 96 L140 102 L178 100" fill="none" stroke="#E24B4A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <g>
+          <path d="M100 22 Q122 42 132 64 Q142 86 140 108 Q137 128 126 144 Q115 156 100 164 Q85 156 74 144 Q63 128 60 108 Q58 86 68 64 Q78 42 100 22Z" fill="url(#a-leaf)" stroke="#04342C" stroke-width="1.2" stroke-opacity=".5"/>
+          <path d="M100 28 L100 158" stroke="#04342C" stroke-width="1.1" opacity=".35"/>
+          <path d="M100 46 Q92 51 84 60 M100 46 Q108 51 116 60 M100 66 Q90 72 80 84 M100 66 Q110 72 120 84 M100 86 Q88 93 76 106 M100 86 Q112 93 124 106 M100 106 Q90 111 80 122 M100 106 Q110 111 120 122" stroke="#04342C" stroke-width=".9" opacity=".28" fill="none"/>
+        </g>
+      </svg>
+      <div class="brand-name">Agri<span class="pulse-word">Pulse</span></div>
+    </div>
+
+    <div class="hero-body">
+      <h1>
+        <span class="beat">Plan the season.</span>
+        <span class="beat">Grow the harvest.</span>
+        <span class="accent">Predict the yield.</span>
+      </h1>
+      <p class="lead">AgriPulse is the planning, growth and prediction layer for orchard and row-crop teams — daily imagery, hyperlocal weather and agronomy signals reconciled into one workspace.</p>
+    </div>
+
+    <div class="hero-foot"><span>&copy; 2026 AgriPulse</span><span>Powered by Keycloak</span></div>
+  </section>
+
+  <section class="form-side">
+    <div class="form-wrap">
+      <h2 class="form-title">Welcome back.</h2>
+      <p class="sub">Sign in to AgriPulse.</p>
+
+      <form onsubmit="return false">
+        <label class="form-label" for="email">Email</label>
+        <div class="field"><input id="email" name="username" type="text" autocomplete="username" placeholder="you@farm.com" /></div>
+
+        <label class="form-label" for="pw">Password</label>
+        <div class="field">
+          <input id="pw" name="password" type="password" autocomplete="current-password" placeholder="••••••••" />
+          <button type="button" class="reveal" data-for="pw" aria-label="Show password">Show</button>
+        </div>
+
+        <div class="field-row">
+          <label class="checkbox"><input type="checkbox" /> <span>Remember me</span></label>
+          <a href="#">Forgot password?</a>
+        </div>
+
+        <button class="btn-primary" type="submit">Sign in</button>
+      </form>
+
+      <div class="divider">No account yet?</div>
+      <p class="help">Access is invitation-only. Ask your admin to invite you.</p>
+      <p class="footnote">v2026.05 &middot; powered by Keycloak</p>
+    </div>
+  </section>
+
+</div>
+<script>
+  // Plot grid: 80 cells, a handful scored so the field reads as data.
+  const grid = document.querySelector('.plots');
+  const on = new Set([10, 25, 36, 43, 58, 68]);
+  const warm = new Set([19, 52]);
+  for (let i = 0; i < 80; i++) {
+    const cell = document.createElement('i');
+    if (on.has(i)) cell.className = 'on';
+    if (warm.has(i)) cell.className = 'warm';
+    if (cell.className) cell.style.animationDelay = (i % 7) + 's';
+    grid.appendChild(cell);
+  }
+  document.querySelectorAll('.reveal').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById(btn.dataset.for);
+      const shown = input.type === 'text';
+      input.type = shown ? 'password' : 'text';
+      btn.textContent = shown ? 'Show' : 'Hide';
+      btn.setAttribute('aria-label', shown ? 'Show password' : 'Hide password');
+    });
+  });
+</script>
+</body>
+</html>

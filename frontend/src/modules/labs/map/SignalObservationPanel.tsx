@@ -17,6 +17,10 @@ interface Props {
   // top-right corner. Mirrors GridCellPopup so the two read as siblings.
   x: number | null;
   y: number | null;
+  // The block's name or code, resolved by the caller from the block list it
+  // already holds. Without it this row could only print a truncated uuid,
+  // which matches nothing the reader can see on the map.
+  blockLabel?: string | null;
   onClose: () => void;
 }
 
@@ -34,6 +38,7 @@ export function SignalObservationPanel({
   isLoading,
   x,
   y,
+  blockLabel,
   onClose,
 }: Props): ReactNode {
   const { t } = useTranslation("signals");
@@ -116,8 +121,8 @@ export function SignalObservationPanel({
         {observation.block_id ? (
           <>
             <dt className="text-ap-muted">{t("observationPanel.block")}</dt>
-            <dd className="font-mono text-[10px] text-ap-ink">
-              {observation.block_id.slice(0, 8)}…
+            <dd className="text-[10px] text-ap-ink">
+              {blockLabel ?? `${observation.block_id.slice(0, 8)}…`}
             </dd>
           </>
         ) : null}

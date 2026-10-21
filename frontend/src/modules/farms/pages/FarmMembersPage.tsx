@@ -12,6 +12,7 @@ import {
 import { isApiError } from "@/api/errors";
 import { useCapability } from "@/rbac/useCapability";
 import { useTenantUsers } from "@/queries/users";
+import { displayUser, displayUserHandle } from "@/lib/userDisplay";
 import { MembersList } from "../components/MembersList";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Button } from "@/components/Button";
@@ -103,7 +104,9 @@ export function FarmMembersPage(): JSX.Element {
         <Card as="form" className="flex items-end gap-3" onSubmit={handleAssign}>
           <div className="flex-1">
             <label className="label" htmlFor="membership-id">
-              {t("members.membershipId")}
+              {/* The control is a person picker whenever names are readable;
+                  only the raw-id fallback is literally a membership id. */}
+              {canReadUsers ? t("members.person") : t("members.membershipId")}
             </label>
             {canReadUsers && tenantUsers.data && tenantUsers.data.length > 0 ? (
               <select
@@ -122,7 +125,8 @@ export function FarmMembersPage(): JSX.Element {
                   .filter((u) => !members.some((m) => m.membership_id === u.membership_id))
                   .map((u) => (
                     <option key={u.membership_id} value={u.membership_id}>
-                      {u.full_name} — {u.email}
+                      {displayUser(u, u.membership_id)}
+                      {displayUserHandle(u) ? ` — ${displayUserHandle(u)}` : ""}
                     </option>
                   ))}
               </select>

@@ -1,0 +1,8 @@
+{
+  "code": "deficit_missing",
+  "name_en": "Pre-harvest cut not done",
+  "name_ar": "لم يتم خفض ما قبل الحصاد",
+  "clause_en": "the block is in its maturity window and the water has not been cut",
+  "clause_ar": "القطعة في نافذة النضج ولم تُخفض المياه",
+  "default_status": "issue"
+}

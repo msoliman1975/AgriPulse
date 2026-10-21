@@ -929,6 +929,9 @@ function Console({ farmId }: { farmId: string }): ReactNode {
                 isLoading={signalObsQ.isLoading}
                 x={obsClickPoint?.x ?? null}
                 y={obsClickPoint?.y ?? null}
+                blockLabel={
+                  selectedObs?.block_id ? (blockNameById.get(selectedObs.block_id) ?? null) : null
+                }
                 onClose={() => {
                   const next = new URLSearchParams(search);
                   next.delete("signal_obs");

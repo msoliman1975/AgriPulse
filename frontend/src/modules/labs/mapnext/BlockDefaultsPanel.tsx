@@ -1256,8 +1256,9 @@ function SimpleApplyPanel({
       <ul className="mt-2 max-h-40 divide-y divide-ap-line/60 overflow-y-auto text-sm">
         {preview.blocks.map((d) => (
           <li key={d.block_id} className="flex items-center gap-2 py-1">
-            <span className="flex-1 truncate font-mono text-xs text-ap-muted">
-              {d.block_id.slice(0, 8)}…
+            <span className="flex-1 truncate text-xs">
+              <span className="font-semibold text-ap-ink">{d.block_code}</span>
+              {d.block_name ? <span className="ms-2 text-ap-muted">{d.block_name}</span> : null}
             </span>
             <span className={"text-xs " + (d.matches ? "text-ap-good" : "text-ap-warn")}>
               {d.matches ? t("blockDefaults.matches") : t("blockDefaults.willChange")}
@@ -1334,10 +1335,14 @@ function ApplyPreviewPanel({
                 checked={!excluded.has(blockId)}
                 onChange={() => onToggle(blockId)}
                 disabled={matches}
+                aria-label={i?.block_code ?? w?.block_code}
                 className="accent-ap-primary"
               />
-              <span className="flex-1 truncate font-mono text-xs text-ap-muted">
-                {blockId.slice(0, 8)}…
+              <span className="flex-1 truncate text-xs">
+                <span className="font-semibold text-ap-ink">{i?.block_code ?? w?.block_code}</span>
+                {(i?.block_name ?? w?.block_name) ? (
+                  <span className="ms-2 text-ap-muted">{i?.block_name ?? w?.block_name}</span>
+                ) : null}
               </span>
               {matches ? (
                 <span className="text-xs text-ap-good">{t("blockDefaults.matches")}</span>

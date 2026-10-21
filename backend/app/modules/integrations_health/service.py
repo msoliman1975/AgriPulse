@@ -162,6 +162,8 @@ class IntegrationsHealthService:
                         SELECT ws.id AS subscription_id,
                                ws.block_id,
                                b.farm_id,
+                               b.code AS block_code,
+                               b.name AS block_name,
                                ws.provider_code,
                                ws.last_successful_ingest_at AS since
                         FROM weather_subscriptions ws
@@ -198,9 +200,12 @@ class IntegrationsHealthService:
                                wa.subscription_id,
                                wa.block_id,
                                wa.farm_id,
+                               b.code AS block_code,
+                               b.name AS block_name,
                                wa.provider_code,
                                wa.started_at AS since
                         FROM weather_ingestion_attempts wa
+                        LEFT JOIN blocks b ON b.id = wa.block_id
                         WHERE wa.status = 'running'
                         ORDER BY wa.started_at ASC
                         """
@@ -234,6 +239,8 @@ class IntegrationsHealthService:
                         SELECT ias.id AS subscription_id,
                                ias.block_id,
                                b.farm_id,
+                               b.code AS block_code,
+                               b.name AS block_name,
                                (SELECT ip.code FROM public.imagery_products ip
                                 WHERE ip.id = ias.product_id) AS provider_code,
                                ias.last_successful_ingest_at AS since
@@ -271,6 +278,8 @@ class IntegrationsHealthService:
                                ij.subscription_id,
                                ij.block_id,
                                b.farm_id,
+                               b.code AS block_code,
+                               b.name AS block_name,
                                (SELECT ip.code FROM public.imagery_products ip
                                 WHERE ip.id = ij.product_id) AS provider_code,
                                COALESCE(ij.started_at, ij.requested_at) AS since

@@ -134,6 +134,7 @@
   },
   "members": {
     "heading": "Members",
+    "person": "Person",
     "membershipId": "Membership ID",
     "role": "Role",
     "grantedAt": "Granted at",

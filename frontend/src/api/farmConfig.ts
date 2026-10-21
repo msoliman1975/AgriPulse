@@ -24,6 +24,8 @@ export interface SubscriptionsTemplate {
 
 export interface BlockDiff {
   block_id: string;
+  block_code: string;
+  block_name: string | null;
   will_add: Record<string, unknown>[];
   will_update: Record<string, unknown>[];
   will_deactivate: Record<string, unknown>[];
@@ -134,6 +136,8 @@ export interface IrrigationTemplate {
 
 export interface SimpleBlockDiff {
   block_id: string;
+  block_code: string;
+  block_name: string | null;
   before: Record<string, unknown>;
   after: Record<string, unknown>;
   matches: boolean;

@@ -134,6 +134,7 @@
   },
   "members": {
     "heading": "الأعضاء",
+    "person": "الشخص",
     "membershipId": "معرّف العضوية",
     "role": "الدور",
     "grantedAt": "تاريخ المنح",

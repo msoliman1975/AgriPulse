@@ -499,7 +499,7 @@ class WeatherRepository:
         self,
         *,
         farm_id: UUID,
-        provider_code: str,
+        provider_code: str | None,
         since: datetime,
         until: datetime,
     ) -> tuple[dict[str, Any], ...]:
@@ -507,33 +507,37 @@ class WeatherRepository:
 
         ``DISTINCT ON (time)`` collapses the keep-all-issuances history
         (per the Slice-4 lock) to one row per hour, picking whichever
-        ``forecast_issued_at`` is most recent. Provider is required —
-        cross-provider reconciliation is out of scope.
+        ``forecast_issued_at`` is most recent.
+
+        ``provider_code`` pins one provider; None spans them all, which is
+        what the index projection wants — it mirrors ``read_observations``,
+        whose window is likewise provider-agnostic, so the observed and
+        forecast halves of a series are drawn from the same set of
+        providers. With one provider configured the two are identical; the
+        DISTINCT ON still yields one row per hour either way (latest
+        issuance wins regardless of which provider produced it).
         """
+        clauses = ["farm_id = :farm_id", "time >= :since", "time < :until"]
+        params: dict[str, Any] = {"farm_id": farm_id, "since": since, "until": until}
+        if provider_code is not None:
+            clauses.append("provider_code = :provider_code")
+            params["provider_code"] = provider_code
         rows = (
             (
                 await self._session.execute(
                     text(
-                        """
+                        f"""
                         SELECT DISTINCT ON (time)
                                time, forecast_issued_at, farm_id, provider_code,
                                air_temp_c, humidity_pct,
                                precipitation_mm, precipitation_probability_pct,
                                wind_speed_m_s, solar_radiation_w_m2, et0_mm
                         FROM weather_forecasts
-                        WHERE farm_id = :farm_id
-                          AND provider_code = :provider_code
-                          AND time >= :since
-                          AND time < :until
+                        WHERE {" AND ".join(clauses)}
                         ORDER BY time ASC, forecast_issued_at DESC
                         """
                     ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
-                    {
-                        "farm_id": farm_id,
-                        "provider_code": provider_code,
-                        "since": since,
-                        "until": until,
-                    },
+                    params,
                 )
             )
             .mappings()
@@ -687,11 +691,17 @@ class WeatherRepository:
         value_max: Decimal | None,
         value_aux: dict[str, Any],
         baseline_deviation: Decimal | None,
+        is_forecast: bool = False,
     ) -> None:
         """Insert-or-replace one (farm_id, date, index_code) projection row.
 
         ``ON CONFLICT DO UPDATE`` — re-deriving a partial / corrected day
         overwrites in place, matching ``upsert_derived_daily``.
+
+        ``is_forecast`` is overwritten like every other column, which is
+        what makes the forecast→observed handover free: yesterday's
+        prediction for today is replaced by today's observed projection
+        and the flag flips back to False on the same key.
         """
         await self._session.execute(
             text(
@@ -699,11 +709,11 @@ class WeatherRepository:
                 INSERT INTO weather_index_daily (
                     farm_id, date, index_code,
                     value, value_min, value_max, value_aux,
-                    baseline_deviation, computed_at
+                    baseline_deviation, is_forecast, computed_at
                 ) VALUES (
                     :farm_id, :date, :index_code,
                     :value, :value_min, :value_max, CAST(:value_aux AS jsonb),
-                    :baseline_deviation, now()
+                    :baseline_deviation, :is_forecast, now()
                 )
                 ON CONFLICT (farm_id, date, index_code) DO UPDATE SET
                     value = EXCLUDED.value,
@@ -711,6 +721,7 @@ class WeatherRepository:
                     value_max = EXCLUDED.value_max,
                     value_aux = EXCLUDED.value_aux,
                     baseline_deviation = EXCLUDED.baseline_deviation,
+                    is_forecast = EXCLUDED.is_forecast,
                     computed_at = now()
                 """
             ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
@@ -723,8 +734,33 @@ class WeatherRepository:
                 "value_max": value_max,
                 "value_aux": json.dumps(value_aux),
                 "baseline_deviation": baseline_deviation,
+                "is_forecast": is_forecast,
             },
         )
+
+    async def delete_forecast_index_rows_after(self, *, farm_id: UUID, after: date_type) -> int:
+        """Drop every forecast projection row strictly after ``after``.
+
+        Run immediately before writing a fresh forecast set. Without it a
+        shrinking horizon leaves orphans: if the provider returns 5 days
+        today and 2 tomorrow, days 3-5 keep yesterday's prediction forever
+        and the chart shows a stale tail that never self-corrects.
+
+        Observed rows are untouched — the ``is_forecast`` predicate is the
+        whole safety of this delete.
+        """
+        result = await self._session.execute(
+            text(
+                """
+                DELETE FROM weather_index_daily
+                WHERE farm_id = :farm_id
+                  AND is_forecast
+                  AND date > :after
+                """
+            ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+            {"farm_id": farm_id, "after": after},
+        )
+        return int(cast("CursorResult[Any]", result).rowcount or 0)
 
     # ---- weather-index climatology baselines (PR-W3) ------------------
 
@@ -746,7 +782,15 @@ class WeatherRepository:
     async def read_weather_index_history(
         self, *, farm_id: UUID, index_code: str
     ) -> tuple[dict[str, Any], ...]:
-        """All valued (date, value) rows for one (farm, index). Date ascending."""
+        """All valued OBSERVED (date, value) rows for one (farm, index).
+        Date ascending.
+
+        This is the climatology's sample set, so forecast rows are excluded
+        without exception — letting predictions into the baseline would
+        make each index partly its own normal, and the z-score that the
+        anomaly chip and the compare view are built on would quietly
+        shrink toward zero.
+        """
         rows = (
             (
                 await self._session.execute(
@@ -757,6 +801,7 @@ class WeatherRepository:
                         WHERE farm_id = :farm_id
                           AND index_code = :index_code
                           AND value IS NOT NULL
+                          AND NOT is_forecast
                         ORDER BY date ASC
                         """
                     ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
@@ -884,7 +929,7 @@ class WeatherRepository:
                     text(
                         f"""
                         SELECT d.date, d.value, d.value_min, d.value_max,
-                               d.value_aux,
+                               d.value_aux, d.is_forecast,
                                d.baseline_deviation AS zscore,
                                b.baseline_mean, b.baseline_std
                         FROM weather_index_daily d
@@ -909,6 +954,11 @@ class WeatherRepository:
     ) -> tuple[dict[str, Any], ...]:
         """Valued rows for all indices on/after ``since`` — drives the
         farm summary (latest value + 7-day trend). Ordered for grouping.
+
+        Forecast rows are excluded outright: the summary strip is the
+        "what is it right now" reading, and since the projection started
+        writing days ahead, ``series[-1]`` would otherwise be a prediction
+        several days out labelled as the current value.
         """
         rows = (
             (
@@ -919,6 +969,7 @@ class WeatherRepository:
                         FROM weather_index_daily
                         WHERE farm_id = :farm_id
                           AND value IS NOT NULL
+                          AND NOT is_forecast
                           AND date >= :since
                         ORDER BY index_code ASC, date ASC
                         """

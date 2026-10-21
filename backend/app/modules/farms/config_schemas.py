@@ -66,6 +66,10 @@ class ApplyPreviewRequest(BaseModel):
 
 class BlockDiffSchema(BaseModel):
     block_id: UUID
+    # The labels a person reads a block by. Without these the preview list can
+    # only print a truncated UUID, which matches nothing on the map.
+    block_code: str
+    block_name: str | None = None
     will_add: list[dict[str, Any]] = Field(default_factory=list)
     will_update: list[dict[str, Any]] = Field(default_factory=list)
     will_deactivate: list[dict[str, Any]] = Field(default_factory=list)
@@ -123,6 +127,8 @@ class IrrigationTemplateSchema(BaseModel):
 
 class SimpleBlockDiffSchema(BaseModel):
     block_id: str
+    block_code: str
+    block_name: str | None = None
     before: dict[str, Any]
     after: dict[str, Any]
     matches: bool

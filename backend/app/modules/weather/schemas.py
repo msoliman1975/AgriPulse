@@ -103,6 +103,11 @@ class WeatherIndexTimeseriesPoint(BaseModel):
     ``baseline_std`` come from the matching day-of-year baseline so the
     SPA can draw the climatology band. All nullable — a gap day or a DOY
     without a baseline yet leaves them None.
+
+    ``is_forecast`` marks the points past today, projected from the
+    provider's forecast rather than observed. The series carries both in
+    one date-ascending list; the flag is what lets the chart draw the
+    forward segment as a prediction instead of passing it off as measured.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -115,6 +120,7 @@ class WeatherIndexTimeseriesPoint(BaseModel):
     zscore: Decimal | None
     baseline_mean: Decimal | None
     baseline_std: Decimal | None
+    is_forecast: bool = False
 
 
 class WeatherIndexTimeseriesResponse(BaseModel):

@@ -75,10 +75,26 @@ class WeatherTemplateRow:
 
 
 @dataclass(frozen=True, slots=True)
+class BlockRef:
+    """A target block's identity plus the labels a person reads it by.
+
+    The preview lists used to render ``block_id[:8]``, which is not a name
+    anybody can match to a block on the map. Every diff therefore carries the
+    code and name, the same pair ``GridPlanRow`` already returns.
+    """
+
+    id: UUID
+    code: str
+    name: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class BlockDiff:
     """What Apply would change for one block."""
 
     block_id: UUID
+    block_code: str
+    block_name: str | None
     will_add: tuple[dict[str, Any], ...]
     will_update: tuple[dict[str, Any], ...]
     will_deactivate: tuple[dict[str, Any], ...]
@@ -229,7 +245,7 @@ async def compute_apply_diff(
     If ``target_block_ids`` is None, the diff covers every active block
     under the farm.
     """
-    block_ids = await _resolve_target_blocks(
+    block_refs = await _resolve_target_block_refs(
         session, farm_id=farm_id, target_block_ids=target_block_ids
     )
     imagery_tpl = await get_imagery_template(session, farm_id)
@@ -238,16 +254,16 @@ async def compute_apply_diff(
     imagery_diffs: list[BlockDiff] = []
     weather_diffs: list[BlockDiff] = []
 
-    for block_id in block_ids:
-        imagery_diffs.append(await _imagery_diff_for_block(session, block_id, imagery_tpl))
-        weather_diffs.append(await _weather_diff_for_block(session, block_id, weather_tpl))
+    for ref in block_refs:
+        imagery_diffs.append(await _imagery_diff_for_block(session, ref, imagery_tpl))
+        weather_diffs.append(await _weather_diff_for_block(session, ref, weather_tpl))
 
     return ApplyDiff(imagery=tuple(imagery_diffs), weather=tuple(weather_diffs))
 
 
 async def _imagery_diff_for_block(
     session: AsyncSession,
-    block_id: UUID,
+    block: BlockRef,
     template: tuple[ImageryTemplateRow, ...],
 ) -> BlockDiff:
     current = {
@@ -255,7 +271,7 @@ async def _imagery_diff_for_block(
         for row in (
             await session.execute(
                 select(ImageryAoiSubscription).where(
-                    ImageryAoiSubscription.block_id == block_id,
+                    ImageryAoiSubscription.block_id == block.id,
                     ImageryAoiSubscription.deleted_at.is_(None),
                 )
             )
@@ -313,7 +329,9 @@ async def _imagery_diff_for_block(
             )
 
     return BlockDiff(
-        block_id=block_id,
+        block_id=block.id,
+        block_code=block.code,
+        block_name=block.name,
         will_add=tuple(will_add),
         will_update=tuple(will_update),
         will_deactivate=tuple(will_deactivate),
@@ -322,7 +340,7 @@ async def _imagery_diff_for_block(
 
 async def _weather_diff_for_block(
     session: AsyncSession,
-    block_id: UUID,
+    block: BlockRef,
     template: tuple[WeatherTemplateRow, ...],
 ) -> BlockDiff:
     current = {
@@ -330,7 +348,7 @@ async def _weather_diff_for_block(
         for row in (
             await session.execute(
                 select(WeatherSubscription).where(
-                    WeatherSubscription.block_id == block_id,
+                    WeatherSubscription.block_id == block.id,
                     WeatherSubscription.deleted_at.is_(None),
                 )
             )
@@ -381,7 +399,9 @@ async def _weather_diff_for_block(
             )
 
     return BlockDiff(
-        block_id=block_id,
+        block_id=block.id,
+        block_code=block.code,
+        block_name=block.name,
         will_add=tuple(will_add),
         will_update=tuple(will_update),
         will_deactivate=tuple(will_deactivate),
@@ -419,7 +439,7 @@ async def apply_template(
 
     Block-side rows touched by Apply get ``applied_at = now()``.
     """
-    block_ids = await _resolve_target_blocks(
+    block_refs = await _resolve_target_block_refs(
         session, farm_id=farm_id, target_block_ids=target_block_ids
     )
     imagery_tpl = await get_imagery_template(session, farm_id)
@@ -436,10 +456,11 @@ async def apply_template(
         "weather_deactivated": 0,
     }
 
-    for block_id in block_ids:
+    for ref in block_refs:
+        block_id = ref.id
         touched = False
-        i_diff = await _imagery_diff_for_block(session, block_id, imagery_tpl)
-        w_diff = await _weather_diff_for_block(session, block_id, weather_tpl)
+        i_diff = await _imagery_diff_for_block(session, ref, imagery_tpl)
+        w_diff = await _weather_diff_for_block(session, ref, weather_tpl)
         if not (i_diff.matches and w_diff.matches):
             touched = True
 
@@ -559,14 +580,27 @@ async def _resolve_target_blocks(
     sees, so a mismatch can only happen via a stale tab and the safe
     behavior is to ignore.
     """
-    stmt = select(Block.id).where(
+    refs = await _resolve_target_block_refs(
+        session, farm_id=farm_id, target_block_ids=target_block_ids
+    )
+    return tuple(r.id for r in refs)
+
+
+async def _resolve_target_block_refs(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    target_block_ids: tuple[UUID, ...] | None,
+) -> tuple[BlockRef, ...]:
+    """Same selection as :func:`_resolve_target_blocks`, plus code + name."""
+    stmt = select(Block.id, Block.code, Block.name).where(
         Block.farm_id == farm_id,
         Block.deleted_at.is_(None),
     )
     if target_block_ids is not None:
         stmt = stmt.where(Block.id.in_(target_block_ids))
     rows = (await session.execute(stmt)).all()
-    return tuple(r.id for r in rows)
+    return tuple(BlockRef(id=r.id, code=r.code, name=r.name) for r in rows)
 
 
 # ---------- PR-3: Locks ------------------------------------------------------
@@ -738,6 +772,8 @@ def _grid_plan_dict(r: Any) -> dict[str, Any]:
 def _diff_dict(d: BlockDiff) -> dict[str, Any]:
     return {
         "block_id": str(d.block_id),
+        "block_code": d.block_code,
+        "block_name": d.block_name,
         "will_add": list(d.will_add),
         "will_update": list(d.will_update),
         "will_deactivate": list(d.will_deactivate),
@@ -748,6 +784,8 @@ def _diff_dict(d: BlockDiff) -> dict[str, Any]:
 def _simple_diff(d: SimpleBlockDiff) -> dict[str, Any]:
     return {
         "block_id": str(d.block_id),
+        "block_code": d.block_code,
+        "block_name": d.block_name,
         "before": d.before,
         "after": d.after,
         "matches": d.matches,
@@ -779,6 +817,8 @@ class SimpleBlockDiff:
     """Used for irrigation + org (single-row templates)."""
 
     block_id: UUID
+    block_code: str
+    block_name: str | None
     before: dict[str, Any]
     after: dict[str, Any]
 
@@ -836,12 +876,13 @@ async def compute_irrigation_apply_diff(
     target_block_ids: tuple[UUID, ...] | None = None,
 ) -> tuple[SimpleBlockDiff, ...]:
     tpl = await get_irrigation_template(session, farm_id=farm_id)
-    block_ids = await _resolve_target_blocks(
+    block_refs = await _resolve_target_block_refs(
         session, farm_id=farm_id, target_block_ids=target_block_ids
     )
     after = tpl.as_dict()
     diffs: list[SimpleBlockDiff] = []
-    for bid in block_ids:
+    for ref in block_refs:
+        bid = ref.id
         row = (
             await session.execute(
                 select(
@@ -858,7 +899,15 @@ async def compute_irrigation_apply_diff(
             "irrigation_source": row.irrigation_source,
             "flow_rate_m3_per_hour": row.flow_rate_m3_per_hour,
         }
-        diffs.append(SimpleBlockDiff(block_id=bid, before=before, after=after))
+        diffs.append(
+            SimpleBlockDiff(
+                block_id=bid,
+                block_code=ref.code,
+                block_name=ref.name,
+                before=before,
+                after=after,
+            )
+        )
     return tuple(diffs)
 
 
@@ -1165,12 +1214,13 @@ async def compute_org_apply_diff(
 ) -> tuple[SimpleBlockDiff, ...]:
     """Additive merge: block matches if every farm tag is already on the block."""
     tpl = await get_org_template(session, farm_id=farm_id)
-    block_ids = await _resolve_target_blocks(
+    block_refs = await _resolve_target_block_refs(
         session, farm_id=farm_id, target_block_ids=target_block_ids
     )
     farm_tags = set(tpl.default_tags)
     diffs: list[SimpleBlockDiff] = []
-    for bid in block_ids:
+    for ref in block_refs:
+        bid = ref.id
         row = (await session.execute(select(Block.tags).where(Block.id == bid))).first()
         if row is None:
             continue
@@ -1184,6 +1234,8 @@ async def compute_org_apply_diff(
         diffs.append(
             SimpleBlockDiff(
                 block_id=bid,
+                block_code=ref.code,
+                block_name=ref.name,
                 before={"tags": existing},
                 after={"tags": after_list},
             )

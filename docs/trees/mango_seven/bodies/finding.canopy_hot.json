@@ -1,0 +1,8 @@
+{
+  "code": "canopy_hot",
+  "name_en": "Canopy hotter than usual",
+  "name_ar": "المجموع أسخن من المعتاد",
+  "clause_en": "the canopy is warmer than the air by more than usual",
+  "clause_ar": "المجموع الخضري أسخن من الهواء بأكثر من المعتاد",
+  "default_status": "issue"
+}

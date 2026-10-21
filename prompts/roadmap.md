@@ -19,10 +19,11 @@ This roadmap shows the six-prompt arc that built AgriPulse to MVP, plus the post
 | 5 | Slice 4 — weather, signals, dashboards | Open-Meteo integration, custom signal entry, native dashboards | 4–6 days | The dashboard shows index trend, weather forecast, custom signals |
 | 6 | Polish | i18n, RTL, audit, performance, hardening, runbooks | 4–6 days | Bilingual UI works end-to-end; security checklist complete |
 | 7 | Product & engagement telemetry | Know how the product is actually used | 9–13 days | Five product questions answerable from the UI without hand-written SQL |
+| 8 | Subscription, billing & self-serve trial | Tiers that are enforced, a price per enrolled feddan, and a front door | 12–16 days | A visitor provisions their own trial and reaches a signed-in tenant with no human in the loop |
 
 **Total wall-clock:** ~5–7 weeks at single-engineer pace for prompts 1–6. The 6-week MVP target is achievable with disciplined scoping and parallel work on frontend/backend within prompts.
 
-Prompts 1–6 are delivered. Prompt 7 is the first post-MVP track and follows the same gate discipline.
+Prompts 1–6 are delivered. Prompts 7 and 8 are post-MVP tracks and follow the same gate discipline.
 
 ---
 
@@ -345,6 +346,86 @@ All of the above are Phase B in the plan document, ordered by value-per-effort.
 - Is the pre-auth login funnel in scope now or Phase B?
 - Unload transport: `fetch(keepalive: true)` (keeps the auth header) or `sendBeacon` (more reliable, needs a token in the URL)?
 - New `platform.read_usage` capability, or fold into the existing `platform.read`?
+
+---
+
+## Prompt 8 — Subscription, billing & the self-serve trial
+
+**Goal:** make a tier mean something, put a price on enrolled area, and let a website visitor provision their own trial without a human in the loop.
+
+**Full plan:** `docs/proposals/subscription-billing-and-self-serve-trial.md`. That document is authoritative for the pricing formula, the schema, and the flow; this section is the gate contract.
+
+### Scope decisions (locked — do not re-litigate)
+1. **Free is a time-limited trial**, not a permanent tier. A platform admin can extend it, audited, with a reason. At the end the tenant goes **read-only** — sign-in and reads work, writes and background jobs stop.
+2. **One dollar rate per feddan per crop**, plus a default rate. Not a multiplier on a base rate, and not a rate per crop *group*.
+3. **A published price list is immutable.** A term pins the version for a year. Changing a rate means publishing a new version. Editing in place would rewrite bills already invoiced.
+4. **A block's billing crop is pinned** the first time the block enters the meter and holds until renewal. Area is *not* pinned — adding blocks still moves the invoice.
+5. **The contract belongs to the tenant**, not the farm. One term, one meter, one invoice.
+6. **Every rate and threshold is editable in the interface.** No number in `settings.py`, in a Python constant, or in a frontend constant.
+7. **`PlatformAdmin` keeps pricing access through its wildcard.** No deny list is added to `CapabilityRegistry` — it could grant itself the role anyway. The control is the audit trail.
+8. **Nothing is provisioned from an unverified email address.**
+
+### In scope
+- Backend: **new `billing` module** (`app/modules/billing/`) — never the word "subscription" inside it; `ImageryAoiSubscription` and `WeatherSubscription` already own that noun
+  - `billing_price_lists`, `billing_crop_rates` (FK `public.crops`), `billing_discount_bands` — a versioned, immutable rate card
+  - `billing_block_crop_pins` — the crop lock; `block_id` and `farm_id` are **logical UUIDs with no foreign key**
+  - `billing_meter_readings` — append-only, the evidence behind every invoice
+  - `billing_invoices` + `billing_invoice_lines`, `billing_entitlements`
+  - New columns on `public.tenant_subscriptions`: `price_list_id`, `base_fee`, `minimum_units`, `minimum_rate`, `committed_units`, `discount_pct`, `included_seats`, `seat_price`, `billing_period`, `currency`. Each row already behaves like a term — reuse it, do not add a rival table
+  - Monthly meter task: per tenant, per active block, from the **pinned** crop and the **pinned** price list. Never reads `block_crops` for pricing
+  - Six new platform capabilities: `platform.pricing.{read,manage,publish}`, `platform.subscription.manage`, `platform.trial.{read,manage}`
+  - New platform role **`PlatformBillingAdmin`** — see the eight registration points in § 11.3 of the plan
+- Backend: **entitlement enforcement wired into the existing `requires_capability`.** No tier is enforced anywhere today; `feature_flags` is stored, displayed, and read by nothing
+- Backend: **a public, unauthenticated route surface** — the first in the API. `POST /api/v1/public/trial/signups`, `GET /api/v1/public/trial/verify`, `GET /api/v1/public/trial/status/{handle}`. Own rate limiting, Cloudflare Turnstile, excluded from the tenant-context middleware because at that point there is no tenant
+- Backend: `public.trial_signups` and the provisioning Celery task — slug generation with a collision suffix, `create_tenant(initial_tier="free")`, trial dates from the published price list, and **success reported only on `keycloak_provisioning == "succeeded"`**
+- Backend: four email templates — verify address, set password, trial ending (D−7, D−1), trial ended
+- Frontend: `/platform/pricing` (crop rates, bands, draft/publish, version history with a difference view), `/platform/trials` (the signup queue), tenant subscription panel with extend-trial, platform meter viewer
+- Frontend: the customer's own billing page — plan, live meter, invoices — behind `subscription.read`
+- Marketing site: the trial form, posting to the public endpoint with a Turnstile token
+- Infra: Turnstile secret in the `shared` chart
+- Docs: `docs/reference/billing.md` — the formula, every variable, and the meter rule
+
+### Out of scope (must not build)
+- Payment collection, card capture, a payment provider, dunning
+- Multi-currency price lists (one US dollar list for the first release)
+- Tax, VAT registration, or invoice numbering for a tax authority
+- Farm-level contracts and third-party payers (bank, exporter, aggregator) — the plan's § 7 second-buyer models
+- Per-crop *band* schedules; volume discount is a percentage on the whole bill
+- Self-service upgrade from trial to paid without a human — sales closes the first cohort
+- A deny list in `CapabilityRegistry` (scope decision 7 rejects it, it is not deferred)
+- Dropping `premium` from the tier enum, or `price_per_feddan` from the table — both stay one release
+
+### Definition of done (the gate)
+1. A visitor on the marketing site who has never spoken to anyone reaches a working, signed-in tenant with their own farm drawn, and every step is visible as a row in `trial_signups`.
+2. A signup whose Keycloak provisioning returns `pending` **never** shows the visitor a success page. It retries, and raises a platform alert after N attempts.
+3. Posting the same email twice, or an email whose domain belongs to an active tenant, creates **no** second tenant, and the response body is identical either way.
+4. A platform admin without `PlatformBillingAdmin` or the wildcard cannot open `/platform/pricing`, and the route returns 403 with the capability named.
+5. Publishing a new price list does not change the total on any existing term. Proven by an invoice generated before and after, from the same meter readings.
+6. A block that changes crop mid-term bills at its pinned rate until renewal, and re-pins at renewal.
+7. A tenant at `A_free` + 1 feddan cannot add another block, and the message names the limit rather than failing generically.
+8. At `trial_end` the tenant can sign in and read, and every write route returns 403. Imagery, weather and decision-tree jobs write nothing for it.
+9. An invoice line traces to the meter readings behind it, in the interface, without hand-written SQL.
+10. Every rate, cap, band and trial length is changed through the interface only. Grepping the shipped image for a hard-coded price finds nothing.
+11. Publishing a price list, extending a trial, and setting a negotiated discount each appear in the audit log with the actor, both values, and the typed reason.
+12. `ruff`, `mypy`, `tsc -b --force`, `eslint`, `import-linter`, and the purge orphan guard all pass.
+
+### Known traps (repo-specific)
+- **The role allow-list exists in seven places across two backend files** — `admins_service.py:113` *and* `:306`, plus five `Literal[...]` annotations in `admins_router.py`. Grep for every copy before editing one. `frontend/src/rbac/capabilities.ts` is a hand-maintained mirror with no test that fails on drift.
+- **Keycloak provisioning returns 201 with `keycloak_provisioning: "pending"` and no error.** This already shipped broken on the invite path. On a self-serve signup it is fatal: the visitor is told to check an email that never arrives.
+- **Never FK from `public` into a tenant schema.** `billing_block_crop_pins` holds logical UUIDs.
+- **The meter loops tenants**, so each iteration needs its own SAVEPOINT or one bad tenant kills the run. Integration tests must assert `current_schema()` at the point of use — a test's own `commit()` unscopes the next read and it returns an empty list with no error.
+- **Bind real `date` and `UUID` objects, never `.isoformat()` strings through a `CAST`.** Meter readings and invoice periods are exactly where this family reappears.
+- **Store two dunum constants.** Iraq is 2,500 m², the Levant and Gulf are 1,000 m². One shared constant bills Iraqi customers 2.5× wrong.
+- Take the next free `public` migration number **at PR time, not at design time**. Two files at one revision merge clean and then break `upgrade head` in the cluster.
+- New tenant-scoped tables must join the purge manifest or CI fails.
+
+### Open questions (answer before BILL-1)
+- Which features are in the trial basic set — is a trial the full product for a short time, or a small product?
+- Auto-provision on email verification, or hold every signup for platform review?
+- Free-mail addresses: allow, hold, or reject?
+- Does a trial start with a seeded demo farm, or empty?
+- Does a block with no crop bill at the default rate or at zero?
+- How long does read-only last before archive and purge, and does reactivation backfill the gap?
 
 ---
 

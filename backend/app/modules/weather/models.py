@@ -314,10 +314,16 @@ class WeatherDerivedDaily(Base):
 class WeatherIndexDaily(Base):
     """`tenant_<id>.weather_index_daily` — per-(farm, day, index) projection.
 
-    The 7 catalog weather indices materialised from observations +
+    The 8 catalog weather indices materialised from observations +
     `weather_derived_daily`, plus a `baseline_deviation` z-score vs the
     matching `weather_index_baselines` row (NULL until the climatology
     sweep runs). Farm-keyed — weather is centroid data. Migration 0047.
+
+    Rows past today are projected from `weather_forecasts` instead and
+    carry ``is_forecast`` (migration 0072). They share the key space with
+    observed rows on purpose: when a forecast day is finally lived
+    through, the observed projection upserts over it and flips the flag
+    back to False.
     """
 
     __tablename__ = "weather_index_daily"
@@ -340,6 +346,7 @@ class WeatherIndexDaily(Base):
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
     baseline_deviation: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
+    is_forecast: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     computed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

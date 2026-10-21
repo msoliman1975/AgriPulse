@@ -4,6 +4,7 @@ import { useAuth } from "react-oidc-context";
 import { useTranslation } from "react-i18next";
 
 import { fetchMe, type Me } from "@/api/me";
+import { listFarms } from "@/api/farms";
 import { isApiError } from "@/api/errors";
 import { Drawer } from "./Drawer";
 import { LanguageToggle } from "./LanguageToggle";
@@ -20,6 +21,10 @@ export function SettingsDrawer({ open, onClose }: Props): ReactNode {
   const auth = useAuth();
   const accessToken = auth.user?.access_token;
   const [me, setMe] = useState<Me | null>(null);
+  // `farm_scopes` carries only a farm uuid — the ids live in `public`, the
+  // names in the tenant schema, so /me cannot join them. Resolve them here,
+  // where the cost is paid once per drawer open instead of on every /me.
+  const [farmNames, setFarmNames] = useState<Map<string, string>>(new Map());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,6 +41,18 @@ export function SettingsDrawer({ open, onClose }: Props): ReactNode {
         else if (err instanceof Error) setError(err.message);
         else setError(tc("errors.generic"));
       });
+    // A scout without `farm.read` gets a 403 here; the list stays empty and
+    // the rows fall back to the id rather than showing an error.
+    listFarms({ limit: 200, include_inactive: true })
+      .then((page) => {
+        if (!cancelled) {
+          setFarmNames(new Map(page.items.map((f) => [f.id, f.name?.trim() || f.code])));
+        }
+      })
+      .catch(() => {
+        /* names are a nicety here, not the point of the drawer */
+      });
+
     return () => {
       cancelled = true;
     };
@@ -74,14 +91,22 @@ export function SettingsDrawer({ open, onClose }: Props): ReactNode {
             {tc("actions.loading")}
           </p>
         ) : (
-          <ProfileBody me={me} lang={i18n.resolvedLanguage} />
+          <ProfileBody me={me} lang={i18n.resolvedLanguage} farmNames={farmNames} />
         )}
       </section>
     </Drawer>
   );
 }
 
-function ProfileBody({ me, lang }: { me: Me; lang: string | undefined }): ReactNode {
+function ProfileBody({
+  me,
+  lang,
+  farmNames,
+}: {
+  me: Me;
+  lang: string | undefined;
+  farmNames: Map<string, string>;
+}): ReactNode {
   const { t } = useTranslation("auth");
   const lastLoginText = me.last_login_at
     ? new Date(me.last_login_at).toLocaleString(lang)
@@ -160,7 +185,7 @@ function ProfileBody({ me, lang }: { me: Me; lang: string | undefined }): ReactN
           <ul className="list-inside list-disc text-ap-ink">
             {me.farm_scopes.map((s) => (
               <li key={s.farm_id}>
-                {s.farm_id} — {s.role}
+                {farmNames.get(s.farm_id) ?? `${s.farm_id.slice(0, 8)}…`} — {s.role}
               </li>
             ))}
           </ul>

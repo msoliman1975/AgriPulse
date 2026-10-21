@@ -375,19 +375,22 @@ footer {
   <div class="meta">
     <span>Compiled 2026-09-08</span>
     <span>Extended 2026-09-11 &mdash; frost and grid sizing</span>
-    <span>Read against origin/main f26355e6</span>
-    <span>75 items</span>
+    <span>Extended 2026-09-11 &mdash; settings, navigation and console revision</span>
+    <span>Extended 2026-09-11 &mdash; language for invited users, and merging Insights with Farm health</span>
+    <span>Read against origin/main cd5e4dad</span>
+    <span>90 items</span>
     <span>Status from the project notes, not re-checked on the server</span>
   </div>
 </header>
 
 <div class="counts">
-  <div class="count"><b>75</b><span>Items</span></div>
-  <div class="count"><b>58</b><span>Not started</span></div>
-  <div class="count"><b>6</b><span>Started, unfinished</span></div>
+  <div class="count"><b>90</b><span>Items</span></div>
+  <div class="count"><b>72</b><span>Not started</span></div>
+  <div class="count"><b>7</b><span>Started, unfinished</span></div>
   <div class="count"><b>3</b><span>Merged, not running</span></div>
   <div class="count"><b>4</b><span>Blocked</span></div>
-  <div class="count"><b>8</b><span>Open decisions</span></div>
+  <div class="count"><b>4</b><span>Decision needed</span></div>
+  <div class="count"><b>9</b><span>Open decisions</span></div>
 </div>
 
 <nav class="toc">
@@ -399,7 +402,8 @@ footer {
   <a href="#platform">6 · Platform and identity</a>
   <a href="#ux">7 · Screens and polish</a>
   <a href="#imagery">8 · Imagery and weather</a>
-  <a href="#decisions">9 · Open decisions</a>
+  <a href="#console">9 · Settings and console</a>
+  <a href="#decisions">10 · Open decisions</a>
 </nav>
 
 <div class="legend">
@@ -598,6 +602,30 @@ footer {
         <td class="size"><span class="size l">L</span></td>
         <td class="state"><span class="state blocked">Blocked: no named translator</span></td>
         <td class="doc">docs/proposals/portuguese-and-generic-localization.md, Volume of translation</td>
+      </tr>
+      <tr>
+        <td class="name">Language on the invite<span class="ref">IL1</span></td>
+        <td class="desc">Team &amp; roles has no language field. <code>invite_user</code> in <code>iam/users_service.py</code> takes email, name, Arabic name, phone, role and farm ids. It writes a <code>public.users</code> row and no <code>public.user_preferences</code> row, so the invited person falls back to the column default <code>'en'</code>. Add a language choice to the invite form and the invite payload, and write it to <code>public.user_preferences.language</code> at invite time. Defaulting it to the tenant's language needs a tenant language first; no such column exists today.</td>
+        <td class="deps">P1 for the registry; P7 for a tenant language to default from</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">backend/app/modules/iam/users_service.py, frontend Team &amp; roles page</td>
+      </tr>
+      <tr>
+        <td class="name">First emails in that language<span class="ref">IL2</span></td>
+        <td class="desc">The invite and password-reset emails come from Keycloak. The realm file sets <code>emailTheme: agripulse</code>, that theme's <code>theme.properties</code> carries <code>locales=en</code>, and the realm leaves <code>internationalizationEnabled</code> unset, so Keycloak has one language to render in. The only message bundle is <code>messages_en.properties</code>. Set the Keycloak user's <code>locale</code> attribute from IL1 at creation, turn realm internationalization on, and add the translated email bundles. Covers the same ground as the "Arabic account email" row and should be done with it.</td>
+        <td class="deps">IL1</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">infra/helm/keycloak/themes/agripulse/email, infra/helm/keycloak/files/agripulse-realm.json</td>
+      </tr>
+      <tr>
+        <td class="name">Login page in that language<span class="ref">IL3</span></td>
+        <td class="desc">The sign-in screen is Keycloak's own page, rendered by the <code>agripulse</code> login theme. That theme also carries <code>locales=en</code> and ships only <code>messages_en.properties</code>, and nothing in the repository sends <code>ui_locales</code> or <code>kc_locale</code> on the authorization request. The first screen an invited person sees is English whatever their stored language says. Pass the language on the redirect and add a message bundle per supported language.</td>
+        <td class="deps">IL2</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">frontend auth redirect, infra/helm/keycloak/themes/agripulse/login</td>
       </tr>
       <tr>
         <td class="name">Arabic gaps, PR-2 and PR-3</td>
@@ -1120,6 +1148,115 @@ footer {
 </section>
 
 <!-- ============ 9 ============ -->
+<section id="console">
+  <h2>Settings, navigation and console revision <span class="tag">new work · 2026-09-11</span></h2>
+  <p class="lede">Screens that were written against an older shape of the system and now describe it wrongly, plus the settings tabs that are still placeholders. Each row is small on its own; together they are what a new user reads first.</p>
+  <div class="scroller">
+  <table>
+    <thead><tr><th>Capability</th><th>What it is</th><th>Depends on</th><th>Size</th><th>Status</th><th>Doc</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="name">Imagery &amp; weather page says the wrong thing</td>
+        <td class="desc"><code>/config/imagery/:farmId</code> still heads its main table "Per-block subscriptions" and its subtitle still sends the reader to each block's detail page. Tenant migration 0074 moved fetching to one farm-level raster, so the page describes a model the system no longer uses. Restate what the page is for, then rewrite the strings in <code>imageryWeatherConfig.json</code>.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_farm_level_subscriptions</td>
+      </tr>
+      <tr>
+        <td class="name">Left navigation names</td>
+        <td class="desc">Read every label in <code>common.json → workspaceNav</code> against what its screen now does: Insights, Farm management, Action Center, Alerts, Recommendations, Signals, Plan, Timeline, Farm health, Reports. Three renames are proposed &mdash; decision tree to agronomy rule, timeline to farm replay, farm management to farm map. PR #544 is open and changes one file, <code>prompts/roadmap.md</code>. No label has changed in the code.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state review">In review, PR #544, design only</span></td>
+        <td class="doc">memory: project_ui_terminology_rename</td>
+      </tr>
+      <tr>
+        <td class="name">Merge Insights and Farm health into one screen</td>
+        <td class="desc"><code>/insights/:farmId</code> and <code>/farm-health/:farmId</code> are two workspace navigation rows that answer the same question at two depths: which part of the farm needs attention, and why. Insights measures &mdash; index values and weather turned into a class per block. Farm health judges &mdash; what one agronomy rule concluded, painted on the map and replayable to a past day. Five collisions follow: two different things are both called health, two date controls that mean different things, the block list appears twice, alert counts sit away from the rule that opened them, and selecting a block leads to two different places. Merged layouts were discussed but are not written down anywhere in the repository; that design note has to be written before the work can start.</td>
+        <td class="deps">Decide which route survives, and which health word sorts the screen</td>
+        <td class="size"><span class="size l">L</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">No design note yet. memory: project_health_map_screen, project_insights_trend_controls_pr369</td>
+      </tr>
+      <tr>
+        <td class="name">Say what a custom-signal template is</td>
+        <td class="desc">Configuration → Custom signals shows a Templates list with a heading and no explanation. A template is a named group of signal definitions recorded as one multi-value field form: the rows share a template code, an observation time, a block and a location, and are stored as one grouped submission. Put that sentence on the page, and ship a starter set of templates so the list is not empty on day one.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_custom_signals_plan</td>
+      </tr>
+      <tr>
+        <td class="name">Organization settings</td>
+        <td class="desc"><code>/settings/org</code> is a placeholder card reading "Tenant profile, branding, and policy. Coming soon." Build the tenant profile, the branding fields the emails and the login page need, and the tenant-level policy settings.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">frontend/src/i18n/locales/en/settings.json, placeholder.org</td>
+      </tr>
+      <tr>
+        <td class="name">Notifications settings as one home</td>
+        <td class="desc"><code>/settings/notifications</code> is a placeholder, while a per-user page already exists at <code>/account/notifications</code>. Make the settings tab the single home: tenant-wide defaults for every notification type, and a link to the personal page for "your notifications". Note that scheduled sweeps currently notify nobody, so the defaults screen needs the worker fix behind it to mean anything.</td>
+        <td class="deps">Scheduled sweeps must register subscribers</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_notification_digest_and_description</td>
+      </tr>
+      <tr>
+        <td class="name">Consolidate integration configuration</td>
+        <td class="desc">Two jobs. First, Integration health reads provider state but not the farm-level subscription configuration, so a farm with no subscription and a farm with a broken one read alike. Second, the gear menu opens a separate per-farm Imagery &amp; weather page while Settings → Integrations already has Weather, Imagery and Detection tabs. Fold them into one place.</td>
+        <td class="deps">Imagery &amp; weather page rewrite</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_integration_health_block_view_farm_path</td>
+      </tr>
+      <tr>
+        <td class="name">Name the detection threshold in the UI</td>
+        <td class="desc">The tenant integrations panel shows the raw key <code>grid.anomaly_z_threshold</code> in a text box with no label or unit. It is the grid anomaly sensitivity: how many standard deviations below the block's own cell mean a cell must sit, within one scene, to be flagged. Default 1.5; a per-block value in <code>grid_configs.anomaly_z_threshold</code> overrides it. Give it a name, a range and one line of help text.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">backend/app/modules/grid/anomaly.py</td>
+      </tr>
+      <tr>
+        <td class="name">Simplify the access model</td>
+        <td class="desc">Team, Workers, Field access, users, farm responsible and block responsible are six surfaces over one question: who may see and act on which farm and block. One fact is written in four tables and no single writer sets all four, which is why farm-scoped 403s keep coming back. Settle one model, then reduce the screens to it.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size l">L</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_scout_access_control_review</td>
+      </tr>
+      <tr>
+        <td class="name">Bulk updates: the other three types</td>
+        <td class="desc">The page is already built as a hub and lists five data types. Crop assignment and crop removal are live; irrigation, grid and subscriptions are listed and disabled. Build them, and decide whether responsibilities, valid-time windows and signal assignments join the list.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">frontend/src/modules/settings/pages/BulkUpdatesPage.tsx</td>
+      </tr>
+      <tr>
+        <td class="name">Cell configuration moves to the background</td>
+        <td class="desc">Cell size and the anomaly threshold are editable in three places: the block grid card, the farm zones panel and bulk grid configuration. A wrong cell size produces a grid that looks right and measures nothing. Decide the values in the system from block size and pixel size, and take the controls away from users.</td>
+        <td class="deps">Name the detection threshold in the UI</td>
+        <td class="size"><span class="size m">M</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">memory: project_bulk_grid_config_farm_level</td>
+      </tr>
+      <tr>
+        <td class="name">A default farm per user</td>
+        <td class="desc">The active farm comes only from the <code>:farmId</code> segment in the URL. There is no stored preference, so every sign-in starts with no farm and the workspace nav rows are disabled until one is picked. Let a user set a default farm, and use it on sign-in and on any route that has no farm.</td>
+        <td class="deps none">None</td>
+        <td class="size"><span class="size s">S</span></td>
+        <td class="state"><span class="state notstarted">Not started</span></td>
+        <td class="doc">frontend/src/hooks/useActiveFarm.ts</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 10 ============ -->
 <section id="decisions">
   <h2>Open decisions <span class="tag">answer these before the work starts</span></h2>
   <p class="lede">Each of these blocks a specific item in the tables. They are questions for Mohamed, not engineering tasks.</p>
@@ -1153,6 +1290,11 @@ footer {
       <h3>Q5 · Can a platform admin edit Portuguese in the catalogue console?</h3>
       <p>If yes, the authoring screens in P4 need a language tab per field. That is design work nobody has done.</p>
       <p class="who">Blocks: P4 authoring screens</p>
+    </div>
+    <div class="decision">
+      <h3>When measured health and judged health disagree, which one wins?</h3>
+      <p>The block scorecard's badge comes from index thresholds. The map's colour comes from an agronomy rule verdict. They can disagree on the same block. A merged screen can show both, but one of them has to decide the sort order and the headline count. A second question rides with it: which of the two routes survives the merge, since both are in the navigation and both are bookmarked.</p>
+      <p class="who">Blocks: merge Insights and Farm health into one screen</p>
     </div>
     <div class="decision">
       <h3>Mixed-clone conilon blocks</h3>

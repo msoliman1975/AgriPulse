@@ -13,10 +13,16 @@ vi.mock("@/api/farms", () => ({
 }));
 
 // `useCapability` reads from `react-oidc-context` for JWT claims; default
-// to a no-claims user so the empty-state CTA stays hidden in the legacy
-// "Welcome / coming soon" assertion. Individual tests override.
+// to a no-claims user.
 vi.mock("react-oidc-context", () => ({
   useAuth: () => ({ user: null }),
+}));
+
+// Drive `farm.create` directly rather than hand-building a JWT — the page
+// branches on that one capability and nothing else.
+const canCreateFarm = vi.hoisted(() => ({ value: false }));
+vi.mock("@/rbac/useCapability", () => ({
+  useCapability: () => canCreateFarm.value,
 }));
 
 function renderWithProviders(node: ReactNode): void {
@@ -32,13 +38,14 @@ describe("HomePage", () => {
   beforeEach(() => {
     void setupTestI18n("en");
     vi.clearAllMocks();
+    canCreateFarm.value = false;
   });
 
   it("renders the welcome heading in English (LTR) when there are no farms", async () => {
     await setupTestI18n("en");
     renderWithProviders(<HomePage />);
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "Welcome" })).toBeInTheDocument(),
+      expect(screen.getByRole("heading", { name: "Welcome to AgriPulse" })).toBeInTheDocument(),
     );
     expect(document.documentElement.getAttribute("dir")).toBe("ltr");
   });
@@ -47,8 +54,59 @@ describe("HomePage", () => {
     await setupTestI18n("ar");
     renderWithProviders(<HomePage />);
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "مرحبًا" })).toBeInTheDocument(),
+      expect(screen.getByRole("heading", { name: "مرحبًا بك في AgriPulse" })).toBeInTheDocument(),
     );
     expect(document.documentElement.getAttribute("dir")).toBe("rtl");
+  });
+
+  it("shows the create CTA and the six setup steps when the user may create a farm", async () => {
+    canCreateFarm.value = true;
+    await setupTestI18n("en");
+    renderWithProviders(<HomePage />);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "No farms yet" })).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("link", { name: "Create your first farm" })).toHaveAttribute(
+      "href",
+      "/labs/map?create=farm",
+    );
+    expect(screen.getByRole("heading", { name: "Set up in six steps" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Read the guide" })).toHaveLength(6);
+  });
+
+  it("hides the setup steps when the user may not create a farm", async () => {
+    renderWithProviders(<HomePage />);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Welcome to AgriPulse" })).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("heading", { name: "Set up in six steps" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Create your first farm" })).not.toBeInTheDocument();
+  });
+
+  it("links the create-a-farm guide and the eight process pages on the docs site", async () => {
+    renderWithProviders(<HomePage />);
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "How to create a farm" })).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("link", { name: "How to create a farm" })).toHaveAttribute(
+      "href",
+      "https://docs.agripulse.cloud/guide-create-a-farm.html",
+    );
+    expect(screen.getByRole("link", { name: /Map the farm/ })).toHaveAttribute(
+      "href",
+      "https://docs.agripulse.cloud/process-map-the-farm.html",
+    );
+    expect(screen.getByRole("link", { name: "Knowledge base by crop" })).toHaveAttribute(
+      "href",
+      "https://docs.agripulse.cloud/kb.html",
+    );
+  });
+
+  it("tells Arabic readers that the documentation pages are English", async () => {
+    await setupTestI18n("ar");
+    renderWithProviders(<HomePage />);
+    await waitFor(() =>
+      expect(screen.getByText("صفحات التوثيق متاحة بالإنجليزية فقط حاليًا.")).toBeInTheDocument(),
+    );
   });
 });

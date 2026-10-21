@@ -1,0 +1,8 @@
+{
+  "code": "size_mismatch",
+  "name_en": "Recorded tree size disagrees with the imagery",
+  "name_ar": "حجم الشجرة المسجّل لا يتفق مع الصور",
+  "clause_en": "the recorded tree size does not match what the imagery shows",
+  "clause_ar": "حجم الشجرة المسجّل لا يطابق ما تُظهره الصور",
+  "default_status": "issue"
+}

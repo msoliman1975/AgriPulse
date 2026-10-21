@@ -1,0 +1,8 @@
+{
+  "code": "soil_dry",
+  "name_en": "Soil moisture below the band",
+  "name_ar": "رطوبة التربة دون النطاق",
+  "clause_en": "soil moisture is below the band for this tree size",
+  "clause_ar": "رطوبة التربة دون النطاق لهذا الحجم",
+  "default_status": "issue"
+}

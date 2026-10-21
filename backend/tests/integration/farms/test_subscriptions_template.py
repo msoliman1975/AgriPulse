@@ -331,6 +331,10 @@ async def test_apply_preview_three_diff_shapes(
         # Aggregate: 1 of 3 matches.
         assert body["matched_blocks"] == 1
         assert body["total_blocks"] == 3
+        # The preview list is read by a person, so every row carries the block
+        # code. Without it the UI can only print a truncated uuid.
+        assert {d["block_code"] for d in body["imagery"]} == {"B1", "B2", "B3"}
+        assert {d["block_code"] for d in body["weather"]} == {"B1", "B2", "B3"}
 
 
 @pytest.mark.asyncio

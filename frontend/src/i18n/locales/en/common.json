@@ -65,11 +65,89 @@
     "switchToView": "Switch to this tenant to view its farms."
   },
   "home": {
-    "welcome": "Welcome",
-    "comingSoon": "Features coming soon.",
+    "welcome": "Welcome to AgriPulse",
+    "comingSoon": "You do not have a farm yet. Ask your administrator to add you to one, or to give you permission to create one.",
     "noFarmsTitle": "No farms yet",
-    "noFarmsBody": "Create your first farm to start tracking blocks, imagery, alerts, and recommendations.",
-    "createFirstFarm": "Create your first farm"
+    "noFarmsBody": "A farm is the starting point. Create one, then blocks, imagery, weather, alerts, and recommendations follow.",
+    "createFirstFarm": "Create your first farm",
+    "readTheGuide": "How to create a farm",
+    "docsEnglishOnly": "",
+    "setup": {
+      "title": "Set up in six steps",
+      "note": "Each step has a written guide on the documentation site.",
+      "guideLink": "Read the guide",
+      "steps": {
+        "createFarm": {
+          "title": "Create a farm",
+          "body": "Draw the boundary on the map. Every other record hangs off the farm."
+        },
+        "addBlocks": {
+          "title": "Add the blocks",
+          "body": "Split the farm into blocks and give each block a crop."
+        },
+        "gridCellSize": {
+          "title": "Set the grid cell size",
+          "body": "Choose the cell size that imagery and indices are summarised on."
+        },
+        "imageryWeather": {
+          "title": "Turn on imagery and weather",
+          "body": "Subscribe the farm so satellite scenes and weather records start arriving."
+        },
+        "attachPeople": {
+          "title": "Attach the people",
+          "body": "Add users and workers, then give each one access to the farm."
+        },
+        "checkArrived": {
+          "title": "Check what arrived",
+          "body": "Confirm the first scenes, indices, and weather rows reached the farm."
+        }
+      }
+    },
+    "capabilities": {
+      "title": "What you can do here",
+      "body": "AgriPulse covers eight processes. Each one has a guide.",
+      "items": {
+        "mapTheFarm": {
+          "title": "Map the farm",
+          "body": "Boundary, blocks, and the grid the field is read on."
+        },
+        "planTheSeason": {
+          "title": "Plan the season",
+          "body": "Crops, plan templates, growth stages, and season tasks."
+        },
+        "connectTheData": {
+          "title": "Connect the data",
+          "body": "Satellite imagery and weather, per farm, on a schedule."
+        },
+        "readTheField": {
+          "title": "Read the field",
+          "body": "Indices, trends, and maps, per block and per grid cell."
+        },
+        "authorTheAgronomy": {
+          "title": "Write the agronomy",
+          "body": "Signals, rules, and decision trees that turn readings into advice."
+        },
+        "runTheFieldTeam": {
+          "title": "Run the field team",
+          "body": "Workers, field access, and scouting forms on the mobile app."
+        },
+        "closeTheLoop": {
+          "title": "Close the loop",
+          "body": "Work alerts and recommendations, then record what was done."
+        },
+        "operateThePlatform": {
+          "title": "Run the platform",
+          "body": "Users, roles, tenants, and integration health."
+        }
+      }
+    },
+    "learn": {
+      "title": "Documentation",
+      "docsHome": "Documentation home",
+      "concepts": "Key concepts",
+      "kb": "Knowledge base by crop",
+      "support": "Support"
+    }
   },
   "farmSwitcher": {
     "newFarm": "+ New farm",

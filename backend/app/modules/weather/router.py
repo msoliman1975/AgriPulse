@@ -53,6 +53,10 @@ from app.shared.db.session import get_db_session
 from app.shared.rbac.check import has_capability, requires_capability
 
 # Canonical order for the summary response (matches the catalog sort_order).
+# Anything missing here is dropped from the strip no matter how well the
+# rest of the pipeline computes it — which is exactly what happened to
+# `humidity` between public migration 0049 seeding it as the eighth index
+# and this tuple being left at seven.
 _WEATHER_INDEX_ORDER: tuple[str, ...] = (
     "temperature",
     "radiation",
@@ -61,6 +65,7 @@ _WEATHER_INDEX_ORDER: tuple[str, ...] = (
     "evapotranspiration",
     "evaporation_coeff",
     "rain_et_balance",
+    "humidity",  # sort_order 8 — appended by 0049, so it sorts last here too
 )
 # Trailing window the farm summary scans for "latest + 7-day trend".
 _SUMMARY_WINDOW_DAYS = 45
@@ -234,6 +239,11 @@ async def get_weather_index_summary(
     """One row per weather index that has recent data for the farm — the
     map/dashboard "current state" strip. Indices stale beyond the trailing
     window are omitted (weather updates every few hours).
+
+    Observed rows only — the repository filters forecast out, so "latest"
+    stays the most recent day the farm actually lived through rather than
+    the far end of the forecast horizon. The forward view is the
+    timeseries endpoint, whose points are flagged.
     """
     _ensure_tenant(context)
     repo = WeatherRepository(tenant_session)

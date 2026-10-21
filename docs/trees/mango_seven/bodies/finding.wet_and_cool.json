@@ -1,0 +1,8 @@
+{
+  "code": "wet_and_cool",
+  "name_en": "Wet canopy in a cool window",
+  "name_ar": "مجموع مُروى في نافذة باردة",
+  "clause_en": "canopy moisture is high while the forecast is cool",
+  "clause_ar": "رطوبة المجموع مرتفعة والتوقع بارد",
+  "default_status": "issue"
+}

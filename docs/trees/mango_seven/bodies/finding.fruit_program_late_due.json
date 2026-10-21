@@ -1,0 +1,8 @@
+{
+  "code": "fruit_program_late_due",
+  "name_en": "Late fruit program due",
+  "name_ar": "برنامج الثمار المتأخر مستحقّ",
+  "clause_en": "the second KNO3 spray and the bulking irrigation are due",
+  "clause_ar": "الرشة الثانية من نترات البوتاسيوم وريّة التحجيم مستحقّتان",
+  "default_status": "issue"
+}

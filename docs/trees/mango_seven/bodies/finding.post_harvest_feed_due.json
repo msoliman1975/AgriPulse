@@ -1,0 +1,8 @@
+{
+  "code": "post_harvest_feed_due",
+  "name_en": "Post-harvest recovery feed due",
+  "name_ar": "تغذية التعافي بعد الحصاد مستحقّة",
+  "clause_en": "the block is in the post-harvest flush and the recovery feed is due",
+  "clause_ar": "القطعة في دفعة ما بعد الحصاد وتغذية التعافي مستحقّة",
+  "default_status": "issue"
+}

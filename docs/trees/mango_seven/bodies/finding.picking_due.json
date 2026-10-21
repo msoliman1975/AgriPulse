@@ -1,0 +1,8 @@
+{
+  "code": "picking_due",
+  "name_en": "Selective picking passes due",
+  "name_ar": "مرورات الجني الانتقائي مستحقّة",
+  "clause_en": "the fruit is in its maturity window and needs repeated selective picking passes",
+  "clause_ar": "الثمار في نافذة النضج وتحتاج مرورات جني انتقائي متكرّرة",
+  "default_status": "issue"
+}

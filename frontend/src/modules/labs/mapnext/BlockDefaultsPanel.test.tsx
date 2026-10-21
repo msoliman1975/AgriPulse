@@ -45,6 +45,8 @@ vi.mock("@/api/farmConfig", async () => {
       Promise.resolve({
         imagery: Array.from({ length: 36 }, (_, i) => ({
           block_id: `b${i}`,
+          block_code: `A-${String(i + 1).padStart(2, "0")}`,
+          block_name: i === 0 ? "North Mango 1" : null,
           will_add: [],
           will_update: [],
           will_deactivate: [],
@@ -52,6 +54,8 @@ vi.mock("@/api/farmConfig", async () => {
         })),
         weather: Array.from({ length: 36 }, (_, i) => ({
           block_id: `b${i}`,
+          block_code: `A-${String(i + 1).padStart(2, "0")}`,
+          block_name: i === 0 ? "North Mango 1" : null,
           will_add: [],
           will_update: [],
           will_deactivate: [],
@@ -171,6 +175,19 @@ describe("BlockDefaultsPanel — apply subscriptions", () => {
     expect(screen.getByRole("button", { name: /Confirm apply/i })).toBeDisabled();
     // The whole point: the user can no longer trigger a no-op that claims success.
     expect(applySubscriptionsMock).not.toHaveBeenCalled();
+  });
+
+  it("names each block in the preview by code, not by id", async () => {
+    const user = userEvent.setup();
+    await renderPanel();
+
+    await user.click(screen.getByRole("button", { name: /Apply subscriptions to blocks/i }));
+
+    await waitFor(() => expect(screen.getByText("A-01")).toBeTruthy());
+    expect(screen.getByText("North Mango 1")).toBeTruthy();
+    expect(screen.getByText("A-36")).toBeTruthy();
+    // The truncated uuid used to be the only label on the row.
+    expect(screen.queryByText(/^b0…$/)).toBeNull();
   });
 });
 

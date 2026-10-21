@@ -229,6 +229,8 @@ async def apply_subscriptions(
 def _diff_to_wire(d: config_template.BlockDiff) -> dict[str, Any]:
     return {
         "block_id": d.block_id,
+        "block_code": d.block_code,
+        "block_name": d.block_name,
         "will_add": list(d.will_add),
         "will_update": list(d.will_update),
         "will_deactivate": list(d.will_deactivate),
@@ -391,6 +393,8 @@ async def apply_irrigation_preview(
         "blocks": [
             {
                 "block_id": str(d.block_id),
+                "block_code": d.block_code,
+                "block_name": d.block_name,
                 "before": d.before,
                 "after": d.after,
                 "matches": d.matches,
@@ -489,6 +493,8 @@ async def apply_org_preview(
         "blocks": [
             {
                 "block_id": str(d.block_id),
+                "block_code": d.block_code,
+                "block_name": d.block_name,
                 "before": d.before,
                 "after": d.after,
                 "matches": d.matches,

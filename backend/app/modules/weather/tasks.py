@@ -306,6 +306,11 @@ _WEATHER_BASELINE_WINDOW_DAYS = 7
 # How far back `backfill_weather_indices` reprojects history into
 # `weather_index_daily` so the climatology sweep has something to chew on.
 _BACKFILL_WINDOW_DAYS = 400
+# Hours of forecast coverage a local day needs before it is projected.
+# Below this it is the stub at the end of the provider horizon, not a day.
+# 20 rather than 24 so a DST-short day (23h) and an hour dropped upstream
+# still qualify.
+_FORECAST_MIN_HOURS_PER_DAY = 20
 
 
 def _aggregate_obs_window(
@@ -346,6 +351,60 @@ def _aggregate_obs_window(
     return daily, radwind_by_date
 
 
+def _aggregate_forecast_window(
+    fc_rows: tuple[dict[str, Any], ...],
+    tz: Any,
+    *,
+    after: Any,
+    min_hours: int = _FORECAST_MIN_HOURS_PER_DAY,
+) -> tuple[dict[Any, DailyDerived], dict[Any, RadiationWindDay]]:
+    """Same aggregation as `_aggregate_obs_window`, over forecast hours.
+
+    Two differences from the observed path, both deliberate:
+
+    * Only local dates strictly after ``after`` (i.e. after today) survive.
+      Today is always the observed projection's day even though the
+      provider also forecasts its remaining hours — a half-predicted today
+      would be strictly worse than the partial-but-real one.
+    * A day needs ``min_hours`` of coverage to be emitted at all. The
+      horizon ends mid-day, and the trailing stub would otherwise post a
+      daily rainfall total of "3 hours' worth" that reads as a dry day.
+      A whole missing day is honest; a wrong one is not.
+
+    ``weather_forecasts`` carries no wind direction, so the wind index's
+    ``mean_direction_deg`` aux is simply absent on forecast days rather
+    than guessed at.
+    """
+    hourly = tuple(
+        HourlyRow(
+            time=r["time"],
+            air_temp_c=r["air_temp_c"],
+            precipitation_mm=r["precipitation_mm"],
+            et0_mm=r["et0_mm"],
+        )
+        for r in fc_rows
+    )
+    buckets = bucket_hourly_by_local_date(hourly, tz)
+    days = {d for d, rows in buckets.items() if d > after and len(rows) >= min_hours}
+    daily = {d: aggregate_one_day(buckets[d], d) for d in days}
+
+    idx_hourly = tuple(
+        IndexHourlyRow(
+            time=r["time"],
+            solar_radiation_w_m2=r["solar_radiation_w_m2"],
+            wind_speed_m_s=r["wind_speed_m_s"],
+            wind_direction_deg=None,
+            humidity_pct=r["humidity_pct"],
+        )
+        for r in fc_rows
+    )
+    idx_buckets = bucket_index_hourly_by_local_date(idx_hourly, tz)
+    radwind_by_date = {
+        d: aggregate_radiation_wind_day(idx_buckets[d]) for d in days if d in idx_buckets
+    }
+    return daily, radwind_by_date
+
+
 async def _persist_day(
     repo: WeatherRepository,
     *,
@@ -353,26 +412,36 @@ async def _persist_day(
     daily: dict[Any, DailyDerived],
     radwind_by_date: dict[Any, RadiationWindDay],
     day: Any,
+    is_forecast: bool = False,
 ) -> int:
     """Upsert one day's `weather_derived_daily` row + project its weather
     indices (with a z-score vs the climatology baseline). Caller guarantees
     ``daily[day]`` exists. Returns the number of index rows written.
+
+    A forecast day writes **only** the index rows. ``weather_derived_daily``
+    stays a record of observed weather: the reports module reads it as the
+    spine of its weather table and LEFT JOINs the index rows onto it, so a
+    predicted row there would silently put forecast GDD and cumulative
+    season totals into a report of what happened. The index table is the
+    one surface that carries the provenance flag, so it is the only one
+    that may hold both.
     """
     row = daily[day]
-    await repo.upsert_derived_daily(
-        farm_id=farm_id,
-        date=day,
-        temp_min_c=row.temp_min_c,
-        temp_max_c=row.temp_max_c,
-        temp_mean_c=row.temp_mean_c,
-        precip_mm_daily=row.precip_mm_daily,
-        et0_mm_daily=row.et0_mm_daily,
-        gdd_base10=row.gdd_base10,
-        gdd_base15=row.gdd_base15,
-        gdd_cumulative_base10_season=cumulative_gdd_base10_for_season(daily, day),
-        precip_mm_7d=rolling_precip_total(daily, day, window_days=7),
-        precip_mm_30d=rolling_precip_total(daily, day, window_days=30),
-    )
+    if not is_forecast:
+        await repo.upsert_derived_daily(
+            farm_id=farm_id,
+            date=day,
+            temp_min_c=row.temp_min_c,
+            temp_max_c=row.temp_max_c,
+            temp_mean_c=row.temp_mean_c,
+            precip_mm_daily=row.precip_mm_daily,
+            et0_mm_daily=row.et0_mm_daily,
+            gdd_base10=row.gdd_base10,
+            gdd_base15=row.gdd_base15,
+            gdd_cumulative_base10_season=cumulative_gdd_base10_for_season(daily, day),
+            precip_mm_7d=rolling_precip_total(daily, day, window_days=7),
+            precip_mm_30d=rolling_precip_total(daily, day, window_days=30),
+        )
 
     doy = day.timetuple().tm_yday
     indices_written = 0
@@ -398,6 +467,7 @@ async def _persist_day(
             value_max=proj.value_max,
             value_aux=proj.value_aux,
             baseline_deviation=deviation,
+            is_forecast=is_forecast,
         )
         indices_written += 1
     return indices_written
@@ -409,12 +479,18 @@ async def _persist_day(
     ignore_result=True,
 )
 def derive_weather_daily(farm_id: str, tenant_schema: str) -> dict[str, Any]:
-    """Recompute today + yesterday `weather_derived_daily` rows for a farm.
+    """Recompute today + yesterday `weather_derived_daily` rows for a farm,
+    and reproject the forecast horizon into `weather_index_daily`.
 
     "Day" is bucketed in the farm's centroid timezone — see
     :mod:`weather.timezone`. The rolling 7d/30d windows pull from
     historical observations, so this task can run without prior
     derivation rows existing (cold-start safe).
+
+    The forward half is index rows only, flagged ``is_forecast``. Chaining
+    it here rather than giving it its own beat is what keeps it honest:
+    the forecast is reprojected by the same fetch that stored it, so the
+    horizon can never outlive the data behind it.
     """
     return _run_task(_derive_weather_daily_async(UUID(farm_id), tenant_schema))
 
@@ -434,9 +510,17 @@ async def _derive_weather_daily_async(farm_id: UUID, tenant_schema: str) -> dict
         # Window: 30 days back through tomorrow (so the rolling 30d window
         # for "today" has data, and the partial day self-corrects as more
         # observations arrive). Times are tz-aware UTC (TIMESTAMPTZ).
+        #
+        # Extended back by the forecast horizon, because the forward days
+        # need a 30-day lookback too: the LAST forecast day's rainfall
+        # 30-day total and evaporation_coeff dry-down reach 30 days behind
+        # *it*, not behind today. A flat 31 would silently under-count both
+        # on exactly the days at the far end of the chart.
         now_utc = datetime.now(UTC)
+        forecast_hours = get_settings().weather_forecast_hours
+        horizon_days = -(-forecast_hours // 24)  # ceil, so a part-day counts
         until_utc = now_utc + timedelta(days=1)
-        since_utc = now_utc - timedelta(days=31)
+        since_utc = now_utc - timedelta(days=31 + horizon_days)
 
         obs_rows = await repo.read_observations(
             farm_id=farm_id,
@@ -444,40 +528,89 @@ async def _derive_weather_daily_async(farm_id: UUID, tenant_schema: str) -> dict
             since=since_utc,
             until=until_utc,
         )
+        # The forward half. The same fetch that wrote these observations
+        # wrote the forecast beside them, so this is always as fresh as the
+        # observed projection it extends. A day of slack past the provider
+        # horizon costs nothing — rows past it simply do not exist.
+        fc_rows = await repo.read_latest_forecast(
+            farm_id=farm_id,
+            provider_code=None,
+            since=now_utc,
+            until=now_utc + timedelta(hours=forecast_hours + 24),
+        )
 
     # Aggregate per local-date from the in-memory rows. Same DB session
     # pattern as imagery's compute_indices: HTTP/CPU work outside any
     # held transaction, then re-open for writes.
     daily, radwind_by_date = _aggregate_obs_window(obs_rows, tz)
 
-    # Recompute today + yesterday in farm-local time. Tomorrow is left
-    # alone — the row would be all-NaN until observations land.
+    # Recompute today + yesterday in farm-local time. Today's row is the
+    # partial-but-real one and self-corrects as observations land.
     today_local = datetime.now(tz).date()
     yesterday_local = today_local - timedelta(days=1)
     targets = (yesterday_local, today_local)
 
+    fc_daily, fc_radwind = _aggregate_forecast_window(fc_rows, tz, after=today_local)
+    # One map for the projection so a forecast day's rolling windows —
+    # rainfall's 7d/30d totals and evaporation_coeff's 30-day dry-down —
+    # reach back into observed history. Both windows only ever look
+    # backwards, so no observed day can pick up a forecast value from
+    # this merge; observed still wins any key collision regardless.
+    merged = {**fc_daily, **daily}
+    merged_radwind = {**fc_radwind, **radwind_by_date}
+
     written = 0
     indices_written = 0
+    forecast_days = 0
+    forecast_indices = 0
     async with factory() as session, session.begin():
         await _set_tenant_context(session, tenant_schema)
         repo = WeatherRepository(session)
         for d in targets:
-            if daily.get(d) is None:
+            if merged.get(d) is None:
                 continue
             indices_written += await _persist_day(
                 repo,
                 farm_id=farm_id,
-                daily=daily,
-                radwind_by_date=radwind_by_date,
+                daily=merged,
+                radwind_by_date=merged_radwind,
                 day=d,
             )
             written += 1
+
+        # Replace the forward half wholesale rather than upserting over it,
+        # so the stored forecast is exactly what THIS run computed rather
+        # than the union of every run that came before. Upserting alone
+        # leaves any day the current projection no longer reaches holding
+        # an old prediction that nothing will refresh — and on the chart a
+        # stale tail is indistinguishable from a live one.
+        #
+        # `weather_forecasts` keeps all issuances, so in the ordinary case
+        # the horizon does not shrink between runs and this deletes exactly
+        # what it is about to rewrite. It earns its keep at the edges: a
+        # raised coverage floor, a retention sweep over the hypertable, or
+        # a farm whose timezone resolves differently than it did before.
+        # Observed rows are never touched — `is_forecast` is the whole
+        # safety of this delete.
+        await repo.delete_forecast_index_rows_after(farm_id=farm_id, after=today_local)
+        for d in sorted(fc_daily):
+            forecast_indices += await _persist_day(
+                repo,
+                farm_id=farm_id,
+                daily=merged,
+                radwind_by_date=merged_radwind,
+                day=d,
+                is_forecast=True,
+            )
+            forecast_days += 1
 
     return {
         "farm_id": str(farm_id),
         "status": "succeeded",
         "days_written": written,
         "indices_written": indices_written,
+        "forecast_days_written": forecast_days,
+        "forecast_indices_written": forecast_indices,
     }
 
 
@@ -532,8 +665,10 @@ async def _backfill_weather_indices_async(
         )
 
     daily, radwind_by_date = _aggregate_obs_window(obs_rows, tz)
-    # Project every complete local day we have data for (skip "tomorrow",
-    # which would be a partial all-None row).
+    # Project every complete local day we have data for. Observed only, and
+    # capped at today: this task seeds the climatology's sample set, which
+    # must never contain a prediction. The forward half belongs to
+    # `derive_weather_daily`, which runs off the same fetch.
     today_local = datetime.now(tz).date()
     targets = sorted(d for d in daily if d <= today_local)
 

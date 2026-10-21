@@ -1,0 +1,8 @@
+{
+  "code": "deficit_confirmed",
+  "name_en": "Pre-harvest cut on plan",
+  "name_ar": "خفض ما قبل الحصاد على الخطة",
+  "clause_en": "soil moisture has fallen into the reduced band the pre-harvest cut is meant to produce",
+  "clause_ar": "هبطت رطوبة التربة إلى النطاق المخفّض المقصود من خفض ما قبل الحصاد",
+  "default_status": "good"
+}

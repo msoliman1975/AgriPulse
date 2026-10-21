@@ -100,6 +100,26 @@ describe("buildAssigneeOptions", () => {
     expect(byId.get("m2-longidhere")).toBe("m2-longi");
   });
 
+  it("shows a phone identity's phone, not their synthesised email", () => {
+    // A field worker's address is generated from their number to satisfy a
+    // NOT NULL/UNIQUE constraint; nothing can be delivered to it, and it
+    // reads as a data-entry mistake somebody will try to correct.
+    const opts = buildAssigneeOptions(
+      [
+        user({
+          membership_id: "m1",
+          full_name: "",
+          email: "+201002203402@scouts.agripulse.cloud",
+          phone: "+201002203402",
+          identity_kind: "phone",
+        } as Partial<TenantUser>),
+      ],
+      [],
+      "",
+    );
+    expect(opts[0].name).toBe("+201002203402");
+  });
+
   it("sorts by name so the list is scannable", () => {
     const opts = buildAssigneeOptions(
       [

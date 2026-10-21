@@ -1,0 +1,8 @@
+{
+  "code": "induction_ready",
+  "name_en": "Ready for the induction dry period",
+  "name_ar": "جاهزة لفترة التصويم",
+  "clause_en": "the flush has stopped and the induction dry period can start",
+  "clause_ar": "توقفت الدفعة ويمكن بدء فترة التصويم",
+  "default_status": "issue"
+}

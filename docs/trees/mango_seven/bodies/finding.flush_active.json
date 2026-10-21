@@ -1,0 +1,8 @@
+{
+  "code": "flush_active",
+  "name_en": "Vegetative flush still running",
+  "name_ar": "دفعة النمو الخضري ما زالت مستمرة",
+  "clause_en": "the canopy is still growing and the flush has not hardened off",
+  "clause_ar": "ما زال المجموع ينمو ولم تنضج الدفعة بعد",
+  "default_status": "good"
+}

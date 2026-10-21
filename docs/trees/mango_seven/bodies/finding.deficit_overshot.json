@@ -1,0 +1,8 @@
+{
+  "code": "deficit_overshot",
+  "name_en": "Pre-harvest cut too deep",
+  "name_ar": "خفض ما قبل الحصاد أعمق من اللازم",
+  "clause_en": "the pre-harvest cut has gone deeper than intended and is costing fruit size",
+  "clause_ar": "تجاوز خفض ما قبل الحصاد الحدّ المقصود وصار يكلّف حجم الثمار",
+  "default_status": "alert"
+}

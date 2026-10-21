@@ -1101,6 +1101,11 @@ function MapForFarm({ farmId }: { farmId: string }) {
               isLoading={signalObservationsQ.isLoading}
               x={obsClickPoint?.x ?? null}
               y={obsClickPoint?.y ?? null}
+              blockLabel={
+                selectedObservation?.block_id
+                  ? (blockNameById.get(selectedObservation.block_id) ?? null)
+                  : null
+              }
               onClose={() => {
                 const next = new URLSearchParams(search);
                 next.delete("signal_obs");

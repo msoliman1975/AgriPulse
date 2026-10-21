@@ -1,0 +1,8 @@
+{
+  "code": "post_harvest_care_due",
+  "name_en": "Post-harvest care due",
+  "name_ar": "رعاية ما بعد الحصاد مستحقّة",
+  "clause_en": "post-harvest pruning and recovery work are due",
+  "clause_ar": "أعمال التقليم والتعافي بعد الحصاد مستحقّة",
+  "default_status": "issue"
+}
