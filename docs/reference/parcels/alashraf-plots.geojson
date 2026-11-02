@@ -5,12 +5,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "M1",
     "plot": 1,
-    "name": "مجدول 1",
+    "name": "M1",
     "declared_feddan": 5,
     "computed_feddan": 4.31,
     "crop": "3 فدان مجدول نسيج + 2 فدان زيتون — عمر 3 سنوات",
-    "group": "مجدول"
+    "group": "مجدول",
+    "name_ar": "مجدول 1"
    },
    "geometry": {
     "type": "Polygon",
@@ -43,12 +45,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "M2",
     "plot": 2,
-    "name": "مجدول 2",
+    "name": "M2",
     "declared_feddan": 20,
     "computed_feddan": 20.07,
     "crop": "4 فدان مجدول + 16 فدان زيتون — عمر 3 سنوات",
-    "group": "مجدول"
+    "group": "مجدول",
+    "name_ar": "مجدول 2"
    },
    "geometry": {
     "type": "Polygon",
@@ -81,12 +85,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "M4",
     "plot": 4,
-    "name": "مجدول 4",
+    "name": "M4",
     "declared_feddan": 4.5,
     "computed_feddan": 4.02,
     "crop": "مجدول جديد",
-    "group": "مجدول"
+    "group": "مجدول",
+    "name_ar": "مجدول 4"
    },
    "geometry": {
     "type": "Polygon",
@@ -119,12 +125,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "M5",
     "plot": 5,
-    "name": "مجدول 5",
+    "name": "M5",
     "declared_feddan": 21,
     "computed_feddan": 21.12,
     "crop": "مجدول",
-    "group": "مجدول"
+    "group": "مجدول",
+    "name_ar": "مجدول 5"
    },
    "geometry": {
     "type": "Polygon",
@@ -157,12 +165,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "M7",
     "plot": 7,
-    "name": "مجدول 7",
+    "name": "M7",
     "declared_feddan": 1,
     "computed_feddan": 1.0,
     "crop": "مجدول",
-    "group": "مجدول"
+    "group": "مجدول",
+    "name_ar": "مجدول 7"
    },
    "geometry": {
     "type": "Polygon",
@@ -195,12 +205,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "M23",
     "plot": 23,
-    "name": "مجدول 23",
+    "name": "M23",
     "declared_feddan": 1,
     "computed_feddan": 1.01,
     "crop": "مجدول",
-    "group": "مجدول"
+    "group": "مجدول",
+    "name_ar": "مجدول 23"
    },
    "geometry": {
     "type": "Polygon",
@@ -233,12 +245,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "M24",
     "plot": 24,
-    "name": "مجدول 24",
+    "name": "M24",
     "declared_feddan": 1,
     "computed_feddan": 1.0,
     "crop": "مجدول",
-    "group": "مجدول"
+    "group": "مجدول",
+    "name_ar": "مجدول 24"
    },
    "geometry": {
     "type": "Polygon",
@@ -271,12 +285,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "M26",
     "plot": 26,
-    "name": "مجدول 26",
+    "name": "M26",
     "declared_feddan": 5,
     "computed_feddan": 5.02,
     "crop": "مجدول — عمر 3 سنوات، إنتاج العام القادم",
-    "group": "مجدول"
+    "group": "مجدول",
+    "name_ar": "مجدول 26"
    },
    "geometry": {
     "type": "Polygon",
@@ -309,12 +325,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "M27",
     "plot": 27,
-    "name": "مجدول 27",
+    "name": "M27",
     "declared_feddan": 1,
     "computed_feddan": 1.0,
     "crop": "مجدول",
-    "group": "مجدول"
+    "group": "مجدول",
+    "name_ar": "مجدول 27"
    },
    "geometry": {
     "type": "Polygon",
@@ -347,12 +365,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "M28",
     "plot": 28,
-    "name": "مجدول 28",
+    "name": "M28",
     "declared_feddan": 2.5,
     "computed_feddan": 2.51,
     "crop": "مجدول",
-    "group": "مجدول"
+    "group": "مجدول",
+    "name_ar": "مجدول 28"
    },
    "geometry": {
     "type": "Polygon",
@@ -385,12 +405,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "M29",
     "plot": 29,
-    "name": "مجدول 29",
+    "name": "M29",
     "declared_feddan": 1,
     "computed_feddan": 1.0,
     "crop": "مجدول",
-    "group": "مجدول"
+    "group": "مجدول",
+    "name_ar": "مجدول 29"
    },
    "geometry": {
     "type": "Polygon",
@@ -423,12 +445,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "M30",
     "plot": 30,
-    "name": "مجدول 30",
+    "name": "M30",
     "declared_feddan": 1,
     "computed_feddan": 1.0,
     "crop": "مجدول",
-    "group": "مجدول"
+    "group": "مجدول",
+    "name_ar": "مجدول 30"
    },
    "geometry": {
     "type": "Polygon",
@@ -461,12 +485,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "M31",
     "plot": 31,
-    "name": "مجدول 31",
+    "name": "M31",
     "declared_feddan": 6.5,
     "computed_feddan": 6.47,
     "crop": "غير مذكورة في الكشف المكتوب",
-    "group": "مجدول"
+    "group": "مجدول",
+    "name_ar": "مجدول 31"
    },
    "geometry": {
     "type": "Polygon",
@@ -507,12 +533,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O1",
     "plot": 1,
-    "name": "زيتون 1",
+    "name": "O1",
     "declared_feddan": 2,
     "computed_feddan": 1.99,
     "crop": "2 فدان زيتون",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 1"
    },
    "geometry": {
     "type": "Polygon",
@@ -545,12 +573,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O2",
     "plot": 2,
-    "name": "زيتون 2",
+    "name": "O2",
     "declared_feddan": 2,
     "computed_feddan": 3.01,
     "crop": "2 فدان زيتون",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 2"
    },
    "geometry": {
     "type": "Polygon",
@@ -583,12 +613,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O3",
     "plot": 3,
-    "name": "زيتون 3",
+    "name": "O3",
     "declared_feddan": 78,
     "computed_feddan": 78.28,
     "crop": "78 فدان: 20 فدان مزروع، 4 فدان ... (40 + 38 فدان)",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 3"
    },
    "geometry": {
     "type": "Polygon",
@@ -629,12 +661,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O4",
     "plot": 4,
-    "name": "زيتون 4",
+    "name": "O4",
     "declared_feddan": 500,
     "computed_feddan": 501.9,
     "crop": "500 فدان: 21 فدان مزروع",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 4"
    },
    "geometry": {
     "type": "Polygon",
@@ -667,13 +701,15 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O5",
     "plot": 5,
-    "name": "زيتون 5",
+    "name": "O5",
     "declared_feddan": 10,
     "computed_feddan": 10.03,
     "crop": "10 فدان: 5 زيتون + 5 نخيل سيوي",
     "note": "رقم القطعة غير ظاهر في الصورة؛ حددناه 5 لأنها القطعة الوحيدة الباقية بمساحة 10 فدان",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 5"
    },
    "geometry": {
     "type": "Polygon",
@@ -706,13 +742,15 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O6",
     "plot": 6,
-    "name": "زيتون 6",
+    "name": "O6",
     "declared_feddan": 5,
     "computed_feddan": 5.26,
     "crop": "5 فدان: 3 مزروع زيتون",
     "note": "الورقة فيها 3 نقاط فقط؛ النقطة 4 محسوبة لتكملة المستطيل",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 6"
    },
    "geometry": {
     "type": "Polygon",
@@ -745,12 +783,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O7",
     "plot": 7,
-    "name": "زيتون 7",
+    "name": "O7",
     "declared_feddan": 10,
     "computed_feddan": 10.04,
     "crop": "10 فدان: 6 مزروع",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 7"
    },
    "geometry": {
     "type": "Polygon",
@@ -783,12 +823,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O8",
     "plot": 8,
-    "name": "زيتون 8",
+    "name": "O8",
     "declared_feddan": 16.5,
     "computed_feddan": 19.92,
     "crop": "16.5 فدان زيتون، 3836 شجرة — جاهز للزراعة الشهر القادم",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 8"
    },
    "geometry": {
     "type": "Polygon",
@@ -821,12 +863,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O9",
     "plot": 9,
-    "name": "زيتون 9",
+    "name": "O9",
     "declared_feddan": 3,
     "computed_feddan": 3.01,
     "crop": "3 فدان: 2 مزروع زيتون — إنتاج العام القادم",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 9"
    },
    "geometry": {
     "type": "Polygon",
@@ -859,12 +903,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O10",
     "plot": 10,
-    "name": "زيتون 10",
+    "name": "O10",
     "declared_feddan": 3,
     "computed_feddan": 3.01,
     "crop": "3 فدان: 2 مزروع",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 10"
    },
    "geometry": {
     "type": "Polygon",
@@ -897,12 +943,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O11",
     "plot": 11,
-    "name": "زيتون 11",
+    "name": "O11",
     "declared_feddan": 10,
     "computed_feddan": 10.04,
     "crop": "10 فدان: 6 مزروع",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 11"
    },
    "geometry": {
     "type": "Polygon",
@@ -935,12 +983,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O13",
     "plot": 13,
-    "name": "زيتون 13",
+    "name": "O13",
     "declared_feddan": 7.5,
     "computed_feddan": 7.54,
     "crop": "7.5 فدان: 3.5 زيتون + 1 نخل سيوي — إنتاج العام القادم",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 13"
    },
    "geometry": {
     "type": "Polygon",
@@ -973,12 +1023,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O14",
     "plot": 14,
-    "name": "زيتون 14",
+    "name": "O14",
     "declared_feddan": 5,
     "computed_feddan": 5.03,
     "crop": "5 فدان: 2 زيتون + 1 سيوي",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 14"
    },
    "geometry": {
     "type": "Polygon",
@@ -1011,12 +1063,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O15",
     "plot": 15,
-    "name": "زيتون 15",
+    "name": "O15",
     "declared_feddan": 5,
     "computed_feddan": 8.22,
     "crop": "5 فدان مزروع — إنتاج العام القادم",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 15"
    },
    "geometry": {
     "type": "Polygon",
@@ -1049,12 +1103,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O17",
     "plot": 17,
-    "name": "زيتون 17",
+    "name": "O17",
     "declared_feddan": 300,
     "computed_feddan": 299.74,
     "crop": "300 فدان: 30 مزروع سيوي، والباقي مخطط لزراعة الزيتون",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 17"
    },
    "geometry": {
     "type": "Polygon",
@@ -1087,12 +1143,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O18",
     "plot": 18,
-    "name": "زيتون 18",
+    "name": "O18",
     "declared_feddan": 3,
     "computed_feddan": 3.01,
     "crop": "3 فدان: 2 مزروع زيتون",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 18"
    },
    "geometry": {
     "type": "Polygon",
@@ -1125,12 +1183,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O19",
     "plot": 19,
-    "name": "زيتون 19",
+    "name": "O19",
     "declared_feddan": 2,
     "computed_feddan": 2.0,
     "crop": "2 فدان مزروع زيتون",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 19"
    },
    "geometry": {
     "type": "Polygon",
@@ -1163,12 +1223,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O20",
     "plot": 20,
-    "name": "زيتون 20",
+    "name": "O20",
     "declared_feddan": 5,
     "computed_feddan": 5.03,
     "crop": "5 فدان مزروع",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 20"
    },
    "geometry": {
     "type": "Polygon",
@@ -1201,12 +1263,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O23",
     "plot": 23,
-    "name": "زيتون 23",
+    "name": "O23",
     "declared_feddan": 1,
     "computed_feddan": 1.0,
     "crop": "1 فدان مزروع",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 23"
    },
    "geometry": {
     "type": "Polygon",
@@ -1239,12 +1303,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O24",
     "plot": 24,
-    "name": "زيتون 24",
+    "name": "O24",
     "declared_feddan": 5,
     "computed_feddan": 5.02,
     "crop": "5 فدان مزروع",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 24"
    },
    "geometry": {
     "type": "Polygon",
@@ -1285,12 +1351,14 @@
   {
    "type": "Feature",
    "properties": {
+    "code": "O25",
     "plot": 25,
-    "name": "زيتون 25",
+    "name": "O25",
     "declared_feddan": 1,
     "computed_feddan": 1.0,
     "crop": "1 فدان مزروع",
-    "group": "زيتون"
+    "group": "زيتون",
+    "name_ar": "زيتون 25"
    },
    "geometry": {
     "type": "Polygon",
