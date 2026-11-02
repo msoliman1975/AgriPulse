@@ -13,8 +13,8 @@ import text2  # noqa: E402,F401  (imports sections 7-13 into text1.B)
 from text1 import B  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-EDITION = "1.0"
-DATE = {"ar": "أكتوبر 2026", "en": "October 2026"}
+EDITION = "1.1"
+DATE = {"ar": "نوفمبر 2026", "en": "November 2026"}
 
 CSS = open(os.path.join(HERE, "style.css"), encoding="utf-8").read()
 CSS = (CSS.replace("--palm:#2A6440", "--palm:#4F6B22").replace("--palm-soft:#E3EEE4", "--palm-soft:#E8EEDB")

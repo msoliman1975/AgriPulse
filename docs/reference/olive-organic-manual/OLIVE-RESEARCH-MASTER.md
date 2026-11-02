@@ -1290,3 +1290,13 @@ Sources: EPPO PM 4/17; IOC germplasm-network and certification harmonisation; Eg
 
 
 ---
+
+---
+
+# PART 5: Third upload batch (reviewed 2026-11-02)
+
+| File | Content | Effect on the manual (Edition 1.1) |
+|---|---|---|
+| Ebiad & Abu-Qaoud (2014), Jordan J. Agric. Sci. 10(1) | Nabali Baladi, Nabali Mohassan and Souri in Palestine (full text) | Variety row expanded:<br>• oil (dry weight) 55.6 / 46.8 / 40.3 %<br>• oleic 66.2 / 56.4 / 70.1 %<br>• polyphenols 380 / 128 / 217 mg/kg<br>• all three alternate-bearing and dual-purpose<br>• Souri originated in Sour (Lebanon)<br>• Δ-7-stigmastenol excessive only in Nabali Baladi<br>Palestinian phenology added to section 6.1: growth from early Feb, full bloom late Apr–early May, pit hardening mid-Jun–early Jul, colour change mid-Oct–early Nov |
+| Abdullah & Khaleel (2023), Dirasat Hum. Soc. Sci. 50(6) | Climate suitability for olive in Iraq (full text) | Iraq row now cites the correct paper title:<br>• local varieties Khastawi, Ashrasi, Dahkan<br>• Mosul, Erbil, Sulaymaniyah and Kirkuk highly suitable; Al-Rutba moderate; the south unsuitable<br>Added to section 6.1: olive needs a frost-free period of at least 150 days |
+| UC Cooperative Extension (2024), *Irrigation and Nutrient Management of Young Orchards*, Ch. 6 (young olive) | Full text | **Correction:** "N can be reduced or omitted in the first two seasons on fertile soils" is from the **walnut** chapter, so it was removed from the seedling plan.<br>Added from the olive chapter:<br>• very frequent fertilisation (weekly to every two weeks) and irrigation (several times a week) in year 1<br>• avoid over-irrigation and N over-fertilisation<br>• Kr = 2 × cover fraction for cover below 60 %<br>• California Kc 0.65 (hedgerow oil) and 0.75 (vase table)<br>• stem-water-potential baselines and stress thresholds (mild below −15 bar, medium −20 to −25 bar)<br>• allowable depletion 65 %<br>• mature intensive rates N 150, P 35, K 200 kg/ha/yr<br>The guide's urea and ammonium-nitrate doses are mineral and are not permitted in organic production; only their frequency is used |
