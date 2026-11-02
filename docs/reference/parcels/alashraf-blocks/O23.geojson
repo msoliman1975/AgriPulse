@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "O23",
+    "name": "O23",
+    "declared_feddan": 1,
+    "computed_feddan": 1.0,
+    "crop": "1 فدان مزروع",
+    "group": "زيتون",
+    "name_ar": "زيتون 23"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8526368,
+       29.3350827
+      ],
+      [
+       25.8513859,
+       29.3351068
+      ],
+      [
+       25.8513847,
+       29.3347946
+      ],
+      [
+       25.8526343,
+       29.3347706
+      ],
+      [
+       25.8526368,
+       29.3350827
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

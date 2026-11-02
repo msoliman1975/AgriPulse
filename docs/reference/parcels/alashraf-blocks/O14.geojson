@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "O14",
+    "name": "O14",
+    "declared_feddan": 5,
+    "computed_feddan": 5.03,
+    "crop": "5 فدان: 2 زيتون + 1 سيوي",
+    "group": "زيتون",
+    "name_ar": "زيتون 14"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8534667,
+       29.3254106
+      ],
+      [
+       25.8553442,
+       29.3259186
+      ],
+      [
+       25.8553317,
+       29.3269561
+      ],
+      [
+       25.8534542,
+       29.3264481
+      ],
+      [
+       25.8534667,
+       29.3254106
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

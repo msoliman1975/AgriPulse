@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "O7",
+    "name": "O7",
+    "declared_feddan": 10,
+    "computed_feddan": 10.04,
+    "crop": "10 فدان: 6 مزروع",
+    "group": "زيتون",
+    "name_ar": "زيتون 7"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8533583,
+       29.3277222
+      ],
+      [
+       25.8514,
+       29.327775
+      ],
+      [
+       25.8514028,
+       29.3257806
+      ],
+      [
+       25.8533583,
+       29.3257278
+      ],
+      [
+       25.8533583,
+       29.3277222
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

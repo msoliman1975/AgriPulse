@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "M30",
+    "name": "M30",
+    "declared_feddan": 1,
+    "computed_feddan": 1.0,
+    "crop": "مجدول",
+    "group": "مجدول",
+    "name_ar": "مجدول 30"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8533345,
+       29.3332515
+      ],
+      [
+       25.8513788,
+       29.3332891
+      ],
+      [
+       25.851378,
+       29.3331016
+      ],
+      [
+       25.8533335,
+       29.3330398
+      ],
+      [
+       25.8533345,
+       29.3332515
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "O2",
+    "name": "O2",
+    "declared_feddan": 2,
+    "computed_feddan": 3.01,
+    "crop": "2 فدان زيتون",
+    "group": "زيتون",
+    "name_ar": "زيتون 2"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8535861,
+       29.2998139
+      ],
+      [
+       25.8555389,
+       29.2999083
+      ],
+      [
+       25.8555028,
+       29.3005056
+      ],
+      [
+       25.85355,
+       29.3004111
+      ],
+      [
+       25.8535861,
+       29.2998139
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "O10",
+    "name": "O10",
+    "declared_feddan": 3,
+    "computed_feddan": 3.01,
+    "crop": "3 فدان: 2 مزروع",
+    "group": "زيتون",
+    "name_ar": "زيتون 10"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.85355,
+       29.3004111
+      ],
+      [
+       25.8555028,
+       29.3005056
+      ],
+      [
+       25.8554639,
+       29.3011028
+      ],
+      [
+       25.8535111,
+       29.3010083
+      ],
+      [
+       25.85355,
+       29.3004111
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

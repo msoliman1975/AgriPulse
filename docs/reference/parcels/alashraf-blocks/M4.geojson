@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "M4",
+    "name": "M4",
+    "declared_feddan": 4.5,
+    "computed_feddan": 4.02,
+    "crop": "مجدول جديد",
+    "group": "مجدول",
+    "name_ar": "مجدول 4"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8572417,
+       29.3269583
+      ],
+      [
+       25.8552833,
+       29.3269417
+      ],
+      [
+       25.8552944,
+       29.3261417
+      ],
+      [
+       25.85725,
+       29.3261611
+      ],
+      [
+       25.8572417,
+       29.3269583
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

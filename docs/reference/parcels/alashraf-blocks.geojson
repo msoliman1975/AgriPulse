@@ -1,12 +1,11 @@
 {
  "type": "FeatureCollection",
- "name": "Al-Ashraf plots",
+ "name": "Al-Ashraf blocks",
  "features": [
   {
    "type": "Feature",
    "properties": {
     "code": "M1",
-    "plot": 1,
     "name": "M1",
     "declared_feddan": 5,
     "computed_feddan": 4.31,
@@ -46,7 +45,6 @@
    "type": "Feature",
    "properties": {
     "code": "M2",
-    "plot": 2,
     "name": "M2",
     "declared_feddan": 20,
     "computed_feddan": 20.07,
@@ -86,7 +84,6 @@
    "type": "Feature",
    "properties": {
     "code": "M4",
-    "plot": 4,
     "name": "M4",
     "declared_feddan": 4.5,
     "computed_feddan": 4.02,
@@ -126,7 +123,6 @@
    "type": "Feature",
    "properties": {
     "code": "M5",
-    "plot": 5,
     "name": "M5",
     "declared_feddan": 21,
     "computed_feddan": 21.12,
@@ -166,7 +162,6 @@
    "type": "Feature",
    "properties": {
     "code": "M7",
-    "plot": 7,
     "name": "M7",
     "declared_feddan": 1,
     "computed_feddan": 1.0,
@@ -206,7 +201,6 @@
    "type": "Feature",
    "properties": {
     "code": "M23",
-    "plot": 23,
     "name": "M23",
     "declared_feddan": 1,
     "computed_feddan": 1.01,
@@ -246,7 +240,6 @@
    "type": "Feature",
    "properties": {
     "code": "M24",
-    "plot": 24,
     "name": "M24",
     "declared_feddan": 1,
     "computed_feddan": 1.0,
@@ -286,7 +279,6 @@
    "type": "Feature",
    "properties": {
     "code": "M26",
-    "plot": 26,
     "name": "M26",
     "declared_feddan": 5,
     "computed_feddan": 5.02,
@@ -326,7 +318,6 @@
    "type": "Feature",
    "properties": {
     "code": "M27",
-    "plot": 27,
     "name": "M27",
     "declared_feddan": 1,
     "computed_feddan": 1.0,
@@ -366,7 +357,6 @@
    "type": "Feature",
    "properties": {
     "code": "M28",
-    "plot": 28,
     "name": "M28",
     "declared_feddan": 2.5,
     "computed_feddan": 2.51,
@@ -406,7 +396,6 @@
    "type": "Feature",
    "properties": {
     "code": "M29",
-    "plot": 29,
     "name": "M29",
     "declared_feddan": 1,
     "computed_feddan": 1.0,
@@ -446,7 +435,6 @@
    "type": "Feature",
    "properties": {
     "code": "M30",
-    "plot": 30,
     "name": "M30",
     "declared_feddan": 1,
     "computed_feddan": 1.0,
@@ -486,7 +474,6 @@
    "type": "Feature",
    "properties": {
     "code": "M31",
-    "plot": 31,
     "name": "M31",
     "declared_feddan": 6.5,
     "computed_feddan": 6.47,
@@ -534,7 +521,6 @@
    "type": "Feature",
    "properties": {
     "code": "O1",
-    "plot": 1,
     "name": "O1",
     "declared_feddan": 2,
     "computed_feddan": 1.99,
@@ -574,7 +560,6 @@
    "type": "Feature",
    "properties": {
     "code": "O2",
-    "plot": 2,
     "name": "O2",
     "declared_feddan": 2,
     "computed_feddan": 3.01,
@@ -614,7 +599,6 @@
    "type": "Feature",
    "properties": {
     "code": "O3",
-    "plot": 3,
     "name": "O3",
     "declared_feddan": 78,
     "computed_feddan": 78.28,
@@ -662,7 +646,6 @@
    "type": "Feature",
    "properties": {
     "code": "O4",
-    "plot": 4,
     "name": "O4",
     "declared_feddan": 500,
     "computed_feddan": 501.9,
@@ -702,7 +685,6 @@
    "type": "Feature",
    "properties": {
     "code": "O5",
-    "plot": 5,
     "name": "O5",
     "declared_feddan": 10,
     "computed_feddan": 10.03,
@@ -743,7 +725,6 @@
    "type": "Feature",
    "properties": {
     "code": "O6",
-    "plot": 6,
     "name": "O6",
     "declared_feddan": 5,
     "computed_feddan": 5.26,
@@ -784,7 +765,6 @@
    "type": "Feature",
    "properties": {
     "code": "O7",
-    "plot": 7,
     "name": "O7",
     "declared_feddan": 10,
     "computed_feddan": 10.04,
@@ -824,7 +804,6 @@
    "type": "Feature",
    "properties": {
     "code": "O8",
-    "plot": 8,
     "name": "O8",
     "declared_feddan": 16.5,
     "computed_feddan": 19.92,
@@ -864,7 +843,6 @@
    "type": "Feature",
    "properties": {
     "code": "O9",
-    "plot": 9,
     "name": "O9",
     "declared_feddan": 3,
     "computed_feddan": 3.01,
@@ -904,7 +882,6 @@
    "type": "Feature",
    "properties": {
     "code": "O10",
-    "plot": 10,
     "name": "O10",
     "declared_feddan": 3,
     "computed_feddan": 3.01,
@@ -944,7 +921,6 @@
    "type": "Feature",
    "properties": {
     "code": "O11",
-    "plot": 11,
     "name": "O11",
     "declared_feddan": 10,
     "computed_feddan": 10.04,
@@ -984,7 +960,6 @@
    "type": "Feature",
    "properties": {
     "code": "O13",
-    "plot": 13,
     "name": "O13",
     "declared_feddan": 7.5,
     "computed_feddan": 7.54,
@@ -1024,7 +999,6 @@
    "type": "Feature",
    "properties": {
     "code": "O14",
-    "plot": 14,
     "name": "O14",
     "declared_feddan": 5,
     "computed_feddan": 5.03,
@@ -1064,7 +1038,6 @@
    "type": "Feature",
    "properties": {
     "code": "O15",
-    "plot": 15,
     "name": "O15",
     "declared_feddan": 5,
     "computed_feddan": 8.22,
@@ -1104,7 +1077,6 @@
    "type": "Feature",
    "properties": {
     "code": "O17",
-    "plot": 17,
     "name": "O17",
     "declared_feddan": 300,
     "computed_feddan": 299.74,
@@ -1144,7 +1116,6 @@
    "type": "Feature",
    "properties": {
     "code": "O18",
-    "plot": 18,
     "name": "O18",
     "declared_feddan": 3,
     "computed_feddan": 3.01,
@@ -1184,7 +1155,6 @@
    "type": "Feature",
    "properties": {
     "code": "O19",
-    "plot": 19,
     "name": "O19",
     "declared_feddan": 2,
     "computed_feddan": 2.0,
@@ -1224,7 +1194,6 @@
    "type": "Feature",
    "properties": {
     "code": "O20",
-    "plot": 20,
     "name": "O20",
     "declared_feddan": 5,
     "computed_feddan": 5.03,
@@ -1264,7 +1233,6 @@
    "type": "Feature",
    "properties": {
     "code": "O23",
-    "plot": 23,
     "name": "O23",
     "declared_feddan": 1,
     "computed_feddan": 1.0,
@@ -1304,7 +1272,6 @@
    "type": "Feature",
    "properties": {
     "code": "O24",
-    "plot": 24,
     "name": "O24",
     "declared_feddan": 5,
     "computed_feddan": 5.02,
@@ -1352,7 +1319,6 @@
    "type": "Feature",
    "properties": {
     "code": "O25",
-    "plot": 25,
     "name": "O25",
     "declared_feddan": 1,
     "computed_feddan": 1.0,

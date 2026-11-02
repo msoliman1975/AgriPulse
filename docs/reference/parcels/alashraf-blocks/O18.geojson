@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "O18",
+    "name": "O18",
+    "declared_feddan": 3,
+    "computed_feddan": 3.01,
+    "crop": "3 فدان: 2 مزروع زيتون",
+    "group": "زيتون",
+    "name_ar": "زيتون 18"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8552528,
+       29.3295333
+      ],
+      [
+       25.8572083,
+       29.3295528
+      ],
+      [
+       25.8572167,
+       29.3289528
+      ],
+      [
+       25.8552583,
+       29.3289361
+      ],
+      [
+       25.8552528,
+       29.3295333
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

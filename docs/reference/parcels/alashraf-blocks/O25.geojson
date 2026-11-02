@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "O25",
+    "name": "O25",
+    "declared_feddan": 1,
+    "computed_feddan": 1.0,
+    "crop": "1 فدان مزروع",
+    "group": "زيتون",
+    "name_ar": "زيتون 25"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8533354,
+       29.3334511
+      ],
+      [
+       25.8513794,
+       29.3334887
+      ],
+      [
+       25.8513788,
+       29.3332891
+      ],
+      [
+       25.8533345,
+       29.3332515
+      ],
+      [
+       25.8533354,
+       29.3334511
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

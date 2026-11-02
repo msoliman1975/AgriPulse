@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "M5",
+    "name": "M5",
+    "declared_feddan": 21,
+    "computed_feddan": 21.12,
+    "crop": "مجدول",
+    "group": "مجدول",
+    "name_ar": "مجدول 5"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8534969,
+       29.32292
+      ],
+      [
+       25.8553744,
+       29.3234281
+      ],
+      [
+       25.8554275,
+       29.3190694
+      ],
+      [
+       25.85355,
+       29.3185614
+      ],
+      [
+       25.8534969,
+       29.32292
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

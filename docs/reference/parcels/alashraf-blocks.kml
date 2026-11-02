@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Al-Ashraf plots</name>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Al-Ashraf blocks</name>
 <Style id="med"><LineStyle><color>ff00ff00</color><width>2</width></LineStyle><PolyStyle><color>4400aa00</color></PolyStyle></Style>
 <Style id="oli"><LineStyle><color>ff00ffff</color><width>2</width></LineStyle><PolyStyle><color>4400cccc</color></PolyStyle></Style>
 <Style id="bad"><LineStyle><color>ff0000ff</color><width>2</width></LineStyle><PolyStyle><color>440000ff</color></PolyStyle></Style>

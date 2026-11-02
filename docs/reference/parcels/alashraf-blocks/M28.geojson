@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "M28",
+    "name": "M28",
+    "declared_feddan": 2.5,
+    "computed_feddan": 2.51,
+    "crop": "مجدول",
+    "group": "مجدول",
+    "name_ar": "مجدول 28"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8533335,
+       29.3330398
+      ],
+      [
+       25.851378,
+       29.3331016
+      ],
+      [
+       25.851377,
+       29.3326026
+      ],
+      [
+       25.8533326,
+       29.3325408
+      ],
+      [
+       25.8533335,
+       29.3330398
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

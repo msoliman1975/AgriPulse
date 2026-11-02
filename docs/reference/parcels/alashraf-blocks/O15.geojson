@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "O15",
+    "name": "O15",
+    "declared_feddan": 5,
+    "computed_feddan": 8.22,
+    "crop": "5 فدان مزروع — إنتاج العام القادم",
+    "group": "زيتون",
+    "name_ar": "زيتون 15"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8557265,
+       29.3335634
+      ],
+      [
+       25.8557434,
+       29.3321931
+      ],
+      [
+       25.8534302,
+       29.3315552
+      ],
+      [
+       25.8534145,
+       29.3329392
+      ],
+      [
+       25.8557265,
+       29.3335634
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

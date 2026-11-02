@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "O20",
+    "name": "O20",
+    "declared_feddan": 5,
+    "computed_feddan": 5.03,
+    "crop": "5 فدان مزروع",
+    "group": "زيتون",
+    "name_ar": "زيتون 20"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8552083,
+       29.3331056
+      ],
+      [
+       25.8533389,
+       29.3326028
+      ],
+      [
+       25.8533528,
+       29.3315583
+      ],
+      [
+       25.8552222,
+       29.3320639
+      ],
+      [
+       25.8552083,
+       29.3331056
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

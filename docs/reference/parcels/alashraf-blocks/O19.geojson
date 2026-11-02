@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "O19",
+    "name": "O19",
+    "declared_feddan": 2,
+    "computed_feddan": 2.0,
+    "crop": "2 فدان مزروع زيتون",
+    "group": "زيتون",
+    "name_ar": "زيتون 19"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8533056,
+       29.3345389
+      ],
+      [
+       25.8533028,
+       29.3341472
+      ],
+      [
+       25.8513333,
+       29.3341569
+      ],
+      [
+       25.8513333,
+       29.3345556
+      ],
+      [
+       25.8533056,
+       29.3345389
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

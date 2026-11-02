@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "O4",
+    "name": "O4",
+    "declared_feddan": 500,
+    "computed_feddan": 501.9,
+    "crop": "500 فدان: 21 فدان مزروع",
+    "group": "زيتون",
+    "name_ar": "زيتون 4"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8420417,
+       29.3353889
+      ],
+      [
+       25.8470917,
+       29.3367556
+      ],
+      [
+       25.8477583,
+       29.2984389
+      ],
+      [
+       25.8424972,
+       29.2981833
+      ],
+      [
+       25.8420417,
+       29.3353889
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

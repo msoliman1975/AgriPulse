@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "M23",
+    "name": "M23",
+    "declared_feddan": 1,
+    "computed_feddan": 1.01,
+    "crop": "مجدول",
+    "group": "مجدول",
+    "name_ar": "مجدول 23"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.853475,
+       29.3183528
+      ],
+      [
+       25.8516139,
+       29.31785
+      ],
+      [
+       25.8516167,
+       29.3176417
+      ],
+      [
+       25.8534861,
+       29.3181444
+      ],
+      [
+       25.853475,
+       29.3183528
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

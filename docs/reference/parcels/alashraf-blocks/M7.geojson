@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "M7",
+    "name": "M7",
+    "declared_feddan": 1,
+    "computed_feddan": 1.0,
+    "crop": "مجدول",
+    "group": "مجدول",
+    "name_ar": "مجدول 7"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8533639,
+       29.3355472
+      ],
+      [
+       25.8533667,
+       29.3351944
+      ],
+      [
+       25.8544639,
+       29.3353389
+      ],
+      [
+       25.8544611,
+       29.3356944
+      ],
+      [
+       25.8533639,
+       29.3355472
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "O11",
+    "name": "O11",
+    "declared_feddan": 10,
+    "computed_feddan": 10.04,
+    "crop": "10 فدان: 6 مزروع",
+    "group": "زيتون",
+    "name_ar": "زيتون 11"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8532694,
+       29.3384222
+      ],
+      [
+       25.8513972,
+       29.3379167
+      ],
+      [
+       25.8514194,
+       29.3358472
+      ],
+      [
+       25.8532944,
+       29.3363361
+      ],
+      [
+       25.8532694,
+       29.3384222
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

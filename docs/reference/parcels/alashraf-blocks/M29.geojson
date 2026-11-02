@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "code": "M29",
+    "name": "M29",
+    "declared_feddan": 1,
+    "computed_feddan": 1.0,
+    "crop": "مجدول",
+    "group": "مجدول",
+    "name_ar": "مجدول 29"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       25.8533307,
+       29.3315428
+      ],
+      [
+       25.851375,
+       29.3316047
+      ],
+      [
+       25.8513746,
+       29.3314051
+      ],
+      [
+       25.8533303,
+       29.3313432
+      ],
+      [
+       25.8533307,
+       29.3315428
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}
