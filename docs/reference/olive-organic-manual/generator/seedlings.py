@@ -1,5 +1,5 @@
 """Section 8: new plantings, from planting to the onset of fruiting."""
-from text1 import B, h2, h3, p, note, facts
+from text1 import B, h2, h3, p, note, facts, table
 
 def timeline(items): B.append(("timeline", items))
 S, D, N = "S", "D", "N"   # how-often source: stated / set by compiler from source timing / not given
@@ -12,6 +12,7 @@ h3("s8-2", "8.2 الشتلة الجاهزة للزراعة", "8.2 Planting mater
 facts([
  ("تُستخدم مادة إكثار عضوية؛ والشتلات غير العضوية تحتاج إذنًا من جهة الرقابة قبل الزراعة، لموسم واحد، ولا تُعامل بمبيدات غير مسموحة.", "Organic planting material is used; non-organic plants need authorisation from the control body before planting, for one season at a time, and must not be treated with non-permitted products.", ["eu848"], "H"),
  ("تُفضّل شتلات منتَجة وفق نظام EPPO PM 4/17 المختبرة من الفيرتيسيليوم والزيليلا والفيروسات.", "Prefer plants produced under the EPPO PM 4/17 scheme, tested for Verticillium, Xylella and viruses.", ["eppo"], "M"),
+ ("الأشجار الناتجة من العقل تثمر بعد نحو 4 سنوات؛ ويُغيّر الصنف بالتطعيم القلفي أو التطعيم العلوي.", "Cutting-grown trees bear fruit in about four years; the cultivar can be changed by bark grafting or top-working.", ["haifaguide"], "M"),
  ("بداية الحمل: التفاحي مبكر، والعجيزي الشامي والحامض وسط.", "Start of bearing: Toffahi is early; Aggezi Shami and Hamed are intermediate.", ["ioc2012", "iocaggezi"], "H"),
 ])
 h3("s8-3", "8.3 الري والتسميد للشتلة الصغيرة", "8.3 Irrigation and nutrition of the young tree")
@@ -27,6 +28,21 @@ facts([
  ("معامل المحصول يُعدّل حسب نسبة تغطية الأشجار للأرض؛ عند تغطية 20% ينخفض معامل القاعدة إلى نحو 0.40.", "The crop coefficient is adjusted for the trees' ground cover; at 20% cover the basal coefficient falls to about 0.40.", ["fao56"], "H"),
  ("البورون للأشجار الصغيرة: 10 جم بوراكس × عدد سنوات الزراعة، مع الحذر لسميته.", "Boron for young trees: 10 g borax × years since planting, with care because it is toxic.", ["ecolive"], "M"),
 ])
+table(["العمر (سنة)", "فترة الري (يوم)", "أوائل الربيع", "الربيع", "أواخر الربيع", "أوائل الصيف", "الصيف", "أواخر الصيف", "أوائل الخريف", "الخريف"],
+      ["Age (years)", "Interval (days)", "Early spring", "Spring", "Late spring", "Early summer", "Summer", "Late summer", "Early fall", "Fall"], [
+ (["1", "3–7", "5", "6", "8", "10", "10", "9", "8", "7"], ["1", "3–7", "5", "6", "8", "10", "10", "9", "8", "7"], ["haifaguide"], "M"),
+ (["2", "3–7", "7", "10", "15", "20", "20", "18", "15", "15"], ["2", "3–7", "7", "10", "15", "20", "20", "18", "15", "15"], ["haifaguide"], "M"),
+ (["3", "3–7", "15", "25", "35", "40", "40", "35", "30", "30"], ["3", "3–7", "15", "25", "35", "40", "40", "35", "30", "30"], ["haifaguide"], "M"),
+ (["4", "3–7", "30", "40", "50", "60", "60", "60", "50", "30"], ["4", "3–7", "30", "40", "50", "60", "60", "60", "50", "30"], ["haifaguide"], "M"),
+])
+note("الجدول: المعدل اليومي (لتر/شجرة/يوم) للأشجار الصغيرة في مناخ البحر المتوسط حسب العمر والموسم.", "Table: daily rate (litres per tree per day) for young olive trees in a Mediterranean climate, by age and season.")
+table(["عمر البستان (سنة)", "نيتروجين (كجم/هكتار)", "K2O (كجم/هكتار)"], ["Orchard age (years)", "N (kg/ha)", "K2O (kg/ha)"], [
+ (["1", "50–80", "50–70"], ["1", "50–80", "50–70"], ["haifaprog", "haifaguide"], "M"),
+ (["2", "80–120", "70–120"], ["2", "80–120", "70–120"], ["haifaprog", "haifaguide"], "M"),
+ (["3", "120–150", "120–145"], ["3", "120–150", "120–145"], ["haifaprog", "haifaguide"], "M"),
+])
+note("الجدول: احتياج البستان غير المثمر من النيتروجين والبوتاسيوم (500 شجرة/هكتار، تربة خفيفة إلى متوسطة)؛ الفوسفور حسب تحليل الأوراق من السنة الثالثة. يُعطى من مصادر عضوية مسموحة.", "Table: nitrogen and potassium needs of a non-bearing orchard (500 trees/ha, light to medium soil); phosphorus by leaf analysis from the third year. Supply from permitted organic sources.")
+
 h3("s8-4", "8.4 حماية الشتلة الصغيرة", "8.4 Protection of the young tree")
 facts([
  ("دودة الياسمين آفة أولية في المشاتل والزراعات الحديثة المروية؛ تُعالج عند إصابة أكثر من 5% من الأشجار في الربيع.", "Jasmine moth is a primary pest of nurseries and young irrigated plantings; treat when more than 5% of trees are infested in spring.", ["palpitamd", "palpitathr"], "M"),
@@ -55,6 +71,7 @@ timeline([
  ]),
  ("موعد الزراعة: منتصف فبراير–منتصف مايو أو منتصف أغسطس–منتصف نوفمبر", "Planting time: mid-February to mid-May, or mid-August to mid-November", "الزراعة", "Planting", [
    ("الزراعة في الموعد الأنسب (منتصف فبراير–منتصف مايو) أو الموعد الثاني (منتصف أغسطس–منتصف نوفمبر)، وتجنب يونيو–أغسطس وديسمبر–يناير.", "Plant in the best window (mid-February to mid-May) or the second window (mid-August to mid-November), avoiding June–August and December–January.", ["agriceg", "elaard"], "L", S, "مرة واحدة", "Once"),
+   ("مرجع آخر: الزراعة ممكنة على مدار السنة عدا يوليو–أغسطس ونوفمبر–يناير.", "Another reference: planting is possible year round except July–August and November–January.", ["haifaguide"], "M", S, "مرة واحدة", "Once"),
    ("حفظ سجل الزراعة: تاريخ الزراعة، مصدر الشتلات، شهادتها، الإذن إن كانت غير عضوية.", "Keep a planting record: date, nursery source, certificate, and the authorisation if non-organic.", ["eu848", "law12"], "H", S, "مرة واحدة", "Once"),
  ]),
  ("الأسبوعان 1–2 بعد الزراعة", "Weeks 1–2 after planting", "التأسيس", "Establishment", [
@@ -63,6 +80,7 @@ timeline([
  ("الأسبوع 3 حتى نهاية السنة الأولى", "Week 3 to the end of year 1", "النمو الأول", "First growth", [
    ("بعد ظهور علامات التأسيس: سماد مسموح مع كل رية بنسبة نيتروجين:بوتاسيوم 1:1، بمعدل 1 جم نيتروجين/شجرة/يوم.", "Once establishment is visible: permitted fertiliser with every irrigation at N:K 1:1, at 1 g N/tree/day.", ["haifaprog", "eu848"], "M", S, "مع كل رية", "With every irrigation"),
    ("حساب الري من معامل المحصول مع معامل التخفيض Kr = 2 × نسبة التغطية، وعدة ريات في الأسبوع حسب التربة؛ تجنب الإجهاد المائي والإفراط في الري.", "Calculate irrigation from the crop coefficient with the reduction coefficient Kr = 2 × cover fraction, with several irrigations per week depending on soil; avoid both water stress and over-irrigation.", ["fao56", "ucyoung"], "M", S, "عدة ريات أسبوعيًا", "Several irrigations per week"),
+   ("الري حسب جدول السنة الأولى (5–10 لتر/شجرة/يوم حسب الموسم، كل 3–7 أيام) بنقاطات سطحية.", "Irrigate by the year-1 schedule (5–10 L per tree per day depending on season, every 3–7 days) with surface drippers.", ["haifaguide"], "M", S, "كل 3–7 أيام", "Every 3–7 days"),
    ("تسميد بمصادر مسموحة أسبوعيًا أو كل أسبوعين، مع تجنب الإفراط في النيتروجين.", "Fertilise from permitted sources weekly or every two weeks, avoiding nitrogen over-fertilisation.", ["ucyoung", "eu848"], "M", S, "أسبوعيًا أو كل أسبوعين", "Weekly or every two weeks"),
    ("فحص دودة الياسمين خلال طيرانها (مايو–يونيو وسبتمبر–نوفمبر)؛ المعالجة عند تجاوز 5% من الأشجار المصابة في الربيع ببكتيريا Bt أو إطلاق التريكوجراما 9000/شجرة كل أسبوعين.", "Inspect for jasmine moth during its flights (May–June and September–November); treat when more than 5% of trees are infested in spring with Bt, or release Trichogramma at 9,000 per tree every two weeks.", ["palpitamd", "palpitathr", "btk"], "M", S, "إطلاقات كل أسبوعين", "Releases every two weeks"),
    ("فحص حلم البراعم على الشتلات وإطلاق المفترس Neoseiulus barkeri عند الإصابة.", "Inspect seedlings for bud mite and release the predator Neoseiulus barkeri when infested.", ["mites"], "M", N, "غير مذكور في المصادر", "Not given in sources"),
@@ -72,6 +90,8 @@ timeline([
  ]),
  ("السنة الثانية", "Year 2", "تكوين الهيكل", "Frame building", [
    ("سماد مسموح مع كل رية بمعدل 2 جم نيتروجين/شجرة/يوم (1 جم × عمر الشجرة).", "Permitted fertiliser with every irrigation at 2 g N/tree/day (1 g × tree age).", ["haifaprog"], "M", S, "مع كل رية", "With every irrigation"),
+   ("الري حسب جدول السنة الثانية (7–20 لتر/شجرة/يوم، كل 3–7 أيام).", "Irrigate by the year-2 schedule (7–20 L per tree per day, every 3–7 days).", ["haifaguide"], "M", S, "كل 3–7 أيام", "Every 3–7 days"),
+   ("أول تحليل أوراق عند عمر سنتين، في يوليو (4 أوراق من أفرع غير مثمرة من 20–25 شجرة).", "First leaf analysis at two years of age, in July (4 leaves from non-bearing shoots of 20–25 trees).", ["haifaguide"], "M", S, "مرة واحدة", "Once"),
    ("بوراكس 10 جم × سنتين = 20 جم للشجرة عند الحاجة.", "Borax 10 g × 2 years = 20 g per tree when needed.", ["ecolive"], "M", S, "مرة واحدة", "Once"),
    ("تكوين شكل الكأس للبستان المكثف: ساق 80–100 سم وفروع رئيسية 2–4 مائلة 45–50°.", "Build the vase form for intensive orchards: trunk 80–100 cm and 2–4 main limbs inclined at 45–50°.", ["ecolive"], "M", N, "غير مذكور في المصادر", "Not given in sources"),
    ("استمرار برنامج حماية السنة الأولى (دودة الياسمين، حلم البراعم، أعفان الجذور).", "Continue the year-1 protection programme (jasmine moth, bud mite, root rot).", ["palpitamd", "mites", "elmorsi"], "M", D, "حسب الرصد", "According to monitoring"),
@@ -80,12 +100,14 @@ timeline([
  ("السنة الثالثة", "Year 3", "الانتقال للحمل", "Transition to bearing", [
    ("سماد مسموح مع كل رية بمعدل 3 جم نيتروجين/شجرة/يوم.", "Permitted fertiliser with every irrigation at 3 g N/tree/day.", ["haifaprog"], "M", S, "مع كل رية", "With every irrigation"),
    ("التحول من النقاطات السطحية إلى الري تحت السطحي.", "Switch from surface drippers to subsurface drip.", ["haifaguide"], "M", S, "مرة واحدة", "Once"),
-   ("أول تحليل أوراق في يوليو (100 ورقة من أفرع غير مثمرة) ومقارنته بالحدود المثلى (القسم 9.3).", "First leaf analysis in July (100 leaves from non-bearing shoots), compared with the optimum ranges (Section 9.3).", ["ucleaf", "ecolive"], "M", S, "مرة في السنة", "Once a year"),
+   ("تكرار تحليل الأوراق كل 1–2 سنة في يوليو ومقارنته بالحدود المثلى (القسم 9.3)؛ بدء الفوسفور حسب التحليل.", "Repeat leaf analysis every 1–2 years in July against the optimum ranges (Section 9.3); start phosphorus according to the analysis.", ["haifaguide", "ecolive"], "M", S, "كل 1–2 سنة", "Every 1–2 years"),
+   ("الري حسب جدول السنة الثالثة (15–40 لتر/شجرة/يوم)، ثم السنة الرابعة (30–60 لتر/شجرة/يوم).", "Irrigate by the year-3 schedule (15–40 L per tree per day), then year 4 (30–60 L per tree per day).", ["haifaguide"], "M", S, "كل 3–7 أيام", "Every 3–7 days"),
    ("رشتا نحاس ضد السل البكتيري: مارس ونوفمبر.", "Two copper sprays against olive knot: March and November.", ["uccost"], "M", S, "مرتان في السنة", "Twice a year"),
    ("بدء برنامج ذبابة الزيتون مع ظهور الثمار (كاولين كل أسبوعين من 1 يونيو حتى الحصاد).", "Start the olive fly programme once fruit appears (kaolin every two weeks from 1 June to harvest).", ["alikaolin"], "H", S, "كل أسبوعين", "Every two weeks"),
  ]),
  ("بعد 3 سنوات من بدء التحول", "Three years after conversion started", "بداية الإثمار العضوي", "Onset of organic fruiting", [
    ("أول حصاد يمكن بيعه عضويًا بعد اكتمال 3 سنوات من بدء التحول؛ والانتقال إلى الخطة الأسبوعية للأشجار المثمرة (القسم 12).", "The first harvest that can be sold as organic comes after 3 full years of conversion; move to the weekly plan for bearing trees (Section 12).", ["eu848", "codex"], "H", S, "مرة واحدة", "Once"),
+   ("الأشجار الناتجة من العقل تبدأ الإثمار بعد نحو 4 سنوات.", "Cutting-grown trees start bearing in about four years.", ["haifaguide"], "M", S, "—", "—"),
    ("في تجربة الإسماعيلية سُجّل محصول الكرونايكي والكوراتينا والمراقي في السنتين الخامسة والسادسة بعد الزراعة: 1.87–2.37 طن/فدان (مكثف) و5.43–6.95 (فائق الكثافة).", "In the Ismailia trial, Koroneiki, Coratina and Maraki yields were recorded in the fifth and sixth years after planting: 1.87–2.37 t/feddan (intensive) and 5.43–6.95 (super-high-density).", ["ali2024"], "H", S, "—", "—"),
  ]),
 ])

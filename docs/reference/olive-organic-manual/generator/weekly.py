@@ -38,9 +38,9 @@ PHASE_NAMES = [
  ("8 · الحصاد", "8 · Harvest"),
  ("9 · ما بعد الحصاد", "9 · Post-harvest"),
 ]
-COMMON = [(1, 6, 0), (7, 11, 1), (12, 16, 2), (17, 24, 3), (25, 30, 4)]
+COMMON = [(1, 6, 0), (7, 10, 1), (11, 17, 2), (18, 24, 3), (25, 30, 4)]
 PHASES = {
- OIL:   COMMON + [(31, 40, 5), (41, 43, 6), (44, 46, 7), (47, 52, 8)],
+ OIL:   COMMON + [(31, 37, 5), (38, 41, 6), (42, 46, 7), (47, 52, 8)],
  GREEN: COMMON + [(31, 32, 5), (33, 35, 6), (36, 39, 7), (40, 52, 8)],
  BLACK: COMMON + [(31, 39, 5), (40, 41, 6), (42, 45, 7), (46, 52, 8)],
 }
@@ -48,7 +48,7 @@ def phase_of(t, w):
     for a, b, ph in PHASES[t]:
         if a <= w <= b:
             return ph
-HARVEST = {OIL: rng(44, 46), GREEN: rng(36, 39), BLACK: rng(42, 45)}
+HARVEST = {OIL: rng(42, 46), GREEN: rng(36, 39), BLACK: rng(42, 45)}
 LAST_FRUIT_WEEK = {OIL: 46, GREEN: 39, BLACK: 45}
 POST = {OIL: rng(47, 50), GREEN: rng(40, 43), BLACK: rng(46, 49)}
 
@@ -76,11 +76,11 @@ rule(rng(1, 52), ALL, "السجلات العضوية: تسجيل كل مدخل �
      "Organic records: record every input, the reason for its use (proof of need) and the operations on each parcel.", ["eu848", "law12"], "H", S, "مع كل عملية", "With every operation")
 
 # Pruning and sanitation
-rule(rng(2, 9), ALL, "التقليم الشتوي: تجنّب التقليم الجائر للأشجار القديمة؛ تقليم سنوي لتحسين الإضاءة والتهوية وتقليل الرطوبة داخل الشجرة.",
-     "Winter pruning: avoid heavy pruning of old trees; prune annually to improve light and aeration and reduce humidity in the canopy.", ["moafeb", "buonaurio"], "L", N, "غير مذكور في المصادر", "Not given in sources")
-rule(rng(2, 9), ALL, "نقل مخلفات التقليم والحشائش خارج المزرعة، وحرق الأفرع المصابة بخنافس القلف.",
+rule(rng(1, 7), ALL, "التقليم الشتوي قبل منتصف فبراير (التقليم بين منتصف فبراير ونضج الثمار، عدا التطويش الخفيف، قد يقلل المحصول)؛ تجنّب التقليم الجائر للأشجار القديمة؛ تقليم سنوي لتحسين الإضاءة والتهوية وتقليل الرطوبة؛ الزيتون يحمل على نموات العام السابق.",
+     "Winter pruning before mid-February (pruning between mid-February and fruit ripening, except light tipping, can reduce the crop); avoid heavy pruning of old trees; prune annually to improve light and aeration and reduce humidity; olive bears on the previous year's growth.", ["haifaguide", "moafeb", "buonaurio"], "M", N, "غير مذكور في المصادر", "Not given in sources")
+rule(rng(1, 8), ALL, "نقل مخلفات التقليم والحشائش خارج المزرعة، وحرق الأفرع المصابة بخنافس القلف.",
      "Remove prunings and weeds from the farm, and burn branches infested with bark beetles.", ["moafeb"], "L", N, "غير مذكور في المصادر", "Not given in sources")
-rule(rng(5, 9), ALL, "رش النحاس بعد تقليم الأشجار الكبيرة (ضمن حد 28 كجم نحاس/هكتار/7 سنوات).",
+rule(rng(3, 8), ALL, "رش النحاس بعد تقليم الأشجار الكبيرة (ضمن حد 28 كجم نحاس/هكتار/7 سنوات).",
      "Spray copper after pruning large trees (within the 28 kg Cu/ha/7-year cap).", ["moafeb", "eu1165"], "L", D, "مرة بعد التقليم", "Once after pruning")
 rule(rng(10, 13), ALL, "رشة نحاس ربيعية (مارس) ضد السل البكتيري وعين الطاووس؛ هيدروكسيد النحاس الأعلى كفاءة بأقل نحاس.",
      "Spring copper spray (March) against olive knot and peacock spot; copper hydroxide gives the best efficacy with the least copper.", ["uccost", "buonaurio"], "M", S, "مرة في مارس", "Once in March")
@@ -94,10 +94,20 @@ rule(rng(1, 4), ALL, "تسميد فوسفاتي وبوتاسي إن لم يُض�
      "Phosphorus and potassium fertilisation if not applied in December, from permitted sources (soft ground rock phosphate, natural potassium sulphate).", ["maazrraty", "eu1165"], "L", S, "مرة واحدة", "Once")
 rule(rng(49, 52), ALL, "تسميد فوسفاتي وبوتاسي (ديسمبر) من المصادر المسموح بها؛ البوتاسيوم بنسبة 2:1 مع النيتروجين بعد سنة الحمل العالي.",
      "Phosphorus and potassium fertilisation (December) from permitted sources; potassium at 2:1 to nitrogen after a high-yield year.", ["maazrraty", "ecolive", "eu1165"], "L", S, "مرة واحدة", "Once")
-rule(rng(7, 22), ALL, "التسميد النيتروجيني مع الري من مصادر عضوية مسموحة (يُحظر النيتروجين المعدني): النمو الربيعي والعقد (أواخر أبريل–منتصف مايو) أكثر فترات الاحتياج؛ الإجمالي السنوي 0.5–1.5 كجم نيتروجين/شجرة.",
-     "Nitrogen with irrigation from permitted organic sources (mineral N banned): spring growth and fruit set (late April–mid-May) are the peak need; annual total 0.5–1.5 kg N per tree.", ["ecolive", "eu848"], "M", N, "عدد الدفعات غير مذكور في المصادر", "Number of splits not given in sources")
-rule(rng(27, 28), ALL, "تحليل الأوراق: 100 ورقة من أفرع غير مثمرة ومقارنتها بالحدود المثلى (نيتروجين 1.5–2.0%، بوتاسيوم 0.8–1.0%).",
-     "Leaf analysis: 100 leaves from non-bearing shoots compared with optimum ranges (N 1.5–2.0%, K 0.8–1.0%).", ["ucleaf", "ecolive"], "M", S, "مرة في يوليو", "Once in July")
+rule(rng(9, 26), ALL, "النيتروجين: يكون في منطقة الجذور قبل فترة أكبر امتصاص (قبل النمو والتزهير، من أوائل الربيع حتى أوائل الصيف)؛ دون تسميد بالرش الأرضي يُقسم على 4–6 دفعات من مارس حتى آخر يونيو، ومع التسميد بالري دفعات أسبوعية مع ري لا يقل عن 3 ساعات، ونحو 25% من الكمية بعد العقد؛ الإجمالي للشجرة المثمرة 0.5–1.0 كجم (0.5–1.5 كجم في دليل ECOLIVE)؛ من مصادر عضوية مسموحة فقط؛ الإفراط قبل العقد يصغّر الثمار ويزيد تبادل الحمل.",
+     "Nitrogen: have it in the root zone just before the period of greatest uptake (ahead of shoot growth and bloom, early spring to early summer); without fertigation split into 4–6 applications from March to the end of June; with fertigation apply weekly amounts with at least 3 hours of irrigation, about 25% of the annual rate after fruit set; bearing-tree total 0.5–1.0 kg (0.5–1.5 kg in ECOLIVE); permitted organic sources only; excess before fruit set gives small fruit and more alternate bearing.", ["haifaguide", "haifaprog", "ecolive", "eu848"], "M", S, "4–6 دفعات (مارس–يونيو) أو أسبوعيًا بالتسميد مع الري", "4–6 applications (March–June) or weekly by fertigation")
+rule(rng(27, 28), ALL, "تحليل الأوراق (يوليو أو بعد 5–8 أسابيع من التزهير الكامل): 4 أوراق سليمة من وسط أفرع العام غير المثمرة من 20–25 شجرة لكل قطعة متجانسة حتى 10 هكتارات، في أكياس ورقية؛ المقارنة بالحدود المثلى (نيتروجين 1.5–2.0%، بوتاسيوم 0.8–1.0%).",
+     "Leaf analysis (July, or 5–8 weeks after full bloom): 4 healthy leaves from the middle of current-season non-bearing shoots of 20–25 trees per uniform block of up to 10 ha, in paper bags; compare with optimum ranges (N 1.5–2.0%, K 0.8–1.0%).", ["haifaguide", "ucleaf", "ecolive"], "M", S, "مرة في يوليو", "Once in July")
+
+rule({36}, (OIL,), "آخر دفعة تسميد مع الري: إنهاء التسميد قبل الحصاد بـ50 يومًا.", "Last fertigation: end fertigation 50 days before harvest.", ["haifaprog"], "L", S, "مرة واحدة", "Once")
+rule({30}, (GREEN,), "آخر دفعة تسميد مع الري: إنهاء التسميد قبل الحصاد بـ50 يومًا.", "Last fertigation: end fertigation 50 days before harvest.", ["haifaprog"], "L", S, "مرة واحدة", "Once")
+rule({35}, (BLACK,), "آخر دفعة تسميد مع الري: إنهاء التسميد قبل الحصاد بـ50 يومًا.", "Last fertigation: end fertigation 50 days before harvest.", ["haifaprog"], "L", S, "مرة واحدة", "Once")
+rule(rng(27, 34), ALL, "البوتاسيوم: في برنامج هايفا لإسبانيا يُعطى أساسًا من يوليو حتى أكتوبر؛ زيادة الماء والنيتروجين والبوتاسيوم في سنة الحمل الغزير وتقليلها في سنة الحمل الخفيف لتخفيف تبادل الحمل؛ من مصادر مسموحة.",
+     "Potassium: in the Haifa programme for Spain it is applied mainly from July to October; give more water, nitrogen and potassium in the heavy-crop year and less in the light-crop year to soften alternate bearing; permitted sources only.", ["haifaprog", "haifaguide", "eu1165"], "L", N, "غير مذكور في المصادر", "Not given in sources")
+HAIFA = "HAIFA"
+rule(rng(11, 44), ALL, HAIFA, HAIFA, ["haifaguide"], "L", S, "يوميًا حسب البخر", "Daily, by evaporation")
+rule(rng(10, 12), ALL, "مناخ متوسطي: أول رية بعد 3 أسابيع من آخر مطرة فعالة، بمعدل لا يقل عن 100 م³/هكتار لترطيب كامل منطقة الجذور.",
+     "Mediterranean climate: first irrigation 3 weeks after the last effective rain, at least 100 m³/ha to wet the whole root zone.", ["haifaguide"], "L", S, "مرة واحدة", "Once")
 
 # Soil and weeds
 rule(rng(9, 13), ALL, "مكافحة الحشائش: حرث سطحي بعمق نحو 10 سم أو حش؛ الحشائش التي تصل الأفرع السفلى تزيد عين الطاووس.",
@@ -125,9 +135,9 @@ rule(set(), ALL, SANIT, SANIT, ["ecolive"], "M", N, "غير مذكور في ال
 # Olive moth
 rule(rng(9, 17), ALL, "فراشة الزيتون: مصائد فرمونية لرصد الطيران الأول (مارس–أبريل، جيل الأزهار).",
      "Olive moth: pheromone traps to monitor the first flight (March–April, flower generation).", ["hegazi2011"], "M", D, "قراءة أسبوعية", "Weekly reading")
-rule(rng(12, 13), ALL, "رش Bt كورستاكي قبل تفتح الأزهار مباشرة ضد جيل الأزهار، حسب نتائج الرصد.",
-     "Spray Bt kurstaki just before flowers open against the flower generation, according to monitoring.", ["ecolive", "btk"], "M", D, "مرة واحدة", "Once")
-rule(rng(17, 19), ALL, "رش Bt كورستاكي بعد العقد مباشرة ضد جيل الثمار، حسب نتائج الرصد.",
+rule(rng(10, 11), ALL, "رش Bt كورستاكي قبل تفتح الأزهار مباشرة ضد جيل الأزهار، حسب نتائج الرصد (بدأ التزهير على طريق القاهرة–الإسكندرية بين 15 و29 مارس حسب الصنف).",
+     "Spray Bt kurstaki just before flowers open against the flower generation, according to monitoring (flowering began between 15 and 29 March on the Cairo–Alexandria road, depending on cultivar).", ["ecolive", "btk", "harvestdays"], "M", D, "مرة واحدة", "Once")
+rule(rng(18, 19), ALL, "رش Bt كورستاكي بعد العقد مباشرة ضد جيل الثمار، حسب نتائج الرصد.",
      "Spray Bt kurstaki just after fruit set against the fruit generation, according to monitoring.", ["ecolive", "btk"], "M", D, "مرة واحدة", "Once")
 rule(rng(18, 26), ALL, "فراشة الزيتون: رصد الطيران الثاني (مايو–يونيو، جيل الثمار).", "Olive moth: monitor the second flight (May–June, fruit generation).", ["hegazi2011"], "M", D, "قراءة أسبوعية", "Weekly reading")
 rule(rng(31, 43), ALL, "فراشة الزيتون: رصد الطيران الثالث (أغسطس–أكتوبر، جيل الأوراق) في البساتين شبه الجافة؛ لا يُسجل عادة في البساتين الجافة.",
@@ -138,8 +148,8 @@ rule(rng(18, 26) | rng(36, 48), ALL, "دودة الياسمين: فترة الط
      "Jasmine moth: flight period (May–June and September–November); mating disruption with pheromone at 80 g/ha, or Trichogramma releases of 9,000 per tree every two weeks, especially on young growth.", ["palpitamd", "tricho"], "M", S, "إطلاق كل أسبوعين", "Release every two weeks")
 
 # Psyllid
-rule(rng(1, 24) | rng(46, 52), ALL, "بسيلا الزيتون: فحص الحوريات على النموات والعناقيد (من نوفمبر/ديسمبر حتى يونيو، الذروة مارس–أبريل).",
-     "Olive psyllid: inspect for nymphs on shoots and inflorescences (November/December to June, peak March–April).", ["psyllid", "scales"], "M", N, "غير مذكور في المصادر", "Not given in sources")
+rule(rng(1, 26) | rng(45, 52), ALL, "بسيلا الزيتون: فحص الحوريات على النموات والعناقيد؛ جيل واحد سنويًا في العريش: وضع البيض في براعم الأفرع من نوفمبر، والحوريات من نوفمبر/ديسمبر حتى يونيو–أغسطس، والذروة حول منتصف أبريل؛ الضرر سقوط العناقيد وجفاف المتاع والعسلة؛ في تونس سبّب 6–8 حشرات/عنقود خسارة 13% وأكثر من 30 حشرة خسارة تتجاوز 40%.",
+     "Olive psyllid: inspect for nymphs on shoots and inflorescences; one generation a year at Al-Arish: eggs laid in twig buds from November, nymphs from November/December to June–August, peak around mid-April; damage is raceme drop, pistil drying and honeydew; in Tunisia 6–8 insects per raceme caused 13% loss and over 30 insects more than 40%.", ["psyllid", "scales"], "H", N, "غير مذكور في المصادر", "Not given in sources")
 rule(rng(6, 10), ALL, "رش زيت معدني (بارافيني) 1.5% ضد بسيلا الزيتون قبل تفتح البراعم وبداية التزهير.",
      "Spray mineral (paraffin) oil at 1.5% against the olive psyllid before bud break and the start of flowering.", ["moafeb", "eu1165"], "L", D, "مرة واحدة", "Once")
 
@@ -164,18 +174,22 @@ rule(rng(1, 14) | rng(46, 52), ALL, "الذبول الفيرتيسيليومي: 
      "Verticillium wilt: period of rising symptoms (late autumn to spring); inspect trees and remove dead ones with their roots.", ["calderon", "diaz"], "M", N, "غير مذكور في المصادر", "Not given in sources")
 
 # Harvest - oil
-rule(set(range(40, 47, 2)), (OIL,), "مؤشر النضج على 100 ثمرة سليمة من محيط الشجرة، مع نسبة الزيت والفينولات، لتحديد موعد الجني.",
+rule(set(range(38, 47, 2)), (OIL,), "مؤشر النضج على 100 ثمرة سليمة من محيط الشجرة، مع نسبة الزيت والفينولات، لتحديد موعد الجني.",
      "Maturity index on 100 healthy fruits from around the tree, with oil and phenol content, to set the picking date.", ["nagaty"], "H", S, "كل أسبوعين", "Every two weeks")
+rule(rng(42, 46), (OIL,), "طريق القاهرة–الإسكندرية: بدأ الجني عند مؤشر نضج 2.5، والفترة المثلى للبيكوال والكوراتينا والكرونايكي 15 أكتوبر–15 نوفمبر، وللأربيكوينا 1–15 نوفمبر (184–224 يومًا بعد التزهير الكامل).",
+     "Cairo–Alexandria road: picking started at a maturity index of 2.5; the optimum window for Picual, Coratina and Koroneiki was 15 October–15 November and for Arbequina 1–15 November (184–224 days after full bloom).", ["harvestdays"], "H", S, "خلال الفترة", "Within the window")
 rule({44}, (OIL,), "جني البيكوال والشملالي (أفضل موعد 2 نوفمبر)؛ وفي المواسم الحارة يُفضل الجني المبكر عند مؤشر نضج أقل.",
      "Pick Picual and Chemlali (best date 2 November); in hot seasons pick earlier at a lower maturity index.", ["nagaty"], "H", S, "مرة", "Once")
 rule(rng(44, 46), (OIL,), "جني الكرونايكي (2–16 نوفمبر)؛ التأخير يرفع الحموضة فوق 0.8% ويخفض الفينولات.",
      "Pick Koroneiki (2–16 November); delay raises acidity above 0.8% and lowers phenols.", ["nagaty"], "H", S, "خلال الفترة", "Within the window")
-rule(rng(44, 46), (OIL,), "العصر في أقصر وقت بعد الجني، خاصة للثمار المصابة بالذبابة؛ تسجيل كمية الحصاد لكل قطعة.",
-     "Mill as soon as possible after picking, especially fly-damaged fruit; record the harvest quantity for each parcel.", ["ecolive", "eu848"], "M", D, "مع كل دفعة", "With every batch")
+rule(rng(42, 46), (OIL,), "العصر خلال 24–48 ساعة من الجني لإنتاج زيت بكر ممتاز، وأسرع للثمار المصابة بالذبابة؛ عدم ضرب الأشجار بالعصي؛ تسجيل كمية الحصاد لكل قطعة.",
+     "Mill within 24–48 hours of picking for extra virgin oil, faster for fly-damaged fruit; do not beat the trees; record the harvest quantity for each parcel.", ["haifaguide", "ecolive", "eu848"], "M", S, "مع كل دفعة", "With every batch")
+rule(rng(39, 41), (OIL,), "إيقاف الري في الأسابيع السابقة للحصاد لتجنب ارتفاع رطوبة الثمار وصعوبة الاستخلاص؛ الرطوبة المثلى نحو 50%.",
+     "Stop irrigation in the weeks before harvest to avoid high fruit moisture and extraction problems; optimum moisture is about 50%.", ["haifaguide"], "M", N, "عدد الأسابيع غير مذكور في المصادر", "Number of weeks not given in sources")
 
 # Harvest - green table
 rule(rng(33, 39), (GREEN,), "متابعة حجم الثمرة ولونها: الزيتون الأخضر يُجنى بعد بلوغ الحجم الطبيعي وقبل التلوّن؛ بلغ مؤشر نضج المنزانيللو 3.5–3.9 في 5 أكتوبر بشمال سيناء؛ التفاحي مبكر الحصاد.",
-     "Monitor fruit size and colour: green olives are picked at normal size and before colour change; Manzanillo reached a maturity index of 3.5–3.9 by 5 October in North Sinai; Toffahi is early.", ["iocot", "nagaty", "toffahi"], "L", D, "أسبوعيًا", "Weekly")
+     "Monitor fruit size and colour: green olives are picked at normal size and before colour change; Manzanillo reached a maturity index of 3.5–3.9 by 5 October in North Sinai; Toffahi is early.", ["iocot", "nagaty", "toffahi", "harvestdays"], "L", D, "أسبوعيًا", "Weekly")
 rule(rng(36, 39), (GREEN,), "الجني الأخضر (العجيزي، التفاحي، المنزانيللو، الحامض) قبل التلوّن، ثم التخمير الطبيعي في محلول ملحي (ملح ≥6%، pH ≤4.3، لاكتيك ≥0.3%) بدون صودا كاوية.",
      "Green harvest (Aggezi, Toffahi, Manzanillo, Hamed) before colour change, then natural brine fermentation (salt ≥6%, pH ≤4.3, lactic ≥0.3%) without lye.", ["iocot", "eu1165"], "L", N, "غير مذكور في المصادر", "Not given in sources")
 
@@ -188,7 +202,27 @@ rule(rng(42, 45), (BLACK,), "الجني الأسود (الكالاماتا، ا�
 # Post-harvest (all types)
 rule(set(), ALL, "POSTMET", "POSTMET", ["metarh"], "L", D, "مرة واحدة", "Once")
 
+HAIFA_STAGES = [  # (first week, last week, ar, en, evaporation mm/day, Kc table, m3/ha/day table, Kc oil, m3/ha/day oil)
+ (11, 13, "أوائل الربيع", "early spring", 5.6, 0.30, 17, 0.40, 19.8),
+ (14, 17, "الربيع", "spring", 7.3, 0.35, 26, 0.40, 25.6),
+ (18, 22, "أواخر الربيع", "late spring", 8.7, 0.30, 26, 0.50, 43.5),
+ (23, 26, "أوائل الصيف", "early summer", 8.7, 0.25, 22, 0.50, 43.5),
+ (27, 30, "الصيف", "summer", 8.0, 0.25, 20, 0.55, 44.0),
+ (31, 35, "أواخر الصيف", "late summer", 6.9, 0.25, 17, 0.55, 38.0),
+ (36, 39, "أوائل الخريف", "early fall", 5.4, 0.20, 11, 0.55, 29.7),
+ (40, 44, "الخريف", "fall", 3.5, 0.15, 5, 0.40, 14.0),
+]
+
 def text_for(rule_ar, rule_en, t, w, month):
+    if rule_ar == HAIFA:
+        for a, b, sar, sen, ev, kt, mt, ko, mo in HAIFA_STAGES:
+            if a <= w <= b:
+                k, m, tot = (ko, mo, "7,717") if t == OIL else (kt, mt, "4,123")
+                kind_ar = "زيتون الزيت" if t == OIL else "زيتون المائدة"
+                kind_en = "oil olives" if t == OIL else "table olives"
+                return (f"جدول هايفا للبساتين المثمرة (أكثر من 10 طن/هكتار، مناخ متوسطي)، مرحلة {sar}: بخر الوعاء {ev} مم/يوم × معامل {k} لـ{kind_ar} = نحو {m} م³/هكتار/يوم؛ الإجمالي السنوي {tot} م³/هكتار.",
+                        f"Haifa schedule for bearing orchards (over 10 t/ha, Mediterranean climate), {sen} stage: pan evaporation {ev} mm/day × coefficient {k} for {kind_en} = about {m} m³/ha/day; annual total {tot} m³/ha.")
+
     if rule_ar == IRR:
         k = KC[month - 1]
         return (f"الري: حساب احتياج الأسبوع = معامل المحصول × البخر-نتح المرجعي؛ معامل الشهر للزيتون (تغطية 60%) = {k:.2f}، ويُخفض حسب التغطية الفعلية (تغطية 20% → معامل قاعدة ≈ 0.40).",
