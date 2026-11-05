@@ -35,7 +35,7 @@ from app.shared.keycloak.errors import (
     KeycloakNotConfiguredError,
     KeycloakRequestError,
 )
-from app.shared.keycloak.field_identity import synthetic_email
+from app.shared.keycloak.field_identity import MOBILE_CLIENT_ID, synthetic_email
 
 _TOKEN_REFRESH_SLACK_SECONDS: float = 30.0
 _GROUP_NAME_PREFIX: str = "tenant-"
@@ -112,6 +112,8 @@ class KeycloakAdminClient(Protocol):
     async def set_field_pin(self, *, keycloak_user_id: str, pin: str) -> None: ...
 
     async def clear_login_failures(self, *, keycloak_user_id: str) -> None: ...
+
+    async def verify_field_pin(self, *, username: str, pin: str) -> bool: ...
 
     async def add_existing_user_to_group(
         self,
@@ -240,6 +242,11 @@ class NoopKeycloakClient:
 
     async def clear_login_failures(self, *, keycloak_user_id: str) -> None:
         self._log.warning("keycloak_noop_clear_login_failures", keycloak_user_id=keycloak_user_id)
+
+    async def verify_field_pin(self, *, username: str, pin: str) -> bool:
+        del username, pin
+        self._log.warning("keycloak_noop_verify_field_pin")
+        return False
 
     async def add_existing_user_to_group(
         self,
@@ -589,6 +596,29 @@ class HttpxKeycloakAdminClient:
             operation="clear_login_failures",
             expected=(204, 404),
         )
+
+    async def verify_field_pin(self, *, username: str, pin: str) -> bool:
+        """True when this PIN signs this person in.
+
+        Goes through the same door as the app rather than comparing anything
+        here, so a wrong PIN counts towards the lockout. A locked account also
+        answers False. The tokens are discarded, and the caller ends the
+        session this opens.
+        """
+        resp = await self._http.post(
+            self._token_url,
+            data={
+                "grant_type": "password",
+                "client_id": MOBILE_CLIENT_ID,
+                "username": username,
+                "password": pin,
+            },
+        )
+        if resp.status_code == 200:
+            return True
+        if resp.status_code in (400, 401):
+            return False
+        raise KeycloakRequestError(resp.status_code, resp.text, operation="verify_field_pin")
 
     async def _reclaim_field_user(
         self, *, keycloak_user_id: str, tenant_id: UUID | str | None

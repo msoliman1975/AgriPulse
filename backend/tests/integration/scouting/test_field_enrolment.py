@@ -1024,6 +1024,106 @@ async def test_a_new_pin_survives_a_failed_sign_out_and_says_so(
     assert resp.json()["sessions_ended"] is False
 
 
+def _as_person(env: ScoutingFixture, user_id: str):  # type: ignore[no-untyped-def]
+    return make_context(user_id=UUID(user_id), tenant_id=env.tenant_id, tenant_role=None)
+
+
+@pytest.mark.asyncio
+async def test_a_scout_can_change_their_own_pin(
+    scouting_env: ScoutingFixture,
+    admin_session: AsyncSession,
+    fake_keycloak: FakeKeycloakClient,
+) -> None:
+    env = scouting_env
+    phone = _unique_phone()
+    enrolled = await _enrol(env, phone=phone)
+    assert enrolled.status_code == 201, enrolled.text
+    body = enrolled.json()
+
+    async with _client(_as_person(env, body["user_id"])) as client:
+        resp = await client.post(
+            "/api/v1/me/field-pin", json={"current_pin": body["pin"], "new_pin": "482913"}
+        )
+    assert resp.status_code == 204, resp.text
+
+    user = next(u for u in fake_keycloak.users.values() if u.phone == body["phone"])
+    assert user.field_pin == "482913"
+    assert user.id in fake_keycloak.logged_out
+
+    await admin_session.execute(text(f"SET LOCAL search_path TO {env.schema}, public"))
+    events = (
+        await admin_session.execute(
+            text(
+                "SELECT event_type, actor_user_id FROM audit_events "
+                "WHERE subject_id = CAST(:u AS uuid) AND event_type = 'iam.field_pin_changed'"
+            ),
+            {"u": body["user_id"]},
+        )
+    ).all()
+    assert [str(e.actor_user_id) for e in events] == [body["user_id"]]
+
+
+@pytest.mark.asyncio
+async def test_a_wrong_current_pin_changes_nothing(
+    scouting_env: ScoutingFixture, fake_keycloak: FakeKeycloakClient
+) -> None:
+    env = scouting_env
+    enrolled = await _enrol(env, phone=_unique_phone())
+    assert enrolled.status_code == 201, enrolled.text
+    body = enrolled.json()
+    wrong = "000000" if body["pin"] != "000000" else "111111"
+
+    async with _client(_as_person(env, body["user_id"])) as client:
+        resp = await client.post(
+            "/api/v1/me/field-pin", json={"current_pin": wrong, "new_pin": "482913"}
+        )
+    assert resp.status_code == 403, resp.text
+    user = next(u for u in fake_keycloak.users.values() if u.phone == body["phone"])
+    assert user.field_pin == body["pin"]
+    assert user.id not in fake_keycloak.logged_out
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("new_pin", ["123456", "000000"])
+async def test_an_obvious_new_pin_is_refused(scouting_env: ScoutingFixture, new_pin: str) -> None:
+    env = scouting_env
+    enrolled = await _enrol(env, phone=_unique_phone())
+    assert enrolled.status_code == 201, enrolled.text
+    body = enrolled.json()
+
+    async with _client(_as_person(env, body["user_id"])) as client:
+        resp = await client.post(
+            "/api/v1/me/field-pin", json={"current_pin": body["pin"], "new_pin": new_pin}
+        )
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["type"].endswith("/weak-pin")
+
+
+@pytest.mark.asyncio
+async def test_reusing_the_current_pin_is_refused(scouting_env: ScoutingFixture) -> None:
+    env = scouting_env
+    enrolled = await _enrol(env, phone=_unique_phone())
+    assert enrolled.status_code == 201, enrolled.text
+    body = enrolled.json()
+
+    async with _client(_as_person(env, body["user_id"])) as client:
+        resp = await client.post(
+            "/api/v1/me/field-pin", json={"current_pin": body["pin"], "new_pin": body["pin"]}
+        )
+    assert resp.status_code == 422, resp.text
+
+
+@pytest.mark.asyncio
+async def test_an_email_account_cannot_use_the_pin_route(scouting_env: ScoutingFixture) -> None:
+    env = scouting_env
+    async with _client(env.agronomist_context) as client:
+        resp = await client.post(
+            "/api/v1/me/field-pin", json={"current_pin": "111111", "new_pin": "482913"}
+        )
+    assert resp.status_code == 422, resp.text
+    assert "password-reset flow" in resp.json()["detail"]
+
+
 @pytest.mark.asyncio
 async def test_a_phone_already_working_in_another_tenant_is_refused(
     scouting_env: ScoutingFixture,

@@ -199,6 +199,62 @@ jobs:
       - name: Build
         run: pnpm build
 
+  # The Scout app had no CI at all, so a native plugin could break the Android
+  # build and nothing would say so until somebody built by hand.
+  mobile:
+    name: mobile
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Enable corepack and pin pnpm
+        run: corepack enable
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Sync native project
+        env:
+          SCOUT_ENV: production
+        run: pnpm exec cap sync android
+
+      - name: Build debug APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Keep the APK
+        uses: actions/upload-artifact@v5
+        with:
+          name: scout-debug-apk
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
   tile-server:
     name: tile-server
     runs-on: ubuntu-24.04

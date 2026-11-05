@@ -31,9 +31,9 @@ because three things are missing and only you can supply them:
 
 ## Building an APK
 
-The build works on this machine, checked 2026-08-26. `java -version` on PATH
-reports 1.8, which is too old, but Android Studio ships its own JDK 25 and
-Gradle takes it from `JAVA_HOME`:
+This needs Android Studio, or the SDK and a JDK 21 or newer. `java -version` on
+PATH may report something too old, so point Gradle at Android Studio's own JDK
+with `JAVA_HOME`:
 
 ```bash
 pnpm install && pnpm build
@@ -52,6 +52,10 @@ A **release** APK needs a keystore, and there is no `signingConfig` in
 APK that Android refuses to install. The keystore has to be created once and
 kept — losing it means the app can never be updated, only reinstalled under a
 new identity.
+
+CI builds a debug APK on every PR from the production settings, so the native
+code is always compiled. It is attached to the `mobile` job as
+`scout-debug-apk`. The same limit applies: it is for testing, not for farms.
 
 ## Proving it, once those exist
 

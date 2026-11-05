@@ -236,6 +236,10 @@ class FakeKeycloakClient:
         self._maybe_fail("clear_login_failures")
         self.cleared_lockouts.append(keycloak_user_id)
 
+    async def verify_field_pin(self, *, username: str, pin: str) -> bool:
+        self._maybe_fail("verify_field_pin")
+        return any(u.phone == username and u.field_pin == pin for u in self.users.values())
+
     async def add_existing_user_to_group(
         self,
         *,

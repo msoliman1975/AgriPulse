@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 
+import { ApiError, changeOwnPin } from "@/api/client";
 import type { FarmScope } from "@/api/me";
-import { signOut } from "@/auth/session";
+import { sessionPhone, signIn, signOut } from "@/auth/session";
 import { t, type Lang } from "@/i18n";
 import { resetLangOnSignOut } from "@/i18n/preference";
 import { releaseDevice } from "@/push/register";
@@ -41,6 +42,8 @@ export function AccountSheet({
   onClose: () => void;
 }): ReactNode {
   const [signingOut, setSigningOut] = useState(false);
+  const [changingPin, setChangingPin] = useState(false);
+  const [pinChanged, setPinChanged] = useState(false);
 
   return (
     <div className="sheet-wrap" onClick={onClose}>
@@ -64,6 +67,33 @@ export function AccountSheet({
             remembers the old settings screen will assume it still is. */}
         <p className="hint">{t(lang, farms.length === 1 ? "me.roleHint" : "me.farmsHint")}</p>
 
+        {changingPin ? (
+          <ChangePinForm
+            lang={lang}
+            onCancel={() => setChangingPin(false)}
+            onDone={() => {
+              setChangingPin(false);
+              setPinChanged(true);
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            className="link"
+            onClick={() => {
+              setPinChanged(false);
+              setChangingPin(true);
+            }}
+          >
+            {t(lang, "pin.change")}
+          </button>
+        )}
+        {pinChanged ? (
+          <p className="hint" role="status">
+            {t(lang, "pin.done")}
+          </p>
+        ) : null}
+
         <button
           type="button"
           className="signout"
@@ -77,10 +107,9 @@ export function AccountSheet({
             // access token, so clearing the session or reloading before it
             // lands would cancel it and leave this handset receiving a
             // departed scout's visits.
-            void releaseDevice().finally(() => {
-              signOut();
-              location.reload();
-            });
+            void releaseDevice()
+              .finally(signOut)
+              .finally(() => location.reload());
           }}
         >
           {t(lang, signingOut ? "visits.signingOut" : "visits.signOut")}
@@ -91,5 +120,108 @@ export function AccountSheet({
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Replace the PIN a supervisor read out. Until this is done they know it too.
+ *
+ * Changing it ends every session, this phone's included, so it signs straight
+ * back in. If that fails the old session is already dead, so the honest next
+ * step is the sign-in screen, where the new PIN works.
+ */
+function ChangePinForm({
+  lang,
+  onCancel,
+  onDone,
+}: {
+  lang: Lang;
+  onCancel: () => void;
+  onDone: () => void;
+}): ReactNode {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [repeat, setRepeat] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const digits = (value: string): string => value.replace(/\D/g, "");
+
+  async function submit(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    if (next !== repeat) {
+      setError(t(lang, "pin.errMatch"));
+      return;
+    }
+    // Read before the change: ending the session is part of it.
+    const phone = sessionPhone();
+    setBusy(true);
+    setError(null);
+    try {
+      await changeOwnPin(current, next);
+    } catch (err) {
+      const status = err instanceof ApiError ? err.status : 0;
+      setError(
+        t(
+          lang,
+          status === 403 ? "pin.errWrong" : status === 422 ? "pin.errWeak" : "pin.errFailed",
+        ),
+      );
+      setBusy(false);
+      return;
+    }
+    try {
+      if (!phone) throw new Error("no phone on the session");
+      await signIn(phone, next);
+      onDone();
+    } catch {
+      await signOut();
+      location.reload();
+    }
+  }
+
+  return (
+    <form className="pinform" onSubmit={submit}>
+      <label htmlFor="pin-current">{t(lang, "pin.current")}</label>
+      <input
+        id="pin-current"
+        inputMode="numeric"
+        type="password"
+        autoComplete="current-password"
+        dir="ltr"
+        maxLength={6}
+        value={current}
+        onChange={(e) => setCurrent(digits(e.target.value))}
+      />
+      <label htmlFor="pin-new">{t(lang, "pin.new")}</label>
+      <input
+        id="pin-new"
+        inputMode="numeric"
+        type="password"
+        autoComplete="new-password"
+        dir="ltr"
+        maxLength={6}
+        value={next}
+        onChange={(e) => setNext(digits(e.target.value))}
+      />
+      <label htmlFor="pin-repeat">{t(lang, "pin.repeat")}</label>
+      <input
+        id="pin-repeat"
+        inputMode="numeric"
+        type="password"
+        autoComplete="new-password"
+        dir="ltr"
+        maxLength={6}
+        value={repeat}
+        onChange={(e) => setRepeat(digits(e.target.value))}
+      />
+      {error ? <p className="error">{error}</p> : null}
+      <button type="submit" disabled={busy || current.length < 4 || next.length !== 6}>
+        {busy ? t(lang, "pin.saving") : t(lang, "pin.save")}
+      </button>
+      <button type="button" className="link" disabled={busy} onClick={onCancel}>
+        {t(lang, "pin.cancel")}
+      </button>
+    </form>
   );
 }
