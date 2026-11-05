@@ -51,6 +51,17 @@ For one-off edits that need to land before the next deploy window:
    ```
 5. Sanitize secrets (next section), PR, merge.
 
+## Sign-in lockout
+
+A realm that already exists never re-reads the JSON. The lockout numbers reach
+the live realm through `promote-kc-scout.py` in the PostSync hook, so change
+them there and in `agripulse-realm.json` together.
+
+Ten wrong attempts lock an account for five minutes, growing to an hour. The
+count clears after a day. The realm is shared, so this covers web users as well
+as scouts. To release someone early, issue a New PIN on Field access. For an
+email user, clear it in the admin console under Users > Details.
+
 ## Adding a client or role
 
 Same procedure as above. Two gotchas:

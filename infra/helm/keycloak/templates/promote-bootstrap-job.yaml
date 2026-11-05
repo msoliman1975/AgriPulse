@@ -3,7 +3,7 @@ PostSync hook Job that drives Keycloak into the realm shape the api
 expects, without any manual `kubectl cp` + `python scripts/promote-*`
 dance after every fresh deploy.
 
-The three scripts run sequentially:
+The scripts run sequentially:
   1. promote-kc-admin.py     — enables unmanagedAttributePolicy on the
                                agripulse realm and sets the dev user's
                                platform_role attribute + matching mapper.
@@ -147,7 +147,7 @@ spec:
                 sleep 5
               done
               if [ "$UP" != "1" ]; then fail "keycloak admin REST never answered"; exit 0; fi
-              for step in promote-kc-admin promote-kc-tenancy add-tenant-mappers; do
+              for step in promote-kc-admin promote-kc-tenancy add-tenant-mappers promote-kc-scout; do
                 echo ""
                 echo "=== ${step}.py ==="
                 /opt/venv/bin/python /promote/${step}.py || fail "${step}.py failed"
