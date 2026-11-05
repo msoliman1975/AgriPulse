@@ -566,15 +566,18 @@ async def test_preview_names_the_trees_a_crop_change_starts_and_stops(
         )
 
     impact = await _with_service(tenant, _preview)
+    # The shipped platform catalogue is visible to every tenant and has mango
+    # trees of its own; assert only on the trees this test authored.
+    mine = {mango_id, potato_id, tenant.tree_id}
 
     block = impact["blocks"][0]
-    assert {t["tree_id"] for t in block["starting"]} == {potato_id}
-    stopping = {t["tree_id"]: t for t in block["stopping"]}
+    assert {t["tree_id"] for t in block["starting"]} & mine == {potato_id}
+    stopping = {t["tree_id"]: t for t in block["stopping"] if t["tree_id"] in mine}
     assert set(stopping) == {mango_id}
     # Still on the other mango block, so the farm keeps it and its "off".
     assert stopping[mango_id]["other_blocks"] == 1
     assert impact["exclusions_cleared"] == []
-    assert {t["tree_id"] for t in impact["farm_starting"]} == {potato_id}
+    assert {t["tree_id"] for t in impact["farm_starting"]} & mine == {potato_id}
     # Nothing was written.
     assert await _exclusions(admin_session, tenant.schema_name, farm_id) == {mango_id}
 
@@ -601,8 +604,10 @@ async def test_removing_the_last_matching_crop_forgets_the_farms_off_choice(
         )
 
     impact = await _with_service(tenant, _preview)
+    # Only this test's trees: the shipped catalogue has mango trees too.
+    mine = {mango_id, tenant.tree_id}
     assert [t["tree_id"] for t in impact["exclusions_cleared"]] == [mango_id]
-    assert {t["tree_id"] for t in impact["farm_stopping"]} == {mango_id}
+    assert {t["tree_id"] for t in impact["farm_stopping"]} & mine == {mango_id}
 
     await _end_crop(admin_session, tenant.schema_name, blocks[0])
 
