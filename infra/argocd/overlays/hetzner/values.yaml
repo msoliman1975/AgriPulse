@@ -4742,7 +4742,10 @@ global:
       # 2ad3420 = #788, frontend. See the api note. Rollback to a7d36e3.
       # 980e321 = #789, frontend. See the api note. Rollback to 2ad3420.
       # 7395f79 = #793, frontend. No web change; moves with the api.
-      tag: "7395f79"
+      # a8fe2aa = #798, frontend only. Platform admins lose the gear menu that
+      #   only led back to the tenant list, and small screens get a menu button
+      #   that opens the side nav. No migration. Rollback: 7395f79.
+      tag: "a8fe2aa"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
