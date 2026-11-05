@@ -692,6 +692,11 @@ class PinReissueResponse(BaseModel):
     sessions_ended: bool
 
 
+class ChangeFieldPinRequest(BaseModel):
+    current_pin: str = Field(min_length=4, max_length=12)
+    new_pin: str = Field(pattern=r"^[0-9]{6}$")
+
+
 @router.get(
     "/users/field-enrolment/audit",
     response_model=FieldEnrolmentAuditResponse,
@@ -787,3 +792,27 @@ async def reissue_field_pin(
         farm_id=farm_id,
     )
     return {"user_id": user_id, "pin": result.pin, "sessions_ended": result.sessions_ended}
+
+
+@router.post(
+    "/me/field-pin",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    summary="A field worker changes their own PIN.",
+)
+async def change_my_field_pin(
+    payload: ChangeFieldPinRequest,
+    context: RequestContext = Depends(get_current_context),
+    session: AsyncSession = Depends(get_admin_db_session),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> None:
+    # No capability check: it acts only on the caller, and proving the current
+    # PIN is the authorization.
+    schema = _ensure_tenant(context)
+    service = get_field_enrolment_service(public_session=session, tenant_session=tenant_session)
+    await service.change_own_pin(
+        tenant_schema=schema,
+        user_id=context.user_id,
+        current_pin=payload.current_pin,
+        new_pin=payload.new_pin,
+    )

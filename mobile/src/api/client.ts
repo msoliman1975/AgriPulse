@@ -48,6 +48,14 @@ export function authedGet<T>(path: string): Promise<T> {
   return request<T>(path);
 }
 
+/** The current PIN is proved at Keycloak, so wrong tries count for the lockout. */
+export function changeOwnPin(currentPin: string, newPin: string): Promise<void> {
+  return request<void>("/me/field-pin", {
+    method: "POST",
+    body: JSON.stringify({ current_pin: currentPin, new_pin: newPin }),
+  });
+}
+
 export type VisitOrigin =
   | "recommendation"
   | "alert"

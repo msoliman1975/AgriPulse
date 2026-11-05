@@ -35,8 +35,10 @@ from app.shared.keycloak.errors import KeycloakError, KeycloakRequestError
 from app.shared.keycloak.field_identity import (
     InvalidPhoneNumberError,
     generate_pin,
+    is_guessable_pin,
     is_synthetic_email,
     normalise_phone,
+    phone_from_synthetic_email,
     synthetic_email,
 )
 
@@ -135,6 +137,28 @@ class InvalidEnrolmentError(APIError):
             title="Cannot enrol this worker",
             detail=detail,
             type_="https://agripulse.cloud/problems/invalid-enrolment",
+        )
+
+
+class WrongPinError(APIError):
+    """Also what a locked account gets: saying so would confirm a guess."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=403,
+            title="Current PIN is not right",
+            detail="That is not your current PIN.",
+            type_="https://agripulse.cloud/problems/wrong-pin",
+        )
+
+
+class WeakPinError(APIError):
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=422,
+            title="PIN too easy to guess",
+            detail="Choose a PIN that is not a repeated digit, a run, or your current PIN.",
+            type_="https://agripulse.cloud/problems/weak-pin",
         )
 
 
@@ -723,6 +747,59 @@ class FieldEnrolmentService:
         )
         return PinReissue(pin=pin, sessions_ended=sessions_ended)
 
+    async def change_own_pin(
+        self, *, tenant_schema: str, user_id: UUID, current_pin: str, new_pin: str
+    ) -> None:
+        """A field worker replaces the PIN somebody read out to them.
+
+        Until they do, the supervisor who read it knows it, so the actions
+        recorded under that login are only as good as that person's memory.
+
+        Ends every session afterwards, this phone's included. The app signs
+        straight back in with the new PIN, so only other phones notice.
+        """
+        row = (
+            await self._public.execute(
+                text(
+                    "SELECT email, keycloak_subject FROM public.users "
+                    "WHERE id = :uid AND deleted_at IS NULL"
+                ).bindparams(bindparam("uid", type_=PG_UUID(as_uuid=True))),
+                {"uid": user_id},
+            )
+        ).first()
+        if row is None or not is_synthetic_email(row.email):
+            raise InvalidEnrolmentError(
+                "that account signs in with an email address; use the password-reset flow"
+            )
+        if new_pin == current_pin or is_guessable_pin(new_pin):
+            raise WeakPinError
+
+        try:
+            verified = await self._kc.verify_field_pin(
+                username=phone_from_synthetic_email(row.email), pin=current_pin
+            )
+            if not verified:
+                raise WrongPinError
+            await self._kc.set_field_pin(keycloak_user_id=row.keycloak_subject, pin=new_pin)
+        except KeycloakRequestError as exc:
+            raise APIError(
+                status_code=502,
+                title="Identity provider unavailable",
+                detail="Could not change the PIN. The old one still works.",
+                type_="https://agripulse.cloud/problems/keycloak-unavailable",
+            ) from exc
+
+        sessions_ended = await self._release_sign_in(keycloak_user_id=row.keycloak_subject)
+        _log.info("field_pin_changed", user_id=str(user_id), sessions_ended=sessions_ended)
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="iam.field_pin_changed",
+            actor_user_id=user_id,
+            subject_kind="user",
+            subject_id=user_id,
+            details={"sessions_ended": sessions_ended},
+        )
+
     async def _release_sign_in(self, *, keycloak_user_id: str) -> bool:
         """Clear the lockout and end every session. True when both worked.
 
@@ -1015,6 +1092,8 @@ __all__ = [
     "InvalidEnrolmentError",
     "PhoneAlreadyEnrolledError",
     "PinReissue",
+    "WeakPinError",
+    "WrongPinError",
     "PhoneBelongsToAnotherTenantError",
     "get_field_enrolment_service",
 ]

@@ -12,8 +12,10 @@ from app.shared.keycloak.field_identity import (
     SYNTHETIC_EMAIL_DOMAIN,
     InvalidPhoneNumberError,
     generate_pin,
+    is_guessable_pin,
     is_synthetic_email,
     normalise_phone,
+    phone_from_synthetic_email,
     synthetic_email,
 )
 
@@ -98,3 +100,23 @@ def test_other_country_codes_keep_the_generic_window() -> None:
     rejecting numbers from anywhere else."""
     assert normalise_phone("+17017305526") == "+17017305526"
     assert normalise_phone("+441234567890") == "+441234567890"
+
+
+@pytest.mark.parametrize("pin", ["000000", "777777", "123456", "654321", "345678", "987654"])
+def test_obvious_pins_are_guessable(pin: str) -> None:
+    assert is_guessable_pin(pin)
+
+
+@pytest.mark.parametrize("pin", ["482913", "112233", "135790", "121212"])
+def test_other_pins_are_not(pin: str) -> None:
+    assert not is_guessable_pin(pin)
+
+
+def test_the_generator_never_hands_out_a_guessable_pin(monkeypatch: pytest.MonkeyPatch) -> None:
+    digits = iter("111111" + "482913")
+    monkeypatch.setattr("app.shared.keycloak.field_identity.secrets.choice", lambda _: next(digits))
+    assert generate_pin() == "482913"
+
+
+def test_phone_comes_back_out_of_a_synthetic_email() -> None:
+    assert phone_from_synthetic_email(synthetic_email("+201001234567")) == "+201001234567"

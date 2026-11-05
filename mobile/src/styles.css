@@ -649,3 +649,13 @@ h1 { line-height: 1.35; font-weight: 700; }
    this the gesture fires twice: once here and once as a page reload, which on
    a signed-in app throws away the loaded state to fetch what we just fetched. */
 html, body { overscroll-behavior-y: contain; }
+
+/* Change PIN, inside the account sheet. */
+.pinform { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.pinform input { font-size: 18px; padding: 12px; border: 1px solid var(--ap-line);
+  border-radius: 10px; background: var(--ap-panel, var(--ap-bg)); color: var(--ap-ink); }
+.pinform button[type="submit"] { padding: 14px; font-size: 16px; font-weight: 650; border: 0;
+  border-radius: 12px; background: var(--ap-primary); color: #fff; margin-top: 6px; }
+.pinform button[type="submit"]:disabled { opacity: .5; }
+.pinform button.link { background: none; border: 0; padding: 10px; color: var(--ap-muted); }
+.acct > button.link { align-self: center; color: var(--ap-primary); }
