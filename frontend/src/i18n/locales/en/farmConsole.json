@@ -894,18 +894,44 @@
   },
   "farmTrees": {
     "title": "Decision trees",
-    "intro": "Every tree runs on this farm until you turn it off here. A tree published later starts running on its own.",
+    "intro": "Trees that match this farm's crops, country and soil run here until you turn them off. When a block's crop changes, matching trees start on their own and trees that no longer apply stop.",
     "loading": "Loading decision trees…",
     "loadFailed": "Could not load the decision trees for this farm.",
     "saveFailed": "Could not save that change. The switch was put back.",
-    "empty": "No decision trees are published for this tenant yet.",
+    "empty": "No published decision tree matches this farm's crops, country or soil yet.",
     "count": "{{running}} of {{total}} running on this farm.",
     "toggleLabel": "Run {{name}} on this farm",
     "openItemsNote": "Turning a tree off stops the next run. Recommendations and alerts it already opened stay in the Action Center.",
     "source": {
       "platform": "Platform",
       "tenant": "Yours"
-    }
+    },
+    "noCrops": "Assign a crop to at least one block to configure decision trees. Trees are matched to a farm by the crops its blocks carry.",
+    "blocksMatched_one": "{{count}} of {{total}} blocks",
+    "blocksMatched_other": "{{count}} of {{total}} blocks"
+  },
+  "treeImpact": {
+    "title": "Decision trees affected by this change",
+    "intro": "Trees run on a block only when its crop, soil and the farm's country match them. Saving this change moves these trees:",
+    "block": "Block {{name}}",
+    "stopping_one": "Stops on this block ({{count}})",
+    "stopping_other": "Stop on this block ({{count}})",
+    "starting_one": "Starts on this block ({{count}})",
+    "starting_other": "Start on this block ({{count}})",
+    "farmStopping_one": "Stops on this farm ({{count}})",
+    "farmStopping_other": "Stop on this farm ({{count}})",
+    "farmStarting_one": "Starts on this farm ({{count}})",
+    "farmStarting_other": "Start on this farm ({{count}})",
+    "stillRunsElsewhere_one": "still runs on {{count}} other block",
+    "stillRunsElsewhere_other": "still runs on {{count}} other blocks",
+    "onBlocks_one": "on {{count}} block",
+    "onBlocks_other": "on {{count}} blocks",
+    "turnedOff": "turned off for this farm",
+    "exclusionsCleared": "You had turned off {{names}} for this farm. It no longer applies to any block, so that choice is cleared: if it matches again later, it runs.",
+    "noCropsAfter": "No block will carry a crop after this change, so the farm will have no decision trees to configure.",
+    "openItemsNote": "Recommendations and alerts a stopping tree already opened stay in the Action Center. You can turn trees off in the farm settings.",
+    "cancel": "Cancel",
+    "confirm": "Save change"
   },
   "flags": {
     "title": "Field flag",

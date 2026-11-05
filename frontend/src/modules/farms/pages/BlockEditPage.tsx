@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { getBlock, updateBlock, type BlockDetail } from "@/api/blocks";
+import { useTreeImpactConfirm } from "@/modules/farms/treeImpact/useTreeImpactConfirm";
 import { isApiError } from "@/api/errors";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Page } from "@/components/Page";
@@ -34,7 +35,17 @@ export function BlockEditPage(): JSX.Element {
     };
   }, [blockId]);
 
+  // Soil texture is one of the axes decision trees target.
+  const treeImpact = useTreeImpactConfirm();
+
   const handleSubmit = async (values: BlockFormValues): Promise<void> => {
+    const nextSoil = values.soil_texture ?? null;
+    if (block && nextSoil !== (block.soil_texture ?? null)) {
+      const ok = await treeImpact.confirm(farmId, {
+        blocks: [{ block_id: blockId, soil_texture: nextSoil }],
+      });
+      if (!ok) return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -90,6 +101,7 @@ export function BlockEditPage(): JSX.Element {
           error={error}
         />
       </div>
+      {treeImpact.dialog}
     </Page>
   );
 }

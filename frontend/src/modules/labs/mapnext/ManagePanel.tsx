@@ -4,6 +4,7 @@
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useTreeImpactConfirm } from "@/modules/farms/treeImpact/useTreeImpactConfirm";
 
 import {
   getBlock,
@@ -68,7 +69,7 @@ export function ManagePanel({
   const { t } = useTranslation("farmConsole");
   return (
     <div className="px-4 pb-8 pt-3">
-      {mode === "edit" ? <EditForm blockId={blockId} onDone={onDone} /> : null}
+      {mode === "edit" ? <EditForm blockId={blockId} farmId={farmId} onDone={onDone} /> : null}
       {mode === "responsible" ? (
         <ResponsibleForm
           blockId={blockId}
@@ -111,7 +112,15 @@ function Field({ label, children }: { label: string; children: ReactNode }): Rea
 const inputCls =
   "w-full rounded-lg border border-ap-line bg-ap-panel px-3 py-2 text-sm text-ap-ink focus:border-ap-primary focus:outline-none";
 
-function EditForm({ blockId, onDone }: { blockId: string; onDone: () => void }): ReactNode {
+function EditForm({
+  blockId,
+  farmId,
+  onDone,
+}: {
+  blockId: string;
+  farmId: string;
+  onDone: () => void;
+}): ReactNode {
   const { t } = useTranslation("farmConsole");
   const { t: tf } = useTranslation("farms");
   const qc = useQueryClient();
@@ -141,6 +150,19 @@ function EditForm({ blockId, onDone }: { blockId: string; onDone: () => void }):
       : {});
   const set = (patch: Partial<BlockUpdatePayload>) => setForm({ ...state, ...patch });
 
+  // Soil texture is a decision-tree targeting axis: say what it moves first.
+  const treeImpact = useTreeImpactConfirm();
+  const save = async (patch: BlockUpdatePayload): Promise<void> => {
+    const nextSoil = patch.soil_texture ?? null;
+    if (b && nextSoil !== (b.soil_texture ?? null)) {
+      const ok = await treeImpact.confirm(farmId, {
+        blocks: [{ block_id: blockId, soil_texture: nextSoil }],
+      });
+      if (!ok) return;
+    }
+    mut.mutate(patch);
+  };
+
   const mut = useMutation({
     mutationFn: (patch: BlockUpdatePayload) => updateBlock(blockId, patch),
     onSuccess: () => {
@@ -157,143 +179,150 @@ function EditForm({ blockId, onDone }: { blockId: string; onDone: () => void }):
     return <div className="text-sm text-ap-crit">{t("manage.editLoadError")}</div>;
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        mut.mutate(state);
-      }}
-    >
-      <Field label={t("manage.name")}>
-        <input
-          className={inputCls}
-          value={state.name ?? ""}
-          onChange={(e) => set({ name: e.target.value || null })}
-        />
-      </Field>
-      <Field label={tf("form.blockNameAr")}>
-        <input
-          className={inputCls}
-          dir="rtl"
-          value={state.name_ar ?? ""}
-          onChange={(e) => set({ name_ar: e.target.value || null })}
-        />
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label={t("manage.irrSystem")}>
-          <select
+    <>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save(state);
+        }}
+      >
+        <Field label={t("manage.name")}>
+          <input
             className={inputCls}
-            value={state.irrigation_system ?? ""}
+            value={state.name ?? ""}
+            onChange={(e) => set({ name: e.target.value || null })}
+          />
+        </Field>
+        <Field label={tf("form.blockNameAr")}>
+          <input
+            className={inputCls}
+            dir="rtl"
+            value={state.name_ar ?? ""}
+            onChange={(e) => set({ name_ar: e.target.value || null })}
+          />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={t("manage.irrSystem")}>
+            <select
+              className={inputCls}
+              value={state.irrigation_system ?? ""}
+              onChange={(e) =>
+                set({ irrigation_system: (e.target.value || null) as IrrigationSystem | null })
+              }
+            >
+              <option value="">—</option>
+              {IRR_SYSTEMS.map((v) => (
+                <option key={v} value={v}>
+                  {v.replace(/_/g, " ")}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label={t("manage.irrSource")}>
+            <select
+              className={inputCls}
+              value={state.irrigation_source ?? ""}
+              onChange={(e) =>
+                set({ irrigation_source: (e.target.value || null) as IrrigationSource | null })
+              }
+            >
+              <option value="">—</option>
+              {IRR_SOURCES.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label={t("manage.soilTexture")}>
+            <select
+              className={inputCls}
+              value={state.soil_texture ?? ""}
+              onChange={(e) =>
+                set({ soil_texture: (e.target.value || null) as SoilTexture | null })
+              }
+            >
+              <option value="">—</option>
+              {SOIL_TEXTURES.map((v) => (
+                <option key={v} value={v}>
+                  {v.replace(/_/g, " ")}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label={t("manage.salinity")}>
+            <select
+              className={inputCls}
+              value={state.salinity_class ?? ""}
+              onChange={(e) =>
+                set({ salinity_class: (e.target.value || null) as SalinityClass | null })
+              }
+            >
+              <option value="">—</option>
+              {SALINITY.map((v) => (
+                <option key={v} value={v}>
+                  {v.replace(/_/g, " ")}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        <Field label={t("manage.soilPh")}>
+          <input
+            type="number"
+            step="0.1"
+            min={0}
+            max={14}
+            className={inputCls}
+            value={state.soil_ph ?? ""}
             onChange={(e) =>
-              set({ irrigation_system: (e.target.value || null) as IrrigationSystem | null })
+              set({ soil_ph: e.target.value === "" ? null : Number(e.target.value) })
             }
-          >
-            <option value="">—</option>
-            {IRR_SYSTEMS.map((v) => (
-              <option key={v} value={v}>
-                {v.replace(/_/g, " ")}
-              </option>
-            ))}
-          </select>
+          />
         </Field>
-        <Field label={t("manage.irrSource")}>
-          <select
+        <Field label={t("manage.tags")}>
+          <input
             className={inputCls}
-            value={state.irrigation_source ?? ""}
+            value={(state.tags ?? []).join(", ")}
             onChange={(e) =>
-              set({ irrigation_source: (e.target.value || null) as IrrigationSource | null })
+              set({
+                tags: e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean),
+              })
             }
-          >
-            <option value="">—</option>
-            {IRR_SOURCES.map((v) => (
-              <option key={v} value={v}>
-                {v}
-              </option>
-            ))}
-          </select>
+          />
         </Field>
-        <Field label={t("manage.soilTexture")}>
-          <select
+        <Field label={t("manage.notes")}>
+          <textarea
             className={inputCls}
-            value={state.soil_texture ?? ""}
-            onChange={(e) => set({ soil_texture: (e.target.value || null) as SoilTexture | null })}
-          >
-            <option value="">—</option>
-            {SOIL_TEXTURES.map((v) => (
-              <option key={v} value={v}>
-                {v.replace(/_/g, " ")}
-              </option>
-            ))}
-          </select>
+            rows={3}
+            value={state.notes ?? ""}
+            onChange={(e) => set({ notes: e.target.value || null })}
+          />
         </Field>
-        <Field label={t("manage.salinity")}>
-          <select
-            className={inputCls}
-            value={state.salinity_class ?? ""}
-            onChange={(e) =>
-              set({ salinity_class: (e.target.value || null) as SalinityClass | null })
-            }
+        {mut.isError ? (
+          <div className="mb-2 text-xs text-ap-crit">{t("manage.saveError")}</div>
+        ) : null}
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={mut.isPending}
+            className="h-9 flex-1 rounded-lg bg-ap-primary text-sm font-semibold text-white hover:bg-ap-primary/90 disabled:opacity-60"
           >
-            <option value="">—</option>
-            {SALINITY.map((v) => (
-              <option key={v} value={v}>
-                {v.replace(/_/g, " ")}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-      <Field label={t("manage.soilPh")}>
-        <input
-          type="number"
-          step="0.1"
-          min={0}
-          max={14}
-          className={inputCls}
-          value={state.soil_ph ?? ""}
-          onChange={(e) => set({ soil_ph: e.target.value === "" ? null : Number(e.target.value) })}
-        />
-      </Field>
-      <Field label={t("manage.tags")}>
-        <input
-          className={inputCls}
-          value={(state.tags ?? []).join(", ")}
-          onChange={(e) =>
-            set({
-              tags: e.target.value
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean),
-            })
-          }
-        />
-      </Field>
-      <Field label={t("manage.notes")}>
-        <textarea
-          className={inputCls}
-          rows={3}
-          value={state.notes ?? ""}
-          onChange={(e) => set({ notes: e.target.value || null })}
-        />
-      </Field>
-      {mut.isError ? (
-        <div className="mb-2 text-xs text-ap-crit">{t("manage.saveError")}</div>
-      ) : null}
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={mut.isPending}
-          className="h-9 flex-1 rounded-lg bg-ap-primary text-sm font-semibold text-white hover:bg-ap-primary/90 disabled:opacity-60"
-        >
-          {mut.isPending ? t("manage.saving") : t("manage.save")}
-        </button>
-        <button
-          type="button"
-          onClick={onDone}
-          className="h-9 rounded-lg border border-ap-line px-4 text-sm font-semibold text-ap-ink hover:bg-ap-bg/60"
-        >
-          {t("manage.cancel")}
-        </button>
-      </div>
-    </form>
+            {mut.isPending ? t("manage.saving") : t("manage.save")}
+          </button>
+          <button
+            type="button"
+            onClick={onDone}
+            className="h-9 rounded-lg border border-ap-line px-4 text-sm font-semibold text-ap-ink hover:bg-ap-bg/60"
+          >
+            {t("manage.cancel")}
+          </button>
+        </div>
+      </form>
+      {treeImpact.dialog}
+    </>
   );
 }

@@ -36,6 +36,7 @@ function tree(over: Record<string, unknown> = {}) {
     version: 2,
     source: "platform",
     crop_paths: ["mango"],
+    blocks_matched: 2,
     enabled: true,
     ...over,
   };
@@ -47,6 +48,8 @@ describe("FarmDecisionTreesPanel", () => {
     vi.clearAllMocks();
     h.list.mockResolvedValue({
       farm_id: "f1",
+      has_crops: true,
+      blocks_total: 3,
       trees: [
         tree(),
         tree({
@@ -66,7 +69,21 @@ describe("FarmDecisionTreesPanel", () => {
     await waitFor(() => expect(screen.getByText("Mango canopy health")).toBeTruthy());
   }
 
-  it("lists every visible tree and counts how many run here", async () => {
+  it("asks for a crop before listing any tree", async () => {
+    h.list.mockResolvedValue({ farm_id: "f1", has_crops: false, blocks_total: 2, trees: [] });
+    render(<FarmDecisionTreesPanel farmId="f1" />);
+    await waitFor(() =>
+      expect(screen.getByRole("status").textContent).toMatch(/Assign a crop to at least one block/),
+    );
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+  });
+
+  it("says how many of the farm's blocks each tree matches", async () => {
+    await open();
+    expect(screen.getAllByText("2 of 3 blocks")).toHaveLength(2);
+  });
+
+  it("lists the matching trees and counts how many run here", async () => {
     await open();
     expect(screen.getByText("Our own tree")).toBeTruthy();
     expect(screen.getByText("2 of 2 running on this farm.")).toBeTruthy();
@@ -89,9 +106,7 @@ describe("FarmDecisionTreesPanel", () => {
     h.set.mockRejectedValue(new Error("boom"));
     await open();
 
-    const box = screen.getByLabelText<HTMLInputElement>(
-      "Run Mango canopy health on this farm",
-    );
+    const box = screen.getByLabelText<HTMLInputElement>("Run Mango canopy health on this farm");
     await user.click(box);
 
     await waitFor(() => expect(box.checked).toBe(true));
@@ -106,10 +121,12 @@ describe("FarmDecisionTreesPanel", () => {
     ).toBeTruthy();
   });
 
-  it("shows an empty list as 'none published', not as a load failure", async () => {
-    h.list.mockResolvedValue({ farm_id: "f1", trees: [] });
+  it("shows an empty list as 'none match', not as a load failure", async () => {
+    h.list.mockResolvedValue({ farm_id: "f1", has_crops: true, blocks_total: 1, trees: [] });
     render(<FarmDecisionTreesPanel farmId="f1" />);
-    await waitFor(() => expect(screen.getByText(/No decision trees are published/i)).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText(/No published decision tree matches this farm/i)).toBeTruthy(),
+    );
   });
 
   it("shows a load failure instead of an empty list", async () => {

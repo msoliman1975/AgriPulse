@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
+import { useTreeImpactConfirm } from "@/modules/farms/treeImpact/useTreeImpactConfirm";
 
 import {
   previewBulkCropRemoval,
@@ -60,6 +61,16 @@ export function BulkCropRemovalPanel({ farmId, payload, onRemoved, onCancel }: P
     onError: (err: unknown) =>
       setError(isApiError(err) ? (err.problem.detail ?? err.problem.title) : t("errors.remove")),
   });
+
+  // Removing a block's current crop takes its decision trees with it.
+  const treeImpact = useTreeImpactConfirm();
+  const removeWithTreeCheck = async (): Promise<void> => {
+    const blocks = (preview?.items ?? [])
+      .filter((item) => item.assignments.some((a) => a.is_current))
+      .map((item) => ({ block_id: item.block_id, crop_removed: true }));
+    if (blocks.length > 0 && !(await treeImpact.confirm(farmId, { blocks }))) return;
+    removeMutation.mutate();
+  };
 
   if (preview === null) {
     return (
@@ -182,7 +193,7 @@ export function BulkCropRemovalPanel({ farmId, payload, onRemoved, onCancel }: P
               <Button
                 variant="danger"
                 disabled={!armed || removeMutation.isPending}
-                onClick={() => removeMutation.mutate()}
+                onClick={() => void removeWithTreeCheck()}
               >
                 {removeMutation.isPending
                   ? t("remove.removing")
@@ -201,6 +212,7 @@ export function BulkCropRemovalPanel({ farmId, payload, onRemoved, onCancel }: P
           </div>
         )}
       </Card>
+      {treeImpact.dialog}
     </div>
   );
 }
