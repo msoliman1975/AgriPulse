@@ -4745,7 +4745,10 @@ global:
       # a8fe2aa = #798, frontend only. Platform admins lose the gear menu that
       #   only led back to the tenant list, and small screens get a menu button
       #   that opens the side nav. No migration. Rollback: 7395f79.
-      tag: "a8fe2aa"
+      # ae19fbd = #800, frontend only. Platform admins get the full app frame
+      #   and side menu back; they were shown the investor frame. No migration.
+      #   Rollback: a8fe2aa.
+      tag: "ae19fbd"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
