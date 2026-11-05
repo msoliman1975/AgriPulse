@@ -26,6 +26,9 @@ import {
 
 const COLLAPSE_STORAGE_KEY = "ap.sidenav.collapsed";
 
+/** `rail` is the desktop column; `drawer` is the same nav on a small screen. */
+type SideNavVariant = "rail" | "drawer";
+
 function readCollapsed(): boolean {
   if (typeof window === "undefined") return false;
   try {
@@ -142,6 +145,7 @@ interface NavShellProps {
   heading: string;
   collapsed: boolean;
   onToggle: () => void;
+  variant: SideNavVariant;
   children: ReactNode;
 }
 
@@ -150,8 +154,20 @@ interface NavShellProps {
  * the collapse toggle. Collapsed drops to an icons-only rail (`w-14`); the
  * group heading goes with the labels since there's nothing left to head.
  */
-function NavShell({ heading, collapsed, onToggle, children }: NavShellProps): ReactNode {
+function NavShell({ heading, collapsed, onToggle, variant, children }: NavShellProps): ReactNode {
   const { t } = useTranslation("common");
+  // The drawer brings its own chrome and is always full width, so it needs
+  // neither the rail's frame nor the collapse toggle.
+  if (variant === "drawer") {
+    return (
+      <nav aria-label="Primary" className="flex flex-col gap-0.5">
+        <span className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-ap-muted">
+          {heading}
+        </span>
+        {children}
+      </nav>
+    );
+  }
   const toggleLabel = collapsed ? t("workspaceNav.expand") : t("workspaceNav.collapse");
   return (
     <nav
@@ -186,13 +202,14 @@ function NavShell({ heading, collapsed, onToggle, children }: NavShellProps): Re
   );
 }
 
-export function SideNav(): ReactNode {
+export function SideNav({ variant = "rail" }: { variant?: SideNavVariant }): ReactNode {
   const { farmId } = useParams<{ farmId?: string }>();
   const hasFarm = Boolean(farmId);
   const isPlatformAdmin = useCapability("platform.manage_tenants");
   const { t } = useTranslation(["admin", "common"]);
   const { t: ti } = useTranslation("investors");
-  const [collapsed, toggleCollapsed] = useCollapsed();
+  const [storedCollapsed, toggleCollapsed] = useCollapsed();
+  const collapsed = variant === "rail" && storedCollapsed;
   const farmSegment = farmId ?? "";
   // Farm work and Investments are separate areas. A user who cannot read a
   // farm plan (an Investment Manager) sees no Workspace group at all, and a
@@ -213,7 +230,12 @@ export function SideNav(): ReactNode {
   // AgriPulse workspace + per-farm config + tenant Settings hub.
   if (isPlatformAdmin) {
     return (
-      <NavShell heading={t("nav.section")} collapsed={collapsed} onToggle={toggleCollapsed}>
+      <NavShell
+        heading={t("nav.section")}
+        collapsed={collapsed}
+        onToggle={toggleCollapsed}
+        variant={variant}
+      >
         <SideNavItem
           to="/platform/tenants"
           label={t("nav.tenants")}
@@ -348,6 +370,7 @@ export function SideNav(): ReactNode {
       heading={showWorkspace ? t("common:workspaceNav.workspace") : ti("nav.group")}
       collapsed={collapsed}
       onToggle={toggleCollapsed}
+      variant={variant}
     >
       {showWorkspace ? (
         <>

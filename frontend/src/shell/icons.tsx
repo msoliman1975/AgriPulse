@@ -15,6 +15,14 @@ function base(props: IconProps): IconProps {
   };
 }
 
+export function MenuIcon(props: IconProps): ReactNode {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
 export function GearIcon(props: IconProps): ReactNode {
   return (
     <svg {...base(props)}>

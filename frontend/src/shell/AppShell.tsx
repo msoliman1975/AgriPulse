@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -7,6 +7,7 @@ import { initTelemetry } from "@/telemetry";
 import { installGlobalErrorCapture } from "@/telemetry/capture";
 import { useTelemetryRoute } from "@/telemetry/useTelemetryRoute";
 
+import { Drawer } from "./Drawer";
 import { Header } from "./Header";
 import { PlatformAlertBanner } from "./PlatformAlertBanner";
 import { SideNav } from "./SideNav";
@@ -42,6 +43,12 @@ export function AppShell(): ReactNode {
   // and every /settings/* page triple-padded. <Page> owns the inset now, so a
   // page's declared width is also its declared padding.
   const { pathname } = useLocation();
+  // Below `md` the rail is hidden, so the same nav opens in a drawer from a
+  // button in the header. Following a link closes it.
+  const [navOpen, setNavOpen] = useState(false);
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
   const viewportPinned =
     pathname.startsWith("/labs/map") ||
     pathname.startsWith("/timeline") ||
@@ -62,7 +69,15 @@ export function AppShell(): ReactNode {
           page you are on, and this is the one strip that must not scroll
           away or sit inside a route that a tenant user never visits. */}
       <PlatformAlertBanner />
-      <Header />
+      <Header onOpenNav={() => setNavOpen(true)} />
+      <Drawer
+        open={navOpen}
+        onClose={() => setNavOpen(false)}
+        title={t("shell.navMenu")}
+        side="start"
+      >
+        <SideNav variant="drawer" />
+      </Drawer>
       <div className="flex min-h-0 w-full flex-1 gap-0">
         <SideNav />
         <main

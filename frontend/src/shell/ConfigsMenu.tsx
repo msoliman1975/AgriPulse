@@ -17,6 +17,7 @@ export function ConfigsMenu(): ReactNode {
   const { t } = useTranslation("common");
   const { farmId } = useParams<{ farmId?: string }>();
   const canDecisionTrees = useCapability("decision_tree.manage");
+  const isPlatformAdmin = useCapability("platform.manage_tenants");
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -35,6 +36,11 @@ export function ConfigsMenu(): ReactNode {
       window.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  // Every destination here is tenant-side. AgriPulseGuard sends a platform
+  // admin back to /platform from all of them, so the menu only ever returned
+  // them to the tenant list. Their whole menu is the Platform side nav.
+  if (isPlatformAdmin) return null;
 
   const itemClass = "flex items-center gap-2 px-3 py-2 text-sm text-ap-ink hover:bg-ap-line/50";
 
