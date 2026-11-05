@@ -15,7 +15,7 @@ import { InvestorAppCallbackPage } from "@/modules/investors/pages/InvestorAppCa
 import { AuthProvider } from "@/auth/AuthProvider";
 import { AuthSync } from "@/auth/AuthSync";
 import { ProtectedRoute } from "@/auth/ProtectedRoute";
-import { useCapability } from "@/rbac/useCapability";
+import { useIsInvestor } from "@/rbac/useCapability";
 import { ConfigProvider } from "@/config/ConfigContext";
 import { PrefsProvider } from "@/prefs/PrefsContext";
 import { AppShell } from "@/shell/AppShell";
@@ -136,13 +136,13 @@ function RedirectPlanToBoard(): ReactNode {
  * menu, no farm picker, no alerts. The role never changes within a session.
  */
 function PersonaShell(): ReactNode {
-  const isInvestor = useCapability("investor_app.use");
+  const isInvestor = useIsInvestor();
   return isInvestor ? <InvestorShell /> : <AppShell />;
 }
 
 /** /my-holdings is the Investor's page only; staff land on their home. */
 function InvestorOnlyGuard(): ReactNode {
-  const isInvestor = useCapability("investor_app.use");
+  const isInvestor = useIsInvestor();
   return isInvestor ? <Outlet /> : <Navigate to="/" replace />;
 }
 

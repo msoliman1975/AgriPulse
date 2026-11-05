@@ -99,3 +99,15 @@ export function useCapability(capability: Capability, scope: CapabilityScope = {
     [claims, capability, farmId, served],
   );
 }
+
+/**
+ * True for a real Investor, who gets the minimal frame and only /my-holdings.
+ *
+ * `investor_app.use` alone cannot answer this. A platform admin holds "*", so
+ * the capability check says yes for them too, and they lost the side menu.
+ */
+export function useIsInvestor(): boolean {
+  const canUseInvestorApp = useCapability("investor_app.use");
+  const isPlatformStaff = useCapability("platform.manage_tenants");
+  return canUseInvestorApp && !isPlatformStaff;
+}
