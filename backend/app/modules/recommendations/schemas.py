@@ -862,12 +862,87 @@ class FarmTreeSelectionRow(BaseModel):
     #: this tenant authored. A farm can turn off either.
     source: Literal["platform", "tenant"]
     crop_paths: list[str] = Field(default_factory=list)
+    country_codes: list[str] = Field(default_factory=list)
+    soil_textures: list[str] = Field(default_factory=list)
+    #: Active blocks of the farm this tree matches on every targeting axis.
+    #: Always at least 1: a tree that matches no block is not listed.
+    blocks_matched: int = 0
     enabled: bool
 
 
 class FarmTreeSelectionResponse(BaseModel):
     farm_id: UUID
+    #: False when no active block carries a crop. The list is then empty, and
+    #: the panel asks for a crop assignment before any tree can be configured.
+    has_crops: bool = True
+    blocks_total: int = 0
     trees: list[FarmTreeSelectionRow]
+
+
+class FarmTreeImpactBlockChange(BaseModel):
+    """One block as it would be after a pending change.
+
+    Only the fields that move are sent. ``crop_id`` set to null (or
+    ``crop_removed``) means the block's crop is ended or removed; a ``crop_id``
+    with its variety/strain is the crop that replaces it. ``removed`` is a
+    block being archived or inactivated.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    block_id: UUID
+    crop_id: UUID | None = None
+    crop_variety_id: UUID | None = None
+    crop_variety_strain_id: UUID | None = None
+    crop_removed: bool = False
+    soil_texture: str | None = None
+    removed: bool = False
+
+
+class FarmTreeImpactRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    blocks: list[FarmTreeImpactBlockChange] = Field(default_factory=list, max_length=500)
+    #: Send to preview a country change; leave out otherwise. Null clears it.
+    country_code: str | None = None
+
+
+class FarmTreeImpactTree(BaseModel):
+    tree_id: UUID
+    code: str
+    name_en: str
+    name_ar: str | None = None
+    #: False when the farm turned this tree off: it is listed, but will not run.
+    enabled: bool = True
+    #: Per-block lists: other blocks of the farm the tree still runs on after
+    #: the change. Farm lists: blocks it runs on after the change.
+    other_blocks: int | None = None
+    blocks: int | None = None
+
+
+class FarmTreeImpactBlock(BaseModel):
+    block_id: UUID
+    label: str | None = None
+    label_ar: str | None = None
+    starting: list[FarmTreeImpactTree]
+    stopping: list[FarmTreeImpactTree]
+
+
+class FarmTreeImpactResponse(BaseModel):
+    farm_id: UUID
+    has_crops_before: bool
+    has_crops_after: bool
+    blocks: list[FarmTreeImpactBlock]
+    #: Trees that reach the farm for the first time with this change.
+    farm_starting: list[FarmTreeImpactTree]
+    #: Trees that stop matching every block of the farm.
+    farm_stopping: list[FarmTreeImpactTree]
+    #: Trees the farm turned off whose "off" is forgotten once the change is
+    #: saved, because they no longer match any block.
+    exclusions_cleared: list[FarmTreeImpactTree]
+    #: False when the change moves no tree at all; the client can skip the
+    #: confirmation then.
+    changes_anything: bool
 
 
 class FarmTreeToggleRequest(BaseModel):
