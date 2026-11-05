@@ -28,6 +28,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.modules.farms.schemas import (
     AttachmentFinalizeRequest,
     AttachmentResponse,
@@ -133,6 +134,55 @@ def _correlation_id(request: Request) -> UUID | None:
     if isinstance(cid, UUID):
         return cid
     return None
+
+
+# ---------- Decision-tree targeting follow-up --------------------------------
+#
+# A crop, a soil texture, the farm's country and the set of active blocks
+# decide which decision trees a farm's blocks match. After any write that can
+# move one of them, the farm's "off" choices for trees that no longer match any
+# block are cleared (recommendations service), so the tree comes back on if the
+# crop does. It runs in this request's transaction, after the write, so it sees
+# the farm as the write left it.
+
+
+def _recommendations(
+    tenant_session: AsyncSession = Depends(get_db_session),
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> Any:
+    from app.modules.recommendations.service import get_recommendations_service
+
+    return get_recommendations_service(tenant_session=tenant_session, public_session=public_session)
+
+
+async def _reconcile_farm_trees(
+    recommendations: Any,
+    tenant_session: AsyncSession,
+    *,
+    farm_id: UUID,
+    context: RequestContext,
+    tenant_schema: str,
+) -> None:
+    """Clear exclusions for trees the farm no longer matches.
+
+    Inside a savepoint: the write it follows is what the caller asked for, and
+    a failure here must not take that write down with it. The next targeting
+    change retries the same reconcile.
+    """
+    if context.tenant_id is None:
+        return
+    try:
+        async with tenant_session.begin_nested():
+            await recommendations.reconcile_farm_tree_exclusions(
+                farm_id=farm_id,
+                tenant_id=context.tenant_id,
+                actor_user_id=context.user_id,
+                tenant_schema=tenant_schema,
+            )
+    except Exception:  # pragma: no cover - defensive; logged, never fatal
+        get_logger(__name__).warning(
+            "farm_tree_reconcile_failed", farm_id=str(farm_id), exc_info=True
+        )
 
 
 def _ensure_tenant(context: RequestContext) -> str:
@@ -258,11 +308,13 @@ async def update_farm(
     request: Request,
     context: RequestContext = Depends(requires_capability("farm.update", farm_id_param="farm_id")),
     service: FarmService = Depends(_service),
+    recommendations: Any = Depends(_recommendations),
+    tenant_session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     schema = _ensure_tenant(context)
     data = payload.model_dump(exclude_unset=True)
     new_boundary = data.pop("boundary", None)
-    return await service.update_farm(
+    result = await service.update_farm(
         farm_id=farm_id,
         changes=data,
         new_boundary=new_boundary,
@@ -271,6 +323,11 @@ async def update_farm(
         preferred_unit=context.preferred_unit,
         correlation_id=_correlation_id(request),
     )
+    if "country_code" in data:
+        await _reconcile_farm_trees(
+            recommendations, tenant_session, farm_id=farm_id, context=context, tenant_schema=schema
+        )
+    return result
 
 
 @router.get(
@@ -555,6 +612,7 @@ async def update_block(
     context: RequestContext = Depends(get_current_context),
     service: FarmService = Depends(_service),
     tenant_session: AsyncSession = Depends(get_db_session),
+    recommendations: Any = Depends(_recommendations),
 ) -> dict[str, Any]:
     # We need to know which farm this block lives in to do per-farm RBAC.
     from app.modules.farms.errors import BlockNotFoundError
@@ -595,7 +653,7 @@ async def update_block(
                 tenant_session, farm_id=farm_id, category="org"
             )
 
-    return await service.update_block(
+    result = await service.update_block(
         block_id=block_id,
         changes=data,
         new_boundary=new_boundary,
@@ -604,6 +662,11 @@ async def update_block(
         preferred_unit=context.preferred_unit,
         correlation_id=_correlation_id(request),
     )
+    if "soil_texture" in data:
+        await _reconcile_farm_trees(
+            recommendations, tenant_session, farm_id=farm_id, context=context, tenant_schema=schema
+        )
+    return result
 
 
 @router.get(
@@ -637,6 +700,8 @@ async def inactivate_block(
     request: Request,
     context: RequestContext = Depends(get_current_context),
     service: FarmService = Depends(_service),
+    recommendations: Any = Depends(_recommendations),
+    tenant_session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     from app.modules.farms.errors import BlockNotFoundError
     from app.shared.rbac.check import has_capability
@@ -646,13 +711,21 @@ async def inactivate_block(
     if not has_capability(context, "block.delete", farm_id=block["farm_id"]):
         raise BlockNotFoundError(block_id)
 
-    return await service.inactivate_block(
+    result = await service.inactivate_block(
         block_id=block_id,
         actor_user_id=context.user_id,
         tenant_schema=schema,
         reason=payload.reason,
         correlation_id=_correlation_id(request),
     )
+    await _reconcile_farm_trees(
+        recommendations,
+        tenant_session,
+        farm_id=block["farm_id"],
+        context=context,
+        tenant_schema=schema,
+    )
+    return result
 
 
 @router.post(
@@ -699,6 +772,8 @@ async def archive_block(
     request: Request,
     context: RequestContext = Depends(get_current_context),
     service: FarmService = Depends(_service),
+    recommendations: Any = Depends(_recommendations),
+    tenant_session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     from app.modules.farms.errors import BlockNotFoundError
     from app.shared.rbac.check import has_capability
@@ -708,12 +783,20 @@ async def archive_block(
     if not has_capability(context, "block.delete", farm_id=block["farm_id"]):
         raise BlockNotFoundError(block_id)
 
-    return await service.inactivate_block(
+    result = await service.inactivate_block(
         block_id=block_id,
         actor_user_id=context.user_id,
         tenant_schema=schema,
         correlation_id=_correlation_id(request),
     )
+    await _reconcile_farm_trees(
+        recommendations,
+        tenant_session,
+        farm_id=block["farm_id"],
+        context=context,
+        tenant_schema=schema,
+    )
+    return result
 
 
 # ---------- Auto-grid -------------------------------------------------------
@@ -783,6 +866,8 @@ async def assign_block_crop(
     request: Request,
     context: RequestContext = Depends(get_current_context),
     service: FarmService = Depends(_service),
+    recommendations: Any = Depends(_recommendations),
+    tenant_session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     from app.modules.farms.errors import BlockNotFoundError
     from app.shared.rbac.check import has_capability
@@ -792,7 +877,7 @@ async def assign_block_crop(
     if not has_capability(context, "crop_assignment.create", farm_id=block["farm_id"]):
         raise BlockNotFoundError(block_id)
 
-    return await service.assign_block_crop(
+    result = await service.assign_block_crop(
         block_id=block_id,
         crop_id=payload.crop_id,
         crop_variety_id=payload.crop_variety_id,
@@ -809,6 +894,14 @@ async def assign_block_crop(
         tenant_schema=schema,
         correlation_id=_correlation_id(request),
     )
+    await _reconcile_farm_trees(
+        recommendations,
+        tenant_session,
+        farm_id=block["farm_id"],
+        context=context,
+        tenant_schema=schema,
+    )
+    return result
 
 
 @router.patch(
@@ -822,6 +915,8 @@ async def update_block_crop(
     payload: BlockCropUpdateRequest,
     context: RequestContext = Depends(get_current_context),
     service: FarmService = Depends(_service),
+    recommendations: Any = Depends(_recommendations),
+    tenant_session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     from app.modules.farms.errors import BlockNotFoundError
     from app.shared.rbac.check import has_capability
@@ -831,13 +926,21 @@ async def update_block_crop(
     if not has_capability(context, "crop_assignment.update", farm_id=block["farm_id"]):
         raise BlockNotFoundError(block_id)
 
-    return await service.update_block_crop(
+    result = await service.update_block_crop(
         block_id=block_id,
         block_crop_id=block_crop_id,
         fields=payload.model_dump(exclude_unset=True),
         actor_user_id=context.user_id,
         tenant_schema=schema,
     )
+    await _reconcile_farm_trees(
+        recommendations,
+        tenant_session,
+        farm_id=block["farm_id"],
+        context=context,
+        tenant_schema=schema,
+    )
+    return result
 
 
 @router.get(
@@ -940,17 +1043,23 @@ async def apply_bulk_crop_assignment(
         requires_capability("crop_assignment.create", farm_id_param="farm_id")
     ),
     service: FarmService = Depends(_service),
+    recommendations: Any = Depends(_recommendations),
+    tenant_session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     schema = _ensure_tenant(context)
     # 200, not 201: a run can partially succeed, and the per-block outcomes in
     # the body are the result — a blanket "created" would misreport that.
-    return await service.apply_bulk_crop_assignment(
+    result = await service.apply_bulk_crop_assignment(
         farm_id=farm_id,
         payload=payload,
         actor_user_id=context.user_id,
         tenant_schema=schema,
         correlation_id=_correlation_id(request),
     )
+    await _reconcile_farm_trees(
+        recommendations, tenant_session, farm_id=farm_id, context=context, tenant_schema=schema
+    )
+    return result
 
 
 # ---------- Bulk crop-assignment removal ------------------------------------
@@ -991,15 +1100,21 @@ async def remove_bulk_crop_assignments(
         requires_capability("crop_assignment.delete", farm_id_param="farm_id")
     ),
     service: FarmService = Depends(_service),
+    recommendations: Any = Depends(_recommendations),
+    tenant_session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     schema = _ensure_tenant(context)
-    return await service.remove_bulk_crop_assignments(
+    result = await service.remove_bulk_crop_assignments(
         farm_id=farm_id,
         payload=payload,
         actor_user_id=context.user_id,
         tenant_schema=schema,
         correlation_id=_correlation_id(request),
     )
+    await _reconcile_farm_trees(
+        recommendations, tenant_session, farm_id=farm_id, context=context, tenant_schema=schema
+    )
+    return result
 
 
 # ---------- Crop attribute values (per assignment) --------------------------
