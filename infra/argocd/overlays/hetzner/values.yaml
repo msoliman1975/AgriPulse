@@ -4064,9 +4064,16 @@ global:
       # 7395f79 = #793, api, workers and frontend. Investor API sends the
       #   block crop's stage name, stage start and expected end, and the
       #   farm's current season. No migration. Rollback: all three to 980e321.
-      tag: "7395f79"
+      # 317609c = #801 and #804, api, workers and frontend. A deleted scout can
+      #   be given access again. New PIN also signs their phone out and lifts a
+      #   lockout. POST /me/field-pin lets a scout change their own PIN.
+      #   Enrolments and PIN changes are audited; phones are out of the logs.
+      #   No migration. Watch: Give access on a scout in the Ready list shows a
+      #   PIN or a message, never nothing.
+      #   Rollback: api and workers to 7395f79, frontend to a8fe2aa.
+      tag: "317609c"
     workers:
-      tag: "7395f79"
+      tag: "317609c"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4745,7 +4752,11 @@ global:
       # a8fe2aa = #798, frontend only. Platform admins lose the gear menu that
       #   only led back to the tenant list, and small screens get a menu button
       #   that opens the side nav. No migration. Rollback: 7395f79.
-      tag: "a8fe2aa"
+      # 317609c = #801, frontend, see the api note. Failures on Field access
+      #   now show, New PIN asks first, and farm managers get the page. Also
+      #   carries #800, platform admins get their side menu back. No migration.
+      #   Rollback: a8fe2aa.
+      tag: "317609c"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
