@@ -111,6 +111,8 @@ class KeycloakAdminClient(Protocol):
 
     async def set_field_pin(self, *, keycloak_user_id: str, pin: str) -> None: ...
 
+    async def clear_login_failures(self, *, keycloak_user_id: str) -> None: ...
+
     async def add_existing_user_to_group(
         self,
         *,
@@ -229,12 +231,15 @@ class NoopKeycloakClient:
         tenant_id: UUID | str | None = None,
     ) -> str:
         del full_name, group_id, pin, tenant_id
-        self._log.warning("keycloak_noop_enrol_field_user", phone=phone_e164)
+        self._log.warning("keycloak_noop_enrol_field_user")
         return f"noop-{phone_e164}"
 
     async def set_field_pin(self, *, keycloak_user_id: str, pin: str) -> None:
         del pin
         self._log.warning("keycloak_noop_set_field_pin", keycloak_user_id=keycloak_user_id)
+
+    async def clear_login_failures(self, *, keycloak_user_id: str) -> None:
+        self._log.warning("keycloak_noop_clear_login_failures", keycloak_user_id=keycloak_user_id)
 
     async def add_existing_user_to_group(
         self,
@@ -543,6 +548,7 @@ class HttpxKeycloakAdminClient:
             if existing is None:
                 raise KeycloakRequestError(409, resp.text, operation="create_field_user")
             user_id = existing
+            await self._reclaim_field_user(keycloak_user_id=user_id, tenant_id=tenant_id)
         else:
             location = resp.headers.get("location") or resp.headers.get("Location")
             if location and "/" in location:
@@ -562,7 +568,7 @@ class HttpxKeycloakAdminClient:
             expected=(204,),
         )
         await self.set_field_pin(keycloak_user_id=user_id, pin=pin)
-        self._log.info("keycloak_enrol_field_user", user_id=user_id, phone=phone_e164)
+        self._log.info("keycloak_enrol_field_user", user_id=user_id)
         return user_id
 
     async def set_field_pin(self, *, keycloak_user_id: str, pin: str) -> None:
@@ -572,6 +578,45 @@ class HttpxKeycloakAdminClient:
             f"/users/{keycloak_user_id}/reset-password",
             operation="set_field_pin",
             json={"type": "password", "value": pin, "temporary": False},
+            expected=(204,),
+        )
+
+    async def clear_login_failures(self, *, keycloak_user_id: str) -> None:
+        """Lift a brute-force lockout. 404 is success: nothing to clear."""
+        await self._request(
+            "DELETE",
+            f"/attack-detection/brute-force/users/{keycloak_user_id}",
+            operation="clear_login_failures",
+            expected=(204, 404),
+        )
+
+    async def _reclaim_field_user(
+        self, *, keycloak_user_id: str, tenant_id: UUID | str | None
+    ) -> None:
+        """Make an existing account usable by this enrolment.
+
+        The account may be disabled, or may name a tenant its owner has left.
+        GET then PUT the whole representation, because a PUT treats missing
+        fields as empty (see ``_set_tenant_attributes``).
+        """
+        resp = await self._request(
+            "GET",
+            f"/users/{keycloak_user_id}",
+            operation="reclaim_field_user_get",
+            expected=(200,),
+        )
+        user = resp.json()
+        user["enabled"] = True
+        if tenant_id is not None:
+            attributes = dict(user.get("attributes") or {})
+            attributes["tenant_id"] = [str(tenant_id)]
+            attributes.pop("tenant_role", None)
+            user["attributes"] = attributes
+        await self._request(
+            "PUT",
+            f"/users/{keycloak_user_id}",
+            operation="reclaim_field_user_put",
+            json=user,
             expected=(204,),
         )
 
