@@ -259,7 +259,8 @@ async def _assign_crop(admin: AsyncSession, schema: str, block_id: UUID, crop_pa
     ).scalar_one()
     await admin.execute(
         text(
-            "UPDATE block_crops SET is_current = FALSE WHERE block_id = :bid AND is_current"
+            "UPDATE block_crops SET is_current = FALSE, deleted_at = now() "
+            "WHERE block_id = :bid AND deleted_at IS NULL"
         ).bindparams(bindparam("bid", type_=PG_UUID(as_uuid=True))),
         {"bid": block_id},
     )
@@ -280,10 +281,14 @@ async def _assign_crop(admin: AsyncSession, schema: str, block_id: UUID, crop_pa
 
 
 async def _end_crop(admin: AsyncSession, schema: str, block_id: UUID) -> None:
+    """Take the block's crop away. Soft-deleted rather than closed: the
+    block_crops no-overlap constraint covers every live row, so a closed row
+    would collide with the next assignment's date range."""
     await admin.execute(text(f'SET LOCAL search_path TO "{schema}", public'))
     await admin.execute(
         text(
-            "UPDATE block_crops SET is_current = FALSE WHERE block_id = :bid AND is_current"
+            "UPDATE block_crops SET is_current = FALSE, deleted_at = now() "
+            "WHERE block_id = :bid AND deleted_at IS NULL"
         ).bindparams(bindparam("bid", type_=PG_UUID(as_uuid=True))),
         {"bid": block_id},
     )
