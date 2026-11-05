@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { Page } from "@/components/Page";
-import { useCapability } from "@/rbac/useCapability";
+import { useCapability, useCapabilityOnAnyFarm } from "@/rbac/useCapability";
 
 /**
  * Tenant Settings Hub layout — single home for tenant-wide configuration:
@@ -35,7 +35,8 @@ export function SettingsLayout(): ReactNode {
   const canReadHealth = useCapability("tenant.read_integration_health");
   const canUser = useCapability("user.read");
   const canResources = useCapability("resource.read");
-  const canFieldEnrol = useCapability("user.field_enrol");
+  // A farm manager holds this through a farm scope, not a tenant role.
+  const canFieldEnrol = useCapabilityOnAnyFarm("user.field_enrol");
   // Farm-scoped grants can't be checked without a farm id, so this gates on
   // the tenant-level grant — which is who the surface is for. A farm-scoped
   // manager still assigns crops from the Farm Console.

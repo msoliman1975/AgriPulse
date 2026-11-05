@@ -601,6 +601,7 @@ async def enrol_field_worker(
     result = await service.enrol(
         tenant_id=tenant_id,
         tenant_slug=str(slug_row.slug) if slug_row else schema,
+        tenant_schema=schema,
         farm_id=payload.farm_id,
         phone=payload.phone,
         full_name=payload.full_name,
@@ -680,10 +681,15 @@ class FarmAccessResponse(BaseModel):
 
 
 class PinReissueResponse(BaseModel):
-    """The new PIN, shown once. The previous one stops working immediately."""
+    """The new PIN, shown once. The previous one stops working immediately.
+
+    ``sessions_ended`` is false when a phone may still be signed in, which
+    matters when this PIN was issued because a phone went missing.
+    """
 
     user_id: UUID
     pin: str
+    sessions_ended: bool
 
 
 @router.get(
@@ -773,5 +779,11 @@ async def reissue_field_pin(
     schema = _ensure_tenant(context)
     tenant_id = await _resolve_tenant_id(schema=schema, session=session)
     service = get_field_enrolment_service(public_session=session, tenant_session=tenant_session)
-    pin = await service.reissue_pin(tenant_id=tenant_id, user_id=user_id, farm_id=farm_id)
-    return {"user_id": user_id, "pin": pin}
+    result = await service.reissue_pin(
+        tenant_id=tenant_id,
+        tenant_schema=schema,
+        user_id=user_id,
+        actor_user_id=context.user_id,
+        farm_id=farm_id,
+    )
+    return {"user_id": user_id, "pin": result.pin, "sessions_ended": result.sessions_ended}

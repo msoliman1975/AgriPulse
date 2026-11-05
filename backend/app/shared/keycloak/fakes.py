@@ -62,6 +62,7 @@ class FakeKeycloakClient:
         # sessions, not only stop the next refresh, and the only way to assert
         # that happened is to record the call.
         self.logged_out: list[str] = []
+        self.cleared_lockouts: list[str] = []
         self._closed = False
         # A method name; the next call to that method raises once.
         self.fail_on: str | None = None
@@ -199,12 +200,17 @@ class FakeKeycloakClient:
         tenant_id: UUID | str | None = None,
     ) -> str:
         self._maybe_fail("enrol_field_user")
-        # The phone is the username, and Keycloak enforces that globally — a
-        # second enrolment of the same number must collide rather than quietly
-        # create a twin. 409 is what the real client surfaces.
+        # The phone is the username, and Keycloak enforces that globally. The
+        # real client answers that 409 by adopting the account and setting the
+        # new PIN, so a second enrolment of the same number lands on one user.
         for existing in self.users.values():
             if existing.phone == phone_e164:
-                raise KeycloakRequestError(409, "user exists", operation="enrol_field_user")
+                existing.field_pin = pin
+                existing.tenant_id = str(tenant_id) if tenant_id is not None else None
+                grp = self.groups.get(group_id)
+                if grp is not None and existing.id not in grp.member_ids:
+                    grp.member_ids.append(existing.id)
+                return existing.id
         uid = uuid4().hex
         self.users[uid] = FakeUser(
             id=uid,
@@ -225,6 +231,10 @@ class FakeKeycloakClient:
         if user is None:
             raise KeycloakRequestError(404, "user not found", operation="set_field_pin")
         user.field_pin = pin
+
+    async def clear_login_failures(self, *, keycloak_user_id: str) -> None:
+        self._maybe_fail("clear_login_failures")
+        self.cleared_lockouts.append(keycloak_user_id)
 
     async def add_existing_user_to_group(
         self,

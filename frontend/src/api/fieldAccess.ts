@@ -88,22 +88,30 @@ export async function reRoleFieldWorkers(args: {
   worker_ids: string[];
   role?: "Scout" | "FieldOperator";
 }): Promise<{ updated: number }> {
-  const { data } = await apiClient.post<{ updated: number }>(
-    "/v1/users/field-enrolment/re-role",
-    { role: "Scout", ...args },
-  );
+  const { data } = await apiClient.post<{ updated: number }>("/v1/users/field-enrolment/re-role", {
+    role: "Scout",
+    ...args,
+  });
   return data;
 }
 
 /**
  * A PIN cannot be looked up — Keycloak stores only its hash — so recovery is
- * replacement, and the old one stops working immediately.
+ * replacement. The old one stops working immediately, any phone signed in is
+ * signed out, and a lockout is lifted.
  */
+export interface PinReissue {
+  user_id: string;
+  pin: string;
+  /** False when the PIN changed but a phone may still be signed in. */
+  sessions_ended: boolean;
+}
+
 export async function reissueFieldPin(args: {
   user_id: string;
   farm_id: string;
-}): Promise<{ user_id: string; pin: string }> {
-  const { data } = await apiClient.post<{ user_id: string; pin: string }>(
+}): Promise<PinReissue> {
+  const { data } = await apiClient.post<PinReissue>(
     `/v1/users/${args.user_id}/field-pin:reissue`,
     null,
     { params: { farm_id: args.farm_id } },
@@ -137,9 +145,9 @@ export async function grantFarmAccess(args: {
   farm_id: string;
   role?: "Scout" | "FieldOperator";
 }): Promise<FarmAccessGrant> {
-  const { data } = await apiClient.post<FarmAccessGrant>(
-    `/v1/users/${args.user_id}/farm-access`,
-    { farm_id: args.farm_id, role: args.role ?? "Scout" },
-  );
+  const { data } = await apiClient.post<FarmAccessGrant>(`/v1/users/${args.user_id}/farm-access`, {
+    farm_id: args.farm_id,
+    role: args.role ?? "Scout",
+  });
   return data;
 }

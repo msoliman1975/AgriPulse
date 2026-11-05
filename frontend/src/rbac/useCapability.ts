@@ -101,6 +101,34 @@ export function useCapability(capability: Capability, scope: CapabilityScope = {
 }
 
 /**
+ * Which farms the session holds a capability on, as a predicate.
+ *
+ * For pages that act on a farm the user picks. Calling `useCapability` there
+ * without a farm only sees tenant and platform grants, so a farm manager, who
+ * holds the capability through a farm scope, is told no on their own farm.
+ */
+export function useCapabilityOnFarm(capability: Capability): (farmId: string) => boolean {
+  const claims = useClaims();
+  const served = useServedGrants();
+  return useMemo(
+    () => (farmId: string) => hasCapability(claims, capability, { farmId }, served),
+    [claims, capability, served],
+  );
+}
+
+/** True when the capability is held tenant-wide or on at least one farm. */
+export function useCapabilityOnAnyFarm(capability: Capability): boolean {
+  const claims = useClaims();
+  const served = useServedGrants();
+  return useMemo(() => {
+    if (hasCapability(claims, capability, {}, served)) return true;
+    return (claims?.farm_scopes ?? []).some((fs) =>
+      hasCapability(claims, capability, { farmId: fs.farm_id }, served),
+    );
+  }, [claims, capability, served]);
+}
+
+/**
  * True for a real Investor, who gets the minimal frame and only /my-holdings.
  *
  * `investor_app.use` alone cannot answer this. A platform admin holds "*", so
