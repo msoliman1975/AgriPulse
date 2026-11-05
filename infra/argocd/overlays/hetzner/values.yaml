@@ -4071,9 +4071,19 @@ global:
       #   No migration. Watch: Give access on a scout in the Ready list shows a
       #   PIN or a message, never nothing.
       #   Rollback: api and workers to 7395f79, frontend to a8fe2aa.
-      tag: "317609c"
+      # 6ee00bc = #806, api, workers and frontend. GET /farms/{id}/decision-
+      #   trees lists only trees matching at least one active block (crop,
+      #   country, soil), with blocks_matched, and none while no block has a
+      #   crop. New POST /farms/{id}/decision-tree-impact previews what a crop,
+      #   soil, country or block change starts and stops. Those writes now
+      #   clear the farm's exclusion for a tree that matches no block any more
+      #   (audited as recommendations.farm_tree_exclusion_cleared). No
+      #   migration. Watch: assigning a crop still saves when the preview
+      #   fails; farm settings shows "Assign a crop…" on a crop-less farm.
+      #   Rollback: all three to 317609c.
+      tag: "6ee00bc"
     workers:
-      tag: "317609c"
+      tag: "6ee00bc"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4756,7 +4766,11 @@ global:
       #   now show, New PIN asks first, and farm managers get the page. Also
       #   carries #800, platform admins get their side menu back. No migration.
       #   Rollback: a8fe2aa.
-      tag: "317609c"
+      # 6ee00bc = #806, frontend, see the api note. Farm settings list only
+      #   matching trees with "X of Y blocks"; a crop, soil, country or block
+      #   change shows which trees it starts and stops before saving.
+      #   Rollback: 317609c.
+      tag: "6ee00bc"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
