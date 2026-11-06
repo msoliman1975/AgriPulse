@@ -4770,7 +4770,11 @@ global:
       #   matching trees with "X of Y blocks"; a crop, soil, country or block
       #   change shows which trees it starts and stops before saving.
       #   Rollback: 317609c.
-      tag: "6ee00bc"
+      # 64bd597 = #809, frontend only. The lab maps (map-legacy: crop assign,
+      #   block inactivate, soil and country edits; map-v2: block inactivate)
+      #   show the same decision-tree impact dialog before saving. No API
+      #   change, no migration. Rollback: 6ee00bc.
+      tag: "64bd597"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
