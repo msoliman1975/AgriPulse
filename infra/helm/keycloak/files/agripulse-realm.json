@@ -17,12 +17,30 @@
   "emailTheme": "agripulse",
   "roles": {
     "realm": [
-      { "name": "PlatformAdmin", "description": "AgriPulse staff with full cross-tenant control." },
-      { "name": "PlatformSupport", "description": "Read-only platform support access." },
-      { "name": "TenantOwner", "description": "Tenant super-admin; exactly one per tenant." },
-      { "name": "TenantAdmin", "description": "Tenant admin; all tenant capabilities except billing and ownership transfer." },
-      { "name": "BillingAdmin", "description": "Subscription and billing only." },
-      { "name": "Viewer", "description": "Read-only tenant access." }
+      {
+        "name": "PlatformAdmin",
+        "description": "AgriPulse staff with full cross-tenant control."
+      },
+      {
+        "name": "PlatformSupport",
+        "description": "Read-only platform support access."
+      },
+      {
+        "name": "TenantOwner",
+        "description": "Tenant super-admin; exactly one per tenant."
+      },
+      {
+        "name": "TenantAdmin",
+        "description": "Tenant admin; all tenant capabilities except billing and ownership transfer."
+      },
+      {
+        "name": "BillingAdmin",
+        "description": "Subscription and billing only."
+      },
+      {
+        "name": "Viewer",
+        "description": "Read-only tenant access."
+      }
     ]
   },
   "clients": [
@@ -147,7 +165,111 @@
       "attributes": {
         "client.secret.creation.time": "0"
       }
+    },
+    {
+      "clientId": "agripulse-mobile",
+      "name": "AgriPulse Scout (mobile)",
+      "description": "Public PKCE client for the Android field-scouting app.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "implicitFlowEnabled": false,
+      "redirectUris": [
+        "agripulse://auth/callback",
+        "agripulse://auth/logout"
+      ],
+      "webOrigins": [
+        "http://localhost",
+        "https://localhost"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "client_offline_session_idle_timeout": "7776000",
+        "client_offline_session_max_lifespan": "7776000"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email",
+        "offline_access"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "microprofile-jwt"
+      ],
+      "protocolMappers": [
+        {
+          "name": "tenant_id-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "tenant_id",
+            "claim.name": "tenant_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "multivalued": "false"
+          }
+        },
+        {
+          "name": "tenant_role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "tenant_role",
+            "claim.name": "tenant_role",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "multivalued": "false"
+          }
+        },
+        {
+          "name": "farm_scopes-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "farm_scopes",
+            "claim.name": "farm_scopes",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "multivalued": "true"
+          }
+        },
+        {
+          "name": "agripulse-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "agripulse-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
     }
   ],
-  "users": []
+  "users": [],
+  "failureFactor": 10,
+  "waitIncrementSeconds": 300,
+  "maxFailureWaitSeconds": 3600,
+  "maxDeltaTimeSeconds": 86400,
+  "quickLoginCheckMilliSeconds": 1000,
+  "minimumQuickLoginWaitSeconds": 60,
+  "permanentLockout": false
 }

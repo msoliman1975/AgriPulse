@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { getFarm, updateFarm, type FarmDetail } from "@/api/farms";
+import { useTreeImpactConfirm } from "@/modules/farms/treeImpact/useTreeImpactConfirm";
 import { isApiError } from "@/api/errors";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Page } from "@/components/Page";
@@ -34,7 +35,15 @@ export function FarmEditPage(): JSX.Element {
     };
   }, [farmId]);
 
+  // The farm's country is one of the axes decision trees target.
+  const treeImpact = useTreeImpactConfirm();
+
   const handleSubmit = async (values: FarmFormValues): Promise<void> => {
+    const nextCountry = values.country_code ?? null;
+    if (farm && nextCountry !== (farm.country_code ?? null)) {
+      const ok = await treeImpact.confirm(farmId, { country_code: nextCountry });
+      if (!ok) return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -95,6 +104,7 @@ export function FarmEditPage(): JSX.Element {
           error={error}
         />
       </div>
+      {treeImpact.dialog}
     </Page>
   );
 }

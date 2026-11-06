@@ -19,7 +19,8 @@
     "heading": "PIN for {{name}}",
     "readAloud": "Read this out to them now. There is no text message and no email — this is the whole handover.",
     "onceOnly": "This is the only time it is shown. If it is lost, issue a new one.",
-    "dismiss": "Done"
+    "dismiss": "Done",
+    "stillSignedIn": "The PIN changed, but their phone may still be signed in. If it was lost, ask support to end the session."
   },
   "ready": {
     "heading": "Ready for the app",
@@ -44,7 +45,10 @@
     "none": "Nobody on this farm has the app yet.",
     "reissue": "New PIN",
     "working": "Issuing…",
-    "noAccount": "This worker is linked to a member who did not get their sign-in here."
+    "noAccount": "This worker is linked to a member who did not get their sign-in here.",
+    "confirm": "Replace PIN",
+    "cancel": "Cancel",
+    "confirmHint": "The old PIN stops working and their phone signs out."
   },
   "addFarm": {
     "col": "Also works on",
@@ -56,5 +60,12 @@
   "mismatch": {
     "heading": "Can be given work here but cannot open it",
     "hint": "These people are on this farm's roster and hold no access to it. Work assigned to them here will not reach their phone. Add the farm to fix it."
+  },
+  "errors": {
+    "alreadyEnrolled": "This number already has the app here. Use New PIN under Already have the app.",
+    "otherTenant": "This number has an account with another organisation, so it cannot be used here.",
+    "identityDown": "The sign-in service did not respond. Try again in a minute.",
+    "generic": "That did not work. Try again.",
+    "dismiss": "Dismiss"
   }
 }

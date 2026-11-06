@@ -18,6 +18,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { FeatureCollection, Polygon } from "geojson";
+import { useTreeImpactConfirm } from "@/modules/farms/treeImpact/useTreeImpactConfirm";
 
 import { listFarms } from "@/api/farms";
 import type { ExistingBlock } from "@/lib/aoi/bulk";
@@ -121,6 +122,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
   };
 
   const c = useFarmConsole(farmId);
+  const treeImpact = useTreeImpactConfirm();
   const m = useConsoleMutations({
     farmId,
     selectedId: c.selectedId,
@@ -686,9 +688,19 @@ function Console({ farmId }: { farmId: string }): ReactNode {
           submitting={m.inactivateMut.isPending}
           submitError={m.inactivateMut.isError ? t("manage.saveError") : null}
           onCancel={() => m.setInactivateOpen(false)}
-          onSubmit={(reason) => m.inactivateMut.mutate({ blockId: c.selectedId!, reason })}
+          onSubmit={(reason) => {
+            const blockId = c.selectedId!;
+            // An inactivated block takes its crop out of tree targeting.
+            void treeImpact
+              .confirm(farmId, { blocks: [{ block_id: blockId, removed: true }] })
+              .then((ok) => {
+                if (ok) m.inactivateMut.mutate({ blockId, reason });
+              });
+          }}
         />
       ) : null}
+
+      {treeImpact.dialog}
 
       {m.inactivateFarmOpen ? (
         <InactivateConfirmModal

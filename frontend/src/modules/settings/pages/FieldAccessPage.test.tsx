@@ -3,19 +3,23 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "@/api/errors";
 import { setupTestI18n } from "@/i18n/testing";
 
 import { FieldAccessPage } from "./FieldAccessPage";
 
 const fetchFieldEnrolmentAudit = vi.fn();
 const grantFarmAccess = vi.fn();
+const enrolFieldWorker = vi.fn();
+const reissueFieldPin = vi.fn();
+const canEnrolOn = vi.fn<(farmId: string) => boolean>(() => true);
 
 vi.mock("@/api/fieldAccess", () => ({
   fetchFieldEnrolmentAudit: (...a: unknown[]) => fetchFieldEnrolmentAudit(...a),
   grantFarmAccess: (...a: unknown[]) => grantFarmAccess(...a),
-  enrolFieldWorker: vi.fn(),
+  enrolFieldWorker: (...a: unknown[]) => enrolFieldWorker(...a),
   reRoleFieldWorkers: vi.fn(),
-  reissueFieldPin: vi.fn(),
+  reissueFieldPin: (...a: unknown[]) => reissueFieldPin(...a),
 }));
 
 vi.mock("@/api/farms", () => ({
@@ -29,7 +33,9 @@ vi.mock("@/api/farms", () => ({
     }),
 }));
 
-vi.mock("@/rbac/useCapability", () => ({ useCapability: () => true }));
+vi.mock("@/rbac/useCapability", () => ({
+  useCapabilityOnFarm: () => (farmId: string) => canEnrolOn(farmId),
+}));
 
 function emptyAudit(over: Record<string, unknown> = {}) {
   return {
@@ -161,9 +167,7 @@ describe("FieldAccessPage — a second farm for someone who already has the app"
     renderPage();
 
     await screen.findByText("Tarek Mahmoud");
-    expect(
-      screen.queryByText("Can be given work here but cannot open it"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Can be given work here but cannot open it")).not.toBeInTheDocument();
   });
 
   it("offers nothing for a worker row with no account behind it", async () => {
@@ -176,5 +180,104 @@ describe("FieldAccessPage — a second farm for someone who already has the app"
 
     const row = within(await screen.findByRole("row", { name: /Tarek Mahmoud/ }));
     expect(row.queryByLabelText("Also works on")).not.toBeInTheDocument();
+  });
+});
+
+describe("FieldAccessPage actions", () => {
+  beforeEach(() => {
+    fetchFieldEnrolmentAudit.mockReset();
+    enrolFieldWorker.mockReset();
+    reissueFieldPin.mockReset();
+    canEnrolOn.mockReset();
+    canEnrolOn.mockImplementation(() => true);
+  });
+
+  const problem = (type: string, detail: string) =>
+    new ApiError({
+      type: `https://agripulse.cloud/problems/${type}`,
+      title: "x",
+      status: 409,
+      detail,
+    });
+
+  it("says why Give access failed instead of doing nothing", async () => {
+    fetchFieldEnrolmentAudit.mockResolvedValue(
+      emptyAudit({ ready_to_enrol: [{ ...TAREK, user_id: null }] }),
+    );
+    enrolFieldWorker.mockRejectedValue(problem("phone-in-another-tenant", "server words"));
+    renderPage();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Give access" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("another organisation");
+  });
+
+  it("shows the server's detail when the failure has no message of its own", async () => {
+    fetchFieldEnrolmentAudit.mockResolvedValue(
+      emptyAudit({ ready_to_enrol: [{ ...TAREK, user_id: null }] }),
+    );
+    enrolFieldWorker.mockRejectedValue(problem("invalid-enrolment", "that worker is archived"));
+    renderPage();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Give access" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("that worker is archived");
+  });
+
+  it("asks before replacing a PIN, and Cancel changes nothing", async () => {
+    fetchFieldEnrolmentAudit.mockResolvedValue(emptyAudit({ enrolled: [TAREK] }));
+    renderPage();
+
+    await userEvent.click(await screen.findByRole("button", { name: "New PIN" }));
+    expect(reissueFieldPin).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(reissueFieldPin).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "New PIN" })).toBeInTheDocument();
+  });
+
+  it("shows the new PIN once confirmed", async () => {
+    fetchFieldEnrolmentAudit.mockResolvedValue(emptyAudit({ enrolled: [TAREK] }));
+    reissueFieldPin.mockResolvedValue({ user_id: "u-1", pin: "482913", sessions_ended: true });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole("button", { name: "New PIN" }));
+    await userEvent.click(screen.getByRole("button", { name: "Replace PIN" }));
+
+    expect(await screen.findByText("482913")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("warns when the PIN changed but the phone may still be signed in", async () => {
+    fetchFieldEnrolmentAudit.mockResolvedValue(emptyAudit({ enrolled: [TAREK] }));
+    reissueFieldPin.mockResolvedValue({ user_id: "u-1", pin: "482913", sessions_ended: false });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole("button", { name: "New PIN" }));
+    await userEvent.click(screen.getByRole("button", { name: "Replace PIN" }));
+
+    expect(await screen.findByText("482913")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("may still be signed in");
+  });
+
+  it("reports a failed reissue", async () => {
+    fetchFieldEnrolmentAudit.mockResolvedValue(emptyAudit({ enrolled: [TAREK] }));
+    reissueFieldPin.mockRejectedValue(problem("keycloak-unavailable", "server words"));
+    renderPage();
+
+    await userEvent.click(await screen.findByRole("button", { name: "New PIN" }));
+    await userEvent.click(screen.getByRole("button", { name: "Replace PIN" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("did not respond");
+  });
+
+  it("gives a farm manager the actions on their own farm, and opens on it", async () => {
+    canEnrolOn.mockImplementation((farmId: string) => farmId === "farm-2");
+    fetchFieldEnrolmentAudit.mockResolvedValue(emptyAudit({ enrolled: [TAREK] }));
+    renderPage();
+
+    expect(await screen.findByRole("button", { name: "New PIN" })).toBeInTheDocument();
+    expect(fetchFieldEnrolmentAudit).toHaveBeenCalledWith("farm-2");
+    expect(screen.queryByRole("option", { name: "Bashayer Farm" })).not.toBeInTheDocument();
   });
 });

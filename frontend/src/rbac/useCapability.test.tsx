@@ -96,3 +96,18 @@ describe("hasCapability with grants served by /v1/me", () => {
     expect(hasCapability(claims, "plan.manage", { farmId: "f2" }, served)).toBe(false);
   });
 });
+
+describe("capability on a chosen farm", () => {
+  const manager: JwtClaims = { farm_scopes: [{ farm_id: "f1", role: "FarmManager" }] };
+
+  it("a farm manager holds user.field_enrol on their farm and not tenant-wide", () => {
+    expect(hasCapability(manager, "user.field_enrol")).toBe(false);
+    expect(hasCapability(manager, "user.field_enrol", { farmId: "f1" })).toBe(true);
+    expect(hasCapability(manager, "user.field_enrol", { farmId: "f2" })).toBe(false);
+  });
+
+  it("a scout holds it nowhere", () => {
+    const scout: JwtClaims = { farm_scopes: [{ farm_id: "f1", role: "Scout" }] };
+    expect(hasCapability(scout, "user.field_enrol", { farmId: "f1" })).toBe(false);
+  });
+});

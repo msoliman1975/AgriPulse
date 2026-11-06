@@ -128,7 +128,7 @@ async def _make_tenant(admin: AsyncSession, slug: str) -> _Fixture:
     )
 
 
-async def _publish_tree(tenant_id: UUID, code: str) -> UUID:
+async def _publish_tree(tenant_id: UUID, code: str, *, crop_paths: tuple[str, ...] = ()) -> UUID:
     factory = AsyncSessionLocal()
     async with factory() as public_session, public_session.begin():
         author = get_decision_trees_author_service(
@@ -138,6 +138,7 @@ async def _publish_tree(tenant_id: UUID, code: str) -> UUID:
             code=code,
             crop_code=None,
             tree_yaml=SELECTION_TREE_YAML.format(code=code),
+            crop_paths=list(crop_paths) or None,
             actor_user_id=None,
         )
         await author.publish_version(code=code, version=1, actor_user_id=None)
@@ -237,13 +238,84 @@ async def _set_enabled(fixture: _Fixture, *, farm_id: UUID, tree_id: UUID, enabl
             )
 
 
-async def _list_selection(fixture: _Fixture, farm_id: UUID) -> tuple[dict, ...]:
+async def _list_selection(fixture: _Fixture, farm_id: UUID) -> dict:
     factory = AsyncSessionLocal()
     async with factory() as session, session.begin():
         await session.execute(text(f'SET LOCAL search_path TO "{fixture.schema_name}", public'))
         async with factory() as public_session:
             svc = get_recommendations_service(tenant_session=session, public_session=public_session)
             return await svc.list_farm_tree_selection(farm_id=farm_id, tenant_id=fixture.tenant_id)
+
+
+async def _assign_crop(admin: AsyncSession, schema: str, block_id: UUID, crop_path: str) -> UUID:
+    """Make ``crop_path`` the block's current crop. The crop row is the
+    shipped catalogue's top-level crop for the path's first segment."""
+    await admin.execute(text(f'SET LOCAL search_path TO "{schema}", public'))
+    crop_id = (
+        await admin.execute(
+            text("SELECT id FROM public.crops WHERE code = :c"),
+            {"c": crop_path.split(".")[0]},
+        )
+    ).scalar_one()
+    await admin.execute(
+        text(
+            "UPDATE block_crops SET is_current = FALSE, deleted_at = now() "
+            "WHERE block_id = :bid AND deleted_at IS NULL"
+        ).bindparams(bindparam("bid", type_=PG_UUID(as_uuid=True))),
+        {"bid": block_id},
+    )
+    await admin.execute(
+        text(
+            "INSERT INTO block_crops "
+            "(id, block_id, crop_id, crop_path, season_label, effective_from, is_current, status) "
+            "VALUES (:aid, :bid, :cid, :path, '2026-summer', CURRENT_DATE - 30, TRUE, 'growing')"
+        ).bindparams(
+            bindparam("aid", type_=PG_UUID(as_uuid=True)),
+            bindparam("bid", type_=PG_UUID(as_uuid=True)),
+            bindparam("cid", type_=PG_UUID(as_uuid=True)),
+        ),
+        {"aid": uuid4(), "bid": block_id, "cid": crop_id, "path": crop_path},
+    )
+    await admin.commit()
+    return UUID(str(crop_id))
+
+
+async def _end_crop(admin: AsyncSession, schema: str, block_id: UUID) -> None:
+    """Take the block's crop away. Soft-deleted rather than closed: the
+    block_crops no-overlap constraint covers every live row, so a closed row
+    would collide with the next assignment's date range."""
+    await admin.execute(text(f'SET LOCAL search_path TO "{schema}", public'))
+    await admin.execute(
+        text(
+            "UPDATE block_crops SET is_current = FALSE, deleted_at = now() "
+            "WHERE block_id = :bid AND deleted_at IS NULL"
+        ).bindparams(bindparam("bid", type_=PG_UUID(as_uuid=True))),
+        {"bid": block_id},
+    )
+    await admin.commit()
+
+
+async def _with_service(fixture: _Fixture, fn):  # type: ignore[no-untyped-def]
+    factory = AsyncSessionLocal()
+    async with factory() as session, session.begin():
+        await session.execute(text(f'SET LOCAL search_path TO "{fixture.schema_name}", public'))
+        async with factory() as public_session:
+            svc = get_recommendations_service(tenant_session=session, public_session=public_session)
+            return await fn(svc)
+
+
+async def _exclusions(admin: AsyncSession, schema: str, farm_id: UUID) -> set[UUID]:
+    await admin.execute(text(f'SET LOCAL search_path TO "{schema}", public'))
+    rows = (
+        await admin.execute(
+            text("SELECT tree_id FROM farm_tree_exclusions WHERE farm_id = :fid").bindparams(
+                bindparam("fid", type_=PG_UUID(as_uuid=True))
+            ),
+            {"fid": farm_id},
+        )
+    ).all()
+    await admin.commit()
+    return {UUID(str(r.tree_id)) for r in rows}
 
 
 async def _open_recommendations(
@@ -390,9 +462,13 @@ async def test_selection_list_marks_the_disabled_tree_and_leaves_the_rest_on(
     admin_session: AsyncSession,
 ) -> None:
     tenant = await _make_tenant(admin_session, "sel-list")
-    farm_id, _ = await _seed_farm(admin_session, tenant.schema_name, code="LIST", block_count=1)
+    farm_id, blocks = await _seed_farm(
+        admin_session, tenant.schema_name, code="LIST", block_count=1
+    )
+    # Nothing is listed until a block carries a crop.
+    await _assign_crop(admin_session, tenant.schema_name, blocks[0], "mango")
 
-    rows = await _list_selection(tenant, farm_id)
+    rows = (await _list_selection(tenant, farm_id))["trees"]
     assert all(r["enabled"] for r in rows)
     # The tenant's own tree is in the list beside the shipped catalogue.
     mine = next(r for r in rows if r["tree_id"] == tenant.tree_id)
@@ -400,7 +476,7 @@ async def test_selection_list_marks_the_disabled_tree_and_leaves_the_rest_on(
 
     await _set_enabled(tenant, farm_id=farm_id, tree_id=tenant.tree_id, enabled=False)
 
-    rows = await _list_selection(tenant, farm_id)
+    rows = (await _list_selection(tenant, farm_id))["trees"]
     assert next(r for r in rows if r["tree_id"] == tenant.tree_id)["enabled"] is False
     assert all(r["enabled"] for r in rows if r["tree_id"] != tenant.tree_id)
 
@@ -427,6 +503,137 @@ async def test_unknown_farm_and_unknown_tree_are_404s(admin_session: AsyncSessio
         await _set_enabled(tenant, farm_id=uuid4(), tree_id=tenant.tree_id, enabled=False)
     with pytest.raises(DecisionTreeNotFoundError):
         await _set_enabled(tenant, farm_id=farm_id, tree_id=uuid4(), enabled=False)
+
+
+# ---------- C: the farm lists only trees its blocks match --------------------
+
+
+@pytest.mark.asyncio
+async def test_a_farm_without_crops_lists_no_trees(admin_session: AsyncSession) -> None:
+    """Even the crop-agnostic fixture tree waits for a crop assignment."""
+    tenant = await _make_tenant(admin_session, "sel-nocrop")
+    farm_id, _ = await _seed_farm(admin_session, tenant.schema_name, code="NOC", block_count=2)
+
+    bag = await _list_selection(tenant, farm_id)
+
+    assert bag["has_crops"] is False
+    assert bag["blocks_total"] == 2
+    assert bag["trees"] == []
+
+
+@pytest.mark.asyncio
+async def test_the_list_keeps_only_trees_matching_a_block(admin_session: AsyncSession) -> None:
+    tenant = await _make_tenant(admin_session, "sel-match")
+    mango_id = await _publish_tree(
+        tenant.tenant_id, f"sel_mango_{uuid4().hex[:8]}", crop_paths=("mango",)
+    )
+    potato_id = await _publish_tree(
+        tenant.tenant_id, f"sel_potato_{uuid4().hex[:8]}", crop_paths=("potato",)
+    )
+    farm_id, blocks = await _seed_farm(admin_session, tenant.schema_name, code="MAT", block_count=2)
+    await _assign_crop(admin_session, tenant.schema_name, blocks[0], "mango")
+
+    bag = await _list_selection(tenant, farm_id)
+    by_id = {r["tree_id"]: r for r in bag["trees"]}
+
+    assert bag["has_crops"] is True
+    # A parent path matches the block's crop; one block of two carries it.
+    assert by_id[mango_id]["blocks_matched"] == 1
+    assert potato_id not in by_id
+    # Crop-agnostic: matches the crop-less block as well, once the farm has a crop.
+    assert by_id[tenant.tree_id]["blocks_matched"] == 2
+
+
+# ---------- D: what a pending change does, and what it forgets ---------------
+
+
+@pytest.mark.asyncio
+async def test_preview_names_the_trees_a_crop_change_starts_and_stops(
+    admin_session: AsyncSession,
+) -> None:
+    tenant = await _make_tenant(admin_session, "sel-prev")
+    mango_id = await _publish_tree(
+        tenant.tenant_id, f"sel_mango_{uuid4().hex[:8]}", crop_paths=("mango",)
+    )
+    potato_id = await _publish_tree(
+        tenant.tenant_id, f"sel_potato_{uuid4().hex[:8]}", crop_paths=("potato",)
+    )
+    farm_id, blocks = await _seed_farm(admin_session, tenant.schema_name, code="PRV", block_count=2)
+    await _assign_crop(admin_session, tenant.schema_name, blocks[0], "mango")
+    await _assign_crop(admin_session, tenant.schema_name, blocks[1], "mango")
+    await _set_enabled(tenant, farm_id=farm_id, tree_id=mango_id, enabled=False)
+
+    async def _preview(svc):  # type: ignore[no-untyped-def]
+        return await svc.preview_farm_tree_impact(
+            farm_id=farm_id,
+            tenant_id=tenant.tenant_id,
+            block_changes=[{"block_id": blocks[0], "crop_id": None, "crop_path": "potato"}],
+        )
+
+    impact = await _with_service(tenant, _preview)
+    # The shipped platform catalogue is visible to every tenant and has mango
+    # trees of its own; assert only on the trees this test authored.
+    mine = {mango_id, potato_id, tenant.tree_id}
+
+    block = impact["blocks"][0]
+    assert {t["tree_id"] for t in block["starting"]} & mine == {potato_id}
+    stopping = {t["tree_id"]: t for t in block["stopping"] if t["tree_id"] in mine}
+    assert set(stopping) == {mango_id}
+    # Still on the other mango block, so the farm keeps it and its "off".
+    assert stopping[mango_id]["other_blocks"] == 1
+    assert impact["exclusions_cleared"] == []
+    assert {t["tree_id"] for t in impact["farm_starting"]} & mine == {potato_id}
+    # Nothing was written.
+    assert await _exclusions(admin_session, tenant.schema_name, farm_id) == {mango_id}
+
+
+@pytest.mark.asyncio
+async def test_removing_the_last_matching_crop_forgets_the_farms_off_choice(
+    admin_session: AsyncSession,
+) -> None:
+    tenant = await _make_tenant(admin_session, "sel-recon")
+    mango_id = await _publish_tree(
+        tenant.tenant_id, f"sel_mango_{uuid4().hex[:8]}", crop_paths=("mango",)
+    )
+    farm_id, blocks = await _seed_farm(admin_session, tenant.schema_name, code="REC", block_count=2)
+    await _assign_crop(admin_session, tenant.schema_name, blocks[0], "mango")
+    await _assign_crop(admin_session, tenant.schema_name, blocks[1], "potato")
+    await _set_enabled(tenant, farm_id=farm_id, tree_id=mango_id, enabled=False)
+    await _set_enabled(tenant, farm_id=farm_id, tree_id=tenant.tree_id, enabled=False)
+
+    async def _preview(svc):  # type: ignore[no-untyped-def]
+        return await svc.preview_farm_tree_impact(
+            farm_id=farm_id,
+            tenant_id=tenant.tenant_id,
+            block_changes=[{"block_id": blocks[0], "crop_id": None, "crop_path": None}],
+        )
+
+    impact = await _with_service(tenant, _preview)
+    # Only this test's trees: the shipped catalogue has mango trees too.
+    mine = {mango_id, tenant.tree_id}
+    assert [t["tree_id"] for t in impact["exclusions_cleared"]] == [mango_id]
+    assert {t["tree_id"] for t in impact["farm_stopping"]} & mine == {mango_id}
+
+    await _end_crop(admin_session, tenant.schema_name, blocks[0])
+
+    async def _reconcile(svc):  # type: ignore[no-untyped-def]
+        return await svc.reconcile_farm_tree_exclusions(
+            farm_id=farm_id,
+            tenant_id=tenant.tenant_id,
+            actor_user_id=None,
+            tenant_schema=tenant.schema_name,
+        )
+
+    cleared = await _with_service(tenant, _reconcile)
+
+    assert [c["tree_id"] for c in cleared] == [mango_id]
+    # The crop-agnostic tree still matches the potato block: its "off" stays.
+    assert await _exclusions(admin_session, tenant.schema_name, farm_id) == {tenant.tree_id}
+
+    # Mango comes back: the tree is on again, like a tree the farm never saw.
+    await _assign_crop(admin_session, tenant.schema_name, blocks[0], "mango")
+    rows = {r["tree_id"]: r for r in (await _list_selection(tenant, farm_id))["trees"]}
+    assert rows[mango_id]["enabled"] is True
 
 
 # ---------- B: per-tenant sweep cadence -------------------------------------

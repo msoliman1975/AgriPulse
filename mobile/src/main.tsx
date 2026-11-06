@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "@/App";
+import { restoreSession } from "@/auth/session";
 import "./styles.css";
 
 // Marks the document when this is the Android app rather than a browser tab.
@@ -13,8 +14,12 @@ if (Capacitor.isNativePlatform()) {
   document.documentElement.classList.add("native");
 }
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+// Before the first render: `App` decides between sign-in and work from the
+// session, and the Keystore cannot answer synchronously.
+void restoreSession().finally(() => {
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+});

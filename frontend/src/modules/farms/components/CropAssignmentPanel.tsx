@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { assignBlockCrop, listBlockCrops } from "@/api/cropAssignments";
+import { useTreeImpactConfirm } from "@/modules/farms/treeImpact/useTreeImpactConfirm";
 import { resolveCropAttributes } from "@/api/crops";
 import { isApiError } from "@/api/errors";
 import { Button } from "@/components/Button";
@@ -137,6 +138,23 @@ export function CropAssignmentPanel({ blockId, farmId, onAssigned }: Props): Rea
       return path;
     });
   }, []);
+
+  // A crop decides which decision trees run on the block; say which ones
+  // this assignment starts and stops before it is saved.
+  const treeImpact = useTreeImpactConfirm();
+  const submit = async (): Promise<void> => {
+    const ok = await treeImpact.confirm(farmId, {
+      blocks: [
+        {
+          block_id: blockId,
+          crop_id: cropId as string,
+          crop_variety_id: varietyId,
+          crop_variety_strain_id: strainId,
+        },
+      ],
+    });
+    if (ok) assign.mutate();
+  };
 
   const assign = useMutation({
     mutationFn: () =>
@@ -414,8 +432,8 @@ export function CropAssignmentPanel({ blockId, farmId, onAssigned }: Props): Rea
             <div className="mt-3">
               <Button
                 size="sm"
-                disabled={!canSubmit || assign.isPending}
-                onClick={() => assign.mutate()}
+                disabled={!canSubmit || assign.isPending || treeImpact.checking}
+                onClick={() => void submit()}
               >
                 {assign.isPending ? t("assignment.assigning") : t("assignment.assign")}
               </Button>
@@ -423,6 +441,7 @@ export function CropAssignmentPanel({ blockId, farmId, onAssigned }: Props): Rea
           </div>
         </div>
       ) : null}
+      {treeImpact.dialog}
     </div>
   );
 }

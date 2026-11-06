@@ -14,14 +14,16 @@ import { FarmSwitcher } from "./FarmSwitcher";
 import { SettingsDrawer } from "./SettingsDrawer";
 import { TenantBadge } from "./TenantBadge";
 import { UserMenu } from "./UserMenu";
-import { BellIcon, UserIcon } from "./icons";
+import { BellIcon, MenuIcon, UserIcon } from "./icons";
 
 interface HeaderProps {
   /** Optional view-specific toolbar slot (Insights date-range, Plan zoom). */
   toolbar?: ReactNode;
+  /** Opens the side nav in a drawer. The rail itself is hidden below `md`. */
+  onOpenNav?: () => void;
 }
 
-export function Header({ toolbar }: HeaderProps = {}): ReactNode {
+export function Header({ toolbar, onOpenNav }: HeaderProps = {}): ReactNode {
   const { t } = useTranslation("common");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
@@ -71,6 +73,17 @@ export function Header({ toolbar }: HeaderProps = {}): ReactNode {
   return (
     <header className="border-b border-ap-line bg-ap-panel">
       <div className="flex w-full items-center gap-3 px-4 py-3">
+        {onOpenNav ? (
+          <button
+            type="button"
+            aria-label={t("shell.navMenu")}
+            title={t("shell.navMenu")}
+            onClick={onOpenNav}
+            className="rounded-md p-2 text-ap-muted hover:bg-ap-line/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ap-primary md:hidden"
+          >
+            <MenuIcon className="h-5 w-5" />
+          </button>
+        ) : null}
         <Link
           to="/"
           className="flex items-center gap-2 text-base font-semibold text-ap-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ap-primary"

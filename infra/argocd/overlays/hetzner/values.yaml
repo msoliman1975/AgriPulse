@@ -4064,9 +4064,26 @@ global:
       # 7395f79 = #793, api, workers and frontend. Investor API sends the
       #   block crop's stage name, stage start and expected end, and the
       #   farm's current season. No migration. Rollback: all three to 980e321.
-      tag: "7395f79"
+      # 317609c = #801 and #804, api, workers and frontend. A deleted scout can
+      #   be given access again. New PIN also signs their phone out and lifts a
+      #   lockout. POST /me/field-pin lets a scout change their own PIN.
+      #   Enrolments and PIN changes are audited; phones are out of the logs.
+      #   No migration. Watch: Give access on a scout in the Ready list shows a
+      #   PIN or a message, never nothing.
+      #   Rollback: api and workers to 7395f79, frontend to a8fe2aa.
+      # 6ee00bc = #806, api, workers and frontend. GET /farms/{id}/decision-
+      #   trees lists only trees matching at least one active block (crop,
+      #   country, soil), with blocks_matched, and none while no block has a
+      #   crop. New POST /farms/{id}/decision-tree-impact previews what a crop,
+      #   soil, country or block change starts and stops. Those writes now
+      #   clear the farm's exclusion for a tree that matches no block any more
+      #   (audited as recommendations.farm_tree_exclusion_cleared). No
+      #   migration. Watch: assigning a crop still saves when the preview
+      #   fails; farm settings shows "Assign a crop…" on a crop-less farm.
+      #   Rollback: all three to 317609c.
+      tag: "6ee00bc"
     workers:
-      tag: "7395f79"
+      tag: "6ee00bc"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4742,7 +4759,22 @@ global:
       # 2ad3420 = #788, frontend. See the api note. Rollback to a7d36e3.
       # 980e321 = #789, frontend. See the api note. Rollback to 2ad3420.
       # 7395f79 = #793, frontend. No web change; moves with the api.
-      tag: "7395f79"
+      # a8fe2aa = #798, frontend only. Platform admins lose the gear menu that
+      #   only led back to the tenant list, and small screens get a menu button
+      #   that opens the side nav. No migration. Rollback: 7395f79.
+      # 317609c = #801, frontend, see the api note. Failures on Field access
+      #   now show, New PIN asks first, and farm managers get the page. Also
+      #   carries #800, platform admins get their side menu back. No migration.
+      #   Rollback: a8fe2aa.
+      # 6ee00bc = #806, frontend, see the api note. Farm settings list only
+      #   matching trees with "X of Y blocks"; a crop, soil, country or block
+      #   change shows which trees it starts and stops before saving.
+      #   Rollback: 317609c.
+      # 64bd597 = #809, frontend only. The lab maps (map-legacy: crop assign,
+      #   block inactivate, soil and country edits; map-v2: block inactivate)
+      #   show the same decision-tree impact dialog before saving. No API
+      #   change, no migration. Rollback: 6ee00bc.
+      tag: "64bd597"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers

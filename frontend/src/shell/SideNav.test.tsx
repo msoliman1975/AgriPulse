@@ -55,6 +55,27 @@ describe("<SideNav> Admin section", () => {
   });
 });
 
+describe("<SideNav> drawer variant", () => {
+  it("shows the full platform menu even when the rail is collapsed", () => {
+    window.localStorage.setItem("ap.sidenav.collapsed", "1");
+    mockUseAuth.mockReturnValue({
+      user: { access_token: jwt({ platform_role: "PlatformAdmin" }) },
+    });
+    render(
+      <MemoryRouter initialEntries={["/platform/tenants"]}>
+        <SideNav variant="drawer" />
+      </MemoryRouter>,
+    );
+    const nav = screen.getByRole("navigation", { name: "Primary" });
+    expect(nav).not.toHaveClass("hidden");
+    expect(screen.getByText("admin,common:nav.tenants")).not.toHaveClass("sr-only");
+    expect(screen.getByText("admin,common:nav.roles").closest("a")).toHaveAttribute(
+      "href",
+      "/platform/roles",
+    );
+  });
+});
+
 describe("<SideNav> menu cutover", () => {
   it("offers Farm Management once, pointing at the v2 console", () => {
     mockUseAuth.mockReturnValue({

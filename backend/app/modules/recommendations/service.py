@@ -550,6 +550,16 @@ class _TraceBuffer:
         )
 
 
+class _Unset:
+    """Sentinel for "this field is not part of the change"."""
+
+    def __repr__(self) -> str:  # pragma: no cover - debug aid
+        return "UNSET"
+
+
+UNSET: Any = _Unset()
+
+
 class RecommendationsService(Protocol):
     """Public contract."""
 
@@ -1157,38 +1167,156 @@ class RecommendationsServiceImpl:
 
     # ---- Farm-level tree selection (tenant 0089) ----------------------
 
-    async def list_farm_tree_selection(
-        self, *, farm_id: UUID, tenant_id: UUID
-    ) -> tuple[dict[str, Any], ...]:
-        """Every tree this tenant can see, with whether the farm runs it.
+    async def list_farm_tree_selection(self, *, farm_id: UUID, tenant_id: UUID) -> dict[str, Any]:
+        """The trees that can reach this farm's blocks, with whether it runs them.
 
-        The list is the same catalog the sweep walks, so a farm manager sees
-        exactly the trees that can reach their blocks. ``enabled`` is False
-        only for a tree the farm turned off; targeting (crop, country, soil)
-        is not applied here, because a tree that no block currently matches
-        may match tomorrow when a crop is assigned.
+        Only a tree that matches at least one active block of the farm on all
+        three targeting axes (crop, country, soil) is listed — the same test
+        the sweep applies, block by block. Each row says how many blocks it
+        matches, because a tree turned on for the farm still only runs where
+        it matches.
+
+        A farm with no crop on any block lists nothing at all, not even the
+        trees that target every crop. ``has_crops`` tells the panel to ask for
+        a crop assignment first instead of reading as "no trees apply".
+
+        ``enabled`` is False only for a tree the farm turned off (tenant 0089).
         """
         if not await self._repo.farm_exists(farm_id=farm_id):
             raise FarmNotFoundError(farm_id)
         trees = await self._repo.list_active_trees_with_current_version(
             visible_to_tenant_id=tenant_id
         )
+        blocks = await self._repo.list_farm_block_targeting(farm_id=farm_id)
+        country_code = await self._repo.get_farm_country_code(farm_id=farm_id)
         excluded = await self._repo.list_farm_tree_exclusions(farm_id=farm_id)
-        return tuple(
-            {
-                "tree_id": tree["tree_id"],
-                "code": tree["tree_code"],
-                "name_en": tree["name_en"],
-                "name_ar": tree["name_ar"],
-                "scope": tree.get("scope") or "block",
-                "version": tree["version"],
-                # Where the tree came from. A tenant can turn off either kind.
-                "source": "tenant" if tree["tenant_id"] is not None else "platform",
-                "crop_paths": list(tree["crop_paths"] or []),
-                "enabled": tree["tree_id"] not in excluded,
-            }
-            for tree in trees
+        matches = farm_tree_matches(trees, blocks=blocks, country_code=country_code)
+        rows = []
+        for tree in trees:
+            matched = matches.get(tree["tree_id"], frozenset())
+            if not matched:
+                continue
+            rows.append(
+                {
+                    "tree_id": tree["tree_id"],
+                    "code": tree["tree_code"],
+                    "name_en": tree["name_en"],
+                    "name_ar": tree["name_ar"],
+                    "scope": tree.get("scope") or "block",
+                    "version": tree["version"],
+                    # Where the tree came from. A tenant can turn off either kind.
+                    "source": "tenant" if tree["tenant_id"] is not None else "platform",
+                    "crop_paths": list(tree["crop_paths"] or []),
+                    "country_codes": list(tree.get("country_codes") or []),
+                    "soil_textures": list(tree.get("soil_textures") or []),
+                    "blocks_matched": len(matched),
+                    "enabled": tree["tree_id"] not in excluded,
+                }
+            )
+        return {
+            "farm_id": farm_id,
+            "has_crops": farm_has_crops(blocks),
+            "blocks_total": len(blocks),
+            "trees": rows,
+        }
+
+    async def preview_farm_tree_impact(
+        self,
+        *,
+        farm_id: UUID,
+        tenant_id: UUID,
+        block_changes: Sequence[dict[str, Any]] = (),
+        country_code: Any = UNSET,
+    ) -> dict[str, Any]:
+        """What a pending change to the farm would do to the trees it runs.
+
+        ``block_changes`` describes the change as the blocks would look after
+        it. Each entry carries ``block_id`` and only the keys that change:
+        ``crop_path`` / ``crop_id`` (None = the crop is removed),
+        ``soil_texture``, or ``removed=True`` for a block being archived or
+        inactivated. ``country_code`` (anything but ``UNSET``) is the farm's
+        new country. Nothing is written.
+
+        The answer is computed twice with the same matcher the sweep uses —
+        once for the farm as it is and once as it would be — so the preview
+        cannot promise something the sweep will not do.
+        """
+        if not await self._repo.farm_exists(farm_id=farm_id):
+            raise FarmNotFoundError(farm_id)
+        trees = await self._repo.list_active_trees_with_current_version(
+            visible_to_tenant_id=tenant_id
         )
+        blocks_before = await self._repo.list_farm_block_targeting(farm_id=farm_id)
+        country_before = await self._repo.get_farm_country_code(farm_id=farm_id)
+        excluded = await self._repo.list_farm_tree_exclusions(farm_id=farm_id)
+        country_after = country_before if country_code is UNSET else country_code
+        blocks_after = apply_block_changes(blocks_before, block_changes)
+        return compute_farm_tree_impact(
+            farm_id=farm_id,
+            trees=trees,
+            blocks_before=blocks_before,
+            blocks_after=blocks_after,
+            country_before=country_before,
+            country_after=country_after,
+            excluded=excluded,
+            changed_block_ids=[UUID(str(c["block_id"])) for c in block_changes],
+        )
+
+    async def reconcile_farm_tree_exclusions(
+        self,
+        *,
+        farm_id: UUID,
+        tenant_id: UUID,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+    ) -> list[dict[str, Any]]:
+        """Forget the farm's "off" choice for every tree that no longer applies.
+
+        Called after a change that can move targeting — a crop assigned,
+        changed or ended, a soil texture edited, the farm's country edited, a
+        block archived or inactivated. A tree the farm turned off that now
+        matches none of its blocks loses its exclusion row, so when the crop
+        (or soil, or country) comes back the tree comes back on, the same as a
+        tree the farm never saw. The row only ever meant something for a tree
+        that applied to the farm.
+
+        Runs in the caller's transaction, so it sees the change it follows.
+        Returns the trees whose exclusion was cleared; each is audited.
+        """
+        excluded = await self._repo.list_farm_tree_exclusions(farm_id=farm_id)
+        if not excluded:
+            return []
+        trees = await self._repo.list_active_trees_with_current_version(
+            visible_to_tenant_id=tenant_id
+        )
+        blocks = await self._repo.list_farm_block_targeting(farm_id=farm_id)
+        country_code = await self._repo.get_farm_country_code(farm_id=farm_id)
+        matches = farm_tree_matches(trees, blocks=blocks, country_code=country_code)
+        cleared: list[dict[str, Any]] = []
+        for tree in trees:
+            tree_id = tree["tree_id"]
+            if tree_id not in excluded or matches.get(tree_id):
+                continue
+            if not await self._repo.remove_farm_tree_exclusion(farm_id=farm_id, tree_id=tree_id):
+                continue
+            await self._audit.record(
+                tenant_schema=tenant_schema,
+                event_type="recommendations.farm_tree_exclusion_cleared",
+                actor_user_id=actor_user_id,
+                actor_kind="system" if actor_user_id is None else "user",
+                subject_kind="decision_tree",
+                subject_id=tree_id,
+                farm_id=farm_id,
+                details={"tree_code": tree["tree_code"], "reason": "no_matching_block"},
+            )
+            cleared.append({"tree_id": tree_id, "code": tree["tree_code"]})
+        if cleared:
+            self._log.info(
+                "farm_tree_exclusions_cleared",
+                farm_id=str(farm_id),
+                trees=[c["code"] for c in cleared],
+            )
+        return cleared
 
     async def set_farm_tree_enabled(
         self,
@@ -3067,6 +3195,167 @@ _MATCHED = TargetingVerdict(matched=True)
 _FARM_DISABLED = TargetingVerdict(
     matched=False, axis="farm", required=("enabled",), actual="disabled"
 )
+
+
+def farm_has_crops(blocks: Sequence[dict[str, Any]]) -> bool:
+    """Whether any active block of the farm carries a crop."""
+    return any(b.get("crop_id") is not None or b.get("crop_path") for b in blocks)
+
+
+def farm_tree_matches(
+    trees: Sequence[dict[str, Any]],
+    *,
+    blocks: Sequence[dict[str, Any]],
+    country_code: str | None,
+) -> dict[UUID, frozenset[UUID]]:
+    """``{tree_id: block ids the tree targets}`` for one farm.
+
+    The per-block test is ``evaluate_targeting``, the one the sweep runs. A
+    farm with no crop on any block matches nothing: the farm tree selection
+    asks for a crop first, and the trees that target every crop wait for it
+    like the rest.
+    """
+    if not farm_has_crops(blocks):
+        return {}
+    out: dict[UUID, frozenset[UUID]] = {}
+    for tree in trees:
+        out[tree["tree_id"]] = frozenset(
+            b["block_id"]
+            for b in blocks
+            if evaluate_targeting(
+                tree,
+                crop_path=b.get("crop_path"),
+                crop_id=b.get("crop_id"),
+                country_code=country_code,
+                soil_texture=b.get("soil_texture"),
+            ).matched
+        )
+    return out
+
+
+def apply_block_changes(
+    blocks: Sequence[dict[str, Any]], changes: Sequence[dict[str, Any]]
+) -> tuple[dict[str, Any], ...]:
+    """The farm's blocks as they would be after ``changes``.
+
+    A change names a block by ``block_id`` and carries only the keys that
+    move. ``removed=True`` drops the block. A change naming a block that is
+    not in the list is ignored — the preview describes the farm, and a block
+    outside it has no say in which trees the farm runs.
+    """
+    by_id = {UUID(str(c["block_id"])): c for c in changes}
+    out: list[dict[str, Any]] = []
+    for block in blocks:
+        change = by_id.get(block["block_id"])
+        if change is None:
+            out.append(dict(block))
+            continue
+        if change.get("removed"):
+            continue
+        updated = dict(block)
+        if "crop_path" in change or "crop_id" in change:
+            updated["crop_path"] = change.get("crop_path") or None
+            updated["crop_id"] = change.get("crop_id")
+        if "soil_texture" in change:
+            updated["soil_texture"] = change.get("soil_texture")
+        out.append(updated)
+    return tuple(out)
+
+
+def _tree_ref(tree: dict[str, Any], **extra: Any) -> dict[str, Any]:
+    return {
+        "tree_id": tree["tree_id"],
+        "code": tree["tree_code"],
+        "name_en": tree["name_en"],
+        "name_ar": tree["name_ar"],
+        **extra,
+    }
+
+
+def compute_farm_tree_impact(
+    *,
+    farm_id: UUID,
+    trees: Sequence[dict[str, Any]],
+    blocks_before: Sequence[dict[str, Any]],
+    blocks_after: Sequence[dict[str, Any]],
+    country_before: str | None,
+    country_after: str | None,
+    excluded: frozenset[UUID],
+    changed_block_ids: Sequence[UUID],
+) -> dict[str, Any]:
+    """Before/after comparison behind ``preview_farm_tree_impact``.
+
+    Two views of the same difference:
+
+    * per changed block — which trees start and stop *on that block*, each
+      with how many other blocks of the farm it still runs on afterwards;
+    * per farm — which trees reach the farm for the first time, which leave
+      it entirely, and which of the leavers lose the farm's "off" choice.
+
+    A tree the farm turned off is still listed where it starts or stops, with
+    ``enabled=False``, so the dialog can say it will not actually run.
+    """
+    before = farm_tree_matches(trees, blocks=blocks_before, country_code=country_before)
+    after = farm_tree_matches(trees, blocks=blocks_after, country_code=country_after)
+    labels = {b["block_id"]: (b.get("label"), b.get("label_ar")) for b in blocks_before}
+
+    per_block: list[dict[str, Any]] = []
+    for block_id in changed_block_ids:
+        starting: list[dict[str, Any]] = []
+        stopping: list[dict[str, Any]] = []
+        for tree in trees:
+            tid = tree["tree_id"]
+            was = block_id in before.get(tid, frozenset())
+            now = block_id in after.get(tid, frozenset())
+            if was == now:
+                continue
+            others = len(after.get(tid, frozenset()) - {block_id})
+            ref = _tree_ref(tree, other_blocks=others, enabled=tid not in excluded)
+            (starting if now else stopping).append(ref)
+        label, label_ar = labels.get(block_id, (None, None))
+        per_block.append(
+            {
+                "block_id": block_id,
+                "label": label,
+                "label_ar": label_ar,
+                "starting": starting,
+                "stopping": stopping,
+            }
+        )
+
+    farm_starting: list[dict[str, Any]] = []
+    farm_stopping: list[dict[str, Any]] = []
+    for tree in trees:
+        tid = tree["tree_id"]
+        had = bool(before.get(tid))
+        has = bool(after.get(tid))
+        if had == has:
+            continue
+        if has:
+            farm_starting.append(
+                _tree_ref(tree, blocks=len(after[tid]), enabled=tid not in excluded)
+            )
+        else:
+            farm_stopping.append(_tree_ref(tree, blocks=0, enabled=tid not in excluded))
+    # Exactly the rows ``reconcile_farm_tree_exclusions`` will delete once the
+    # change is saved: every "off" choice for a tree that then matches nothing.
+    exclusions_cleared = [
+        _tree_ref(tree)
+        for tree in trees
+        if tree["tree_id"] in excluded and not after.get(tree["tree_id"])
+    ]
+    return {
+        "farm_id": farm_id,
+        "has_crops_before": farm_has_crops(blocks_before),
+        "has_crops_after": farm_has_crops(blocks_after),
+        "blocks": per_block,
+        "farm_starting": farm_starting,
+        "farm_stopping": farm_stopping,
+        "exclusions_cleared": exclusions_cleared,
+        "changes_anything": bool(
+            farm_starting or farm_stopping or any(b["starting"] or b["stopping"] for b in per_block)
+        ),
+    }
 
 
 def evaluate_targeting(

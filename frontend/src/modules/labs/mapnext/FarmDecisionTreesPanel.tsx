@@ -1,7 +1,11 @@
 // Which decision trees this farm runs.
 //
-// Every tree the tenant can see is listed and every one is on until somebody
-// turns it off. That is an opt-out and not a saved selection on purpose: a
+// Only trees that match at least one of the farm's active blocks (crop,
+// country, soil — the sweep's own test) are listed, each with how many blocks
+// it matches. Until a block carries a crop nothing is listed, and the panel
+// asks for a crop assignment instead.
+//
+// Every listed tree is on until somebody turns it off. That is an opt-out and not a saved selection on purpose: a
 // tree published after this screen was last opened still reaches the farm,
 // where a saved allow-list would leave it out and report nothing.
 //
@@ -33,6 +37,8 @@ const rowCls = "flex flex-wrap items-center gap-2 rounded-lg border border-ap-li
 export function FarmDecisionTreesPanel({ farmId }: Props): ReactNode {
   const { t, i18n } = useTranslation("farmConsole");
   const [trees, setTrees] = useState<FarmDecisionTree[] | null>(null);
+  const [hasCrops, setHasCrops] = useState(true);
+  const [blocksTotal, setBlocksTotal] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [busyTreeId, setBusyTreeId] = useState<string | null>(null);
@@ -41,6 +47,8 @@ export function FarmDecisionTreesPanel({ farmId }: Props): ReactNode {
     setLoadError(null);
     try {
       const bag = await listFarmDecisionTrees(farmId);
+      setHasCrops(bag.has_crops);
+      setBlocksTotal(bag.blocks_total);
       setTrees(bag.trees);
     } catch (err) {
       // A tenant whose user cannot manage this farm gets a 403 here. Show the
@@ -90,6 +98,10 @@ export function FarmDecisionTreesPanel({ farmId }: Props): ReactNode {
         <p className="text-xs text-ap-muted">{t("farmTrees.loading")}</p>
       ) : loadError !== null ? (
         <p className="text-xs text-ap-crit">{loadError}</p>
+      ) : !hasCrops ? (
+        <p className="rounded-lg bg-ap-warn-soft px-3 py-2 text-xs text-ap-ink" role="status">
+          {t("farmTrees.noCrops")}
+        </p>
       ) : trees.length === 0 ? (
         <p className="text-xs text-ap-muted">{t("farmTrees.empty")}</p>
       ) : (
@@ -114,6 +126,12 @@ export function FarmDecisionTreesPanel({ farmId }: Props): ReactNode {
                     {localizedName(i18n.language, tree.name_en, tree.name_ar)}
                   </span>
                 </label>
+                <span className="text-[11px] text-ap-muted">
+                  {t("farmTrees.blocksMatched", {
+                    count: tree.blocks_matched,
+                    total: blocksTotal,
+                  })}
+                </span>
                 <span className="rounded-md border border-ap-line px-1.5 py-0.5 text-[11px] text-ap-muted">
                   {t(`farmTrees.source.${tree.source}`)}
                 </span>

@@ -21,11 +21,16 @@ from __future__ import annotations
 
 import re
 import secrets
+from itertools import pairwise
 
 # A domain we control, with **no MX record**, so a stray send cannot leave the
 # building. Deliberately not `.local`: Keycloak 26 strips `.local` addresses on
 # user-profile write, which would silently blank the field we just set.
 SYNTHETIC_EMAIL_DOMAIN = "scouts.agripulse.cloud"
+
+# The public client the Scout app signs in through. The api uses it too, to
+# check a PIN the same way the app would, so wrong guesses count for the lockout.
+MOBILE_CLIENT_ID = "agripulse-mobile"
 
 # Egypt. Kept explicit rather than guessed from a locale: a wrong country code
 # produces a plausible-looking number that belongs to somebody else.
@@ -108,6 +113,21 @@ def is_synthetic_email(email: str | None) -> bool:
     return email.strip().lower().endswith(f"@{SYNTHETIC_EMAIL_DOMAIN}")
 
 
+def phone_from_synthetic_email(email: str) -> str:
+    """The Keycloak username behind a minted address."""
+    return f"+{email.split('@', 1)[0]}"
+
+
+def is_guessable_pin(pin: str) -> bool:
+    """One digit repeated, or a straight run up or down.
+
+    These are the first things anyone tries, and a person choosing their own
+    PIN reaches for them. Six digits has no margin to give away.
+    """
+    steps = {int(b) - int(a) for a, b in pairwise(pin)}
+    return steps in ({0}, {1}, {-1})
+
+
 def generate_pin(length: int = 6) -> str:
     """A numeric PIN a scout can be told out loud and can type with gloves on.
 
@@ -119,4 +139,7 @@ def generate_pin(length: int = 6) -> str:
     """
     if length < 4:
         raise ValueError("a PIN shorter than 4 digits is not a credential")
-    return "".join(secrets.choice("0123456789") for _ in range(length))
+    while True:
+        pin = "".join(secrets.choice("0123456789") for _ in range(length))
+        if not is_guessable_pin(pin):
+            return pin

@@ -2560,6 +2560,52 @@ class RecommendationsRepository:
         ).all()
         return tuple(r.id for r in rows)
 
+    async def list_farm_block_targeting(self, *, farm_id: UUID) -> tuple[dict[str, Any], ...]:
+        """Every active block of one farm, with the values tree targeting reads.
+
+        One row per block: its current crop (path and id, both None when the
+        block carries no crop) and its soil texture. "Active" is the same
+        window ``list_active_block_ids`` uses, so the farm tree selection and
+        the sweep agree on which blocks exist.
+
+        The farm's country is not repeated here; ``get_farm_country_code``
+        reads it once.
+        """
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        """
+                        SELECT b.id AS block_id,
+                               COALESCE(NULLIF(b.name, ''), b.code) AS label,
+                               NULLIF(b.name_ar, '') AS label_ar,
+                               b.soil_texture,
+                               bc.crop_id,
+                               NULLIF(bc.crop_path, '') AS crop_path
+                          FROM blocks b
+                          LEFT JOIN LATERAL (
+                                SELECT c.crop_id, c.crop_path
+                                  FROM block_crops c
+                                 WHERE c.block_id = b.id
+                                   AND c.is_current = TRUE
+                                   AND c.deleted_at IS NULL
+                                 LIMIT 1
+                          ) bc ON TRUE
+                         WHERE b.farm_id = :farm_id
+                           AND b.deleted_at IS NULL
+                           AND b.active_from <= (public.app_now())::date
+                           AND (b.active_to IS NULL OR b.active_to > (public.app_now())::date)
+                         ORDER BY b.code
+                        """
+                    ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                    {"farm_id": farm_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return tuple(dict(r) for r in rows)
+
     async def get_block_labels(
         self, *, block_ids: tuple[UUID, ...]
     ) -> dict[UUID, tuple[str, str | None]]:

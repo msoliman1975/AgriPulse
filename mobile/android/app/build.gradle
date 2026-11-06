@@ -1,6 +1,5 @@
 apply plugin: 'com.android.application'
 
-import groovy.json.JsonSlurper
 
 // ---------------------------------------------------------------------------
 // Release signing.
@@ -37,10 +36,11 @@ def hasReleaseSigning = releaseStoreFile && releaseStorePassword && releaseKeyAl
 // because cloud and CI checkouts are shallow, where the count is the clone
 // depth and would go DOWN. Minutes stay below Android's 2,100,000,000 ceiling
 // for ~4,000 years. Override with -PscoutVersionCode=N to rebuild a given code.
+// It was a hand-bumped 2 before this; any computed value is far above that, so
+// phones on the 1.1 build still upgrade.
 def scoutVersionCode = project.hasProperty('scoutVersionCode')
         ? project.property('scoutVersionCode').toString().toInteger()
         : (int) ((System.currentTimeMillis() - Date.parse('yyyy-MM-dd HH:mm z', '2025-01-01 00:00 UTC').time) / 60000L)
-def scoutVersionName = new JsonSlurper().parse(rootProject.file('../package.json')).version
 
 android {
     namespace = "cloud.agripulse.scout"
@@ -50,7 +50,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode scoutVersionCode
-        versionName scoutVersionName
+        versionName "1.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

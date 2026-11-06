@@ -29,13 +29,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import APIError
 from app.core.logging import get_logger
+from app.modules.audit import AuditService, get_audit_service
 from app.shared.keycloak.client import KeycloakAdminClient, get_keycloak_client
-from app.shared.keycloak.errors import KeycloakRequestError
+from app.shared.keycloak.errors import KeycloakError, KeycloakRequestError
 from app.shared.keycloak.field_identity import (
     InvalidPhoneNumberError,
     generate_pin,
+    is_guessable_pin,
     is_synthetic_email,
     normalise_phone,
+    phone_from_synthetic_email,
     synthetic_email,
 )
 
@@ -75,6 +78,15 @@ class EnrolmentResult:
     phone: str
     # Shown once, then gone. Not persisted, not logged, not returned again.
     pin: str
+
+
+@dataclass(frozen=True)
+class PinReissue:
+    # Shown once, then gone, like the enrolment PIN.
+    pin: str
+    # False when the PIN changed but a phone may still be signed in. The
+    # operator has to hear that: a new PIN is often issued for a lost phone.
+    sessions_ended: bool
 
 
 class PhoneAlreadyEnrolledError(APIError):
@@ -128,6 +140,28 @@ class InvalidEnrolmentError(APIError):
         )
 
 
+class WrongPinError(APIError):
+    """Also what a locked account gets: saying so would confirm a guess."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=403,
+            title="Current PIN is not right",
+            detail="That is not your current PIN.",
+            type_="https://agripulse.cloud/problems/wrong-pin",
+        )
+
+
+class WeakPinError(APIError):
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=422,
+            title="PIN too easy to guess",
+            detail="Choose a PIN that is not a repeated digit, a run, or your current PIN.",
+            type_="https://agripulse.cloud/problems/weak-pin",
+        )
+
+
 class FieldEnrolmentService:
     def __init__(
         self,
@@ -135,16 +169,19 @@ class FieldEnrolmentService:
         public_session: AsyncSession,
         tenant_session: AsyncSession,
         keycloak: KeycloakAdminClient | None = None,
+        audit: AuditService | None = None,
     ) -> None:
         self._public = public_session
         self._tenant = tenant_session
         self._kc = keycloak or get_keycloak_client()
+        self._audit = audit or get_audit_service()
 
     async def enrol(
         self,
         *,
         tenant_id: UUID,
         tenant_slug: str,
+        tenant_schema: str,
         farm_id: UUID,
         phone: str,
         full_name: str,
@@ -182,12 +219,14 @@ class FieldEnrolmentService:
             #
             # Archived memberships do not count: a scout who left one farm
             # business can be taken on by another, and that is the case this
-            # `deleted_at IS NULL` keeps open.
+            # `deleted_at IS NULL` keeps open. A suspended one does count. It
+            # is still live, and getting past here would create a Keycloak
+            # account before the insert below refused the membership.
             membership = (
                 await self._public.execute(
                     text(
-                        "SELECT tenant_id FROM public.tenant_memberships "
-                        "WHERE user_id = :uid AND status = 'active' "
+                        "SELECT tenant_id, status FROM public.tenant_memberships "
+                        "WHERE user_id = :uid "
                         "  AND deleted_at IS NULL "
                         "ORDER BY (tenant_id = :tid) DESC "
                         "LIMIT 1"
@@ -200,6 +239,10 @@ class FieldEnrolmentService:
             ).first()
             if membership is not None:
                 if membership.tenant_id == tenant_id:
+                    if membership.status != "active":
+                        raise InvalidEnrolmentError(
+                            "this person is suspended; reactivate them on the Team screen"
+                        )
                     raise PhoneAlreadyEnrolledError(phone_e164)
                 raise PhoneBelongsToAnotherTenantError(phone_e164)
 
@@ -217,7 +260,7 @@ class FieldEnrolmentService:
                 tenant_id=tenant_id,
             )
         except KeycloakRequestError as exc:
-            _log.exception("field_enrolment_keycloak_failed", phone=phone_e164)
+            _log.exception("field_enrolment_keycloak_failed", farm_id=str(farm_id))
             raise APIError(
                 status_code=502,
                 title="Identity provider unavailable",
@@ -252,29 +295,65 @@ class FieldEnrolmentService:
                     "actor": actor_user_id,
                 },
             )
-
-        membership_id = uuid4()
-        try:
+        else:
+            # Somebody coming back. `delete_user` archives this row and deletes
+            # their Keycloak account, so without this they would hold a
+            # membership on a deleted user, pointing at an account that no
+            # longer exists. Local id kept, so their history stays theirs.
             await self._public.execute(
                 text(
                     """
-                    INSERT INTO public.tenant_memberships
-                        (id, tenant_id, user_id, status, invited_by, joined_at,
-                         created_by, updated_by)
-                    VALUES (:id, :tid, :uid, 'active',
-                            (SELECT id FROM public.users WHERE id = :actor),
-                            public.app_now(), :actor, :actor)
+                    UPDATE public.users
+                       SET deleted_at = NULL,
+                           status = 'active',
+                           keycloak_subject = :kc,
+                           full_name = :name,
+                           full_name_ar = COALESCE(:name_ar, full_name_ar),
+                           phone = :phone,
+                           updated_by = :actor,
+                           updated_at = public.app_now()
+                     WHERE id = :id
                     """
                 ).bindparams(
                     bindparam("id", type_=PG_UUID(as_uuid=True)),
-                    bindparam("tid", type_=PG_UUID(as_uuid=True)),
-                    bindparam("uid", type_=PG_UUID(as_uuid=True)),
                     bindparam("actor", type_=PG_UUID(as_uuid=True)),
                 ),
-                {"id": membership_id, "tid": tenant_id, "uid": user_id, "actor": actor_user_id},
+                {
+                    "id": user_id,
+                    "kc": kc_subject,
+                    "name": full_name,
+                    "name_ar": full_name_ar,
+                    "phone": phone_e164,
+                    "actor": actor_user_id,
+                },
             )
-        except IntegrityError as exc:
-            raise PhoneAlreadyEnrolledError(phone_e164) from exc
+
+        restored = await self._restore_membership(
+            tenant_id=tenant_id, user_id=user_id, actor_user_id=actor_user_id
+        )
+        membership_id = restored or uuid4()
+        if restored is None:
+            try:
+                await self._public.execute(
+                    text(
+                        """
+                        INSERT INTO public.tenant_memberships
+                            (id, tenant_id, user_id, status, invited_by, joined_at,
+                             created_by, updated_by)
+                        VALUES (:id, :tid, :uid, 'active',
+                                (SELECT id FROM public.users WHERE id = :actor),
+                                public.app_now(), :actor, :actor)
+                        """
+                    ).bindparams(
+                        bindparam("id", type_=PG_UUID(as_uuid=True)),
+                        bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                        bindparam("uid", type_=PG_UUID(as_uuid=True)),
+                        bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                    ),
+                    {"id": membership_id, "tid": tenant_id, "uid": user_id, "actor": actor_user_id},
+                )
+            except IntegrityError as exc:
+                raise PhoneAlreadyEnrolledError(phone_e164) from exc
 
         # No tenant role: a scout is farm-scoped only. That combination works
         # since PR #269/#270 and is what keeps them out of tenant-wide screens.
@@ -332,6 +411,17 @@ class FieldEnrolmentService:
             role=role,
             worker_id=str(linked_worker) if linked_worker else None,
         )
+        # Handing out a credential is the act an auditor will ask about. No
+        # phone here: the user id finds the person, and details are kept.
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="iam.field_worker_enrolled",
+            actor_user_id=actor_user_id,
+            subject_kind="user",
+            subject_id=user_id,
+            farm_id=farm_id,
+            details={"role": role, "returning": restored is not None},
+        )
         return EnrolmentResult(
             user_id=user_id,
             membership_id=membership_id,
@@ -339,6 +429,56 @@ class FieldEnrolmentService:
             phone=phone_e164,
             pin=pin,
         )
+
+    async def _restore_membership(
+        self, *, tenant_id: UUID, user_id: UUID, actor_user_id: UUID | None
+    ) -> UUID | None:
+        """Bring back this person's archived membership here, if they have one.
+
+        Deleting a person keeps the membership row, and
+        ``uq_tenant_memberships_user_tenant`` covers archived rows too. An
+        insert therefore always fails for somebody coming back to a tenant
+        they left, which used to leave them stuck: enrolling answered "already
+        enrolled" and reissuing answered "no active member".
+
+        Coming back starts clean. Deletions from before grants were revoked
+        left rows active on the archived membership, and restoring it must not
+        quietly hand back whatever they used to hold. The caller grants the
+        one farm being enrolled.
+        """
+        row = (
+            await self._public.execute(
+                text(
+                    """
+                    UPDATE public.tenant_memberships
+                       SET status = 'active',
+                           deleted_at = NULL,
+                           joined_at = public.app_now(),
+                           updated_by = :actor,
+                           updated_at = public.app_now()
+                     WHERE user_id = :uid AND tenant_id = :tid
+                       AND deleted_at IS NOT NULL
+                    RETURNING id
+                    """
+                ).bindparams(
+                    bindparam("uid", type_=PG_UUID(as_uuid=True)),
+                    bindparam("tid", type_=PG_UUID(as_uuid=True)),
+                    bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                ),
+                {"uid": user_id, "tid": tenant_id, "actor": actor_user_id},
+            )
+        ).first()
+        if row is None:
+            return None
+        for table in ("public.tenant_role_assignments", "public.farm_scopes"):
+            await self._public.execute(
+                text(
+                    f"UPDATE {table} SET revoked_at = public.app_now() "  # noqa: S608
+                    "WHERE membership_id = :mid AND revoked_at IS NULL"
+                ).bindparams(bindparam("mid", type_=PG_UUID(as_uuid=True))),
+                {"mid": row.id},
+            )
+        return UUID(str(row.id))
 
     async def audit_workers(self, *, farm_id: UUID | None = None) -> dict[str, Any]:
         """Who on this farm can actually be given the app, and who cannot.
@@ -512,9 +652,15 @@ class FieldEnrolmentService:
         return int(getattr(result, "rowcount", 0) or 0)
 
     async def reissue_pin(
-        self, *, tenant_id: UUID, user_id: UUID, farm_id: UUID | None = None
-    ) -> str:
-        """Mint a fresh PIN for a field worker who forgot theirs.
+        self,
+        *,
+        tenant_id: UUID,
+        tenant_schema: str,
+        user_id: UUID,
+        actor_user_id: UUID | None,
+        farm_id: UUID | None = None,
+    ) -> PinReissue:
+        """Mint a fresh PIN for a field worker who forgot theirs or lost a phone.
 
         A PIN cannot be looked up — Keycloak stores only its hash — so recovery
         is replacement. Restricted to synthetic-email users: this must never
@@ -525,6 +671,13 @@ class FieldEnrolmentService:
         When it is set the target must hold an active scope on that farm, or a
         farm manager could reset the PIN of any scout in the tenant simply by
         naming their own farm.
+
+        Changing the PIN alone is not enough, and both gaps were measured on a
+        real Keycloak. A phone already signed in keeps working on its offline
+        token, so a stolen one stayed in. And a lockout outlives the change,
+        so the new PIN was refused as "wrong phone or PIN" to the scout it had
+        just been read out to. So this also ends their sessions and clears the
+        lockout.
         """
         row = (
             await self._public.execute(
@@ -534,6 +687,7 @@ class FieldEnrolmentService:
                       FROM public.users u
                       JOIN public.tenant_memberships m ON m.user_id = u.id
                      WHERE u.id = :uid AND m.tenant_id = :tid AND m.status = 'active'
+                       AND m.deleted_at IS NULL AND u.deleted_at IS NULL
                     """
                 ).bindparams(
                     bindparam("uid", type_=PG_UUID(as_uuid=True)),
@@ -580,8 +734,85 @@ class FieldEnrolmentService:
                 detail="Could not set a new PIN. The old one still works.",
                 type_="https://agripulse.cloud/problems/keycloak-unavailable",
             ) from exc
-        _log.info("field_pin_reissued", user_id=str(user_id))
-        return pin
+        sessions_ended = await self._release_sign_in(keycloak_user_id=row.keycloak_subject)
+        _log.info("field_pin_reissued", user_id=str(user_id), sessions_ended=sessions_ended)
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="iam.field_pin_reissued",
+            actor_user_id=actor_user_id,
+            subject_kind="user",
+            subject_id=user_id,
+            farm_id=farm_id,
+            details={"sessions_ended": sessions_ended},
+        )
+        return PinReissue(pin=pin, sessions_ended=sessions_ended)
+
+    async def change_own_pin(
+        self, *, tenant_schema: str, user_id: UUID, current_pin: str, new_pin: str
+    ) -> None:
+        """A field worker replaces the PIN somebody read out to them.
+
+        Until they do, the supervisor who read it knows it, so the actions
+        recorded under that login are only as good as that person's memory.
+
+        Ends every session afterwards, this phone's included. The app signs
+        straight back in with the new PIN, so only other phones notice.
+        """
+        row = (
+            await self._public.execute(
+                text(
+                    "SELECT email, keycloak_subject FROM public.users "
+                    "WHERE id = :uid AND deleted_at IS NULL"
+                ).bindparams(bindparam("uid", type_=PG_UUID(as_uuid=True))),
+                {"uid": user_id},
+            )
+        ).first()
+        if row is None or not is_synthetic_email(row.email):
+            raise InvalidEnrolmentError(
+                "that account signs in with an email address; use the password-reset flow"
+            )
+        if new_pin == current_pin or is_guessable_pin(new_pin):
+            raise WeakPinError
+
+        try:
+            verified = await self._kc.verify_field_pin(
+                username=phone_from_synthetic_email(row.email), pin=current_pin
+            )
+            if not verified:
+                raise WrongPinError
+            await self._kc.set_field_pin(keycloak_user_id=row.keycloak_subject, pin=new_pin)
+        except KeycloakRequestError as exc:
+            raise APIError(
+                status_code=502,
+                title="Identity provider unavailable",
+                detail="Could not change the PIN. The old one still works.",
+                type_="https://agripulse.cloud/problems/keycloak-unavailable",
+            ) from exc
+
+        sessions_ended = await self._release_sign_in(keycloak_user_id=row.keycloak_subject)
+        _log.info("field_pin_changed", user_id=str(user_id), sessions_ended=sessions_ended)
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="iam.field_pin_changed",
+            actor_user_id=user_id,
+            subject_kind="user",
+            subject_id=user_id,
+            details={"sessions_ended": sessions_ended},
+        )
+
+    async def _release_sign_in(self, *, keycloak_user_id: str) -> bool:
+        """Clear the lockout and end every session. True when both worked.
+
+        Failure here does not fail the request. The PIN has already changed,
+        so reporting an error would lose the only copy of it.
+        """
+        try:
+            await self._kc.clear_login_failures(keycloak_user_id=keycloak_user_id)
+            await self._kc.logout_user(keycloak_user_id=keycloak_user_id)
+        except KeycloakError:
+            _log.exception("field_pin_release_failed", keycloak_user_id=keycloak_user_id)
+            return False
+        return True
 
     async def grant_farm_access(
         self,
@@ -761,6 +992,21 @@ class FieldEnrolmentService:
         farm at all: they would sign in, hold a farm scope, and still be
         invisible to every board.
         """
+        if worker_id is None:
+            # A returning person keeps their restored membership, and the
+            # worker row still points at it. A second row would be a twin.
+            current = (
+                await self._tenant.execute(
+                    text(
+                        "SELECT id FROM resources WHERE membership_id = :mid "
+                        "AND kind = 'worker' AND archived_at IS NULL LIMIT 1"
+                    ).bindparams(bindparam("mid", type_=PG_UUID(as_uuid=True))),
+                    {"mid": membership_id},
+                )
+            ).first()
+            if current is not None:
+                await self._link_worker_to_farm(worker_id=current.id, farm_id=farm_id)
+                return UUID(str(current.id))
         if worker_id is not None:
             # The farm check this had been missing. The error text always said
             # "on this farm" while the query never looked, so enrolling onto
@@ -845,6 +1091,9 @@ __all__ = [
     "FieldEnrolmentService",
     "InvalidEnrolmentError",
     "PhoneAlreadyEnrolledError",
+    "PinReissue",
+    "WeakPinError",
+    "WrongPinError",
     "PhoneBelongsToAnotherTenantError",
     "get_field_enrolment_service",
 ]

@@ -3,16 +3,18 @@ import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 
 import { listFarms, type Farm } from "@/api/farms";
+import { isApiError } from "@/api/errors";
 import type { EnrolmentResult, WorkerBrief } from "@/api/fieldAccess";
 import { AsyncBoundary } from "@/components/AsyncBoundary";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
 import { PageHeader } from "@/components/PageHeader";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { Toolbar } from "@/components/Toolbar";
 import { queryState } from "@/components/asyncState";
-import { useCapability } from "@/rbac/useCapability";
+import { useCapabilityOnFarm } from "@/rbac/useCapability";
 import {
   useEnrolFieldWorker,
   useFieldEnrolmentAudit,
@@ -32,11 +34,30 @@ import {
  *
  * Everything is farm-scoped. `user.field_enrol` resolves against the farm in
  * each request, so the manager standing with the crew can do this without
- * tenant-wide user administration.
+ * tenant-wide user administration. The buttons have to ask about the same
+ * farm, or that manager is shown a page with nothing to press.
  */
+
+/** A PIN waiting to be read out. `sessionsEnded` is set only by a reissue. */
+interface Issued {
+  name: string;
+  result: EnrolmentResult;
+  sessionsEnded?: boolean;
+}
+
+/** Problem types with a message of their own, keyed to `errors.*`. */
+const ERROR_KEYS: Record<string, string> = {
+  "phone-already-enrolled": "errors.alreadyEnrolled",
+  "phone-in-another-tenant": "errors.otherTenant",
+  "keycloak-unavailable": "errors.identityDown",
+};
+
+/** Hands a failed action up to the one error slot at the top of the page. */
+type ReportError = (error: unknown) => void;
+
 export function FieldAccessPage(): ReactNode {
   const { t } = useTranslation("fieldAccess");
-  const canEnrol = useCapability("user.field_enrol");
+  const canEnrolOn = useCapabilityOnFarm("user.field_enrol");
 
   const farmsQ = useQuery({
     queryKey: ["farms", "list-tenant"],
@@ -45,16 +66,20 @@ export function FieldAccessPage(): ReactNode {
   });
 
   const [farmId, setFarmId] = useState<string | null>(null);
-  const effectiveFarmId = useMemo(
-    () => farmId ?? farmsQ.data?.items[0]?.id ?? null,
-    [farmId, farmsQ.data],
+  // Only the farms this person can act on. The list is tenant-wide, and the
+  // audit answers 403 for anything else, so opening on the first farm would
+  // greet a farm manager with an error.
+  const allFarms = useMemo(
+    () => (farmsQ.data?.items ?? []).filter((f) => canEnrolOn(f.id)),
+    [farmsQ.data, canEnrolOn],
   );
+  const effectiveFarmId = useMemo(() => farmId ?? allFarms[0]?.id ?? null, [farmId, allFarms]);
+  const canEnrol = effectiveFarmId !== null && canEnrolOn(effectiveFarmId);
 
   const auditQ = useFieldEnrolmentAudit(effectiveFarmId);
 
   // Adding somebody to the farm they are already on is a no-op the API would
   // happily accept, so it is not offered.
-  const allFarms = useMemo(() => farmsQ.data?.items ?? [], [farmsQ.data]);
   const otherFarms = useMemo(
     () => allFarms.filter((f) => f.id !== effectiveFarmId),
     [allFarms, effectiveFarmId],
@@ -66,7 +91,21 @@ export function FieldAccessPage(): ReactNode {
 
   // The PIN is returned once, by design — nothing stores it and nothing can
   // look it up again. Held here only until the operator dismisses it.
-  const [issued, setIssued] = useState<{ name: string; result: EnrolmentResult } | null>(null);
+  const [issued, setIssued] = useState<Issued | null>(null);
+
+  // Every action below reports here. They used to fail in silence: the button
+  // stopped spinning and nothing else happened, which reads as a dead button.
+  const [failure, setFailure] = useState<string | null>(null);
+  const reportError: ReportError = (error) => {
+    const slug = isApiError(error) ? (error.problem.type ?? "").split("/").pop() : undefined;
+    const key = slug ? ERROR_KEYS[slug] : undefined;
+    const detail = isApiError(error) ? error.problem.detail : undefined;
+    setFailure(key ? t(key) : (detail ?? t("errors.generic")));
+  };
+  const showIssued = (value: Issued): void => {
+    setFailure(null);
+    setIssued(value);
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -79,10 +118,13 @@ export function FieldAccessPage(): ReactNode {
             <select
               className="rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-sm text-ap-ink"
               value={effectiveFarmId ?? ""}
-              onChange={(e) => setFarmId(e.target.value || null)}
+              onChange={(e) => {
+                setFarmId(e.target.value || null);
+                setFailure(null);
+              }}
             >
               <option value="">{t("noFarm")}</option>
-              {(farmsQ.data?.items ?? []).map((f) => (
+              {allFarms.map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.name}
                 </option>
@@ -92,11 +134,23 @@ export function FieldAccessPage(): ReactNode {
         }
       />
 
+      {failure ? (
+        <ErrorState
+          message={failure}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => setFailure(null)}>
+              {t("errors.dismiss")}
+            </Button>
+          }
+        />
+      ) : null}
+
       {issued ? (
         <PinCallout
           name={issued.name}
           phone={issued.result.phone}
           pin={issued.result.pin}
+          sessionsEnded={issued.sessionsEnded ?? true}
           onDismiss={() => setIssued(null)}
         />
       ) : null}
@@ -116,12 +170,14 @@ export function FieldAccessPage(): ReactNode {
                 rows={audit.ready_to_enrol}
                 farmId={effectiveFarmId}
                 canEnrol={canEnrol}
-                onIssued={setIssued}
+                onIssued={showIssued}
+                onError={reportError}
               />
               <BlockedByRole
                 rows={audit.blocked_by_role}
                 farmId={effectiveFarmId}
                 canEnrol={canEnrol}
+                onError={reportError}
               />
               <MissingPhone rows={audit.missing_phone} />
               <ScopeMismatch
@@ -129,13 +185,15 @@ export function FieldAccessPage(): ReactNode {
                 farmId={effectiveFarmId}
                 farmName={currentFarmName}
                 canEnrol={canEnrol}
+                onError={reportError}
               />
               <Enrolled
                 rows={audit.enrolled}
                 farmId={effectiveFarmId}
                 otherFarms={otherFarms}
                 canEnrol={canEnrol}
-                onIssued={setIssued}
+                onIssued={showIssued}
+                onError={reportError}
               />
             </div>
           )}
@@ -155,11 +213,13 @@ function PinCallout({
   name,
   phone,
   pin,
+  sessionsEnded,
   onDismiss,
 }: {
   name: string;
   phone: string;
   pin: string;
+  sessionsEnded: boolean;
   onDismiss: () => void;
 }): ReactNode {
   const { t } = useTranslation("fieldAccess");
@@ -174,6 +234,11 @@ function PinCallout({
           <span className="font-mono text-sm text-ap-muted">{phone}</span>
         </div>
         <p className="text-sm text-ap-warn">{t("pin.onceOnly")}</p>
+        {sessionsEnded ? null : (
+          <p className="text-sm text-ap-crit" role="alert">
+            {t("pin.stillSignedIn")}
+          </p>
+        )}
         <div>
           <Button size="sm" variant="secondary" onClick={onDismiss}>
             {t("pin.dismiss")}
@@ -189,11 +254,13 @@ function ReadyToEnrol({
   farmId,
   canEnrol,
   onIssued,
+  onError,
 }: {
   rows: WorkerBrief[];
   farmId: string;
   canEnrol: boolean;
-  onIssued: (v: { name: string; result: EnrolmentResult }) => void;
+  onIssued: (v: Issued) => void;
+  onError: ReportError;
 }): ReactNode {
   const { t } = useTranslation("fieldAccess");
   const enrol = useEnrolFieldWorker(farmId);
@@ -240,6 +307,7 @@ function ReadyToEnrol({
                           },
                           {
                             onSuccess: (result) => onIssued({ name: w.name, result }),
+                            onError,
                             onSettled: () => setBusyId(null),
                           },
                         );
@@ -267,10 +335,12 @@ function BlockedByRole({
   rows,
   farmId,
   canEnrol,
+  onError,
 }: {
   rows: WorkerBrief[];
   farmId: string;
   canEnrol: boolean;
+  onError: ReportError;
 }): ReactNode {
   const { t } = useTranslation("fieldAccess");
   const reRole = useReRoleFieldWorkers(farmId);
@@ -285,7 +355,12 @@ function BlockedByRole({
           <Button
             size="sm"
             disabled={reRole.isPending}
-            onClick={() => reRole.mutate(rows.map((r) => r.id))}
+            onClick={() =>
+              reRole.mutate(
+                rows.map((r) => r.id),
+                { onError },
+              )
+            }
           >
             {reRole.isPending ? t("blocked.working") : t("blocked.promoteAll", { n: rows.length })}
           </Button>
@@ -347,12 +422,14 @@ function Enrolled({
   otherFarms,
   canEnrol,
   onIssued,
+  onError,
 }: {
   rows: WorkerBrief[];
   farmId: string;
   otherFarms: Farm[];
   canEnrol: boolean;
-  onIssued: (v: { name: string; result: EnrolmentResult }) => void;
+  onIssued: (v: Issued) => void;
+  onError: ReportError;
 }): ReactNode {
   const { t } = useTranslation("fieldAccess");
   return (
@@ -377,12 +454,22 @@ function Enrolled({
                 <Td>{w.role}</Td>
                 {canEnrol ? (
                   <Td>
-                    <AddFarmControl worker={w} farmId={farmId} farms={otherFarms} />
+                    <AddFarmControl
+                      worker={w}
+                      farmId={farmId}
+                      farms={otherFarms}
+                      onError={onError}
+                    />
                   </Td>
                 ) : null}
                 {canEnrol ? (
                   <Td>
-                    <ReissueButton worker={w} farmId={farmId} onIssued={onIssued} />
+                    <ReissueButton
+                      worker={w}
+                      farmId={farmId}
+                      onIssued={onIssued}
+                      onError={onError}
+                    />
                   </Td>
                 ) : null}
               </Tr>
@@ -410,10 +497,12 @@ function AddFarmControl({
   worker,
   farmId,
   farms,
+  onError,
 }: {
   worker: WorkerBrief;
   farmId: string;
   farms: Farm[];
+  onError: ReportError;
 }): ReactNode {
   const { t } = useTranslation("fieldAccess");
   const [target, setTarget] = useState("");
@@ -454,7 +543,7 @@ function AddFarmControl({
         onClick={() =>
           grant.mutate(
             { user_id: worker.user_id as string, farm_id: target, role },
-            { onSuccess: () => setTarget("") },
+            { onSuccess: () => setTarget(""), onError },
           )
         }
       >
@@ -480,11 +569,13 @@ function ScopeMismatch({
   farmId,
   farmName,
   canEnrol,
+  onError,
 }: {
   rows: WorkerBrief[];
   farmId: string;
   farmName: string;
   canEnrol: boolean;
+  onError: ReportError;
 }): ReactNode {
   const { t } = useTranslation("fieldAccess");
   if (rows.length === 0) {
@@ -509,7 +600,7 @@ function ScopeMismatch({
               <Td>{w.role}</Td>
               {canEnrol ? (
                 <Td>
-                  <AddFarmControl worker={w} farmId={farmId} farms={here} />
+                  <AddFarmControl worker={w} farmId={farmId} farms={here} onError={onError} />
                 </Td>
               ) : null}
             </Tr>
@@ -526,6 +617,9 @@ function ScopeMismatch({
  * new one has to reach the person — which is why the result goes straight to
  * the read-aloud callout at the top of the page.
  *
+ * It also signs their phone out, so it asks once first. A stray click here
+ * would take a working scout off the app in the middle of a field.
+ *
  * Disabled when the worker row has no linked user. That happens when someone
  * was linked to a membership by hand on the workers screen without going
  * through enrolment, and there is genuinely no account to re-credential.
@@ -534,13 +628,16 @@ function ReissueButton({
   worker,
   farmId,
   onIssued,
+  onError,
 }: {
   worker: WorkerBrief;
   farmId: string;
-  onIssued: (v: { name: string; result: EnrolmentResult }) => void;
+  onIssued: (v: Issued) => void;
+  onError: ReportError;
 }): ReactNode {
   const { t } = useTranslation("fieldAccess");
   const reissue = useReissueFieldPin(farmId);
+  const [confirming, setConfirming] = useState(false);
   if (!worker.user_id) {
     return (
       <Button size="sm" variant="secondary" disabled title={t("enrolled.noAccount")}>
@@ -548,28 +645,50 @@ function ReissueButton({
       </Button>
     );
   }
+  if (!confirming) {
+    return (
+      <Button size="sm" variant="secondary" onClick={() => setConfirming(true)}>
+        {t("enrolled.reissue")}
+      </Button>
+    );
+  }
   return (
-    <Button
-      size="sm"
-      variant="secondary"
-      disabled={reissue.isPending}
-      onClick={() =>
-        reissue.mutate(worker.user_id as string, {
-          onSuccess: (result) =>
-            onIssued({
-              name: worker.name,
-              result: {
-                user_id: result.user_id,
-                pin: result.pin,
-                phone: worker.phone ?? "",
-                membership_id: "",
-                worker_id: worker.id,
-              },
-            }),
-        })
-      }
-    >
-      {reissue.isPending ? t("enrolled.working") : t("enrolled.reissue")}
-    </Button>
+    <span className="flex flex-col items-start gap-2">
+      <span className="text-xs text-ap-muted">{t("enrolled.confirmHint")}</span>
+      <span className="flex items-center gap-2">
+        <Button
+          size="sm"
+          disabled={reissue.isPending}
+          onClick={() =>
+            reissue.mutate(worker.user_id as string, {
+              onSuccess: (result) =>
+                onIssued({
+                  name: worker.name,
+                  sessionsEnded: result.sessions_ended,
+                  result: {
+                    user_id: result.user_id,
+                    pin: result.pin,
+                    phone: worker.phone ?? "",
+                    membership_id: "",
+                    worker_id: worker.id,
+                  },
+                }),
+              onError,
+              onSettled: () => setConfirming(false),
+            })
+          }
+        >
+          {reissue.isPending ? t("enrolled.working") : t("enrolled.confirm")}
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={reissue.isPending}
+          onClick={() => setConfirming(false)}
+        >
+          {t("enrolled.cancel")}
+        </Button>
+      </span>
+    </span>
   );
 }

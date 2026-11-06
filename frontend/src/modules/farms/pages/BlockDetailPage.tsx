@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { archiveBlock, getBlock, type BlockDetail } from "@/api/blocks";
 import { assignBlockCrop, listBlockCrops, type BlockCropAssignment } from "@/api/cropAssignments";
+import { useTreeImpactConfirm } from "@/modules/farms/treeImpact/useTreeImpactConfirm";
 import { getFarm } from "@/api/farms";
 import { isApiError } from "@/api/errors";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -71,7 +72,13 @@ export function BlockDetailPage(): JSX.Element {
     };
   }, [blockId, farmId]);
 
+  // Archiving a block or changing its crop moves which decision trees run.
+  const treeImpact = useTreeImpactConfirm();
+
   const handleArchive = async (): Promise<void> => {
+    if (!(await treeImpact.confirm(farmId, { blocks: [{ block_id: blockId, removed: true }] }))) {
+      return;
+    }
     setBusy(true);
     try {
       await archiveBlock(blockId);
@@ -85,6 +92,17 @@ export function BlockDetailPage(): JSX.Element {
 
   const handleAssignCrop = async (): Promise<void> => {
     if (!cropId || !seasonLabel) return;
+    const ok = await treeImpact.confirm(farmId, {
+      blocks: [
+        {
+          block_id: blockId,
+          crop_id: cropId,
+          crop_variety_id: cropVarietyId,
+          crop_variety_strain_id: cropVarietyStrainId,
+        },
+      ],
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const created = await assignBlockCrop(blockId, {
@@ -271,6 +289,7 @@ export function BlockDetailPage(): JSX.Element {
       {canReadWeather ? <WeatherForecastPanel blockId={block.id} farmId={farmId} /> : null}
 
       {canReadWeather ? <WeatherSubscriptionsTab blockId={block.id} farmId={farmId} /> : null}
+      {treeImpact.dialog}
     </Page>
   );
 }

@@ -821,6 +821,309 @@ async def test_a_deleted_scout_returns_to_ready_to_enrol(
     assert "Leaver Layth" in {w["name"] for w in after["ready_to_enrol"]}
 
 
+async def _delete_like_offboarding(
+    session: AsyncSession, keycloak: FakeKeycloakClient, enrolled: dict[str, Any]
+) -> str:
+    """Archives somebody's last membership and deletes their Keycloak account.
+
+    Leaves their grants active on purpose, which is what deletions did before
+    `delete_user` began revoking them. Those people are the harder case.
+    """
+    subject = (
+        await session.execute(
+            text("SELECT keycloak_subject FROM public.users WHERE id = CAST(:u AS uuid)"),
+            {"u": enrolled["user_id"]},
+        )
+    ).scalar_one()
+    await session.execute(
+        text(
+            "UPDATE public.tenant_memberships SET status = 'archived', deleted_at = now() "
+            "WHERE id = CAST(:m AS uuid)"
+        ),
+        {"m": enrolled["membership_id"]},
+    )
+    await session.execute(
+        text(
+            "UPDATE public.users SET status = 'archived', deleted_at = now() "
+            "WHERE id = CAST(:u AS uuid)"
+        ),
+        {"u": enrolled["user_id"]},
+    )
+    await session.commit()
+    await keycloak.delete_user(keycloak_user_id=subject)
+    return str(subject)
+
+
+@pytest.mark.asyncio
+async def test_a_deleted_scout_can_be_given_access_again(
+    scouting_env: ScoutingFixture,
+    admin_session: AsyncSession,
+    fake_keycloak: FakeKeycloakClient,
+) -> None:
+    """Re-enrolling used to fail on the archived membership row, answering
+    "re-issue their PIN" for somebody the screen offers no reissue for."""
+    env = scouting_env
+    phone = _unique_phone()
+    first = await _enrol(env, phone=phone, full_name="Returning Rami")
+    assert first.status_code == 201, first.text
+    old_subject = await _delete_like_offboarding(admin_session, fake_keycloak, first.json())
+
+    again = await _enrol(
+        env, phone=phone, full_name="Returning Rami", worker_id=first.json()["worker_id"]
+    )
+    assert again.status_code == 201, again.text
+    assert again.json()["user_id"] == first.json()["user_id"]
+    assert again.json()["membership_id"] == first.json()["membership_id"]
+
+    row = (
+        await admin_session.execute(
+            text(
+                "SELECT u.deleted_at, u.status, u.keycloak_subject, m.status AS m_status, "
+                "       m.deleted_at AS m_deleted "
+                "FROM public.users u JOIN public.tenant_memberships m ON m.user_id = u.id "
+                "WHERE u.id = CAST(:u AS uuid)"
+            ),
+            {"u": first.json()["user_id"]},
+        )
+    ).one()
+    assert row.deleted_at is None
+    assert row.status == "active"
+    assert row.m_deleted is None
+    assert row.m_status == "active"
+    assert row.keycloak_subject != old_subject
+    assert row.keycloak_subject in fake_keycloak.users
+
+    # Old grants do not come back with them: one live scope, the farm enrolled.
+    scopes = (
+        await admin_session.execute(
+            text(
+                "SELECT farm_id FROM public.farm_scopes "
+                "WHERE membership_id = CAST(:m AS uuid) AND revoked_at IS NULL"
+            ),
+            {"m": first.json()["membership_id"]},
+        )
+    ).all()
+    assert [str(s.farm_id) for s in scopes] == [env.farm_id]
+
+    # And the point of it all: a working sign-in that can be replaced.
+    async with _client(env.admin_context) as client:
+        reissued = await client.post(
+            f"/api/v1/users/{first.json()['user_id']}/field-pin:reissue?farm_id={env.farm_id}"
+        )
+        audit = (
+            await client.get(f"/api/v1/users/field-enrolment/audit?farm_id={env.farm_id}")
+        ).json()
+    assert reissued.status_code == 200, reissued.text
+    assert "Returning Rami" in {w["name"] for w in audit["enrolled"]}
+    assert "Returning Rami" not in {w["name"] for w in audit["ready_to_enrol"]}
+
+
+@pytest.mark.asyncio
+async def test_returning_without_a_worker_id_keeps_one_worker_row(
+    scouting_env: ScoutingFixture,
+    admin_session: AsyncSession,
+    fake_keycloak: FakeKeycloakClient,
+) -> None:
+    env = scouting_env
+    phone = _unique_phone()
+    first = await _enrol(env, phone=phone, full_name="Single Row Sami")
+    assert first.status_code == 201, first.text
+    await _delete_like_offboarding(admin_session, fake_keycloak, first.json())
+
+    again = await _enrol(env, phone=phone, full_name="Single Row Sami")
+    assert again.status_code == 201, again.text
+    assert again.json()["worker_id"] == first.json()["worker_id"]
+
+
+@pytest.mark.asyncio
+async def test_a_suspended_scout_is_refused_before_keycloak_is_touched(
+    scouting_env: ScoutingFixture,
+    admin_session: AsyncSession,
+    fake_keycloak: FakeKeycloakClient,
+) -> None:
+    env = scouting_env
+    phone = _unique_phone()
+    first = await _enrol(env, phone=phone, full_name="Suspended Salma")
+    assert first.status_code == 201, first.text
+    await admin_session.execute(
+        text(
+            "UPDATE public.tenant_memberships SET status = 'suspended' WHERE id = CAST(:m AS uuid)"
+        ),
+        {"m": first.json()["membership_id"]},
+    )
+    await admin_session.commit()
+    pin_before = {u.id: u.field_pin for u in fake_keycloak.users.values()}
+
+    again = await _enrol(env, phone=phone, full_name="Suspended Salma")
+    assert again.status_code == 422, again.text
+    assert "suspended" in again.json()["detail"]
+    assert {u.id: u.field_pin for u in fake_keycloak.users.values()} == pin_before
+
+
+@pytest.mark.asyncio
+async def test_a_new_pin_ends_sessions_clears_lockout_and_is_audited(
+    scouting_env: ScoutingFixture,
+    admin_session: AsyncSession,
+    fake_keycloak: FakeKeycloakClient,
+) -> None:
+    """A new PIN is often issued for a lost phone, so the old phone has to stop
+    working, and a locked-out scout has to be able to use what they were told."""
+    env = scouting_env
+    enrolled = await _enrol(env, phone=_unique_phone())
+    assert enrolled.status_code == 201, enrolled.text
+    user_id = enrolled.json()["user_id"]
+    subject = (
+        await admin_session.execute(
+            text("SELECT keycloak_subject FROM public.users WHERE id = CAST(:u AS uuid)"),
+            {"u": user_id},
+        )
+    ).scalar_one()
+
+    async with _client(env.admin_context) as client:
+        resp = await client.post(f"/api/v1/users/{user_id}/field-pin:reissue?farm_id={env.farm_id}")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["sessions_ended"] is True
+    assert subject in fake_keycloak.logged_out
+    assert subject in fake_keycloak.cleared_lockouts
+
+    await admin_session.execute(text(f"SET LOCAL search_path TO {env.schema}, public"))
+    events = (
+        await admin_session.execute(
+            text(
+                "SELECT event_type, details FROM audit_events "
+                "WHERE subject_id = CAST(:u AS uuid) ORDER BY time"
+            ),
+            {"u": user_id},
+        )
+    ).all()
+    assert [e.event_type for e in events] == [
+        "iam.field_worker_enrolled",
+        "iam.field_pin_reissued",
+    ]
+    # The phone is the person. It stays out of the audit details.
+    assert all("phone" not in e.details for e in events)
+
+
+@pytest.mark.asyncio
+async def test_a_new_pin_survives_a_failed_sign_out_and_says_so(
+    scouting_env: ScoutingFixture, fake_keycloak: FakeKeycloakClient
+) -> None:
+    """The PIN has already changed by then. Failing the request would lose the
+    only copy of it, so the operator gets the PIN and a warning instead."""
+    env = scouting_env
+    enrolled = await _enrol(env, phone=_unique_phone())
+    assert enrolled.status_code == 201, enrolled.text
+
+    fake_keycloak.fail_on = "logout_user"
+    async with _client(env.admin_context) as client:
+        resp = await client.post(
+            f"/api/v1/users/{enrolled.json()['user_id']}/field-pin:reissue?farm_id={env.farm_id}"
+        )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["pin"].isdigit()
+    assert resp.json()["sessions_ended"] is False
+
+
+def _as_person(env: ScoutingFixture, user_id: str):  # type: ignore[no-untyped-def]
+    return make_context(user_id=UUID(user_id), tenant_id=env.tenant_id, tenant_role=None)
+
+
+@pytest.mark.asyncio
+async def test_a_scout_can_change_their_own_pin(
+    scouting_env: ScoutingFixture,
+    admin_session: AsyncSession,
+    fake_keycloak: FakeKeycloakClient,
+) -> None:
+    env = scouting_env
+    phone = _unique_phone()
+    enrolled = await _enrol(env, phone=phone)
+    assert enrolled.status_code == 201, enrolled.text
+    body = enrolled.json()
+
+    async with _client(_as_person(env, body["user_id"])) as client:
+        resp = await client.post(
+            "/api/v1/me/field-pin", json={"current_pin": body["pin"], "new_pin": "482913"}
+        )
+    assert resp.status_code == 204, resp.text
+
+    user = next(u for u in fake_keycloak.users.values() if u.phone == body["phone"])
+    assert user.field_pin == "482913"
+    assert user.id in fake_keycloak.logged_out
+
+    await admin_session.execute(text(f"SET LOCAL search_path TO {env.schema}, public"))
+    events = (
+        await admin_session.execute(
+            text(
+                "SELECT event_type, actor_user_id FROM audit_events "
+                "WHERE subject_id = CAST(:u AS uuid) AND event_type = 'iam.field_pin_changed'"
+            ),
+            {"u": body["user_id"]},
+        )
+    ).all()
+    assert [str(e.actor_user_id) for e in events] == [body["user_id"]]
+
+
+@pytest.mark.asyncio
+async def test_a_wrong_current_pin_changes_nothing(
+    scouting_env: ScoutingFixture, fake_keycloak: FakeKeycloakClient
+) -> None:
+    env = scouting_env
+    enrolled = await _enrol(env, phone=_unique_phone())
+    assert enrolled.status_code == 201, enrolled.text
+    body = enrolled.json()
+    wrong = "000000" if body["pin"] != "000000" else "111111"
+
+    async with _client(_as_person(env, body["user_id"])) as client:
+        resp = await client.post(
+            "/api/v1/me/field-pin", json={"current_pin": wrong, "new_pin": "482913"}
+        )
+    assert resp.status_code == 403, resp.text
+    user = next(u for u in fake_keycloak.users.values() if u.phone == body["phone"])
+    assert user.field_pin == body["pin"]
+    assert user.id not in fake_keycloak.logged_out
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("new_pin", ["123456", "000000"])
+async def test_an_obvious_new_pin_is_refused(scouting_env: ScoutingFixture, new_pin: str) -> None:
+    env = scouting_env
+    enrolled = await _enrol(env, phone=_unique_phone())
+    assert enrolled.status_code == 201, enrolled.text
+    body = enrolled.json()
+
+    async with _client(_as_person(env, body["user_id"])) as client:
+        resp = await client.post(
+            "/api/v1/me/field-pin", json={"current_pin": body["pin"], "new_pin": new_pin}
+        )
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["type"].endswith("/weak-pin")
+
+
+@pytest.mark.asyncio
+async def test_reusing_the_current_pin_is_refused(scouting_env: ScoutingFixture) -> None:
+    env = scouting_env
+    enrolled = await _enrol(env, phone=_unique_phone())
+    assert enrolled.status_code == 201, enrolled.text
+    body = enrolled.json()
+
+    async with _client(_as_person(env, body["user_id"])) as client:
+        resp = await client.post(
+            "/api/v1/me/field-pin", json={"current_pin": body["pin"], "new_pin": body["pin"]}
+        )
+    assert resp.status_code == 422, resp.text
+
+
+@pytest.mark.asyncio
+async def test_an_email_account_cannot_use_the_pin_route(scouting_env: ScoutingFixture) -> None:
+    env = scouting_env
+    async with _client(env.agronomist_context) as client:
+        resp = await client.post(
+            "/api/v1/me/field-pin", json={"current_pin": "111111", "new_pin": "482913"}
+        )
+    assert resp.status_code == 422, resp.text
+    assert "password-reset flow" in resp.json()["detail"]
+
+
 @pytest.mark.asyncio
 async def test_a_phone_already_working_in_another_tenant_is_refused(
     scouting_env: ScoutingFixture,

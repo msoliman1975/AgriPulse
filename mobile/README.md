@@ -30,9 +30,9 @@ because three things are missing and only you can supply them:
 
 ## Building an APK
 
-The build works on this machine, checked 2026-08-26. `java -version` on PATH
-reports 1.8, which is too old, but Android Studio ships its own JDK 25 and
-Gradle takes it from `JAVA_HOME`:
+This needs Android Studio, or the SDK and a JDK 21 or newer. `java -version` on
+PATH may report something too old, so point Gradle at Android Studio's own JDK
+with `JAVA_HOME`:
 
 ```bash
 pnpm install && pnpm build
@@ -59,7 +59,7 @@ Android installs an update in place only when the new APK is signed with the
 - **versionCode**: minutes since 2025-01-01 UTC, so every build is higher than
   the last. Not a git commit count — cloud/CI clones are shallow and the count
   would go down. Override with `-PscoutVersionCode=N`.
-- **versionName**: the `version` in `mobile/package.json`.
+- **versionName**: set by hand in `app/build.gradle` (currently `1.1`).
 
 ```bash
 SCOUT_ENV=production pnpm build && SCOUT_ENV=production pnpm exec cap sync android
@@ -72,6 +72,10 @@ was created 2026-11-05 and is held outside the repo by the project owner.
 **Back it up. If it is lost, no future build can update installed apps**: every
 scout would have to uninstall and reinstall. A phone that has a *debug* build
 installed must uninstall it once before the first release build goes on.
+
+CI builds a debug APK on every PR from the production settings, so the native
+code is always compiled. It is attached to the `mobile` job as
+`scout-debug-apk`. The same limit applies: it is for testing, not for farms.
 
 ## Proving it, once those exist
 

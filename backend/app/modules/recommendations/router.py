@@ -87,6 +87,8 @@ from app.modules.recommendations.schemas import (
     EvalTraceResponse,
     EvaluateBlockResponse,
     ExplainBlockResponse,
+    FarmTreeImpactRequest,
+    FarmTreeImpactResponse,
     FarmTreeSelectionResponse,
     FarmTreeToggleRequest,
     FarmTreeToggleResponse,
@@ -1399,8 +1401,58 @@ async def list_farm_decision_trees(
 ) -> dict[str, Any]:
     _ensure_tenant(context)
     assert context.tenant_id is not None  # _ensure_tenant guarantees
-    rows = await service.list_farm_tree_selection(farm_id=farm_id, tenant_id=context.tenant_id)
-    return {"farm_id": farm_id, "trees": list(rows)}
+    return await service.list_farm_tree_selection(farm_id=farm_id, tenant_id=context.tenant_id)
+
+
+@router.post(
+    "/farms/{farm_id}/decision-tree-impact",
+    response_model=FarmTreeImpactResponse,
+    summary="Dry run: which decision trees a pending crop/soil/country/block change moves.",
+)
+async def preview_farm_decision_tree_impact(
+    farm_id: UUID,
+    payload: FarmTreeImpactRequest,
+    context: RequestContext = Depends(requires_capability("block.read", farm_id_param="farm_id")),
+    service: RecommendationsServiceImpl = Depends(_service),
+    tenant_session: AsyncSession = Depends(get_db_session),
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> dict[str, Any]:
+    """Nothing is written. The client shows the answer before it saves.
+
+    A crop is resolved to its path by the farms module — the same call the
+    assignment makes — so the preview tests the path the write will store.
+    """
+    from app.modules.farms.service import get_farm_service
+    from app.modules.recommendations.service import UNSET
+
+    _ensure_tenant(context)
+    assert context.tenant_id is not None  # _ensure_tenant guarantees
+    farms = get_farm_service(tenant_session=tenant_session, public_session=public_session)
+    changes: list[dict[str, Any]] = []
+    for change in payload.blocks:
+        entry: dict[str, Any] = {"block_id": change.block_id}
+        if change.removed:
+            entry["removed"] = True
+        if change.crop_removed:
+            entry["crop_id"] = None
+            entry["crop_path"] = None
+        elif change.crop_id is not None:
+            entry["crop_id"] = change.crop_id
+            entry["crop_path"] = await farms.resolve_crop_path(
+                crop_id=change.crop_id,
+                crop_variety_id=change.crop_variety_id,
+                crop_variety_strain_id=change.crop_variety_strain_id,
+            )
+        if "soil_texture" in change.model_fields_set:
+            entry["soil_texture"] = change.soil_texture
+        changes.append(entry)
+    country = payload.country_code if "country_code" in payload.model_fields_set else UNSET
+    return await service.preview_farm_tree_impact(
+        farm_id=farm_id,
+        tenant_id=context.tenant_id,
+        block_changes=changes,
+        country_code=country,
+    )
 
 
 @router.put(

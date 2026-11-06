@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTreeImpactConfirm } from "@/modules/farms/treeImpact/useTreeImpactConfirm";
 
 import {
   applyBulkCropAssignment,
@@ -193,6 +194,25 @@ export function BulkUpdatesPage(): ReactNode {
     onError: (err: unknown) =>
       setError(isApiError(err) ? (err.problem.detail ?? err.problem.title) : t("errors.apply")),
   });
+
+  // A crop decides which decision trees run on each block: show what this run
+  // starts and stops before it is applied. Only blocks the dry run will
+  // actually write to are sent.
+  const treeImpact = useTreeImpactConfirm();
+  const applyWithTreeCheck = async (): Promise<void> => {
+    if (!farmId || !payload || !preview) return;
+    const p = payload;
+    const blocks = preview.items
+      .filter((item) => item.outcome !== "skip")
+      .map((item) => ({
+        block_id: item.block_id,
+        crop_id: p.crop_id,
+        crop_variety_id: p.crop_variety_id ?? null,
+        crop_variety_strain_id: p.crop_variety_strain_id ?? null,
+      }));
+    if (blocks.length > 0 && !(await treeImpact.confirm(farmId, { blocks }))) return;
+    applyMutation.mutate();
+  };
 
   const blockingReason = ((): string | null => {
     if (step === 1) return farmId ? null : t("validation.pickFarm");
@@ -613,7 +633,7 @@ export function BulkUpdatesPage(): ReactNode {
               <Card>
                 <div className="flex flex-wrap items-center gap-3">
                   <Button
-                    onClick={() => applyMutation.mutate()}
+                    onClick={() => void applyWithTreeCheck()}
                     disabled={
                       applyMutation.isPending || preview.assign_count + preview.replace_count === 0
                     }
@@ -706,6 +726,7 @@ export function BulkUpdatesPage(): ReactNode {
           {blockingReason ? <span className="text-sm text-ap-muted">{blockingReason}</span> : null}
         </div>
       ) : null}
+      {treeImpact.dialog}
     </div>
   );
 }

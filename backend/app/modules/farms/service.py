@@ -605,6 +605,14 @@ class FarmService(Protocol):
 
     async def get_block_crop_farm_id(self, *, block_crop_id: UUID) -> UUID: ...
 
+    async def resolve_crop_path(
+        self,
+        *,
+        crop_id: UUID,
+        crop_variety_id: UUID | None,
+        crop_variety_strain_id: UUID | None,
+    ) -> str: ...
+
     async def get_block_crop_attributes(self, *, block_crop_id: UUID) -> dict[str, Any]: ...
 
     async def set_block_crop_attributes(
@@ -3529,6 +3537,25 @@ class FarmServiceImpl:
             return []
         rows = await self._repo.list_crop_attribute_definitions(crop_id=crop.id)
         return resolve_crop_attribute_definitions(rows, crop_path=block_crop.crop_path).definitions
+
+    async def resolve_crop_path(
+        self,
+        *,
+        crop_id: UUID,
+        crop_variety_id: UUID | None,
+        crop_variety_strain_id: UUID | None,
+    ) -> str:
+        """The crop path an assignment of this crop/variety/strain would store.
+
+        Public so a dry run elsewhere (the decision-tree impact preview) uses
+        the exact path the write will, instead of re-deriving it. Raises the
+        same taxonomy errors the assignment does.
+        """
+        return await self._repo.resolve_crop_path(
+            crop_id=crop_id,
+            crop_variety_id=crop_variety_id,
+            crop_variety_strain_id=crop_variety_strain_id,
+        )
 
     async def get_block_crop_farm_id(self, *, block_crop_id: UUID) -> UUID:
         """The farm owning an assignment — the router's capability check.

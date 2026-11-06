@@ -1,6 +1,6 @@
 {
   "name": "agripulse-scout",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@9.15.5",
@@ -13,9 +13,11 @@
     "typecheck": "tsc -b --noEmit",
     "preview": "vite preview",
     "sync": "cap sync android",
-    "android": "cap open android"
+    "android": "cap open android",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@aparajita/capacitor-secure-storage": "8.0.1",
     "@capacitor/android": "^8.5.0",
     "@capacitor/core": "^8.5.0",
     "@capacitor/push-notifications": "^8.1.2",
@@ -34,6 +36,7 @@
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.7.2",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vitest": "2.1.9"
   }
 }

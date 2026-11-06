@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate } from "react-router-dom";
 
-import { useCapability } from "@/rbac/useCapability";
+import { useCapability, useCapabilityOnAnyFarm } from "@/rbac/useCapability";
 
 /**
  * /settings landing — bounces to the first reachable tab so deep-linking
@@ -14,11 +14,13 @@ export function SettingsIndexPage(): ReactNode {
   const canReadHealth = useCapability("tenant.read_integration_health");
   const canUser = useCapability("user.read");
   const canResources = useCapability("resource.read");
+  const canFieldEnrol = useCapabilityOnAnyFarm("user.field_enrol");
 
   if (canManageIntegrations) return <Navigate to="/settings/org" replace />;
   if (canReadHealth) return <Navigate to="/settings/integrations/health" replace />;
   if (canUser) return <Navigate to="/settings/users" replace />;
   if (canResources) return <Navigate to="/settings/workers" replace />;
+  if (canFieldEnrol) return <Navigate to="/settings/field-access" replace />;
   return (
     <div className="mx-auto max-w-3xl py-12 text-center">
       <h2 className="text-xl font-semibold text-ap-ink">{t("noAccess.title")}</h2>

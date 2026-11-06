@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
-import { useCapability, useClaims } from "@/rbac/useCapability";
+import { useCapability, useClaims, useIsInvestor } from "@/rbac/useCapability";
 
 /**
  * Inverse of `PlatformAdminGuard`. Used as a layout route element
@@ -14,7 +14,7 @@ import { useCapability, useClaims } from "@/rbac/useCapability";
  */
 export function AgriPulseGuard(): ReactNode {
   const isPlatformStaff = useCapability("platform.manage_tenants");
-  const isInvestor = useCapability("investor_app.use");
+  const isInvestor = useIsInvestor();
   const canFarmWork = useCapability("plan.read");
   const canHoldings = useCapability("holding.read");
   const claims = useClaims();
