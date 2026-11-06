@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useTreeImpactConfirm } from "@/modules/farms/treeImpact/useTreeImpactConfirm";
 
 import {
   createBlock,
@@ -438,6 +439,10 @@ function MapForFarm({ farmId }: { farmId: string }) {
       selectUnit(newBlock.id);
     },
   });
+
+  // Inactivating a block, or editing its soil or the farm's country, moves
+  // which decision trees run: say which before saving.
+  const treeImpact = useTreeImpactConfirm();
 
   const inactivateBlockMut = useMutation({
     mutationFn: async (vars: { blockId: string; reason: string }) =>
@@ -971,7 +976,15 @@ function MapForFarm({ farmId }: { farmId: string }) {
             onStartDrawAoi={() => setDrawTarget("farm_aoi")}
             onCancelDrawAoi={() => setDrawTarget(null)}
             onSubmitCreate={(payload) => createFarmMut.mutate(payload)}
-            onSubmitUpdate={(payload) => updateFarmMut.mutate(payload)}
+            onSubmitUpdate={(payload) => {
+              const check =
+                "country_code" in payload
+                  ? treeImpact.confirm(farmId, { country_code: payload.country_code ?? null })
+                  : Promise.resolve(true);
+              void check.then((ok) => {
+                if (ok) updateFarmMut.mutate(payload);
+              });
+            }}
             onInactivateFarm={openInactivateFarm}
             onReactivateBlock={(blockId) => reactivateBlockMut.mutate(blockId)}
             onAoiUploaded={(boundary, areaM2) => {
@@ -1139,7 +1152,20 @@ function MapForFarm({ farmId }: { farmId: string }) {
               editableBlock={editingBlock}
               onStartEdit={openEditBlock}
               onCancelEdit={() => setEditingBlock(null)}
-              onSaveEdit={(patch) => updateBlockMut.mutate({ blockId: selectedId, patch })}
+              onSaveEdit={(patch) => {
+                const blockId = selectedId;
+                // The preview says "nothing moves" when the soil is unchanged,
+                // and then no dialog is shown.
+                const check =
+                  "soil_texture" in patch
+                    ? treeImpact.confirm(farmId, {
+                        blocks: [{ block_id: blockId, soil_texture: patch.soil_texture ?? null }],
+                      })
+                    : Promise.resolve(true);
+                void check.then((ok) => {
+                  if (ok) updateBlockMut.mutate({ blockId, patch });
+                });
+              }}
               saving={updateBlockMut.isPending}
               saveError={updateBlockMut.error?.message ?? null}
               reshaping={reshapeTarget?.id === selectedId}
@@ -1214,6 +1240,8 @@ function MapForFarm({ farmId }: { farmId: string }) {
             />
           ) : null}
 
+          {treeImpact.dialog}
+
           {inactivateBlockOpen && selectedId ? (
             <InactivateConfirmModal
               confirmKeyword={summary.blocks.find((b) => b.id === selectedId)?.code ?? "INACTIVATE"}
@@ -1227,7 +1255,14 @@ function MapForFarm({ farmId }: { farmId: string }) {
                 setInactivateBlockPreview(null);
                 setInactivateBlockPreviewError(null);
               }}
-              onSubmit={(reason) => inactivateBlockMut.mutate({ blockId: selectedId, reason })}
+              onSubmit={(reason) => {
+                const blockId = selectedId;
+                void treeImpact
+                  .confirm(farmId, { blocks: [{ block_id: blockId, removed: true }] })
+                  .then((ok) => {
+                    if (ok) inactivateBlockMut.mutate({ blockId, reason });
+                  });
+              }}
             />
           ) : null}
 
