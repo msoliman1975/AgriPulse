@@ -25,9 +25,8 @@ because three things are missing and only you can supply them:
    lived, so production mints it at deploy rather than storing it). Until
    `FCM_ENABLED` is true every send records `status='skipped'` — by design, so a
    dev environment without Firebase does not look like an outage.
-3. **A device, and a signing key.** The toolchain itself works — see
-   "Building an APK" below. What is missing is a keystore, so nothing built
-   here can be installed as a release.
+3. **A device.** The toolchain and release signing both work — see
+   "Building an APK" below.
 
 ## Building an APK
 
@@ -47,11 +46,32 @@ A **debug** APK is signed with Gradle's generated debug key. It installs on a
 handset for testing and is not something to hand to a farm: the debug key is
 not stable across machines, so the next build cannot upgrade it in place.
 
-A **release** APK needs a keystore, and there is no `signingConfig` in
-`app/build.gradle`. Until one exists, `assembleRelease` produces an unsigned
-APK that Android refuses to install. The keystore has to be created once and
-kept — losing it means the app can never be updated, only reinstalled under a
-new identity.
+### Release APK (installs over the previous one)
+
+Android installs an update in place only when the new APK is signed with the
+**same key** and has a **higher `versionCode`**. Both are handled:
+
+- **Key**: `app/build.gradle` signs `release` from `android/keystore.properties`
+  (git-ignored; copy `keystore.properties.example`) or from the env vars
+  `SCOUT_KEYSTORE_FILE`, `SCOUT_KEYSTORE_PASSWORD`, `SCOUT_KEY_ALIAS`,
+  `SCOUT_KEY_PASSWORD`. Without either, `assembleRelease` fails with a message
+  rather than producing an unsigned APK that will not install.
+- **versionCode**: minutes since 2025-01-01 UTC, so every build is higher than
+  the last. Not a git commit count — cloud/CI clones are shallow and the count
+  would go down. Override with `-PscoutVersionCode=N`.
+- **versionName**: set by hand in `app/build.gradle` (currently `1.1`).
+
+```bash
+SCOUT_ENV=production pnpm build && SCOUT_ENV=production pnpm exec cap sync android
+cd android && ./gradlew assembleRelease
+# -> app/build/outputs/apk/release/app-release.apk
+```
+
+The release keystore (`agripulse-scout-release.p12`, alias `agripulse-scout`)
+was created 2026-11-05 and is held outside the repo by the project owner.
+**Back it up. If it is lost, no future build can update installed apps**: every
+scout would have to uninstall and reinstall. A phone that has a *debug* build
+installed must uninstall it once before the first release build goes on.
 
 CI builds a debug APK on every PR from the production settings, so the native
 code is always compiled. It is attached to the `mobile` job as

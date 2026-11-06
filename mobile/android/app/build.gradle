@@ -1,5 +1,47 @@
 apply plugin: 'com.android.application'
 
+
+// ---------------------------------------------------------------------------
+// Release signing.
+//
+// Android only installs an update over an existing app when both APKs are
+// signed with the SAME key and the new versionCode is HIGHER. A debug build
+// fails the first test (the debug key is generated per machine), so every
+// debug APK handed to a scout had to be uninstalled first. The release key
+// fixes that, as long as it is never lost: a lost key means the app can never
+// be updated again, only uninstalled and replaced under a new identity.
+//
+// The keystore is NOT in the repo. Point at it with either
+//   * android/keystore.properties (git-ignored; see keystore.properties.example)
+//   * or env vars SCOUT_KEYSTORE_FILE / SCOUT_KEYSTORE_PASSWORD /
+//     SCOUT_KEY_ALIAS / SCOUT_KEY_PASSWORD (for CI).
+// ---------------------------------------------------------------------------
+def signingProps = new Properties()
+def signingPropsFile = rootProject.file('keystore.properties')
+if (signingPropsFile.exists()) {
+    signingPropsFile.withInputStream { signingProps.load(it) }
+}
+def signingValue = { String prop, String env ->
+    def v = signingProps.getProperty(prop) ?: System.getenv(env)
+    return v ? v.trim() : null
+}
+def releaseStoreFile = signingValue('storeFile', 'SCOUT_KEYSTORE_FILE')
+def releaseStorePassword = signingValue('storePassword', 'SCOUT_KEYSTORE_PASSWORD')
+def releaseKeyAlias = signingValue('keyAlias', 'SCOUT_KEY_ALIAS')
+def releaseKeyPassword = signingValue('keyPassword', 'SCOUT_KEY_PASSWORD') ?: releaseStorePassword
+def hasReleaseSigning = releaseStoreFile && releaseStorePassword && releaseKeyAlias
+
+// versionCode must rise with every build that is meant to install over the
+// last one. It is minutes since 2025-01-01 UTC rather than a git commit count
+// because cloud and CI checkouts are shallow, where the count is the clone
+// depth and would go DOWN. Minutes stay below Android's 2,100,000,000 ceiling
+// for ~4,000 years. Override with -PscoutVersionCode=N to rebuild a given code.
+// It was a hand-bumped 2 before this; any computed value is far above that, so
+// phones on the 1.1 build still upgrade.
+def scoutVersionCode = project.hasProperty('scoutVersionCode')
+        ? project.property('scoutVersionCode').toString().toInteger()
+        : (int) ((System.currentTimeMillis() - Date.parse('yyyy-MM-dd HH:mm z', '2025-01-01 00:00 UTC').time) / 60000L)
+
 android {
     namespace = "cloud.agripulse.scout"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,7 +49,7 @@ android {
         applicationId "cloud.agripulse.scout"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
+        versionCode scoutVersionCode
         versionName "1.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -16,8 +58,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile rootProject.file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -43,6 +98,18 @@ dependencies {
 }
 
 apply from: 'capacitor.build.gradle'
+
+// An unsigned release APK builds "successfully" and then refuses to install,
+// which reads on the phone as a broken file. Fail the build instead.
+gradle.taskGraph.whenReady { graph ->
+    def wantsRelease = graph.allTasks.any { it.project == project && it.name ==~ /(assemble|bundle|package)Release/ }
+    if (wantsRelease && !hasReleaseSigning) {
+        throw new GradleException(
+            "Release signing is not configured. Create android/keystore.properties " +
+            "(see keystore.properties.example) or set SCOUT_KEYSTORE_FILE, " +
+            "SCOUT_KEYSTORE_PASSWORD and SCOUT_KEY_ALIAS.")
+    }
+}
 
 try {
     def servicesJSON = file('google-services.json')
