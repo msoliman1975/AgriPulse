@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { assignBlockCrop } from "@/api/cropAssignments";
 import { isApiError } from "@/api/errors";
 import { CropPicker } from "@/modules/farms/components/CropPicker";
+import { useTreeImpactConfirm } from "@/modules/farms/treeImpact/useTreeImpactConfirm";
 import { BulkCropRemovalPanel } from "@/modules/settings/components/BulkCropRemovalPanel";
 import { useCapability } from "@/rbac/useCapability";
 
@@ -44,6 +45,8 @@ export function BlockCropAssignCard({
   const [planting, setPlanting] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A crop decides which decision trees run on the block.
+  const treeImpact = useTreeImpactConfirm();
 
   if (!canAssign && !canRemove) return null;
 
@@ -58,6 +61,17 @@ export function BlockCropAssignCard({
 
   const submit = async (): Promise<void> => {
     if (!cropId || !complete || !season) return;
+    const ok = await treeImpact.confirm(farmId, {
+      blocks: [
+        {
+          block_id: blockId,
+          crop_id: cropId,
+          crop_variety_id: varietyId,
+          crop_variety_strain_id: strainId,
+        },
+      ],
+    });
+    if (!ok) return;
     setBusy(true);
     setError(null);
     try {
@@ -184,6 +198,7 @@ export function BlockCropAssignCard({
           Cancel
         </button>
       </div>
+      {treeImpact.dialog}
     </form>
   );
 }
