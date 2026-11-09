@@ -4,6 +4,33 @@ Promotions are gated by human PRs that bump image tags in the per-env
 overlay. There is no automated promotion in V1 â€” that's the feature,
 not a gap. Manual gates are what keep prod's blast radius bounded.
 
+## Current reality: Hetzner is the only live environment
+
+AWS/dev is decommissioned (see `infra/argocd/appsets/services.yaml`). The only
+ArgoCD destination is the Hetzner node, driven by
+`infra/argocd/overlays/hetzner/values.yaml`, which auto-syncs on merge. The
+`argocd-sync.yml` bumps of `overlays/dev/values.yaml` still land on `main`, but
+nothing deploys from them, so there is no dev environment to check.
+
+A prod promotion is therefore: merge the feature PR, wait for `ci` on `main`
+(the `containers (...)` jobs build the images tagged with the short SHA), then
+a PR that bumps the api / workers / frontend tags in the hetzner overlay, with
+a note on each saying what changed, what to watch and the rollback tag.
+
+### Verify the frontend after a prod promotion
+
+Once the promotion PR merges, confirm prod actually serves the new frontend:
+
+```bash
+scripts/ops/verify-prod-frontend.sh <frontend-tag>
+```
+
+It polls `https://app.agripulse.cloud` (up to 10 min by default) until the
+entry bundle names that build: the image bakes its short SHA in as
+`__APP_VERSION__`. Exit 0 means prod serves it; exit 1 prints the version prod
+serves instead. Run it whenever the frontend tag changed. The api and workers
+expose no version without a token, so they are not covered.
+
 ## The three overlays
 
 | Overlay | Auto-bumped by | Approvals to merge | Soak target |
