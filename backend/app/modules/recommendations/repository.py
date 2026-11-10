@@ -1420,6 +1420,23 @@ class RecommendationsRepository:
         ).all()
         return frozenset(r.tree_id for r in rows)
 
+    async def list_farm_tree_exclusions_by_source(self, *, farm_id: UUID) -> dict[UUID, str]:
+        """``{tree_id: 'farm' | 'tenant'}`` for the trees one farm has off.
+
+        'farm' rows are the farm's own choice; 'tenant' rows were written by
+        the tenant-wide switch (tenant 0099). Only 'farm' rows are cleared when
+        a tree stops matching the farm's blocks.
+        """
+        rows = (
+            await self._tenant.execute(
+                text(
+                    "SELECT tree_id, source FROM farm_tree_exclusions WHERE farm_id = :fid"
+                ).bindparams(bindparam("fid", type_=PG_UUID(as_uuid=True))),
+                {"fid": farm_id},
+            )
+        ).all()
+        return {r.tree_id: r.source for r in rows}
+
     async def add_farm_tree_exclusion(
         self, *, farm_id: UUID, tree_id: UUID, actor_user_id: UUID | None
     ) -> bool:
@@ -1473,12 +1490,18 @@ class RecommendationsRepository:
             result = await self._tenant.execute(
                 text(
                     """
-                    INSERT INTO farm_tree_exclusions (farm_id, tree_id, disabled_by)
-                    SELECT f.id, :tid, :actor
+                    INSERT INTO farm_tree_exclusions (farm_id, tree_id, disabled_by, source)
+                    SELECT f.id, :tid, :actor, 'tenant'
                       FROM farms f
                      WHERE f.deleted_at IS NULL
-                    ON CONFLICT (farm_id, tree_id) DO NOTHING
-                    RETURNING farm_id
+                    -- A farm that already had the tree off keeps its row but
+                    -- the tenant's decision now owns it, so a later crop
+                    -- change does not clear it (tenant 0099). Not counted as
+                    -- a change: the farm was off before and is off after.
+                    ON CONFLICT (farm_id, tree_id) DO UPDATE
+                       SET source = 'tenant'
+                     WHERE farm_tree_exclusions.source <> 'tenant'
+                    RETURNING farm_id, (xmax = 0) AS inserted
                     """
                 ).bindparams(
                     bindparam("tid", type_=PG_UUID(as_uuid=True)),
@@ -1486,13 +1509,15 @@ class RecommendationsRepository:
                 ),
                 {"tid": tree_id, "actor": actor_user_id},
             )
-        else:
-            result = await self._tenant.execute(
-                text(
-                    "DELETE FROM farm_tree_exclusions WHERE tree_id = :tid RETURNING farm_id"
-                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
-                {"tid": tree_id},
-            )
+            # Only the farms that went from on to off; a row re-marked as
+            # 'tenant' was already off.
+            return sum(1 for r in result.all() if r.inserted)
+        result = await self._tenant.execute(
+            text(
+                "DELETE FROM farm_tree_exclusions WHERE tree_id = :tid RETURNING farm_id"
+            ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+            {"tid": tree_id},
+        )
         return len(result.all())
 
     async def count_farms_running_tree(self, *, tree_id: UUID) -> tuple[int, int]:

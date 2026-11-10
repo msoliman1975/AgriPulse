@@ -356,6 +356,10 @@ class FarmTreeExclusion(Base):
         DateTime(timezone=True), nullable=False, server_default=text("public.app_now()")
     )
     disabled_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    #: 'farm' when the farm turned the tree off itself; 'tenant' when the
+    #: tenant-wide switch did (tenant 0099). Only 'farm' rows are cleared when
+    #: the tree stops matching the farm's blocks.
+    source: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'farm'"))
 
 
 class TenantDecisionTreeDispatch(Base):
