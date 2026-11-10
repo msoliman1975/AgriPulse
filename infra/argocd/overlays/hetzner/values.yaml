@@ -4081,9 +4081,19 @@ global:
       #   migration. Watch: assigning a crop still saves when the preview
       #   fails; farm settings shows "Assign a crop…" on a crop-less farm.
       #   Rollback: all three to 317609c.
-      tag: "6ee00bc"
+      # 407bd10 = #812, api and workers. A crop, soil, country or block change
+      #   no longer clears a tenant-wide "off everywhere" on a farm that did
+      #   not match the tree yet; only a farm's own "off" is cleared.
+      #   MIGRATION -- tenant 0099 adds farm_tree_exclusions.source ('farm' |
+      #   'tenant', default 'farm') and marks existing rows written together
+      #   across farms (same tree_id and disabled_at) as 'tenant'. Safe to
+      #   leave behind on a rollback: 6ee00bc inserts without the column and
+      #   gets the 'farm' default, and never reads it. Frontend unchanged
+      #   (stays 64bd597). Watch: the PreSync migration job completes for
+      #   every tenant. Rollback: api and workers to 6ee00bc.
+      tag: "407bd10"
     workers:
-      tag: "6ee00bc"
+      tag: "407bd10"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
