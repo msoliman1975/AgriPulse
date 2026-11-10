@@ -1248,7 +1248,7 @@ class RecommendationsServiceImpl:
         )
         blocks_before = await self._repo.list_farm_block_targeting(farm_id=farm_id)
         country_before = await self._repo.get_farm_country_code(farm_id=farm_id)
-        excluded = await self._repo.list_farm_tree_exclusions(farm_id=farm_id)
+        by_source = await self._repo.list_farm_tree_exclusions_by_source(farm_id=farm_id)
         country_after = country_before if country_code is UNSET else country_code
         blocks_after = apply_block_changes(blocks_before, block_changes)
         return compute_farm_tree_impact(
@@ -1258,7 +1258,8 @@ class RecommendationsServiceImpl:
             blocks_after=blocks_after,
             country_before=country_before,
             country_after=country_after,
-            excluded=excluded,
+            excluded=frozenset(by_source),
+            clearable=frozenset(t for t, src in by_source.items() if src == "farm"),
             changed_block_ids=[UUID(str(c["block_id"])) for c in block_changes],
         )
 
@@ -1280,10 +1281,16 @@ class RecommendationsServiceImpl:
         tree the farm never saw. The row only ever meant something for a tree
         that applied to the farm.
 
+        Only the farm's own choices are cleared. A row the tenant-wide switch
+        wrote (``source='tenant'``, tenant 0099) stays: the tenant said "not on
+        any farm", and a farm that does not match the tree yet is exactly where
+        that still has to hold when the crop arrives.
+
         Runs in the caller's transaction, so it sees the change it follows.
         Returns the trees whose exclusion was cleared; each is audited.
         """
-        excluded = await self._repo.list_farm_tree_exclusions(farm_id=farm_id)
+        by_source = await self._repo.list_farm_tree_exclusions_by_source(farm_id=farm_id)
+        excluded = frozenset(t for t, src in by_source.items() if src == "farm")
         if not excluded:
             return []
         trees = await self._repo.list_active_trees_with_current_version(
@@ -3282,6 +3289,7 @@ def compute_farm_tree_impact(
     country_after: str | None,
     excluded: frozenset[UUID],
     changed_block_ids: Sequence[UUID],
+    clearable: frozenset[UUID] | None = None,
 ) -> dict[str, Any]:
     """Before/after comparison behind ``preview_farm_tree_impact``.
 
@@ -3294,7 +3302,12 @@ def compute_farm_tree_impact(
 
     A tree the farm turned off is still listed where it starts or stops, with
     ``enabled=False``, so the dialog can say it will not actually run.
+
+    ``excluded`` is every tree the farm has off; ``clearable`` the ones a
+    reconcile may forget — the farm's own choices, not the tenant-wide ones.
+    Omitted, every exclusion is clearable.
     """
+    clearable_ids = excluded if clearable is None else clearable
     before = farm_tree_matches(trees, blocks=blocks_before, country_code=country_before)
     after = farm_tree_matches(trees, blocks=blocks_after, country_code=country_after)
     labels = {b["block_id"]: (b.get("label"), b.get("label_ar")) for b in blocks_before}
@@ -3338,11 +3351,12 @@ def compute_farm_tree_impact(
         else:
             farm_stopping.append(_tree_ref(tree, blocks=0, enabled=tid not in excluded))
     # Exactly the rows ``reconcile_farm_tree_exclusions`` will delete once the
-    # change is saved: every "off" choice for a tree that then matches nothing.
+    # change is saved: every farm-made "off" choice for a tree that then
+    # matches nothing. Tenant-wide ones stay and are not reported.
     exclusions_cleared = [
         _tree_ref(tree)
         for tree in trees
-        if tree["tree_id"] in excluded and not after.get(tree["tree_id"])
+        if tree["tree_id"] in clearable_ids and not after.get(tree["tree_id"])
     ]
     return {
         "farm_id": farm_id,

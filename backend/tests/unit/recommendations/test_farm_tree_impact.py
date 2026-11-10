@@ -181,3 +181,33 @@ def test_a_change_that_moves_nothing_says_so() -> None:
 
     assert out["changes_anything"] is False
     assert isinstance(out["blocks"][0]["block_id"], UUID)
+
+
+def test_a_tenant_wide_exclusion_is_not_reported_as_cleared() -> None:
+    mango = _tree("mango", crops=["mango"])
+    potato = _tree("potato", crops=["potato"])
+    b1 = _block("mango")
+    b2 = _block("potato")
+    after = apply_block_changes(
+        [b1, b2],
+        [
+            {"block_id": b1["block_id"], "crop_path": None},
+            {"block_id": b2["block_id"], "crop_path": None},
+        ],
+    )
+
+    out = compute_farm_tree_impact(
+        farm_id=uuid4(),
+        trees=[mango, potato],
+        blocks_before=[b1, b2],
+        blocks_after=after,
+        country_before="EG",
+        country_after="EG",
+        excluded=frozenset({mango["tree_id"], potato["tree_id"]}),
+        # Only potato was the farm's own choice; mango was turned off tenant-wide.
+        clearable=frozenset({potato["tree_id"]}),
+        changed_block_ids=[b1["block_id"], b2["block_id"]],
+    )
+
+    assert [t["code"] for t in out["exclusions_cleared"]] == ["potato"]
+    assert {t["code"] for t in out["farm_stopping"]} == {"mango", "potato"}

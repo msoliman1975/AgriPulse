@@ -636,6 +636,73 @@ async def test_removing_the_last_matching_crop_forgets_the_farms_off_choice(
     assert rows[mango_id]["enabled"] is True
 
 
+@pytest.mark.asyncio
+async def test_a_tenant_wide_off_survives_a_farm_that_does_not_match_yet(
+    admin_session: AsyncSession,
+) -> None:
+    """The tenant said "not on any farm". A farm without the crop yet must
+    still have the tree off when the crop arrives, so a reconcile leaves the
+    tenant's rows alone (tenant 0099); only a farm's own choice is forgotten.
+    """
+    tenant = await _make_tenant(admin_session, "sel-tenantoff")
+    mango_id = await _publish_tree(
+        tenant.tenant_id, f"sel_mango_{uuid4().hex[:8]}", crop_paths=("mango",)
+    )
+    mango_farm, mango_blocks = await _seed_farm(
+        admin_session, tenant.schema_name, code="TWM", block_count=1
+    )
+    potato_farm, potato_blocks = await _seed_farm(
+        admin_session, tenant.schema_name, code="TWP", block_count=1
+    )
+    await _assign_crop(admin_session, tenant.schema_name, mango_blocks[0], "mango")
+    await _assign_crop(admin_session, tenant.schema_name, potato_blocks[0], "potato")
+    # The mango farm turned it off first, on its own.
+    await _set_enabled(tenant, farm_id=mango_farm, tree_id=mango_id, enabled=False)
+
+    async def _off_everywhere(svc):  # type: ignore[no-untyped-def]
+        # The same repository call the tree page's "off everywhere" makes.
+        return await svc._repo.set_tree_excluded_on_every_farm(
+            tree_id=mango_id, excluded=True, actor_user_id=None
+        )
+
+    # Only the potato farm went from on to off; the mango farm was off already.
+    assert await _with_service(tenant, _off_everywhere) == 1
+
+    async def _preview(svc):  # type: ignore[no-untyped-def]
+        return await svc.preview_farm_tree_impact(
+            farm_id=mango_farm,
+            tenant_id=tenant.tenant_id,
+            block_changes=[{"block_id": mango_blocks[0], "crop_id": None, "crop_path": None}],
+        )
+
+    # The mango farm's row now belongs to the tenant decision: losing the
+    # crop does not forget it.
+    impact = await _with_service(tenant, _preview)
+    assert impact["exclusions_cleared"] == []
+
+    def _reconcile(farm_id: UUID):  # type: ignore[no-untyped-def]
+        async def run(svc):  # type: ignore[no-untyped-def]
+            return await svc.reconcile_farm_tree_exclusions(
+                farm_id=farm_id,
+                tenant_id=tenant.tenant_id,
+                actor_user_id=None,
+                tenant_schema=tenant.schema_name,
+            )
+
+        return run
+
+    await _end_crop(admin_session, tenant.schema_name, mango_blocks[0])
+    assert await _with_service(tenant, _reconcile(mango_farm)) == []
+    assert await _with_service(tenant, _reconcile(potato_farm)) == []
+    assert mango_id in await _exclusions(admin_session, tenant.schema_name, mango_farm)
+    assert mango_id in await _exclusions(admin_session, tenant.schema_name, potato_farm)
+
+    # Mango arrives on the potato farm: the tree is listed, and off.
+    await _assign_crop(admin_session, tenant.schema_name, potato_blocks[0], "mango")
+    rows = {r["tree_id"]: r for r in (await _list_selection(tenant, potato_farm))["trees"]}
+    assert rows[mango_id]["enabled"] is False
+
+
 # ---------- B: per-tenant sweep cadence -------------------------------------
 
 
