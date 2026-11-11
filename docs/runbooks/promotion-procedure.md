@@ -31,6 +31,24 @@ entry bundle names that build: the image bakes its short SHA in as
 serves instead. Run it whenever the frontend tag changed. The api and workers
 expose no version without a token, so they are not covered.
 
+### Check the Beta designer after a prod promotion
+
+When the frontend tag changed, also confirm the platform Beta designer works:
+
+```bash
+AGRIPULSE_SMOKE_USER=... AGRIPULSE_SMOKE_PASSWORD=... \
+  node scripts/ops/check-prod-beta-designer.cjs [tree-code] [screenshot-dir]
+```
+
+It signs in through Keycloak as a platform admin, opens a Beta tree (the
+first in the list unless a code is given), checks the Canvas, Targeting,
+Combinations and Dry run tabs, and that the Targeting tab shows the crop
+picker, the country list and the seven soil textures. It only clicks tabs;
+nothing is saved. Exit 0 passes; exit 1 names the failed step and saves a
+screenshot; exit 2 means missing credentials. Keep the credentials in the
+environment, never in a file, and do not loop on a failed sign-in: ten wrong
+passwords lock the account.
+
 ## The three overlays
 
 | Overlay | Auto-bumped by | Approvals to merge | Soak target |
