@@ -4091,9 +4091,15 @@ global:
       #   gets the 'farm' default, and never reads it. Frontend unchanged
       #   (stays 64bd597). Watch: the PreSync migration job completes for
       #   every tenant. Rollback: api and workers to 6ee00bc.
-      tag: "407bd10"
+      # 0383ce9 = #814, api, workers and frontend. Publishing a beta tree
+      #   version now copies its crop_paths, country_codes, soil_textures and
+      #   scope onto public.decision_trees (before, only creation did), so a
+      #   targeting change made in the Beta designer reaches the sweep and
+      #   farm settings. No migration. Watch: publishing a beta tree still
+      #   succeeds. Rollback: api and workers to 407bd10.
+      tag: "0383ce9"
     workers:
-      tag: "407bd10"
+      tag: "0383ce9"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4784,7 +4790,10 @@ global:
       #   block inactivate, soil and country edits; map-v2: block inactivate)
       #   show the same decision-tree impact dialog before saving. No API
       #   change, no migration. Rollback: 6ee00bc.
-      tag: "64bd597"
+      # 0383ce9 = #814, frontend, see the api note. The Beta designer gains a
+      #   Targeting tab (crops, countries, soil textures; empty = any) saved
+      #   in the tree's definition. Rollback: 64bd597.
+      tag: "0383ce9"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
