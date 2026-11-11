@@ -862,9 +862,12 @@ class InvestorsService:
             },
         }
 
-    async def farm_map(self, *, farm_id: UUID) -> dict[str, Any]:
-        blocks = await self._repo.farm_blocks(farm_id=farm_id)
-        holdings = await self.list_holdings(farm_id=farm_id)
+    async def farm_map(self, *, farm_id: UUID, geometry: bool = True) -> dict[str, Any]:
+        """Blocks and holdings of a farm. ``geometry=False`` leaves every
+        ``boundary`` null, for screens that count and sum but draw nothing."""
+        blocks = await self._repo.farm_blocks(farm_id=farm_id, geometry=geometry)
+        rows = await self._repo.list_holdings(farm_id=farm_id, geometry=geometry)
+        holdings = [_shape_holding(r) for r in rows]
         return {"farm_id": farm_id, "blocks": blocks, "holdings": holdings}
 
     # ---- Investor app (the signed-in investor's own rows) -----------------

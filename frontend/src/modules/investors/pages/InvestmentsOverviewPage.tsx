@@ -4,12 +4,12 @@ import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 
 import {
-  getFarmHoldingsMap,
+  getFarmHoldingsSummary,
   getInvestmentsOverview,
   listFarmInvestors,
-  type FarmHoldingsMap,
+  type FarmHoldingsSummary,
   type FarmInvestor,
-  type Holding,
+  type Holding as FullHolding,
 } from "@/api/investors";
 import { AsyncBoundary } from "@/components/AsyncBoundary";
 import { Card } from "@/components/Card";
@@ -23,6 +23,9 @@ import { queryState } from "@/components/asyncState";
 import { localizedName } from "@/lib/localizedField";
 import { AreaDisplay } from "@/modules/farms/components/AreaDisplay";
 import { HOLDING_STATUS_COLOR, INVESTOR_STATUS_PILL, formatPct } from "../lib";
+
+/** A holding as the Overview gets it: no polygon. */
+type Holding = Omit<FullHolding, "boundary">;
 
 /** The undrawn part of the land bar. */
 const UNDRAWN_COLOR = "#e2e8f0";
@@ -78,7 +81,10 @@ export interface OverviewFigures {
 }
 
 /** Everything the page shows that the overview route does not count itself. */
-export function overviewFigures(map: FarmHoldingsMap, investors: FarmInvestor[]): OverviewFigures {
+export function overviewFigures(
+  map: FarmHoldingsSummary,
+  investors: FarmInvestor[],
+): OverviewFigures {
   const holdings = map.holdings.filter((h) => h.archived_at === null);
   const sold = holdings.filter((h) => h.current_owner !== null);
   const forSale = holdings.filter((h) => h.current_owner === null && h.status === "available");
@@ -155,8 +161,9 @@ export function InvestmentsOverviewPage(): JSX.Element {
     enabled: Boolean(farmId),
   });
   const mapQ = useQuery({
-    queryKey: ["holdings", "farm-map", farmId],
-    queryFn: () => getFarmHoldingsMap(farmId),
+    // Not the map pages' key: this entry has no boundaries.
+    queryKey: ["holdings", "farm-summary", farmId],
+    queryFn: () => getFarmHoldingsSummary(farmId),
     enabled: Boolean(farmId),
   });
   const invQ = useQuery({

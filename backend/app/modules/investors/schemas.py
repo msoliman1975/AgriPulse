@@ -370,16 +370,22 @@ class FarmMapBlock(BaseModel):
     code: str
     name: str | None = None
     name_ar: str | None = None
-    boundary: dict[str, Any]
+    # Null when the map was asked for with geometry=false.
+    boundary: dict[str, Any] | None
     area_m2: Decimal
     # False for a pivot split into sectors: draw on a sector instead.
     eligible: bool
 
 
+class FarmMapHolding(HoldingResponse):
+    # Null when the map was asked for with geometry=false.
+    boundary: dict[str, Any] | None  # type: ignore[assignment]
+
+
 class FarmHoldingsMapResponse(BaseModel):
     farm_id: UUID
     blocks: list[FarmMapBlock]
-    holdings: list[HoldingResponse]
+    holdings: list[FarmMapHolding]
 
 
 # ---- Investor app (what the investor sees about themselves) ---------------

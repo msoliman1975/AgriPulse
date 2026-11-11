@@ -90,7 +90,7 @@ _HOLDING_COLUMNS = """
     h.id, h.code, b.farm_id, f.name AS farm_name, f.name_ar AS farm_name_ar,
     h.block_id, b.code AS block_code, b.name AS block_name,
     b.name_ar AS block_name_ar,
-    h.name, h.name_ar, ST_AsGeoJSON(h.boundary)::jsonb AS boundary,
+    h.name, h.name_ar, {boundary},
     h.area_m2,
     round(ST_Area(b.boundary_utm)::numeric, 2) AS block_area_m2,
     round(h.area_m2 * 100 / NULLIF(ST_Area(b.boundary_utm)::numeric, 0), 2) AS share_pct,
@@ -114,6 +114,15 @@ _HOLDING_COLUMNS = """
        WHERE o3.holding_id = h.id AND o3.deleted_at IS NULL
     ) AS has_ownership_history
 """
+
+_HOLDING_GEOJSON = "ST_AsGeoJSON(h.boundary)::jsonb AS boundary"
+# For callers that only count and sum: the polygon is most of the row's bytes.
+_NO_GEOMETRY = "NULL::jsonb AS boundary"
+
+
+def _holding_columns(*, geometry: bool = True) -> str:
+    return _HOLDING_COLUMNS.format(boundary=_HOLDING_GEOJSON if geometry else _NO_GEOMETRY)
+
 
 _HOLDING_FROM = f"""
     holdings h
@@ -446,6 +455,7 @@ class InvestorsRepository:
         block_id: UUID | None = None,
         investor_id: UUID | None = None,
         include_archived: bool = False,
+        geometry: bool = True,
     ) -> list[dict[str, Any]]:
         clauses = ["h.deleted_at IS NULL"]
         params: dict[str, Any] = {}
@@ -465,14 +475,14 @@ class InvestorsRepository:
         if not include_archived:
             clauses.append("h.archived_at IS NULL")
         sql = (
-            f"SELECT {_HOLDING_COLUMNS} FROM {_HOLDING_FROM} "
+            f"SELECT {_holding_columns(geometry=geometry)} FROM {_HOLDING_FROM} "
             f"WHERE {' AND '.join(clauses)} ORDER BY b.code, h.code"
         )
         return await self._rows(sql, params, tuple(uuid_params))
 
     async def get_holding(self, *, holding_id: UUID) -> dict[str, Any] | None:
         rows = await self._rows(
-            f"SELECT {_HOLDING_COLUMNS} FROM {_HOLDING_FROM} "
+            f"SELECT {_holding_columns()} FROM {_HOLDING_FROM} "
             "WHERE h.id = :id AND h.deleted_at IS NULL",
             {"id": holding_id},
             ("id",),
@@ -771,12 +781,13 @@ class InvestorsRepository:
             ("farm_id",),
         )
 
-    async def farm_blocks(self, *, farm_id: UUID) -> list[dict[str, Any]]:
+    async def farm_blocks(self, *, farm_id: UUID, geometry: bool = True) -> list[dict[str, Any]]:
         """Active blocks of a farm, as the Holdings map draws them."""
+        boundary = "ST_AsGeoJSON(b.boundary)::jsonb" if geometry else "NULL::jsonb"
         return await self._rows(
             f"""
             SELECT b.id, b.code, b.name, b.name_ar,
-                   ST_AsGeoJSON(b.boundary)::jsonb AS boundary,
+                   {boundary} AS boundary,
                    round(ST_Area(b.boundary_utm)::numeric, 2) AS area_m2,
                    NOT EXISTS (
                      SELECT 1 FROM blocks c

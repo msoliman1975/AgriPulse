@@ -332,6 +332,30 @@ async def test_farm_map_returns_blocks_and_holdings(scouting_env: ScoutingFixtur
     assert [b["id"] for b in body["blocks"]] == [env.block_id]
     assert body["blocks"][0]["eligible"] is True
     assert [h["code"] for h in body["holdings"]] == [sold["code"]]
+    assert body["blocks"][0]["boundary"]["type"] == "Polygon"
+    assert body["holdings"][0]["boundary"]["type"] == "Polygon"
+
+
+@pytest.mark.asyncio
+async def test_farm_map_without_geometry(scouting_env: ScoutingFixture) -> None:
+    """The Overview's call: same rows and figures, no polygons."""
+    env = scouting_env
+    _, investor = await _sold_holding(env)
+    async with _client(env.admin_context) as c:
+        full = (await c.get(f"/api/v1/farms/{env.farm_id}/holdings-map")).json()
+        resp = await c.get(f"/api/v1/farms/{env.farm_id}/holdings-map?geometry=false")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert [b["boundary"] for b in body["blocks"]] == [None]
+    assert [h["boundary"] for h in body["holdings"]] == [None]
+
+    def strip(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [{k: v for k, v in r.items() if k != "boundary"} for r in rows]
+
+    assert strip(body["blocks"]) == strip(full["blocks"])
+    assert strip(body["holdings"]) == strip(full["holdings"])
+    assert body["holdings"][0]["status"] == "sold"
+    assert body["holdings"][0]["current_owner"]["investor_id"] == investor["id"]
 
 
 async def _rekey(admin_session: Any, *, old_id: UUID, sub: UUID) -> None:
