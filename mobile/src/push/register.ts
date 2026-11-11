@@ -16,7 +16,7 @@
  * than by being told.
  */
 
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 
 import { registerDevice, revokeDevice } from "@/api/client";
@@ -31,6 +31,27 @@ export function pushSupported(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable("PushNotifications");
 }
 
+/**
+ * Native, in `MainActivity`: whether this APK carries a Firebase config.
+ * Without one, `PushNotifications.register()` throws natively and Capacitor
+ * turns that into an app crash rather than a rejected promise, so the check
+ * has to happen before the call, not around it.
+ */
+const PushConfig = registerPlugin<{ status(): Promise<{ firebaseConfigured: boolean }> }>(
+  "PushConfig",
+);
+
+async function firebaseConfigured(): Promise<boolean> {
+  // An APK built before the plugin existed has no PushConfig; treat as
+  // unconfigured so it degrades to "no push" rather than to a crash.
+  if (!Capacitor.isPluginAvailable("PushConfig")) return false;
+  try {
+    return (await PushConfig.status()).firebaseConfigured;
+  } catch {
+    return false;
+  }
+}
+
 async function run(farmId: string): Promise<void> {
   // Registration is farm-gated: a Scout holds no tenant role, so the wrong
   // farm is a guaranteed 403 and the phone silently never buzzes. The farm now
@@ -38,6 +59,11 @@ async function run(farmId: string): Promise<void> {
   // a build-time constant that could name somebody else's farm entirely.
   if (!farmId) {
     console.warn("push: no farm resolved yet; skipping device registration");
+    return;
+  }
+
+  if (!(await firebaseConfigured())) {
+    console.warn("push: this build has no Firebase config; skipping device registration");
     return;
   }
 
