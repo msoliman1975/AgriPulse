@@ -60,6 +60,7 @@ import { BetaDryRunPanel } from "../components/BetaDryRunPanel";
 import { WalkExplainerPanel } from "../components/WalkExplainerPanel";
 import { BetaNodePanel } from "../components/BetaNodePanel";
 import { CombinationsTab } from "../components/CombinationsTab";
+import { TargetingTab } from "../components/TargetingTab";
 import { PublishChecksPanel } from "../components/PublishChecksPanel";
 import { betaEditorHints, type EditorHint } from "../lib/betaCompile";
 import { layoutBetaTree } from "../lib/betaLayout";
@@ -75,10 +76,12 @@ import {
   fillSwitchDefaults,
   parseBetaDoc,
   readCombinations,
+  readTargeting,
   readRegisters,
   setBetaNode,
   setBetaNodePosition,
   writeCombinations,
+  writeTargeting,
   writeRegisters,
   type BetaNode,
   type BetaNodeKind,
@@ -87,7 +90,7 @@ import {
 } from "../lib/betaTree";
 import { betaBasePath } from "../lib/betaRoutes";
 
-type Tab = "canvas" | "combinations" | "dryRun";
+type Tab = "canvas" | "targeting" | "combinations" | "dryRun";
 
 interface PendingAdd {
   parentId: string;
@@ -154,6 +157,7 @@ export function BetaDesignerPage(): ReactNode {
   const layout = useMemo(() => layoutBetaTree(doc), [doc]);
   const declaredCodes = useMemo(() => readRegisters(doc), [doc]);
   const rules = useMemo(() => readCombinations(doc), [doc]);
+  const targeting = useMemo(() => readTargeting(doc), [doc]);
   const nodeIds = useMemo(() => Object.keys(doc?.nodes ?? {}).sort(), [doc]);
 
   /** Severity per code, read off the register nodes. The highest wins, which
@@ -454,6 +458,7 @@ export function BetaDesignerPage(): ReactNode {
               onChange={setTab}
               items={[
                 { value: "canvas", label: t("designer.tabs.canvas") },
+                { value: "targeting", label: t("designer.tabs.targeting") },
                 { value: "combinations", label: t("designer.tabs.combinations") },
                 { value: "dryRun", label: t("designer.tabs.dryRun") },
               ]}
@@ -527,6 +532,17 @@ export function BetaDesignerPage(): ReactNode {
                   ) : null}
                 </div>
               </div>
+            ) : null}
+
+            {tab === "targeting" ? (
+              <TargetingTab
+                targeting={targeting}
+                readOnly={readOnly}
+                onChange={(next) => {
+                  if (draftYaml === null) return;
+                  applyYaml(writeTargeting(draftYaml, next));
+                }}
+              />
             ) : null}
 
             {tab === "combinations" ? (

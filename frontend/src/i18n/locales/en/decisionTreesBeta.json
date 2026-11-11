@@ -43,6 +43,7 @@
     "loadFailed": "This tree could not be read.",
     "tabs": {
       "canvas": "Canvas",
+      "targeting": "Targeting",
       "combinations": "Combinations",
       "dryRun": "Dry run"
     },
@@ -68,7 +69,13 @@
     "discardFailed": "The draft was not discarded.",
     "noDraft": "No draft. The published version is on screen.",
     "cancel": "Cancel",
-    "readOnlyNoPermission": "You do not have permission to change this tree."
+    "readOnlyNoPermission": "You do not have permission to change this tree.",
+    "targeting": {
+      "title": "Where this tree runs",
+      "intro": "A block runs this tree only when its crop, its farm's country and its soil texture all match. Leave an axis empty to match any. A crop matches its varieties too: mango covers mango.alphonso.",
+      "any": "Any",
+      "publishNote": "Saved with the draft. Farms start or stop running the tree when this version is published."
+    }
   },
   "canvas": {
     "aria": "Beta tree canvas",
