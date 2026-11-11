@@ -369,8 +369,10 @@ async def test_publishing_a_version_moves_the_trees_targeting(admin_session: Asy
     carry them there, both when they are set and when they are cleared."""
     service = await _service(admin_session)
     code = _code("targeting")
+    # `_definition` targets mango; start from a tree that targets nothing.
+    untargeted = {k: v for k, v in _definition(code).items() if k != "crop_paths"}
     tree = await service.create_tree(
-        code=code, definition=_definition(code), notes=None, actor_user_id=None
+        code=code, definition=untargeted, notes=None, actor_user_id=None
     )
 
     async def _row() -> Any:
@@ -385,7 +387,7 @@ async def test_publishing_a_version_moves_the_trees_targeting(admin_session: Asy
         ).one()
 
     targeted = {
-        **_definition(code),
+        **untargeted,
         "crop_paths": ["mango", "citrus.valencia"],
         "country_codes": ["eg", "JO"],
         "soil_textures": ["clay"],
@@ -406,7 +408,7 @@ async def test_publishing_a_version_moves_the_trees_targeting(admin_session: Asy
 
     # Clearing them in a later version and publishing goes back to "any".
     v3 = await service.append_version(
-        tree_id=tree["id"], definition=_definition(code), notes=None, actor_user_id=None
+        tree_id=tree["id"], definition=untargeted, notes=None, actor_user_id=None
     )
     v3_id = next(v["id"] for v in v3["versions"] if v["version"] == 3)
     await service.publish_version(tree_id=tree["id"], version_id=v3_id, actor_user_id=None)
