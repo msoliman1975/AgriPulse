@@ -22,3 +22,20 @@ no dev deploy to check. Full procedure: `docs/runbooks/promotion-procedure.md`.
 
    It needs `app.agripulse.cloud` allowed in the session's network. On exit 1,
    report the version prod serves instead; do not call the deploy done.
+5. If the frontend tag changed, also check the Beta designer in prod:
+
+   ```bash
+   node scripts/ops/check-prod-beta-designer.cjs
+   ```
+
+   It signs in as a platform admin, opens a Beta tree and checks the four
+   tabs (Canvas, Targeting, Combinations, Dry run) and the Targeting fields.
+   It is read-only: never Save draft or Publish during a check.
+   - Credentials: `AGRIPULSE_SMOKE_USER` / `AGRIPULSE_SMOKE_PASSWORD`, from
+     the environment only. Never write them to a file, a commit, a PR or a
+     scheduled task. If they are not set, ask the user for them.
+   - Network: `app.`, `api.` and `keycloak.agripulse.cloud`.
+   - Do not retry a failed sign-in in a loop: ten wrong passwords lock the
+     account.
+   On exit 1, report the failing step and the screenshot; do not call the
+   deploy done.
