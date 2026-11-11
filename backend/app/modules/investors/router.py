@@ -14,7 +14,7 @@ Mounted under /api/v1:
 
   GET    /farms/{farm_id}/investments/overview        holding.read
   GET    /farms/{farm_id}/investors                   investor.read
-  GET    /farms/{farm_id}/holdings-map                holding.read
+  GET    /farms/{farm_id}/holdings-map                holding.read   (?geometry=false)
 
   GET    /farms/{farm_id}/holdings                    holding.read
   GET    /farms/{farm_id}/blocks/{block_id}/holdings  holding.read   (draw-screen context)
@@ -468,7 +468,10 @@ async def list_farm_investors(
 @router.get("/farms/{farm_id}/holdings-map", response_model=FarmHoldingsMapResponse)
 async def farm_holdings_map(
     farm_id: UUID,
+    # false: every boundary is null. The Overview only counts and sums, and
+    # the polygons are most of the response.
+    geometry: bool = Query(default=True),
     _: RequestContext = Depends(requires_capability("holding.read", farm_id_param="farm_id")),
     service: InvestorsService = Depends(_service),
 ) -> dict[str, Any]:
-    return await service.farm_map(farm_id=farm_id)
+    return await service.farm_map(farm_id=farm_id, geometry=geometry)

@@ -470,6 +470,24 @@ export async function getFarmHoldingsMap(farmId: string): Promise<FarmHoldingsMa
   return data;
 }
 
+/** The farm map without any polygon: what the Overview counts and sums. */
+export interface FarmHoldingsSummary {
+  farm_id: string;
+  blocks: Array<Omit<FarmMapBlock, "boundary">>;
+  holdings: Array<Omit<Holding, "boundary">>;
+}
+
+/**
+ * The farm map with every boundary left out, which is most of its bytes.
+ * Use it where nothing is drawn.
+ */
+export async function getFarmHoldingsSummary(farmId: string): Promise<FarmHoldingsSummary> {
+  const { data } = await apiClient.get<FarmHoldingsSummary>(`/v1/farms/${farmId}/holdings-map`, {
+    params: { geometry: false },
+  });
+  return data;
+}
+
 // ---- The signed-in investor -----------------------------------------------
 
 export interface InvestorAppMe {

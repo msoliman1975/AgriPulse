@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.core.errors import install_exception_handlers
 from app.core.logging import configure_logging, get_logger
@@ -100,7 +101,14 @@ def create_app() -> FastAPI:
     #                        SPA can't even start its real request.
     #   CorrelationIdMiddleware — runs before auth so a 401 from invalid
     #                             JWT still carries a correlation ID.
-    #   AuthMiddleware     — innermost: parses bearer token.
+    #   AuthMiddleware     — parses bearer token.
+    #   GZipMiddleware     — innermost: compresses JSON bodies over 1 KB
+    #                        when the client accepts gzip. Nothing in front
+    #                        of the API compresses (ingress-nginx defaults
+    #                        to use-gzip off), and map responses carrying
+    #                        GeoJSON shrink about tenfold. Starlette skips
+    #                        text/event-stream, so the SSE feed still streams.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
     app.add_middleware(AuthMiddleware)
     app.add_middleware(CorrelationIdMiddleware)
     if settings.cors_allowed_origins:
