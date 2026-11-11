@@ -4097,9 +4097,21 @@ global:
       #   targeting change made in the Beta designer reaches the sweep and
       #   farm settings. No migration. Watch: publishing a beta tree still
       #   succeeds. Rollback: api and workers to 407bd10.
-      tag: "0383ce9"
+      # a3d6a6b = #817, api, workers and frontend. The Investments Overview
+      #   was slow: it loaded GET /farms/{id}/holdings-map with every block
+      #   and holding polygon and drew none of them. holdings-map now takes
+      #   ?geometry=false (boundaries null); the Overview uses it, the
+      #   Holdings and New Holding maps keep the default. The api also
+      #   gzips JSON bodies over 1 KB (GZipMiddleware); nothing in front of
+      #   it compressed. text/event-stream is skipped, so the notifications
+      #   SSE feed is unchanged. No migration.
+      #   Watch: the notifications bell still updates live (SSE); the
+      #   Holdings map still draws blocks and holdings; API responses carry
+      #   content-encoding: gzip.
+      #   Rollback: api and workers to 0383ce9.
+      tag: "a3d6a6b"
     workers:
-      tag: "0383ce9"
+      tag: "a3d6a6b"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4793,7 +4805,15 @@ global:
       # 0383ce9 = #814, frontend, see the api note. The Beta designer gains a
       #   Targeting tab (crops, countries, soil textures; empty = any) saved
       #   in the tree's definition. Rollback: 64bd597.
-      tag: "0383ce9"
+      # a3d6a6b = #817, frontend, see the api note. The Overview asks for
+      #   holdings-map without geometry, and the SPA's nginx now gzips JS,
+      #   CSS, JSON, SVG and HTML (the 4.9 MB main bundle was sent raw).
+      #   Needs the api at a3d6a6b for the smaller payload; an older api
+      #   ignores ?geometry=false and still works.
+      #   Watch: /assets/*.js served with content-encoding: gzip; the
+      #   Investments Overview loads and its figures match the Holdings page.
+      #   Rollback: this tag alone back to 0383ce9.
+      tag: "a3d6a6b"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
