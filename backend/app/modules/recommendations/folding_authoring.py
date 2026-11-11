@@ -486,6 +486,25 @@ class FoldingTreeAuthorService:
                 applicable_regions=compiled.get("applicable_regions") or [],
                 actor_user_id=actor_user_id,
             )
+            # Targeting too. Without it the crops, countries and soils set in
+            # the designer's Targeting tab reached the catalogue row only when
+            # the tree was created, so a published change never moved which
+            # farms run the tree (nor the farm settings list, which reads the
+            # row).
+            await self._repo.update_tree_targeting_metadata(
+                tree_id=tree_id,
+                name_en=compiled.get("name_en") or tree["name_en"],
+                name_ar=compiled.get("name_ar"),
+                description_en=compiled.get("description_en"),
+                description_ar=compiled.get("description_ar"),
+                crop_id=crop_id,
+                crop_path=crop_path,
+                crop_paths=list(compiled.get("crop_paths") or []),
+                country_codes=list(compiled.get("country_codes") or []),
+                soil_textures=list(compiled.get("soil_textures") or []),
+                scope=compiled.get("scope") or tree.get("scope") or "block",
+                actor_user_id=actor_user_id,
+            )
         await self._audit.record(
             tenant_schema=None,
             event_type="recommendations.beta_tree_version_published",

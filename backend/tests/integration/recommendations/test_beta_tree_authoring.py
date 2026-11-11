@@ -363,6 +363,58 @@ async def test_publish_stamps_and_is_idempotent(admin_session: AsyncSession) -> 
 
 
 @pytest.mark.asyncio
+async def test_publishing_a_version_moves_the_trees_targeting(admin_session: AsyncSession) -> None:
+    """The designer's Targeting tab writes crops, countries and soils into the
+    definition. Farms are matched on the catalogue row, so publishing has to
+    carry them there, both when they are set and when they are cleared."""
+    service = await _service(admin_session)
+    code = _code("targeting")
+    tree = await service.create_tree(
+        code=code, definition=_definition(code), notes=None, actor_user_id=None
+    )
+
+    async def _row() -> Any:
+        return (
+            await admin_session.execute(
+                text(
+                    "SELECT crop_paths, country_codes, soil_textures "
+                    "FROM public.decision_trees WHERE id = :tid"
+                ),
+                {"tid": tree["id"]},
+            )
+        ).one()
+
+    targeted = {
+        **_definition(code),
+        "crop_paths": ["mango", "citrus.valencia"],
+        "country_codes": ["eg", "JO"],
+        "soil_textures": ["clay"],
+    }
+    v2 = await service.append_version(
+        tree_id=tree["id"], definition=targeted, notes=None, actor_user_id=None
+    )
+    # Saved but not published: the row still says "any".
+    row = await _row()
+    assert (row.crop_paths, row.country_codes, row.soil_textures) == ([], [], [])
+
+    v2_id = next(v["id"] for v in v2["versions"] if v["version"] == 2)
+    await service.publish_version(tree_id=tree["id"], version_id=v2_id, actor_user_id=None)
+    row = await _row()
+    assert row.crop_paths == ["mango", "citrus.valencia"]
+    assert row.country_codes == ["EG", "JO"]
+    assert row.soil_textures == ["clay"]
+
+    # Clearing them in a later version and publishing goes back to "any".
+    v3 = await service.append_version(
+        tree_id=tree["id"], definition=_definition(code), notes=None, actor_user_id=None
+    )
+    v3_id = next(v["id"] for v in v3["versions"] if v["version"] == 3)
+    await service.publish_version(tree_id=tree["id"], version_id=v3_id, actor_user_id=None)
+    row = await _row()
+    assert (row.crop_paths, row.country_codes, row.soil_textures) == ([], [], [])
+
+
+@pytest.mark.asyncio
 async def test_a_published_beta_tree_never_reaches_the_sweep(
     admin_session: AsyncSession,
 ) -> None:

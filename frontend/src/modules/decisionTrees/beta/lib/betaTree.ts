@@ -655,6 +655,52 @@ export function writeCombinations(yaml: string, rules: CombinationRule[]): strin
   return dumpBetaDoc(doc);
 }
 
+// ---- Targeting --------------------------------------------------------
+
+/** Which blocks the tree runs on. Each axis empty = any. Mirrors the
+ *  backend's `_validate_targeting`: `crop_paths` (taxonomy prefixes, so
+ *  `mango` covers `mango.keitt`), `country_codes` (ISO alpha-2 of the farm),
+ *  `soil_textures` (the block soil vocabulary). */
+export interface BetaTargeting {
+  crop_paths: string[];
+  country_codes: string[];
+  soil_textures: string[];
+}
+
+function stringList(v: unknown): string[] {
+  if (typeof v === "string") return v ? [v] : [];
+  if (!Array.isArray(v)) return [];
+  return [...new Set(v.filter((x): x is string => typeof x === "string" && x !== ""))];
+}
+
+export function readTargeting(doc: BetaTreeDoc | null): BetaTargeting {
+  // The legacy single `crop_path` still counts: the compiler folds it into
+  // `crop_paths`, so a tree written with it targets that crop.
+  const crops = [...stringList(doc?.crop_paths), ...stringList(doc?.crop_path)];
+  return {
+    crop_paths: [...new Set(crops)],
+    country_codes: stringList(doc?.country_codes).map((c) => c.toUpperCase()),
+    soil_textures: stringList(doc?.soil_textures),
+  };
+}
+
+/** Write the three axes into the definition. An empty axis is removed rather
+ *  than written as `[]`, so "any" reads the same as a tree that never set it.
+ *  The legacy `crop_path` goes too: left behind, the compiler would fold it
+ *  back in and a crop removed here would return on save. */
+export function writeTargeting(yaml: string, next: BetaTargeting): string {
+  const doc = parseBetaDoc(yaml);
+  if (!doc) throw new Error("writeTargeting: source YAML did not parse");
+  delete doc.crop_path;
+  const axes: (keyof BetaTargeting)[] = ["crop_paths", "country_codes", "soil_textures"];
+  for (const key of axes) {
+    const values = [...new Set(next[key])];
+    if (values.length > 0) doc[key] = values;
+    else delete doc[key];
+  }
+  return dumpBetaDoc(doc);
+}
+
 // ---- Starter ----------------------------------------------------------
 
 /** The smallest publishable beta tree: a condition, one register on the
