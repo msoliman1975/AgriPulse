@@ -14,9 +14,11 @@ import { ACTION_TYPES, ACTION_TYPE_GROUP_ORDER, isActionType } from "@/lib/actio
  * test reads the backend's own source rather than a copy of it.
  */
 const BACKEND_SCHEMAS = join(__dirname, "../../../backend/app/modules/recommendations/schemas.py");
-const MIGRATION_0015 = join(
+// The latest migration that sets the CHECK (0015 created it, 0100 added
+// `treat`). Point this at the newest one whenever the constraint changes.
+const MIGRATION_CHECK = join(
   __dirname,
-  "../../../backend/migrations/tenant/versions/0015_recommendations.py",
+  "../../../backend/migrations/tenant/versions/0100_recommendation_action_treat.py",
 );
 
 function backendLiteral(): string[] {
@@ -27,9 +29,10 @@ function backendLiteral(): string[] {
 }
 
 function checkConstraint(): string[] {
-  const src = readFileSync(MIGRATION_0015, "utf8");
-  const block = /action_type IN \(([\s\S]*?)\)"?\s*\)/.exec(src);
-  if (block === null) throw new Error("action_type CHECK not found in migration 0015");
+  const src = readFileSync(MIGRATION_CHECK, "utf8");
+  // The upgrade target is the `_NEW` constant.
+  const block = /_NEW = \(([\s\S]*?)\n\)/.exec(src);
+  if (block === null) throw new Error("_NEW action_type CHECK not found in migration 0100");
   return [...block[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
 }
 

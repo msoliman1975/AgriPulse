@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID
@@ -26,6 +26,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.indices.trends import compute_trend
+from app.modules.recommendations import cell_features
+from app.modules.recommendations.cell_features import CellObservation, compute_cell_features
 from app.modules.recommendations.models import DecisionTree, DecisionTreeVersion
 from app.shared import clock
 from app.shared.action_items import REC_SQL, TENANT_TODAY_SQL
@@ -2329,7 +2331,7 @@ class RecommendationsRepository:
     ) -> dict[UUID, dict[str, dict[str, Any]]]:
         """Latest per-cell mean per index for the block's active grid(s).
 
-        Shape ``{cell_id: {index_code: {time, mean}}}`` — the per-cell analogue
+        Shape ``{cell_id: {index_code: {time, mean, cell_*}}}`` — the per-cell analogue
         of :meth:`get_latest_aggregate_per_index`, read from
         ``block_grid_aggregates`` (the grid module's cell-grain hypertable).
         Only cells of a non-retired grid config are included. Drives the
@@ -2347,13 +2349,93 @@ class RecommendationsRepository:
         rows = await self._latest_cell_rows(block_id=block_id, lookback=True)
         if not rows:
             rows = await self._latest_cell_rows(block_id=block_id, lookback=False)
+        latest = [
+            CellObservation(
+                cell_id=row["cell_id"],
+                index_code=row["index_code"],
+                product_id=row["product_id"],
+                time=row["time"],
+                mean=row["mean"],
+                valid_pixel_pct=row["valid_pixel_pct"],
+            )
+            for row in rows
+        ]
+        history = await self._get_cell_history(block_id=block_id, latest=latest)
+        features = compute_cell_features(latest, history)
         out: dict[UUID, dict[str, dict[str, Any]]] = {}
-        for row in rows:
-            out.setdefault(row["cell_id"], {})[row["index_code"]] = {
-                "time": row["time"],
-                "mean": row["mean"],
+        for obs in latest:
+            out.setdefault(obs.cell_id, {})[obs.index_code] = {
+                "time": obs.time,
+                "mean": obs.mean,
+                **features[obs.cell_id][obs.index_code],
             }
         return out
+
+    async def _get_cell_history(
+        self, *, block_id: UUID, latest: list[CellObservation]
+    ) -> list[CellObservation]:
+        """The ``block_grid_aggregates`` rows the cell features need: the
+        day-of-year window around the latest scene in earlier seasons (the
+        baseline) plus the recent trend window. Filtered in SQL so a block
+        with years of history and thousands of cells reads only those rows;
+        the product and recent-days rules are applied in
+        :mod:`cell_features`."""
+        if not latest:
+            return []
+        # Cells can have different latest scenes (one was clouded out on the
+        # newest pass). Read a superset that covers every cell's own window:
+        # trend rows from the oldest latest scene on, and a day-of-year band
+        # widened by the spread between the oldest and newest latest scene.
+        ref = max(obs.time for obs in latest)
+        oldest = min(obs.time for obs in latest)
+        spread_days = min((ref - oldest).days + 1, 182)
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        """
+                        SELECT obs.cell_id, obs.index_code, obs.product_id,
+                               obs.time, obs.mean
+                        FROM block_grid_aggregates obs
+                        WHERE obs.block_id = :block_id
+                          AND obs.time <= :ref
+                          AND (
+                            obs.time >= :trend_since
+                            OR (
+                              obs.time < :baseline_before
+                              AND LEAST(
+                                ABS(LEAST(EXTRACT(DOY FROM obs.time), 365)
+                                    - :ref_doy),
+                                365 - ABS(LEAST(EXTRACT(DOY FROM obs.time), 365)
+                                          - :ref_doy)
+                              ) <= :window
+                            )
+                          )
+                        """
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                    {
+                        "block_id": block_id,
+                        "ref": ref,
+                        "trend_since": oldest - timedelta(days=cell_features.TREND_WINDOW_DAYS),
+                        "baseline_before": ref - timedelta(days=cell_features.EXCLUDE_RECENT_DAYS),
+                        "ref_doy": min(ref.timetuple().tm_yday, 365),
+                        "window": cell_features.BASELINE_WINDOW_DAYS + spread_days,
+                    },
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [
+            CellObservation(
+                cell_id=row["cell_id"],
+                index_code=row["index_code"],
+                product_id=row["product_id"],
+                time=row["time"],
+                mean=row["mean"],
+            )
+            for row in rows
+        ]
 
     async def _latest_cell_rows(self, *, block_id: UUID, lookback: bool) -> Sequence[Any]:
         window = (
@@ -2367,7 +2449,8 @@ class RecommendationsRepository:
                     text(
                         f"""
                         SELECT DISTINCT ON (obs.cell_id, obs.index_code)
-                               obs.cell_id, obs.index_code, obs.time, obs.mean
+                               obs.cell_id, obs.index_code, obs.time, obs.mean,
+                               obs.product_id, obs.valid_pixel_pct
                         FROM block_grid_aggregates obs
                         JOIN grid_cells gc ON gc.id = obs.cell_id
                         -- Valid time, not transaction time: the latest

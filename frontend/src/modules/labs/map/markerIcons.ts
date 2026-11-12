@@ -53,6 +53,7 @@ export const ALERT_ACTION_TYPES = [
   "inspect",
   "harvest_window",
   "prune",
+  "treat",
   "no_action",
   "other",
   "unknown",
@@ -160,6 +161,8 @@ const GLYPH_PATHS: Record<AlertActionType, string[]> = {
     "M6 20 a 2.5 2.5 0 1 1 0 -5 a 2.5 2.5 0 0 1 0 5 z",
     "M18 20 a 2.5 2.5 0 1 1 0 -5 a 2.5 2.5 0 0 1 0 5 z",
   ],
+  // A plus in a circle: a treatment applied to the palm.
+  treat: ["M12 21 a 9 9 0 1 1 0 -18 a 9 9 0 0 1 0 18 z", "M12 8 v 8", "M8 12 h 8"],
   // A bar — nothing to do.
   no_action: ["M5 12 h 14"],
   // Three dots.
