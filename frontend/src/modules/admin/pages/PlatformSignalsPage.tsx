@@ -105,6 +105,13 @@ export function PlatformSignalsPage(): ReactNode {
                 : d.aggregation,
           },
           {
+            // D21: an empty scope means every crop.
+            key: "crops",
+            header: t("signals.colCrops"),
+            className: "font-mono text-[11px] text-ap-muted",
+            cell: (d) => (d.crop_paths.length ? d.crop_paths.join(", ") : t("signals.allCrops")),
+          },
+          {
             key: "state",
             header: t("signals.colState"),
             cell: (d) => statePill(d.is_active),
@@ -134,6 +141,13 @@ export function PlatformSignalsPage(): ReactNode {
             header: t("signals.colName"),
             className: "text-xs text-ap-muted",
             cell: (tpl) => tpl.description ?? "—",
+          },
+          {
+            key: "crops",
+            header: t("signals.colCrops"),
+            className: "font-mono text-[11px] text-ap-muted",
+            cell: (tpl) =>
+              tpl.crop_paths.length ? tpl.crop_paths.join(", ") : t("signals.allCrops"),
           },
           {
             key: "state",

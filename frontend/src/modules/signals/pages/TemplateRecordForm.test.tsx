@@ -66,6 +66,7 @@ function defn(id: string, code: string, name: string): SignalDefinition {
     updated_at: "2026-05-01T00:00:00Z",
     aggregation: "latest",
     aggregation_window_days: null,
+    crop_paths: [],
   };
 }
 
@@ -79,6 +80,7 @@ const template: SignalTemplate = {
   is_active: true,
   created_at: "2026-05-01T00:00:00Z",
   updated_at: "2026-05-01T00:00:00Z",
+  crop_paths: [],
 };
 
 const definitions: SignalDefinition[] = [

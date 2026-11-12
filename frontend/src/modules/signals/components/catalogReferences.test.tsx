@@ -30,6 +30,7 @@ function defn(
     updated_at: "2026-01-01T00:00:00Z",
     aggregation: "latest",
     aggregation_window_days: null,
+    crop_paths: [],
     ...p,
   };
 }
