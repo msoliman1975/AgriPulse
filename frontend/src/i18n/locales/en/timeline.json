@@ -96,6 +96,7 @@
       "inspect": "Inspect",
       "harvest_window": "Harvest window",
       "prune": "Prune",
+      "treat": "Treat",
       "no_action": "No action",
       "other": "Other",
       "unknown": "Unclassified"
@@ -108,6 +109,7 @@
       "inspect": "Inspect",
       "harvest_window": "Harvest window",
       "prune": "Prune",
+      "treat": "Treat",
       "no_action": "No action",
       "other": "Other"
     },

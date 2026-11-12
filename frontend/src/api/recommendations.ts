@@ -14,6 +14,7 @@ export type RecommendationActionType =
   | "scout"
   | "harvest_window"
   | "prune"
+  | "treat"
   | "no_action"
   | "other";
 

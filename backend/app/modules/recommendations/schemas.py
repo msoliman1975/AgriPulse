@@ -18,6 +18,7 @@ ActionType = Literal[
     "scout",
     "harvest_window",
     "prune",
+    "treat",
     "no_action",
     "other",
 ]
