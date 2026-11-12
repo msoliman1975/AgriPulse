@@ -961,7 +961,9 @@
     "retired": "Retired",
     "emptyDefinitions": "No platform definitions yet.",
     "emptyTemplates": "No platform forms yet.",
-    "loadFailed": "Could not load the signal catalog."
+    "loadFailed": "Could not load the signal catalog.",
+    "colCrops": "Crops",
+    "allCrops": "All crops"
   },
   "phenology": {
     "heading": "Stage calendar — {{crop}}",
@@ -1008,7 +1010,8 @@
       "stages": "Stages",
       "sizes": "Size classes",
       "attributes": "Attributes",
-      "health": "Health"
+      "health": "Health",
+      "signals": "Signals"
     },
     "level": {
       "crop": "Crop",
@@ -1056,7 +1059,20 @@
     "attrsNoneInherited": "Nothing is inherited here.",
     "createDefaults": "Starts as a crop-only annual with no calendar. Set the cycle, the classification depth and the degree-day temperatures on Details afterwards.",
     "addingVariety": "New variety under {{parent}}",
-    "addingStrain": "New strain under {{parent}}"
+    "addingStrain": "New strain under {{parent}}",
+    "signals": {
+      "intro": "Signals and scout forms scoped to {{path}} switch on by themselves for every block on this crop or below it, and the scout app offers them only there. Definitions are written on the Signals page; scope is set here.",
+      "noneHere": "Nothing is scoped to {{path}} yet.",
+      "inherited": "Scoped to a crop above this one (change it there):",
+      "remove": "Remove from this crop",
+      "lastScope": "Only crop: retire it on the Signals page instead",
+      "addLabel": "Scope a signal to this crop",
+      "addPlaceholder": "Choose one scoped to another crop…",
+      "add": "Add",
+      "everyCrop_one": "{{count}} more applies to every crop",
+      "everyCrop_other": "{{count}} more apply to every crop",
+      "saveFailed": "Could not save the crop scope."
+    }
   },
   "sizeClasses": {
     "hint": "The canopy sizes offered on a block's crop assignment. Order is taken from position.",

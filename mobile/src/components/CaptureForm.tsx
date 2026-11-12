@@ -60,8 +60,11 @@ export function CaptureForm({
   useEffect(() => {
     let live = true;
     async function load(): Promise<SignalDefinition[]> {
+      // Without a template the scout picks from the catalogue, so narrow it to
+      // the block's crop: a Medjool block should not offer mango questions.
+      // A template is the supervisor's own choice of signals; keep it whole.
+      if (!templateId) return listSignalDefinitions(farmId, blockId);
       const all = await listSignalDefinitions(farmId);
-      if (!templateId) return all;
       // Narrow to the template, keeping its order — position is the sequence
       // the form was designed to be filled in.
       try {
@@ -87,7 +90,7 @@ export function CaptureForm({
     return () => {
       live = false;
     };
-  }, [farmId, lang, templateId]);
+  }, [farmId, blockId, lang, templateId]);
 
   const chosen = defs.find((d) => d.id === defId);
   // The API accepts EXACTLY ONE value column and it must be the one matching

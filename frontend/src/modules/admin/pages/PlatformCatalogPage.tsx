@@ -39,6 +39,7 @@ import { queryState } from "@/components/asyncState";
 import { AttributesPanel } from "@/modules/admin/components/catalog/CatalogAttributes";
 import { CreateCropForm, CreateNodeForm } from "@/modules/admin/components/catalog/CatalogCreate";
 import { HealthPanel } from "@/modules/admin/components/catalog/CatalogHealth";
+import { SignalsPanel } from "@/modules/admin/components/catalog/CatalogSignals";
 import {
   CropDetailsForm,
   NodeDetailsForm,
@@ -60,7 +61,7 @@ import {
   useUpdateVariety,
 } from "@/queries/cropCatalog";
 
-const TABS = ["details", "stages", "sizes", "attributes", "health"] as const;
+const TABS = ["details", "stages", "sizes", "attributes", "health", "signals"] as const;
 type Tab = (typeof TABS)[number];
 
 export function PlatformCatalogPage(): ReactNode {
@@ -220,6 +221,8 @@ function Inspector({
   attributesLoading: boolean;
 }): ReactNode {
   const { t } = useTranslation("admin");
+  // Signal scope is the signal catalogue's to edit, not the crop catalogue's.
+  const canManageSignals = useCapability("signal.platform.manage");
   const [adding, setAdding] = useState(false);
   const level = deepestLevel(chain);
   const node = chain.strain ?? chain.variety ?? chain.crop;
@@ -296,6 +299,7 @@ function Inspector({
           <AttributesPanel chain={chain} definitions={attributes} loading={attributesLoading} />
         ) : null}
         {tab === "health" ? <HealthPanel cropPath={path} canManage={canManage} /> : null}
+        {tab === "signals" ? <SignalsPanel cropPath={path} canManage={canManageSignals} /> : null}
       </div>
     </div>
   );

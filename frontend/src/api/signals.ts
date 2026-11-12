@@ -29,7 +29,11 @@ export interface SignalDefinition {
   created_at: string;
   updated_at: string;
   aggregation: Aggregation;
+  /** For `latest`, how many days an answer stays valid (D6); older reads as missing. */
   aggregation_window_days: number | null;
+  /** D21 crop scope. Empty = every crop; otherwise switches on by itself for
+   *  blocks whose current crop is one of these paths or sits below one. */
+  crop_paths: string[];
 }
 
 export interface SignalDefinitionCreatePayload {
@@ -48,6 +52,7 @@ export interface SignalDefinitionCreatePayload {
   attachment_allowed?: boolean;
   aggregation?: Aggregation;
   aggregation_window_days?: number | null;
+  crop_paths?: string[];
 }
 
 export interface SignalDefinitionUpdatePayload {
@@ -65,6 +70,7 @@ export interface SignalDefinitionUpdatePayload {
   is_active?: boolean;
   aggregation?: Aggregation;
   aggregation_window_days?: number | null;
+  crop_paths?: string[];
 }
 
 export interface SignalAssignment {
@@ -219,7 +225,9 @@ export async function listSignalAssignments(definitionId: string): Promise<Signa
 
 export async function createSignalAssignment(
   definitionId: string,
-  payload: { farm_id?: string | null; block_id?: string | null },
+  // `is_active: false` records an opt-out: a crop-scoped signal stays off
+  // for that farm or block (D21).
+  payload: { farm_id?: string | null; block_id?: string | null; is_active?: boolean },
 ): Promise<SignalAssignment> {
   const { data } = await apiClient.post<SignalAssignment>(
     `/v1/signals/definitions/${definitionId}/assignments`,
@@ -367,6 +375,8 @@ export interface SignalTemplate {
   description: string | null;
   description_ar: string | null;
   is_active: boolean;
+  /** D21 crop scope, as on SignalDefinition. */
+  crop_paths: string[];
   created_at: string;
   updated_at: string;
 }
@@ -389,6 +399,7 @@ export interface SignalTemplateCreatePayload {
   description?: string | null;
   description_ar?: string | null;
   members: SignalTemplateMember[];
+  crop_paths?: string[];
 }
 
 export interface SignalTemplateUpdatePayload {
@@ -398,6 +409,7 @@ export interface SignalTemplateUpdatePayload {
   description_ar?: string | null;
   is_active?: boolean;
   members?: SignalTemplateMember[];
+  crop_paths?: string[];
 }
 
 export interface SignalTemplateObservationMemberSubmission {
@@ -491,9 +503,10 @@ export async function createSignalTemplateObservation(
 
 export async function listPlatformSignalDefinitions(
   includeInactive = true,
+  cropPath?: string,
 ): Promise<SignalDefinition[]> {
   const { data } = await apiClient.get<SignalDefinition[]>("/v1/platform/signals/definitions", {
-    params: { include_inactive: includeInactive },
+    params: { include_inactive: includeInactive, crop_path: cropPath },
   });
   return data;
 }
@@ -521,9 +534,10 @@ export async function updatePlatformSignalDefinition(
 
 export async function listPlatformSignalTemplates(
   includeInactive = true,
+  cropPath?: string,
 ): Promise<SignalTemplate[]> {
   const { data } = await apiClient.get<SignalTemplate[]>("/v1/platform/signals/templates", {
-    params: { include_inactive: includeInactive },
+    params: { include_inactive: includeInactive, crop_path: cropPath },
   });
   return data;
 }

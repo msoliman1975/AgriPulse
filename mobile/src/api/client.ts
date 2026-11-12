@@ -350,9 +350,13 @@ export function categoricalLabel(
   return label && label.trim() !== "" ? label : value;
 }
 
-export function listSignalDefinitions(farmId: string) {
+/** The signals a scout can record on this farm. With `blockId`, only those
+ *  that apply to the block's current crop: every unscoped signal plus the ones
+ *  scoped to that crop or a crop above it (D21). */
+export function listSignalDefinitions(farmId: string, blockId?: string | null) {
+  const block = blockId ? `&block_id=${encodeURIComponent(blockId)}` : "";
   return request<SignalDefinition[]>(
-    `/signals/definitions?farm_id=${encodeURIComponent(farmId)}`,
+    `/signals/definitions?farm_id=${encodeURIComponent(farmId)}${block}`,
   );
 }
 

@@ -176,10 +176,9 @@ export function SignalsConfigPage(): ReactNode {
       value_max: form.value_max ? form.value_max : null,
       attachment_allowed: form.attachment_allowed,
       aggregation: isNumeric ? form.aggregation : "latest",
-      aggregation_window_days:
-        isNumeric && form.aggregation_window_days
-          ? Number.parseInt(form.aggregation_window_days, 10)
-          : null,
+      aggregation_window_days: form.aggregation_window_days
+        ? Number.parseInt(form.aggregation_window_days, 10)
+        : null,
     };
     createMut.mutate(payload, {
       onSuccess: () => {
@@ -313,25 +312,34 @@ export function SignalsConfigPage(): ReactNode {
                     </select>
                   )}
                 </Field>
-                <Field label={t("config.form.aggregation.windowLabel")}>
-                  {(props) => (
-                    <input
-                      {...props}
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={form.aggregation_window_days}
-                      onChange={(e) =>
-                        setForm({ ...form, aggregation_window_days: e.target.value })
-                      }
-                      placeholder={t("config.form.aggregation.windowHint")}
-                      className={inputCls}
-                      disabled={form.aggregation === "latest"}
-                    />
-                  )}
-                </Field>
               </>
             ) : null}
+            {/* D6: every kind takes a window. On `latest` (every non-numeric
+                signal) it is how long an answer stays valid; blank = forever. */}
+            <Field
+              label={t(
+                form.value_kind !== "numeric" || form.aggregation === "latest"
+                  ? "config.form.aggregation.validForLabel"
+                  : "config.form.aggregation.windowLabel",
+              )}
+            >
+              {(props) => (
+                <input
+                  {...props}
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={form.aggregation_window_days}
+                  onChange={(e) => setForm({ ...form, aggregation_window_days: e.target.value })}
+                  placeholder={t(
+                    form.value_kind !== "numeric" || form.aggregation === "latest"
+                      ? "config.form.aggregation.validForHint"
+                      : "config.form.aggregation.windowHint",
+                  )}
+                  className={inputCls}
+                />
+              )}
+            </Field>
             {form.value_kind === "categorical" ? (
               <>
                 <Field label={t("config.form.categoricalValues")} className="sm:col-span-2">
