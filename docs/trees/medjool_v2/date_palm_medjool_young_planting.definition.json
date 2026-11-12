@@ -4,6 +4,8 @@
   "name_ar": "نخيل المجدول — الزراعات الجديدة",
   "description_en": "Care from planting to first fruiting: establishment gaps, first-summer irrigation on sand and monthly weevil checks at the palm base. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly. Palm size is read from the block's palm phase: new planting = small, juvenile and onset of fruiting = medium, bearing = large.",
   "description_ar": "الرعاية من الزراعة حتى أول إثمار: فجوات التأسيس، وري الصيف الأول على الرمل، وفحص السوسة الشهري عند قاعدة النخلة. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا. يُقرأ حجم النخيل من طور النخلة في القطعة: زراعة جديدة = صغير، يافع وبداية الإثمار = متوسط، مثمر = كبير.",
+  "readiness_note_en": "Needs the palm phase on the block's crop and its soil texture, the farm's weather, MSAVI and BSI imagery, and scout records of weevil inspections.",
+  "readiness_note_ar": "تحتاج إلى طور النخلة في محصول القطعة وقوام التربة، وطقس المزرعة، وصور مؤشري الغطاء والتربة العارية، وسجلات الاستكشاف لفحص السوسة.",
   "scope": "block",
   "crop_path": "date_palm.medjool",
   "country_codes": [

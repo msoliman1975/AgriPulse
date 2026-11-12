@@ -4,6 +4,8 @@
   "name_ar": "نخيل المجدول — ضرر البرد",
   "description_en": "New tree, authored from manual section 10.4 #6 (FAO, High): Medjool is cold-susceptible; leaflet tips yellow and dry at −6 °C, the outer crown dries at −12 °C, and a freshly irrigated plantation stores heat, so irrigate when temperatures approach −5 °C. Weather only; no imagery needed. New tree, not in the trees document: authored from the Organic Medjool Manual, Edition 1.7, section 10.4 #6 (FAO, high confidence).",
   "description_ar": "شجرة جديدة مؤلفة من الدليل 10.4 #6 (الفاو، عالية): المجدول حساس للبرد؛ تصفرّ أطراف الوريقات وتجف عند −6 °م ويجف السعف الخارجي عند −12 °م، والمزرعة المروية حديثًا تختزن حرارة، لذا يُروى عند اقتراب الحرارة من −5 °م. طقس فقط دون صور. شجرة جديدة غير موجودة في وثيقة الأشجار: أُعدّت من دليل المجدول العضوي، الإصدار 1.7، القسم 10.4 رقم 6 (الفاو، ثقة عالية).",
+  "readiness_note_en": "Needs the farm's weather subscription. Nothing else is set on the block.",
+  "readiness_note_ar": "تحتاج إلى اشتراك الطقس للمزرعة فقط، ولا يلزم ضبط شيء في القطعة.",
   "scope": "block",
   "crop_path": "date_palm.medjool",
   "country_codes": [

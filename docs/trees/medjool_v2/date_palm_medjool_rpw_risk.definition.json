@@ -4,6 +4,8 @@
   "name_ar": "نخيل المجدول — خطر سوسة النخيل الحمراء والوقاية",
   "description_en": "Prevention comes before detection. This tree checks the farm practices that let the weevil in — the 22 farmer errors from the New Valley and the Al-Ahsa risk factors — plus trap catches. Fixing these errors cut infestation in an El-Kharga sector from 1% to 0.16%. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly. Palm size is read from the block's palm phase: new planting = small, juvenile and onset of fruiting = medium, bearing = large.",
   "description_ar": "الوقاية قبل الكشف. تفحص هذه الشجرة الممارسات التي تُدخل السوسة — الأخطاء الـ22 للمزارعين في الوادي الجديد وعوامل الخطر في الأحساء — مع صيد المصائد. خفّض تصحيح هذه الأخطاء الإصابة في قطاع بالخارجة من 1% إلى 0.16%. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا. يُقرأ حجم النخيل من طور النخلة في القطعة: زراعة جديدة = صغير، يافع وبداية الإثمار = متوسط، مثمر = كبير.",
+  "readiness_note_en": "Needs the block's growth stage, the palm phase on its crop, the farm's weather, and regular scout records: trap catches and servicing, inspections, wounds and cuts, irrigation method, exposed roots, rodent damage and waste left in the field.",
+  "readiness_note_ar": "تحتاج إلى مرحلة النمو للقطعة، وطور النخلة في محصولها، وطقس المزرعة، وسجلات استكشاف منتظمة: صيد المصائد وخدمتها، والفحص، والجروح والقطع، وطريقة الري، والجذور المكشوفة، وأضرار القوارض، والمخلفات المتروكة في الحقل.",
   "scope": "block",
   "crop_path": "date_palm.medjool",
   "country_codes": [

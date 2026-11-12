@@ -4,6 +4,8 @@
   "name_ar": "نخيل المجدول — تقويم العمليات الموسمية",
   "description_en": "Stage-keyed reminders for the manual's routine operations: irrigation regime, winter sanitation and pruning, pollination, thinning, bending, bagging and harvest. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly.",
   "description_ar": "تذكيرات حسب المرحلة لعمليات الدليل الروتينية: نظام الري، والنظافة والتقليم الشتوي، والتلقيح، والخف، والتدلية، والتكييس، والحصاد. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا.",
+  "readiness_note_en": "Needs only the block's growth stage, which the daily planting-calendar job sets. It stays silent until that job has run.",
+  "readiness_note_ar": "تحتاج فقط إلى مرحلة النمو للقطعة، وتضبطها مهمة تقويم الزراعة اليومية. تبقى صامتة حتى تعمل تلك المهمة.",
   "scope": "block",
   "crop_path": "date_palm.medjool",
   "country_codes": [

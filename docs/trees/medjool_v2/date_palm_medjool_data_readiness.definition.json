@@ -4,6 +4,8 @@
   "name_ar": "نخيل المجدول — جاهزية البيانات",
   "description_en": "Checks the two block records the health trees depend on: palm size and soil salinity class. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly. Palm size is read from the block's palm phase: new planting = small, juvenile and onset of fruiting = medium, bearing = large.",
   "description_ar": "يفحص سجلي القطعة اللذين تعتمد عليهما أشجار الصحة: حجم النخيل وفئة ملوحة التربة. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا. يُقرأ حجم النخيل من طور النخلة في القطعة: زراعة جديدة = صغير، يافع وبداية الإثمار = متوسط، مثمر = كبير.",
+  "readiness_note_en": "Checks the block itself: its salinity class, the palm phase on its crop, and whether NDVI imagery has arrived. It is the tree that tells you what the others lack.",
+  "readiness_note_ar": "تفحص القطعة نفسها: فئة الملوحة، وطور النخلة في محصولها، ووصول صور مؤشر الغطاء. هي الشجرة التي تخبرك بما ينقص الأشجار الأخرى.",
   "scope": "block",
   "crop_path": "date_palm.medjool",
   "country_codes": [

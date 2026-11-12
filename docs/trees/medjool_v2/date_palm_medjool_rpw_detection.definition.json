@@ -4,6 +4,8 @@
   "name_ar": "نخيل المجدول — كشف سوسة النخيل الحمراء",
   "description_en": "Finds infested palms. The canopy stays green while larvae destroy the trunk, so satellites see the weevil late. The tree puts scout reports first, then drone signals (crown temperature and the missing seasonal NDRE rise), and uses satellite data only as weak or late hints. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly.",
   "description_ar": "يجد النخيل المصاب. يبقى السعف أخضر بينما تدمّر اليرقات الجذع، فترى الأقمار السوسة متأخرة. تضع الشجرة تقارير المستكشف أولًا ثم إشارات المسيّرة (حرارة التاج وغياب ارتفاع NDRE الموسمي)، وتستخدم بيانات الأقمار كإشارات ضعيفة أو متأخرة فقط. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا.",
+  "readiness_note_en": "Needs the block's growth stage, scout records of weevil symptoms and drone findings, NDRE imagery, and the NDVI grid to point at the palms to inspect.",
+  "readiness_note_ar": "تحتاج إلى مرحلة النمو للقطعة، وسجلات الاستكشاف لأعراض السوسة ونتائج الطائرة المسيّرة، وصور مؤشر النيتروجين، وشبكة مؤشر الغطاء لتحديد النخيل المطلوب فحصه.",
   "scope": "block",
   "crop_path": "date_palm.medjool",
   "country_codes": [

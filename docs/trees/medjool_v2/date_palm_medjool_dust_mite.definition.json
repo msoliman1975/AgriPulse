@@ -4,6 +4,8 @@
   "name_ar": "نخيل المجدول — عنكبوت الغبار",
   "description_en": "The dust mite spins webbing on green fruit in summer. The tree watches the susceptible stages, hot and dry weather, scout reports and weekly scouting. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly. Choice made where the page named a check but not its test, approved by the owner: a hot, dry spell is a 72-hour forecast maximum at or above hot_c (40 °C) with no rain forecast.",
   "description_ar": "يغزل عنكبوت الغبار نسيجه على الثمار الخضراء صيفًا. تراقب الشجرة مراحل الحساسية والطقس الحار الجاف وتقارير المستكشف والفحص الأسبوعي. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا. اختيار حيث ذكرت الصفحة الفحص دون طريقته، وافق عليه المالك: الموجة الحارة الجافة هي توقع حرارة عظمى خلال 72 ساعة عند hot_c (40 °م) أو أعلى دون أمطار متوقعة.",
+  "readiness_note_en": "Needs the block's growth stage (set daily from the planting calendar), the farm's weather, and scout records of bunches scouted and mite webbing.",
+  "readiness_note_ar": "تحتاج إلى مرحلة النمو للقطعة (تُحدَّث يومياً من تقويم الزراعة)، وطقس المزرعة، وسجلات الاستكشاف للسباطات المفحوصة ونسيج العنكبوت.",
   "scope": "block",
   "crop_path": "date_palm.medjool",
   "country_codes": [
