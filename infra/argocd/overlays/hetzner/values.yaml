@@ -4166,7 +4166,12 @@ global:
       #   Watch: /farms/{id}/latest-photo answers 200; its tile_url carries
       #   three rescale params and renders in natural colours.
       #   Rollback: api to b02551e.
-      tag: "957a299"
+      # 5be0f66 = #831, api, see the frontend note. GET /farms/{id}/latest-photo
+      #   and the investor route now also return the farm's bounds, so the
+      #   photo layer asks only for tiles over the farm. No migration.
+      #   Watch: /farms/{id}/latest-photo answers 200 with photo.bounds.
+      #   Rollback: api to 957a299.
+      tag: "5be0f66"
     workers:
       tag: "b02551e"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
@@ -4904,7 +4909,18 @@ global:
       #   Watch: Farm Console index colours paint promptly with the default
       #   view; the switch shows both dates.
       #   Rollback: this tag alone back to de15345.
-      tag: "957a299"
+      # 5be0f66 = #831, frontend. Fixes the slow, blocky index painting that
+      #   #824 exposed: the Farm Console gated its data effects on
+      #   isStyleLoaded(), which is false while ANY tiles are in flight, so
+      #   index pixels waited for every tile on screen (stretched parent tiles
+      #   showed meanwhile) and other updates fell back to an already-fired
+      #   `load` and were dropped. It now waits only for its own load handler.
+      #   The photo layer is limited to the farm's bounds.
+      #   Watch: switching index or date paints the pixels promptly with
+      #   smooth class edges, with Latest (10 m) on and off; cell highlights
+      #   and filters still update.
+      #   Rollback: this tag alone back to 957a299 (api may stay).
+      tag: "5be0f66"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
