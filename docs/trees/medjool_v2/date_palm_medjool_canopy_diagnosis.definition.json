@@ -12,11 +12,11 @@
   "root": "n_cloud",
   "registers": [
     "cell_cloudy",
-    "vigour_low",
+    "cell_vigour_low",
     "cell_cover_open",
     "leaf_dry",
     "cell_nutrient_low",
-    "chlorophyll_low",
+    "cell_chlorophyll_low",
     "water_deficit",
     "provisional_no_history",
     "block_history_used",
@@ -723,7 +723,7 @@
       "label_en": "Canopy vigour below the cell's seasonal normal",
       "label_ar": "حيوية السعف دون المعتاد الموسمي للخلية",
       "register": {
-        "code": "vigour_low",
+        "code": "cell_vigour_low",
         "severity": "warning"
       },
       "next": "n_vig_spot"
@@ -817,7 +817,7 @@
       "label_en": "Canopy vigour below the block's seasonal normal (no cell history)",
       "label_ar": "حيوية السعف دون المعتاد الموسمي للقطعة (لا تاريخ للخلية)",
       "register": {
-        "code": "vigour_low",
+        "code": "cell_vigour_low",
         "severity": "warning"
       },
       "next": "n_vig_spot"
@@ -886,7 +886,7 @@
       "label_en": "Canopy vigour below the band (provisional, no history)",
       "label_ar": "حيوية السعف دون النطاق (مبدئي، لا تاريخ)",
       "register": {
-        "code": "vigour_low",
+        "code": "cell_vigour_low",
         "severity": "info"
       },
       "next": "n_vig_spot"
@@ -1890,7 +1890,7 @@
       "label_en": "Leaf chlorophyll (gndvi) below the cell's seasonal normal",
       "label_ar": "كلوروفيل الأوراق (GNDVI) دون المعتاد الموسمي للخلية",
       "register": {
-        "code": "chlorophyll_low",
+        "code": "cell_chlorophyll_low",
         "severity": "warning"
       },
       "next": "n_chl_spot"
@@ -1988,7 +1988,7 @@
       "label_en": "Leaf chlorophyll (gndvi) below the block's seasonal normal (no cell history)",
       "label_ar": "كلوروفيل الأوراق (GNDVI) دون المعتاد الموسمي للقطعة (لا تاريخ للخلية)",
       "register": {
-        "code": "chlorophyll_low",
+        "code": "cell_chlorophyll_low",
         "severity": "warning"
       },
       "next": "n_chl_spot"
@@ -2060,7 +2060,7 @@
       "label_en": "Leaf chlorophyll (gndvi) below the band (provisional, no history)",
       "label_ar": "كلوروفيل الأوراق (GNDVI) دون النطاق (مبدئي، لا تاريخ)",
       "register": {
-        "code": "chlorophyll_low",
+        "code": "cell_chlorophyll_low",
         "severity": "info"
       },
       "next": "n_chl_spot"
@@ -3178,7 +3178,7 @@
       "codes": [
         "leaf_dry",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3191,7 +3191,7 @@
         "cause_salt_patch",
         "leaf_dry",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -3204,7 +3204,7 @@
         "cause_block_water",
         "leaf_dry",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3217,7 +3217,7 @@
         "cause_local_irrigation",
         "leaf_dry",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3229,7 +3229,7 @@
       "codes": [
         "leaf_dry",
         "loc_block_wide",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3242,7 +3242,7 @@
         "cause_salinity",
         "leaf_dry",
         "loc_block_wide",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3255,7 +3255,7 @@
         "cause_block_water",
         "leaf_dry",
         "loc_block_wide",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3267,7 +3267,7 @@
       "codes": [
         "leaf_dry",
         "loc_unknown",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3280,7 +3280,7 @@
         "cause_salinity",
         "leaf_dry",
         "loc_unknown",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3293,7 +3293,7 @@
         "cause_block_water",
         "leaf_dry",
         "loc_unknown",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3306,7 +3306,7 @@
         "leaf_dry",
         "loc_spot",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -3320,7 +3320,7 @@
         "leaf_dry",
         "loc_spot",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -3333,7 +3333,7 @@
         "leaf_dry",
         "loc_block_wide",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -3347,7 +3347,7 @@
         "leaf_dry",
         "loc_block_wide",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -3360,7 +3360,7 @@
         "leaf_dry",
         "loc_unknown",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -3374,7 +3374,7 @@
         "leaf_dry",
         "loc_unknown",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -3387,7 +3387,7 @@
         "block_history_used",
         "leaf_dry",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3401,7 +3401,7 @@
         "cause_salt_patch",
         "leaf_dry",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -3415,7 +3415,7 @@
         "cause_block_water",
         "leaf_dry",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3429,7 +3429,7 @@
         "cause_local_irrigation",
         "leaf_dry",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3442,7 +3442,7 @@
         "block_history_used",
         "leaf_dry",
         "loc_block_wide",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3456,7 +3456,7 @@
         "cause_salinity",
         "leaf_dry",
         "loc_block_wide",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3470,7 +3470,7 @@
         "cause_block_water",
         "leaf_dry",
         "loc_block_wide",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3483,7 +3483,7 @@
         "block_history_used",
         "leaf_dry",
         "loc_unknown",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3497,7 +3497,7 @@
         "cause_salinity",
         "leaf_dry",
         "loc_unknown",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3511,7 +3511,7 @@
         "cause_block_water",
         "leaf_dry",
         "loc_unknown",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3826,7 +3826,7 @@
       "codes": [
         "cell_cover_open",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -3839,7 +3839,7 @@
         "cause_salt_patch",
         "cell_cover_open",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -3851,7 +3851,7 @@
       "codes": [
         "cell_cover_open",
         "loc_block_wide",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -3864,7 +3864,7 @@
         "cause_salinity",
         "cell_cover_open",
         "loc_block_wide",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3876,7 +3876,7 @@
       "codes": [
         "cell_cover_open",
         "loc_unknown",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -3889,7 +3889,7 @@
         "cause_salinity",
         "cell_cover_open",
         "loc_unknown",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -3902,7 +3902,7 @@
         "cell_cover_open",
         "loc_spot",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -3916,7 +3916,7 @@
         "cell_cover_open",
         "loc_spot",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -3929,7 +3929,7 @@
         "cell_cover_open",
         "loc_block_wide",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -3943,7 +3943,7 @@
         "cell_cover_open",
         "loc_block_wide",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -3956,7 +3956,7 @@
         "cell_cover_open",
         "loc_unknown",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -3970,7 +3970,7 @@
         "cell_cover_open",
         "loc_unknown",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -3983,7 +3983,7 @@
         "block_history_used",
         "cell_cover_open",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -3997,7 +3997,7 @@
         "cause_salt_patch",
         "cell_cover_open",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -4010,7 +4010,7 @@
         "block_history_used",
         "cell_cover_open",
         "loc_block_wide",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -4024,7 +4024,7 @@
         "cause_salinity",
         "cell_cover_open",
         "loc_block_wide",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4037,7 +4037,7 @@
         "block_history_used",
         "cell_cover_open",
         "loc_unknown",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -4051,7 +4051,7 @@
         "cause_salinity",
         "cell_cover_open",
         "loc_unknown",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4063,7 +4063,7 @@
       "codes": [
         "loc_spot",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "fertilize",
@@ -4076,7 +4076,7 @@
         "cause_salt_patch",
         "loc_spot",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -4088,7 +4088,7 @@
       "codes": [
         "loc_block_wide",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "fertilize",
@@ -4101,7 +4101,7 @@
         "cause_salinity",
         "loc_block_wide",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4113,7 +4113,7 @@
       "codes": [
         "loc_unknown",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "fertilize",
@@ -4126,7 +4126,7 @@
         "cause_salinity",
         "loc_unknown",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4139,7 +4139,7 @@
         "loc_spot",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "fertilize",
@@ -4153,7 +4153,7 @@
         "loc_spot",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -4166,7 +4166,7 @@
         "loc_block_wide",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "fertilize",
@@ -4180,7 +4180,7 @@
         "loc_block_wide",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -4193,7 +4193,7 @@
         "loc_unknown",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "fertilize",
@@ -4207,7 +4207,7 @@
         "loc_unknown",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -4220,7 +4220,7 @@
         "block_history_used",
         "loc_spot",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "fertilize",
@@ -4234,7 +4234,7 @@
         "cause_salt_patch",
         "loc_spot",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -4247,7 +4247,7 @@
         "block_history_used",
         "loc_block_wide",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "fertilize",
@@ -4261,7 +4261,7 @@
         "cause_salinity",
         "loc_block_wide",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4274,7 +4274,7 @@
         "block_history_used",
         "loc_unknown",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "fertilize",
@@ -4288,7 +4288,7 @@
         "cause_salinity",
         "loc_unknown",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4298,10 +4298,10 @@
     {
       "code": "r088",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_spot",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "fertilize",
@@ -4312,10 +4312,10 @@
       "code": "r089",
       "codes": [
         "cause_salt_patch",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_spot",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -4325,10 +4325,10 @@
     {
       "code": "r090",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_block_wide",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "fertilize",
@@ -4339,10 +4339,10 @@
       "code": "r091",
       "codes": [
         "cause_salinity",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_block_wide",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4352,10 +4352,10 @@
     {
       "code": "r092",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_unknown",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "fertilize",
@@ -4366,10 +4366,10 @@
       "code": "r093",
       "codes": [
         "cause_salinity",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_unknown",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4379,11 +4379,11 @@
     {
       "code": "r094",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_spot",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "fertilize",
@@ -4394,11 +4394,11 @@
       "code": "r095",
       "codes": [
         "cause_salt_patch",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_spot",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -4408,11 +4408,11 @@
     {
       "code": "r096",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_block_wide",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "fertilize",
@@ -4423,11 +4423,11 @@
       "code": "r097",
       "codes": [
         "cause_salinity",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_block_wide",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -4437,11 +4437,11 @@
     {
       "code": "r098",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_unknown",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "fertilize",
@@ -4452,11 +4452,11 @@
       "code": "r099",
       "codes": [
         "cause_salinity",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_unknown",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -4467,10 +4467,10 @@
       "code": "r100",
       "codes": [
         "block_history_used",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_spot",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "fertilize",
@@ -4482,10 +4482,10 @@
       "codes": [
         "block_history_used",
         "cause_salt_patch",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_spot",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -4496,10 +4496,10 @@
       "code": "r102",
       "codes": [
         "block_history_used",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_block_wide",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "fertilize",
@@ -4511,10 +4511,10 @@
       "codes": [
         "block_history_used",
         "cause_salinity",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_block_wide",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4525,10 +4525,10 @@
       "code": "r104",
       "codes": [
         "block_history_used",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_unknown",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "fertilize",
@@ -4540,10 +4540,10 @@
       "codes": [
         "block_history_used",
         "cause_salinity",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_unknown",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4553,7 +4553,7 @@
     {
       "code": "r106",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_spot",
         "cell_nutrient_low"
       ],
@@ -4565,7 +4565,7 @@
     {
       "code": "r107",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_block_wide",
         "cell_nutrient_low"
       ],
@@ -4577,7 +4577,7 @@
     {
       "code": "r108",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_unknown",
         "cell_nutrient_low"
       ],
@@ -4589,7 +4589,7 @@
     {
       "code": "r109",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_spot",
         "cell_nutrient_low",
         "provisional_no_history"
@@ -4602,7 +4602,7 @@
     {
       "code": "r110",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_block_wide",
         "cell_nutrient_low",
         "provisional_no_history"
@@ -4615,7 +4615,7 @@
     {
       "code": "r111",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_unknown",
         "cell_nutrient_low",
         "provisional_no_history"
@@ -4629,7 +4629,7 @@
       "code": "r112",
       "codes": [
         "block_history_used",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_spot",
         "cell_nutrient_low"
       ],
@@ -4642,7 +4642,7 @@
       "code": "r113",
       "codes": [
         "block_history_used",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_block_wide",
         "cell_nutrient_low"
       ],
@@ -4655,7 +4655,7 @@
       "code": "r114",
       "codes": [
         "block_history_used",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_unknown",
         "cell_nutrient_low"
       ],
@@ -4772,7 +4772,7 @@
     {
       "code": "r124",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_spot"
       ],
       "status": "issue",
@@ -4783,7 +4783,7 @@
     {
       "code": "r125",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_block_wide"
       ],
       "status": "issue",
@@ -4794,7 +4794,7 @@
     {
       "code": "r126",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_unknown"
       ],
       "status": "issue",
@@ -4805,7 +4805,7 @@
     {
       "code": "r127",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_spot",
         "provisional_no_history"
       ],
@@ -4817,7 +4817,7 @@
     {
       "code": "r128",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_block_wide",
         "provisional_no_history"
       ],
@@ -4829,7 +4829,7 @@
     {
       "code": "r129",
       "codes": [
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_unknown",
         "provisional_no_history"
       ],
@@ -4842,7 +4842,7 @@
       "code": "r130",
       "codes": [
         "block_history_used",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_spot"
       ],
       "status": "issue",
@@ -4854,7 +4854,7 @@
       "code": "r131",
       "codes": [
         "block_history_used",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_block_wide"
       ],
       "status": "issue",
@@ -4866,7 +4866,7 @@
       "code": "r132",
       "codes": [
         "block_history_used",
-        "chlorophyll_low",
+        "cell_chlorophyll_low",
         "loc_unknown"
       ],
       "status": "issue",
@@ -4880,7 +4880,7 @@
         "leaf_dry",
         "loc_spot",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4894,7 +4894,7 @@
         "leaf_dry",
         "loc_spot",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -4908,7 +4908,7 @@
         "leaf_dry",
         "loc_spot",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4922,7 +4922,7 @@
         "leaf_dry",
         "loc_spot",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4935,7 +4935,7 @@
         "leaf_dry",
         "loc_block_wide",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4949,7 +4949,7 @@
         "leaf_dry",
         "loc_block_wide",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4963,7 +4963,7 @@
         "leaf_dry",
         "loc_block_wide",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4976,7 +4976,7 @@
         "leaf_dry",
         "loc_unknown",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -4990,7 +4990,7 @@
         "leaf_dry",
         "loc_unknown",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -5004,7 +5004,7 @@
         "leaf_dry",
         "loc_unknown",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -5018,7 +5018,7 @@
         "loc_spot",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -5033,7 +5033,7 @@
         "loc_spot",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -5047,7 +5047,7 @@
         "loc_block_wide",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -5062,7 +5062,7 @@
         "loc_block_wide",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -5076,7 +5076,7 @@
         "loc_unknown",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -5091,7 +5091,7 @@
         "loc_unknown",
         "cell_nutrient_low",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -5105,7 +5105,7 @@
         "leaf_dry",
         "loc_spot",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -5120,7 +5120,7 @@
         "leaf_dry",
         "loc_spot",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -5135,7 +5135,7 @@
         "leaf_dry",
         "loc_spot",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -5150,7 +5150,7 @@
         "leaf_dry",
         "loc_spot",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -5164,7 +5164,7 @@
         "leaf_dry",
         "loc_block_wide",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -5179,7 +5179,7 @@
         "leaf_dry",
         "loc_block_wide",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -5194,7 +5194,7 @@
         "leaf_dry",
         "loc_block_wide",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -5208,7 +5208,7 @@
         "leaf_dry",
         "loc_unknown",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -5223,7 +5223,7 @@
         "leaf_dry",
         "loc_unknown",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -5238,7 +5238,7 @@
         "leaf_dry",
         "loc_unknown",
         "cell_nutrient_low",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -5249,7 +5249,7 @@
       "code": "r159",
       "codes": [
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -5261,7 +5261,7 @@
       "codes": [
         "cause_salt_patch",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -5273,7 +5273,7 @@
       "codes": [
         "decline_unexplained",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -5284,7 +5284,7 @@
       "code": "r162",
       "codes": [
         "loc_block_wide",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -5296,7 +5296,7 @@
       "codes": [
         "cause_salinity",
         "loc_block_wide",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -5308,7 +5308,7 @@
       "codes": [
         "decline_unexplained",
         "loc_block_wide",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -5319,7 +5319,7 @@
       "code": "r165",
       "codes": [
         "loc_unknown",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -5331,7 +5331,7 @@
       "codes": [
         "cause_salinity",
         "loc_unknown",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -5343,7 +5343,7 @@
       "codes": [
         "decline_unexplained",
         "loc_unknown",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -5355,7 +5355,7 @@
       "codes": [
         "loc_spot",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -5368,7 +5368,7 @@
         "cause_salt_patch",
         "loc_spot",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -5381,7 +5381,7 @@
         "decline_unexplained",
         "loc_spot",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -5393,7 +5393,7 @@
       "codes": [
         "loc_block_wide",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -5406,7 +5406,7 @@
         "cause_salinity",
         "loc_block_wide",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -5419,7 +5419,7 @@
         "decline_unexplained",
         "loc_block_wide",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -5431,7 +5431,7 @@
       "codes": [
         "loc_unknown",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -5444,7 +5444,7 @@
         "cause_salinity",
         "loc_unknown",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "irrigate",
@@ -5457,7 +5457,7 @@
         "decline_unexplained",
         "loc_unknown",
         "provisional_no_history",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -5469,7 +5469,7 @@
       "codes": [
         "block_history_used",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -5482,7 +5482,7 @@
         "block_history_used",
         "cause_salt_patch",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -5495,7 +5495,7 @@
         "block_history_used",
         "decline_unexplained",
         "loc_spot",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -5507,7 +5507,7 @@
       "codes": [
         "block_history_used",
         "loc_block_wide",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -5520,7 +5520,7 @@
         "block_history_used",
         "cause_salinity",
         "loc_block_wide",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -5533,7 +5533,7 @@
         "block_history_used",
         "decline_unexplained",
         "loc_block_wide",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",
@@ -5545,7 +5545,7 @@
       "codes": [
         "block_history_used",
         "loc_unknown",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "issue",
       "action_type": "scout",
@@ -5558,7 +5558,7 @@
         "block_history_used",
         "cause_salinity",
         "loc_unknown",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "irrigate",
@@ -5571,7 +5571,7 @@
         "block_history_used",
         "decline_unexplained",
         "loc_unknown",
-        "vigour_low"
+        "cell_vigour_low"
       ],
       "status": "alert",
       "action_type": "scout",

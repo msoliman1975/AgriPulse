@@ -152,10 +152,29 @@ def test_treat_replaces_spray_on_the_sixteen_rules() -> None:
     assert sum(counts.values()) == 16
 
 
-def test_canopy_uses_medjool_cell_codes() -> None:
-    regs = set(DEFS["date_palm_medjool_canopy_diagnosis"]["registers"])
-    assert {"cell_cover_open", "cell_nutrient_low"} <= regs
-    assert not {"cover_open", "nutrient_low"} & regs
+# Platform finding codes mango already owns, with mango's wording (D10c, D31).
+MANGO_SHARED = {
+    "cover_open",
+    "nutrient_low",
+    "vigour_low",
+    "chlorophyll_low",
+    "size_missing",
+    "size_mismatch",
+}
+
+
+def test_medjool_uses_its_own_codes_not_mangos() -> None:
+    regs = {c for d in DEFS.values() for c in d["registers"]}
+    assert not MANGO_SHARED & regs
+    assert {
+        "cell_cover_open",
+        "cell_nutrient_low",
+        "cell_vigour_low",
+        "cell_chlorophyll_low",
+    } <= set(DEFS["date_palm_medjool_canopy_diagnosis"]["registers"])
+    assert {"palm_size_missing", "palm_size_mismatch"} <= set(
+        DEFS["date_palm_medjool_data_readiness"]["registers"]
+    )
 
 
 def test_catalogue_matches_registers_with_both_languages() -> None:
