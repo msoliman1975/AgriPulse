@@ -175,6 +175,9 @@ def test_catalogue_matches_registers_with_both_languages() -> None:
         assert "already_in_platform_catalogue" not in f
         for key in ("name_ar", "clause_ar"):
             assert f[key].strip(), (f["code"], key)
+        # The findings API caps names at 80 characters.
+        assert len(f["name_en"]) <= 80, f["code"]
+        assert len(f["name_ar"]) <= 80, f["code"]
 
 
 # ---------------------------------------------------------------- fuzz

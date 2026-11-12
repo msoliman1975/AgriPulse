@@ -3,8 +3,10 @@
 Reads docs/trees/medjool_v2: the 83-row findings catalogue and the 15 tree
 definitions (the 14 of "Medjool Decision Trees v2" plus tree 15, cold injury).
 
-* Findings: POST each row; a code that already exists is updated with PATCH
-  so a re-run converges on the file.
+* Findings: POST each row. A code that already exists is never changed:
+  platform finding codes are shared across crops, so a PATCH would reword
+  another crop's cards. An existing row that matches the file is fine; one
+  that differs is reported and counts as a failure, to be resolved by hand.
 * Trees: each one is created as a beta DRAFT. A tree that already exists gets
   a new draft version instead. This script never publishes: publishing is
   the owner's call (decision D8), done in the Beta designer.
@@ -14,6 +16,7 @@ AGRIPULSE_API, e.g. https://api.agripulse.cloud/api/v1.
 
     python scripts/load_medjool_v2_trees.py --dry-run
     python scripts/load_medjool_v2_trees.py
+    python scripts/load_medjool_v2_trees.py date_palm_medjool_operations   # some trees only
 """
 
 from __future__ import annotations
@@ -56,39 +59,38 @@ def _call(method: str, path: str, payload: object | None = None) -> tuple[int, s
         return exc.code, exc.read().decode("utf-8", errors="replace")
 
 
-def load(dry_run: bool) -> int:
-    findings = json.loads((TREES / "findings.json").read_text(encoding="utf-8"))
-    definitions = [
-        json.loads(p.read_text(encoding="utf-8"))
-        for p in sorted(TREES.glob("*.definition.json"))
-    ]
-    print(f"{len(findings)} findings, {len(definitions)} trees")
-    if dry_run:
-        for d in definitions:
-            print(f"would create draft {d['code']}")
-        return 0
-
+def _load_findings(findings: list[dict[str, object]]) -> int:
+    status, text = _call("GET", "/decision-tree-findings")
+    if status != 200:
+        print(f"finding list failed: {status} {text}")
+        return 1
+    existing = {row["code"]: row for row in json.loads(text)["findings"]}
     failed = 0
     for finding in findings:
+        stored = existing.get(finding["code"])
+        if stored is not None:
+            differs = [k for k, v in finding.items() if stored.get(k) != v]
+            if differs:
+                print(f"EXISTS, differs on {differs}, not changed: {finding['code']}")
+                failed += 1
+            else:
+                print(f"exists, identical: {finding['code']}")
+            continue
         status, text = _call("POST", "/decision-tree-findings", finding)
-        if status == 409:
-            fields = {k: v for k, v in finding.items() if k != "code"}
-            status, text = _call(
-                "PATCH", f"/decision-tree-findings/{finding['code']}", fields
-            )
-            action = "update"
-        else:
-            action = "create"
-        print(f"{status} finding {action} {finding['code']}")
+        print(f"{status} finding create {finding['code']}")
         if status not in (200, 201):
             print(text)
             failed += 1
+    return failed
 
+
+def _load_trees(definitions: list[dict[str, object]]) -> int:
     status, text = _call("GET", "/platform/decision-trees/beta")
     if status != 200:
-        print(f"list failed: {status} {text}")
+        print(f"tree list failed: {status} {text}")
         return 1
     existing = {t["code"]: t["id"] for t in json.loads(text)}
+    failed = 0
     for definition in definitions:
         code = definition["code"]
         if code in existing:
@@ -109,6 +111,23 @@ def load(dry_run: bool) -> int:
         if status not in (200, 201):
             print(text)
             failed += 1
+    return failed
+
+
+def load(dry_run: bool, trees_only: list[str]) -> int:
+    findings = json.loads((TREES / "findings.json").read_text(encoding="utf-8"))
+    definitions = [
+        json.loads(p.read_text(encoding="utf-8"))
+        for p in sorted(TREES.glob("*.definition.json"))
+    ]
+    if trees_only:
+        definitions = [d for d in definitions if d["code"] in trees_only]
+    print(f"{len(findings)} findings, {len(definitions)} trees")
+    if dry_run:
+        for d in definitions:
+            print(f"would load draft {d['code']}")
+        return 0
+    failed = _load_findings(findings) + _load_trees(definitions)
     return 1 if failed else 0
 
 
@@ -116,7 +135,11 @@ def main() -> int:
     if not API or not TOKEN:
         print("Set AGRIPULSE_API and AGRIPULSE_TOKEN.")
         return 2
-    return load(dry_run="--dry-run" in sys.argv[1:])
+    args = sys.argv[1:]
+    return load(
+        dry_run="--dry-run" in args,
+        trees_only=[a for a in args if not a.startswith("--")],
+    )
 
 
 if __name__ == "__main__":

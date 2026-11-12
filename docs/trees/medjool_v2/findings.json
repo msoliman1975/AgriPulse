@@ -441,8 +441,8 @@
   },
   {
     "code": "sanitation_due",
-    "name_en": "Clean frond bases, leaf axils and debris; prune and remove offshoots now and treat every cut.",
-    "name_ar": "نظّف قواعد السعف وآباط الأوراق والمخلفات؛ قلّم وافصل الفسائل الآن وعالج كل جرح.",
+    "name_en": "Winter sanitation and pruning due",
+    "name_ar": "موعد التنظيف الشتوي والتقليم",
     "clause_en": "clean frond bases leaf axils and debris — prune and remove offshoots now and treat every cut.",
     "clause_ar": "نظّف قواعد السعف وآباط الأوراق والمخلفات؛ قلّم وافصل الفسائل الآن وعالج كل جرح.",
     "default_status": "issue",
@@ -451,8 +451,8 @@
   },
   {
     "code": "pollination_due",
-    "name_en": "Inspect female palms daily; pollinate within 2–4 days of spathe opening and repeat 3–4 days later.",
-    "name_ar": "افحص النخيل المؤنث يوميًا؛ لقّح خلال 2–4 أيام من تفتح الطلعة وكرّر بعد 3–4 أيام.",
+    "name_en": "Pollination due",
+    "name_ar": "موعد التلقيح",
     "clause_en": "inspect female palms daily — pollinate within 2–4 days of spathe opening and repeat 3–4 days later.",
     "clause_ar": "افحص النخيل المؤنث يوميًا؛ لقّح خلال 2–4 أيام من تفتح الطلعة وكرّر بعد 3–4 أيام.",
     "default_status": "issue",
@@ -461,8 +461,8 @@
   },
   {
     "code": "thinning_due",
-    "name_en": "Hand-thin each bunch 3–4 weeks after pollination: about 30 strands per bunch, 10 fruits per strand.",
-    "name_ar": "خفّ كل عذق يدويًا بعد 3–4 أسابيع من تلقيحه: نحو 30 شمراخًا و10 ثمار للشمراخ.",
+    "name_en": "Bunch thinning due",
+    "name_ar": "موعد خف العذوق",
     "clause_en": "hand-thin each bunch 3–4 weeks after pollination: about 30 strands per bunch 10 fruits per strand.",
     "clause_ar": "خفّ كل عذق يدويًا بعد 3–4 أسابيع من تلقيحه: نحو 30 شمراخًا و10 ثمار للشمراخ.",
     "default_status": "issue",
@@ -481,8 +481,8 @@
   },
   {
     "code": "regime_summer",
-    "name_en": "Summer and fruit irrigation: about twice a week, with steady soil moisture to avoid fruit cracking.",
-    "name_ar": "ري الصيف والثمار: نحو مرتين أسبوعيًا مع رطوبة تربة ثابتة لتجنّب تشقق الثمار.",
+    "name_en": "Summer and fruit irrigation regime",
+    "name_ar": "نظام ري الصيف والثمار",
     "clause_en": "summer and fruit irrigation: about twice a week with steady soil moisture to avoid fruit cracking.",
     "clause_ar": "ري الصيف والثمار: نحو مرتين أسبوعيًا مع رطوبة تربة ثابتة لتجنّب تشقق الثمار.",
     "default_status": "issue",
