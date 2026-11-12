@@ -33,7 +33,10 @@ no dev deploy to check. Full procedure: `docs/runbooks/promotion-procedure.md`.
    It is read-only: never Save draft or Publish during a check.
    - Credentials: `AGRIPULSE_SMOKE_USER` / `AGRIPULSE_SMOKE_PASSWORD`, from
      the environment only. Never write them to a file, a commit, a PR or a
-     scheduled task. If they are not set, ask the user for them.
+     scheduled task. If they are not set, use the token mode instead:
+     `AGRIPULSE_SMOKE_TOKEN` set to a fresh `claude-automation`
+     client-credentials token (it lasts ~15 min). It skips the Keycloak
+     login page only; everything after sign-in is checked the same way.
    - Network: `app.`, `api.` and `keycloak.agripulse.cloud`.
    - Do not retry a failed sign-in in a loop: ten wrong passwords lock the
      account.

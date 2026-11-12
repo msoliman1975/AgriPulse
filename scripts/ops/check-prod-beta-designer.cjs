@@ -14,6 +14,15 @@
 //     textures.
 // Read-only: it clicks tabs and nothing else. Never Save draft or Publish.
 //
+// Two ways to sign in:
+//   * AGRIPULSE_SMOKE_USER / AGRIPULSE_SMOKE_PASSWORD: through the Keycloak
+//     login page, as a person would.
+//   * AGRIPULSE_SMOKE_TOKEN: a platform-admin access token (for example the
+//     `claude-automation` client-credentials token). The browser starts with
+//     it already in the SPA's session store, so no password is needed. It
+//     skips the Keycloak page itself; everything after sign-in is the same.
+//     The token lasts ~15 min: fetch it right before running.
+//
 // Credentials come only from the environment. Do not write them to a file or
 // commit them. The account must be a platform admin; the page is English-only
 // checked, so use an account whose UI language is English.
@@ -50,12 +59,35 @@ const SOILS = ["Sandy", "Sandy loam", "Loam", "Clay loam", "Clay", "Silty loam",
 
 const user = process.env.AGRIPULSE_SMOKE_USER;
 const pass = process.env.AGRIPULSE_SMOKE_PASSWORD;
+const token = process.env.AGRIPULSE_SMOKE_TOKEN;
+// Must match the SPA's OIDC settings (frontend/.env.production) so
+// oidc-client-ts finds the session under its own key.
+const OIDC_AUTHORITY =
+  process.env.PROD_OIDC_AUTHORITY || "https://keycloak.agripulse.cloud/realms/agripulse";
+const OIDC_CLIENT_ID = process.env.PROD_OIDC_CLIENT_ID || "agripulse-api";
 const treeCode = process.argv[2] && process.argv[2] !== "-" ? process.argv[2] : null;
 const outDir = process.argv[3] || ".";
 
-if (!user || !pass) {
-  console.error("Set AGRIPULSE_SMOKE_USER and AGRIPULSE_SMOKE_PASSWORD (a platform admin).");
+if (!token && (!user || !pass)) {
+  console.error(
+    "Set AGRIPULSE_SMOKE_TOKEN, or AGRIPULSE_SMOKE_USER and AGRIPULSE_SMOKE_PASSWORD (a platform admin).",
+  );
   process.exit(2);
+}
+
+/** The session oidc-client-ts would have stored after a real sign-in. */
+function seededSession(accessToken) {
+  const claims = JSON.parse(Buffer.from(accessToken.split(".")[1], "base64url").toString());
+  return {
+    key: `oidc.user:${OIDC_AUTHORITY}:${OIDC_CLIENT_ID}`,
+    value: JSON.stringify({
+      access_token: accessToken,
+      token_type: "Bearer",
+      scope: "openid profile email",
+      profile: { sub: claims.sub, iss: claims.iss, aud: claims.aud, exp: claims.exp },
+      expires_at: claims.exp,
+    }),
+  };
 }
 fs.mkdirSync(outDir, { recursive: true });
 
@@ -65,7 +97,17 @@ const log = (m) => console.log(`${new Date().toISOString().slice(11, 19)} ${m}`)
   const chromium = loadChromium();
   const proxy = process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY } : undefined;
   const browser = await chromium.launch({ proxy });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  if (token) {
+    const { key, value } = seededSession(token);
+    await context.addInitScript(
+      ([k, v]) => {
+        if (window.location.hostname.startsWith("app.")) window.sessionStorage.setItem(k, v);
+      },
+      [key, value],
+    );
+  }
+  const page = await context.newPage();
   let step = "start";
   const fail = async (why) => {
     const shot = path.join(outDir, "beta-designer-fail.png");
@@ -78,13 +120,17 @@ const log = (m) => console.log(`${new Date().toISOString().slice(11, 19)} ${m}`)
   try {
     step = "sign in";
     await page.goto(treeCode ? `${LIST}/${treeCode}` : LIST, { waitUntil: "domcontentloaded" });
-    const pw = page.locator('input[type="password"]');
-    await pw.first().waitFor({ timeout: 30000 });
-    await page.locator('input[type="email"], input[name="username"], #username').first().fill(user);
-    await pw.first().fill(pass);
-    await page.getByRole("button", { name: /sign in/i }).first().click();
-    await pw.first().waitFor({ state: "detached", timeout: 30000 });
-    log("signed in");
+    if (token) {
+      log("signed in with a token (session seeded)");
+    } else {
+      const pw = page.locator('input[type="password"]');
+      await pw.first().waitFor({ timeout: 30000 });
+      await page.locator('input[type="email"], input[name="username"], #username').first().fill(user);
+      await pw.first().fill(pass);
+      await page.getByRole("button", { name: /sign in/i }).first().click();
+      await pw.first().waitFor({ state: "detached", timeout: 30000 });
+      log("signed in");
+    }
 
     if (!treeCode) {
       step = "open the first beta tree";
