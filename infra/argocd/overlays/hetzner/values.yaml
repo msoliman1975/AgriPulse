@@ -4121,9 +4121,22 @@ global:
       #   tree runs log no errors; Medjool irrigation plans regenerate.
       #   Rollback: api and workers to a3d6a6b. 0100 can stay under the old
       #   image (it only widens a CHECK).
-      tag: "838b81b"
+      # 033de0e = #821 + #823, api and workers. Crop-scoped signals (D21) and
+      #   windowed latest (D6). Public migration 0102 adds crop_paths text[]
+      #   (default '{}' = every crop) plus a GIN index to signal_definitions
+      #   and signal_templates; no row changes. A crop-scoped signal switches
+      #   on by itself for blocks of that crop (an inactive assignment opts
+      #   out); list routes take ?crop_path= and ?block_id=; a window on
+      #   `latest` now expires old answers (no existing row has one); new
+      #   signal key days_since_latest.
+      #   Watch: signal snapshot and the recommendations sweep log no SQL
+      #   errors; /signals/definitions?block_id= answers 200; the scout app
+      #   still lists signals.
+      #   Rollback: api and workers to 838b81b. 0102 can stay under the old
+      #   image (it only adds a defaulted column the old code never reads).
+      tag: "033de0e"
     workers:
-      tag: "838b81b"
+      tag: "033de0e"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4830,7 +4843,16 @@ global:
       #   Watch: Action Center and the Beta designer render; a `treat`
       #   recommendation shows its label and icon.
       #   Rollback: this tag alone back to a3d6a6b.
-      tag: "838b81b"
+      # 033de0e = #823 (and #821), frontend, see the api note. Crop catalogue
+      #   gains a Signals tab (scope signals and forms to a crop); the
+      #   platform Signals page shows each row's crops; the tenant signal form
+      #   takes "answer valid for (days)" on every kind; the condition builder
+      #   offers days_since_latest.
+      #   Needs the api at 033de0e (reads crop_paths).
+      #   Watch: /platform/catalog Signals tab loads; the Beta designer's
+      #   signal key list includes days_since_latest.
+      #   Rollback: this tag alone back to 838b81b.
+      tag: "033de0e"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
