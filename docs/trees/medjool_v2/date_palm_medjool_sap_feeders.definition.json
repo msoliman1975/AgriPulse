@@ -1,0 +1,231 @@
+{
+  "code": "date_palm_medjool_sap_feeders",
+  "name_en": "Date palm Medjool — Dubas bug and white scale",
+  "name_ar": "نخيل المجدول — الدوباس والقشرية البيضاء",
+  "description_en": "Two sap-feeding insects that yellow the fronds: white scale (present in Egypt all year) and Dubas bug (a watch item for the Western Desert). Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly.",
+  "description_ar": "حشرتان ماصتان تصفّران السعف: القشرية البيضاء (موجودة في مصر طوال العام) والدوباس (بند مراقبة للصحراء الغربية). المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا.",
+  "scope": "block",
+  "crop_path": "date_palm.medjool",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_spring",
+  "registers": [
+    "dubas_seen",
+    "dubas_window",
+    "scale_high",
+    "chlorosis_patch"
+  ],
+  "parameters": {
+    "dubas_base_c": {
+      "type": "number",
+      "default": 13.0,
+      "min": 5.0,
+      "max": 25.0
+    },
+    "scale_high": {
+      "type": "number",
+      "default": 10.0,
+      "min": 0.0,
+      "max": 2000.0
+    },
+    "chlorosis_z": {
+      "type": "number",
+      "default": 2.0,
+      "min": 0.0,
+      "max": 6.0
+    }
+  },
+  "nodes": {
+    "n_spring": {
+      "label_en": "Is it spring (pollination stage, when Dubas eggs hatch in February–March)?",
+      "label_ar": "هل هو الربيع (مرحلة التلقيح، حين يفقس بيض الدوباس في فبراير–مارس)؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "pollination"
+          ]
+        }
+      },
+      "on_match": "n_warm",
+      "on_miss": "n_scale_seen"
+    },
+    "n_warm": {
+      "label_en": "Is the daily mean above the Dubas development threshold (about 13 °C)?",
+      "label_ar": "هل المتوسط اليومي فوق حد تطور الدوباس (نحو 13 °م)؟",
+      "condition": {
+        "tree": {
+          "op": "gt",
+          "left": {
+            "source": "weather",
+            "scope": "derived_today",
+            "field": "temp_mean_c"
+          },
+          "right": {
+            "source": "params",
+            "name": "dubas_base_c"
+          }
+        }
+      },
+      "on_match": "n_honeydew",
+      "on_miss": "n_scale_seen"
+    },
+    "n_honeydew": {
+      "label_en": "Has a scout seen honeydew drops or sooty fronds?",
+      "label_ar": "هل رأى المستكشف قطرات ندوة عسلية أو سعفًا مسودًّا؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_honeydew_seen",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_dubas",
+      "on_miss": "r_dubas_watch"
+    },
+    "r_dubas": {
+      "label_en": "Dubas bug honeydew seen",
+      "label_ar": "ندوة الدوباس ظاهرة",
+      "register": {
+        "code": "dubas_seen",
+        "severity": "warning"
+      },
+      "next": "n_scale_seen"
+    },
+    "r_dubas_watch": {
+      "label_en": "Dubas hatching window",
+      "label_ar": "نافذة فقس الدوباس",
+      "register": {
+        "code": "dubas_window",
+        "severity": "info"
+      },
+      "next": "n_scale_seen"
+    },
+    "n_scale_seen": {
+      "label_en": "Is the white-scale count per leaflet at or above the action level?",
+      "label_ar": "هل عدد القشرية البيضاء لكل وريقة عند حد التدخل أو أعلى؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "signals",
+            "code": "date_scale_per_leaflet",
+            "key": "value_numeric"
+          },
+          "right": {
+            "source": "params",
+            "name": "scale_high"
+          }
+        }
+      },
+      "on_match": "r_scale",
+      "on_miss": "n_chlor"
+    },
+    "r_scale": {
+      "label_en": "White scale above action level",
+      "label_ar": "القشرية البيضاء فوق حد التدخل",
+      "register": {
+        "code": "scale_high",
+        "severity": "warning"
+      },
+      "next": "n_chlor"
+    },
+    "n_chlor": {
+      "label_en": "Is there a cell where red-edge greenness (NDRE) is well below the block?",
+      "label_ar": "هل توجد خلية خضرة الحافة الحمراء (NDRE) فيها أدنى كثيرًا من القطعة؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "grid",
+            "index_code": "ndre",
+            "field": "worst_z"
+          },
+          "right": {
+            "source": "params",
+            "name": "chlorosis_z"
+          }
+        }
+      },
+      "on_match": "r_chlor",
+      "on_miss": "n_stop"
+    },
+    "r_chlor": {
+      "label_en": "Low red-edge greenness patch",
+      "label_ar": "بقعة خضرة حافة حمراء منخفضة",
+      "register": {
+        "code": "chlorosis_patch",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "r001",
+      "codes": [
+        "dubas_seen"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Honeydew points to Dubas bug, which has not been reported from the Western Desert farms covered by the manual. Confirm the insect, and report it to the plant-protection authority if confirmed.",
+      "text_ar": "الندوة العسلية تشير إلى الدوباس الذي لم يُسجَّل في مزارع الصحراء الغربية المشمولة. أكّد الحشرة وأبلغ جهة وقاية النبات إن تأكدت."
+    },
+    {
+      "code": "r002",
+      "codes": [
+        "chlorosis_patch",
+        "dubas_seen"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "Honeydew is seen and a low red-edge patch appears in the imagery. Sooty mould reduces photosynthesis; confirm Dubas and map the affected palms.",
+      "text_ar": "الندوة ظاهرة وبقعة حافة حمراء منخفضة في الصور. العفن الأسود يقلل البناء الضوئي؛ أكّد الدوباس وحدّد النخيل المصاب."
+    },
+    {
+      "code": "r003",
+      "codes": [
+        "scale_high"
+      ],
+      "status": "issue",
+      "action_type": "treat",
+      "text_en": "White scale is above the action level. In Egypt it has four generations a year with peaks in early September, December, January and June; its parasitoid Peteropetrix aegyptica helps, so choose a treatment that spares it.",
+      "text_ar": "القشرية البيضاء فوق حد التدخل. لها في مصر أربعة أجيال سنويًا بذُرى في أوائل سبتمبر وديسمبر ويناير ويونيو؛ وطفيلها Peteropetrix aegyptica مفيد فاختر معاملة لا تضره."
+    },
+    {
+      "code": "r004",
+      "codes": [
+        "chlorosis_patch",
+        "scale_high"
+      ],
+      "status": "alert",
+      "action_type": "treat",
+      "text_en": "Heavy white scale and a low red-edge patch: leaflets are yellowing. Treat the affected palms and prune heavily infested old fronds.",
+      "text_ar": "قشرية بيضاء شديدة وبقعة حافة حمراء منخفضة: الوريقات تصفرّ. عالج النخيل المصاب وقلّم السعف المسن شديد الإصابة."
+    },
+    {
+      "code": "r005",
+      "codes": [
+        "chlorosis_patch"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "A patch of low red-edge greenness. Check leaflets for scale, Dubas honeydew, nutrient deficiency and the yellow streaking of Al-Wijam.",
+      "text_ar": "بقعة خضرة حافة حمراء منخفضة. افحص الوريقات للقشرية وندوة الدوباس ونقص العناصر والتخطيط الأصفر للوجام."
+    }
+  ]
+}

@@ -1,0 +1,204 @@
+{
+  "code": "date_palm_medjool_moths",
+  "name_en": "Date palm Medjool — lesser date moth and stored-date moths",
+  "name_ar": "نخيل المجدول — دودة البلح الصغرى وفراشات المخازن",
+  "description_en": "Covers the moth that attacks flowers and young fruit, and the moths that attack dates in storage. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly.",
+  "description_ar": "يغطي الفراشة التي تهاجم الأزهار والثمار الصغيرة، والفراشات التي تهاجم التمور في المخازن. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا.",
+  "scope": "block",
+  "crop_path": "date_palm.medjool",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_poll",
+  "registers": [
+    "ldm_bt_window",
+    "ldm_damage",
+    "ldm_overwinter_cleanup",
+    "store_moth_watch"
+  ],
+  "parameters": {},
+  "nodes": {
+    "n_poll": {
+      "label_en": "Is the block at pollination or fruit set?",
+      "label_ar": "هل القطعة في التلقيح أو العقد؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "pollination",
+            "fruit_set"
+          ]
+        }
+      },
+      "on_match": "n_bt_done",
+      "on_miss": "n_hollow"
+    },
+    "n_bt_done": {
+      "label_en": "Has Bt been applied at pollination?",
+      "label_ar": "هل طُبّق Bt عند التلقيح؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_bt_applied",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "n_hollow",
+      "on_miss": "r_bt"
+    },
+    "r_bt": {
+      "label_en": "Bt window: at pollination and two weeks later",
+      "label_ar": "نافذة Bt: عند التلقيح وبعده بأسبوعين",
+      "register": {
+        "code": "ldm_bt_window",
+        "severity": "warning"
+      },
+      "next": "n_hollow"
+    },
+    "n_hollow": {
+      "label_en": "Has a scout seen dropped or hollow young fruit?",
+      "label_ar": "هل رأى المستكشف ثمارًا صغيرة متساقطة أو مجوّفة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_hollow_fruit_seen",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_hollow",
+      "on_miss": "n_winter"
+    },
+    "r_hollow": {
+      "label_en": "Lesser date moth damage on young fruit",
+      "label_ar": "ضرر دودة البلح الصغرى على الثمار الصغيرة",
+      "register": {
+        "code": "ldm_damage",
+        "severity": "critical"
+      },
+      "next": "n_winter"
+    },
+    "n_winter": {
+      "label_en": "Is it winter (dormancy)?",
+      "label_ar": "هل هو الشتاء (السكون)؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "dormancy"
+          ]
+        }
+      },
+      "on_match": "r_winter",
+      "on_miss": "n_store"
+    },
+    "r_winter": {
+      "label_en": "Remove overwintering larvae from frond bases",
+      "label_ar": "أزل اليرقات الشتوية من قواعد السعف",
+      "register": {
+        "code": "ldm_overwinter_cleanup",
+        "severity": "info"
+      },
+      "next": "n_store"
+    },
+    "n_store": {
+      "label_en": "Are dates in storage?",
+      "label_ar": "هل توجد تمور في المخزن؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_dates_in_storage",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_store",
+      "on_miss": "n_stop"
+    },
+    "r_store": {
+      "label_en": "Stored dates — watch for Ephestia moths",
+      "label_ar": "تمور مخزّنة — راقب فراشات المخازن",
+      "register": {
+        "code": "store_moth_watch",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "r001",
+      "codes": [
+        "ldm_bt_window"
+      ],
+      "status": "issue",
+      "action_type": "treat",
+      "text_en": "Lesser date moth larvae feed on flowers and young fruit (losses can exceed 50%). Apply Bt (permitted in organic production) at pollination and again two weeks later.",
+      "text_ar": "يرقات دودة البلح الصغرى تتغذى على الأزهار والثمار الصغيرة (قد تتجاوز الخسائر 50%). طبّق Bt (مسموح عضويًا) عند التلقيح ثم بعد أسبوعين."
+    },
+    {
+      "code": "r002",
+      "codes": [
+        "ldm_bt_window",
+        "ldm_damage"
+      ],
+      "status": "alert",
+      "action_type": "treat",
+      "text_en": "Hollow young fruit are already seen and Bt has not been applied. Apply Bt now and repeat after two weeks.",
+      "text_ar": "ثمار صغيرة مجوّفة ظاهرة ولم يُطبّق Bt. طبّقه الآن وكرّر بعد أسبوعين."
+    },
+    {
+      "code": "r003",
+      "codes": [
+        "ldm_damage"
+      ],
+      "status": "alert",
+      "action_type": "treat",
+      "text_en": "Hollow or dropped young fruit point to the lesser date moth. Treat affected bunches with Bt.",
+      "text_ar": "الثمار الصغيرة المجوّفة أو المتساقطة تشير إلى دودة البلح الصغرى. عالج العذوق المصابة بـ Bt."
+    },
+    {
+      "code": "r004",
+      "codes": [
+        "ldm_overwinter_cleanup"
+      ],
+      "status": "good",
+      "action_type": "prune",
+      "text_en": "Clean frond bases and leaf axils in winter, where lesser date moth larvae overwinter.",
+      "text_ar": "نظّف قواعد السعف وآباط الأوراق في الشتاء حيث تقضي يرقات الحميرة الشتاء."
+    },
+    {
+      "code": "r005",
+      "codes": [
+        "store_moth_watch"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Stored dates attract Ephestia moths (4–10 generations a year at 18–34 °C); no Egyptian variety is immune. Inspect stored fruit and use a storage treatment permitted under your certificate.",
+      "text_ar": "التمور المخزّنة تجذب فراشات المخازن (4–10 أجيال سنويًا عند 18–34 °م)؛ ولا يوجد صنف مصري منيع. افحص التمور المخزّنة واستخدم معاملة تخزين مسموحة."
+    }
+  ]
+}

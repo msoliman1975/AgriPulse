@@ -1,0 +1,832 @@
+[
+  {
+    "code": "cell_cloudy",
+    "name_en": "Cell too cloudy to judge",
+    "name_ar": "الخلية غائمة فلا يُحكم عليها",
+    "clause_en": "cell too cloudy to judge",
+    "clause_ar": "الخلية غائمة فلا يُحكم عليها",
+    "default_status": "na",
+    "description_en": "Less than 60% of this cell was clear on the latest image, so it was not judged. The next clear image will be used.",
+    "description_ar": "أقل من 60% من هذه الخلية كان صافيًا في أحدث صورة، فلم يُحكم عليها. ستُستخدم الصورة الصافية التالية."
+  },
+  {
+    "code": "vigour_low",
+    "name_en": "Canopy vigour below the cell's seasonal normal",
+    "name_ar": "حيوية السعف دون المعتاد الموسمي للخلية",
+    "clause_en": "canopy vigour below the cell's seasonal normal",
+    "clause_ar": "حيوية السعف دون المعتاد الموسمي للخلية",
+    "default_status": "issue",
+    "description_en": "The vigour index (MSAVI, SAVI or NDVI) is at least 1 SD below the seasonal normal. The normal is the cell's own history (with a real change of at least 0.05, or 0.04 for NDRE and GNDVI), else the block's history, else — provisionally — the band.",
+    "description_ar": "مؤشر الحيوية (MSAVI أو SAVI أو NDVI) دون المعتاد الموسمي بانحراف معياري واحد على الأقل. والمعتاد هو تاريخ الخلية نفسها (مع تغير فعلي 0.05 على الأقل، أو 0.04 لـ NDRE وGNDVI)، وإلا فتاريخ القطعة، وإلا — مبدئيًا — النطاق."
+  },
+  {
+    "code": "cell_cover_open",
+    "name_en": "Bare soil (bsi) above the cell's seasonal normal",
+    "name_ar": "التربة العارية (BSI) فوق المعتاد الموسمي للخلية",
+    "clause_en": "bare soil (bsi) above the cell's seasonal normal",
+    "clause_ar": "التربة العارية (BSI) فوق المعتاد الموسمي للخلية",
+    "default_status": "issue",
+    "description_en": "BSI is at least 1 SD above the seasonal normal: missing, dead or collapsed palms. The normal is the cell's own history (with a real change of at least 0.05, or 0.04 for NDRE and GNDVI), else the block's history, else — provisionally — the band.",
+    "description_ar": "BSI فوق المعتاد الموسمي بانحراف معياري واحد على الأقل: نخيل مفقود أو ميت أو منهار. والمعتاد هو تاريخ الخلية نفسها (مع تغير فعلي 0.05 على الأقل، أو 0.04 لـ NDRE وGNDVI)، وإلا فتاريخ القطعة، وإلا — مبدئيًا — النطاق."
+  },
+  {
+    "code": "leaf_dry",
+    "name_en": "Leaf water (ndmi) below the cell's seasonal normal",
+    "name_ar": "ماء الأوراق (NDMI) دون المعتاد الموسمي للخلية",
+    "clause_en": "leaf water (ndmi) below the cell's seasonal normal",
+    "clause_ar": "ماء الأوراق (NDMI) دون المعتاد الموسمي للخلية",
+    "default_status": "issue",
+    "description_en": "NDMI is at least 1 SD below the seasonal normal. The normal is the cell's own history (with a real change of at least 0.05, or 0.04 for NDRE and GNDVI), else the block's history, else — provisionally — the band.",
+    "description_ar": "NDMI دون المعتاد الموسمي بانحراف معياري واحد على الأقل. والمعتاد هو تاريخ الخلية نفسها (مع تغير فعلي 0.05 على الأقل، أو 0.04 لـ NDRE وGNDVI)، وإلا فتاريخ القطعة، وإلا — مبدئيًا — النطاق."
+  },
+  {
+    "code": "cell_nutrient_low",
+    "name_en": "Red-edge greenness (ndre, nitrogen) below the cell's seasonal normal",
+    "name_ar": "خضرة الحافة الحمراء (NDRE، النيتروجين) دون المعتاد الموسمي للخلية",
+    "clause_en": "red-edge greenness (ndre nitrogen) below the cell's seasonal normal",
+    "clause_ar": "خضرة الحافة الحمراء (NDRE النيتروجين) دون المعتاد الموسمي للخلية",
+    "default_status": "issue",
+    "description_en": "NDRE is at least 1 SD below the seasonal normal — possible nitrogen shortage. The same-day-of-year baseline already allows for NDRE's June–December rise. The normal is the cell's own history (with a real change of at least 0.05, or 0.04 for NDRE and GNDVI), else the block's history, else — provisionally — the band.",
+    "description_ar": "NDRE دون المعتاد الموسمي بانحراف معياري واحد على الأقل — احتمال نقص نيتروجين. وخط الأساس لليوم نفسه من السنة يراعي ارتفاع NDRE من يونيو إلى ديسمبر. والمعتاد هو تاريخ الخلية نفسها (مع تغير فعلي 0.05 على الأقل، أو 0.04 لـ NDRE وGNDVI)، وإلا فتاريخ القطعة، وإلا — مبدئيًا — النطاق."
+  },
+  {
+    "code": "chlorophyll_low",
+    "name_en": "Leaf chlorophyll (gndvi) below the cell's seasonal normal",
+    "name_ar": "كلوروفيل الأوراق (GNDVI) دون المعتاد الموسمي للخلية",
+    "clause_en": "leaf chlorophyll (gndvi) below the cell's seasonal normal",
+    "clause_ar": "كلوروفيل الأوراق (GNDVI) دون المعتاد الموسمي للخلية",
+    "default_status": "issue",
+    "description_en": "GNDVI is at least 1 SD below the seasonal normal. The normal is the cell's own history (with a real change of at least 0.05, or 0.04 for NDRE and GNDVI), else the block's history, else — provisionally — the band.",
+    "description_ar": "GNDVI دون المعتاد الموسمي بانحراف معياري واحد على الأقل. والمعتاد هو تاريخ الخلية نفسها (مع تغير فعلي 0.05 على الأقل، أو 0.04 لـ NDRE وGNDVI)، وإلا فتاريخ القطعة، وإلا — مبدئيًا — النطاق."
+  },
+  {
+    "code": "water_deficit",
+    "name_en": "Water balance in deficit before the canopy responds",
+    "name_ar": "عجز في الميزان المائي قبل أن يستجيب السعف",
+    "clause_en": "water balance in deficit before the canopy responds",
+    "clause_ar": "عجز في الميزان المائي قبل أن يستجيب السعف",
+    "default_status": "issue",
+    "description_en": "The block's daily water balance is in deficit while the canopy and leaf water in this cell are still normal. Raise the irrigation before leaf water starts to fall.",
+    "description_ar": "الميزان المائي اليومي للقطعة في عجز بينما السعف وماء الأوراق في هذه الخلية ما زالا طبيعيين. زِد الري قبل أن يبدأ ماء الأوراق في الانخفاض."
+  },
+  {
+    "code": "provisional_no_history",
+    "name_en": "Provisional: no seasonal history yet",
+    "name_ar": "مبدئي: لا تاريخ موسمي بعد",
+    "clause_en": "provisional: no seasonal history yet",
+    "clause_ar": "مبدئي: لا تاريخ موسمي بعد",
+    "default_status": "issue",
+    "description_en": "Provisional: there is no seasonal history yet, so this was judged against the workbook band for the palm size, a Low-confidence estimate. Confirm in the field; the standard-deviation method takes over once the history exists.",
+    "description_ar": "مبدئي: لا يوجد تاريخ موسمي بعد، فحُكم بنطاق المصنف لحجم النخلة، وهو تقدير منخفض الثقة. تحقّق حقليًا؛ وستتولى طريقة الانحراف المعياري الحكم حين يتوفر التاريخ."
+  },
+  {
+    "code": "block_history_used",
+    "name_en": "Judged on the block's history",
+    "name_ar": "حُكم عليها بتاريخ القطعة",
+    "clause_en": "judged on the block's history",
+    "clause_ar": "حُكم عليها بتاريخ القطعة",
+    "default_status": "issue",
+    "description_en": "This cell has no seasonal history of its own yet (a new or rezoned grid), so it was judged against the block's seasonal history.",
+    "description_ar": "لا تاريخ موسمي لهذه الخلية بعد (شبكة جديدة أو أُعيد تقسيمها)، فحُكم عليها مقارنة بتاريخ القطعة الموسمي."
+  },
+  {
+    "code": "chronic_below_band",
+    "name_en": "Below the band but steady — chronic or calibration",
+    "name_ar": "دون النطاق لكن ثابت — مزمن أو معايرة",
+    "clause_en": "below the band but steady — chronic or calibration",
+    "clause_ar": "دون النطاق لكن ثابت — مزمن أو معايرة",
+    "default_status": "issue",
+    "description_en": "One or more indices sit below the workbook band for this palm size but are steady at this place's usual level. This is not a new problem: it points to a chronic site condition (salinity, sparse or young planting) or to a band set too high for this farm. Test the soil and compare with the farm's best blocks before acting.",
+    "description_ar": "مؤشر أو أكثر دون نطاق المصنف لهذا الحجم لكنه ثابت عند المستوى المعتاد للمكان. ليست مشكلة جديدة: تشير إلى حالة مزمنة في الموقع (ملوحة، زراعة متباعدة أو حديثة) أو إلى نطاق أعلى مما يناسب المزرعة. حلّل التربة وقارن بأفضل قطع المزرعة قبل التصرف."
+  },
+  {
+    "code": "loc_spot",
+    "name_en": "A localised spot",
+    "name_ar": "بقعة موضعية",
+    "clause_en": "a localised spot",
+    "clause_ar": "بقعة موضعية",
+    "default_status": "issue",
+    "description_en": "Location: this cell is clearly weaker than the other cells of the same image (at least 1.5 SD below them). The problem is local — inspect the palms in this cell first.",
+    "description_ar": "المكان: هذه الخلية أضعف بوضوح من باقي خلايا الصورة نفسها (دونها بانحراف معياري 1.5 على الأقل). المشكلة موضعية — افحص نخيل هذه الخلية أولًا."
+  },
+  {
+    "code": "loc_block_wide",
+    "name_en": "Part of a block-wide problem",
+    "name_ar": "جزء من مشكلة تعم القطعة",
+    "clause_en": "part of a block-wide problem",
+    "clause_ar": "جزء من مشكلة تعم القطعة",
+    "default_status": "issue",
+    "description_en": "Location: this cell is not weaker than its neighbours, so the problem covers much of the block — the cells with the same finding are grouped under one card. Act on the whole block.",
+    "description_ar": "المكان: هذه الخلية ليست أضعف من جيرانها، فالمشكلة تشمل جزءًا كبيرًا من القطعة — والخلايا ذات النتيجة نفسها مجمّعة تحت بطاقة واحدة. تصرّف على القطعة كلها."
+  },
+  {
+    "code": "loc_unknown",
+    "name_en": "Location cannot be judged",
+    "name_ar": "المكان لا يمكن الحكم عليه",
+    "clause_en": "location cannot be judged",
+    "clause_ar": "المكان لا يمكن الحكم عليه",
+    "default_status": "issue",
+    "description_en": "Location: the cell could not be compared with its neighbours — the block has fewer than 20 cells, or its cells are almost identical (spread below 0.02), which itself points to the whole block.",
+    "description_ar": "المكان: تعذّرت مقارنة الخلية بجيرانها — القطعة أقل من 20 خلية، أو خلاياها شبه متطابقة (تباين دون 0.02)، وهذا بحد ذاته يشير إلى القطعة كلها."
+  },
+  {
+    "code": "cause_salt_patch",
+    "name_en": "Likely cause: salt build-up in this spot",
+    "name_ar": "السبب المرجح: تراكم أملاح في هذه البقعة",
+    "clause_en": "likely cause: salt build-up in this spot",
+    "clause_ar": "السبب المرجح: تراكم أملاح في هذه البقعة",
+    "default_status": "issue",
+    "description_en": "Likely cause: the block is recorded as saline and this spot is weaker than its neighbours — salts may be building up here (poor wetting, a low spot, a shallow water table). Take a soil sample for ECe from this cell and from a healthy cell, and check that the emitters here wet the root zone fully.",
+    "description_ar": "السبب المرجح: القطعة مسجّلة ملحية وهذه البقعة أضعف من جيرانها — قد تتراكم الأملاح هنا (ترطيب ضعيف، منخفض، ماء أرضي قريب). خذ عينة تربة لقياس ECe من هذه الخلية ومن خلية سليمة، وتأكد أن النقاطات هنا ترطّب منطقة الجذور كاملة."
+  },
+  {
+    "code": "cause_local_irrigation",
+    "name_en": "Likely cause: this cell is not getting its water",
+    "name_ar": "السبب المرجح: هذه الخلية لا تأخذ نصيبها من الماء",
+    "clause_en": "likely cause: this cell is not getting its water",
+    "clause_ar": "السبب المرجح: هذه الخلية لا تأخذ نصيبها من الماء",
+    "default_status": "issue",
+    "description_en": "Likely cause: leaf water is low in this spot while the block's water balance is not in deficit, so the block is being watered — this cell is not getting its share. Check the emitters, laterals and pressure on the lines that feed this cell.",
+    "description_ar": "السبب المرجح: ماء الأوراق منخفض في هذه البقعة بينما الميزان المائي للقطعة ليس في عجز، فالقطعة تُروى — لكن هذه الخلية لا تأخذ نصيبها. افحص النقاطات والخطوط الفرعية والضغط في الخطوط التي تغذي هذه الخلية."
+  },
+  {
+    "code": "cause_block_water",
+    "name_en": "Likely cause: the whole block is short of water",
+    "name_ar": "السبب المرجح: القطعة كلها ينقصها الماء",
+    "clause_en": "likely cause: the whole block is short of water",
+    "clause_ar": "السبب المرجح: القطعة كلها ينقصها الماء",
+    "default_status": "issue",
+    "description_en": "Likely cause: the block's water balance is in deficit — the whole block is short of water, not just this cell. Fix the block's irrigation schedule first; then check whether this cell recovers with the rest.",
+    "description_ar": "السبب المرجح: الميزان المائي للقطعة في عجز — القطعة كلها ينقصها الماء لا هذه الخلية وحدها. أصلح جدول ري القطعة أولًا؛ ثم تحقّق هل تتعافى هذه الخلية مع البقية."
+  },
+  {
+    "code": "cause_salinity",
+    "name_en": "Likely cause: soil salinity",
+    "name_ar": "السبب المرجح: ملوحة التربة",
+    "clause_en": "likely cause: soil salinity",
+    "clause_ar": "السبب المرجح: ملوحة التربة",
+    "default_status": "issue",
+    "description_en": "Likely cause: the block is recorded as saline (ECe above date palm's 4 dS/m threshold) and the problem is not confined to a spot — salinity is the likely cause across the block. Irrigate with a leaching fraction and test the irrigation water.",
+    "description_ar": "السبب المرجح: القطعة مسجّلة ملحية (ECe فوق حد النخيل 4 ديسي سيمنز/م) والمشكلة لا تقتصر على بقعة — الملوحة هي السبب المرجح في القطعة. اروِ بنسبة غسيل وحلّل ماء الري."
+  },
+  {
+    "code": "decline_unexplained",
+    "name_en": "Weak canopy with no other cause — pest or disease suspected",
+    "name_ar": "سعف ضعيف بلا سبب آخر — يُشتبه بآفة أو مرض",
+    "clause_en": "weak canopy with no other cause — pest or disease suspected",
+    "clause_ar": "سعف ضعيف بلا سبب آخر — يُشتبه بآفة أو مرض",
+    "default_status": "issue",
+    "description_en": "Likely cause: none of water, salinity, cover, nitrogen or chlorophyll explains it. Red Palm Weevil, sudden decline and black scorch can all start like this: inspect trunks within 1 m of the ground for holes, oozing sap, chewed fibre and cocoons, and fronds for one-sided whitening.",
+    "description_ar": "السبب المرجح: لا يفسّره الماء ولا الملوحة ولا الغطاء ولا النيتروجين ولا الكلوروفيل. قد تبدأ سوسة النخيل الحمراء والتدهور المفاجئ واللفحة السوداء هكذا: افحص الجذوع حتى متر من الأرض بحثًا عن ثقوب ونز وألياف ممضوغة وشرانق، والسعف بحثًا عن ابيضاض في جانب واحد."
+  },
+  {
+    "code": "black_scorch_suspect",
+    "name_en": "Charcoal lesions — black scorch",
+    "name_ar": "بقع فحمية — اللفحة السوداء",
+    "clause_en": "charcoal lesions — black scorch",
+    "clause_ar": "بقع فحمية — اللفحة السوداء",
+    "default_status": "issue",
+    "description_en": "Dark, hard, charcoal-like lesions; found in New Valley with Higazi highly susceptible.",
+    "description_ar": "بقع داكنة صلبة فحمية؛ موجودة في الوادي الجديد والحجازي شديد القابلية."
+  },
+  {
+    "code": "wilt_suspect",
+    "name_en": "One-sided whitening — Fusarium wilt / Bayoud pattern",
+    "name_ar": "ابيضاض جهة واحدة — نمط الفيوزاريوم / البيوض",
+    "clause_en": "one-sided whitening — Fusarium wilt / Bayoud pattern",
+    "clause_ar": "ابيضاض جهة واحدة — نمط الفيوزاريوم / البيوض",
+    "default_status": "alert",
+    "description_en": "Whitening on one side of the rachis from base to tip; Bayoud is absent from Egypt and Medjool is susceptible.",
+    "description_ar": "ابيضاض جهة من العرق من القاعدة إلى القمة؛ البيوض غير موجود في مصر والمجدول قابل."
+  },
+  {
+    "code": "leaf_base_rot",
+    "name_en": "Leaf base rot",
+    "name_ar": "تعفن قواعد الأوراق",
+    "clause_en": "leaf base rot",
+    "clause_ar": "تعفن قواعد الأوراق",
+    "default_status": "issue",
+    "description_en": "Recorded in New Valley palms and nurseries.",
+    "description_ar": "مسجّل في نخيل ومشاتل الوادي الجديد."
+  },
+  {
+    "code": "wijam_suspect",
+    "name_en": "Al-Wijam pattern — not reported from Egypt",
+    "name_ar": "نمط الوجام — غير مسجّل في مصر",
+    "clause_en": "al-Wijam pattern — not reported from Egypt",
+    "clause_ar": "نمط الوجام — غير مسجّل في مصر",
+    "default_status": "alert",
+    "description_en": "Stunting, yellow streaking, fruit and stalks about 30% smaller; phytoplasma 16SrI; not reported from Egypt.",
+    "description_ar": "تقزم وتخطيط أصفر وثمار وعراجين أصغر بنحو 30%؛ فيتوبلازما 16SrI؛ غير مسجّل في مصر."
+  },
+  {
+    "code": "brittle_leaf_suspect",
+    "name_en": "Brittle leaflets — check manganese",
+    "name_ar": "وريقات هشة — افحص المنجنيز",
+    "clause_en": "brittle leaflets — check manganese",
+    "clause_ar": "وريقات هشة — افحص المنجنيز",
+    "default_status": "issue",
+    "description_en": "Affected leaflets had 6.5 ppm manganese against 29 ppm in healthy leaves.",
+    "description_ar": "الوريقات المصابة بها 6.5 جزء في المليون منجنيز مقابل 29 في السليمة."
+  },
+  {
+    "code": "crown_collapse_cell",
+    "name_en": "NDVI collapse in one cell",
+    "name_ar": "انهيار NDVI في خلية",
+    "clause_en": "nDVI collapse in one cell",
+    "clause_ar": "انهيار NDVI في خلية",
+    "default_status": "issue",
+    "description_en": "One cell's NDVI is at least 3 standard deviations below the block: collapsed or dead crown (late stage).",
+    "description_ar": "NDVI لخلية أدنى من القطعة بثلاثة انحرافات معيارية على الأقل: تاج منهار أو ميت (مرحلة متأخرة)."
+  },
+  {
+    "code": "size_missing",
+    "name_en": "Palm size not recorded",
+    "name_ar": "حجم النخيل غير مسجّل",
+    "clause_en": "palm size not recorded",
+    "clause_ar": "حجم النخيل غير مسجّل",
+    "default_status": "issue",
+    "description_en": "No tree_size_class on the block's crop.",
+    "description_ar": "لا توجد tree_size_class على محصول القطعة."
+  },
+  {
+    "code": "size_mismatch",
+    "name_en": "Recorded size disagrees with NDVI",
+    "name_ar": "الحجم المسجّل لا يطابق NDVI",
+    "clause_en": "recorded size disagrees with NDVI",
+    "clause_ar": "الحجم المسجّل لا يطابق NDVI",
+    "default_status": "issue",
+    "description_en": "Recorded large with NDVI below 0.30, or recorded small with NDVI at 0.50 or more.",
+    "description_ar": "مسجّلة كبيرة وNDVI دون 0.30، أو صغيرة وNDVI 0.50 أو أكثر."
+  },
+  {
+    "code": "salinity_missing",
+    "name_en": "Soil salinity class not recorded",
+    "name_ar": "فئة ملوحة التربة غير مسجّلة",
+    "clause_en": "soil salinity class not recorded",
+    "clause_ar": "فئة ملوحة التربة غير مسجّلة",
+    "default_status": "issue",
+    "description_en": "No salinity_class recorded; FAO's date palm threshold is 4 dS/m.",
+    "description_ar": "لا توجد salinity_class مسجّلة؛ حد الفاو للنخيل 4 ديسي سيمنز/م."
+  },
+  {
+    "code": "mite_webbing",
+    "name_en": "Dust mite webbing on bunches",
+    "name_ar": "نسيج عنكبوت الغبار على العذوق",
+    "clause_en": "dust mite webbing on bunches",
+    "clause_ar": "نسيج عنكبوت الغبار على العذوق",
+    "default_status": "alert",
+    "description_en": "Webbing and dust on bunches; peak about 14 mites per fruit; native predators absent from fruit mid-July to end of August.",
+    "description_ar": "نسيج وغبار على العذوق؛ الذروة نحو 14 حلمًا للثمرة؛ والمفترسات غائبة عن الثمار من منتصف يوليو حتى نهاية أغسطس."
+  },
+  {
+    "code": "mite_weather",
+    "name_en": "Hot, dry spell at the mite-susceptible stage",
+    "name_ar": "طقس حار جاف في مرحلة الحساسية للعنكبوت",
+    "clause_en": "hot dry spell at the mite-susceptible stage",
+    "clause_ar": "طقس حار جاف في مرحلة الحساسية للعنكبوت",
+    "default_status": "issue",
+    "description_en": "Hot, dry weather favours the mite, which stays active at 45 °C and prefers drier areas.",
+    "description_ar": "الطقس الحار الجاف يشجّع الحلم الذي يبقى نشطًا عند 45 °م ويفضّل المناطق الأجف."
+  },
+  {
+    "code": "mite_scouting_due",
+    "name_en": "Weekly bunch scouting due",
+    "name_ar": "الفحص الأسبوعي للعذوق مستحق",
+    "clause_en": "weekly bunch scouting due",
+    "clause_ar": "الفحص الأسبوعي للعذوق مستحق",
+    "default_status": "good",
+    "description_en": "Weekly bunch scouting from Kimri.",
+    "description_ar": "فحص أسبوعي للعذوق من الكمري."
+  },
+  {
+    "code": "khamedj_wet_season",
+    "name_en": "Wet late winter / spring at spathe emergence",
+    "name_ar": "أواخر شتاء / ربيع ممطر عند خروج الطلع",
+    "clause_en": "wet late winter / spring at spathe emergence",
+    "clause_ar": "أواخر شتاء / ربيع ممطر عند خروج الطلع",
+    "default_status": "issue",
+    "description_en": "Khamedj depends mainly on February–March rainfall; started in March and peaked in April in Khuzestan.",
+    "description_ar": "يعتمد الخامج أساسًا على أمطار فبراير–مارس؛ وبدأ في مارس وبلغ ذروته في أبريل في خوزستان."
+  },
+  {
+    "code": "khamedj_rain_ahead",
+    "name_en": "Rain forecast at spathe emergence",
+    "name_ar": "مطر متوقع عند خروج الطلع",
+    "clause_en": "rain forecast at spathe emergence",
+    "clause_ar": "مطر متوقع عند خروج الطلع",
+    "default_status": "issue",
+    "description_en": "Rain forecast during spathe emergence.",
+    "description_ar": "مطر متوقع أثناء خروج الطلع."
+  },
+  {
+    "code": "khamedj_soil_risk",
+    "name_en": "Heavy or saline soil — higher Khamedj risk",
+    "name_ar": "تربة ثقيلة أو ملحية — خطر خامج أعلى",
+    "clause_en": "heavy or saline soil — higher Khamedj risk",
+    "clause_ar": "تربة ثقيلة أو ملحية — خطر خامج أعلى",
+    "default_status": "issue",
+    "description_en": "Most severe on saline, heavy, poorly drained soils.",
+    "description_ar": "يشتد في التربة الملحية الثقيلة سيئة الصرف."
+  },
+  {
+    "code": "khamedj_seen",
+    "name_en": "Rotted spathes seen",
+    "name_ar": "طلع متعفن",
+    "clause_en": "rotted spathes seen",
+    "clause_ar": "طلع متعفن",
+    "default_status": "alert",
+    "description_en": "Recorded in New Valley surveys; spathes rot and the bunch's fruit set is lost.",
+    "description_ar": "مسجّل في مسوحات الوادي الجديد؛ يتعفن الطلع ويضيع عقد العذق."
+  },
+  {
+    "code": "graphiola_seen",
+    "name_en": "Graphiola on old fronds",
+    "name_ar": "جرافيولا على السعف المسن",
+    "clause_en": "graphiola on old fronds",
+    "clause_ar": "جرافيولا على السعف المسن",
+    "default_status": "issue",
+    "description_en": "Black Graphiola sori on the oldest fronds, reported by a scout. Do not remove old infected fronds from potassium-deficient palms.",
+    "description_ar": "بثرات الجرافيولا السوداء على أقدم السعف، يبلّغ عنها المستكشف. ولا تُزال الأوراق المسنة المصابة من نخيل ناقص البوتاسيوم."
+  },
+  {
+    "code": "graphiola_spread_risk",
+    "name_en": "Wet spell ahead with Graphiola present",
+    "name_ar": "فترة مبللة قادمة والجرافيولا موجودة",
+    "clause_en": "wet spell ahead with Graphiola present",
+    "clause_ar": "فترة مبللة قادمة والجرافيولا موجودة",
+    "default_status": "issue",
+    "description_en": "A wet spell is likely while Graphiola is present: infection needs 10–12 h of free water. Rain probability ≥ 60% is a proxy for long leaf wetness (no leaf-wetness sensor).",
+    "description_ar": "فترة مبللة محتملة والجرافيولا موجودة: العدوى تحتاج 10–12 ساعة من الماء الحر. واحتمال مطر ≥ 60% بديل للابتلال الطويل (لا مجس ابتلال)."
+  },
+  {
+    "code": "pollination_rain",
+    "name_en": "Rain within 24 hours of pollination",
+    "name_ar": "مطر خلال 24 ساعة من التلقيح",
+    "clause_en": "rain within 24 hours of pollination",
+    "clause_ar": "مطر خلال 24 ساعة من التلقيح",
+    "default_status": "issue",
+    "description_en": "Rain shortly after pollination reduces fruit set.",
+    "description_ar": "المطر بعد التلقيح بقليل يقلل العقد."
+  },
+  {
+    "code": "ripening_rain",
+    "name_en": "Rain forecast on ripening fruit",
+    "name_ar": "مطر متوقع على الثمار الناضجة",
+    "clause_en": "rain forecast on ripening fruit",
+    "clause_ar": "مطر متوقع على الثمار الناضجة",
+    "default_status": "issue",
+    "description_en": "Rain at Rutab/Tamar causes souring and fruit fall; at Kimri/Khalal it causes checking.",
+    "description_ar": "المطر في الرطب/التمر يسبب التخمّر والتساقط؛ وفي الكمري/الخلال يسبب التشقق."
+  },
+  {
+    "code": "bunches_unbagged",
+    "name_en": "Bunches not bagged",
+    "name_ar": "العذوق غير مكيّسة",
+    "clause_en": "bunches not bagged",
+    "clause_ar": "العذوق غير مكيّسة",
+    "default_status": "issue",
+    "description_en": "Bagging at the start of Khalal with open-ended bags protects against humidity, rain, sunburn and birds.",
+    "description_ar": "التكييس في بداية الخلال بأكياس مفتوحة يحمي من الرطوبة والمطر ولفحة الشمس والطيور."
+  },
+  {
+    "code": "ldm_bt_window",
+    "name_en": "Bt window: at pollination and two weeks later",
+    "name_ar": "نافذة Bt: عند التلقيح وبعده بأسبوعين",
+    "clause_en": "bt window: at pollination and two weeks later",
+    "clause_ar": "نافذة Bt: عند التلقيح وبعده بأسبوعين",
+    "default_status": "issue",
+    "description_en": "Bt dust at pollination or a Bt spray two weeks after pollination gave good results.",
+    "description_ar": "تعفير Bt عند التلقيح أو رشه بعد أسبوعين أعطى نتائج جيدة."
+  },
+  {
+    "code": "ldm_damage",
+    "name_en": "Lesser date moth damage on young fruit",
+    "name_ar": "ضرر دودة البلح الصغرى على الثمار الصغيرة",
+    "clause_en": "lesser date moth damage on young fruit",
+    "clause_ar": "ضرر دودة البلح الصغرى على الثمار الصغيرة",
+    "default_status": "alert",
+    "description_en": "Larvae feed on flowers and developing fruit; losses can exceed 50%.",
+    "description_ar": "اليرقات تتغذى على الأزهار والثمار النامية؛ وقد تتجاوز الخسائر 50%."
+  },
+  {
+    "code": "ldm_overwinter_cleanup",
+    "name_en": "Remove overwintering larvae from frond bases",
+    "name_ar": "أزل اليرقات الشتوية من قواعد السعف",
+    "clause_en": "remove overwintering larvae from frond bases",
+    "clause_ar": "أزل اليرقات الشتوية من قواعد السعف",
+    "default_status": "good",
+    "description_en": "Overwintering larvae hide between the bases of the terminal fronds.",
+    "description_ar": "اليرقات الشتوية تختبئ بين قواعد السعف الطرفية."
+  },
+  {
+    "code": "store_moth_watch",
+    "name_en": "Stored dates — watch for Ephestia moths",
+    "name_ar": "تمور مخزّنة — راقب فراشات المخازن",
+    "clause_en": "stored dates — watch for Ephestia moths",
+    "clause_ar": "تمور مخزّنة — راقب فراشات المخازن",
+    "default_status": "issue",
+    "description_en": "No Egyptian variety is immune; Aamry most susceptible; E. cautella has 4–10 generations a year at 18–34 °C.",
+    "description_ar": "لا يوجد صنف مصري منيع؛ العامري الأشد؛ وE. cautella لها 4–10 أجيال سنويًا عند 18–34 °م."
+  },
+  {
+    "code": "regime_winter",
+    "name_en": "Winter irrigation: reduce, do not stop — about once a week.",
+    "name_ar": "ري الشتاء: خفّض ولا تقطع — نحو مرة أسبوعيًا.",
+    "clause_en": "winter irrigation: reduce do not stop — about once a week.",
+    "clause_ar": "ري الشتاء: خفّض ولا تقطع — نحو مرة أسبوعيًا.",
+    "default_status": "issue",
+    "description_en": "Winter irrigation: reduce, do not stop — about once a week.",
+    "description_ar": "ري الشتاء: خفّض ولا تقطع — نحو مرة أسبوعيًا."
+  },
+  {
+    "code": "sanitation_due",
+    "name_en": "Clean frond bases, leaf axils and debris; prune and remove offshoots now and treat every cut.",
+    "name_ar": "نظّف قواعد السعف وآباط الأوراق والمخلفات؛ قلّم وافصل الفسائل الآن وعالج كل جرح.",
+    "clause_en": "clean frond bases leaf axils and debris — prune and remove offshoots now and treat every cut.",
+    "clause_ar": "نظّف قواعد السعف وآباط الأوراق والمخلفات؛ قلّم وافصل الفسائل الآن وعالج كل جرح.",
+    "default_status": "issue",
+    "description_en": "Clean frond bases, leaf axils and debris; prune and remove offshoots now and treat every cut.",
+    "description_ar": "نظّف قواعد السعف وآباط الأوراق والمخلفات؛ قلّم وافصل الفسائل الآن وعالج كل جرح."
+  },
+  {
+    "code": "pollination_due",
+    "name_en": "Inspect female palms daily; pollinate within 2–4 days of spathe opening and repeat 3–4 days later.",
+    "name_ar": "افحص النخيل المؤنث يوميًا؛ لقّح خلال 2–4 أيام من تفتح الطلعة وكرّر بعد 3–4 أيام.",
+    "clause_en": "inspect female palms daily — pollinate within 2–4 days of spathe opening and repeat 3–4 days later.",
+    "clause_ar": "افحص النخيل المؤنث يوميًا؛ لقّح خلال 2–4 أيام من تفتح الطلعة وكرّر بعد 3–4 أيام.",
+    "default_status": "issue",
+    "description_en": "Inspect female palms daily; pollinate within 2–4 days of spathe opening and repeat 3–4 days later.",
+    "description_ar": "افحص النخيل المؤنث يوميًا؛ لقّح خلال 2–4 أيام من تفتح الطلعة وكرّر بعد 3–4 أيام."
+  },
+  {
+    "code": "thinning_due",
+    "name_en": "Hand-thin each bunch 3–4 weeks after pollination: about 30 strands per bunch, 10 fruits per strand.",
+    "name_ar": "خفّ كل عذق يدويًا بعد 3–4 أسابيع من تلقيحه: نحو 30 شمراخًا و10 ثمار للشمراخ.",
+    "clause_en": "hand-thin each bunch 3–4 weeks after pollination: about 30 strands per bunch 10 fruits per strand.",
+    "clause_ar": "خفّ كل عذق يدويًا بعد 3–4 أسابيع من تلقيحه: نحو 30 شمراخًا و10 ثمار للشمراخ.",
+    "default_status": "issue",
+    "description_en": "Hand-thin each bunch 3–4 weeks after pollination: about 30 strands per bunch, 10 fruits per strand.",
+    "description_ar": "خفّ كل عذق يدويًا بعد 3–4 أسابيع من تلقيحه: نحو 30 شمراخًا و10 ثمار للشمراخ."
+  },
+  {
+    "code": "bending_due",
+    "name_en": "Bend and tie each bunch once its stalk is fully extended but still flexible.",
+    "name_ar": "دلِّ واربط كل عذق عند اكتمال استطالة عرجونه وهو ما زال مرنًا.",
+    "clause_en": "bend and tie each bunch once its stalk is fully extended but still flexible.",
+    "clause_ar": "دلِّ واربط كل عذق عند اكتمال استطالة عرجونه وهو ما زال مرنًا.",
+    "default_status": "issue",
+    "description_en": "Bend and tie each bunch once its stalk is fully extended but still flexible.",
+    "description_ar": "دلِّ واربط كل عذق عند اكتمال استطالة عرجونه وهو ما زال مرنًا."
+  },
+  {
+    "code": "regime_summer",
+    "name_en": "Summer and fruit irrigation: about twice a week, with steady soil moisture to avoid fruit cracking.",
+    "name_ar": "ري الصيف والثمار: نحو مرتين أسبوعيًا مع رطوبة تربة ثابتة لتجنّب تشقق الثمار.",
+    "clause_en": "summer and fruit irrigation: about twice a week with steady soil moisture to avoid fruit cracking.",
+    "clause_ar": "ري الصيف والثمار: نحو مرتين أسبوعيًا مع رطوبة تربة ثابتة لتجنّب تشقق الثمار.",
+    "default_status": "issue",
+    "description_en": "Summer and fruit irrigation: about twice a week, with steady soil moisture to avoid fruit cracking.",
+    "description_ar": "ري الصيف والثمار: نحو مرتين أسبوعيًا مع رطوبة تربة ثابتة لتجنّب تشقق الثمار."
+  },
+  {
+    "code": "bagging_due",
+    "name_en": "Bag bunches at the start of Khalal with open-ended bags, left on until harvest.",
+    "name_ar": "كيّس العذوق في بداية الخلال بأكياس مفتوحة تُترك حتى الحصاد.",
+    "clause_en": "bag bunches at the start of Khalal with open-ended bags left on until harvest.",
+    "clause_ar": "كيّس العذوق في بداية الخلال بأكياس مفتوحة تُترك حتى الحصاد.",
+    "default_status": "issue",
+    "description_en": "Bag bunches at the start of Khalal with open-ended bags, left on until harvest.",
+    "description_ar": "كيّس العذوق في بداية الخلال بأكياس مفتوحة تُترك حتى الحصاد."
+  },
+  {
+    "code": "harvest_due",
+    "name_en": "Pick soft ripe fruit individually in 2–3 passes, 1–2 weeks apart.",
+    "name_ar": "اجنِ الثمار الطرية الناضجة فرديًا على 2–3 دفعات يفصل بينها أسبوع إلى أسبوعين.",
+    "clause_en": "pick soft ripe fruit individually in 2–3 passes 1–2 weeks apart.",
+    "clause_ar": "اجنِ الثمار الطرية الناضجة فرديًا على 2–3 دفعات يفصل بينها أسبوع إلى أسبوعين.",
+    "default_status": "issue",
+    "description_en": "Pick soft ripe fruit individually in 2–3 passes, 1–2 weeks apart.",
+    "description_ar": "اجنِ الثمار الطرية الناضجة فرديًا على 2–3 دفعات يفصل بينها أسبوع إلى أسبوعين."
+  },
+  {
+    "code": "rpw_signs_reported",
+    "name_en": "RPW signs reported on a palm",
+    "name_ar": "علامات السوسة مسجّلة على نخلة",
+    "clause_en": "rPW signs reported on a palm",
+    "clause_ar": "علامات السوسة مسجّلة على نخلة",
+    "default_status": "alert",
+    "description_en": "Egg-laying notches, holes, oozing brown fluid, chewed fibre, cocoons about 40 mm, off-centre crown or wilting like water shortage.",
+    "description_ar": "ثقوب وضع البيض، ثقوب، سائل بني، ألياف ممضوغة، شرانق نحو 40 مم، قمة مائلة أو ذبول يشبه العطش."
+  },
+  {
+    "code": "rpw_drone_thermal",
+    "name_en": "Drone thermal: crown temperature anomaly",
+    "name_ar": "حراري المسيّرة: شذوذ حرارة التاج",
+    "clause_en": "drone thermal: crown temperature anomaly",
+    "clause_ar": "حراري المسيّرة: شذوذ حرارة التاج",
+    "default_status": "issue",
+    "description_en": "Maximum crown temperature and its standard deviation differed significantly from June at the severe stage, before visible symptoms.",
+    "description_ar": "اختلفت أقصى حرارة للتاج وانحرافها المعياري معنويًا من يونيو في المرحلة الشديدة قبل الأعراض."
+  },
+  {
+    "code": "rpw_drone_ndre",
+    "name_en": "Drone NDRE: palm missed the seasonal greenness rise",
+    "name_ar": "NDRE المسيّرة: نخلة افتقدت ارتفاع الخضرة الموسمي",
+    "clause_en": "drone NDRE: palm missed the seasonal greenness rise",
+    "clause_ar": "NDRE المسيّرة: نخلة افتقدت ارتفاع الخضرة الموسمي",
+    "default_status": "issue",
+    "description_en": "Infested palms lacked the significant seasonal NDRE rise from June to December; on a single date they looked greener.",
+    "description_ar": "افتقد المصاب الارتفاع الموسمي المعنوي في NDRE من يونيو إلى ديسمبر؛ وبدا أكثر خضرة في الصورة الواحدة."
+  },
+  {
+    "code": "rpw_block_ndre_flat",
+    "name_en": "Block NDRE did not rise in season",
+    "name_ar": "NDRE القطعة لم يرتفع في موسمه",
+    "clause_en": "block NDRE did not rise in season",
+    "clause_ar": "NDRE القطعة لم يرتفع في موسمه",
+    "default_status": "issue",
+    "description_en": "Block-mean NDRE is falling in Kimri–Tamar, when it should rise. Applying the per-palm drone result to a block mean is an inference.",
+    "description_ar": "متوسط NDRE للقطعة يهبط في الكمري–التمر بدل أن يرتفع. تطبيق نتيجة المسيّرة للنخلة على متوسط القطعة استنتاج."
+  },
+  {
+    "code": "rpw_untreated_wounds",
+    "name_en": "Untreated fresh cuts while weevils can lay eggs",
+    "name_ar": "جروح حديثة غير معالجة والسوسة قادرة على وضع البيض",
+    "clause_en": "untreated fresh cuts while weevils can lay eggs",
+    "clause_ar": "جروح حديثة غير معالجة والسوسة قادرة على وضع البيض",
+    "default_status": "alert",
+    "description_en": "Fresh cuts without protective treatment while the daily mean is above the 15.45 °C egg-laying threshold; untreated offshoot wounds and pruning are among the farmer errors.",
+    "description_ar": "جروح حديثة دون معالجة والمتوسط اليومي فوق حد وضع البيض 15.45 °م؛ وترك جروح الفسائل والتقليم دون معالجة من أخطاء المزارعين."
+  },
+  {
+    "code": "rpw_wound_window",
+    "name_en": "Winter: the safest window for wound-making work — treat every cut",
+    "name_ar": "الشتاء: أأمن نافذة لأعمال الجروح — عالج كل جرح",
+    "clause_en": "winter: the safest window for wound-making work — treat every cut",
+    "clause_ar": "الشتاء: أأمن نافذة لأعمال الجروح — عالج كل جرح",
+    "default_status": "good",
+    "description_en": "Dormancy stage: weevil egg-laying is lowest; the UAE calendar cuts fronds in December–January.",
+    "description_ar": "مرحلة السكون: وضع البيض في أدناه؛ والتقويم الإماراتي يقطع السعف في ديسمبر–يناير."
+  },
+  {
+    "code": "rpw_flood_irrigation",
+    "name_en": "Flood irrigation — 88% of Al-Ahsa infestations",
+    "name_ar": "ري بالغمر — 88% من إصابات الأحساء",
+    "clause_en": "flood irrigation — 88% of Al-Ahsa infestations",
+    "clause_ar": "ري بالغمر — 88% من إصابات الأحساء",
+    "default_status": "issue",
+    "description_en": "88% of Al-Ahsa infestations were under flood irrigation, 9.6% basin, 2.4% drip.",
+    "description_ar": "88% من إصابات الأحساء تحت الري بالغمر و9.6% بالأحواض و2.4% بالتنقيط."
+  },
+  {
+    "code": "rpw_susceptible_age",
+    "name_en": "Susceptible age — attacks mostly within 1 m of the ground",
+    "name_ar": "عمر قابل للإصابة — الإصابة غالبًا ضمن متر من الأرض",
+    "clause_en": "susceptible age — attacks mostly within 1 m of the ground",
+    "clause_ar": "عمر قابل للإصابة — الإصابة غالبًا ضمن متر من الأرض",
+    "default_status": "issue",
+    "description_en": "Plantations 4–14 years after planting are the susceptible age; over 85% of stem colonisation is within about 1 m of the ground.",
+    "description_ar": "المزارع بعمر 4–14 سنة في السن القابلة؛ وأكثر من 85% من الاستيطان ضمن نحو متر من الأرض."
+  },
+  {
+    "code": "rpw_roots_exposed",
+    "name_en": "Exposed aerial roots",
+    "name_ar": "جذور هوائية مكشوفة",
+    "clause_en": "exposed aerial roots",
+    "clause_ar": "جذور هوائية مكشوفة",
+    "default_status": "issue",
+    "description_en": "Leaving aerial roots uncovered is one of the 22 New Valley farmer errors.",
+    "description_ar": "ترك الجذور الهوائية مكشوفة من أخطاء المزارعين الـ22 في الوادي الجديد."
+  },
+  {
+    "code": "rpw_rodents",
+    "name_en": "Rodent feeding — attracts the weevil",
+    "name_ar": "تغذية الفئران — تجذب السوسة",
+    "clause_en": "rodent feeding — attracts the weevil",
+    "clause_ar": "تغذية الفئران — تجذب السوسة",
+    "default_status": "issue",
+    "description_en": "Rat and mouse feeding attracts the weevil (New Valley study).",
+    "description_ar": "تغذية الفئران تجذب السوسة (دراسة الوادي الجديد)."
+  },
+  {
+    "code": "rpw_infested_waste",
+    "name_en": "Infested waste left in the farm",
+    "name_ar": "مخلفات مصابة متروكة في المزرعة",
+    "clause_en": "infested waste left in the farm",
+    "clause_ar": "مخلفات مصابة متروكة في المزرعة",
+    "default_status": "alert",
+    "description_en": "Leaving infested waste beside paths is a farmer error; heavily infested palms must be removed, burnt and buried.",
+    "description_ar": "ترك المخلفات المصابة بجوار الممرات خطأ؛ ويجب إزالة النخيل شديد الإصابة وحرقه ودفنه."
+  },
+  {
+    "code": "rpw_inspection_overdue",
+    "name_en": "Monthly palm inspection overdue",
+    "name_ar": "الفحص الشهري للنخيل متأخر",
+    "clause_en": "monthly palm inspection overdue",
+    "clause_ar": "الفحص الشهري للنخيل متأخر",
+    "default_status": "issue",
+    "description_en": "Inspections should be monthly; not inspecting monthly is a farmer error.",
+    "description_ar": "يجب أن يكون الفحص شهريًا؛ وعدم الفحص الشهري خطأ."
+  },
+  {
+    "code": "rpw_trap_high",
+    "name_en": "Trap catch at the action level",
+    "name_ar": "صيد المصائد عند حد التدخل",
+    "clause_en": "trap catch at the action level",
+    "clause_ar": "صيد المصائد عند حد التدخل",
+    "default_status": "issue",
+    "description_en": "Catch per trap at or above the tenant's action level.",
+    "description_ar": "الصيد لكل مصيدة عند حد التدخل للمستأجر أو أعلى."
+  },
+  {
+    "code": "rpw_trap_rising",
+    "name_en": "Trap catch rising",
+    "name_ar": "صيد المصائد في ازدياد",
+    "clause_en": "trap catch rising",
+    "clause_ar": "صيد المصائد في ازدياد",
+    "default_status": "issue",
+    "description_en": "Catch trend is rising. Trap catch versus temperature differs between Saudi Arabia (negative) and Damietta (positive), so the trend matters more than the season.",
+    "description_ar": "اتجاه الصيد صاعد. علاقة الصيد بالحرارة تختلف بين السعودية (سالبة) ودمياط (موجبة)، فالاتجاه أهم من الموسم."
+  },
+  {
+    "code": "rpw_trap_service_due",
+    "name_en": "Trap bait and water due",
+    "name_ar": "تجديد طعم المصائد والماء مستحق",
+    "clause_en": "trap bait and water due",
+    "clause_ar": "تجديد طعم المصائد والماء مستحق",
+    "default_status": "issue",
+    "description_en": "Bait and water should be renewed every 7–15 days (Al-Ahsa: every two weeks).",
+    "description_ar": "يُجدَّد الطعم والماء كل 7–15 يومًا (الأحساء: كل أسبوعين)."
+  },
+  {
+    "code": "dubas_seen",
+    "name_en": "Dubas bug honeydew seen",
+    "name_ar": "ندوة الدوباس ظاهرة",
+    "clause_en": "dubas bug honeydew seen",
+    "clause_ar": "ندوة الدوباس ظاهرة",
+    "default_status": "issue",
+    "description_en": "Honeydew promotes sooty mould; Dubas can cause up to 28% loss of date production.",
+    "description_ar": "الندوة تشجّع العفن الأسود؛ وقد يسبب الدوباس فقدًا حتى 28% من التمور."
+  },
+  {
+    "code": "dubas_window",
+    "name_en": "Dubas hatching window",
+    "name_ar": "نافذة فقس الدوباس",
+    "clause_en": "dubas hatching window",
+    "clause_ar": "نافذة فقس الدوباس",
+    "default_status": "issue",
+    "description_en": "Development stops below about 12.9–13.2 °C; spring eggs hatch February–March, autumn eggs in August.",
+    "description_ar": "يتوقف التطور دون نحو 12.9–13.2 °م؛ ويفقس بيض الربيع في فبراير–مارس وبيض الخريف في أغسطس."
+  },
+  {
+    "code": "scale_high",
+    "name_en": "White scale above action level",
+    "name_ar": "القشرية البيضاء فوق حد التدخل",
+    "clause_en": "white scale above action level",
+    "clause_ar": "القشرية البيضاء فوق حد التدخل",
+    "default_status": "issue",
+    "description_en": "Four overlapping generations a year in Qalioubiya; population rises with temperature.",
+    "description_ar": "أربعة أجيال متداخلة سنويًا في القليوبية؛ ويزيد التعداد مع الحرارة."
+  },
+  {
+    "code": "chlorosis_patch",
+    "name_en": "Low red-edge greenness patch",
+    "name_ar": "بقعة خضرة حافة حمراء منخفضة",
+    "clause_en": "low red-edge greenness patch",
+    "clause_ar": "بقعة خضرة حافة حمراء منخفضة",
+    "default_status": "issue",
+    "description_en": "One cell's NDRE is at least 2 standard deviations below the block (grid worst_z ≥ 2). That chlorosis shows first in red-edge indices is an expected order, not a measured one.",
+    "description_ar": "NDRE لخلية أدنى من القطعة بانحرافين معياريين على الأقل (worst_z في الشبكة ≥ 2). ظهور الاصفرار أولًا في مؤشرات الحافة الحمراء ترتيب متوقع لا مقيس."
+  },
+  {
+    "code": "canopy_warm",
+    "name_en": "Canopy warmer than a well-watered palm (CWSI high)",
+    "name_ar": "السعف أدفأ من نخلة مروية جيدًا (CWSI مرتفع)",
+    "clause_en": "canopy warmer than a well-watered palm (CWSI high)",
+    "clause_ar": "السعف أدفأ من نخلة مروية جيدًا (CWSI مرتفع)",
+    "default_status": "issue",
+    "description_en": "CWSI is above 0.30 on the 0 (unstressed) to 1 (fully stressed) scale.",
+    "description_ar": "CWSI فوق 0.30 على مقياس 0 (دون إجهاد) إلى 1 (إجهاد كامل)."
+  },
+  {
+    "code": "soil_dry_thermal",
+    "name_en": "Soil drier than the wet edge (SMI low)",
+    "name_ar": "التربة أجف من الحافة الرطبة (SMI منخفض)",
+    "clause_en": "soil drier than the wet edge (SMI low)",
+    "clause_ar": "التربة أجف من الحافة الرطبة (SMI منخفض)",
+    "default_status": "issue",
+    "description_en": "SMI is below 0.60 on the 0 (dry edge) to 1 (wet edge) scale.",
+    "description_ar": "SMI دون 0.60 على مقياس 0 (الحافة الجافة) إلى 1 (الحافة الرطبة)."
+  },
+  {
+    "code": "heat_ahead",
+    "name_en": "Surface warming with a hot spell ahead",
+    "name_ar": "ارتفاع حرارة السطح وموجة حارة قادمة",
+    "clause_en": "surface warming with a hot spell ahead",
+    "clause_ar": "ارتفاع حرارة السطح وموجة حارة قادمة",
+    "default_status": "issue",
+    "description_en": "Land-surface temperature is rising and a maximum of 45 °C or more is forecast.",
+    "description_ar": "حرارة السطح صاعدة ويُتوقّع عظمى 45 °م أو أكثر."
+  },
+  {
+    "code": "irrigation_not_logged",
+    "name_en": "Irrigation not logged — water balance cannot be trusted",
+    "name_ar": "الري غير مسجّل — لا يُوثق بالميزان المائي",
+    "clause_en": "irrigation not logged — water balance cannot be trusted",
+    "clause_ar": "الري غير مسجّل — لا يُوثق بالميزان المائي",
+    "default_status": "good",
+    "description_en": "The water-balance row has no irrigation logged.",
+    "description_ar": "صف الميزان المائي بلا ري مسجّل."
+  },
+  {
+    "code": "establishment_gaps",
+    "name_en": "Establishment gaps — failed offshoots likely",
+    "name_ar": "فجوات في التأسيس — فسائل فاشلة محتملة",
+    "clause_en": "establishment gaps — failed offshoots likely",
+    "clause_ar": "فجوات في التأسيس — فسائل فاشلة محتملة",
+    "default_status": "issue",
+    "description_en": "BSI above and MSAVI below the workbook seedling band.",
+    "description_ar": "BSI فوق وMSAVI دون نطاق الشتلات في المصنف."
+  },
+  {
+    "code": "young_irrigation_sandy",
+    "name_en": "Young palms on sand in hot weather — daily irrigation",
+    "name_ar": "نخيل صغير على رمل في طقس حار — ري يومي",
+    "clause_en": "young palms on sand in hot weather — daily irrigation",
+    "clause_ar": "نخيل صغير على رمل في طقس حار — ري يومي",
+    "default_status": "issue",
+    "description_en": "Manual: young palms on sand need frequent irrigation in the first summer.",
+    "description_ar": "الدليل: النخيل الصغير على الرمل يحتاج ريًا متكررًا في الصيف الأول."
+  },
+  {
+    "code": "young_rpw_check_due",
+    "name_en": "Young palms: RPW base inspection due",
+    "name_ar": "النخيل الصغير: فحص القاعدة للسوسة مستحق",
+    "clause_en": "young palms: RPW base inspection due",
+    "clause_ar": "النخيل الصغير: فحص القاعدة للسوسة مستحق",
+    "default_status": "issue",
+    "description_en": "On palms under 5 years, symptoms appear within 1 m of the ground; 6- and 10-year-old palms were highly susceptible.",
+    "description_ar": "في النخيل الأصغر من 5 سنوات تظهر الأعراض ضمن متر من الأرض؛ والنخيل بعمر 6 و10 سنوات شديد القابلية."
+  },
+  {
+    "code": "heat_units_short",
+    "name_en": "Heat units short for ripening",
+    "name_ar": "الوحدات الحرارية أقل من اللازم للنضج",
+    "clause_en": "heat units short for ripening",
+    "clause_ar": "الوحدات الحرارية أقل من اللازم للنضج",
+    "default_status": "issue",
+    "description_en": "Season heat units since 1 January (base 10 °C) are below about 3,440 at Tamar or harvest. 3,440 at base 10 °C is the figure cited for Medjool to mature (Mertia & Kumawat 2010, cited in Kahramanoglu & Usanmaz 2019); the same paper cites about 1,800 at base 18 °C. In Northern Cyprus 3,039 (base 10) and 1,279 (base 18) by late October left only about 10% of fruit ripe on the palm.",
+    "description_ar": "الوحدات الحرارية للموسم منذ 1 يناير (أساس 10 °م) أقل من نحو 3440 في طور التمر أو الحصاد. و3440 بأساس 10 °م هو الرقم المنقول لنضج المجدول (Mertia وKumawat 2010، منقول في Kahramanoglu وUsanmaz 2019)؛ وينقل البحث نفسه نحو 1800 بأساس 18 °م. وفي شمال قبرص لم ينضج على النخلة إلا نحو 10% من الثمار عند 3039 (أساس 10) و1279 (أساس 18) في أواخر أكتوبر."
+  },
+  {
+    "code": "ripening_heat_stopped",
+    "name_en": "No heat accumulating at base 18 °C",
+    "name_ar": "لا تتراكم حرارة بأساس 18 °م",
+    "clause_en": "no heat accumulating at base 18 °C",
+    "clause_ar": "لا تتراكم حرارة بأساس 18 °م",
+    "default_status": "issue",
+    "description_en": "Today's mean temperature is below 18 °C at Rutab, Tamar or harvest, so no heat units accumulate at base 18 °C. In the Cyprus study the on-palm trials ended when daily heat units at base 18 °C fell to zero; 18 °C is the zero point for flowering and fruiting since Swingle (1904).",
+    "description_ar": "متوسط حرارة اليوم أقل من 18 °م في طور الرطب أو التمر أو الحصاد، فلا تتراكم وحدات حرارية بأساس 18 °م. وفي دراسة قبرص انتهت التجارب على النخلة حين هبطت الوحدات اليومية بأساس 18 °م إلى الصفر؛ و18 °م نقطة الصفر للتزهير والإثمار منذ Swingle (1904)."
+  },
+  {
+    "code": "fruit_still_khalal",
+    "name_en": "Fruit still at Khalal",
+    "name_ar": "الثمار ما زالت في طور الخلال",
+    "clause_en": "fruit still at Khalal",
+    "clause_ar": "الثمار ما زالت في طور الخلال",
+    "default_status": "issue",
+    "description_en": "Scouts record the fruit inside the bags as still at Khalal (date_ripening_stage) after a heat finding. Measured on Medjool: with too little heat, fruit stayed at Khalal and only about 10% ripened on the palm.",
+    "description_ar": "يسجّل المستكشف الثمار داخل الأكياس ما زالت في طور الخلال (date_ripening_stage) بعد نتيجة حرارية. وقيس على المجدول: مع نقص الحرارة بقيت الثمار في الخلال ولم ينضج على النخلة إلا نحو 10%."
+  },
+  {
+    "code": "cold_crown_damage",
+    "name_en": "Cold: outer crown likely dried",
+    "name_ar": "البرد: السعف الخارجي جف غالبًا",
+    "clause_en": "the minimum fell to −12 °C or below where the outer crown dries",
+    "clause_ar": "انخفضت الصغرى إلى −12 °م أو أقل حيث يجف السعف الخارجي",
+    "default_status": "alert",
+    "description_en": "At −12 °C the outer crown of Medjool dries (manual 10.4 #6; FAO; High).",
+    "description_ar": "عند −12 °م يجف السعف الخارجي للمجدول (الدليل 10.4 #6؛ الفاو؛ عالية)."
+  },
+  {
+    "code": "cold_leaf_damage",
+    "name_en": "Cold: leaflet tips likely yellowed",
+    "name_ar": "البرد: أطراف الوريقات اصفرّت غالبًا",
+    "clause_en": "the minimum fell to −6 °C or below where leaflet tips yellow and dry",
+    "clause_ar": "انخفضت الصغرى إلى −6 °م أو أقل حيث تصفرّ أطراف الوريقات وتجف",
+    "default_status": "issue",
+    "description_en": "At −6 °C Medjool leaflet tips yellow and dry (manual 10.4 #6; FAO; High).",
+    "description_ar": "عند −6 °م تصفرّ أطراف وريقات المجدول وتجف (الدليل 10.4 #6؛ الفاو؛ عالية)."
+  },
+  {
+    "code": "cold_irrigate_ahead",
+    "name_en": "Cold ahead: irrigate first",
+    "name_ar": "برد قادم: اروِ أولًا",
+    "clause_en": "a minimum near −5 °C is forecast so irrigate before it",
+    "clause_ar": "يُتوقع أن تقترب الصغرى من −5 °م فاروِ قبلها",
+    "default_status": "issue",
+    "description_en": "A plantation that has just been irrigated stores heat, so irrigate when temperatures approach −5 °C (manual 10.4 #6; FAO; High).",
+    "description_ar": "المزرعة المروية حديثًا تختزن حرارة، لذا يُروى عند اقتراب الحرارة من −5 °م (الدليل 10.4 #6؛ الفاو؛ عالية)."
+  }
+]

@@ -1,0 +1,241 @@
+{
+  "code": "date_palm_medjool_data_readiness",
+  "name_en": "Date palm Medjool — data readiness",
+  "name_ar": "نخيل المجدول — جاهزية البيانات",
+  "description_en": "Checks the two block records the health trees depend on: palm size and soil salinity class. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly. Palm size is read from the block's palm phase: new planting = small, juvenile and onset of fruiting = medium, bearing = large.",
+  "description_ar": "يفحص سجلي القطعة اللذين تعتمد عليهما أشجار الصحة: حجم النخيل وفئة ملوحة التربة. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا. يُقرأ حجم النخيل من طور النخلة في القطعة: زراعة جديدة = صغير، يافع وبداية الإثمار = متوسط، مثمر = كبير.",
+  "scope": "block",
+  "crop_path": "date_palm.medjool",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_has_size",
+  "registers": [
+    "size_missing",
+    "size_mismatch",
+    "salinity_missing"
+  ],
+  "parameters": {
+    "medium_ndvi_floor": {
+      "type": "number",
+      "default": 0.3,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "large_ndvi_floor": {
+      "type": "number",
+      "default": 0.5,
+      "min": -2.0,
+      "max": 3.0
+    }
+  },
+  "nodes": {
+    "n_has_size": {
+      "label_en": "Is palm size recorded?",
+      "label_ar": "هل حجم النخيل مسجّل؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "crop_attribute",
+            "code": "palm_phase",
+            "key": "value"
+          },
+          "values": [
+            "new_planting",
+            "juvenile",
+            "onset_of_fruiting",
+            "bearing"
+          ]
+        }
+      },
+      "on_match": "n_large",
+      "on_miss": "r_missing"
+    },
+    "r_missing": {
+      "label_en": "Palm size not recorded",
+      "label_ar": "حجم النخيل غير مسجّل",
+      "register": {
+        "code": "size_missing",
+        "severity": "warning"
+      },
+      "next": "n_sal"
+    },
+    "n_large": {
+      "label_en": "Recorded as large?",
+      "label_ar": "مسجّلة كبيرة؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "crop_attribute",
+            "code": "palm_phase",
+            "key": "value"
+          },
+          "values": [
+            "bearing"
+          ]
+        }
+      },
+      "on_match": "n_large_ndvi",
+      "on_miss": "n_small"
+    },
+    "n_large_ndvi": {
+      "label_en": "Does NDVI read below even the medium band?",
+      "label_ar": "هل NDVI دون نطاق المتوسطة حتى؟",
+      "condition": {
+        "tree": {
+          "op": "lt",
+          "left": {
+            "source": "indices",
+            "index_code": "ndvi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "params",
+            "name": "medium_ndvi_floor"
+          }
+        }
+      },
+      "on_match": "r_mismatch",
+      "on_miss": "n_sal"
+    },
+    "n_small": {
+      "label_en": "Recorded as small?",
+      "label_ar": "مسجّلة صغيرة؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "crop_attribute",
+            "code": "palm_phase",
+            "key": "value"
+          },
+          "values": [
+            "new_planting"
+          ]
+        }
+      },
+      "on_match": "n_small_ndvi",
+      "on_miss": "n_sal"
+    },
+    "n_small_ndvi": {
+      "label_en": "Does NDVI read at the large band?",
+      "label_ar": "هل NDVI عند نطاق الكبيرة؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "indices",
+            "index_code": "ndvi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "params",
+            "name": "large_ndvi_floor"
+          }
+        }
+      },
+      "on_match": "r_mismatch",
+      "on_miss": "n_sal"
+    },
+    "r_mismatch": {
+      "label_en": "Recorded size disagrees with NDVI",
+      "label_ar": "الحجم المسجّل لا يطابق NDVI",
+      "register": {
+        "code": "size_mismatch",
+        "severity": "info"
+      },
+      "next": "n_sal"
+    },
+    "n_sal": {
+      "label_en": "Is the soil salinity class recorded?",
+      "label_ar": "هل فئة ملوحة التربة مسجّلة؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "salinity_class"
+          },
+          "values": [
+            "non_saline",
+            "slightly_saline",
+            "moderately_saline",
+            "strongly_saline"
+          ]
+        }
+      },
+      "on_match": "n_stop",
+      "on_miss": "r_no_sal"
+    },
+    "r_no_sal": {
+      "label_en": "Soil salinity class not recorded",
+      "label_ar": "فئة ملوحة التربة غير مسجّلة",
+      "register": {
+        "code": "salinity_missing",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "r001",
+      "codes": [
+        "size_missing"
+      ],
+      "status": "issue",
+      "action_type": "other",
+      "text_en": "Record the palm size class on the block's crop; the canopy tree uses it to judge seedling blocks on MSAVI, and the young-planting tree needs it.",
+      "text_ar": "سجّل فئة حجم النخيل على محصول القطعة؛ تستخدمها شجرة السعف لقياس قطع الشتلات بـ MSAVI، وتحتاجها شجرة الزراعات الجديدة."
+    },
+    {
+      "code": "r002",
+      "codes": [
+        "salinity_missing",
+        "size_missing"
+      ],
+      "status": "issue",
+      "action_type": "other",
+      "text_en": "Record palm size and a laboratory soil salinity (ECe) class for this block.",
+      "text_ar": "سجّل حجم النخيل وفئة ملوحة التربة (ECe معملي) لهذه القطعة."
+    },
+    {
+      "code": "r003",
+      "codes": [
+        "salinity_missing"
+      ],
+      "status": "issue",
+      "action_type": "other",
+      "text_en": "Record the soil salinity class from a laboratory ECe test; date palm loses yield above 4 dS/m.",
+      "text_ar": "سجّل فئة ملوحة التربة من تحليل ECe معملي؛ يفقد النخيل محصوله فوق 4 ديسي سيمنز/م."
+    },
+    {
+      "code": "r004",
+      "codes": [
+        "size_mismatch"
+      ],
+      "status": "issue",
+      "action_type": "other",
+      "text_en": "The recorded size disagrees with what the imagery reads. Check the record; a large palm reading as small may also be a sick palm.",
+      "text_ar": "الحجم المسجّل لا يطابق ما تقرؤه الصور. راجع السجل؛ فالنخلة الكبيرة التي تُقرأ صغيرة قد تكون مريضة."
+    },
+    {
+      "code": "r005",
+      "codes": [
+        "salinity_missing",
+        "size_mismatch"
+      ],
+      "status": "issue",
+      "action_type": "other",
+      "text_en": "Check the size record and add a soil salinity class for this block.",
+      "text_ar": "راجع سجل الحجم وأضف فئة ملوحة التربة لهذه القطعة."
+    }
+  ]
+}

@@ -1,0 +1,343 @@
+{
+  "code": "date_palm_medjool_heat_units",
+  "name_en": "Date palm Medjool — heat units (GDD) and ripening on the palm",
+  "name_ar": "نخيل المجدول — الوحدات الحرارية (GDD) والنضج على النخلة",
+  "description_en": "Late in the season, checks whether Medjool fruit has had enough heat to ripen on the palm, and what to do if not. Source: Medjool Decision Trees v2 (original definition).",
+  "description_ar": "في آخر الموسم، تفحص هل نالت ثمار المجدول حرارة كافية لتنضج على النخلة، وماذا يُفعل إن لم تنل. المصدر: أشجار قرار المجدول، الإصدار 2 (التعريف الأصلي).",
+  "scope": "block",
+  "crop_path": "date_palm.medjool",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_late",
+  "registers": [
+    "heat_units_short",
+    "ripening_heat_stopped",
+    "fruit_still_khalal",
+    "bunches_unbagged"
+  ],
+  "nodes": {
+    "n_late": {
+      "label_en": "Is the block at Tamar or harvest?",
+      "label_ar": "هل القطعة في طور التمر أو الحصاد؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "tamar",
+            "harvest"
+          ]
+        }
+      },
+      "on_match": "n_gdd",
+      "on_miss": "n_ripe_stage"
+    },
+    "n_gdd": {
+      "label_en": "Are heat units since 1 January (base 10 °C) below the Medjool figure?",
+      "label_ar": "هل الوحدات الحرارية منذ 1 يناير (أساس 10 °م) أقل من رقم المجدول؟",
+      "condition": {
+        "tree": {
+          "op": "lt",
+          "left": {
+            "source": "weather",
+            "scope": "derived_today",
+            "field": "gdd_cumulative_base10_season"
+          },
+          "right": {
+            "source": "params",
+            "name": "gdd10_medjool"
+          }
+        }
+      },
+      "on_match": "r_short",
+      "on_miss": "n_ripe_stage"
+    },
+    "r_short": {
+      "label_en": "Heat units short for ripening",
+      "label_ar": "الوحدات الحرارية أقل من اللازم للنضج",
+      "register": {
+        "code": "heat_units_short",
+        "severity": "warning"
+      },
+      "next": "n_ripe_stage"
+    },
+    "n_ripe_stage": {
+      "label_en": "Is the block at Rutab, Tamar or harvest?",
+      "label_ar": "هل القطعة في طور الرطب أو التمر أو الحصاد؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "rutab",
+            "tamar",
+            "harvest"
+          ]
+        }
+      },
+      "on_match": "n_cool",
+      "on_miss": "n_stop"
+    },
+    "n_cool": {
+      "label_en": "Is today's mean temperature below 18 °C?",
+      "label_ar": "هل متوسط حرارة اليوم أقل من 18 °م؟",
+      "condition": {
+        "tree": {
+          "op": "lt",
+          "left": {
+            "source": "weather",
+            "scope": "derived_today",
+            "field": "temp_mean_c"
+          },
+          "right": {
+            "source": "params",
+            "name": "heat_zero_mean_c"
+          }
+        }
+      },
+      "on_match": "r_stopped",
+      "on_miss": "n_any_short"
+    },
+    "r_stopped": {
+      "label_en": "No heat accumulating at base 18 °C",
+      "label_ar": "لا تتراكم حرارة بأساس 18 °م",
+      "register": {
+        "code": "ripening_heat_stopped",
+        "severity": "warning"
+      },
+      "next": "n_fruit"
+    },
+    "n_any_short": {
+      "label_en": "Were heat units found short?",
+      "label_ar": "هل وُجدت الوحدات الحرارية أقل من اللازم؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "findings",
+            "code": "heat_units_short"
+          },
+          "right": true
+        }
+      },
+      "on_match": "n_fruit",
+      "on_miss": "n_stop"
+    },
+    "n_fruit": {
+      "label_en": "Do scouts still see the fruit at Khalal?",
+      "label_ar": "هل يرى المستكشف الثمار ما زالت في طور الخلال؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_ripening_stage",
+            "key": "value_categorical"
+          },
+          "right": "khalal"
+        }
+      },
+      "on_match": "r_khalal",
+      "on_miss": "n_bag"
+    },
+    "r_khalal": {
+      "label_en": "Fruit still at Khalal",
+      "label_ar": "الثمار ما زالت في طور الخلال",
+      "register": {
+        "code": "fruit_still_khalal",
+        "severity": "warning"
+      },
+      "next": "n_bag"
+    },
+    "n_bag": {
+      "label_en": "Are the bunches unbagged?",
+      "label_ar": "هل العذوق غير مكيّسة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_bunches_bagged",
+            "key": "value_boolean"
+          },
+          "right": false
+        }
+      },
+      "on_match": "r_unbag",
+      "on_miss": "n_stop"
+    },
+    "r_unbag": {
+      "label_en": "Bunches not bagged",
+      "label_ar": "العذوق غير مكيّسة",
+      "register": {
+        "code": "bunches_unbagged",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "parameters": {
+    "gdd10_medjool": {
+      "type": "number",
+      "default": 3440,
+      "min": 1500,
+      "max": 6000
+    },
+    "heat_zero_mean_c": {
+      "type": "number",
+      "default": 18,
+      "min": 10,
+      "max": 25
+    }
+  },
+  "combinations": [
+    {
+      "code": "heat_heatu",
+      "codes": [
+        "heat_units_short"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Heat units since 1 January (base 10 °C) are below about 3,440, the figure reported for Medjool to mature. In Northern Cyprus 3,039 units by late October left only about 10% of Medjool fruit ripe on the palm. Watch ripening inside the bags.",
+      "text_ar": "الوحدات الحرارية منذ 1 يناير (أساس 10 °م) أقل من نحو 3440، وهو الرقم المذكور لنضج المجدول. وفي شمال قبرص لم ينضج على النخلة إلا نحو 10% من ثمار المجدول عند 3039 وحدة في أواخر أكتوبر. تابع النضج داخل الأكياس."
+    },
+    {
+      "code": "heat_heatu_bunchesu",
+      "codes": [
+        "bunches_unbagged",
+        "heat_units_short"
+      ],
+      "status": "issue",
+      "action_type": "other",
+      "text_en": "Heat units since 1 January (base 10 °C) are below about 3,440, the figure reported for Medjool to mature. In Northern Cyprus 3,039 units by late October left only about 10% of Medjool fruit ripe on the palm. The bunches are not bagged. Bag the bunches with perforated black polyethylene: it raised heat around the fruit and the share of ripe fruit on the palm.",
+      "text_ar": "الوحدات الحرارية منذ 1 يناير (أساس 10 °م) أقل من نحو 3440، وهو الرقم المذكور لنضج المجدول. وفي شمال قبرص لم ينضج على النخلة إلا نحو 10% من ثمار المجدول عند 3039 وحدة في أواخر أكتوبر. العذوق غير مكيّسة. كيّس العذوق بأكياس بولي إيثيلين سوداء مثقّبة: فقد رفعت الحرارة حول الثمار ونسبة الثمار الناضجة على النخلة."
+    },
+    {
+      "code": "heat_heatu_fruits",
+      "codes": [
+        "fruit_still_khalal",
+        "heat_units_short"
+      ],
+      "status": "alert",
+      "action_type": "harvest_window",
+      "text_en": "Heat units since 1 January (base 10 °C) are below about 3,440, the figure reported for Medjool to mature. In Northern Cyprus 3,039 units by late October left only about 10% of Medjool fruit ripe on the palm. Scouts still see the fruit at Khalal. Fruit still firm at Khalal can be picked and ripened off the palm: in the same study freezing at −18 °C for 3 days ripened all Khalal fruit to Tamr. Check any dip, such as vinegar, against the certifying body's list first.",
+      "text_ar": "الوحدات الحرارية منذ 1 يناير (أساس 10 °م) أقل من نحو 3440، وهو الرقم المذكور لنضج المجدول. وفي شمال قبرص لم ينضج على النخلة إلا نحو 10% من ثمار المجدول عند 3039 وحدة في أواخر أكتوبر. يرى المستكشف الثمار ما زالت في طور الخلال. يمكن جني الثمار الصلبة في طور الخلال وإنضاجها بعيدًا عن النخلة: ففي الدراسة نفسها أنضج التجميد عند −18 °م لمدة 3 أيام كل ثمار الخلال إلى تمر. وتحقق من أي غمر، مثل الخل، مقابل قائمة جهة الاعتماد أولًا."
+    },
+    {
+      "code": "heat_heatu_fruits_bunchesu",
+      "codes": [
+        "bunches_unbagged",
+        "fruit_still_khalal",
+        "heat_units_short"
+      ],
+      "status": "alert",
+      "action_type": "harvest_window",
+      "text_en": "Heat units since 1 January (base 10 °C) are below about 3,440, the figure reported for Medjool to mature. In Northern Cyprus 3,039 units by late October left only about 10% of Medjool fruit ripe on the palm. Scouts still see the fruit at Khalal. The bunches are not bagged. Bag the bunches with perforated black polyethylene: it raised heat around the fruit and the share of ripe fruit on the palm. Fruit still firm at Khalal can be picked and ripened off the palm: in the same study freezing at −18 °C for 3 days ripened all Khalal fruit to Tamr. Check any dip, such as vinegar, against the certifying body's list first.",
+      "text_ar": "الوحدات الحرارية منذ 1 يناير (أساس 10 °م) أقل من نحو 3440، وهو الرقم المذكور لنضج المجدول. وفي شمال قبرص لم ينضج على النخلة إلا نحو 10% من ثمار المجدول عند 3039 وحدة في أواخر أكتوبر. يرى المستكشف الثمار ما زالت في طور الخلال. العذوق غير مكيّسة. كيّس العذوق بأكياس بولي إيثيلين سوداء مثقّبة: فقد رفعت الحرارة حول الثمار ونسبة الثمار الناضجة على النخلة. يمكن جني الثمار الصلبة في طور الخلال وإنضاجها بعيدًا عن النخلة: ففي الدراسة نفسها أنضج التجميد عند −18 °م لمدة 3 أيام كل ثمار الخلال إلى تمر. وتحقق من أي غمر، مثل الخل، مقابل قائمة جهة الاعتماد أولًا."
+    },
+    {
+      "code": "heat_ripeningh",
+      "codes": [
+        "ripening_heat_stopped"
+      ],
+      "status": "issue",
+      "action_type": "harvest_window",
+      "text_en": "Today's mean temperature is below 18 °C, so no heat accumulates at base 18 °C. The Cyprus on-palm trials ended when daily heat units at base 18 °C fell to zero, with only about 10% of fruit ripe. Fruit still firm at Khalal can be picked and ripened off the palm: in the same study freezing at −18 °C for 3 days ripened all Khalal fruit to Tamr. Check any dip, such as vinegar, against the certifying body's list first.",
+      "text_ar": "متوسط حرارة اليوم أقل من 18 °م، فلا تتراكم حرارة بأساس 18 °م. وانتهت تجارب قبرص على النخلة حين هبطت الوحدات اليومية بأساس 18 °م إلى الصفر، ولم ينضج إلا نحو 10% من الثمار. يمكن جني الثمار الصلبة في طور الخلال وإنضاجها بعيدًا عن النخلة: ففي الدراسة نفسها أنضج التجميد عند −18 °م لمدة 3 أيام كل ثمار الخلال إلى تمر. وتحقق من أي غمر، مثل الخل، مقابل قائمة جهة الاعتماد أولًا."
+    },
+    {
+      "code": "heat_ripeningh_bunchesu",
+      "codes": [
+        "bunches_unbagged",
+        "ripening_heat_stopped"
+      ],
+      "status": "issue",
+      "action_type": "harvest_window",
+      "text_en": "Today's mean temperature is below 18 °C, so no heat accumulates at base 18 °C. The Cyprus on-palm trials ended when daily heat units at base 18 °C fell to zero, with only about 10% of fruit ripe. The bunches are not bagged. Bag the bunches with perforated black polyethylene: it raised heat around the fruit and the share of ripe fruit on the palm. Fruit still firm at Khalal can be picked and ripened off the palm: in the same study freezing at −18 °C for 3 days ripened all Khalal fruit to Tamr. Check any dip, such as vinegar, against the certifying body's list first.",
+      "text_ar": "متوسط حرارة اليوم أقل من 18 °م، فلا تتراكم حرارة بأساس 18 °م. وانتهت تجارب قبرص على النخلة حين هبطت الوحدات اليومية بأساس 18 °م إلى الصفر، ولم ينضج إلا نحو 10% من الثمار. العذوق غير مكيّسة. كيّس العذوق بأكياس بولي إيثيلين سوداء مثقّبة: فقد رفعت الحرارة حول الثمار ونسبة الثمار الناضجة على النخلة. يمكن جني الثمار الصلبة في طور الخلال وإنضاجها بعيدًا عن النخلة: ففي الدراسة نفسها أنضج التجميد عند −18 °م لمدة 3 أيام كل ثمار الخلال إلى تمر. وتحقق من أي غمر، مثل الخل، مقابل قائمة جهة الاعتماد أولًا."
+    },
+    {
+      "code": "heat_ripeningh_fruits",
+      "codes": [
+        "fruit_still_khalal",
+        "ripening_heat_stopped"
+      ],
+      "status": "issue",
+      "action_type": "harvest_window",
+      "text_en": "Today's mean temperature is below 18 °C, so no heat accumulates at base 18 °C. The Cyprus on-palm trials ended when daily heat units at base 18 °C fell to zero, with only about 10% of fruit ripe. Scouts still see the fruit at Khalal. Fruit still firm at Khalal can be picked and ripened off the palm: in the same study freezing at −18 °C for 3 days ripened all Khalal fruit to Tamr. Check any dip, such as vinegar, against the certifying body's list first.",
+      "text_ar": "متوسط حرارة اليوم أقل من 18 °م، فلا تتراكم حرارة بأساس 18 °م. وانتهت تجارب قبرص على النخلة حين هبطت الوحدات اليومية بأساس 18 °م إلى الصفر، ولم ينضج إلا نحو 10% من الثمار. يرى المستكشف الثمار ما زالت في طور الخلال. يمكن جني الثمار الصلبة في طور الخلال وإنضاجها بعيدًا عن النخلة: ففي الدراسة نفسها أنضج التجميد عند −18 °م لمدة 3 أيام كل ثمار الخلال إلى تمر. وتحقق من أي غمر، مثل الخل، مقابل قائمة جهة الاعتماد أولًا."
+    },
+    {
+      "code": "heat_ripeningh_fruits_bunchesu",
+      "codes": [
+        "bunches_unbagged",
+        "fruit_still_khalal",
+        "ripening_heat_stopped"
+      ],
+      "status": "issue",
+      "action_type": "harvest_window",
+      "text_en": "Today's mean temperature is below 18 °C, so no heat accumulates at base 18 °C. The Cyprus on-palm trials ended when daily heat units at base 18 °C fell to zero, with only about 10% of fruit ripe. Scouts still see the fruit at Khalal. The bunches are not bagged. Bag the bunches with perforated black polyethylene: it raised heat around the fruit and the share of ripe fruit on the palm. Fruit still firm at Khalal can be picked and ripened off the palm: in the same study freezing at −18 °C for 3 days ripened all Khalal fruit to Tamr. Check any dip, such as vinegar, against the certifying body's list first.",
+      "text_ar": "متوسط حرارة اليوم أقل من 18 °م، فلا تتراكم حرارة بأساس 18 °م. وانتهت تجارب قبرص على النخلة حين هبطت الوحدات اليومية بأساس 18 °م إلى الصفر، ولم ينضج إلا نحو 10% من الثمار. يرى المستكشف الثمار ما زالت في طور الخلال. العذوق غير مكيّسة. كيّس العذوق بأكياس بولي إيثيلين سوداء مثقّبة: فقد رفعت الحرارة حول الثمار ونسبة الثمار الناضجة على النخلة. يمكن جني الثمار الصلبة في طور الخلال وإنضاجها بعيدًا عن النخلة: ففي الدراسة نفسها أنضج التجميد عند −18 °م لمدة 3 أيام كل ثمار الخلال إلى تمر. وتحقق من أي غمر، مثل الخل، مقابل قائمة جهة الاعتماد أولًا."
+    },
+    {
+      "code": "heat_heatu_ripeningh",
+      "codes": [
+        "heat_units_short",
+        "ripening_heat_stopped"
+      ],
+      "status": "alert",
+      "action_type": "harvest_window",
+      "text_en": "Heat units since 1 January (base 10 °C) are below about 3,440, the figure reported for Medjool to mature. In Northern Cyprus 3,039 units by late October left only about 10% of Medjool fruit ripe on the palm. Today's mean temperature is below 18 °C, so no heat accumulates at base 18 °C. The Cyprus on-palm trials ended when daily heat units at base 18 °C fell to zero, with only about 10% of fruit ripe. Fruit still firm at Khalal can be picked and ripened off the palm: in the same study freezing at −18 °C for 3 days ripened all Khalal fruit to Tamr. Check any dip, such as vinegar, against the certifying body's list first.",
+      "text_ar": "الوحدات الحرارية منذ 1 يناير (أساس 10 °م) أقل من نحو 3440، وهو الرقم المذكور لنضج المجدول. وفي شمال قبرص لم ينضج على النخلة إلا نحو 10% من ثمار المجدول عند 3039 وحدة في أواخر أكتوبر. متوسط حرارة اليوم أقل من 18 °م، فلا تتراكم حرارة بأساس 18 °م. وانتهت تجارب قبرص على النخلة حين هبطت الوحدات اليومية بأساس 18 °م إلى الصفر، ولم ينضج إلا نحو 10% من الثمار. يمكن جني الثمار الصلبة في طور الخلال وإنضاجها بعيدًا عن النخلة: ففي الدراسة نفسها أنضج التجميد عند −18 °م لمدة 3 أيام كل ثمار الخلال إلى تمر. وتحقق من أي غمر، مثل الخل، مقابل قائمة جهة الاعتماد أولًا."
+    },
+    {
+      "code": "heat_heatu_ripeningh_bunchesu",
+      "codes": [
+        "bunches_unbagged",
+        "heat_units_short",
+        "ripening_heat_stopped"
+      ],
+      "status": "alert",
+      "action_type": "harvest_window",
+      "text_en": "Heat units since 1 January (base 10 °C) are below about 3,440, the figure reported for Medjool to mature. In Northern Cyprus 3,039 units by late October left only about 10% of Medjool fruit ripe on the palm. Today's mean temperature is below 18 °C, so no heat accumulates at base 18 °C. The Cyprus on-palm trials ended when daily heat units at base 18 °C fell to zero, with only about 10% of fruit ripe. The bunches are not bagged. Bag the bunches with perforated black polyethylene: it raised heat around the fruit and the share of ripe fruit on the palm. Fruit still firm at Khalal can be picked and ripened off the palm: in the same study freezing at −18 °C for 3 days ripened all Khalal fruit to Tamr. Check any dip, such as vinegar, against the certifying body's list first.",
+      "text_ar": "الوحدات الحرارية منذ 1 يناير (أساس 10 °م) أقل من نحو 3440، وهو الرقم المذكور لنضج المجدول. وفي شمال قبرص لم ينضج على النخلة إلا نحو 10% من ثمار المجدول عند 3039 وحدة في أواخر أكتوبر. متوسط حرارة اليوم أقل من 18 °م، فلا تتراكم حرارة بأساس 18 °م. وانتهت تجارب قبرص على النخلة حين هبطت الوحدات اليومية بأساس 18 °م إلى الصفر، ولم ينضج إلا نحو 10% من الثمار. العذوق غير مكيّسة. كيّس العذوق بأكياس بولي إيثيلين سوداء مثقّبة: فقد رفعت الحرارة حول الثمار ونسبة الثمار الناضجة على النخلة. يمكن جني الثمار الصلبة في طور الخلال وإنضاجها بعيدًا عن النخلة: ففي الدراسة نفسها أنضج التجميد عند −18 °م لمدة 3 أيام كل ثمار الخلال إلى تمر. وتحقق من أي غمر، مثل الخل، مقابل قائمة جهة الاعتماد أولًا."
+    },
+    {
+      "code": "heat_heatu_ripeningh_fruits",
+      "codes": [
+        "fruit_still_khalal",
+        "heat_units_short",
+        "ripening_heat_stopped"
+      ],
+      "status": "alert",
+      "action_type": "harvest_window",
+      "text_en": "Heat units since 1 January (base 10 °C) are below about 3,440, the figure reported for Medjool to mature. In Northern Cyprus 3,039 units by late October left only about 10% of Medjool fruit ripe on the palm. Today's mean temperature is below 18 °C, so no heat accumulates at base 18 °C. The Cyprus on-palm trials ended when daily heat units at base 18 °C fell to zero, with only about 10% of fruit ripe. Scouts still see the fruit at Khalal. Fruit still firm at Khalal can be picked and ripened off the palm: in the same study freezing at −18 °C for 3 days ripened all Khalal fruit to Tamr. Check any dip, such as vinegar, against the certifying body's list first.",
+      "text_ar": "الوحدات الحرارية منذ 1 يناير (أساس 10 °م) أقل من نحو 3440، وهو الرقم المذكور لنضج المجدول. وفي شمال قبرص لم ينضج على النخلة إلا نحو 10% من ثمار المجدول عند 3039 وحدة في أواخر أكتوبر. متوسط حرارة اليوم أقل من 18 °م، فلا تتراكم حرارة بأساس 18 °م. وانتهت تجارب قبرص على النخلة حين هبطت الوحدات اليومية بأساس 18 °م إلى الصفر، ولم ينضج إلا نحو 10% من الثمار. يرى المستكشف الثمار ما زالت في طور الخلال. يمكن جني الثمار الصلبة في طور الخلال وإنضاجها بعيدًا عن النخلة: ففي الدراسة نفسها أنضج التجميد عند −18 °م لمدة 3 أيام كل ثمار الخلال إلى تمر. وتحقق من أي غمر، مثل الخل، مقابل قائمة جهة الاعتماد أولًا."
+    },
+    {
+      "code": "heat_heatu_ripeningh_fruits_bunchesu",
+      "codes": [
+        "bunches_unbagged",
+        "fruit_still_khalal",
+        "heat_units_short",
+        "ripening_heat_stopped"
+      ],
+      "status": "alert",
+      "action_type": "harvest_window",
+      "text_en": "Heat units since 1 January (base 10 °C) are below about 3,440, the figure reported for Medjool to mature. In Northern Cyprus 3,039 units by late October left only about 10% of Medjool fruit ripe on the palm. Today's mean temperature is below 18 °C, so no heat accumulates at base 18 °C. The Cyprus on-palm trials ended when daily heat units at base 18 °C fell to zero, with only about 10% of fruit ripe. Scouts still see the fruit at Khalal. The bunches are not bagged. Bag the bunches with perforated black polyethylene: it raised heat around the fruit and the share of ripe fruit on the palm. Fruit still firm at Khalal can be picked and ripened off the palm: in the same study freezing at −18 °C for 3 days ripened all Khalal fruit to Tamr. Check any dip, such as vinegar, against the certifying body's list first.",
+      "text_ar": "الوحدات الحرارية منذ 1 يناير (أساس 10 °م) أقل من نحو 3440، وهو الرقم المذكور لنضج المجدول. وفي شمال قبرص لم ينضج على النخلة إلا نحو 10% من ثمار المجدول عند 3039 وحدة في أواخر أكتوبر. متوسط حرارة اليوم أقل من 18 °م، فلا تتراكم حرارة بأساس 18 °م. وانتهت تجارب قبرص على النخلة حين هبطت الوحدات اليومية بأساس 18 °م إلى الصفر، ولم ينضج إلا نحو 10% من الثمار. يرى المستكشف الثمار ما زالت في طور الخلال. العذوق غير مكيّسة. كيّس العذوق بأكياس بولي إيثيلين سوداء مثقّبة: فقد رفعت الحرارة حول الثمار ونسبة الثمار الناضجة على النخلة. يمكن جني الثمار الصلبة في طور الخلال وإنضاجها بعيدًا عن النخلة: ففي الدراسة نفسها أنضج التجميد عند −18 °م لمدة 3 أيام كل ثمار الخلال إلى تمر. وتحقق من أي غمر، مثل الخل، مقابل قائمة جهة الاعتماد أولًا."
+    }
+  ]
+}

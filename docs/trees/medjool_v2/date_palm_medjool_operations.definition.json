@@ -1,0 +1,252 @@
+{
+  "code": "date_palm_medjool_operations",
+  "name_en": "Date palm Medjool — seasonal operations calendar",
+  "name_ar": "نخيل المجدول — تقويم العمليات الموسمية",
+  "description_en": "Stage-keyed reminders for the manual's routine operations: irrigation regime, winter sanitation and pruning, pollination, thinning, bending, bagging and harvest. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly.",
+  "description_ar": "تذكيرات حسب المرحلة لعمليات الدليل الروتينية: نظام الري، والنظافة والتقليم الشتوي، والتلقيح، والخف، والتدلية، والتكييس، والحصاد. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا.",
+  "scope": "block",
+  "crop_path": "date_palm.medjool",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_0",
+  "registers": [
+    "regime_winter",
+    "sanitation_due",
+    "pollination_due",
+    "thinning_due",
+    "bending_due",
+    "regime_summer",
+    "bagging_due",
+    "harvest_due"
+  ],
+  "parameters": {},
+  "nodes": {
+    "n_0": {
+      "label_en": "Is the block in dormancy?",
+      "label_ar": "هل القطعة في مرحلة dormancy؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "dormancy"
+          ]
+        }
+      },
+      "on_match": "r_0",
+      "on_miss": "n_1"
+    },
+    "r_0": {
+      "label_en": "Winter irrigation: reduce, do not stop — about once a week.",
+      "label_ar": "ري الشتاء: خفّض ولا تقطع — نحو مرة أسبوعيًا.",
+      "register": {
+        "code": "regime_winter",
+        "severity": "info"
+      },
+      "next": "n_1"
+    },
+    "n_1": {
+      "label_en": "Is the block in dormancy?",
+      "label_ar": "هل القطعة في مرحلة dormancy؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "dormancy"
+          ]
+        }
+      },
+      "on_match": "r_1",
+      "on_miss": "n_2"
+    },
+    "r_1": {
+      "label_en": "Clean frond bases, leaf axils and debris; prune and remove offshoots now and treat every cut.",
+      "label_ar": "نظّف قواعد السعف وآباط الأوراق والمخلفات؛ قلّم وافصل الفسائل الآن وعالج كل جرح.",
+      "register": {
+        "code": "sanitation_due",
+        "severity": "info"
+      },
+      "next": "n_2"
+    },
+    "n_2": {
+      "label_en": "Is the block in pollination?",
+      "label_ar": "هل القطعة في مرحلة pollination؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "pollination"
+          ]
+        }
+      },
+      "on_match": "r_2",
+      "on_miss": "n_3"
+    },
+    "r_2": {
+      "label_en": "Inspect female palms daily; pollinate within 2–4 days of spathe opening and repeat 3–4 days later.",
+      "label_ar": "افحص النخيل المؤنث يوميًا؛ لقّح خلال 2–4 أيام من تفتح الطلعة وكرّر بعد 3–4 أيام.",
+      "register": {
+        "code": "pollination_due",
+        "severity": "warning"
+      },
+      "next": "n_3"
+    },
+    "n_3": {
+      "label_en": "Is the block in fruit_set?",
+      "label_ar": "هل القطعة في مرحلة fruit_set؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "fruit_set"
+          ]
+        }
+      },
+      "on_match": "r_3",
+      "on_miss": "n_4"
+    },
+    "r_3": {
+      "label_en": "Hand-thin each bunch 3–4 weeks after pollination: about 30 strands per bunch, 10 fruits per strand.",
+      "label_ar": "خفّ كل عذق يدويًا بعد 3–4 أسابيع من تلقيحه: نحو 30 شمراخًا و10 ثمار للشمراخ.",
+      "register": {
+        "code": "thinning_due",
+        "severity": "warning"
+      },
+      "next": "n_4"
+    },
+    "n_4": {
+      "label_en": "Is the block in kimri?",
+      "label_ar": "هل القطعة في مرحلة kimri؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "kimri"
+          ]
+        }
+      },
+      "on_match": "r_4",
+      "on_miss": "n_5"
+    },
+    "r_4": {
+      "label_en": "Bend and tie each bunch once its stalk is fully extended but still flexible.",
+      "label_ar": "دلِّ واربط كل عذق عند اكتمال استطالة عرجونه وهو ما زال مرنًا.",
+      "register": {
+        "code": "bending_due",
+        "severity": "info"
+      },
+      "next": "n_5"
+    },
+    "n_5": {
+      "label_en": "Is the block in kimri, khalal, rutab, tamar?",
+      "label_ar": "هل القطعة في مرحلة kimri، khalal، rutab، tamar؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "kimri",
+            "khalal",
+            "rutab",
+            "tamar"
+          ]
+        }
+      },
+      "on_match": "r_5",
+      "on_miss": "n_6"
+    },
+    "r_5": {
+      "label_en": "Summer and fruit irrigation: about twice a week, with steady soil moisture to avoid fruit cracking.",
+      "label_ar": "ري الصيف والثمار: نحو مرتين أسبوعيًا مع رطوبة تربة ثابتة لتجنّب تشقق الثمار.",
+      "register": {
+        "code": "regime_summer",
+        "severity": "info"
+      },
+      "next": "n_6"
+    },
+    "n_6": {
+      "label_en": "Is the block in khalal?",
+      "label_ar": "هل القطعة في مرحلة khalal؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "khalal"
+          ]
+        }
+      },
+      "on_match": "r_6",
+      "on_miss": "n_7"
+    },
+    "r_6": {
+      "label_en": "Bag bunches at the start of Khalal with open-ended bags, left on until harvest.",
+      "label_ar": "كيّس العذوق في بداية الخلال بأكياس مفتوحة تُترك حتى الحصاد.",
+      "register": {
+        "code": "bagging_due",
+        "severity": "warning"
+      },
+      "next": "n_7"
+    },
+    "n_7": {
+      "label_en": "Is the block in rutab, tamar?",
+      "label_ar": "هل القطعة في مرحلة rutab، tamar؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "rutab",
+            "tamar"
+          ]
+        }
+      },
+      "on_match": "r_7",
+      "on_miss": "n_stop"
+    },
+    "r_7": {
+      "label_en": "Pick soft ripe fruit individually in 2–3 passes, 1–2 weeks apart.",
+      "label_ar": "اجنِ الثمار الطرية الناضجة فرديًا على 2–3 دفعات يفصل بينها أسبوع إلى أسبوعين.",
+      "register": {
+        "code": "harvest_due",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": []
+}
