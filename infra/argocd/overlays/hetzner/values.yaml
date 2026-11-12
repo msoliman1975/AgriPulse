@@ -4109,9 +4109,21 @@ global:
       #   Holdings map still draws blocks and holdings; API responses carry
       #   content-encoding: gzip.
       #   Rollback: api and workers to 0383ce9.
-      tag: "a3d6a6b"
+      # 838b81b = #820, api and workers. Medjool v2 step 1 (D4, D19):
+      #   six per-cell index keys for cell-scoped walks (cell_z,
+      #   cell_baseline_samples, cell_delta, cell_trend, cell_spatial_z,
+      #   cell_valid_pct); a `treat` action type, with tenant migration
+      #   0100 widening ck_recommendations_action_type (no row changes);
+      #   a stage's missing Kc is inherited from the nearest ancestor
+      #   stage with the same code. This changes Medjool irrigation advice:
+      #   fruit set 1.10 -> 0.90, kimri to rutab 0.85 -> 0.95.
+      #   Watch: tenant migrations reach 0100 on every tenant; cell-scoped
+      #   tree runs log no errors; Medjool irrigation plans regenerate.
+      #   Rollback: api and workers to a3d6a6b. 0100 can stay under the old
+      #   image (it only widens a CHECK).
+      tag: "838b81b"
     workers:
-      tag: "a3d6a6b"
+      tag: "838b81b"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4813,7 +4825,12 @@ global:
       #   Watch: /assets/*.js served with content-encoding: gzip; the
       #   Investments Overview loads and its figures match the Holdings page.
       #   Rollback: this tag alone back to 0383ce9.
-      tag: "a3d6a6b"
+      # 838b81b = #820, frontend, see the api note. Adds the `treat` action
+      #   (label, EN/AR, map marker icon) to every action list. Nothing else.
+      #   Watch: Action Center and the Beta designer render; a `treat`
+      #   recommendation shows its label and icon.
+      #   Rollback: this tag alone back to a3d6a6b.
+      tag: "838b81b"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
