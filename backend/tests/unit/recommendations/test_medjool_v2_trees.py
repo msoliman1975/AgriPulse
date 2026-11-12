@@ -17,6 +17,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import random
+import re
 from collections import Counter
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -175,6 +176,23 @@ def test_catalogue_matches_registers_with_both_languages() -> None:
         assert "already_in_platform_catalogue" not in f
         for key in ("name_ar", "clause_ar"):
             assert f[key].strip(), (f["code"], key)
+        # The findings API caps names at 80 characters.
+        assert len(f["name_en"]) <= 80, f["code"]
+        assert len(f["name_ar"]) <= 80, f["code"]
+
+
+_CODE_WORDS = re.compile(
+    r"\b(dormancy|pollination|fruit_set|kimri|khalal|rutab|tamar|small|medium|large)\b"
+)
+
+
+@pytest.mark.parametrize("code", sorted(DEFS))
+def test_arabic_labels_carry_no_english_codes(code: str) -> None:
+    """D26: Arabic text names stages and sizes in Arabic, not by their codes."""
+    for node_id, node in DEFS[code]["nodes"].items():
+        assert not _CODE_WORDS.search(node.get("label_ar") or ""), (node_id, node["label_ar"])
+    for rule in DEFS[code]["combinations"]:
+        assert not _CODE_WORDS.search(rule.get("text_ar") or ""), rule["code"]
 
 
 # ---------------------------------------------------------------- fuzz

@@ -348,7 +348,7 @@
     },
     "n_b_small": {
       "label_en": "Load the small palm bands (backup only)",
-      "label_ar": "حمّل نطاقات حجم small (احتياط فقط)",
+      "label_ar": "حمّل نطاقات حجم صغير (احتياط فقط)",
       "set": {
         "size_class": "small",
         "ndvi_floor": {
@@ -384,7 +384,7 @@
     },
     "n_b_medium": {
       "label_en": "Load the medium palm bands (backup only)",
-      "label_ar": "حمّل نطاقات حجم medium (احتياط فقط)",
+      "label_ar": "حمّل نطاقات حجم متوسط (احتياط فقط)",
       "set": {
         "size_class": "medium",
         "ndvi_floor": {
@@ -420,7 +420,7 @@
     },
     "n_b_large": {
       "label_en": "Load the large palm bands (backup only)",
-      "label_ar": "حمّل نطاقات حجم large (احتياط فقط)",
+      "label_ar": "حمّل نطاقات حجم كبير (احتياط فقط)",
       "set": {
         "size_class": "large",
         "ndvi_floor": {
