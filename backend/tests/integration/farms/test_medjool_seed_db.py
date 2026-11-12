@@ -95,13 +95,16 @@ async def test_medjool_signals_and_forms(admin_session: AsyncSession) -> None:
     rows = (
         await admin_session.execute(
             text(
-                "SELECT code, name_ar, categorical_values, categorical_values_ar "
+                "SELECT code, name_ar, categorical_values, categorical_values_ar, crop_paths "
                 "FROM public.signal_definitions WHERE tenant_id IS NULL AND code LIKE 'date\\_%'"
             )
         )
     ).all()
-    assert len(rows) == 15
-    assert all(name_ar for _, name_ar, _, _ in rows)
+    # 15 from public 0098 plus the 27 Medjool v2 signals of public 0103, all
+    # scoped to Medjool (D21).
+    assert len(rows) == 42
+    assert all(r.name_ar for r in rows)
+    assert all(r.crop_paths == ["date_palm.medjool"] for r in rows)
     ripening = next(r for r in rows if r.code == "date_ripening_stage")
     assert ripening.categorical_values == ["khalal", "rutab", "tamar"]
     assert len(ripening.categorical_values_ar) == 3
@@ -117,7 +120,15 @@ async def test_medjool_signals_and_forms(admin_session: AsyncSession) -> None:
             )
         ).all()
     )
-    assert members == {"medjool_bearing": 13, "medjool_new_planting": 4}
+    assert members == {
+        "medjool_bearing": 13,
+        "medjool_new_planting": 4,
+        "medjool_rpw_inspection": 9,
+        "medjool_bunch_scouting": 6,
+        "medjool_frond_crown_check": 8,
+        "medjool_farm_records": 3,
+        "medjool_drone_results": 2,
+    }
     black_nose = next(r for r in rows if r.code == "date_black_nose_seen")
     assert black_nose.name_ar == "ظهور الذنب الأسود"
 
