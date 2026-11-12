@@ -15,6 +15,7 @@ Pinned here:
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from urllib.parse import parse_qs, urlsplit
 from uuid import UUID, uuid4
 
 import pytest
@@ -22,6 +23,7 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.settings import get_settings
 from app.modules.tenancy.service import get_tenant_service
 from app.shared.auth.context import TenantRole
 
@@ -158,8 +160,11 @@ async def test_latest_photo_skips_a_pass_clouded_over_the_farm(
     # s2_l2a stores blue, green, red first: red is band 3.
     assert photo["rgb_band_indexes"] == [3, 2, 1]
     assert photo["clear_fraction"] == pytest.approx(0.98)
-    assert "/CLEAR/" in photo["tile_url"]
-    assert "raw_bands.tif" in photo["tile_url"]
+    # The tile URL carries the asset as an encoded query value.
+    asset = parse_qs(urlsplit(photo["tile_url"]).query)["url"]
+    assert asset == [
+        f"s3://{get_settings().s3_bucket_uploads}/{photo['stac_item_id']}/raw_bands.tif"
+    ]
 
 
 @pytest.mark.asyncio
