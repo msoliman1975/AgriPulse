@@ -34,6 +34,7 @@ from app.core.logging import get_logger
 from app.modules.audit import AuditService, get_audit_service
 from app.modules.farms.attribute_snapshot import load_crop_attribute_snapshot
 from app.modules.grid.snapshot import load_snapshot as load_grid_snapshot
+from app.modules.recommendations.cell_features import CELL_FEATURE_KEYS
 from app.modules.recommendations.engine import (
     EvaluationResult,
     TreeOutcome,
@@ -168,7 +169,17 @@ _NO_FINDINGS_AR = "تم الفحص؛ لا توجد ملاحظات."
 # fail for the whole block rather than for the one card. `other` is the honest
 # landing place: work is asked for, and the board has no more specific column.
 _ALLOWED_ACTION_TYPES: frozenset[str] = frozenset(
-    {"irrigate", "fertilize", "spray", "scout", "harvest_window", "prune", "no_action", "other"}
+    {
+        "irrigate",
+        "fertilize",
+        "spray",
+        "scout",
+        "harvest_window",
+        "prune",
+        "treat",
+        "no_action",
+        "other",
+    }
 )
 
 
@@ -3157,20 +3168,25 @@ def _merge_cell_means(
     with the cell's own per-index ``mean`` swapped in (PR-C3, input fidelity:
     cell imagery, inherit the rest).
 
-    ``baseline_deviation`` and trend features stay the block's — they're
-    per-block z-scores with no per-cell equivalent in ``block_grid_aggregates``,
-    so a cell predicate on ``{key: baseline_deviation}`` reads the block value
-    while ``{key: mean}`` reads the cell's own mean. Indices the cell has no
-    observation for keep the block's row unchanged."""
+    ``baseline_deviation`` and trend features stay the block's, so a cell
+    predicate on ``{key: baseline_deviation}`` reads the block value while
+    ``{key: mean}`` reads the cell's own mean. The cell's own z-score, trend
+    and spatial z travel under the separate ``cell_*`` keys
+    (:mod:`cell_features`), which leaves existing cell trees unchanged.
+    Indices the cell has no observation for keep the block's row unchanged."""
     merged: dict[str, dict[str, Any]] = {code: dict(vals) for code, vals in block_latest.items()}
     for code, cvals in cell_means.items():
+        # The cell-grain keys (cell_features) ride along so a cell tree can
+        # read the cell's own z-score, trend and spatial z by their own names.
+        cell_keys = {k: cvals[k] for k in CELL_FEATURE_KEYS if k in cvals}
         if code in merged:
-            merged[code] = {**merged[code], "mean": cvals["mean"]}
+            merged[code] = {**merged[code], "mean": cvals["mean"], **cell_keys}
         else:
             merged[code] = {
                 "time": cvals["time"],
                 "mean": cvals["mean"],
                 "baseline_deviation": None,
+                **cell_keys,
             }
     return merged
 

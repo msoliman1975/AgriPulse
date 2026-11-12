@@ -133,6 +133,12 @@ class IndicesEntry:
     slope: Decimal | None = None
     delta: Decimal | None = None
     trend_direction: str | None = None
+    cell_z: Decimal | None = None
+    cell_baseline_samples: int | None = None
+    cell_delta: Decimal | None = None
+    cell_trend: str | None = None
+    cell_spatial_z: Decimal | None = None
+    cell_valid_pct: Decimal | None = None
 
 
 # Allowed keys for a signals value-ref. ``value_kind`` on the underlying
@@ -360,6 +366,14 @@ class ConditionContext:
                 slope=_to_decimal(row.get("slope")),
                 delta=_to_decimal(row.get("delta")),
                 trend_direction=row.get("trend_direction"),
+                # Cell-grain features (recommendations.cell_features): set on a
+                # cell walk only; absent on a block walk, so they stay None.
+                cell_z=_to_decimal(row.get("cell_z")),
+                cell_baseline_samples=row.get("cell_baseline_samples"),
+                cell_delta=_to_decimal(row.get("cell_delta")),
+                cell_trend=row.get("cell_trend"),
+                cell_spatial_z=_to_decimal(row.get("cell_spatial_z")),
+                cell_valid_pct=_to_decimal(row.get("cell_valid_pct")),
             )
         return cls(
             block_id=block_id,

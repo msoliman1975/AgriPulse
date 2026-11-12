@@ -36,6 +36,12 @@ INDICES_KEYS: tuple[str, ...] = (
     "slope",
     "delta",
     "trend_direction",
+    "cell_z",
+    "cell_baseline_samples",
+    "cell_delta",
+    "cell_trend",
+    "cell_spatial_z",
+    "cell_valid_pct",
 )
 # ``growth_stage`` (KB P3) is the stored phenological stage on the block's
 # current block_crops row (categorical, e.g. tuber_bulking). Compare with
