@@ -64,10 +64,15 @@ export function SatelliteBasemapControl({ map, photo, className }: Props): JSX.E
   const fmt = useMemo(() => makeDateLabelFmt(i18n.language), [i18n.language]);
 
   const tileUrl = photo?.tile_url ?? null;
+  const bounds = photo?.bounds ?? null;
+  const boundsKey = bounds?.join(",") ?? "";
   useEffect(() => {
     if (!map) return;
-    applyLatestPhoto(map, tileUrl, choice === "latest");
-  }, [map, tileUrl, choice]);
+    applyLatestPhoto(map, tileUrl, choice === "latest", bounds);
+    // `bounds` is read through its key so a new array of the same box does
+    // not re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, tileUrl, choice, boundsKey]);
 
   if (!photo && !baseDate) return null;
 

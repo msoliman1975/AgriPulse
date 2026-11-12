@@ -85,6 +85,8 @@ export interface LatestPhoto {
   scene_datetime: string;
   /** XYZ template, `{z}/{x}/{y}` left in, for a 512 px raster source. */
   tile_url: string;
+  /** [west, south, east, north] of the farm; absent from older apis. */
+  bounds?: [number, number, number, number] | null;
 }
 
 /**

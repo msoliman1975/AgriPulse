@@ -1005,7 +1005,11 @@ class ImageryRepository:
                         """
                         WITH recent AS (
                             SELECT r.scene_datetime, r.stac_item_id, r.aoi_hash,
-                                   p.bands
+                                   p.bands,
+                                   ST_XMin(f.boundary::box2d) AS west,
+                                   ST_YMin(f.boundary::box2d) AS south,
+                                   ST_XMax(f.boundary::box2d) AS east,
+                                   ST_YMax(f.boundary::box2d) AS north
                             FROM farm_scene_rasters r
                             JOIN farms f ON f.id = r.farm_id
                             JOIN public.imagery_products p ON p.id = r.product_id
@@ -1018,6 +1022,7 @@ class ImageryRepository:
                         )
                         SELECT recent.scene_datetime, recent.stac_item_id,
                                recent.aoi_hash, recent.bands,
+                               recent.west, recent.south, recent.east, recent.north,
                                clear.fraction AS clear_fraction
                         FROM recent
                         CROSS JOIN LATERAL (

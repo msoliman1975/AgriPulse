@@ -309,6 +309,10 @@ class FarmLatestPhotoRead(BaseModel):
     #: Ready-to-use XYZ template (``{z}/{x}/{y}`` left in) for a raster
     #: source with ``tileSize: 512``.
     tile_url: str
+    #: ``[west, south, east, north]`` of the farm, WGS84. A raster source given
+    #: these asks only for tiles over the farm; without them the map requests
+    #: every tile on screen and the tile server renders empty ones.
+    bounds: tuple[float, float, float, float] | None = None
 
 
 class FarmLatestPhotoResponse(BaseModel):

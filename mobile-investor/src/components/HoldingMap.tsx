@@ -41,13 +41,22 @@ function positions(coords: unknown, out: number[][] = []): number[][] {
 const PHOTO = "latest-photo";
 
 /** Add, show or hide the latest-photo layer, just above the Esri base. */
-function applyPhoto(map: maplibregl.Map, tileUrl: string | null, visible: boolean): void {
+type Bounds = [number, number, number, number];
+
+function applyPhoto(
+  map: maplibregl.Map,
+  tileUrl: string | null,
+  visible: boolean,
+  bounds: Bounds | null,
+): void {
   if (!tileUrl) return;
   if (!map.getSource(PHOTO)) {
     map.addSource(PHOTO, {
       type: "raster",
       tiles: [tileUrl],
       tileSize: 512,
+      // Only tiles over the farm: each one outside it is an empty render.
+      ...(bounds ? { bounds } : {}),
       attribution: "Contains modified Copernicus Sentinel data",
     });
     map.addLayer({ id: PHOTO, type: "raster", source: PHOTO }, "block-dim");
@@ -64,12 +73,14 @@ export function HoldingMap({
   holding,
   block,
   photoTileUrl = null,
+  photoBounds = null,
   showPhoto = true,
   onBaseDate,
 }: {
   holding: Geometry;
   block: Geometry;
   photoTileUrl?: string | null;
+  photoBounds?: Bounds | null;
   showPhoto?: boolean;
   onBaseDate?: (date: string | null) => void;
 }): ReactNode {
@@ -78,8 +89,8 @@ export function HoldingMap({
   const loadedRef = useRef(false);
   const onBaseDateRef = useRef(onBaseDate);
   onBaseDateRef.current = onBaseDate;
-  const photoTileRef = useRef({ url: photoTileUrl, visible: showPhoto });
-  photoTileRef.current = { url: photoTileUrl, visible: showPhoto };
+  const photoTileRef = useRef({ url: photoTileUrl, visible: showPhoto, bounds: photoBounds });
+  photoTileRef.current = { url: photoTileUrl, visible: showPhoto, bounds: photoBounds };
 
   useEffect(() => {
     const el = ref.current;
@@ -152,7 +163,8 @@ export function HoldingMap({
     mapRef.current = map;
     map.on("load", () => {
       loadedRef.current = true;
-      applyPhoto(map, photoTileRef.current.url, photoTileRef.current.visible);
+      const p = photoTileRef.current;
+      applyPhoto(map, p.url, p.visible, p.bounds);
     });
     const resize = new ResizeObserver(() => map.resize());
     resize.observe(el);
@@ -167,7 +179,8 @@ export function HoldingMap({
   // The photo arrives after the map; laying it on later keeps the view.
   useEffect(() => {
     const map = mapRef.current;
-    if (map && loadedRef.current) applyPhoto(map, photoTileUrl, showPhoto);
+    if (map && loadedRef.current) applyPhoto(map, photoTileUrl, showPhoto, photoBounds);
+    // photoBounds arrives with photoTileUrl, so the URL is enough to re-run.
   }, [photoTileUrl, showPhoto]);
 
   return <div ref={ref} className="map" />;

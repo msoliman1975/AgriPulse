@@ -116,6 +116,15 @@ def latest_photo_tile_url(
     return f"{base}/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}.png?{urlencode(params)}"
 
 
+def _bounds(row: dict[str, Any]) -> tuple[float, float, float, float] | None:
+    """The farm's box from a row carrying west/south/east/north, if complete."""
+    values = [row.get(k) for k in ("west", "south", "east", "north")]
+    if any(v is None for v in values):
+        return None
+    west, south, east, north = (float(v) for v in values)
+    return (west, south, east, north)
+
+
 def rgb_band_indexes(bands: Sequence[str]) -> tuple[int, int, int] | None:
     """1-based band numbers of red, green, blue in a raw_bands COG, or None."""
     names = list(bands)
@@ -393,6 +402,7 @@ class ImageryServiceImpl:
                 aoi_hash=row["aoi_hash"],
                 rgb_band_indexes=bands,
                 clear_fraction=float(row["clear_fraction"]),
+                bounds=_bounds(row),
                 tile_url=latest_photo_tile_url(
                     tile_server_base_url=settings.tile_server_base_url,
                     s3_bucket=settings.s3_bucket_uploads,
