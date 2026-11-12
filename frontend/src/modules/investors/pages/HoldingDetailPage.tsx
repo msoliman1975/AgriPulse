@@ -218,6 +218,7 @@ export function HoldingDetailPage(): JSX.Element {
       <Card>
         {redrawing ? (
           <MapDraw
+            farmId={farmId}
             initial={holding.boundary}
             mode="simple_select"
             references={references}
@@ -225,6 +226,7 @@ export function HoldingDetailPage(): JSX.Element {
           />
         ) : blockQ.data ? (
           <HoldingsMap
+            farmId={farmId}
             block={blockQ.data.boundary}
             holdings={blockQ.data.holdings}
             highlightId={holding.id}

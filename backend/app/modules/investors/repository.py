@@ -891,6 +891,9 @@ class InvestorsRepository:
                    b.code AS block_code, b.name AS block_name, b.name_ar AS block_name_ar,
                    ST_AsGeoJSON(b.boundary)::jsonb AS block_boundary,
                    f.name AS farm_name, f.name_ar AS farm_name_ar,
+                   -- Internal: lets the app route find the farm's latest
+                   -- photo. The response allowlist never returns it.
+                   b.farm_id,
                    crop.crop_name_en, crop.crop_name_ar,
                    crop.variety_name_en, crop.variety_name_ar, crop.planting_date,
                    crop.stage_name_en, crop.stage_name_ar,

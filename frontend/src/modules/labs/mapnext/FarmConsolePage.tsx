@@ -796,6 +796,7 @@ function Console({ farmId }: { farmId: string }): ReactNode {
         <div className="flex min-w-0 flex-1 flex-col">
           <main className="relative min-w-0 flex-1">
             <MapCanvas
+              farmId={farmId}
               geojson={summary.geojson}
               farmBoundary={summary.farm.boundary}
               selectedId={selectedId}

@@ -56,6 +56,8 @@ interface Props {
   onCancel?: () => void;
   busy?: boolean;
   error?: string | null;
+  /** The block's farm, so the map can lay the farm's latest photo over it. */
+  farmId?: string;
 }
 
 export function BlockForm({
@@ -66,6 +68,7 @@ export function BlockForm({
   onCancel,
   busy,
   error,
+  farmId,
 }: Props): ReactNode {
   const { t, i18n } = useTranslation("farms");
   const [code, setCode] = useState(initial?.code ?? "");
@@ -319,7 +322,7 @@ export function BlockForm({
       <Card>
         <h2 className="text-lg font-semibold text-ap-ink">{t("form.blockBoundary")}</h2>
         <div className="mt-4">
-          <MapDraw initial={drawnPolygon ?? null} onChange={setDrawnPolygon} />
+          <MapDraw initial={drawnPolygon ?? null} onChange={setDrawnPolygon} farmId={farmId} />
         </div>
         <div className="mt-4">
           <AoiUploader

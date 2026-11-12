@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
-import type { Holding } from "@/api/client";
+import { fetchLatestPhoto, type Holding, type LatestPhoto } from "@/api/client";
 import { HoldingMap } from "@/components/HoldingMap";
 import { formatDate, formatFeddan, formatNumber, t, treeAgeYears, type Lang } from "@/i18n";
 import { pick } from "@/screens/HoldingsScreen";
@@ -17,6 +17,18 @@ export function HoldingScreen({
   onBack: () => void;
 }): ReactNode {
   const [tab, setTab] = useState<Tab>("map");
+  const [photo, setPhoto] = useState<LatestPhoto | null>(null);
+  const [showPhoto, setShowPhoto] = useState(true);
+  const [baseDate, setBaseDate] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void fetchLatestPhoto(h.holding_id).then((p) => {
+      if (live) setPhoto(p);
+    });
+    return () => {
+      live = false;
+    };
+  }, [h.holding_id]);
   const unknown = t(lang, "details.unknown");
   const age = treeAgeYears(h.planting_date);
   const rows: Array<[string, string]> = [
@@ -71,9 +83,46 @@ export function HoldingScreen({
       </div>
       {tab === "map" ? (
         <div className="map-wrap">
-          <HoldingMap holding={h.boundary} block={h.block_boundary} />
+          <HoldingMap
+            holding={h.boundary}
+            block={h.block_boundary}
+            photoTileUrl={photo?.tile_url ?? null}
+            showPhoto={showPhoto}
+            onBaseDate={setBaseDate}
+          />
+          {photo ? (
+            <div
+              className="basemap-switch pad"
+              role="radiogroup"
+              aria-label={t(lang, "map.background")}
+            >
+              {([true, false] as const).map((latest) => (
+                <button
+                  key={String(latest)}
+                  type="button"
+                  role="radio"
+                  aria-checked={showPhoto === latest}
+                  className={showPhoto === latest ? "chip chip-on" : "chip"}
+                  onClick={() => setShowPhoto(latest)}
+                >
+                  {t(lang, latest ? "map.latest" : "map.highres")}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <p className="muted small pad">{t(lang, "map.legend")}</p>
-          <p className="muted small pad">{t(lang, "map.imagery")}</p>
+          {photo && showPhoto ? (
+            <p className="muted small pad">
+              {t(lang, "map.photoDate", { date: formatDate(photo.scene_datetime) })}
+            </p>
+          ) : null}
+          <p className="muted small pad">
+            {baseDate
+              ? t(lang, photo && showPhoto ? "map.aroundDate" : "map.baseDate", {
+                  date: formatDate(baseDate),
+                })
+              : t(lang, "map.imagery")}
+          </p>
         </div>
       ) : (
         <dl className="details card">

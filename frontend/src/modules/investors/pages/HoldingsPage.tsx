@@ -90,6 +90,7 @@ export function HoldingsPage(): JSX.Element {
           <div className="flex flex-col gap-4">
             <Card>
               <FarmHoldingsMap
+                farmId={farmId}
                 blocks={data.blocks}
                 holdings={data.holdings}
                 selectedBlockId={blockFilter || null}

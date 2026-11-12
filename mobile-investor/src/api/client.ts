@@ -80,6 +80,28 @@ export const fetchMe = (): Promise<Me> => get<Me>("/investor/me");
 export const fetchHoldings = (): Promise<Holding[]> => get<Holding[]>("/investor/holdings");
 export const fetchAppVersion = (): Promise<AppVersion> => get<AppVersion>("/investor/app-version");
 
+/** The newest clear Sentinel-2 photo over a holding's farm. */
+export interface LatestPhoto {
+  scene_datetime: string;
+  /** XYZ template, `{z}/{x}/{y}` left in, for a 512 px raster source. */
+  tile_url: string;
+}
+
+/**
+ * The photo, or null when there is none, the api predates the route, or the
+ * phone is offline. The map works without it, so no failure is surfaced.
+ */
+export async function fetchLatestPhoto(holdingId: string): Promise<LatestPhoto | null> {
+  try {
+    const body = await get<{ photo: LatestPhoto | null }>(
+      `/investor/holdings/${holdingId}/latest-photo`,
+    );
+    return body.photo ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ---- The last answers, kept for opening with no network --------------------
 
 const CACHE_KEY = "agripulse.investor.cache";

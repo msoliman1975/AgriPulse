@@ -1,26 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import type { Feature, FeatureCollection, Polygon } from "geojson";
 
 import { DRAW_STYLES, applyMapLibreClassesToDraw } from "@/lib/drawStyles";
+import { SatelliteBasemapControl, satelliteStyle, useFarmLatestPhoto } from "@/lib/basemap";
 import { bboxOfGeometry, centerOfBbox } from "@/lib/geometry";
 
 const DEFAULT_CENTER: [number, number] = [31.2357, 30.0444]; // Cairo
 const DEFAULT_ZOOM = 5;
-
-const RASTER_STYLE: maplibregl.StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      attribution: "© OpenStreetMap contributors",
-    },
-  },
-  layers: [{ id: "osm", type: "raster", source: "osm" }],
-};
 
 /**
  * Read-only shapes drawn under the editable polygon, for orientation.
@@ -40,6 +28,8 @@ interface Props {
   /** Label for the button that removes the shape and starts drawing again. */
   clearLabel?: string;
   className?: string;
+  /** The farm being drawn in, for its latest satellite photo. None while creating one. */
+  farmId?: string | null;
 }
 
 /**
@@ -55,10 +45,13 @@ export function MapDraw({
   references,
   clearLabel,
   className,
+  farmId,
 }: Props): JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
+  const [mapForBase, setMapForBase] = useState<maplibregl.Map | null>(null);
+  const photo = useFarmLatestPhoto(farmId);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -66,11 +59,12 @@ export function MapDraw({
     const center = focus ? centerOfBbox(focus) : DEFAULT_CENTER;
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: RASTER_STYLE,
+      style: satelliteStyle(),
       center,
       zoom: initial ? 13 : focus ? 15 : DEFAULT_ZOOM,
     });
     mapRef.current = map;
+    setMapForBase(map);
 
     applyMapLibreClassesToDraw(MapboxDraw);
     const draw = new MapboxDraw({
@@ -177,6 +171,7 @@ export function MapDraw({
 
     return () => {
       resize.disconnect();
+      setMapForBase(null);
       map.remove();
       mapRef.current = null;
       drawRef.current = null;
@@ -209,6 +204,7 @@ export function MapDraw({
           {clearLabel}
         </button>
       ) : null}
+      <SatelliteBasemapControl map={mapForBase} photo={photo} />
     </div>
   );
 }

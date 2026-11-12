@@ -3,6 +3,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, type ReactNode } from "react";
 
 import type { Geometry } from "@/api/client";
+import { fetchCaptureDate } from "@/components/imageryDate";
 
 const IMAGERY =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
@@ -37,12 +38,48 @@ function positions(coords: unknown, out: number[][] = []): number[][] {
   return out;
 }
 
+const PHOTO = "latest-photo";
+
+/** Add, show or hide the latest-photo layer, just above the Esri base. */
+function applyPhoto(map: maplibregl.Map, tileUrl: string | null, visible: boolean): void {
+  if (!tileUrl) return;
+  if (!map.getSource(PHOTO)) {
+    map.addSource(PHOTO, {
+      type: "raster",
+      tiles: [tileUrl],
+      tileSize: 512,
+      attribution: "Contains modified Copernicus Sentinel data",
+    });
+    map.addLayer({ id: PHOTO, type: "raster", source: PHOTO }, "block-dim");
+  }
+  map.setLayoutProperty(PHOTO, "visibility", visible ? "visible" : "none");
+}
+
 /**
- * The holding outline over its block's outline, on a satellite basemap
- * (design option 1: sharp, but the image date is unknown).
+ * The holding outline over its block's outline, on Esri's sharp satellite
+ * mosaic, with our newest clear Sentinel-2 photo over the farm when there is
+ * one. `onBaseDate` reports when the Esri image under the holding was taken.
  */
-export function HoldingMap({ holding, block }: { holding: Geometry; block: Geometry }): ReactNode {
+export function HoldingMap({
+  holding,
+  block,
+  photoTileUrl = null,
+  showPhoto = true,
+  onBaseDate,
+}: {
+  holding: Geometry;
+  block: Geometry;
+  photoTileUrl?: string | null;
+  showPhoto?: boolean;
+  onBaseDate?: (date: string | null) => void;
+}): ReactNode {
   const ref = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const loadedRef = useRef(false);
+  const onBaseDateRef = useRef(onBaseDate);
+  onBaseDateRef.current = onBaseDate;
+  const photoTileRef = useRef({ url: photoTileUrl, visible: showPhoto });
+  photoTileRef.current = { url: photoTileUrl, visible: showPhoto };
 
   useEffect(() => {
     const el = ref.current;
@@ -101,6 +138,9 @@ export function HoldingMap({ holding, block }: { holding: Geometry; block: Geome
     if (pts.length > 0) {
       const xs = pts.map((p) => p[0]);
       const ys = pts.map((p) => p[1]);
+      const lon = (Math.min(...xs) + Math.max(...xs)) / 2;
+      const lat = (Math.min(...ys) + Math.max(...ys)) / 2;
+      void fetchCaptureDate(lon, lat).then((d) => onBaseDateRef.current?.(d));
       map.fitBounds(
         [
           [Math.min(...xs), Math.min(...ys)],
@@ -109,13 +149,26 @@ export function HoldingMap({ holding, block }: { holding: Geometry; block: Geome
         { padding: 56, duration: 0, maxZoom: 19 },
       );
     }
+    mapRef.current = map;
+    map.on("load", () => {
+      loadedRef.current = true;
+      applyPhoto(map, photoTileRef.current.url, photoTileRef.current.visible);
+    });
     const resize = new ResizeObserver(() => map.resize());
     resize.observe(el);
     return () => {
       resize.disconnect();
+      loadedRef.current = false;
+      mapRef.current = null;
       map.remove();
     };
   }, [holding, block]);
+
+  // The photo arrives after the map; laying it on later keeps the view.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map && loadedRef.current) applyPhoto(map, photoTileUrl, showPhoto);
+  }, [photoTileUrl, showPhoto]);
 
   return <div ref={ref} className="map" />;
 }

@@ -333,3 +333,7 @@ p {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.basemap-switch {
+  display: flex;
+  gap: 8px;
+}

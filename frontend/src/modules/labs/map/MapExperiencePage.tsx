@@ -1010,6 +1010,7 @@ function MapForFarm({ farmId }: { farmId: string }) {
             </FullState>
           ) : (
             <MapCanvas
+              farmId={farmId}
               geojson={geojsonWithRisk}
               riskOverlay={showRiskOverlay}
               farmBoundary={summary.farm.boundary}

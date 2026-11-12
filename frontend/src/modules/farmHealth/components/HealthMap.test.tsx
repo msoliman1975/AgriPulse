@@ -35,6 +35,14 @@ const fake = vi.hoisted(() => {
   return state;
 });
 
+// The satellite background has its own tests; here it would only need a
+// QueryClient and the network.
+vi.mock("@/lib/basemap", () => ({
+  ESRI_IMAGERY_TILES: "https://esri.test/{z}/{y}/{x}",
+  SatelliteBasemapControl: () => null,
+  useFarmLatestPhoto: () => null,
+}));
+
 vi.mock("maplibre-gl", () => {
   class FakeMap {
     constructor(options: Record<string, unknown>) {

@@ -969,6 +969,86 @@ class ImageryRepository:
         )
         return dict(rows[0]) if rows else None
 
+    async def get_latest_clear_farm_photo(
+        self,
+        *,
+        farm_id: UUID,
+        product_codes: Sequence[str],
+        min_clear_fraction: float,
+        lookback_passes: int,
+    ) -> dict[str, Any] | None:
+        """The newest farm surface that is a usable PHOTO of the farm.
+
+        Backs the "latest satellite photo" map background. Three conditions,
+        each there because skipping it draws something misleading:
+
+        * ``source = 'fetched'``: only a surface fetched for the farm boundary
+          has a farm-level ``raw_bands.tif`` to colour. A stitched one wrote
+          index rasters only, so asking for its bands is a 404 per tile.
+        * The farm's CURRENT ``aoi_hash``, as everywhere else: a reshaped farm
+          must not be drawn from a photo cut to its old outline.
+        * Clear over THIS farm, measured, not the provider's tile-wide cloud
+          cover. A Sentinel-2 granule is 110 km across; 5% cloud over it can be
+          100% over one farm, and 60% over it can leave the farm untouched.
+          The NDVI rows written off this surface carry valid vs total pixels
+          per block, cloud excluded, which is exactly the farm's own number.
+
+        ``lookback_passes`` bounds the scan, so a farm under a month of cloud
+        costs a handful of aggregate lookups rather than its whole history.
+        """
+        if not product_codes:
+            return None
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        """
+                        WITH recent AS (
+                            SELECT r.scene_datetime, r.stac_item_id, r.aoi_hash,
+                                   p.bands
+                            FROM farm_scene_rasters r
+                            JOIN farms f ON f.id = r.farm_id
+                            JOIN public.imagery_products p ON p.id = r.product_id
+                            WHERE r.farm_id = :farm
+                              AND r.aoi_hash = f.aoi_hash
+                              AND r.source = 'fetched'
+                              AND p.code IN :product_codes
+                            ORDER BY r.scene_datetime DESC
+                            LIMIT :lookback
+                        )
+                        SELECT recent.scene_datetime, recent.stac_item_id,
+                               recent.aoi_hash, recent.bands,
+                               clear.fraction AS clear_fraction
+                        FROM recent
+                        CROSS JOIN LATERAL (
+                            SELECT SUM(a.valid_pixel_count)::float
+                                   / NULLIF(SUM(a.total_pixel_count), 0) AS fraction
+                            FROM block_index_aggregates a
+                            WHERE a.stac_item_id = recent.stac_item_id
+                              AND a.time = recent.scene_datetime
+                              AND a.index_code = 'ndvi'
+                        ) clear
+                        WHERE clear.fraction >= :min_clear
+                        ORDER BY recent.scene_datetime DESC
+                        LIMIT 1
+                        """
+                    ).bindparams(
+                        bindparam("farm", type_=PG_UUID(as_uuid=True)),
+                        bindparam("product_codes", expanding=True),
+                    ),
+                    {
+                        "farm": farm_id,
+                        "product_codes": list(product_codes),
+                        "lookback": lookback_passes,
+                        "min_clear": min_clear_fraction,
+                    },
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return dict(rows[0]) if rows else None
+
     async def list_ingestion_jobs_for_block(
         self,
         *,

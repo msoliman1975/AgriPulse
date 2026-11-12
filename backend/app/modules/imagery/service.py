@@ -12,9 +12,11 @@ service for auditability.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from typing import Any, Protocol
+from urllib.parse import urlencode
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +35,8 @@ from app.modules.imagery.farm_aoi import FarmAoiFit, measure_fit, product_resolu
 from app.modules.imagery.repository import ImageryRepository
 from app.modules.imagery.schemas import (
     ConfigResponse,
+    FarmLatestPhotoRead,
+    FarmLatestPhotoResponse,
     FarmRasterRead,
     FarmSceneAssetRead,
     FarmSceneAssetsResponse,
@@ -58,6 +62,64 @@ from app.shared.eventbus import EventBus, get_default_bus
 # what both queries hardcoded before. New callers always send the index they
 # are about to draw.
 DEFAULT_CONSOLE_INDEX = "ndvi"
+
+# The "latest satellite photo" map background.
+#
+# Only products carrying all three visible bands can be drawn in true colour;
+# today that is Sentinel-2 (Landsat thermal carries red but no green/blue).
+_PHOTO_BANDS = ("red", "green", "blue")
+# A photo with more than 1 pixel in 10 under cloud over the farm reads as a
+# white smear, and the base layer under it is the better picture.
+PHOTO_MIN_CLEAR_FRACTION = 0.9
+# ~4 months of a 5-day revisit: past that, a farm has a cloud problem this
+# layer cannot solve and the high-resolution base is all there is.
+PHOTO_LOOKBACK_PASSES = 24
+
+
+# Surface reflectance to display brightness. 0..0.35 is the usual Sentinel-2
+# true-colour stretch (about 2.9x gain): vegetation and soil read naturally
+# and bright desert sand only just clips.
+PHOTO_RESCALE = "0,0.35"
+
+
+def latest_photo_tile_url(
+    *,
+    tile_server_base_url: str,
+    s3_bucket: str,
+    stac_item_id: str,
+    aoi_hash: str,
+    rgb: tuple[int, int, int],
+) -> str:
+    """XYZ template for the photo, with ``{z}/{x}/{y}`` left for the map.
+
+    Built here rather than in each client so the web app, the investor web
+    page and the Android app draw the same picture, and a change to the
+    stretch is one deploy rather than an app release.
+
+    Same rendering conventions as the index layer (frontend pixelTiles.ts):
+    512 px tiles asked for as ``scale=2``, bilinear warping, and a cutline to
+    the farm outline published at ``aoi/<hash>.geojson``.
+    """
+    params: list[tuple[str, str]] = [
+        ("url", f"s3://{s3_bucket}/{stac_item_id}/raw_bands.tif"),
+        *(("bidx", str(b)) for b in rgb),
+        ("rescale", PHOTO_RESCALE),
+        ("reproject", "bilinear"),
+        ("scale", "2"),
+        ("algorithm", "cutline"),
+        ("algorithm_params", json.dumps({"aoi": aoi_hash}, separators=(",", ":"))),
+    ]
+    base = tile_server_base_url.rstrip("/")
+    return f"{base}/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}.png?{urlencode(params)}"
+
+
+def rgb_band_indexes(bands: Sequence[str]) -> tuple[int, int, int] | None:
+    """1-based band numbers of red, green, blue in a raw_bands COG, or None."""
+    names = list(bands)
+    if not all(b in names for b in _PHOTO_BANDS):
+        return None
+    r, g, b = (names.index(name) + 1 for name in _PHOTO_BANDS)
+    return (r, g, b)
 
 
 class ImageryService(Protocol):
@@ -121,6 +183,8 @@ class ImageryService(Protocol):
         at: datetime | None = None,
         index_code: str = DEFAULT_CONSOLE_INDEX,
     ) -> FarmSceneAssetsResponse: ...
+
+    async def get_farm_latest_photo(self, *, farm_id: UUID) -> FarmLatestPhotoResponse: ...
 
     async def list_farm_subscriptions(
         self, *, farm_id: UUID, include_inactive: bool = False
@@ -299,6 +363,42 @@ class ImageryServiceImpl:
         items = tuple(IngestionJobRead.model_validate(r) for r in rows)
         next_cursor = _encode_scene_cursor(next_cursor_dt) if next_cursor_dt else None
         return items, next_cursor
+
+    async def get_farm_latest_photo(self, *, farm_id: UUID) -> FarmLatestPhotoResponse:
+        """The newest clear true-colour photo of the farm, if there is one.
+
+        `products_for_index("ndvi")` is the optical family; the clear-sky
+        measure reads NDVI rows, so the two have to agree.
+        """
+        row = await self._repo.get_latest_clear_farm_photo(
+            farm_id=farm_id,
+            product_codes=products_for_index("ndvi"),
+            min_clear_fraction=PHOTO_MIN_CLEAR_FRACTION,
+            lookback_passes=PHOTO_LOOKBACK_PASSES,
+        )
+        bands = rgb_band_indexes(row["bands"]) if row else None
+        if row is None or bands is None:
+            return FarmLatestPhotoResponse(farm_id=farm_id, photo=None)
+        from app.core.settings import get_settings
+
+        settings = get_settings()
+        return FarmLatestPhotoResponse(
+            farm_id=farm_id,
+            photo=FarmLatestPhotoRead(
+                stac_item_id=row["stac_item_id"],
+                scene_datetime=row["scene_datetime"],
+                aoi_hash=row["aoi_hash"],
+                rgb_band_indexes=bands,
+                clear_fraction=float(row["clear_fraction"]),
+                tile_url=latest_photo_tile_url(
+                    tile_server_base_url=settings.tile_server_base_url,
+                    s3_bucket=settings.s3_bucket_uploads,
+                    stac_item_id=row["stac_item_id"],
+                    aoi_hash=row["aoi_hash"],
+                    rgb=bands,
+                ),
+            ),
+        )
 
     async def list_farm_scenes(
         self, *, farm_id: UUID, limit: int = 120, index_code: str = DEFAULT_CONSOLE_INDEX

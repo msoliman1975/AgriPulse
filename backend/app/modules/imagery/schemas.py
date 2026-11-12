@@ -287,6 +287,39 @@ class FarmSceneAssetsResponse(BaseModel):
     items: tuple[FarmSceneAssetRead, ...]
 
 
+class FarmLatestPhotoRead(BaseModel):
+    """The newest clear true-colour photo of one farm.
+
+    The map draws it over the high-resolution base layer. That layer is a
+    mosaic the vendor refreshes on its own schedule (2020 for parts of our
+    farm belt), while this one follows every Sentinel-2 pass we process.
+    """
+
+    #: Same ``provider/product/scene/aoi`` shape as every other asset; the
+    #: true-colour source is ``{stac_item_id}/raw_bands.tif``.
+    stac_item_id: str
+    scene_datetime: datetime
+    #: The boundary the photo is cut to, for the tile server's cutline.
+    aoi_hash: str
+    #: 1-based band numbers of red, green and blue in ``raw_bands.tif``, in
+    #: that order. Read from the product's band list rather than assumed.
+    rgb_band_indexes: tuple[int, int, int]
+    #: Share of the farm's block pixels that were cloud-free on this pass.
+    clear_fraction: float
+    #: Ready-to-use XYZ template (``{z}/{x}/{y}`` left in) for a raster
+    #: source with ``tileSize: 512``.
+    tile_url: str
+
+
+class FarmLatestPhotoResponse(BaseModel):
+    """GET /api/v1/farms/{farm_id}/latest-photo response body."""
+
+    farm_id: UUID
+    #: Null when the farm has no clear farm-wide pass yet — a farm still on
+    #: the per-block path, or one clouded over for every recent pass.
+    photo: FarmLatestPhotoRead | None = None
+
+
 class ConfigResponse(BaseModel):
     """GET /api/v1/config response body.
 

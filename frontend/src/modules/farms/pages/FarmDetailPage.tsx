@@ -100,7 +100,7 @@ export function FarmDetailPage(): JSX.Element {
       />
 
       <Card>
-        <MapPreview geometry={farm.boundary} />
+        <MapPreview geometry={farm.boundary} farmId={farm.id} />
       </Card>
 
       {canReadWeather && blocks.length > 0 ? (

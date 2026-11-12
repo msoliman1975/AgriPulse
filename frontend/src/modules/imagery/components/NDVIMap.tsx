@@ -1,24 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import { TileLayer } from "@deck.gl/geo-layers";
 import { BitmapLayer } from "@deck.gl/layers";
 import type { Geometry } from "geojson";
 
+import { SatelliteBasemapControl, satelliteStyle } from "@/lib/basemap";
 import { centerOfBbox } from "@/lib/geometry";
-
-const RASTER_STYLE: maplibregl.StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      attribution: "© OpenStreetMap contributors",
-    },
-  },
-  layers: [{ id: "osm", type: "raster", source: "osm" }],
-};
 
 interface Props {
   /** AOI polygon, in WGS84. Drawn under the raster as a vector overlay. */
@@ -38,13 +26,14 @@ interface Props {
 export function NDVIMap({ geometry, tileUrlTemplate, className }: Props): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<MapboxOverlay | null>(null);
+  const [mapForBase, setMapForBase] = useState<maplibregl.Map | null>(null);
 
   useEffect(() => {
     if (!ref.current || !geometry) return;
     const center = centerOfBbox(geometry);
     const map = new maplibregl.Map({
       container: ref.current,
-      style: RASTER_STYLE,
+      style: satelliteStyle(),
       center,
       zoom: 12,
     });
@@ -75,7 +64,9 @@ export function NDVIMap({ geometry, tileUrlTemplate, className }: Props): JSX.El
       applyOverlay(overlay, tileUrlTemplate);
     });
 
+    setMapForBase(map);
     return () => {
+      setMapForBase(null);
       overlayRef.current = null;
       map.remove();
     };
@@ -93,7 +84,13 @@ export function NDVIMap({ geometry, tileUrlTemplate, className }: Props): JSX.El
     applyOverlay(overlay, tileUrlTemplate);
   }, [tileUrlTemplate]);
 
-  return <div ref={ref} className={className ?? "h-72 w-full rounded"} />;
+  // The index layer covers the block, so only the base's date is shown here.
+  return (
+    <div className="relative">
+      <div ref={ref} className={className ?? "h-72 w-full rounded"} />
+      <SatelliteBasemapControl map={mapForBase} photo={null} />
+    </div>
+  );
 }
 
 function applyOverlay(overlay: MapboxOverlay, tileUrlTemplate: string | null): void {

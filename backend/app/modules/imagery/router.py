@@ -33,6 +33,7 @@ from app.modules.imagery.repository import ImageryRepository
 from app.modules.imagery.schemas import (
     ConfigResponse,
     CursorPage,
+    FarmLatestPhotoResponse,
     FarmSceneAssetsResponse,
     FarmScenesResponse,
     FarmSubscriptionCreate,
@@ -397,6 +398,28 @@ async def list_farm_scene_assets(
     """
     del context  # the capability check's side-effect is the only consumer
     return await service.list_farm_scene_assets(farm_id=farm_id, at=at, index_code=index_code)
+
+
+@router.get(
+    "/farms/{farm_id}/latest-photo",
+    response_model=FarmLatestPhotoResponse,
+    summary="Newest clear true-colour Sentinel-2 photo of the farm, for the map background.",
+)
+async def get_farm_latest_photo(
+    farm_id: UUID,
+    context: RequestContext = Depends(requires_capability("imagery.read", farm_id_param="farm_id")),
+    service: ImageryService = Depends(_service),
+) -> FarmLatestPhotoResponse:
+    """What the map should show of the farm as it looks now.
+
+    The high-resolution base layer is a vendor mosaic refreshed on the
+    vendor's schedule — years old over parts of our farm belt. This answers
+    with the newest pass we fetched for the farm that is clear over it, so
+    every map can lay a current photo on top. ``photo`` is null when there is
+    none yet, and the caller falls back to the base layer alone.
+    """
+    del context  # the capability check's side-effect is the only consumer
+    return await service.get_farm_latest_photo(farm_id=farm_id)
 
 
 # --- Tenant config --------------------------------------------------------

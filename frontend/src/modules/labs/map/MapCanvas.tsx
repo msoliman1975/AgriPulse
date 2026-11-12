@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import maplibregl, {
   type ExpressionSpecification,
   type GeoJSONSource,
@@ -11,6 +11,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 
 import type { AnyIndexCode as ApiIndexCode } from "@/api/indices";
+import { ESRI_IMAGERY_TILES, SatelliteBasemapControl, useFarmLatestPhoto } from "@/lib/basemap";
 import { buildAlertBadgePoints } from "./alertBadges";
 import { registerMarkerImages, SIGNAL_IMAGE_ID, SIGNAL_STACK_IMAGE_ID } from "./markerIcons";
 import { gridRampExpression } from "./gridRamp";
@@ -158,6 +159,8 @@ interface Props {
   // so the base map shows rather than defaulting to a colour that means
   // nothing.
   blockFillColorProperty?: string | null;
+  /** The farm, for its latest satellite photo under everything else. */
+  farmId?: string | null;
 }
 
 export interface PixelLayer {
@@ -331,9 +334,7 @@ function buildStyle(): StyleSpecification {
     sources: {
       satellite: {
         type: "raster",
-        tiles: [
-          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        ],
+        tiles: [ESRI_IMAGERY_TILES],
         tileSize: satelliteTileSize(),
         attribution:
           "Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
@@ -401,9 +402,12 @@ export function MapCanvas({
   pixelOpacity = 0.85,
   gridFillVisible = true,
   blockFillColorProperty = null,
+  farmId = null,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
+  const [mapForBase, setMapForBase] = useState<MlMap | null>(null);
+  const photo = useFarmLatestPhoto(farmId);
   const drawRef = useRef<MapboxDraw | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
@@ -461,6 +465,7 @@ export function MapCanvas({
     // not animate a second fit over an already-correct view.
     if (initialBounds) lastFitKeyRef.current = initial.fitBoundsKey;
     mapRef.current = map;
+    setMapForBase(map);
     // Dev-only handle for browser tests. The marks are symbol layers and the
     // click path is MapLibre's own hit-testing, so an e2e spec has to be able
     // to turn a lon/lat into a screen pixel. Stripped from the production
@@ -1046,6 +1051,7 @@ export function MapCanvas({
         drawRef.current = null;
       }
       resizeObserver.disconnect();
+      setMapForBase(null);
       map.remove();
       mapRef.current = null;
     };
@@ -1785,7 +1791,10 @@ export function MapCanvas({
   }, [drawEnabled, drawTarget]);
 
   return (
-    <div ref={containerRef} className="h-full w-full" role="application" aria-label="Farm map" />
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className="h-full w-full" role="application" aria-label="Farm map" />
+      <SatelliteBasemapControl map={mapForBase} photo={photo} />
+    </div>
   );
 }
 

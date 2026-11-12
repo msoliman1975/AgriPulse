@@ -642,6 +642,7 @@ export function FarmHealthViewPage(): ReactNode {
                         </div>
                         <MapDate text={dateText} dayKey={currentDay} />
                         <HealthMap
+                          farmId={farmId}
                           blocks={mapBlocks}
                           cells={mapCells}
                           highlighted={highlighted}
