@@ -1,0 +1,232 @@
+{
+  "code": "date_palm_medjool_dust_mite",
+  "name_en": "Date palm Medjool — dust mite",
+  "name_ar": "نخيل المجدول — عنكبوت الغبار",
+  "description_en": "The dust mite spins webbing on green fruit in summer. The tree watches the susceptible stages, hot and dry weather, scout reports and weekly scouting. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly. Choice made where the page named a check but not its test, approved by the owner: a hot, dry spell is a 72-hour forecast maximum at or above hot_c (40 °C) with no rain forecast.",
+  "description_ar": "يغزل عنكبوت الغبار نسيجه على الثمار الخضراء صيفًا. تراقب الشجرة مراحل الحساسية والطقس الحار الجاف وتقارير المستكشف والفحص الأسبوعي. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا. اختيار حيث ذكرت الصفحة الفحص دون طريقته، وافق عليه المالك: الموجة الحارة الجافة هي توقع حرارة عظمى خلال 72 ساعة عند hot_c (40 °م) أو أعلى دون أمطار متوقعة.",
+  "scope": "block",
+  "crop_path": "date_palm.medjool",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_stage",
+  "registers": [
+    "mite_webbing",
+    "mite_weather",
+    "mite_scouting_due"
+  ],
+  "parameters": {
+    "hot_c": {
+      "type": "number",
+      "default": 40.0,
+      "min": 25.0,
+      "max": 55.0
+    },
+    "scout_days": {
+      "type": "number",
+      "default": 7,
+      "min": 1.0,
+      "max": 30.0
+    }
+  },
+  "nodes": {
+    "n_stage": {
+      "label_en": "Is the fruit at Kimri or Khalal (green fruit, July–August)?",
+      "label_ar": "هل الثمار في الكمري أو الخلال (ثمار خضراء، يوليو–أغسطس)؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "kimri",
+            "khalal"
+          ]
+        }
+      },
+      "on_match": "n_seen",
+      "on_miss": "n_stop"
+    },
+    "n_seen": {
+      "label_en": "Has a scout seen webbing and dust on bunches?",
+      "label_ar": "هل رأى المستكشف نسيجًا وغبارًا على العذوق؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_mite_webbing_seen",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_seen",
+      "on_miss": "n_hot"
+    },
+    "r_seen": {
+      "label_en": "Dust mite webbing on bunches",
+      "label_ar": "نسيج عنكبوت الغبار على العذوق",
+      "register": {
+        "code": "mite_webbing",
+        "severity": "critical"
+      },
+      "next": "n_hot"
+    },
+    "n_hot": {
+      "label_en": "Is a hot, dry spell forecast for the next 72 hours?",
+      "label_ar": "هل يُتوقّع طقس حار جاف خلال 72 ساعة؟",
+      "condition": {
+        "tree": {
+          "all_of": [
+            {
+              "op": "ge",
+              "left": {
+                "source": "weather",
+                "scope": "forecast_72h",
+                "field": "air_temp_c_max"
+              },
+              "right": {
+                "source": "params",
+                "name": "hot_c"
+              }
+            },
+            {
+              "op": "le",
+              "left": {
+                "source": "weather",
+                "scope": "forecast_72h",
+                "field": "precipitation_mm_total"
+              },
+              "right": 0
+            }
+          ]
+        }
+      },
+      "on_match": "r_hot",
+      "on_miss": "n_scout_due"
+    },
+    "r_hot": {
+      "label_en": "Hot, dry spell at the mite-susceptible stage",
+      "label_ar": "طقس حار جاف في مرحلة الحساسية للعنكبوت",
+      "register": {
+        "code": "mite_weather",
+        "severity": "warning"
+      },
+      "next": "n_scout_due"
+    },
+    "n_scout_due": {
+      "label_en": "Has it been more than 7 days since bunches were scouted?",
+      "label_ar": "هل مرّ أكثر من 7 أيام منذ فحص العذوق؟",
+      "condition": {
+        "tree": {
+          "op": "gt",
+          "left": {
+            "source": "signals",
+            "code": "date_bunches_scouted",
+            "key": "days_since_latest"
+          },
+          "right": {
+            "source": "params",
+            "name": "scout_days"
+          }
+        }
+      },
+      "on_match": "r_scout",
+      "on_miss": "n_stop"
+    },
+    "r_scout": {
+      "label_en": "Weekly bunch scouting due",
+      "label_ar": "الفحص الأسبوعي للعذوق مستحق",
+      "register": {
+        "code": "mite_scouting_due",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "r001",
+      "codes": [
+        "mite_weather",
+        "mite_webbing"
+      ],
+      "status": "alert",
+      "action_type": "treat",
+      "text_en": "Webbing is on the bunches and hot, dry weather is coming, when native predatory mites are absent from the fruit. Treat bunches now with an option permitted under your organic certificate (sulphur dusting is the FAO option).",
+      "text_ar": "النسيج على العذوق وطقس حار جاف قادم وقت غياب المفترسات المحلية عن الثمار. عالج العذوق الآن بخيار مسموح عضويًا (تعفير الكبريت خيار الفاو)."
+    },
+    {
+      "code": "r002",
+      "codes": [
+        "mite_webbing"
+      ],
+      "status": "alert",
+      "action_type": "treat",
+      "text_en": "Dust mite webbing is on the bunches. Losses can reach 30–100% if not controlled early. Treat the affected bunches with a permitted option.",
+      "text_ar": "نسيج عنكبوت الغبار على العذوق. قد تصل الخسائر 30–100% إن لم يُكافح مبكرًا. عالج العذوق المصابة بخيار مسموح."
+    },
+    {
+      "code": "r003",
+      "codes": [
+        "mite_weather"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Hot, dry weather is forecast while the fruit is green. Fruit infestation starts in the first to third week of July; inspect bunches this week.",
+      "text_ar": "يُتوقّع طقس حار جاف والثمار خضراء. تبدأ إصابة الثمار بين الأسبوع الأول والثالث من يوليو؛ افحص العذوق هذا الأسبوع."
+    },
+    {
+      "code": "r004",
+      "codes": [
+        "mite_scouting_due",
+        "mite_weather"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Hot, dry weather is coming and bunches have not been scouted for over a week. Scout bunches for webbing and dust now.",
+      "text_ar": "طقس حار جاف قادم ولم تُفحص العذوق منذ أكثر من أسبوع. افحص العذوق الآن بحثًا عن النسيج والغبار."
+    },
+    {
+      "code": "r005",
+      "codes": [
+        "mite_scouting_due"
+      ],
+      "status": "good",
+      "action_type": "scout",
+      "text_en": "Weekly bunch scouting is due while the fruit is green. Check bunches for webbing and dust.",
+      "text_ar": "الفحص الأسبوعي للعذوق مستحق والثمار خضراء. افحص العذوق بحثًا عن النسيج والغبار."
+    },
+    {
+      "code": "r006",
+      "codes": [
+        "mite_scouting_due",
+        "mite_webbing"
+      ],
+      "status": "alert",
+      "action_type": "treat",
+      "text_en": "Dust mite webbing is on the bunches. Losses can reach 30–100% if not controlled early. Treat the affected bunches with a permitted option and scout the rest this week.",
+      "text_ar": "نسيج عنكبوت الغبار على العذوق. قد تصل الخسارة إلى 30–100% إن لم يُكافح مبكرًا. عالج العذوق المصابة بخيار مسموح وافحص الباقي هذا الأسبوع."
+    },
+    {
+      "code": "r007",
+      "codes": [
+        "mite_scouting_due",
+        "mite_weather",
+        "mite_webbing"
+      ],
+      "status": "alert",
+      "action_type": "treat",
+      "text_en": "Webbing is on the bunches and hot, dry weather is coming. Treat bunches now with a permitted option and scout every block this week.",
+      "text_ar": "النسيج على العذوق وطقس حار جاف قادم. عالج العذوق الآن بخيار مسموح وافحص كل القطع هذا الأسبوع."
+    }
+  ]
+}

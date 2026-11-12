@@ -1,0 +1,239 @@
+{
+  "code": "date_palm_medjool_young_planting",
+  "name_en": "Date palm Medjool — new plantings",
+  "name_ar": "نخيل المجدول — الزراعات الجديدة",
+  "description_en": "Care from planting to first fruiting: establishment gaps, first-summer irrigation on sand and monthly weevil checks at the palm base. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly. Palm size is read from the block's palm phase: new planting = small, juvenile and onset of fruiting = medium, bearing = large.",
+  "description_ar": "الرعاية من الزراعة حتى أول إثمار: فجوات التأسيس، وري الصيف الأول على الرمل، وفحص السوسة الشهري عند قاعدة النخلة. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا. يُقرأ حجم النخيل من طور النخلة في القطعة: زراعة جديدة = صغير، يافع وبداية الإثمار = متوسط، مثمر = كبير.",
+  "scope": "block",
+  "crop_path": "date_palm.medjool",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_small",
+  "registers": [
+    "establishment_gaps",
+    "young_irrigation_sandy",
+    "young_rpw_check_due"
+  ],
+  "parameters": {
+    "small_bsi_ceiling": {
+      "type": "number",
+      "default": 0.3,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "small_msavi_floor": {
+      "type": "number",
+      "default": 0.05,
+      "min": -2.0,
+      "max": 3.0
+    },
+    "hot_c": {
+      "type": "number",
+      "default": 40.0,
+      "min": 25.0,
+      "max": 55.0
+    },
+    "inspect_days": {
+      "type": "number",
+      "default": 30,
+      "min": 7.0,
+      "max": 120.0
+    }
+  },
+  "nodes": {
+    "n_small": {
+      "label_en": "Is this a seedling block?",
+      "label_ar": "هل هذه قطعة شتلات؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "crop_attribute",
+            "code": "palm_phase",
+            "key": "value"
+          },
+          "values": [
+            "new_planting"
+          ]
+        }
+      },
+      "on_match": "n_bsi",
+      "on_miss": "n_stop"
+    },
+    "n_bsi": {
+      "label_en": "Is bare ground (BSI) above the seedling band?",
+      "label_ar": "هل التربة العارية (BSI) فوق نطاق الشتلات؟",
+      "condition": {
+        "tree": {
+          "op": "gt",
+          "left": {
+            "source": "indices",
+            "index_code": "bsi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "params",
+            "name": "small_bsi_ceiling"
+          }
+        }
+      },
+      "on_match": "n_msavi",
+      "on_miss": "n_sandy"
+    },
+    "n_msavi": {
+      "label_en": "Is MSAVI also below the seedling band?",
+      "label_ar": "هل MSAVI أيضًا دون نطاق الشتلات؟",
+      "condition": {
+        "tree": {
+          "op": "lt",
+          "left": {
+            "source": "indices",
+            "index_code": "msavi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "params",
+            "name": "small_msavi_floor"
+          }
+        }
+      },
+      "on_match": "r_gaps",
+      "on_miss": "n_sandy"
+    },
+    "r_gaps": {
+      "label_en": "Establishment gaps — failed offshoots likely",
+      "label_ar": "فجوات في التأسيس — فسائل فاشلة محتملة",
+      "register": {
+        "code": "establishment_gaps",
+        "severity": "warning"
+      },
+      "next": "n_sandy"
+    },
+    "n_sandy": {
+      "label_en": "Is the soil sandy or sandy loam?",
+      "label_ar": "هل التربة رملية أو رملية طميية؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "soil_texture"
+          },
+          "values": [
+            "sandy",
+            "sandy_loam"
+          ]
+        }
+      },
+      "on_match": "n_summer",
+      "on_miss": "n_rpw"
+    },
+    "n_summer": {
+      "label_en": "Is hot weather forecast?",
+      "label_ar": "هل يُتوقّع طقس حار؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "weather",
+            "scope": "forecast_72h",
+            "field": "air_temp_c_max"
+          },
+          "right": {
+            "source": "params",
+            "name": "hot_c"
+          }
+        }
+      },
+      "on_match": "r_sandy",
+      "on_miss": "n_rpw"
+    },
+    "r_sandy": {
+      "label_en": "Young palms on sand in hot weather — daily irrigation",
+      "label_ar": "نخيل صغير على رمل في طقس حار — ري يومي",
+      "register": {
+        "code": "young_irrigation_sandy",
+        "severity": "info"
+      },
+      "next": "n_rpw"
+    },
+    "n_rpw": {
+      "label_en": "Has it been more than a month since young palms were inspected for RPW at the base?",
+      "label_ar": "هل مر أكثر من شهر منذ فحص قواعد النخيل الصغير للسوسة؟",
+      "condition": {
+        "tree": {
+          "op": "gt",
+          "left": {
+            "source": "signals",
+            "code": "date_rpw_inspection_done",
+            "key": "days_since_latest"
+          },
+          "right": {
+            "source": "params",
+            "name": "inspect_days"
+          }
+        }
+      },
+      "on_match": "r_rpw",
+      "on_miss": "n_stop"
+    },
+    "r_rpw": {
+      "label_en": "Young palms: RPW base inspection due",
+      "label_ar": "النخيل الصغير: فحص القاعدة للسوسة مستحق",
+      "register": {
+        "code": "young_rpw_check_due",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "r001",
+      "codes": [
+        "establishment_gaps"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Bare ground is high and greenness low for a seedling block. Count failed offshoots or plantlets and replace them.",
+      "text_ar": "التربة العارية عالية والخضرة منخفضة لقطعة شتلات. عُدّ الفسائل أو النباتات الفاشلة واستبدلها."
+    },
+    {
+      "code": "r002",
+      "codes": [
+        "young_irrigation_sandy"
+      ],
+      "status": "issue",
+      "action_type": "irrigate",
+      "text_en": "Young palms on very sandy soil in hot weather. Irrigate daily in the first summer and keep water off the heart.",
+      "text_ar": "نخيل صغير على تربة رملية جدًا في طقس حار. اروِ يوميًا في الصيف الأول وأبعد الماء عن القلب."
+    },
+    {
+      "code": "r003",
+      "codes": [
+        "establishment_gaps",
+        "young_irrigation_sandy"
+      ],
+      "status": "alert",
+      "action_type": "irrigate",
+      "text_en": "Seedlings are failing on hot sand. Check that every plant gets water daily, then replace the dead ones.",
+      "text_ar": "الشتلات تفشل على رمل حار. تأكّد أن كل نبات يصله الماء يوميًا ثم استبدل الميت."
+    },
+    {
+      "code": "r004",
+      "codes": [
+        "young_rpw_check_due"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Young palms are the weevil's main target and on palms under five years symptoms appear within 1 m of the ground. Inspect the bases this week.",
+      "text_ar": "النخيل الصغير الهدف الرئيسي للسوسة، وفي النخيل الأصغر من خمس سنوات تظهر الأعراض ضمن متر من الأرض. افحص القواعد هذا الأسبوع."
+    }
+  ]
+}

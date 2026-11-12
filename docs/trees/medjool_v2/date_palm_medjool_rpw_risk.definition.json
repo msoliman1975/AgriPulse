@@ -1,0 +1,506 @@
+{
+  "code": "date_palm_medjool_rpw_risk",
+  "name_en": "Date palm Medjool — Red Palm Weevil risk and prevention",
+  "name_ar": "نخيل المجدول — خطر سوسة النخيل الحمراء والوقاية",
+  "description_en": "Prevention comes before detection. This tree checks the farm practices that let the weevil in — the 22 farmer errors from the New Valley and the Al-Ahsa risk factors — plus trap catches. Fixing these errors cut infestation in an El-Kharga sector from 1% to 0.16%. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly. Palm size is read from the block's palm phase: new planting = small, juvenile and onset of fruiting = medium, bearing = large.",
+  "description_ar": "الوقاية قبل الكشف. تفحص هذه الشجرة الممارسات التي تُدخل السوسة — الأخطاء الـ22 للمزارعين في الوادي الجديد وعوامل الخطر في الأحساء — مع صيد المصائد. خفّض تصحيح هذه الأخطاء الإصابة في قطاع بالخارجة من 1% إلى 0.16%. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا. يُقرأ حجم النخيل من طور النخلة في القطعة: زراعة جديدة = صغير، يافع وبداية الإثمار = متوسط، مثمر = كبير.",
+  "scope": "block",
+  "crop_path": "date_palm.medjool",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_wound",
+  "registers": [
+    "rpw_untreated_wounds",
+    "rpw_wound_window",
+    "rpw_flood_irrigation",
+    "rpw_susceptible_age",
+    "rpw_roots_exposed",
+    "rpw_rodents",
+    "rpw_infested_waste",
+    "rpw_inspection_overdue",
+    "rpw_trap_high",
+    "rpw_trap_rising",
+    "rpw_trap_service_due"
+  ],
+  "parameters": {
+    "oviposition_min_c": {
+      "type": "number",
+      "default": 15.45,
+      "min": 5.0,
+      "max": 30.0
+    },
+    "inspect_days": {
+      "type": "number",
+      "default": 30,
+      "min": 7.0,
+      "max": 120.0
+    },
+    "trap_catch_high": {
+      "type": "number",
+      "default": 1.0,
+      "min": 0.0,
+      "max": 100.0
+    },
+    "trap_service_days": {
+      "type": "number",
+      "default": 15,
+      "min": 7.0,
+      "max": 60.0
+    }
+  },
+  "nodes": {
+    "n_wound": {
+      "label_en": "Were offshoots removed or fronds cut in the last week?",
+      "label_ar": "هل فُصلت فسائل أو قُطع سعف خلال الأسبوع الماضي؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_offshoot_or_frond_cut",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "n_wound_temp",
+      "on_miss": "n_prune_season"
+    },
+    "n_wound_temp": {
+      "label_en": "Is the daily mean temperature above 15.45 °C, or unknown (weevils may lay eggs)?",
+      "label_ar": "هل متوسط الحرارة اليومي فوق 15.45 °م أو غير معروف (قد تضع السوسة البيض)؟",
+      "condition": {
+        "tree": {
+          "not": {
+            "op": "le",
+            "left": {
+              "source": "weather",
+              "scope": "derived_today",
+              "field": "temp_mean_c"
+            },
+            "right": {
+              "source": "params",
+              "name": "oviposition_min_c"
+            }
+          }
+        }
+      },
+      "on_match": "n_wound_treated",
+      "on_miss": "n_prune_season"
+    },
+    "n_wound_treated": {
+      "label_en": "Were the cuts given a protective treatment?",
+      "label_ar": "هل عولجت الجروح معالجة وقائية؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_wounds_treated",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "n_prune_season",
+      "on_miss": "r_wound"
+    },
+    "r_wound": {
+      "label_en": "Untreated fresh cuts while weevils can lay eggs",
+      "label_ar": "جروح حديثة غير معالجة والسوسة قادرة على وضع البيض",
+      "register": {
+        "code": "rpw_untreated_wounds",
+        "severity": "critical"
+      },
+      "next": "n_prune_season"
+    },
+    "n_prune_season": {
+      "label_en": "Is it the winter pruning season (dormancy stage)?",
+      "label_ar": "هل هو موسم التقليم الشتوي (مرحلة السكون)؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "dormancy"
+          ]
+        }
+      },
+      "on_match": "r_prune",
+      "on_miss": "n_flood"
+    },
+    "r_prune": {
+      "label_en": "Winter: the safest window for wound-making work — treat every cut",
+      "label_ar": "الشتاء: أأمن نافذة لأعمال الجروح — عالج كل جرح",
+      "register": {
+        "code": "rpw_wound_window",
+        "severity": "info"
+      },
+      "next": "n_flood"
+    },
+    "n_flood": {
+      "label_en": "Is the block flood-irrigated?",
+      "label_ar": "هل القطعة تُروى بالغمر؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_irrigation_method",
+            "key": "value_categorical"
+          },
+          "right": "flood"
+        }
+      },
+      "on_match": "r_flood",
+      "on_miss": "n_age"
+    },
+    "r_flood": {
+      "label_en": "Flood irrigation — 88% of Al-Ahsa infestations",
+      "label_ar": "ري بالغمر — 88% من إصابات الأحساء",
+      "register": {
+        "code": "rpw_flood_irrigation",
+        "severity": "warning"
+      },
+      "next": "n_age"
+    },
+    "n_age": {
+      "label_en": "Are these young or mid-size palms (most susceptible age)?",
+      "label_ar": "هل النخيل صغير أو متوسط (أكثر الأعمار قابلية)؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "crop_attribute",
+            "code": "palm_phase",
+            "key": "value"
+          },
+          "values": [
+            "new_planting",
+            "juvenile",
+            "onset_of_fruiting"
+          ]
+        }
+      },
+      "on_match": "r_age",
+      "on_miss": "n_roots"
+    },
+    "r_age": {
+      "label_en": "Susceptible age — attacks mostly within 1 m of the ground",
+      "label_ar": "عمر قابل للإصابة — الإصابة غالبًا ضمن متر من الأرض",
+      "register": {
+        "code": "rpw_susceptible_age",
+        "severity": "info"
+      },
+      "next": "n_roots"
+    },
+    "n_roots": {
+      "label_en": "Are aerial roots at the palm base left uncovered?",
+      "label_ar": "هل الجذور الهوائية عند قاعدة النخلة مكشوفة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_aerial_roots_exposed",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_roots",
+      "on_miss": "n_rodents"
+    },
+    "r_roots": {
+      "label_en": "Exposed aerial roots",
+      "label_ar": "جذور هوائية مكشوفة",
+      "register": {
+        "code": "rpw_roots_exposed",
+        "severity": "info"
+      },
+      "next": "n_rodents"
+    },
+    "n_rodents": {
+      "label_en": "Is there rat or mouse feeding damage at palm bases?",
+      "label_ar": "هل يوجد ضرر تغذية فئران عند قواعد النخيل؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_rodent_damage_seen",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_rodents",
+      "on_miss": "n_waste"
+    },
+    "r_rodents": {
+      "label_en": "Rodent feeding — attracts the weevil",
+      "label_ar": "تغذية الفئران — تجذب السوسة",
+      "register": {
+        "code": "rpw_rodents",
+        "severity": "info"
+      },
+      "next": "n_waste"
+    },
+    "n_waste": {
+      "label_en": "Is infested palm waste left beside paths or field edges?",
+      "label_ar": "هل تُركت مخلفات نخيل مصابة بجوار الممرات أو الحواف؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_infested_waste_left",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_waste",
+      "on_miss": "n_inspect"
+    },
+    "r_waste": {
+      "label_en": "Infested waste left in the farm",
+      "label_ar": "مخلفات مصابة متروكة في المزرعة",
+      "register": {
+        "code": "rpw_infested_waste",
+        "severity": "warning"
+      },
+      "next": "n_inspect"
+    },
+    "n_inspect": {
+      "label_en": "Has it been more than a month since every palm was inspected?",
+      "label_ar": "هل مر أكثر من شهر منذ فحص كل النخيل؟",
+      "condition": {
+        "tree": {
+          "op": "gt",
+          "left": {
+            "source": "signals",
+            "code": "date_rpw_inspection_done",
+            "key": "days_since_latest"
+          },
+          "right": {
+            "source": "params",
+            "name": "inspect_days"
+          }
+        }
+      },
+      "on_match": "r_inspect",
+      "on_miss": "n_trap"
+    },
+    "r_inspect": {
+      "label_en": "Monthly palm inspection overdue",
+      "label_ar": "الفحص الشهري للنخيل متأخر",
+      "register": {
+        "code": "rpw_inspection_overdue",
+        "severity": "warning"
+      },
+      "next": "n_trap"
+    },
+    "n_trap": {
+      "label_en": "Is the trap catch per trap per fortnight at or above the action level?",
+      "label_ar": "هل الصيد لكل مصيدة كل أسبوعين عند حد التدخل أو أعلى؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "signals",
+            "code": "date_rpw_trap_catch_value",
+            "key": "value_numeric"
+          },
+          "right": {
+            "source": "params",
+            "name": "trap_catch_high"
+          }
+        }
+      },
+      "on_match": "r_trap",
+      "on_miss": "n_trap_up"
+    },
+    "r_trap": {
+      "label_en": "Trap catch at the action level",
+      "label_ar": "صيد المصائد عند حد التدخل",
+      "register": {
+        "code": "rpw_trap_high",
+        "severity": "warning"
+      },
+      "next": "n_trap_up"
+    },
+    "n_trap_up": {
+      "label_en": "Is the trap catch rising?",
+      "label_ar": "هل صيد المصائد في ازدياد؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_rpw_trap_catch_value",
+            "key": "value_trend_direction"
+          },
+          "right": "rising"
+        }
+      },
+      "on_match": "r_trap_up",
+      "on_miss": "n_trap_service"
+    },
+    "r_trap_up": {
+      "label_en": "Trap catch rising",
+      "label_ar": "صيد المصائد في ازدياد",
+      "register": {
+        "code": "rpw_trap_rising",
+        "severity": "info"
+      },
+      "next": "n_trap_service"
+    },
+    "n_trap_service": {
+      "label_en": "Have traps gone more than 15 days without new bait and water?",
+      "label_ar": "هل مرّ على المصائد أكثر من 15 يومًا دون تجديد الطعم والماء؟",
+      "condition": {
+        "tree": {
+          "op": "gt",
+          "left": {
+            "source": "signals",
+            "code": "date_trap_serviced",
+            "key": "days_since_latest"
+          },
+          "right": {
+            "source": "params",
+            "name": "trap_service_days"
+          }
+        }
+      },
+      "on_match": "r_service",
+      "on_miss": "n_stop"
+    },
+    "r_service": {
+      "label_en": "Trap bait and water due",
+      "label_ar": "تجديد طعم المصائد والماء مستحق",
+      "register": {
+        "code": "rpw_trap_service_due",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "r001",
+      "codes": [
+        "rpw_untreated_wounds"
+      ],
+      "status": "alert",
+      "action_type": "treat",
+      "text_en": "Fresh cuts are untreated while temperatures allow egg-laying. Treat every cut today with a protective treatment permitted under your organic certificate.",
+      "text_ar": "جروح حديثة غير معالجة والحرارة تسمح بوضع البيض. عالج كل جرح اليوم بمعاملة وقائية مسموحة في شهادتك العضوية."
+    },
+    {
+      "code": "r002",
+      "codes": [
+        "rpw_trap_high",
+        "rpw_untreated_wounds"
+      ],
+      "status": "alert",
+      "action_type": "treat",
+      "text_en": "Weevils are active and fresh cuts are untreated. Treat every cut today and stop offshoot removal until the catch falls.",
+      "text_ar": "السوسة نشطة والجروح غير معالجة. عالج كل جرح اليوم وأوقف فصل الفسائل حتى ينخفض الصيد."
+    },
+    {
+      "code": "r003",
+      "codes": [
+        "rpw_susceptible_age",
+        "rpw_untreated_wounds"
+      ],
+      "status": "alert",
+      "action_type": "treat",
+      "text_en": "Untreated cuts on young palms in egg-laying weather. Treat the same day and check trunk bases within 1 m of the ground.",
+      "text_ar": "جروح غير معالجة على نخيل صغير في طقس وضع البيض. عالجها في اليوم نفسه وافحص قواعد الجذوع ضمن متر من الأرض."
+    },
+    {
+      "code": "r004",
+      "codes": [
+        "rpw_trap_high",
+        "rpw_trap_rising"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "Trap catch is at the action level and still rising. Inspect every palm in the block this week, starting at trunk bases.",
+      "text_ar": "الصيد عند حد التدخل وما زال يرتفع. افحص كل نخلة في القطعة هذا الأسبوع بدءًا من قواعد الجذوع."
+    },
+    {
+      "code": "r005",
+      "codes": [
+        "rpw_trap_high"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Trap catch is at the action level. Inspect palms near the catching traps, and keep traps at 1–4 per hectare near the orchard edges.",
+      "text_ar": "الصيد عند حد التدخل. افحص النخيل قرب المصائد الصائدة وأبقِ المصائد 1–4 لكل هكتار قرب حواف البستان."
+    },
+    {
+      "code": "r006",
+      "codes": [
+        "rpw_flood_irrigation",
+        "rpw_susceptible_age"
+      ],
+      "status": "issue",
+      "action_type": "other",
+      "text_en": "Young palms under flood irrigation are the highest-risk combination in Al-Ahsa. Plan a move to drip and keep water off the trunk base.",
+      "text_ar": "النخيل الصغير تحت الري بالغمر هو أعلى توليفة خطرًا في الأحساء. خطّط للتحول إلى التنقيط وأبعد الماء عن قاعدة الجذع."
+    },
+    {
+      "code": "r007",
+      "codes": [
+        "rpw_inspection_overdue",
+        "rpw_trap_high"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "Traps are catching and the monthly inspection is overdue. Inspect every palm, including male and seedling palms on roads and edges.",
+      "text_ar": "المصائد تصطاد والفحص الشهري متأخر. افحص كل نخلة بما فيها الذكور والبذري على الطرق والحواف."
+    },
+    {
+      "code": "r008",
+      "codes": [
+        "rpw_infested_waste"
+      ],
+      "status": "alert",
+      "action_type": "other",
+      "text_en": "Infested palm waste is lying in the farm and will breed weevils. Chop, burn and bury it; never move it to another farm.",
+      "text_ar": "مخلفات نخيل مصابة في المزرعة وستكون بؤرة للسوسة. قطّعها واحرقها وادفنها ولا تنقلها إلى مزرعة أخرى."
+    },
+    {
+      "code": "r009",
+      "codes": [
+        "rpw_rodents",
+        "rpw_roots_exposed"
+      ],
+      "status": "issue",
+      "action_type": "other",
+      "text_en": "Exposed aerial roots and rodent feeding at the palm base both attract the weevil. Cover the roots with soil and control rats and mice.",
+      "text_ar": "الجذور الهوائية المكشوفة وتغذية الفئران عند القاعدة تجذبان السوسة. غطِّ الجذور بالتربة وكافح الفئران."
+    },
+    {
+      "code": "r010",
+      "codes": [
+        "rpw_wound_window"
+      ],
+      "status": "good",
+      "action_type": "prune",
+      "text_en": "Winter is the safest time for offshoot removal and frond cutting. Treat every cut, never cut green fronds, and leave two rows of dry fronds to protect the crown.",
+      "text_ar": "الشتاء أأمن وقت لفصل الفسائل وقطع السعف. عالج كل جرح ولا تقطع السعف الأخضر واترك صفين من السعف الجاف لحماية القمة."
+    }
+  ]
+}

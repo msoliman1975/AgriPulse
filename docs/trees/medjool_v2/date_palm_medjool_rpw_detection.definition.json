@@ -1,0 +1,274 @@
+{
+  "code": "date_palm_medjool_rpw_detection",
+  "name_en": "Date palm Medjool — Red Palm Weevil detection",
+  "name_ar": "نخيل المجدول — كشف سوسة النخيل الحمراء",
+  "description_en": "Finds infested palms. The canopy stays green while larvae destroy the trunk, so satellites see the weevil late. The tree puts scout reports first, then drone signals (crown temperature and the missing seasonal NDRE rise), and uses satellite data only as weak or late hints. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly.",
+  "description_ar": "يجد النخيل المصاب. يبقى السعف أخضر بينما تدمّر اليرقات الجذع، فترى الأقمار السوسة متأخرة. تضع الشجرة تقارير المستكشف أولًا ثم إشارات المسيّرة (حرارة التاج وغياب ارتفاع NDRE الموسمي)، وتستخدم بيانات الأقمار كإشارات ضعيفة أو متأخرة فقط. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا.",
+  "scope": "block",
+  "crop_path": "date_palm.medjool",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_symptom",
+  "registers": [
+    "rpw_signs_reported",
+    "rpw_drone_thermal",
+    "rpw_drone_ndre",
+    "rpw_block_ndre_flat",
+    "crown_collapse_cell"
+  ],
+  "parameters": {
+    "collapse_z": {
+      "type": "number",
+      "default": 3.0,
+      "min": 0.0,
+      "max": 6.0
+    }
+  },
+  "nodes": {
+    "n_symptom": {
+      "label_en": "Has a scout reported RPW signs (egg notches, holes, oozing brown fluid, chewed fibre, cocoons, off-centre crown)?",
+      "label_ar": "هل أبلغ المستكشف عن علامات السوسة (ثقوب وضع البيض، ثقوب، سائل بني، ألياف ممضوغة، شرانق، قمة مائلة)؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_rpw_symptom_seen",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_symptom",
+      "on_miss": "n_drone_hot"
+    },
+    "r_symptom": {
+      "label_en": "RPW signs reported on a palm",
+      "label_ar": "علامات السوسة مسجّلة على نخلة",
+      "register": {
+        "code": "rpw_signs_reported",
+        "severity": "critical"
+      },
+      "next": "n_drone_hot"
+    },
+    "n_drone_hot": {
+      "label_en": "Did the drone thermal flight flag palms with abnormal maximum crown temperature or spread?",
+      "label_ar": "هل حددت رحلة المسيّرة الحرارية نخيلًا بأقصى حرارة تاج أو تباين غير طبيعي؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_drone_crown_temp_anomaly",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_drone_hot",
+      "on_miss": "n_drone_ndre"
+    },
+    "r_drone_hot": {
+      "label_en": "Drone thermal: crown temperature anomaly",
+      "label_ar": "حراري المسيّرة: شذوذ حرارة التاج",
+      "register": {
+        "code": "rpw_drone_thermal",
+        "severity": "warning"
+      },
+      "next": "n_drone_ndre"
+    },
+    "n_drone_ndre": {
+      "label_en": "Did drone NDRE time series flag palms that missed the June–December greenness rise?",
+      "label_ar": "هل حددت سلاسل NDRE من المسيّرة نخيلًا افتقدت ارتفاع الخضرة يونيو–ديسمبر؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_drone_ndre_no_seasonal_rise",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_drone_ndre",
+      "on_miss": "n_season"
+    },
+    "r_drone_ndre": {
+      "label_en": "Drone NDRE: palm missed the seasonal greenness rise",
+      "label_ar": "NDRE المسيّرة: نخلة افتقدت ارتفاع الخضرة الموسمي",
+      "register": {
+        "code": "rpw_drone_ndre",
+        "severity": "warning"
+      },
+      "next": "n_season"
+    },
+    "n_season": {
+      "label_en": "Is it June–December (Kimri to Tamar), when healthy palms' red-edge greenness rises?",
+      "label_ar": "هل هي فترة يونيو–ديسمبر (الكمري إلى التمر) حين ترتفع خضرة الحافة الحمراء في السليم؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "kimri",
+            "khalal",
+            "rutab",
+            "tamar"
+          ]
+        }
+      },
+      "on_match": "n_ndre_trend",
+      "on_miss": "n_collapse"
+    },
+    "n_ndre_trend": {
+      "label_en": "Is the block's NDRE falling instead of rising?",
+      "label_ar": "هل NDRE للقطعة ثابت أو هابط بدل أن يرتفع؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "indices",
+            "index_code": "ndre",
+            "key": "trend_direction"
+          },
+          "right": "falling"
+        }
+      },
+      "on_match": "r_ndre",
+      "on_miss": "n_collapse"
+    },
+    "r_ndre": {
+      "label_en": "Block NDRE did not rise in season",
+      "label_ar": "NDRE القطعة لم يرتفع في موسمه",
+      "register": {
+        "code": "rpw_block_ndre_flat",
+        "severity": "info"
+      },
+      "next": "n_collapse"
+    },
+    "n_collapse": {
+      "label_en": "Is there a cell where NDVI collapsed far below the block (advanced damage)?",
+      "label_ar": "هل توجد خلية انهار فيها NDVI بعيدًا عن القطعة (ضرر متقدم)؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "grid",
+            "index_code": "ndvi",
+            "field": "worst_z"
+          },
+          "right": {
+            "source": "params",
+            "name": "collapse_z"
+          }
+        }
+      },
+      "on_match": "r_collapse",
+      "on_miss": "n_stop"
+    },
+    "r_collapse": {
+      "label_en": "NDVI collapse in one cell",
+      "label_ar": "انهيار NDVI في خلية",
+      "register": {
+        "code": "crown_collapse_cell",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "r001",
+      "codes": [
+        "rpw_signs_reported"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "RPW signs were reported. Confirm on the trunk within 1 m of the ground; remove, burn and bury a palm whose crown is destroyed, and inspect every palm in the block. External spraying does not cure an infestation inside the palm.",
+      "text_ar": "سُجّلت علامات السوسة. أكّد على الجذع ضمن متر من الأرض؛ أزل النخلة المدمّرة القمة واحرقها وادفنها، وافحص كل نخلة في القطعة. الرش الخارجي لا يعالج الإصابة داخل النخلة."
+    },
+    {
+      "code": "r002",
+      "codes": [
+        "rpw_drone_ndre",
+        "rpw_drone_thermal"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "The drone flagged the same palms by crown temperature and by a missing seasonal NDRE rise — the two strongest remote signals in the drone study. Inspect those trunks first.",
+      "text_ar": "حددت المسيّرة النخيل نفسها بحرارة التاج وبغياب ارتفاع NDRE الموسمي — أقوى إشارتين عن بعد في دراسة المسيّرة. افحص جذوعها أولًا."
+    },
+    {
+      "code": "r003",
+      "codes": [
+        "rpw_drone_thermal"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "The drone thermal flight flagged palms with abnormal crown temperature. In the drone study this appeared from June at a severe stage, before visible crown symptoms. Inspect the flagged palms.",
+      "text_ar": "حددت رحلة المسيّرة الحرارية نخيلًا بحرارة تاج غير طبيعية. في دراسة المسيّرة ظهر ذلك من يونيو في مرحلة شديدة قبل أعراض التاج. افحص النخيل المحددة."
+    },
+    {
+      "code": "r004",
+      "codes": [
+        "rpw_drone_ndre"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Drone NDRE flagged palms that did not green up with the season. A single image would have shown them as healthy; inspect them.",
+      "text_ar": "حدد NDRE المسيّرة نخيلًا لم تخضرّ مع الموسم. الصورة الواحدة كانت ستُظهرها سليمة؛ افحصها."
+    },
+    {
+      "code": "r005",
+      "codes": [
+        "crown_collapse_cell",
+        "rpw_signs_reported"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "RPW signs are reported and a crown has collapsed in the imagery. Remove and destroy the collapsed palm and inspect its neighbours.",
+      "text_ar": "علامات السوسة مسجّلة وتاج انهار في الصور. أزل النخلة المنهارة وأتلفها وافحص جيرانها."
+    },
+    {
+      "code": "r006",
+      "codes": [
+        "crown_collapse_cell"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "A crown has collapsed in the imagery. At 10 m this is late-stage damage; check the palm for Red Palm Weevil, bud rot and wilt.",
+      "text_ar": "انهار تاج في الصور. بدقة 10 م هذا ضرر متأخر؛ افحص النخلة للسوسة وتعفن البرعم والذبول."
+    },
+    {
+      "code": "r007",
+      "codes": [
+        "rpw_block_ndre_flat"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "The block's red-edge greenness did not rise in season. This is a weak, block-level hint only; order a drone flight or inspect the palms.",
+      "text_ar": "خضرة الحافة الحمراء للقطعة لم ترتفع في موسمها. هذه إشارة ضعيفة على مستوى القطعة فقط؛ اطلب رحلة مسيّرة أو افحص النخيل."
+    },
+    {
+      "code": "r008",
+      "codes": [
+        "crown_collapse_cell",
+        "rpw_block_ndre_flat"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "Block greenness did not rise and one cell's crown collapsed. Inspect the collapsed palm and its neighbours for RPW.",
+      "text_ar": "خضرة القطعة لم ترتفع وانهار تاج في خلية. افحص النخلة المنهارة وجيرانها للسوسة."
+    }
+  ]
+}

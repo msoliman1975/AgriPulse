@@ -1,0 +1,279 @@
+{
+  "code": "date_palm_medjool_crown_diseases",
+  "name_en": "Date palm Medjool — crown, frond and vascular diseases",
+  "name_ar": "نخيل المجدول — أمراض التاج والسعف والأوعية",
+  "description_en": "Differential for diseases a scout can see on fronds and the crown: black scorch and leaf base rot (both recorded in New Valley), Fusarium wilt and the quarantine Bayoud pattern, Al-Wijam (not in Egypt) and brittle leaf disease. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly.",
+  "description_ar": "تشخيص تفريقي للأمراض التي يراها المستكشف على السعف والتاج: اللفحة السوداء وتعفن قواعد الأوراق (مسجّلان في الوادي الجديد)، وذبول الفيوزاريوم ونمط البيوض الحجري، والوجام (غير موجود في مصر)، ومرض الأوراق الهشة. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا.",
+  "scope": "block",
+  "crop_path": "date_palm.medjool",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_charcoal",
+  "registers": [
+    "black_scorch_suspect",
+    "wilt_suspect",
+    "leaf_base_rot",
+    "wijam_suspect",
+    "brittle_leaf_suspect",
+    "crown_collapse_cell"
+  ],
+  "parameters": {
+    "collapse_z": {
+      "type": "number",
+      "default": 3.0,
+      "min": 0.0,
+      "max": 6.0
+    }
+  },
+  "nodes": {
+    "n_charcoal": {
+      "label_en": "Are dark, hard, charcoal-like lesions seen on fronds, spathes or the heart?",
+      "label_ar": "هل تُرى بقع داكنة صلبة فحمية على السعف أو الطلع أو القلب؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_charcoal_lesions_seen",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_scorch",
+      "on_miss": "n_white"
+    },
+    "r_scorch": {
+      "label_en": "Charcoal lesions — black scorch",
+      "label_ar": "بقع فحمية — اللفحة السوداء",
+      "register": {
+        "code": "black_scorch_suspect",
+        "severity": "warning"
+      },
+      "next": "n_white"
+    },
+    "n_white": {
+      "label_en": "Is one side of the rachis whitening from base to tip?",
+      "label_ar": "هل تبيضّ جهة من العرق الوسطي من القاعدة إلى القمة؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_rachis_one_side_whitening",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_wilt",
+      "on_miss": "n_lbr"
+    },
+    "r_wilt": {
+      "label_en": "One-sided whitening — Fusarium wilt / Bayoud pattern",
+      "label_ar": "ابيضاض جهة واحدة — نمط الفيوزاريوم / البيوض",
+      "register": {
+        "code": "wilt_suspect",
+        "severity": "critical"
+      },
+      "next": "n_lbr"
+    },
+    "n_lbr": {
+      "label_en": "Are the bases of the lower fronds rotting?",
+      "label_ar": "هل تتعفن قواعد السعف السفلي؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_leaf_base_rot_seen",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_lbr",
+      "on_miss": "n_streak"
+    },
+    "r_lbr": {
+      "label_en": "Leaf base rot",
+      "label_ar": "تعفن قواعد الأوراق",
+      "register": {
+        "code": "leaf_base_rot",
+        "severity": "warning"
+      },
+      "next": "n_streak"
+    },
+    "n_streak": {
+      "label_en": "Are leaves stunted with yellow streaks and fruit stalks smaller (Al-Wijam pattern)?",
+      "label_ar": "هل الأوراق متقزمة بتخطيط أصفر والعراجين أصغر (نمط الوجام)؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_yellow_streaking_stunting",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_wijam",
+      "on_miss": "n_brittle"
+    },
+    "r_wijam": {
+      "label_en": "Al-Wijam pattern — not reported from Egypt",
+      "label_ar": "نمط الوجام — غير مسجّل في مصر",
+      "register": {
+        "code": "wijam_suspect",
+        "severity": "critical"
+      },
+      "next": "n_brittle"
+    },
+    "n_brittle": {
+      "label_en": "Are leaflets dull olive, brittle and breaking easily?",
+      "label_ar": "هل الوريقات زيتونية باهتة هشة سهلة الكسر؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_brittle_leaflets_seen",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_brittle",
+      "on_miss": "n_grid"
+    },
+    "r_brittle": {
+      "label_en": "Brittle leaflets — check manganese",
+      "label_ar": "وريقات هشة — افحص المنجنيز",
+      "register": {
+        "code": "brittle_leaf_suspect",
+        "severity": "info"
+      },
+      "next": "n_grid"
+    },
+    "n_grid": {
+      "label_en": "Is there a cell where NDVI collapsed far below the block?",
+      "label_ar": "هل توجد خلية انهار فيها NDVI بعيدًا عن القطعة؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "grid",
+            "index_code": "ndvi",
+            "field": "worst_z"
+          },
+          "right": {
+            "source": "params",
+            "name": "collapse_z"
+          }
+        }
+      },
+      "on_match": "r_collapse",
+      "on_miss": "n_stop"
+    },
+    "r_collapse": {
+      "label_en": "NDVI collapse in one cell",
+      "label_ar": "انهيار NDVI في خلية",
+      "register": {
+        "code": "crown_collapse_cell",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "r001",
+      "codes": [
+        "wilt_suspect"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "One-sided rachis whitening is the pattern of Fusarium wilt and Bayoud. Bayoud is a quarantine disease absent from Egypt and Medjool is susceptible: isolate the palm, move nothing from it, and send rachis and root samples to a plant-protection laboratory.",
+      "text_ar": "ابيضاض جهة واحدة من العرق هو نمط ذبول الفيوزاريوم والبيوض. البيوض مرض حجر غير موجود في مصر والمجدول قابل: اعزل النخلة ولا تنقل منها شيئًا وأرسل عينات العرق والجذور لمعمل وقاية النبات."
+    },
+    {
+      "code": "r002",
+      "codes": [
+        "crown_collapse_cell",
+        "wilt_suspect"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "A wilt pattern is reported and the imagery shows a collapsing crown. Treat as a possible quarantine case: report to the plant-protection authority and sample before removing the palm.",
+      "text_ar": "نمط ذبول مسجّل والصور تُظهر تاجًا ينهار. تعامل معها كحالة حجر محتملة: أبلغ جهة وقاية النبات وخذ عينات قبل إزالة النخلة."
+    },
+    {
+      "code": "r003",
+      "codes": [
+        "black_scorch_suspect"
+      ],
+      "status": "issue",
+      "action_type": "treat",
+      "text_en": "Black scorch lesions are reported. Remove and burn affected fronds and spathes and disinfect tools between palms.",
+      "text_ar": "سُجّلت بقع اللفحة السوداء. أزل السعف والطلع المصاب واحرقه وطهّر الأدوات بين النخيل."
+    },
+    {
+      "code": "r004",
+      "codes": [
+        "black_scorch_suspect",
+        "crown_collapse_cell"
+      ],
+      "status": "alert",
+      "action_type": "treat",
+      "text_en": "Charcoal lesions and a collapsing crown: black scorch has reached the bud. Cut out and burn affected tissue and treat the heart with an option permitted under your certificate.",
+      "text_ar": "بقع فحمية وتاج ينهار: وصلت اللفحة السوداء إلى البرعم. اقطع الأنسجة المصابة واحرقها وعالج القلب بخيار مسموح."
+    },
+    {
+      "code": "r005",
+      "codes": [
+        "leaf_base_rot"
+      ],
+      "status": "issue",
+      "action_type": "prune",
+      "text_en": "Leaf base rot is reported (recorded in New Valley palms and nurseries). Remove and burn rotted frond bases and do not move affected offshoots.",
+      "text_ar": "سُجّل تعفن قواعد الأوراق (مسجّل في نخيل ومشاتل الوادي الجديد). أزل قواعد السعف المتعفنة واحرقها ولا تنقل الفسائل المصابة."
+    },
+    {
+      "code": "r006",
+      "codes": [
+        "wijam_suspect"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "Stunting with yellow streaks matches Al-Wijam, a phytoplasma disease reported from Saudi Arabia but not from Egypt. Report it to the plant-protection authority and sample the palm.",
+      "text_ar": "التقزم مع التخطيط الأصفر يطابق الوجام، مرض فيتوبلازما مسجّل في السعودية لا في مصر. أبلغ جهة وقاية النبات وخذ عينة."
+    },
+    {
+      "code": "r007",
+      "codes": [
+        "brittle_leaf_suspect"
+      ],
+      "status": "issue",
+      "action_type": "fertilize",
+      "text_en": "Brittle, dull leaflets match brittle leaf disease, which is linked to low manganese (6.5 against 29 ppm). Test leaf manganese.",
+      "text_ar": "الوريقات الهشة الباهتة تطابق مرض الأوراق الهشة المرتبط بنقص المنجنيز (6.5 مقابل 29 جزء في المليون). حلّل منجنيز الأوراق."
+    },
+    {
+      "code": "r008",
+      "codes": [
+        "crown_collapse_cell"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "A crown is collapsing in the imagery with no scout report yet. Inspect it for Red Palm Weevil, bud rot and wilt.",
+      "text_ar": "تاج ينهار في الصور ولا تقرير استكشاف بعد. افحصه للسوسة وتعفن البرعم والذبول."
+    }
+  ]
+}

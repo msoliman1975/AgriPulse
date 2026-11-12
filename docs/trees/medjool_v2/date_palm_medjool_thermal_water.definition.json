@@ -1,0 +1,277 @@
+{
+  "code": "date_palm_medjool_thermal_water",
+  "name_en": "Date palm Medjool — thermal water status",
+  "name_ar": "نخيل المجدول — الحالة المائية الحرارية",
+  "description_en": "A water-status tree for thermal data from a drone thermal camera. A well-watered palm is cooler than a thirsty one. Neither 10 m nor 3 m satellite imagery has a thermal band, so this tree waits for drone flights. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly.",
+  "description_ar": "شجرة حالة مائية لبيانات الكاميرا الحرارية على المسيّرة. النخلة المروية جيدًا أبرد من العطشى. لا تحمل صور الأقمار بدقة 10 م ولا 3 م نطاقًا حراريًا، فتنتظر هذه الشجرة رحلات المسيّرة. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا.",
+  "scope": "block",
+  "crop_path": "date_palm.medjool",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_cwsi",
+  "registers": [
+    "canopy_warm",
+    "soil_dry_thermal",
+    "heat_ahead",
+    "irrigation_not_logged"
+  ],
+  "parameters": {
+    "cwsi_ceiling": {
+      "type": "number",
+      "default": 0.3,
+      "min": 0.0,
+      "max": 1.0
+    },
+    "smi_floor": {
+      "type": "number",
+      "default": 0.6,
+      "min": 0.0,
+      "max": 1.0
+    },
+    "heat_c": {
+      "type": "number",
+      "default": 45.0,
+      "min": 30.0,
+      "max": 55.0
+    }
+  },
+  "nodes": {
+    "n_cwsi": {
+      "label_en": "Is the crop water stress index (CWSI, thermal) above 0.30?",
+      "label_ar": "هل مؤشر الإجهاد المائي الحراري (CWSI) فوق 0.30؟",
+      "condition": {
+        "tree": {
+          "op": "gt",
+          "left": {
+            "source": "indices",
+            "index_code": "cwsi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "params",
+            "name": "cwsi_ceiling"
+          }
+        }
+      },
+      "on_match": "r_cwsi",
+      "on_miss": "n_smi"
+    },
+    "r_cwsi": {
+      "label_en": "Canopy warmer than a well-watered palm (CWSI high)",
+      "label_ar": "السعف أدفأ من نخلة مروية جيدًا (CWSI مرتفع)",
+      "register": {
+        "code": "canopy_warm",
+        "severity": "warning"
+      },
+      "next": "n_smi"
+    },
+    "n_smi": {
+      "label_en": "Is the soil moisture index (SMI) below 0.60?",
+      "label_ar": "هل مؤشر رطوبة التربة (SMI) دون 0.60؟",
+      "condition": {
+        "tree": {
+          "op": "lt",
+          "left": {
+            "source": "indices",
+            "index_code": "smi",
+            "key": "mean"
+          },
+          "right": {
+            "source": "params",
+            "name": "smi_floor"
+          }
+        }
+      },
+      "on_match": "r_smi",
+      "on_miss": "n_lst_trend"
+    },
+    "r_smi": {
+      "label_en": "Soil drier than the wet edge (SMI low)",
+      "label_ar": "التربة أجف من الحافة الرطبة (SMI منخفض)",
+      "register": {
+        "code": "soil_dry_thermal",
+        "severity": "warning"
+      },
+      "next": "n_lst_trend"
+    },
+    "n_lst_trend": {
+      "label_en": "Is land-surface temperature trending up?",
+      "label_ar": "هل حرارة سطح الأرض في اتجاه صاعد؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "indices",
+            "index_code": "lst",
+            "key": "trend_direction"
+          },
+          "right": "rising"
+        }
+      },
+      "on_match": "n_heat",
+      "on_miss": "n_et"
+    },
+    "n_heat": {
+      "label_en": "Is a hot spell (maximum ≥ 45 °C) forecast for the next 72 hours?",
+      "label_ar": "هل يُتوقّع موجة حارة (عظمى ≥ 45 °م) خلال 72 ساعة؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "weather",
+            "scope": "forecast_72h",
+            "field": "air_temp_c_max"
+          },
+          "right": {
+            "source": "params",
+            "name": "heat_c"
+          }
+        }
+      },
+      "on_match": "r_heat",
+      "on_miss": "n_et"
+    },
+    "r_heat": {
+      "label_en": "Surface warming with a hot spell ahead",
+      "label_ar": "ارتفاع حرارة السطح وموجة حارة قادمة",
+      "register": {
+        "code": "heat_ahead",
+        "severity": "info"
+      },
+      "next": "n_et"
+    },
+    "n_et": {
+      "label_en": "Is irrigation missing from the water-balance log?",
+      "label_ar": "هل الري غير مسجّل في الميزان المائي؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "water_balance",
+            "field": "irrigation_logged"
+          },
+          "right": false
+        }
+      },
+      "on_match": "r_unlogged",
+      "on_miss": "n_stop"
+    },
+    "r_unlogged": {
+      "label_en": "Irrigation not logged — water balance cannot be trusted",
+      "label_ar": "الري غير مسجّل — لا يُوثق بالميزان المائي",
+      "register": {
+        "code": "irrigation_not_logged",
+        "severity": "info"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "r001",
+      "codes": [
+        "canopy_warm",
+        "soil_dry_thermal"
+      ],
+      "status": "alert",
+      "action_type": "irrigate",
+      "text_en": "The canopy is warmer than a watered palm and the soil is dry. Irrigate and check that every emitter delivers.",
+      "text_ar": "السعف أدفأ من نخلة مروية والتربة جافة. اروِ وتأكّد من عمل كل نقّاط."
+    },
+    {
+      "code": "r002",
+      "codes": [
+        "canopy_warm",
+        "heat_ahead",
+        "soil_dry_thermal"
+      ],
+      "status": "alert",
+      "action_type": "irrigate",
+      "text_en": "Warm canopy, dry soil and a hot spell coming. Irrigate before the heat, in the early morning.",
+      "text_ar": "سعف دافئ وتربة جافة وموجة حارة قادمة. اروِ قبل الحر في الصباح الباكر."
+    },
+    {
+      "code": "r003",
+      "codes": [
+        "canopy_warm"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "The canopy is warm but soil moisture is not low. A warm crown with normal water can come from internal fermentation (Red Palm Weevil) at an advanced stage; inspect the warmest palms.",
+      "text_ar": "السعف دافئ لكن رطوبة التربة ليست منخفضة. التاج الدافئ مع ماء طبيعي قد ينتج عن تخمّر داخلي (السوسة) في مرحلة متقدمة؛ افحص أدفأ النخيل."
+    },
+    {
+      "code": "r004",
+      "codes": [
+        "irrigation_not_logged",
+        "soil_dry_thermal"
+      ],
+      "status": "issue",
+      "action_type": "other",
+      "text_en": "The soil reads dry and irrigation has not been logged. Log the irrigation so the water balance can confirm or rule out a deficit.",
+      "text_ar": "التربة تبدو جافة والري غير مسجّل. سجّل الري ليؤكد الميزان المائي العجز أو ينفيه."
+    },
+    {
+      "code": "r005",
+      "codes": [
+        "soil_dry_thermal"
+      ],
+      "status": "issue",
+      "action_type": "irrigate",
+      "text_en": "The soil is drier than the wet edge while the canopy is not yet warm. Check that the next irrigation reaches this block in full.",
+      "text_ar": "التربة أجف من الحافة الرطبة والسعف لم يدفأ بعد. تأكد أن الرية القادمة تصل إلى القطعة كاملة."
+    },
+    {
+      "code": "r006",
+      "codes": [
+        "canopy_warm",
+        "irrigation_not_logged",
+        "soil_dry_thermal"
+      ],
+      "status": "alert",
+      "action_type": "irrigate",
+      "text_en": "The canopy is warmer than a watered palm and the soil is dry. Irrigate and check that every emitter delivers — and log the irrigation, so the water balance can show whether the block is being under-watered.",
+      "text_ar": "السعف أدفأ من نخلة مروية والتربة جافة. اروِ وتأكد من عمل كل نقاط — وسجّل الري ليُظهر الميزان المائي هل القطعة تُروى بأقل من حاجتها."
+    },
+    {
+      "code": "r007",
+      "codes": [
+        "canopy_warm",
+        "heat_ahead",
+        "irrigation_not_logged",
+        "soil_dry_thermal"
+      ],
+      "status": "alert",
+      "action_type": "irrigate",
+      "text_en": "Warm canopy, dry soil and a hot spell coming. Irrigate before the heat, in the early morning, and log the irrigation.",
+      "text_ar": "سعف دافئ وتربة جافة وموجة حارة قادمة. اروِ قبل الحر في الصباح الباكر، وسجّل الري."
+    },
+    {
+      "code": "r008",
+      "codes": [
+        "canopy_warm",
+        "irrigation_not_logged"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "The canopy is warm but soil moisture is not low, and irrigation is not logged. Inspect the warmest palms (a warm crown with normal water can come from Red Palm Weevil at an advanced stage) and log the irrigation.",
+      "text_ar": "السعف دافئ لكن رطوبة التربة ليست منخفضة، والري غير مسجّل. افحص أدفأ النخيل (التاج الدافئ مع ماء طبيعي قد يأتي من سوسة النخيل في مرحلة متقدمة) وسجّل الري."
+    },
+    {
+      "code": "r009",
+      "codes": [
+        "irrigation_not_logged"
+      ],
+      "status": "good",
+      "action_type": "other",
+      "text_en": "Irrigation is not logged for this block, so its water balance cannot show a real deficit. Log each irrigation in AgriPulse.",
+      "text_ar": "الري غير مسجّل لهذه القطعة، فلا يستطيع ميزانها المائي إظهار عجز حقيقي. سجّل كل رية في أجري بلس."
+    }
+  ]
+}

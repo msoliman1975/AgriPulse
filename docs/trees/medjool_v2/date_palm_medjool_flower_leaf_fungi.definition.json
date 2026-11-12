@@ -1,0 +1,324 @@
+{
+  "code": "date_palm_medjool_flower_leaf_fungi",
+  "name_en": "Date palm Medjool — inflorescence rot (Khamedj) and Graphiola",
+  "name_ar": "نخيل المجدول — تعفن النورات (الخامج) والجرافيولا",
+  "description_en": "Khamedj rots spathes and destroys the bunch; it depends mainly on February–March rain and is worst on heavy, saline, poorly drained soils. Graphiola needs 10–12 hours of leaf wetness, so it is rare in the dry Western Desert. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly. Choice made where the page named a check but not its test, approved by the owner: heavy or saline soil is clay, clay loam or silty clay, or a moderately or strongly saline block.",
+  "description_ar": "الخامج يعفّن الطلع ويتلف العذق؛ ويعتمد أساسًا على أمطار فبراير–مارس ويشتد في التربة الثقيلة الملحية سيئة الصرف. والجرافيولا تحتاج 10–12 ساعة ابتلال، فهي نادرة في الصحراء الغربية الجافة. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا. اختيار حيث ذكرت الصفحة الفحص دون طريقته، وافق عليه المالك: التربة الثقيلة أو المالحة هي طينية أو طينية لومية أو طينية سلتية، أو قطعة متوسطة أو شديدة الملوحة.",
+  "scope": "block",
+  "crop_path": "date_palm.medjool",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_poll",
+  "registers": [
+    "khamedj_wet_season",
+    "khamedj_rain_ahead",
+    "khamedj_soil_risk",
+    "khamedj_seen",
+    "graphiola_seen",
+    "graphiola_spread_risk"
+  ],
+  "parameters": {
+    "khamedj_rain_30d": {
+      "type": "number",
+      "default": 10.0,
+      "min": 0.0,
+      "max": 200.0
+    },
+    "khamedj_rain_fc": {
+      "type": "number",
+      "default": 2.0,
+      "min": 0.0,
+      "max": 100.0
+    },
+    "graph_rain_prob": {
+      "type": "number",
+      "default": 60.0,
+      "min": 0.0,
+      "max": 100.0
+    }
+  },
+  "nodes": {
+    "n_poll": {
+      "label_en": "Is the block at spathe emergence / pollination?",
+      "label_ar": "هل القطعة عند خروج الطلع / التلقيح؟",
+      "condition": {
+        "tree": {
+          "op": "in",
+          "left": {
+            "source": "block",
+            "field": "growth_stage"
+          },
+          "values": [
+            "pollination"
+          ]
+        }
+      },
+      "on_match": "n_rain",
+      "on_miss": "n_graph"
+    },
+    "n_rain": {
+      "label_en": "Has it rained 10 mm or more in the last 30 days (February–March rain drives Khamedj)?",
+      "label_ar": "هل هطل 10 مم أو أكثر خلال 30 يومًا (أمطار فبراير–مارس تحرّك الخامج)؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "weather",
+            "scope": "derived_today",
+            "field": "precip_mm_30d"
+          },
+          "right": {
+            "source": "params",
+            "name": "khamedj_rain_30d"
+          }
+        }
+      },
+      "on_match": "r_rain",
+      "on_miss": "n_rain_fc"
+    },
+    "r_rain": {
+      "label_en": "Wet late winter / spring at spathe emergence",
+      "label_ar": "أواخر شتاء / ربيع ممطر عند خروج الطلع",
+      "register": {
+        "code": "khamedj_wet_season",
+        "severity": "warning"
+      },
+      "next": "n_soil"
+    },
+    "n_rain_fc": {
+      "label_en": "Is rain forecast in the next 72 hours?",
+      "label_ar": "هل يُتوقّع مطر خلال 72 ساعة؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "weather",
+            "scope": "forecast_72h",
+            "field": "precipitation_mm_total"
+          },
+          "right": {
+            "source": "params",
+            "name": "khamedj_rain_fc"
+          }
+        }
+      },
+      "on_match": "r_rain_fc",
+      "on_miss": "n_rot"
+    },
+    "r_rain_fc": {
+      "label_en": "Rain forecast at spathe emergence",
+      "label_ar": "مطر متوقع عند خروج الطلع",
+      "register": {
+        "code": "khamedj_rain_ahead",
+        "severity": "info"
+      },
+      "next": "n_soil"
+    },
+    "n_soil": {
+      "label_en": "Is the soil heavy or saline (where Khamedj is most severe)?",
+      "label_ar": "هل التربة ثقيلة أو ملحية (حيث يشتد الخامج)؟",
+      "condition": {
+        "tree": {
+          "any_of": [
+            {
+              "op": "in",
+              "left": {
+                "source": "block",
+                "field": "soil_texture"
+              },
+              "values": [
+                "clay",
+                "clay_loam",
+                "silty_clay"
+              ]
+            },
+            {
+              "op": "in",
+              "left": {
+                "source": "block",
+                "field": "salinity_class"
+              },
+              "values": [
+                "moderately_saline",
+                "strongly_saline"
+              ]
+            }
+          ]
+        }
+      },
+      "on_match": "r_soil",
+      "on_miss": "n_rot"
+    },
+    "r_soil": {
+      "label_en": "Heavy or saline soil — higher Khamedj risk",
+      "label_ar": "تربة ثقيلة أو ملحية — خطر خامج أعلى",
+      "register": {
+        "code": "khamedj_soil_risk",
+        "severity": "info"
+      },
+      "next": "n_rot"
+    },
+    "n_rot": {
+      "label_en": "Has a scout seen rotted spathes?",
+      "label_ar": "هل رأى المستكشف طلعًا متعفنًا؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_spathe_rot_seen",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_rot",
+      "on_miss": "n_graph"
+    },
+    "r_rot": {
+      "label_en": "Rotted spathes seen",
+      "label_ar": "طلع متعفن",
+      "register": {
+        "code": "khamedj_seen",
+        "severity": "critical"
+      },
+      "next": "n_graph"
+    },
+    "n_graph": {
+      "label_en": "Are black Graphiola sori seen on the oldest fronds?",
+      "label_ar": "هل تُرى بثرات الجرافيولا السوداء على أقدم السعف؟",
+      "condition": {
+        "tree": {
+          "op": "eq",
+          "left": {
+            "source": "signals",
+            "code": "date_graphiola_spots_seen",
+            "key": "value_boolean"
+          },
+          "right": true
+        }
+      },
+      "on_match": "r_graph",
+      "on_miss": "n_stop"
+    },
+    "r_graph": {
+      "label_en": "Graphiola on old fronds",
+      "label_ar": "جرافيولا على السعف المسن",
+      "register": {
+        "code": "graphiola_seen",
+        "severity": "info"
+      },
+      "next": "n_graph_wet"
+    },
+    "n_graph_wet": {
+      "label_en": "Is a wet spell likely (long leaf wetness lets Graphiola spread)?",
+      "label_ar": "هل فترة مبللة محتملة (الابتلال الطويل ينشر الجرافيولا)؟",
+      "condition": {
+        "tree": {
+          "op": "ge",
+          "left": {
+            "source": "weather",
+            "scope": "forecast_72h",
+            "field": "precipitation_probability_pct_max"
+          },
+          "right": {
+            "source": "params",
+            "name": "graph_rain_prob"
+          }
+        }
+      },
+      "on_match": "r_graph_wet",
+      "on_miss": "n_stop"
+    },
+    "r_graph_wet": {
+      "label_en": "Wet spell ahead with Graphiola present",
+      "label_ar": "فترة مبللة قادمة والجرافيولا موجودة",
+      "register": {
+        "code": "graphiola_spread_risk",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "r001",
+      "codes": [
+        "khamedj_soil_risk",
+        "khamedj_wet_season"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "A wet late winter on heavy or saline soil is the main Khamedj setting. Inspect emerging spathes more often and remove and burn any rotted ones.",
+      "text_ar": "أواخر شتاء ممطر على تربة ثقيلة أو ملحية هو الوسط الرئيسي للخامج. كثّف فحص الطلع الخارج وأزل المتعفن واحرقه."
+    },
+    {
+      "code": "r002",
+      "codes": [
+        "khamedj_wet_season"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Late winter has been wet at spathe emergence. Inspect spathes as they emerge for inflorescence rot.",
+      "text_ar": "أواخر الشتاء ممطرة عند خروج الطلع. افحص الطلع عند خروجه لتعفن النورات."
+    },
+    {
+      "code": "r003",
+      "codes": [
+        "khamedj_seen"
+      ],
+      "status": "alert",
+      "action_type": "treat",
+      "text_en": "Rotted spathes are present. Remove and burn them, do not use pollen from affected palms, and treat with an option permitted under your organic certificate.",
+      "text_ar": "طلع متعفن موجود. أزله واحرقه ولا تستخدم لقاح النخيل المصاب، وعالج بخيار مسموح عضويًا."
+    },
+    {
+      "code": "r004",
+      "codes": [
+        "khamedj_rain_ahead",
+        "khamedj_seen"
+      ],
+      "status": "alert",
+      "action_type": "treat",
+      "text_en": "Rotted spathes are present and rain is coming. Remove infected spathes before the rain and protect emerging ones.",
+      "text_ar": "طلع متعفن موجود ومطر قادم. أزل المصاب قبل المطر واحمِ الطلع الخارج."
+    },
+    {
+      "code": "r005",
+      "codes": [
+        "khamedj_rain_ahead"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Rain is forecast at spathe emergence. Check opening spathes after the rain.",
+      "text_ar": "يُتوقّع مطر عند خروج الطلع. افحص الطلع المتفتح بعد المطر."
+    },
+    {
+      "code": "r006",
+      "codes": [
+        "graphiola_seen"
+      ],
+      "status": "issue",
+      "action_type": "prune",
+      "text_en": "Graphiola is on the oldest fronds. Prune heavily infected old fronds, but not on palms that also show potassium deficiency.",
+      "text_ar": "الجرافيولا على أقدم السعف. قلّم السعف المسن شديد الإصابة، لكن ليس على النخيل الذي يُظهر نقص البوتاسيوم أيضًا."
+    },
+    {
+      "code": "r007",
+      "codes": [
+        "graphiola_seen",
+        "graphiola_spread_risk"
+      ],
+      "status": "issue",
+      "action_type": "prune",
+      "text_en": "Graphiola is on the oldest fronds and a wet spell is likely, which lets it spread. Prune heavily infected old fronds before the rain, but not on palms that also show potassium deficiency.",
+      "text_ar": "الجرافيولا على أقدم السعف وفترة مبللة محتملة تساعد على انتشارها. قلّم السعف المسن شديد الإصابة قبل المطر، لكن ليس على النخيل الذي يُظهر نقص البوتاسيوم أيضًا."
+    }
+  ]
+}

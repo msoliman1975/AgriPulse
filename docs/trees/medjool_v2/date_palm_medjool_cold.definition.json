@@ -1,0 +1,189 @@
+{
+  "code": "date_palm_medjool_cold",
+  "name_en": "Date palm Medjool — cold injury",
+  "name_ar": "نخيل المجدول — ضرر البرد",
+  "description_en": "New tree, authored from manual section 10.4 #6 (FAO, High): Medjool is cold-susceptible; leaflet tips yellow and dry at −6 °C, the outer crown dries at −12 °C, and a freshly irrigated plantation stores heat, so irrigate when temperatures approach −5 °C. Weather only; no imagery needed. New tree, not in the trees document: authored from the Organic Medjool Manual, Edition 1.7, section 10.4 #6 (FAO, high confidence).",
+  "description_ar": "شجرة جديدة مؤلفة من الدليل 10.4 #6 (الفاو، عالية): المجدول حساس للبرد؛ تصفرّ أطراف الوريقات وتجف عند −6 °م ويجف السعف الخارجي عند −12 °م، والمزرعة المروية حديثًا تختزن حرارة، لذا يُروى عند اقتراب الحرارة من −5 °م. طقس فقط دون صور. شجرة جديدة غير موجودة في وثيقة الأشجار: أُعدّت من دليل المجدول العضوي، الإصدار 1.7، القسم 10.4 رقم 6 (الفاو، ثقة عالية).",
+  "scope": "block",
+  "crop_path": "date_palm.medjool",
+  "country_codes": [
+    "EG"
+  ],
+  "root": "n_crown",
+  "registers": [
+    "cold_crown_damage",
+    "cold_leaf_damage",
+    "cold_irrigate_ahead"
+  ],
+  "parameters": {
+    "crown_damage_c": {
+      "type": "number",
+      "default": -12.0,
+      "min": -20.0,
+      "max": 0.0,
+      "description": "Minimum at which the outer crown dries (manual 10.4 #6)"
+    },
+    "leaf_damage_c": {
+      "type": "number",
+      "default": -6.0,
+      "min": -20.0,
+      "max": 0.0,
+      "description": "Minimum at which leaflet tips yellow and dry (manual 10.4 #6)"
+    },
+    "cold_irrigate_c": {
+      "type": "number",
+      "default": -5.0,
+      "min": -15.0,
+      "max": 5.0,
+      "description": "Forecast minimum at which to irrigate ahead of cold (manual 10.4 #6)"
+    }
+  },
+  "nodes": {
+    "n_crown": {
+      "label_en": "Did yesterday's minimum fall to −12 °C or below?",
+      "label_ar": "هل انخفضت الصغرى أمس إلى −12 °م أو أقل؟",
+      "condition": {
+        "tree": {
+          "op": "le",
+          "left": {
+            "source": "weather",
+            "scope": "derived_yesterday",
+            "field": "temp_min_c"
+          },
+          "right": {
+            "source": "params",
+            "name": "crown_damage_c"
+          }
+        }
+      },
+      "on_match": "r_crown",
+      "on_miss": "n_leaf"
+    },
+    "r_crown": {
+      "label_en": "Outer crown likely dried by cold",
+      "label_ar": "السعف الخارجي جف غالبًا من البرد",
+      "register": {
+        "code": "cold_crown_damage",
+        "severity": "critical"
+      },
+      "next": "n_ahead"
+    },
+    "n_leaf": {
+      "label_en": "Did yesterday's minimum fall to −6 °C or below?",
+      "label_ar": "هل انخفضت الصغرى أمس إلى −6 °م أو أقل؟",
+      "condition": {
+        "tree": {
+          "op": "le",
+          "left": {
+            "source": "weather",
+            "scope": "derived_yesterday",
+            "field": "temp_min_c"
+          },
+          "right": {
+            "source": "params",
+            "name": "leaf_damage_c"
+          }
+        }
+      },
+      "on_match": "r_leaf",
+      "on_miss": "n_ahead"
+    },
+    "r_leaf": {
+      "label_en": "Leaflet tips likely yellowed by cold",
+      "label_ar": "أطراف الوريقات اصفرّت غالبًا من البرد",
+      "register": {
+        "code": "cold_leaf_damage",
+        "severity": "warning"
+      },
+      "next": "n_ahead"
+    },
+    "n_ahead": {
+      "label_en": "Is a minimum near −5 °C forecast in the next 72 hours?",
+      "label_ar": "هل يُتوقع أن تقترب الصغرى من −5 °م خلال 72 ساعة؟",
+      "condition": {
+        "tree": {
+          "op": "le",
+          "left": {
+            "source": "weather",
+            "scope": "forecast_72h",
+            "field": "air_temp_c_min"
+          },
+          "right": {
+            "source": "params",
+            "name": "cold_irrigate_c"
+          }
+        }
+      },
+      "on_match": "r_ahead",
+      "on_miss": "n_stop"
+    },
+    "r_ahead": {
+      "label_en": "Irrigate ahead of the cold",
+      "label_ar": "اروِ قبل البرد",
+      "register": {
+        "code": "cold_irrigate_ahead",
+        "severity": "warning"
+      },
+      "next": "n_stop"
+    },
+    "n_stop": {
+      "label_en": "End of the walk",
+      "label_ar": "نهاية المسار",
+      "stop": true
+    }
+  },
+  "combinations": [
+    {
+      "code": "r001",
+      "codes": [
+        "cold_irrigate_ahead"
+      ],
+      "status": "issue",
+      "action_type": "irrigate",
+      "text_en": "A minimum near −5 °C is forecast in the next 72 hours. Medjool is cold-susceptible and a plantation that has just been irrigated stores heat: irrigate the block before the cold arrives.",
+      "text_ar": "يُتوقع أن تقترب الصغرى من −5 °م خلال 72 ساعة. المجدول حساس للبرد والمزرعة المروية حديثًا تختزن حرارة، لذا اروِ القطعة قبل وصول البرد."
+    },
+    {
+      "code": "r002",
+      "codes": [
+        "cold_leaf_damage"
+      ],
+      "status": "issue",
+      "action_type": "scout",
+      "text_en": "Yesterday's minimum fell to −6 °C or below. At −6 °C Medjool leaflet tips yellow and dry. Inspect the palms for cold damage.",
+      "text_ar": "انخفضت الصغرى أمس إلى −6 °م أو أقل. عند −6 °م تصفرّ أطراف وريقات المجدول وتجف. افحص النخيل بحثًا عن ضرر البرد."
+    },
+    {
+      "code": "r003",
+      "codes": [
+        "cold_crown_damage"
+      ],
+      "status": "alert",
+      "action_type": "scout",
+      "text_en": "Yesterday's minimum fell to −12 °C or below. At −12 °C the outer crown of Medjool dries. Inspect every palm for cold damage.",
+      "text_ar": "انخفضت الصغرى أمس إلى −12 °م أو أقل. عند −12 °م يجف السعف الخارجي للمجدول. افحص كل النخيل بحثًا عن ضرر البرد."
+    },
+    {
+      "code": "r004",
+      "codes": [
+        "cold_irrigate_ahead",
+        "cold_leaf_damage"
+      ],
+      "status": "alert",
+      "action_type": "irrigate",
+      "text_en": "Yesterday's minimum fell to −6 °C or below. At −6 °C Medjool leaflet tips yellow and dry. Inspect the palms for cold damage. More cold is coming. Medjool is cold-susceptible and a plantation that has just been irrigated stores heat: irrigate the block before the cold arrives.",
+      "text_ar": "انخفضت الصغرى أمس إلى −6 °م أو أقل. عند −6 °م تصفرّ أطراف وريقات المجدول وتجف. افحص النخيل بحثًا عن ضرر البرد. والمزيد من البرد قادم. المجدول حساس للبرد والمزرعة المروية حديثًا تختزن حرارة، لذا اروِ القطعة قبل وصول البرد."
+    },
+    {
+      "code": "r005",
+      "codes": [
+        "cold_crown_damage",
+        "cold_irrigate_ahead"
+      ],
+      "status": "alert",
+      "action_type": "irrigate",
+      "text_en": "Yesterday's minimum fell to −12 °C or below. At −12 °C the outer crown of Medjool dries. Inspect every palm for cold damage. More cold is coming. Medjool is cold-susceptible and a plantation that has just been irrigated stores heat: irrigate the block before the cold arrives.",
+      "text_ar": "انخفضت الصغرى أمس إلى −12 °م أو أقل. عند −12 °م يجف السعف الخارجي للمجدول. افحص كل النخيل بحثًا عن ضرر البرد. والمزيد من البرد قادم. المجدول حساس للبرد والمزرعة المروية حديثًا تختزن حرارة، لذا اروِ القطعة قبل وصول البرد."
+    }
+  ]
+}
