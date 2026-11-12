@@ -10,7 +10,7 @@
     "description_ar": "أقل من 60% من هذه الخلية كان صافيًا في أحدث صورة، فلم يُحكم عليها. ستُستخدم الصورة الصافية التالية."
   },
   {
-    "code": "vigour_low",
+    "code": "cell_vigour_low",
     "name_en": "Canopy vigour below the cell's seasonal normal",
     "name_ar": "حيوية السعف دون المعتاد الموسمي للخلية",
     "clause_en": "canopy vigour below the cell's seasonal normal",
@@ -50,7 +50,7 @@
     "description_ar": "NDRE دون المعتاد الموسمي بانحراف معياري واحد على الأقل — احتمال نقص نيتروجين. وخط الأساس لليوم نفسه من السنة يراعي ارتفاع NDRE من يونيو إلى ديسمبر. والمعتاد هو تاريخ الخلية نفسها (مع تغير فعلي 0.05 على الأقل، أو 0.04 لـ NDRE وGNDVI)، وإلا فتاريخ القطعة، وإلا — مبدئيًا — النطاق."
   },
   {
-    "code": "chlorophyll_low",
+    "code": "cell_chlorophyll_low",
     "name_en": "Leaf chlorophyll (gndvi) below the cell's seasonal normal",
     "name_ar": "كلوروفيل الأوراق (GNDVI) دون المعتاد الموسمي للخلية",
     "clause_en": "leaf chlorophyll (gndvi) below the cell's seasonal normal",
@@ -240,7 +240,7 @@
     "description_ar": "NDVI لخلية أدنى من القطعة بثلاثة انحرافات معيارية على الأقل: تاج منهار أو ميت (مرحلة متأخرة)."
   },
   {
-    "code": "size_missing",
+    "code": "palm_size_missing",
     "name_en": "Palm size not recorded",
     "name_ar": "حجم النخيل غير مسجّل",
     "clause_en": "palm size not recorded",
@@ -250,7 +250,7 @@
     "description_ar": "لا توجد tree_size_class على محصول القطعة."
   },
   {
-    "code": "size_mismatch",
+    "code": "palm_size_mismatch",
     "name_en": "Recorded size disagrees with NDVI",
     "name_ar": "الحجم المسجّل لا يطابق NDVI",
     "clause_en": "recorded size disagrees with NDVI",
