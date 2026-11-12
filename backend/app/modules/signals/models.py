@@ -113,6 +113,12 @@ class SignalDefinition(Base, TimestampedMixin):
     # the schema layer (CHECK only pins the allowed string values).
     aggregation: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'latest'"))
     aggregation_window_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # D21 (public 0102): crop paths this definition belongs to. Empty = all
+    # crops. Non-empty: active on every block whose current crop path equals
+    # one of these or sits below it, with no manual assignment.
+    crop_paths: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
 
 
 class SignalAssignment(Base, TimestampedMixin):
@@ -252,6 +258,11 @@ class SignalTemplate(Base, TimestampedMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     description_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
+    # D21 (public 0102): see SignalDefinition.crop_paths. A scout form scoped
+    # to a crop is offered only on blocks of that crop.
+    crop_paths: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
 
 
 class SignalTemplateDefinition(Base):

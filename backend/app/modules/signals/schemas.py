@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -15,6 +15,9 @@ ValueKind = Literal["numeric", "categorical", "event", "boolean", "geopoint"]
 # in the request validators, not in DB (legacy rows + clean-data
 # trade-off).
 Aggregation = Literal["latest", "mean", "median", "max", "min", "count", "sum"]
+
+# D21: a crop path as the catalog writes it ("date_palm", "date_palm.medjool").
+CropPath = Field(pattern=r"^[a-z][a-z0-9_]*(\.[a-z0-9][a-z0-9_]*){0,2}$", max_length=128)
 NUMERIC_VALUE_KINDS: frozenset[str] = frozenset({"numeric"})
 # CS-14: count works on any value_kind (it counts observations, not values);
 # every other non-`latest` aggregate needs a numeric value column.
@@ -64,6 +67,8 @@ class SignalDefinitionResponse(BaseModel):
     # rows, so this is always present on read.
     aggregation: Aggregation = "latest"
     aggregation_window_days: int | None = None
+    # D21: empty = all crops.
+    crop_paths: list[str] = []
 
 
 class SignalDefinitionCreateRequest(BaseModel):
@@ -88,6 +93,9 @@ class SignalDefinitionCreateRequest(BaseModel):
     # before persisting so non-numeric kinds always end up as `latest`.
     aggregation: Aggregation = "latest"
     aggregation_window_days: int | None = Field(default=None, gt=0)
+    # D21: crop paths this signal belongs to; empty = all crops. A scoped
+    # signal switches on by itself for blocks of that crop.
+    crop_paths: list[Annotated[str, CropPath]] = Field(default_factory=list, max_length=20)
 
 
 class SignalDefinitionUpdateRequest(BaseModel):
@@ -109,6 +117,7 @@ class SignalDefinitionUpdateRequest(BaseModel):
     is_active: bool | None = None
     aggregation: Aggregation | None = None
     aggregation_window_days: int | None = Field(default=None, gt=0)
+    crop_paths: list[Annotated[str, CropPath]] | None = Field(default=None, max_length=20)
 
 
 class SignalAssignmentResponse(BaseModel):
@@ -130,6 +139,9 @@ class SignalAssignmentCreateRequest(BaseModel):
 
     farm_id: UUID | None = None
     block_id: UUID | None = None
+    # D21 — False records an opt-out: a crop-scoped signal that would switch
+    # on by itself for this farm or block stays off there.
+    is_active: bool = True
 
 
 class GeopointModel(BaseModel):
@@ -206,6 +218,7 @@ class SignalTemplateResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    crop_paths: list[str] = []
 
 
 class SignalTemplateDefinitionMember(BaseModel):
@@ -230,6 +243,7 @@ class SignalTemplateCreateRequest(BaseModel):
     # in a broken half-defined state. Positions must be unique within
     # the template; the service rejects duplicates with a 400.
     members: list[SignalTemplateDefinitionMember] = Field(min_length=1)
+    crop_paths: list[Annotated[str, CropPath]] = Field(default_factory=list, max_length=20)
 
 
 class SignalTemplateUpdateRequest(BaseModel):
@@ -246,6 +260,7 @@ class SignalTemplateUpdateRequest(BaseModel):
     # service performs delete-then-insert in one transaction). Null =
     # leave member list unchanged.
     members: list[SignalTemplateDefinitionMember] | None = None
+    crop_paths: list[Annotated[str, CropPath]] | None = Field(default=None, max_length=20)
 
 
 # ---- CS-4: template-observation submission --------------------------------

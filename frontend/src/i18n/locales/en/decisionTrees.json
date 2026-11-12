@@ -486,7 +486,8 @@
           "value_boolean": "The recorded yes/no.",
           "value_slope": "Rate of change over the last 30 days. Numeric signals only.",
           "value_delta": "Total change over the last 30 days. Numeric signals only.",
-          "value_trend_direction": "Rising, falling or stable over the last 30 days. Numeric signals only."
+          "value_trend_direction": "Rising, falling or stable over the last 30 days. Numeric signals only.",
+          "days_since_latest": "Whole days since the latest record, for any signal. Still readable after the answer has expired."
         },
         "gridField": {
           "worst_z": "How far below the block mean the worst cell sits, in standard deviations.",

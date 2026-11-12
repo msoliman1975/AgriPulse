@@ -151,6 +151,10 @@ SIGNAL_KEYS: tuple[str, ...] = (
     "value_slope",
     "value_delta",
     "value_trend_direction",
+    # D6 — whole days since the latest observation, for any value_kind. Read
+    # even when a windowed `latest` answer has expired, so a tree can ask
+    # "how long since the last record".
+    "days_since_latest",
 )
 
 
@@ -173,6 +177,8 @@ class SignalEntry:
     value_slope: Decimal | None = None
     value_delta: Decimal | None = None
     value_trend_direction: str | None = None
+    # D6 — whole days between the latest observation and now.
+    days_since_latest: Decimal | None = None
 
 
 # Allowed keys for a crop_attribute value-ref. One key today — the recorded

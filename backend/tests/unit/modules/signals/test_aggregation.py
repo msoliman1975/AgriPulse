@@ -236,7 +236,9 @@ class TestCountAndSum:
             window_days=None,
             now=NOW,
         )
-        assert out == AggregatedValue(time=NOW, value_numeric=Decimal("6"))
+        assert out == AggregatedValue(
+            time=NOW, value_numeric=Decimal("6"), days_since_latest=Decimal(0)
+        )
 
     def test_count_numeric_counts_rows(self) -> None:
         out = aggregate_observations(

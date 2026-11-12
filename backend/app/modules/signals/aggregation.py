@@ -23,6 +23,11 @@ Behaviour MUST match the SQL in snapshot.py:
     recent observation's value, regardless of the configured rule.
   * Numeric value_kinds with aggregation='latest' resolve to the most
     recent value_numeric.
+  * D6: on the latest path a window bounds how old the answer may be. An
+    answer older than the window keeps its ``time`` but its values read as
+    ``None`` (the SQL's ``stale`` flag). With no window, any age is valid.
+  * ``days_since_latest`` is the whole days from the reported ``time`` to
+    ``now`` (SQL: ``floor(epoch / 86400)``).
   * Numeric value_kinds with aggregation ∈ {mean, median, max, min, sum}
     (CS-14 adds sum) aggregate value_numeric over observations whose time
     falls inside [now - window_days, now], or all observations if
@@ -36,6 +41,7 @@ Behaviour MUST match the SQL in snapshot.py:
 
 from __future__ import annotations
 
+import math
 import statistics
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -70,6 +76,7 @@ class AggregatedValue:
     value_categorical: str | None = None
     value_event: str | None = None
     value_boolean: bool | None = None
+    days_since_latest: Decimal | None = None
 
 
 def aggregate_observations(  # noqa: PLR0911  # one branch per aggregation rule reads clearer flat
@@ -95,17 +102,24 @@ def aggregate_observations(  # noqa: PLR0911  # one branch per aggregation rule 
         rows = _in_window(observations, window_days=window_days, now=now)
         if not rows:
             return None
+        latest_time = max(r.time for r in rows)
         return AggregatedValue(
-            time=max(r.time for r in rows),
+            time=latest_time,
             value_numeric=Decimal(len(rows)),
+            days_since_latest=_days_since(latest_time, now),
         )
 
     # Non-numeric kinds always use latest, regardless of aggregation
     # config — belt-and-brace against a misconfigured definition.
     if value_kind not in NUMERIC_VALUE_KINDS or aggregation == "latest":
         latest = max(observations, key=lambda o: o.time)
+        if window_days is not None and latest.time < now - timedelta(days=window_days):
+            return AggregatedValue(
+                time=latest.time, days_since_latest=_days_since(latest.time, now)
+            )
         return AggregatedValue(
             time=latest.time,
+            days_since_latest=_days_since(latest.time, now),
             value_numeric=latest.value_numeric,
             value_categorical=latest.value_categorical,
             value_event=latest.value_event,
@@ -123,10 +137,16 @@ def aggregate_observations(  # noqa: PLR0911  # one branch per aggregation rule 
         # under the value-presence CHECK constraint but defensive).
         return None
     aggregated_value = _apply_aggregate(values, aggregation)
+    latest_time = max(r.time for r in rows)
     return AggregatedValue(
-        time=max(r.time for r in rows),
+        time=latest_time,
         value_numeric=aggregated_value,
+        days_since_latest=_days_since(latest_time, now),
     )
+
+
+def _days_since(time: datetime, now: datetime) -> Decimal:
+    return Decimal(math.floor((now - time).total_seconds() / 86400))
 
 
 def _in_window(
