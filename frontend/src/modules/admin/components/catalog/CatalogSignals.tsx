@@ -67,10 +67,18 @@ export function SignalsPanel({
   });
 
   const scope = useMutation({
-    mutationFn: ({ kind, row, next }: { kind: Kind; row: Row; next: string[] }) =>
-      kind === "definition"
-        ? updatePlatformSignalDefinition(row.id, { crop_paths: next })
-        : updatePlatformSignalTemplate(row.id, { crop_paths: next }),
+    mutationFn: async ({
+      kind,
+      row,
+      next,
+    }: {
+      kind: Kind;
+      row: Row;
+      next: string[];
+    }): Promise<void> => {
+      if (kind === "definition") await updatePlatformSignalDefinition(row.id, { crop_paths: next });
+      else await updatePlatformSignalTemplate(row.id, { crop_paths: next });
+    },
     onSuccess: (_data, { kind }) => {
       setError(null);
       void client.invalidateQueries({ queryKey: kind === "definition" ? DEFS_KEY : TPLS_KEY });
