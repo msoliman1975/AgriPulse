@@ -18,7 +18,8 @@ export function HoldingScreen({
 }): ReactNode {
   const [tab, setTab] = useState<Tab>("map");
   const [photo, setPhoto] = useState<LatestPhoto | null>(null);
-  const [showPhoto, setShowPhoto] = useState(true);
+  // Sharp base first: the photo is current but 10 m per pixel. One tap away.
+  const [showPhoto, setShowPhoto] = useState(false);
   const [baseDate, setBaseDate] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
@@ -96,7 +97,7 @@ export function HoldingScreen({
               role="radiogroup"
               aria-label={t(lang, "map.background")}
             >
-              {([true, false] as const).map((latest) => (
+              {([false, true] as const).map((latest) => (
                 <button
                   key={String(latest)}
                   type="button"

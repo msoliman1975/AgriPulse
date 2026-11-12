@@ -76,10 +76,13 @@ PHOTO_MIN_CLEAR_FRACTION = 0.9
 PHOTO_LOOKBACK_PASSES = 24
 
 
-# Surface reflectance to display brightness. 0..0.35 is the usual Sentinel-2
-# true-colour stretch (about 2.9x gain): vegetation and soil read naturally
-# and bright desert sand only just clips.
-PHOTO_RESCALE = "0,0.35"
+# Surface reflectance to display brightness, per band, in red, green, blue
+# order. One window for all three (0..0.35) clipped red and left blue at half
+# range over desert sand, so the photo came out orange next to the base map.
+# Measured on Bashier Elkhier (3 Nov 2026), the 98th percentiles were red
+# 0.37, green 0.28, blue 0.19; these windows sit just above them, which
+# renders the sand in the same beige as the Esri base.
+PHOTO_RESCALE = ("0,0.42", "0,0.34", "0,0.26")
 
 
 def latest_photo_tile_url(
@@ -103,7 +106,7 @@ def latest_photo_tile_url(
     params: list[tuple[str, str]] = [
         ("url", f"s3://{s3_bucket}/{stac_item_id}/raw_bands.tif"),
         *(("bidx", str(b)) for b in rgb),
-        ("rescale", PHOTO_RESCALE),
+        *(("rescale", window) for window in PHOTO_RESCALE),
         ("reproject", "bilinear"),
         ("scale", "2"),
         ("algorithm", "cutline"),

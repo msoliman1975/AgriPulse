@@ -51,10 +51,11 @@
   },
   "basemap": {
     "label": "Map background",
-    "latest": "Latest",
-    "highres": "High-res",
+    "latest": "Latest (10 m)",
+    "highres": "Sharp (older)",
     "photoDate": "Farm: Sentinel-2 photo of {{date}} (10 m)",
     "aroundDate": "Around it: high-res image of {{date}}",
-    "baseDate": "Satellite image of {{date}}"
+    "baseDate": "Satellite image of {{date}}",
+    "newerPhoto": "Newer photo: Sentinel-2, {{date}} (10 m). Pick Latest to see it."
   }
 }

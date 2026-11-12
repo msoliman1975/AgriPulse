@@ -30,27 +30,31 @@ describe("SatelliteBasemapControl", () => {
     window.localStorage.clear();
   });
 
-  it("lays the latest photo on by default and dates both images", () => {
+  it("shows the sharp base by default and says a newer photo exists", () => {
     renderControl();
-    expect(apply).toHaveBeenLastCalledWith(map, "https://tiles/x", true);
-    expect(screen.getByRole("radio", { name: "Latest" })).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByText(/Sentinel-2 photo of Nov 8, 2026/)).toBeInTheDocument();
-    expect(screen.getByText(/high-res image of Apr 19, 2020/)).toBeInTheDocument();
+    expect(apply).toHaveBeenLastCalledWith(map, "https://tiles/x", false);
+    expect(screen.getByRole("radio", { name: "Sharp (older)" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByText("Satellite image of Apr 19, 2020")).toBeInTheDocument();
+    expect(screen.getByText(/Newer photo: Sentinel-2, Nov 8, 2026/)).toBeInTheDocument();
   });
 
-  it("switches to the high-res base and remembers it", () => {
+  it("lays the latest photo on when picked, dates both images, and remembers it", () => {
     renderControl();
-    fireEvent.click(screen.getByRole("radio", { name: "High-res" }));
-    expect(apply).toHaveBeenLastCalledWith(map, "https://tiles/x", false);
-    expect(screen.getByText("Satellite image of Apr 19, 2020")).toBeInTheDocument();
-    expect(window.localStorage.getItem("agripulse.basemap")).toBe("highres");
+    fireEvent.click(screen.getByRole("radio", { name: "Latest (10 m)" }));
+    expect(apply).toHaveBeenLastCalledWith(map, "https://tiles/x", true);
+    expect(screen.getByText(/Sentinel-2 photo of Nov 8, 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/high-res image of Apr 19, 2020/)).toBeInTheDocument();
+    expect(window.localStorage.getItem("agripulse.basemap.v2")).toBe("latest");
   });
 
   it("without a photo still says how old the base is, with no switch", () => {
     renderControl(null);
     expect(screen.queryByRole("radiogroup")).toBeNull();
     expect(screen.getByText("Satellite image of Apr 19, 2020")).toBeInTheDocument();
-    expect(apply).toHaveBeenLastCalledWith(map, null, true);
+    expect(apply).toHaveBeenLastCalledWith(map, null, false);
   });
 
   it("renders nothing when there is neither a photo nor a date", () => {
