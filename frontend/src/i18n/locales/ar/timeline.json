@@ -108,6 +108,7 @@
       "inspect": "فحص",
       "harvest_window": "موعد الحصاد",
       "prune": "تقليم",
+      "treat": "معالجة",
       "no_action": "لا إجراء",
       "other": "أخرى",
       "unknown": "غير مصنّف"
@@ -120,6 +121,7 @@
       "inspect": "فحص",
       "harvest_window": "موعد الحصاد",
       "prune": "تقليم",
+      "treat": "معالجة",
       "no_action": "لا إجراء",
       "other": "أخرى"
     },

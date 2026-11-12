@@ -20,6 +20,7 @@ export const ACTION_TYPES = [
   "scout",
   "harvest_window",
   "prune",
+  "treat",
   "no_action",
   "other",
 ] as const;
@@ -38,6 +39,7 @@ export const ACTION_TYPE_GROUP_ORDER: readonly ActionType[] = [
   "irrigate",
   "fertilize",
   "prune",
+  "treat",
   "harvest_window",
   "other",
 ];
