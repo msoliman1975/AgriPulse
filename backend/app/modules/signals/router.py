@@ -124,6 +124,8 @@ async def list_definitions(
     include_inactive: bool = Query(default=False),
     farm_id: UUID | None = Query(default=None),
     crop_path: str | None = _CROP_PATH_QUERY,
+    # D21 — only what applies to this block's current crop (the scout app).
+    block_id: UUID | None = Query(default=None),
     # SMK-RBAC-GAP-02: signal definitions are tenant-wide config, but the
     # capability is farm-scoped. Gate on the farm in scope so a farm-scoped-only
     # user can load them (the signals page passes ?farm_id=) to record against.
@@ -132,7 +134,9 @@ async def list_definitions(
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
     return list(
-        await service.list_definitions(include_inactive=include_inactive, crop_path=crop_path)
+        await service.list_definitions(
+            include_inactive=include_inactive, crop_path=crop_path, block_id=block_id
+        )
     )
 
 
@@ -352,12 +356,16 @@ class SignalTemplateWithMembersResponse(BaseModel):
 async def list_templates(
     include_inactive: bool = Query(default=False),
     crop_path: str | None = _CROP_PATH_QUERY,
+    # D21 — only the forms that apply to this block's current crop.
+    block_id: UUID | None = Query(default=None),
     context: RequestContext = Depends(requires_capability("signal.read", any_farm=True)),
     service: SignalsServiceImpl = Depends(_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
     return list(
-        await service.list_templates(include_inactive=include_inactive, crop_path=crop_path)
+        await service.list_templates(
+            include_inactive=include_inactive, crop_path=crop_path, block_id=block_id
+        )
     )
 
 

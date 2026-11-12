@@ -48,3 +48,7 @@ async def test_crop_scoped_signal_sql_runs_against_asyncpg(admin_session: object
         assert {d["code"] for d in for_medjool} <= {d["code"] for d in everything}
         assert all(isinstance(d["crop_paths"], list) for d in everything)
         await repo.list_templates(include_inactive=True, crop_path="mango")
+        # A block with no current crop sees only the unscoped rows.
+        for_block = await repo.list_definitions(include_inactive=True, block_id=uuid4())
+        assert all(d["crop_paths"] == [] for d in for_block)
+        await repo.list_templates(include_inactive=True, block_id=uuid4())

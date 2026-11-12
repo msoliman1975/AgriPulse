@@ -105,7 +105,11 @@ def _normalize_crop_paths(paths: list[str] | None) -> list[str]:
 
 class SignalsService(Protocol):
     async def list_definitions(
-        self, *, include_inactive: bool = False, crop_path: str | None = None
+        self,
+        *,
+        include_inactive: bool = False,
+        crop_path: str | None = None,
+        block_id: UUID | None = None,
     ) -> tuple[dict[str, Any], ...]: ...
 
     async def get_definition(self, *, definition_id: UUID) -> dict[str, Any]: ...
@@ -147,7 +151,11 @@ class SignalsService(Protocol):
     # ---- Templates (CS-2/3) ----
 
     async def list_templates(
-        self, *, include_inactive: bool = False, crop_path: str | None = None
+        self,
+        *,
+        include_inactive: bool = False,
+        crop_path: str | None = None,
+        block_id: UUID | None = None,
     ) -> tuple[dict[str, Any], ...]: ...
 
     async def get_template(
@@ -318,10 +326,14 @@ class SignalsServiceImpl:
     # ---- Definitions --------------------------------------------------
 
     async def list_definitions(
-        self, *, include_inactive: bool = False, crop_path: str | None = None
+        self,
+        *,
+        include_inactive: bool = False,
+        crop_path: str | None = None,
+        block_id: UUID | None = None,
     ) -> tuple[dict[str, Any], ...]:
         return await self._repo.list_definitions(
-            include_inactive=include_inactive, crop_path=crop_path
+            include_inactive=include_inactive, crop_path=crop_path, block_id=block_id
         )
 
     async def get_definition(self, *, definition_id: UUID) -> dict[str, Any]:
@@ -863,10 +875,14 @@ class SignalsServiceImpl:
     # ---- Templates (CS-2/3) -------------------------------------------
 
     async def list_templates(
-        self, *, include_inactive: bool = False, crop_path: str | None = None
+        self,
+        *,
+        include_inactive: bool = False,
+        crop_path: str | None = None,
+        block_id: UUID | None = None,
     ) -> tuple[dict[str, Any], ...]:
         return await self._repo.list_templates(
-            include_inactive=include_inactive, crop_path=crop_path
+            include_inactive=include_inactive, crop_path=crop_path, block_id=block_id
         )
 
     async def get_template(

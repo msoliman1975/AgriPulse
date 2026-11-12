@@ -93,6 +93,23 @@ def _crop_scope_matches(column: Any, crop_path: str) -> ColumnElement[bool]:
     )  # type: ignore[return-value]
 
 
+def _applies_to_block_crop(column: Any, block_id: UUID) -> ColumnElement[bool]:
+    """Rows a scout on this block should see (D21): unscoped rows, and rows
+    whose scope holds the block's current crop or an ancestor of it. Unlike
+    :func:`_crop_scope_matches`, a scope *below* the block's crop does not
+    match. The same rule ``snapshot.py`` uses to switch signals on."""
+    table = column.table.name
+    return text(
+        f"(cardinality({table}.crop_paths) = 0 OR EXISTS ("
+        f"SELECT 1 FROM block_crops bc, unnest({table}.crop_paths) AS cp(p) "
+        "WHERE bc.block_id = :scope_block_id AND bc.is_current = TRUE "
+        "AND bc.deleted_at IS NULL "
+        "AND (bc.crop_path = cp.p OR starts_with(bc.crop_path, cp.p || '.'))))"
+    ).bindparams(  # type: ignore[return-value]
+        bindparam("scope_block_id", value=block_id, type_=PG_UUID(as_uuid=True))
+    )
+
+
 class SignalsRepository:
     """Internal repository — service layer is the only consumer."""
 
@@ -102,13 +119,19 @@ class SignalsRepository:
     # ---- Definitions --------------------------------------------------
 
     async def list_definitions(
-        self, *, include_inactive: bool = False, crop_path: str | None = None
+        self,
+        *,
+        include_inactive: bool = False,
+        crop_path: str | None = None,
+        block_id: UUID | None = None,
     ) -> tuple[dict[str, Any], ...]:
         clauses = [SignalDefinition.deleted_at.is_(None), _visible_scope(SignalDefinition)]
         if not include_inactive:
             clauses.append(SignalDefinition.is_active.is_(True))
         if crop_path is not None:
             clauses.append(_crop_scope_matches(SignalDefinition.crop_paths, crop_path))
+        if block_id is not None:
+            clauses.append(_applies_to_block_crop(SignalDefinition.crop_paths, block_id))
         # Tenant rows shadow a platform row sharing their code, so the tenant
         # copy sorts first and `DISTINCT ON (code)` keeps it — the same rule
         # snapshot.py applies before the evaluator sees a definition.
@@ -424,13 +447,19 @@ class SignalsRepository:
     # text matching for two different constraints.
 
     async def list_templates(
-        self, *, include_inactive: bool = False, crop_path: str | None = None
+        self,
+        *,
+        include_inactive: bool = False,
+        crop_path: str | None = None,
+        block_id: UUID | None = None,
     ) -> tuple[dict[str, Any], ...]:
         clauses = [SignalTemplate.deleted_at.is_(None), _visible_scope(SignalTemplate)]
         if not include_inactive:
             clauses.append(SignalTemplate.is_active.is_(True))
         if crop_path is not None:
             clauses.append(_crop_scope_matches(SignalTemplate.crop_paths, crop_path))
+        if block_id is not None:
+            clauses.append(_applies_to_block_crop(SignalTemplate.crop_paths, block_id))
         stmt = (
             select(SignalTemplate)
             .where(*clauses)

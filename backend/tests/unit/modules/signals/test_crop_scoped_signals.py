@@ -229,3 +229,16 @@ class TestSnapshotSqlShape:
         assert "a.is_active = FALSE" in sql
         # LIKE would treat the `_` in every crop code as a wildcard.
         assert " LIKE " not in sql
+
+
+class TestBlockListingFilter:
+    def test_block_filter_matches_scope_at_or_above_the_crop_only(self) -> None:
+        from app.modules.signals.models import SignalDefinition
+        from app.modules.signals.repository import _applies_to_block_crop
+
+        sql = " ".join(str(_applies_to_block_crop(SignalDefinition.crop_paths, uuid4())).split())
+        assert "cardinality(signal_definitions.crop_paths) = 0" in sql
+        assert "starts_with(bc.crop_path, cp.p || '.')" in sql
+        # The catalog filter also matches scopes below the crop; a block must not.
+        assert "starts_with(cp.p" not in sql
+        assert "bc.is_current = TRUE" in sql
