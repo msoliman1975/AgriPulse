@@ -24,7 +24,7 @@
   "nodes": {
     "n_0": {
       "label_en": "Is the block in dormancy?",
-      "label_ar": "هل القطعة في مرحلة dormancy؟",
+      "label_ar": "هل القطعة في مرحلة الشتاء / ما قبل التزهير؟",
       "condition": {
         "tree": {
           "op": "in",
@@ -51,7 +51,7 @@
     },
     "n_1": {
       "label_en": "Is the block in dormancy?",
-      "label_ar": "هل القطعة في مرحلة dormancy؟",
+      "label_ar": "هل القطعة في مرحلة الشتاء / ما قبل التزهير؟",
       "condition": {
         "tree": {
           "op": "in",
@@ -78,7 +78,7 @@
     },
     "n_2": {
       "label_en": "Is the block in pollination?",
-      "label_ar": "هل القطعة في مرحلة pollination؟",
+      "label_ar": "هل القطعة في مرحلة خروج الطلع والتلقيح؟",
       "condition": {
         "tree": {
           "op": "in",
@@ -105,7 +105,7 @@
     },
     "n_3": {
       "label_en": "Is the block in fruit_set?",
-      "label_ar": "هل القطعة في مرحلة fruit_set؟",
+      "label_ar": "هل القطعة في مرحلة نهاية التلقيح / الحبابوك؟",
       "condition": {
         "tree": {
           "op": "in",
@@ -132,7 +132,7 @@
     },
     "n_4": {
       "label_en": "Is the block in kimri?",
-      "label_ar": "هل القطعة في مرحلة kimri؟",
+      "label_ar": "هل القطعة في مرحلة الكمري (نمو الثمار)؟",
       "condition": {
         "tree": {
           "op": "in",
@@ -159,7 +159,7 @@
     },
     "n_5": {
       "label_en": "Is the block in kimri, khalal, rutab, tamar?",
-      "label_ar": "هل القطعة في مرحلة kimri، khalal، rutab، tamar؟",
+      "label_ar": "هل القطعة في مرحلة الكمري (نمو الثمار)، الخلال (تغيّر اللون)، الرطب (النضج)، التمر (اكتمال النضج)؟",
       "condition": {
         "tree": {
           "op": "in",
@@ -189,7 +189,7 @@
     },
     "n_6": {
       "label_en": "Is the block in khalal?",
-      "label_ar": "هل القطعة في مرحلة khalal؟",
+      "label_ar": "هل القطعة في مرحلة الخلال (تغيّر اللون)؟",
       "condition": {
         "tree": {
           "op": "in",
@@ -216,7 +216,7 @@
     },
     "n_7": {
       "label_en": "Is the block in rutab, tamar?",
-      "label_ar": "هل القطعة في مرحلة rutab، tamar؟",
+      "label_ar": "هل القطعة في مرحلة الرطب (النضج)، التمر (اكتمال النضج)؟",
       "condition": {
         "tree": {
           "op": "in",
