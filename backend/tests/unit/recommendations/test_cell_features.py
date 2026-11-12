@@ -52,7 +52,8 @@ def test_cell_z_against_own_same_day_history() -> None:
 def test_too_few_samples_leave_z_and_delta_empty() -> None:
     out = temporal_features(_obs(0.55), _seasons([0.60, 0.62]))
     assert out["cell_baseline_samples"] == 2
-    assert out["cell_z"] is None and out["cell_delta"] is None
+    assert out["cell_z"] is None
+    assert out["cell_delta"] is None
 
 
 def test_recent_rows_never_enter_the_baseline() -> None:
@@ -94,9 +95,9 @@ def test_spatial_z_needs_enough_cells_and_spread() -> None:
 
 
 def test_compute_cell_features_keys_and_scene_grouping() -> None:
-    latest = [
-        _obs(0.6, cell=UUID(int=i), valid=90) for i in range(1, 25)
-    ] + [_obs(0.3, cell=UUID(int=99), valid=40)]
+    latest = [_obs(0.6, cell=UUID(int=i), valid=90) for i in range(1, 25)] + [
+        _obs(0.3, cell=UUID(int=99), valid=40)
+    ]
     history = _seasons([0.6, 0.61, 0.59], cell=UUID(int=99))
     out = compute_cell_features(latest, history)
     weak = out[UUID(int=99)]["ndvi"]
