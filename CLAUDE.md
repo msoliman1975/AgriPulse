@@ -39,3 +39,16 @@ no dev deploy to check. Full procedure: `docs/runbooks/promotion-procedure.md`.
      account.
    On exit 1, report the failing step and the screenshot; do not call the
    deploy done.
+
+## Autonomy
+
+Claude may merge its own PRs, and the promotion PRs that bump the api /
+workers / frontend tags in `infra/argocd/overlays/hetzner/values.yaml`, once
+required CI is green, following `docs/runbooks/promotion-procedure.md`.
+
+Claude may not, without the owner's explicit approval in the conversation:
+force-push or rewrite `main`; disable or skip tests; switch the decision
+engine; publish decision trees; hard-delete data.
+
+Production changes go through the API only (identity: the `claude-automation`
+Keycloak client, platform admin). Every production action is logged.
