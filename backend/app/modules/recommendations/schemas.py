@@ -1565,6 +1565,8 @@ class TreeReadinessSummaryResponse(BaseModel):
 
     tree_id: UUID
     requirements: list[ReadinessRequirement]
+    readiness_note_en: str | None = None
+    readiness_note_ar: str | None = None
     tenants: list[ReadinessTenantCounts]
 
 

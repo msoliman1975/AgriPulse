@@ -2292,6 +2292,7 @@ async def tree_readiness_summary_route(
         )
     ).all()
     requirements: list[dict[str, Any]] = []
+    notes: dict[str, Any] = {}
     rows: list[dict[str, Any]] = []
     for tid, name, schema in tenants:
         service = FoldingTreeAuthorService(public_session=public_session, tenant_id=tid)
@@ -2315,6 +2316,7 @@ async def tree_readiness_summary_route(
             )
             continue
         requirements = result["requirements"]
+        notes = {k: result.get(k) for k in ("readiness_note_en", "readiness_note_ar")}
         if result["blocks_targeted"]:
             rows.append(
                 {
@@ -2324,7 +2326,7 @@ async def tree_readiness_summary_route(
                     "counts": result["counts"],
                 }
             )
-    return {"tree_id": tree_id, "requirements": requirements, "tenants": rows}
+    return {"tree_id": tree_id, "requirements": requirements, **notes, "tenants": rows}
 
 
 @router.get(

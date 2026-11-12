@@ -89,8 +89,9 @@ import {
   type EdgeSlot,
 } from "../lib/betaTree";
 import { betaBasePath } from "../lib/betaRoutes";
+import { ReadinessTab } from "../components/ReadinessTab";
 
-type Tab = "canvas" | "targeting" | "combinations" | "dryRun";
+type Tab = "canvas" | "targeting" | "combinations" | "dryRun" | "readiness";
 
 interface PendingAdd {
   parentId: string;
@@ -103,6 +104,7 @@ export function BetaDesignerPage(): ReactNode {
   const scope = useAuthoringScope();
   const base = betaBasePath(scope);
   const canManage = useCapability("decision_tree.manage");
+  const canFixBlocks = useCapability("block.update_metadata") && scope === "tenant";
 
   const treeQ = useBetaTree(code);
   const findingsQ = useFindingCatalogue(scope);
@@ -461,6 +463,7 @@ export function BetaDesignerPage(): ReactNode {
                 { value: "targeting", label: t("designer.tabs.targeting") },
                 { value: "combinations", label: t("designer.tabs.combinations") },
                 { value: "dryRun", label: t("designer.tabs.dryRun") },
+                { value: "readiness", label: t("designer.tabs.readiness") },
               ]}
             />
 
@@ -555,6 +558,10 @@ export function BetaDesignerPage(): ReactNode {
                 readOnly={readOnly}
                 onChangeRules={onChangeRules}
               />
+            ) : null}
+
+            {tab === "readiness" ? (
+              <ReadinessTab treeId={treeId || null} scope={scope} canFix={canFixBlocks} />
             ) : null}
 
             {tab === "dryRun" ? (
