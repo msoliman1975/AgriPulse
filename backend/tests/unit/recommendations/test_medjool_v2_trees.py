@@ -54,8 +54,7 @@ def _load(name: str) -> ModuleType:
 DEFS: dict[str, dict[str, Any]] = {
     d["code"]: d
     for d in (
-        json.loads(p.read_text(encoding="utf-8"))
-        for p in sorted(_TREES.glob("*.definition.json"))
+        json.loads(p.read_text(encoding="utf-8")) for p in sorted(_TREES.glob("*.definition.json"))
     )
 }
 FINDINGS = json.loads((_TREES / "findings.json").read_text(encoding="utf-8"))
@@ -210,9 +209,7 @@ def _context(rng: random.Random) -> ConditionContext:
             time=now,
             mean=None if gap() else _d(rng.uniform(-0.3, 0.9)),
             baseline_deviation=None if gap() else _d(rng.uniform(-3, 3)),
-            trend_direction=(
-                None if gap() else rng.choice(["rising", "falling", "stable"])
-            ),
+            trend_direction=(None if gap() else rng.choice(["rising", "falling", "stable"])),
             cell_z=None if gap() else _d(rng.uniform(-3, 3)),
             cell_baseline_samples=None if gap() else rng.choice([0, 1, 3, 9]),
             cell_delta=None if gap() else _d(rng.uniform(-0.2, 0.2)),
@@ -267,13 +264,9 @@ def _context(rng: random.Random) -> ConditionContext:
             derived_today={
                 "temp_mean_c": None if gap() else _d(rng.uniform(8, 38)),
                 "precip_mm_30d": _d(rng.uniform(0, 30)),
-                "gdd_cumulative_base10_season": (
-                    None if gap() else _d(rng.uniform(500, 6000))
-                ),
+                "gdd_cumulative_base10_season": (None if gap() else _d(rng.uniform(500, 6000))),
             },
-            derived_yesterday={
-                "temp_min_c": None if gap() else _d(rng.uniform(-14, 25))
-            },
+            derived_yesterday={"temp_min_c": None if gap() else _d(rng.uniform(-14, 25))},
         )
     )
     balance = (
@@ -304,8 +297,7 @@ def _context(rng: random.Random) -> ConditionContext:
 
 def test_random_inputs_never_error_and_reach_findings() -> None:
     compiled = {
-        c: compile_folding_tree(d, known_codes=set(d["registers"]))
-        for c, d in DEFS.items()
+        c: compile_folding_tree(d, known_codes=set(d["registers"])) for c, d in DEFS.items()
     }
     rng = random.Random(7)
     errors: Counter[str] = Counter()
