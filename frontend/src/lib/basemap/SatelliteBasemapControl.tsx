@@ -9,13 +9,21 @@ import { useBaseCaptureDate, type LatestPhoto } from "./useBasemap";
 
 export type BasemapChoice = "latest" | "highres";
 
-const STORAGE_KEY = "agripulse.basemap";
+// v2: the default flipped from "latest" to "highres". A new key so nobody
+// keeps the old default only because the page once wrote it.
+const STORAGE_KEY = "agripulse.basemap.v2";
 
+/**
+ * The sharp base by default. The latest photo is 10 m per pixel against the
+ * base's ~0.5 m: current, but blurred at farm zoom, and laid over the base it
+ * reads as an index layer to anyone who switched the index off to see the
+ * ground. It is one click away, and its date is shown either way.
+ */
 function readChoice(): BasemapChoice {
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === "highres" ? "highres" : "latest";
+    return window.localStorage.getItem(STORAGE_KEY) === "latest" ? "latest" : "highres";
   } catch {
-    return "latest";
+    return "highres";
   }
 }
 
@@ -77,7 +85,7 @@ export function SatelliteBasemapControl({ map, photo, className }: Props): JSX.E
     >
       {photo ? (
         <div role="radiogroup" aria-label={t("basemap.label")} className="flex gap-1">
-          {(["latest", "highres"] as const).map((option) => (
+          {(["highres", "latest"] as const).map((option) => (
             <button
               key={option}
               type="button"
@@ -95,15 +103,20 @@ export function SatelliteBasemapControl({ map, photo, className }: Props): JSX.E
       ) : null}
       <div className="mt-1 space-y-0.5 leading-tight">
         {photo && choice === "latest" ? (
-          <div>{t("basemap.photoDate", { date: photoLabel })}</div>
-        ) : null}
-        {baseLabel ? (
-          <div className="text-ap-muted">
-            {t(photo && choice === "latest" ? "basemap.aroundDate" : "basemap.baseDate", {
-              date: baseLabel,
-            })}
-          </div>
-        ) : null}
+          <>
+            <div>{t("basemap.photoDate", { date: photoLabel })}</div>
+            {baseLabel ? (
+              <div className="text-ap-muted">{t("basemap.aroundDate", { date: baseLabel })}</div>
+            ) : null}
+          </>
+        ) : (
+          <>
+            {baseLabel ? <div>{t("basemap.baseDate", { date: baseLabel })}</div> : null}
+            {photo ? (
+              <div className="text-ap-muted">{t("basemap.newerPhoto", { date: photoLabel })}</div>
+            ) : null}
+          </>
+        )}
       </div>
     </div>
   );

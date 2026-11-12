@@ -38,6 +38,7 @@ def test_photo_tile_url_draws_true_colour_cut_to_the_farm() -> None:
     q = parse_qs(parts.query)
     assert q["url"] == ["s3://bucket/sentinel_hub/s2_l2a/S2B_X/abcd1234/raw_bands.tif"]
     assert q["bidx"] == ["3", "2", "1"], "red, green, blue, in that order"
+    assert q["rescale"] == ["0,0.42", "0,0.34", "0,0.26"], "one window per band"
     assert q["scale"] == ["2"], "512 px tiles; TiTiler has no tilesize parameter"
     assert q["algorithm"] == ["cutline"]
     assert q["algorithm_params"] == ['{"aoi":"abcd1234"}']
