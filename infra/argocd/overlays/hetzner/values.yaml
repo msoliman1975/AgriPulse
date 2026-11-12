@@ -4134,7 +4134,19 @@ global:
       #   still lists signals.
       #   Rollback: api and workers to 838b81b. 0102 can stay under the old
       #   image (it only adds a defaulted column the old code never reads).
-      tag: "033de0e"
+      # de15345 = #824, api only (de15345 is #824 plus a values-only commit;
+      #   #824's own frontend image build was cancelled). Two read-only
+      #   routes for the map's "latest satellite photo": GET
+      #   /farms/{id}/latest-photo (imagery.read) and GET
+      #   /investor/holdings/{id}/latest-photo (investor_app.use). Each
+      #   returns the newest farm-fetched Sentinel-2 pass that is >=90% clear
+      #   over the farm, with a TiTiler URL that renders raw_bands.tif in
+      #   true colour, cut to the farm outline. No migration, no worker change.
+      #   Watch: both routes answer 200 (photo may be null on farms still on
+      #   per-block fetching); the tile URLs they return render, not 404/500,
+      #   on the tile server.
+      #   Rollback: api to 033de0e.
+      tag: "de15345"
     workers:
       tag: "033de0e"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
@@ -4852,7 +4864,19 @@ global:
       #   Watch: /platform/catalog Signals tab loads; the Beta designer's
       #   signal key list includes days_since_latest.
       #   Rollback: this tag alone back to 838b81b.
-      tag: "033de0e"
+      # de15345 = #824, frontend, see the api note. Every map shares one
+      #   satellite base (Esri World Imagery); farm draw/preview, NDVI and the
+      #   investments/investor maps move off OpenStreetMap onto it. A small
+      #   control shows the base image's capture date (from Esri's metadata
+      #   service, services.arcgisonline.com) and, where the api has a clear
+      #   pass, lays our latest Sentinel-2 photo over the farm with a
+      #   Latest / High-res switch.
+      #   Needs the api at de15345; an older api answers 404 and the maps
+      #   show the base alone.
+      #   Watch: Farm Health / Console / farm pages draw the photo and both
+      #   dates; drawing a block still works; no new console errors.
+      #   Rollback: this tag alone back to 033de0e.
+      tag: "de15345"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
