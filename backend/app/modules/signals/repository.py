@@ -67,6 +67,49 @@ def _visible_scope(model: Any) -> ColumnElement[bool]:
     return or_(model.tenant_id.is_(None), model.tenant_id == _THIS_TENANT_ID)
 
 
+def crop_path_related(scope: str, crop_path: str) -> bool:
+    """True when ``scope`` equals ``crop_path`` or one is a dotted prefix of
+    the other (``date_palm`` vs ``date_palm.medjool``). Python twin of
+    :func:`_crop_scope_matches`, used by tests and the snapshot."""
+    return (
+        scope == crop_path or crop_path.startswith(scope + ".") or scope.startswith(crop_path + ".")
+    )
+
+
+def _crop_scope_matches(column: Any, crop_path: str) -> ColumnElement[bool]:
+    """Catalog filter for one crop (D21): unscoped rows (empty array) match
+    every crop; a scoped row matches when one of its paths is the crop, an
+    ancestor of it, or a descendant of it."""
+    return text(
+        f"(cardinality({column.table.name}.crop_paths) = 0 OR EXISTS ("
+        f"SELECT 1 FROM unnest({column.table.name}.crop_paths) AS cp(p) "
+        # starts_with, not LIKE: crop codes are full of `_`, a LIKE wildcard.
+        # Explicit casts: an untyped bind beside `||` is ambiguous to asyncpg.
+        "WHERE cp.p = CAST(:crop_path AS text) "
+        "OR starts_with(CAST(:crop_path AS text), cp.p || '.') "
+        "OR starts_with(cp.p, CAST(:crop_path AS text) || '.')))"
+    ).bindparams(
+        bindparam("crop_path", value=crop_path, type_=String)
+    )  # type: ignore[return-value]
+
+
+def _applies_to_block_crop(column: Any, block_id: UUID) -> ColumnElement[bool]:
+    """Rows a scout on this block should see (D21): unscoped rows, and rows
+    whose scope holds the block's current crop or an ancestor of it. Unlike
+    :func:`_crop_scope_matches`, a scope *below* the block's crop does not
+    match. The same rule ``snapshot.py`` uses to switch signals on."""
+    table = column.table.name
+    return text(
+        f"(cardinality({table}.crop_paths) = 0 OR EXISTS ("
+        f"SELECT 1 FROM block_crops bc, unnest({table}.crop_paths) AS cp(p) "
+        "WHERE bc.block_id = :scope_block_id AND bc.is_current = TRUE "
+        "AND bc.deleted_at IS NULL "
+        "AND (bc.crop_path = cp.p OR starts_with(bc.crop_path, cp.p || '.'))))"
+    ).bindparams(  # type: ignore[return-value]
+        bindparam("scope_block_id", value=block_id, type_=PG_UUID(as_uuid=True))
+    )
+
+
 class SignalsRepository:
     """Internal repository — service layer is the only consumer."""
 
@@ -76,11 +119,19 @@ class SignalsRepository:
     # ---- Definitions --------------------------------------------------
 
     async def list_definitions(
-        self, *, include_inactive: bool = False
+        self,
+        *,
+        include_inactive: bool = False,
+        crop_path: str | None = None,
+        block_id: UUID | None = None,
     ) -> tuple[dict[str, Any], ...]:
         clauses = [SignalDefinition.deleted_at.is_(None), _visible_scope(SignalDefinition)]
         if not include_inactive:
             clauses.append(SignalDefinition.is_active.is_(True))
+        if crop_path is not None:
+            clauses.append(_crop_scope_matches(SignalDefinition.crop_paths, crop_path))
+        if block_id is not None:
+            clauses.append(_applies_to_block_crop(SignalDefinition.crop_paths, block_id))
         # Tenant rows shadow a platform row sharing their code, so the tenant
         # copy sorts first and `DISTINCT ON (code)` keeps it — the same rule
         # snapshot.py applies before the evaluator sees a definition.
@@ -141,6 +192,7 @@ class SignalsRepository:
         attachment_allowed: bool,
         aggregation: str = "latest",
         aggregation_window_days: int | None = None,
+        crop_paths: list[str] | None = None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
         try:
@@ -153,7 +205,7 @@ class SignalsRepository:
                         categorical_values, categorical_values_ar,
                         value_min, value_max,
                         attachment_allowed, is_active,
-                        aggregation, aggregation_window_days,
+                        aggregation, aggregation_window_days, crop_paths,
                         created_by, updated_by
                     ) VALUES (
                         :id,
@@ -165,7 +217,7 @@ class SignalsRepository:
                         :categorical_values, :categorical_values_ar,
                         :value_min, :value_max,
                         :attachment_allowed, TRUE,
-                        :aggregation, :aggregation_window_days,
+                        :aggregation, :aggregation_window_days, :crop_paths,
                         :actor, :actor
                     )
                     """
@@ -190,6 +242,7 @@ class SignalsRepository:
                     "attachment_allowed": attachment_allowed,
                     "aggregation": aggregation,
                     "aggregation_window_days": aggregation_window_days,
+                    "crop_paths": list(crop_paths or []),
                     "actor": actor_user_id,
                 },
             )
@@ -235,6 +288,8 @@ class SignalsRepository:
             # non-numeric value_kinds to 'latest' before calling in.
             "aggregation",
             "aggregation_window_days",
+            # D21 — crop scope; [] means every crop.
+            "crop_paths",
         }
         sets: list[str] = []
         params: dict[str, Any] = {"id": definition_id, "actor": actor_user_id}
@@ -324,6 +379,7 @@ class SignalsRepository:
         definition_id: UUID,
         farm_id: UUID | None,
         block_id: UUID | None,
+        is_active: bool = True,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
         await self._session.execute(
@@ -334,7 +390,7 @@ class SignalsRepository:
                     is_active, created_by, updated_by
                 ) VALUES (
                     :id, :def_id, :farm_id, :block_id,
-                    TRUE, :actor, :actor
+                    :is_active, :actor, :actor
                 )
                 """
             ).bindparams(
@@ -349,6 +405,7 @@ class SignalsRepository:
                 "def_id": definition_id,
                 "farm_id": farm_id,
                 "block_id": block_id,
+                "is_active": is_active,
                 "actor": actor_user_id,
             },
         )
@@ -389,10 +446,20 @@ class SignalsRepository:
     # so we can raise a tidy 400 instead of relying on IntegrityError
     # text matching for two different constraints.
 
-    async def list_templates(self, *, include_inactive: bool = False) -> tuple[dict[str, Any], ...]:
+    async def list_templates(
+        self,
+        *,
+        include_inactive: bool = False,
+        crop_path: str | None = None,
+        block_id: UUID | None = None,
+    ) -> tuple[dict[str, Any], ...]:
         clauses = [SignalTemplate.deleted_at.is_(None), _visible_scope(SignalTemplate)]
         if not include_inactive:
             clauses.append(SignalTemplate.is_active.is_(True))
+        if crop_path is not None:
+            clauses.append(_crop_scope_matches(SignalTemplate.crop_paths, crop_path))
+        if block_id is not None:
+            clauses.append(_applies_to_block_crop(SignalTemplate.crop_paths, block_id))
         stmt = (
             select(SignalTemplate)
             .where(*clauses)
@@ -509,6 +576,7 @@ class SignalsRepository:
         description: str | None,
         description_ar: str | None,
         members: tuple[tuple[UUID, int, bool], ...],
+        crop_paths: list[str] | None = None,
         actor_user_id: UUID | None,
     ) -> dict[str, Any]:
         """Atomic: insert the template row then its N members.
@@ -524,7 +592,7 @@ class SignalsRepository:
                     """
                     INSERT INTO public.signal_templates (
                         id, tenant_id, code, name, name_ar,
-                        description, description_ar,
+                        description, description_ar, crop_paths,
                         is_active, created_by, updated_by
                     ) VALUES (
                         :id,
@@ -532,7 +600,7 @@ class SignalsRepository:
                           WHERE replace(t.id::text, '-', '')
                                 = replace(current_schema(), 'tenant_', '')),
                         :code, :name, :name_ar,
-                        :description, :description_ar,
+                        :description, :description_ar, :crop_paths,
                         TRUE, :actor, :actor
                     )
                     """
@@ -547,6 +615,7 @@ class SignalsRepository:
                     "name_ar": name_ar,
                     "description": description,
                     "description_ar": description_ar,
+                    "crop_paths": list(crop_paths or []),
                     "actor": actor_user_id,
                 },
             )
@@ -575,7 +644,7 @@ class SignalsRepository:
         """Patch template scalars + optionally replace the member list
         atomically (delete-then-insert). `members=None` leaves members
         untouched."""
-        allowed = {"name", "name_ar", "description", "description_ar", "is_active"}
+        allowed = {"name", "name_ar", "description", "description_ar", "is_active", "crop_paths"}
         sets: list[str] = []
         params: dict[str, Any] = {"id": template_id, "actor": actor_user_id}
         for col, value in updates.items():
@@ -1057,6 +1126,7 @@ def _definition_to_dict(row: SignalDefinition) -> dict[str, Any]:
         # ('latest', None) on read.
         "aggregation": row.aggregation,
         "aggregation_window_days": row.aggregation_window_days,
+        "crop_paths": list(row.crop_paths or []),
         "created_at": row.created_at,
         "updated_at": row.updated_at,
     }
@@ -1083,6 +1153,7 @@ def _template_to_dict(row: SignalTemplate) -> dict[str, Any]:
         "description": row.description,
         "description_ar": row.description_ar,
         "is_active": row.is_active,
+        "crop_paths": list(row.crop_paths or []),
         "created_at": row.created_at,
         "updated_at": row.updated_at,
     }

@@ -80,6 +80,8 @@ export const SIGNAL_KEYS = [
   "value_slope",
   "value_delta",
   "value_trend_direction",
+  // D6: whole days since the latest record, for every value kind.
+  "days_since_latest",
 ] as const;
 export const WEATHER_SCOPES = [
   "latest_observation",
@@ -237,13 +239,19 @@ export function attributePathAppliesToCrops(path: string, cropPaths: string[]): 
 export function signalKeysForValueKind(kind: string | undefined): readonly string[] {
   switch (kind) {
     case "numeric":
-      return ["value_numeric", "value_slope", "value_delta", "value_trend_direction"];
+      return [
+        "value_numeric",
+        "value_slope",
+        "value_delta",
+        "value_trend_direction",
+        "days_since_latest",
+      ];
     case "categorical":
-      return ["value_categorical"];
+      return ["value_categorical", "days_since_latest"];
     case "event":
-      return ["value_event"];
+      return ["value_event", "days_since_latest"];
     case "boolean":
-      return ["value_boolean"];
+      return ["value_boolean", "days_since_latest"];
     default:
       // Unknown / not-yet-picked (and `geopoint`, which no key exposes) —
       // fall back to the full list rather than emptying the dropdown.

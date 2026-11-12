@@ -79,6 +79,44 @@ _AGGREGATE_SQL = """
 """
 
 
+# "Applies to this block" (see the module docstring). A definition applies
+# when an active assignment covers the block, or (D21) when it is scoped to
+# crops and the block's current crop is one of them or sits below one, unless
+# an inactive assignment covering the block opts it out. `d` is the
+# definition row; binds :block_id and :farm_id. starts_with, not LIKE: crop
+# codes are full of `_`, a LIKE wildcard.
+_ASSIGNMENT_COVERS_BLOCK_SQL = """
+    a.signal_definition_id = d.id
+    AND a.deleted_at IS NULL
+    AND (
+          (a.farm_id IS NULL AND a.block_id IS NULL)
+       OR (a.block_id = :block_id)
+       OR (a.farm_id = :farm_id AND a.block_id IS NULL)
+    )
+"""
+_APPLIES_TO_BLOCK_SQL = f"""(
+    EXISTS (
+        SELECT 1 FROM signal_assignments a
+        WHERE {_ASSIGNMENT_COVERS_BLOCK_SQL} AND a.is_active = TRUE
+    )
+    OR (
+        cardinality(d.crop_paths) > 0
+        AND EXISTS (
+            SELECT 1
+            FROM block_crops bc, unnest(d.crop_paths) AS scope(p)
+            WHERE bc.block_id = :block_id
+              AND bc.is_current = TRUE
+              AND bc.deleted_at IS NULL
+              AND (bc.crop_path = scope.p OR starts_with(bc.crop_path, scope.p || '.'))
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM signal_assignments a
+            WHERE {_ASSIGNMENT_COVERS_BLOCK_SQL} AND a.is_active = FALSE
+        )
+    )
+)"""  # noqa: S608 — static SQL, no request input
+
+
 async def load_snapshot(
     session: AsyncSession,
     *,
@@ -120,24 +158,15 @@ async def load_snapshot(
                            d.id, d.code, d.value_kind,
                            d.aggregation, d.aggregation_window_days
                     FROM public.signal_definitions d
-                    JOIN signal_assignments a ON a.signal_definition_id = d.id
                     WHERE d.deleted_at IS NULL
                       AND d.is_active = TRUE
                       -- Scope to platform + own-tenant rows. Without this a
-                      -- tenant would read every other tenant's definitions;
-                      -- the join to the tenant-scoped signal_assignments masks
-                      -- it in practice, but that is accidental, not a check.
+                      -- tenant would read every other tenant's definitions.
                       AND (
                             d.tenant_id IS NULL
                          OR d.tenant_id = (SELECT id FROM this_tenant)
                       )
-                      AND a.deleted_at IS NULL
-                      AND a.is_active = TRUE
-                      AND (
-                            (a.farm_id IS NULL AND a.block_id IS NULL)
-                         OR (a.block_id = :block_id)
-                         OR (a.farm_id = :farm_id AND a.block_id IS NULL)
-                      )
+                      AND {_APPLIES_TO_BLOCK_SQL}
                     ORDER BY d.code, d.tenant_id NULLS LAST
                 ),
                 -- CS-6: latest-mode rows + every non-numeric value_kind.
@@ -147,7 +176,12 @@ async def load_snapshot(
                     SELECT DISTINCT ON (o.signal_definition_id)
                            o.signal_definition_id, o.time,
                            o.value_numeric, o.value_categorical,
-                           o.value_event, o.value_boolean
+                           o.value_event, o.value_boolean,
+                           (
+                               a.aggregation_window_days IS NOT NULL
+                               AND o.time < public.app_now()
+                                   - make_interval(days => a.aggregation_window_days)
+                           ) AS stale
                     FROM signal_observations o
                     JOIN applicable a ON a.id = o.signal_definition_id
                     -- latest if explicitly configured, or a non-numeric def
@@ -171,7 +205,8 @@ async def load_snapshot(
                            {_AGGREGATE_SQL} AS value_numeric,
                            NULL::text     AS value_categorical,
                            NULL::text     AS value_event,
-                           NULL::boolean  AS value_boolean
+                           NULL::boolean  AS value_boolean,
+                           FALSE          AS stale
                     FROM signal_observations o
                     JOIN applicable a ON a.id = o.signal_definition_id
                     -- numeric non-latest rules, plus `count` on ANY
@@ -192,8 +227,22 @@ async def load_snapshot(
                     UNION ALL
                     SELECT * FROM aggregated_per_def
                 )
-                SELECT a.code, r.time, r.value_numeric, r.value_categorical,
-                       r.value_event, r.value_boolean
+                -- D6: on the `latest` path a window is how long the answer
+                -- stays valid. An older answer keeps its time (so
+                -- days_since_latest still reads) but its value reads as
+                -- missing, so value predicates fail closed.
+                SELECT a.code, r.time,
+                       CASE WHEN r.stale THEN NULL ELSE r.value_numeric END
+                           AS value_numeric,
+                       CASE WHEN r.stale THEN NULL ELSE r.value_categorical END
+                           AS value_categorical,
+                       CASE WHEN r.stale THEN NULL ELSE r.value_event END
+                           AS value_event,
+                       CASE WHEN r.stale THEN NULL ELSE r.value_boolean END
+                           AS value_boolean,
+                       floor(
+                           extract(epoch FROM public.app_now() - r.time) / 86400
+                       )::numeric AS days_since_latest
                 FROM applicable a
                 JOIN resolved r ON r.signal_definition_id = a.id
                 """  # noqa: S608 — only interp is the _AGGREGATE_SQL constant
@@ -214,6 +263,7 @@ async def load_snapshot(
             value_categorical=row["value_categorical"],
             value_event=row["value_event"],
             value_boolean=row["value_boolean"],
+            days_since_latest=_to_decimal(row["days_since_latest"]),
         )
         for row in rows
     }
@@ -247,21 +297,14 @@ async def _load_numeric_trends(
         (
             await session.execute(
                 text(
-                    """
+                    f"""
                     WITH applicable AS (
                         SELECT DISTINCT d.id, d.code
                         FROM signal_definitions d
-                        JOIN signal_assignments a ON a.signal_definition_id = d.id
                         WHERE d.deleted_at IS NULL
                           AND d.is_active = TRUE
                           AND d.value_kind = 'numeric'
-                          AND a.deleted_at IS NULL
-                          AND a.is_active = TRUE
-                          AND (
-                                (a.farm_id IS NULL AND a.block_id IS NULL)
-                             OR (a.block_id = :block_id)
-                             OR (a.farm_id = :farm_id AND a.block_id IS NULL)
-                          )
+                          AND {_APPLIES_TO_BLOCK_SQL}
                     )
                     SELECT a.code, o.time, o.value_numeric
                     FROM applicable a
@@ -271,7 +314,7 @@ async def _load_numeric_trends(
                       AND o.farm_id = :farm_id
                       AND o.time >= public.app_now() - make_interval(days => :window_days)
                     ORDER BY a.code, o.time
-                    """
+                    """  # noqa: S608 — only interp is the _APPLIES_TO_BLOCK_SQL constant
                 ).bindparams(
                     bindparam("block_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("farm_id", type_=PG_UUID(as_uuid=True)),

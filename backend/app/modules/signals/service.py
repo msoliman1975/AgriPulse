@@ -97,9 +97,19 @@ def _assert_categorical_ar_matches(values: list[str] | None, values_ar: list[str
         )
 
 
+def _normalize_crop_paths(paths: list[str] | None) -> list[str]:
+    """D21 crop scope as stored: unique and sorted. ``None`` (an explicit
+    null on a patch) means the same as ``[]``: every crop."""
+    return sorted(set(paths or []))
+
+
 class SignalsService(Protocol):
     async def list_definitions(
-        self, *, include_inactive: bool = False
+        self,
+        *,
+        include_inactive: bool = False,
+        crop_path: str | None = None,
+        block_id: UUID | None = None,
     ) -> tuple[dict[str, Any], ...]: ...
 
     async def get_definition(self, *, definition_id: UUID) -> dict[str, Any]: ...
@@ -124,6 +134,7 @@ class SignalsService(Protocol):
         attachment_allowed: bool,
         aggregation: str,
         aggregation_window_days: int | None,
+        crop_paths: list[str] | None = None,
         actor_user_id: UUID | None,
         tenant_schema: str | None,
     ) -> dict[str, Any]: ...
@@ -140,7 +151,11 @@ class SignalsService(Protocol):
     # ---- Templates (CS-2/3) ----
 
     async def list_templates(
-        self, *, include_inactive: bool = False
+        self,
+        *,
+        include_inactive: bool = False,
+        crop_path: str | None = None,
+        block_id: UUID | None = None,
     ) -> tuple[dict[str, Any], ...]: ...
 
     async def get_template(
@@ -156,6 +171,7 @@ class SignalsService(Protocol):
         description: str | None,
         description_ar: str | None = None,
         members: tuple[SignalTemplateDefinitionMember, ...],
+        crop_paths: list[str] | None = None,
         actor_user_id: UUID | None,
         tenant_schema: str | None,
     ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]: ...
@@ -198,6 +214,7 @@ class SignalsService(Protocol):
         definition_id: UUID,
         farm_id: UUID | None,
         block_id: UUID | None,
+        is_active: bool = True,
         actor_user_id: UUID | None,
         tenant_schema: str,
     ) -> dict[str, Any]: ...
@@ -309,9 +326,15 @@ class SignalsServiceImpl:
     # ---- Definitions --------------------------------------------------
 
     async def list_definitions(
-        self, *, include_inactive: bool = False
+        self,
+        *,
+        include_inactive: bool = False,
+        crop_path: str | None = None,
+        block_id: UUID | None = None,
     ) -> tuple[dict[str, Any], ...]:
-        return await self._repo.list_definitions(include_inactive=include_inactive)
+        return await self._repo.list_definitions(
+            include_inactive=include_inactive, crop_path=crop_path, block_id=block_id
+        )
 
     async def get_definition(self, *, definition_id: UUID) -> dict[str, Any]:
         row = await self._repo.get_definition(definition_id=definition_id)
@@ -339,6 +362,7 @@ class SignalsServiceImpl:
         attachment_allowed: bool,
         aggregation: str,
         aggregation_window_days: int | None,
+        crop_paths: list[str] | None = None,
         actor_user_id: UUID | None,
         tenant_schema: str | None,
     ) -> dict[str, Any]:
@@ -357,12 +381,9 @@ class SignalsServiceImpl:
         # schema-layer coercion runs here (not in the Pydantic model)
         # because the relevant value_kind comes from the request body
         # alongside the aggregation field.
+        # D6 — the window is kept for `latest` too: it is how long the
+        # latest answer stays valid. An older answer reads as missing.
         coerced_aggregation = _coerce_aggregation_for_value_kind(value_kind, aggregation)
-        if coerced_aggregation == "latest" and aggregation_window_days is not None:
-            # Window only meaningful for non-latest rules; clamp instead
-            # of erroring so non-numeric defs (which always coerce to
-            # latest) don't 400 when a UI sends a window unconditionally.
-            aggregation_window_days = None
 
         definition_id = uuid7()
         row = await self._repo.insert_definition(
@@ -382,6 +403,7 @@ class SignalsServiceImpl:
             attachment_allowed=attachment_allowed,
             aggregation=coerced_aggregation,
             aggregation_window_days=aggregation_window_days,
+            crop_paths=_normalize_crop_paths(crop_paths),
             actor_user_id=actor_user_id,
         )
         await self._audit_catalog(
@@ -420,16 +442,16 @@ class SignalsServiceImpl:
                 updates.get("categorical_values", existing["categorical_values"]),
                 updates["categorical_values_ar"],
             )
+        if "crop_paths" in updates:
+            updates["crop_paths"] = _normalize_crop_paths(updates["crop_paths"])
         # CS-1 D3 — if the caller is changing aggregation, coerce
         # against the existing value_kind (kind itself isn't updatable
-        # per SignalDefinitionUpdateRequest). Window-day cleanup mirrors
-        # create_definition: `latest` always has window = NULL.
+        # per SignalDefinitionUpdateRequest). D6: the window survives a
+        # change to `latest`; there it bounds how old the answer may be.
         if "aggregation" in updates and updates["aggregation"] is not None:
             updates["aggregation"] = _coerce_aggregation_for_value_kind(
                 str(existing["value_kind"]), updates["aggregation"]
             )
-            if updates["aggregation"] == "latest":
-                updates["aggregation_window_days"] = None
         out = await self._repo.update_definition(
             definition_id=definition_id, updates=updates, actor_user_id=actor_user_id
         )
@@ -525,6 +547,7 @@ class SignalsServiceImpl:
         definition_id: UUID,
         farm_id: UUID | None,
         block_id: UUID | None,
+        is_active: bool = True,
         actor_user_id: UUID | None,
         tenant_schema: str,
     ) -> dict[str, Any]:
@@ -538,6 +561,7 @@ class SignalsServiceImpl:
             definition_id=definition_id,
             farm_id=farm_id,
             block_id=block_id,
+            is_active=is_active,
             actor_user_id=actor_user_id,
         )
         await self._audit.record(
@@ -550,6 +574,7 @@ class SignalsServiceImpl:
             details={
                 "signal_definition_id": str(definition_id),
                 "block_id": str(block_id) if block_id else None,
+                "is_active": is_active,
             },
         )
         return row
@@ -849,8 +874,16 @@ class SignalsServiceImpl:
 
     # ---- Templates (CS-2/3) -------------------------------------------
 
-    async def list_templates(self, *, include_inactive: bool = False) -> tuple[dict[str, Any], ...]:
-        return await self._repo.list_templates(include_inactive=include_inactive)
+    async def list_templates(
+        self,
+        *,
+        include_inactive: bool = False,
+        crop_path: str | None = None,
+        block_id: UUID | None = None,
+    ) -> tuple[dict[str, Any], ...]:
+        return await self._repo.list_templates(
+            include_inactive=include_inactive, crop_path=crop_path, block_id=block_id
+        )
 
     async def get_template(
         self, *, template_id: UUID
@@ -870,6 +903,7 @@ class SignalsServiceImpl:
         description: str | None,
         description_ar: str | None = None,
         members: tuple[SignalTemplateDefinitionMember, ...],
+        crop_paths: list[str] | None = None,
         actor_user_id: UUID | None,
         tenant_schema: str | None,
     ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
@@ -886,6 +920,7 @@ class SignalsServiceImpl:
             description=description,
             description_ar=description_ar,
             members=repo_members,
+            crop_paths=_normalize_crop_paths(crop_paths),
             actor_user_id=actor_user_id,
         )
         await self._audit_catalog(
@@ -928,6 +963,8 @@ class SignalsServiceImpl:
                 (m.signal_definition_id, m.position, m.is_required) for m in members
             )
 
+        if "crop_paths" in updates:
+            updates = {**updates, "crop_paths": _normalize_crop_paths(updates["crop_paths"])}
         out = await self._repo.update_template(
             template_id=template_id,
             updates=updates,

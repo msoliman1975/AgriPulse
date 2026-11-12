@@ -739,10 +739,14 @@ describe("source vocabularies vs the tree's targeting", () => {
       "value_slope",
       "value_delta",
       "value_trend_direction",
+      "days_since_latest",
     ]);
-    expect(signalKeysForValueKind("categorical")).toEqual(["value_categorical"]);
-    expect(signalKeysForValueKind("boolean")).toEqual(["value_boolean"]);
-    expect(signalKeysForValueKind("event")).toEqual(["value_event"]);
+    expect(signalKeysForValueKind("categorical")).toEqual([
+      "value_categorical",
+      "days_since_latest",
+    ]);
+    expect(signalKeysForValueKind("boolean")).toEqual(["value_boolean", "days_since_latest"]);
+    expect(signalKeysForValueKind("event")).toEqual(["value_event", "days_since_latest"]);
     // No definition picked yet — don't empty the dropdown.
     expect(signalKeysForValueKind(undefined)).toEqual(SIGNAL_KEYS);
   });

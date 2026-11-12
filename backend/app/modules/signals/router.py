@@ -62,6 +62,14 @@ from app.shared.rbac.check import (
 
 router = APIRouter(prefix="/api/v1", tags=["signals"])
 
+# D21 — narrow a catalog listing to one crop: rows scoped to that crop, an
+# ancestor or a descendant of it, plus every unscoped (all-crops) row.
+_CROP_PATH_QUERY = Query(
+    default=None,
+    pattern=r"^[a-z][a-z0-9_]*(\.[a-z0-9][a-z0-9_]*){0,2}$",
+    max_length=128,
+)
+
 
 def _service(
     tenant_session: AsyncSession = Depends(get_db_session),
@@ -115,6 +123,9 @@ async def _resolve_tenant_id(*, schema: str, tenant_session: AsyncSession) -> UU
 async def list_definitions(
     include_inactive: bool = Query(default=False),
     farm_id: UUID | None = Query(default=None),
+    crop_path: str | None = _CROP_PATH_QUERY,
+    # D21 — only what applies to this block's current crop (the scout app).
+    block_id: UUID | None = Query(default=None),
     # SMK-RBAC-GAP-02: signal definitions are tenant-wide config, but the
     # capability is farm-scoped. Gate on the farm in scope so a farm-scoped-only
     # user can load them (the signals page passes ?farm_id=) to record against.
@@ -122,7 +133,11 @@ async def list_definitions(
     service: SignalsServiceImpl = Depends(_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
-    return list(await service.list_definitions(include_inactive=include_inactive))
+    return list(
+        await service.list_definitions(
+            include_inactive=include_inactive, crop_path=crop_path, block_id=block_id
+        )
+    )
 
 
 @router.post(
@@ -153,6 +168,7 @@ async def create_definition(
         attachment_allowed=payload.attachment_allowed,
         aggregation=payload.aggregation,
         aggregation_window_days=payload.aggregation_window_days,
+        crop_paths=payload.crop_paths,
         actor_user_id=context.user_id,
         tenant_schema=schema,
     )
@@ -289,6 +305,7 @@ async def create_assignment(
         definition_id=definition_id,
         farm_id=payload.farm_id,
         block_id=payload.block_id,
+        is_active=payload.is_active,
         actor_user_id=context.user_id,
         tenant_schema=schema,
     )
@@ -338,11 +355,18 @@ class SignalTemplateWithMembersResponse(BaseModel):
 )
 async def list_templates(
     include_inactive: bool = Query(default=False),
+    crop_path: str | None = _CROP_PATH_QUERY,
+    # D21 — only the forms that apply to this block's current crop.
+    block_id: UUID | None = Query(default=None),
     context: RequestContext = Depends(requires_capability("signal.read", any_farm=True)),
     service: SignalsServiceImpl = Depends(_service),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
-    return list(await service.list_templates(include_inactive=include_inactive))
+    return list(
+        await service.list_templates(
+            include_inactive=include_inactive, crop_path=crop_path, block_id=block_id
+        )
+    )
 
 
 @router.post(
@@ -364,6 +388,7 @@ async def create_template(
         description=payload.description,
         description_ar=payload.description_ar,
         members=tuple(payload.members),
+        crop_paths=payload.crop_paths,
         actor_user_id=context.user_id,
         tenant_schema=schema,
     )
@@ -797,11 +822,14 @@ def _platform_service(
 )
 async def platform_list_definitions(
     include_inactive: bool = Query(default=True),
+    crop_path: str | None = _CROP_PATH_QUERY,
     context: RequestContext = Depends(requires_capability("signal.platform.manage")),
     service: SignalsServiceImpl = Depends(_platform_service),
 ) -> list[dict[str, Any]]:
     del context
-    return list(await service.list_definitions(include_inactive=include_inactive))
+    return list(
+        await service.list_definitions(include_inactive=include_inactive, crop_path=crop_path)
+    )
 
 
 @router.post(
@@ -831,6 +859,7 @@ async def platform_create_definition(
         attachment_allowed=payload.attachment_allowed,
         aggregation=payload.aggregation,
         aggregation_window_days=payload.aggregation_window_days,
+        crop_paths=payload.crop_paths,
         actor_user_id=context.user_id,
         # No tenant schema: audit_events is per-tenant, so a platform write has
         # nowhere tenant-shaped to record. See SignalsServiceImpl._audit_catalog.
@@ -864,11 +893,14 @@ async def platform_update_definition(
 )
 async def platform_list_templates(
     include_inactive: bool = Query(default=True),
+    crop_path: str | None = _CROP_PATH_QUERY,
     context: RequestContext = Depends(requires_capability("signal.platform.manage")),
     service: SignalsServiceImpl = Depends(_platform_service),
 ) -> list[dict[str, Any]]:
     del context
-    return list(await service.list_templates(include_inactive=include_inactive))
+    return list(
+        await service.list_templates(include_inactive=include_inactive, crop_path=crop_path)
+    )
 
 
 @router.get(
@@ -904,6 +936,7 @@ async def platform_create_template(
         description=payload.description,
         description_ar=payload.description_ar,
         members=tuple(payload.members),
+        crop_paths=payload.crop_paths,
         actor_user_id=context.user_id,
         tenant_schema=None,
     )
