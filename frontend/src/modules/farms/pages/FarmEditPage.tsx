@@ -80,6 +80,7 @@ export function FarmEditPage(): JSX.Element {
           subtitle={farm.name}
         />
         <FarmForm
+          farmId={farmId}
           initial={{
             code: farm.code,
             name: farm.name,

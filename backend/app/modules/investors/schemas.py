@@ -444,6 +444,25 @@ class InvestorAppVersionResponse(BaseModel):
     download_url: str | None = None
 
 
+class InvestorAppPhotoRead(BaseModel):
+    """The newest clear satellite photo over the holding's farm.
+
+    A picture of the ground, nothing measured: no index values, no cloud
+    statistics. Just enough for the map to draw it and say when it was taken.
+    """
+
+    scene_datetime: datetime
+    #: XYZ template (``{z}/{x}/{y}`` left in) for a 512 px raster source.
+    tile_url: str
+
+
+class InvestorAppPhotoResponse(BaseModel):
+    """GET /investor/holdings/{holding_id}/latest-photo. ``photo`` may be null."""
+
+    holding_id: UUID
+    photo: InvestorAppPhotoRead | None = None
+
+
 # ---- Block detection for drawn or uploaded shapes -------------------------
 
 

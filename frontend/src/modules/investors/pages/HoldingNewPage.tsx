@@ -266,6 +266,7 @@ export function HoldingNewPage(): JSX.Element {
           <Card>
             <p className="mb-2 text-sm text-ap-muted">{t("newHolding.drawHelp")}</p>
             <MapDraw
+              farmId={farmId}
               references={references}
               onChange={setPolygon}
               clearLabel={t("newHolding.clear")}
@@ -328,6 +329,7 @@ export function HoldingNewPage(): JSX.Element {
             <>
               <Card>
                 <FarmHoldingsMap
+                  farmId={farmId}
                   blocks={mapQ.data.blocks}
                   holdings={mapQ.data.holdings}
                   previews={rows.map((r) => ({

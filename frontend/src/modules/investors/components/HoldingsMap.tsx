@@ -1,23 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import type { FeatureCollection, Polygon } from "geojson";
 
 import type { Holding } from "@/api/investors";
+import { SatelliteBasemapControl, satelliteStyle, useFarmLatestPhoto } from "@/lib/basemap";
 import { bboxOfGeometry, centerOfBbox } from "@/lib/geometry";
 import { HOLDING_STATUS_COLOR } from "../lib";
-
-const RASTER_STYLE: maplibregl.StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      attribution: "© OpenStreetMap contributors",
-    },
-  },
-  layers: [{ id: "osm", type: "raster", source: "osm" }],
-};
 
 interface Props {
   block: Polygon;
@@ -26,6 +14,8 @@ interface Props {
   highlightId?: string;
   onSelect?: (holdingId: string) => void;
   className?: string;
+  /** The farm, for its latest satellite photo. */
+  farmId?: string | null;
 }
 
 /**
@@ -38,8 +28,11 @@ export function HoldingsMap({
   highlightId,
   onSelect,
   className,
+  farmId,
 }: Props): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null);
+  const [mapForBase, setMapForBase] = useState<maplibregl.Map | null>(null);
+  const photo = useFarmLatestPhoto(farmId);
   // Kept in a ref so a new callback each render does not rebuild the map.
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
@@ -49,7 +42,7 @@ export function HoldingsMap({
     if (!ref.current) return;
     const map = new maplibregl.Map({
       container: ref.current,
-      style: RASTER_STYLE,
+      style: satelliteStyle(),
       center: centerOfBbox(block),
       zoom: 15,
     });
@@ -117,17 +110,22 @@ export function HoldingsMap({
         });
       }
     });
+    setMapForBase(map);
     return () => {
+      setMapForBase(null);
       resize.disconnect();
       map.remove();
     };
   }, [block, holdings, highlightId, selectable]);
 
   return (
-    <div
-      ref={ref}
-      data-testid="holdings-map"
-      className={className ?? "h-72 w-full overflow-hidden rounded-md border border-ap-line"}
-    />
+    <div className="relative">
+      <div
+        ref={ref}
+        data-testid="holdings-map"
+        className={className ?? "h-72 w-full overflow-hidden rounded-md border border-ap-line"}
+      />
+      <SatelliteBasemapControl map={mapForBase} photo={photo} />
+    </div>
   );
 }

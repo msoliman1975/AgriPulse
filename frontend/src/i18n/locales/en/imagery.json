@@ -48,5 +48,13 @@
     "failed": "Failed",
     "skipped_cloud": "Skipped (cloud)",
     "skipped_duplicate": "Skipped (duplicate)"
+  },
+  "basemap": {
+    "label": "Map background",
+    "latest": "Latest",
+    "highres": "High-res",
+    "photoDate": "Farm: Sentinel-2 photo of {{date}} (10 m)",
+    "aroundDate": "Around it: high-res image of {{date}}",
+    "baseDate": "Satellite image of {{date}}"
   }
 }

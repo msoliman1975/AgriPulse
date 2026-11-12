@@ -36,6 +36,8 @@ interface Props {
   onCancel?: () => void;
   busy?: boolean;
   error?: string | null;
+  /** Set when editing, so the map can lay the farm's latest photo over it. */
+  farmId?: string;
 }
 
 /**
@@ -53,6 +55,7 @@ export function FarmForm({
   onCancel,
   busy,
   error,
+  farmId,
 }: Props): ReactNode {
   const { t, i18n } = useTranslation("farms");
   const isAr = i18n.language === "ar";
@@ -369,7 +372,7 @@ export function FarmForm({
       <Card title={t("form.boundary")}>
         <p className="text-sm text-ap-muted">{t("form.boundaryHelp")}</p>
         <div className="mt-4">
-          <MapDraw onChange={setDrawnPolygon} />
+          <MapDraw onChange={setDrawnPolygon} farmId={farmId} />
         </div>
         <div className="mt-4">
           <AoiUploader

@@ -81,6 +81,7 @@ export function BlockEditPage(): JSX.Element {
           title={t("block.edit")}
         />
         <BlockForm
+          farmId={farmId}
           initial={{
             code: block.code,
             name: block.name,

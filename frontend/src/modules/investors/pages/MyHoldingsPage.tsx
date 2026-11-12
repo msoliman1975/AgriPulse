@@ -12,32 +12,22 @@ import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Skeleton } from "@/components/Skeleton";
+import { SatelliteBasemapControl, satelliteStyle, useHoldingLatestPhoto } from "@/lib/basemap";
 import { bboxOfGeometry } from "@/lib/geometry";
 import { localizedName } from "@/lib/localizedField";
 import { AreaDisplay } from "@/modules/farms/components/AreaDisplay";
 
-const RASTER_STYLE: maplibregl.StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      attribution: "© OpenStreetMap contributors",
-    },
-  },
-  layers: [{ id: "osm", type: "raster", source: "osm" }],
-};
-
 /** The holding over its block outline. Nothing else of the farm is drawn. */
 function HoldingMap({ holding }: { holding: InvestorAppHolding }): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null);
+  const [mapForBase, setMapForBase] = useState<maplibregl.Map | null>(null);
+  const photo = useHoldingLatestPhoto(holding.holding_id);
   useEffect(() => {
     if (!ref.current) return;
     const [minX, minY, maxX, maxY] = bboxOfGeometry(holding.block_boundary);
     const map = new maplibregl.Map({
       container: ref.current,
-      style: RASTER_STYLE,
+      style: satelliteStyle(),
       bounds: [
         [minX, minY],
         [maxX, maxY],
@@ -82,17 +72,22 @@ function HoldingMap({ holding }: { holding: InvestorAppHolding }): JSX.Element {
         paint: { "line-color": "#a16207", "line-width": 2 },
       });
     });
+    setMapForBase(map);
     return () => {
+      setMapForBase(null);
       resize.disconnect();
       map.remove();
     };
   }, [holding]);
   return (
-    <div
-      ref={ref}
-      data-testid="my-holding-map"
-      className="h-80 w-full overflow-hidden rounded-md border border-ap-line"
-    />
+    <div className="relative">
+      <div
+        ref={ref}
+        data-testid="my-holding-map"
+        className="h-80 w-full overflow-hidden rounded-md border border-ap-line"
+      />
+      <SatelliteBasemapControl map={mapForBase} photo={photo} />
+    </div>
   );
 }
 

@@ -25,6 +25,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { Feature, FeatureCollection, Polygon } from "geojson";
 
 import type { StatusCode } from "@/api/farmHealth";
+import { ESRI_IMAGERY_TILES, SatelliteBasemapControl, useFarmLatestPhoto } from "@/lib/basemap";
 import { areaBounds, farmBounds, boundsOfPolygon, padBounds, toLngLatBounds } from "../lib/fit";
 import {
   bboxToImageCoordinates,
@@ -82,6 +83,8 @@ interface Props {
   fitMode: FitMode;
   /** Changing this refits without changing the mode: pass the block id. */
   fitKey: string;
+  /** The farm, for its latest satellite photo under the health colours. */
+  farmId?: string | null;
 }
 
 export type FitMode = "block" | "area" | "farm";
@@ -110,9 +113,7 @@ function buildStyle(): StyleSpecification {
     sources: {
       satellite: {
         type: "raster",
-        tiles: [
-          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        ],
+        tiles: [ESRI_IMAGERY_TILES],
         tileSize: 256,
         attribution:
           "Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, " +
@@ -196,8 +197,11 @@ export function HealthMap({
   onSelectCell,
   fitMode,
   fitKey,
+  farmId,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [mapForBase, setMapForBase] = useState<MlMap | null>(null);
+  const photo = useFarmLatestPhoto(farmId);
   const mapRef = useRef<MlMap | null>(null);
   // State, not a ref. A ref change does not re-run an effect, so gating the
   // data effects on one meant that whenever the queries resolved before the
@@ -252,6 +256,7 @@ export function HealthMap({
     // animate a second fit over an already-correct view.
     if (initialBox) lastFit.current = `${fitModeRef.current}|${fitKeyRef.current}`;
     mapRef.current = map;
+    setMapForBase(map);
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
 
@@ -368,6 +373,7 @@ export function HealthMap({
       setReady(false);
       lastFit.current = null;
       resizeObserver.disconnect();
+      setMapForBase(null);
       map.remove();
       mapRef.current = null;
     };
@@ -480,5 +486,10 @@ export function HealthMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitKey, fitMode, blocks, cells, ready]);
 
-  return <div ref={containerRef} className="h-full w-full" data-testid="health-map" />;
+  return (
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className="h-full w-full" data-testid="health-map" />
+      <SatelliteBasemapControl map={mapForBase} photo={photo} />
+    </div>
+  );
 }

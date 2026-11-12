@@ -181,6 +181,8 @@ async def test_investor_reads_only_their_own_holdings(scouting_env: ScoutingFixt
         listed = await c.get("/api/v1/investor/holdings")
         one = await c.get(f"/api/v1/investor/holdings/{mine['id']}")
         other = await c.get(f"/api/v1/investor/holdings/{theirs['id']}")
+        photo = await c.get(f"/api/v1/investor/holdings/{mine['id']}/latest-photo")
+        other_photo = await c.get(f"/api/v1/investor/holdings/{theirs['id']}/latest-photo")
         staff_route = await c.get(f"/api/v1/farms/{env.farm_id}/holdings")
 
     assert who.status_code == 200, who.text
@@ -192,6 +194,11 @@ async def test_investor_reads_only_their_own_holdings(scouting_env: ScoutingFixt
     assert one.json()["period"] == "current"
     # Another investor's holding answers like a missing one.
     assert other.status_code == 404, other.text
+    # No imagery fetched for this farm yet: no photo, and no error.
+    assert photo.status_code == 200, photo.text
+    assert photo.json() == {"holding_id": mine["id"], "photo": None}
+    # Someone else's holding gives away nothing, not even its farm's photo.
+    assert other_photo.status_code == 404, other_photo.text
     # Staff routes stay closed to an investor token.
     assert staff_route.status_code == 403, staff_route.text
 

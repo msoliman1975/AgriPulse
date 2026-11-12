@@ -1,22 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import type { FeatureCollection, Polygon } from "geojson";
 
 import type { FarmMapBlock, Holding } from "@/api/investors";
+import { SatelliteBasemapControl, satelliteStyle, useFarmLatestPhoto } from "@/lib/basemap";
 import { HOLDING_STATUS_COLOR } from "../lib";
-
-const RASTER_STYLE: maplibregl.StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: "raster",
-      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-      tileSize: 256,
-      attribution: "© OpenStreetMap contributors",
-    },
-  },
-  layers: [{ id: "osm", type: "raster", source: "osm" }],
-};
 
 interface Props {
   blocks: FarmMapBlock[];
@@ -28,6 +16,8 @@ interface Props {
   /** Uploaded shapes not saved yet: green when they fit a block, red when not. */
   previews?: { geometry: Polygon; ok: boolean }[];
   className?: string;
+  /** The farm, for its latest satellite photo. */
+  farmId?: string | null;
 }
 
 /**
@@ -42,8 +32,11 @@ export function FarmHoldingsMap({
   onHoldingClick,
   previews,
   className,
+  farmId,
 }: Props): JSX.Element {
   const ref = useRef<HTMLDivElement | null>(null);
+  const [mapForBase, setMapForBase] = useState<maplibregl.Map | null>(null);
+  const photo = useFarmLatestPhoto(farmId);
   // Kept in refs so a new callback each render does not rebuild the map.
   const onBlockRef = useRef(onBlockClick);
   const onHoldingRef = useRef(onHoldingClick);
@@ -58,7 +51,7 @@ export function FarmHoldingsMap({
     }
     const map = new maplibregl.Map({
       container: ref.current,
-      style: RASTER_STYLE,
+      style: satelliteStyle(),
       bounds,
       fitBoundsOptions: { padding: 30 },
     });
@@ -166,17 +159,22 @@ export function FarmHoldingsMap({
         map.getCanvas().style.cursor = n > 0 ? "pointer" : "";
       });
     });
+    setMapForBase(map);
     return () => {
+      setMapForBase(null);
       resize.disconnect();
       map.remove();
     };
   }, [blocks, holdings, selectedBlockId, previews]);
 
   return (
-    <div
-      ref={ref}
-      data-testid="farm-holdings-map"
-      className={className ?? "h-96 w-full overflow-hidden rounded-md border border-ap-line"}
-    />
+    <div className="relative">
+      <div
+        ref={ref}
+        data-testid="farm-holdings-map"
+        className={className ?? "h-96 w-full overflow-hidden rounded-md border border-ap-line"}
+      />
+      <SatelliteBasemapControl map={mapForBase} photo={photo} />
+    </div>
   );
 }

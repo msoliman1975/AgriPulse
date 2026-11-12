@@ -48,5 +48,13 @@
     "failed": "فاشل",
     "skipped_cloud": "تم التخطي (غيوم)",
     "skipped_duplicate": "تم التخطي (مكرر)"
+  },
+  "basemap": {
+    "label": "خلفية الخريطة",
+    "latest": "الأحدث",
+    "highres": "عالية الدقة",
+    "photoDate": "المزرعة: صورة Sentinel-2 بتاريخ {{date}} (10 م)",
+    "aroundDate": "ما حولها: صورة عالية الدقة بتاريخ {{date}}",
+    "baseDate": "صورة القمر الصناعي بتاريخ {{date}}"
   }
 }

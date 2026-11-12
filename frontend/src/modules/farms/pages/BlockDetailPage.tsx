@@ -183,7 +183,7 @@ export function BlockDetailPage(): JSX.Element {
       />
 
       <Card>
-        <MapPreview geometry={block.boundary} />
+        <MapPreview geometry={block.boundary} farmId={block.farm_id} />
       </Card>
 
       <Card>

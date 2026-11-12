@@ -1,8 +1,9 @@
 import maplibregl from "maplibre-gl";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Feature, FeatureCollection, Geometry, Polygon } from "geojson";
 
 import type { CellFeature, PixelFeature } from "@/api/observer";
+import { ESRI_IMAGERY_TILES, SatelliteBasemapControl } from "@/lib/basemap";
 import { centerOfBbox } from "@/lib/geometry";
 
 /**
@@ -33,9 +34,7 @@ function buildStyle(): maplibregl.StyleSpecification {
     sources: {
       satellite: {
         type: "raster",
-        tiles: [
-          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        ],
+        tiles: [ESRI_IMAGERY_TILES],
         tileSize: satelliteTileSize(),
         attribution:
           "Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, " +
@@ -70,21 +69,19 @@ interface Props {
 function pixelCollection(pixels: PixelFeature[]): FeatureCollection<Polygon> {
   return {
     type: "FeatureCollection",
-    features: pixels.map(
-      (p): Feature<Polygon> => ({
-        type: "Feature",
-        geometry: p.geometry as unknown as Polygon,
-        properties: {
-          row: p.row,
-          col: p.col,
-          // MapLibre expressions cannot branch on null, so carry a separate
-          // flag and keep `value` numeric.
-          value: p.value ?? 0,
-          hasValue: p.value === null ? 0 : 1,
-          masked: p.masked ? 1 : 0,
-        },
-      }),
-    ),
+    features: pixels.map((p): Feature<Polygon> => ({
+      type: "Feature",
+      geometry: p.geometry as unknown as Polygon,
+      properties: {
+        row: p.row,
+        col: p.col,
+        // MapLibre expressions cannot branch on null, so carry a separate
+        // flag and keep `value` numeric.
+        value: p.value ?? 0,
+        hasValue: p.value === null ? 0 : 1,
+        masked: p.masked ? 1 : 0,
+      },
+    })),
   };
 }
 
@@ -94,19 +91,17 @@ function cellCollection(
 ): FeatureCollection<Polygon> {
   return {
     type: "FeatureCollection",
-    features: cells.map(
-      (c): Feature<Polygon> => ({
-        type: "Feature",
-        id: c.cell_id,
-        geometry: c.geometry as unknown as Polygon,
-        properties: {
-          cell_id: c.cell_id,
-          label: `R${c.row_idx}C${c.col_idx}`,
-          selected: c.cell_id === selectedId ? 1 : 0,
-          hasMean: c.mean === null ? 0 : 1,
-        },
-      }),
-    ),
+    features: cells.map((c): Feature<Polygon> => ({
+      type: "Feature",
+      id: c.cell_id,
+      geometry: c.geometry as unknown as Polygon,
+      properties: {
+        cell_id: c.cell_id,
+        label: `R${c.row_idx}C${c.col_idx}`,
+        selected: c.cell_id === selectedId ? 1 : 0,
+        hasMean: c.mean === null ? 0 : 1,
+      },
+    })),
   };
 }
 
@@ -122,6 +117,7 @@ export function ObserverSceneMap({
 }: Props): ReactNode {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const [mapForBase, setMapForBase] = useState<maplibregl.Map | null>(null);
   const readyRef = useRef(false);
   // Handlers live in refs so the map is built once and never torn down just
   // because the parent re-rendered with new callback identities.
@@ -138,6 +134,7 @@ export function ObserverSceneMap({
       maxZoom: 22,
     });
     mapRef.current = map;
+    setMapForBase(map);
 
     map.on("load", () => {
       map.addSource("pixels", { type: "geojson", data: pixelCollection([]) });
@@ -240,6 +237,7 @@ export function ObserverSceneMap({
 
     return () => {
       readyRef.current = false;
+      setMapForBase(null);
       mapRef.current = null;
       map.remove();
     };
@@ -262,5 +260,10 @@ export function ObserverSceneMap({
     else map.once("observer:ready", apply);
   }, [pixels, cells, selectedCellId]);
 
-  return <div ref={containerRef} className={className ?? "h-[28rem] w-full rounded"} />;
+  return (
+    <div className="relative">
+      <div ref={containerRef} className={className ?? "h-[28rem] w-full rounded"} />
+      <SatelliteBasemapControl map={mapForBase} photo={null} />
+    </div>
+  );
 }

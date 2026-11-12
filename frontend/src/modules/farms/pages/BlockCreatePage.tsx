@@ -50,6 +50,7 @@ export function BlockCreatePage(): JSX.Element {
           title={t("detail.addBlock")}
         />
         <BlockForm
+          farmId={farmId}
           submitLabel={t("form.submitBlockCreate")}
           onSubmit={handleSubmit}
           onCancel={() => navigate(`/farms/${farmId}`)}

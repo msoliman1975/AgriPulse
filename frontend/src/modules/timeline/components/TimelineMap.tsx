@@ -9,7 +9,7 @@
 // part that must not drift: the marker artwork (`registerMarkerImages`)
 // and the tile-URL rules (`pixelTiles`), both imported.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl, {
   type GeoJSONSource,
   type Map as MlMap,
@@ -18,6 +18,7 @@ import maplibregl, {
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { FeatureCollection, MultiPolygon, Point, Polygon } from "geojson";
 
+import { ESRI_IMAGERY_TILES, SatelliteBasemapControl } from "@/lib/basemap";
 import { registerMarkerImages } from "@/modules/labs/map/markerIcons";
 import type { MarkProps } from "../lib/marks";
 import { buildMarkElement, updateMarkElement, type CardMark } from "../lib/cardMarkElement";
@@ -92,9 +93,7 @@ function buildStyle(): StyleSpecification {
     sources: {
       satellite: {
         type: "raster",
-        tiles: [
-          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        ],
+        tiles: [ESRI_IMAGERY_TILES],
         tileSize: 256,
         attribution:
           "Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, " +
@@ -133,6 +132,7 @@ export function TimelineMap({
 }: Props): React.ReactElement {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
+  const [mapForBase, setMapForBase] = useState<MlMap | null>(null);
   const readyRef = useRef(false);
   const lastFitRef = useRef<string | null>(null);
   const onMarkClickRef = useRef(onMarkClick);
@@ -201,6 +201,7 @@ export function TimelineMap({
     });
     if (initialBounds) lastFitRef.current = initial.fitKey;
     mapRef.current = map;
+    setMapForBase(map);
     map.dragRotate.disable();
     map.touchZoomRotate.disableRotation();
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
@@ -338,6 +339,7 @@ export function TimelineMap({
     return () => {
       ro.disconnect();
       readyRef.current = false;
+      setMapForBase(null);
       map.remove();
       mapRef.current = null;
       // The cache indexes layers of a map that no longer exists. Leaving it
@@ -457,6 +459,8 @@ export function TimelineMap({
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" data-testid="timeline-map" />
+      {/* Each pass paints its own index raster, so only the base's date is shown. */}
+      <SatelliteBasemapControl map={mapForBase} photo={null} />
       {/* No text in here, so nothing to mirror under RTL. `pointer-events-none`
           because the line sits over the canvas and must not eat a drag. */}
       <svg
