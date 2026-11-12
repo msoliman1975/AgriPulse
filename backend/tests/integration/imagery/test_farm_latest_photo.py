@@ -160,6 +160,9 @@ async def test_latest_photo_skips_a_pass_clouded_over_the_farm(
     # s2_l2a stores blue, green, red first: red is band 3.
     assert photo["rgb_band_indexes"] == [3, 2, 1]
     assert photo["clear_fraction"] == pytest.approx(0.98)
+    west, south, east, north = photo["bounds"]
+    assert west < east, "the farm's box, for the map source"
+    assert south < north
     # The tile URL carries the asset as an encoded query value.
     asset = parse_qs(urlsplit(photo["tile_url"]).query)["url"]
     assert asset == [

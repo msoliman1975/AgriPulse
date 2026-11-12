@@ -112,7 +112,13 @@ async def investor_holding_latest_photo(
     return {
         "holding_id": holding_id,
         "photo": (
-            {"scene_datetime": photo.scene_datetime, "tile_url": photo.tile_url} if photo else None
+            {
+                "scene_datetime": photo.scene_datetime,
+                "tile_url": photo.tile_url,
+                "bounds": photo.bounds,
+            }
+            if photo
+            else None
         ),
     }
 

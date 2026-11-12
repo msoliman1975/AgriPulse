@@ -10,6 +10,8 @@ import { CAPTURE_DATE_MIN_ZOOM, esriCaptureDateUrl, parseEsriCaptureDate } from 
 export interface LatestPhoto {
   scene_datetime: string;
   tile_url: string;
+  /** `[west, south, east, north]` of the farm; absent from older apis. */
+  bounds?: [number, number, number, number] | null;
 }
 
 interface LatestPhotoResponse {

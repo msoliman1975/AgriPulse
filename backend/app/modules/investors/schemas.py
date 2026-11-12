@@ -454,6 +454,8 @@ class InvestorAppPhotoRead(BaseModel):
     scene_datetime: datetime
     #: XYZ template (``{z}/{x}/{y}`` left in) for a 512 px raster source.
     tile_url: str
+    #: ``[west, south, east, north]`` of the farm, to limit the tile requests.
+    bounds: tuple[float, float, float, float] | None = None
 
 
 class InvestorAppPhotoResponse(BaseModel):

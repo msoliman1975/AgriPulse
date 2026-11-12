@@ -9,7 +9,7 @@ function fakeMap(layerIds: string[]) {
   const sources = new Map<string, { tiles?: string[] }>();
   const visibility = new Map<string, string>();
   const map = {
-    isStyleLoaded: () => true,
+    style: { _loaded: true },
     once: vi.fn(),
     getStyle: () => ({ layers }),
     getSource: (id: string) => sources.get(id),
@@ -65,11 +65,18 @@ describe("applyLatestPhoto", () => {
     expect(f.layers.map((l) => l.id)).toEqual(["satellite", "outline"]);
   });
 
+  it("limits the photo to the farm's box when given one", () => {
+    const f = fakeMap(["satellite"]);
+    applyLatestPhoto(f.map, "u1", true, [32.63, 30.07, 32.64, 30.08]);
+    expect(f.sources.get(PHOTO_SOURCE_ID)).toMatchObject({ bounds: [32.63, 30.07, 32.64, 30.08] });
+  });
+
   it("waits for a style that is still loading", () => {
     const f = fakeMap(["satellite"]);
-    (f.map as unknown as { isStyleLoaded: () => boolean }).isStyleLoaded = () => false;
+    // Tiles in flight do not matter, only whether the style document loaded.
+    (f.map as unknown as { style: { _loaded: boolean } }).style._loaded = false;
     applyLatestPhoto(f.map, "u1", true);
-    expect(f.map.once).toHaveBeenCalledWith("idle", expect.any(Function));
+    expect(f.map.once).toHaveBeenCalledWith("load", expect.any(Function));
     expect(f.sources.size).toBe(0);
   });
 });

@@ -406,6 +406,14 @@ export function MapCanvas({
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MlMap | null>(null);
+  // True once the init effect's own `load` handler has run, i.e. every source
+  // and layer the data effects below write into exists. NOT
+  // `map.isStyleLoaded()`: in MapLibre 4 that is false while ANY source still
+  // has tiles in flight, so an effect gated on it either waited for `idle`
+  // (behind every tile on screen) or fell back to `once("load")`, which had
+  // already fired, and dropped the update. With a slow source on the map,
+  // index pixels were painted seconds late, or not until the next change.
+  const mapLoadedRef = useRef(false);
   const [mapForBase, setMapForBase] = useState<MlMap | null>(null);
   const photo = useFarmLatestPhoto(farmId);
   const drawRef = useRef<MapboxDraw | null>(null);
@@ -466,6 +474,7 @@ export function MapCanvas({
     if (initialBounds) lastFitKeyRef.current = initial.fitBoundsKey;
     mapRef.current = map;
     setMapForBase(map);
+    mapLoadedRef.current = false;
     // Dev-only handle for browser tests. The marks are symbol layers and the
     // click path is MapLibre's own hit-testing, so an e2e spec has to be able
     // to turn a lon/lat into a screen pixel. Stripped from the production
@@ -1040,6 +1049,11 @@ export function MapCanvas({
         onSignalClickRef.current?.(props.observation_id, { x: ev.point.x, y: ev.point.y }, stack);
       });
     });
+    // Registered after the handler above, so it runs once that has built
+    // every source and layer.
+    map.on("load", () => {
+      mapLoadedRef.current = true;
+    });
 
     return () => {
       if (drawRef.current) {
@@ -1052,6 +1066,7 @@ export function MapCanvas({
       }
       resizeObserver.disconnect();
       setMapForBase(null);
+      mapLoadedRef.current = false;
       map.remove();
       mapRef.current = null;
     };
@@ -1088,7 +1103,7 @@ export function MapCanvas({
         }
       }
     };
-    if (map.isStyleLoaded()) apply();
+    if (mapLoadedRef.current) apply();
     else map.once("load", apply);
   }, [geojson, fitBoundsKey, farmBoundary]);
 
@@ -1156,7 +1171,7 @@ export function MapCanvas({
       map.setPaintProperty(FILL_LAYER, "fill-color", paint.color);
       map.setPaintProperty(FILL_LAYER, "fill-opacity", paint.opacity);
     };
-    if (map.isStyleLoaded()) apply();
+    if (mapLoadedRef.current) apply();
     else map.once("load", apply);
     // blockFillPaint is rebuilt every render by design; these are the inputs
     // it actually reads.
@@ -1187,7 +1202,7 @@ export function MapCanvas({
         ],
       });
     };
-    if (map.isStyleLoaded()) apply();
+    if (mapLoadedRef.current) apply();
     else map.once("load", apply);
   }, [farmBoundary]);
 
@@ -1209,7 +1224,7 @@ export function MapCanvas({
         map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
       }
     };
-    if (map.isStyleLoaded()) apply();
+    if (mapLoadedRef.current) apply();
     else map.once("load", apply);
   }, [signalOverlay]);
 
@@ -1229,7 +1244,7 @@ export function MapCanvas({
         map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
       }
     };
-    if (map.isStyleLoaded()) apply();
+    if (mapLoadedRef.current) apply();
     else map.once("load", apply);
   }, [flagOverlay]);
 
@@ -1256,7 +1271,7 @@ export function MapCanvas({
         map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
       }
     };
-    if (map.isStyleLoaded()) apply();
+    if (mapLoadedRef.current) apply();
     else map.once("load", apply);
   }, [gridCells]);
 
@@ -1275,7 +1290,7 @@ export function MapCanvas({
         map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
       }
     };
-    if (map.isStyleLoaded()) apply();
+    if (mapLoadedRef.current) apply();
     else map.once("load", apply);
   }, [autoBlockPreview]);
 
@@ -1294,7 +1309,7 @@ export function MapCanvas({
         map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
       }
     };
-    if (map.isStyleLoaded()) apply();
+    if (mapLoadedRef.current) apply();
     else map.once("load", apply);
   }, [bulkPreview]);
 
@@ -1376,7 +1391,7 @@ export function MapCanvas({
       // three inputs to the fill paint, and applying it separately is what let
       // the last effect to run overwrite the other two. See blockFillPaint.
     };
-    if (map.isStyleLoaded()) apply();
+    if (mapLoadedRef.current) apply();
     else map.once("load", apply);
   }, [showAoi, showBlocks, showBlockBorders, showBlockLabels, showAlerts, borderOpacity]);
 
@@ -1398,7 +1413,7 @@ export function MapCanvas({
         ["get", "name"],
       ]);
     };
-    if (map.isStyleLoaded()) apply();
+    if (mapLoadedRef.current) apply();
     else map.once("load", apply);
   }, [blockLabelProperty]);
 
@@ -1462,14 +1477,13 @@ export function MapCanvas({
         if (map.getLayer(id)) map.setPaintProperty(id, "raster-opacity", pixelOpacity);
       }
     };
-    // `idle`, NOT `load`. These layers arrive well after the first paint — the
-    // statistics call decides which blocks have a readable raster — and by then
-    // `load` has already fired for good. Deferring to it means the pixels are
-    // never added at all, which is the same trap the grid-highlight effect
-    // below documents. `idle` fires every time the map goes quiet, so a style
-    // that is mid-update when this runs still gets its layers.
-    if (map.isStyleLoaded()) apply();
-    else map.once("idle", apply);
+    // These layers arrive well after the first paint (the statistics call
+    // decides which blocks have a readable raster), so by then the map has
+    // loaded and they are added at once. This used to wait for `idle` whenever
+    // tiles were in flight, which put the index pixels behind every other tile
+    // on screen; see `mapLoadedRef`.
+    if (mapLoadedRef.current) apply();
+    else map.once("load", apply);
   }, [pixelLayers, pixelOpacity]);
 
   // Cells as lines: drop the fill without dropping the click. See the prop's
@@ -1510,7 +1524,7 @@ export function MapCanvas({
       if (!map.getLayer(SELECTED_LAYER)) return;
       map.setFilter(SELECTED_LAYER, ["==", ["get", "id"], selectedId ?? ""]);
     };
-    if (map.isStyleLoaded()) apply();
+    if (mapLoadedRef.current) apply();
     else map.once("load", apply);
   }, [selectedId]);
 

@@ -6,17 +6,26 @@
 // and below every outline, marker and index layer a page adds.
 import type { Map as MapLibreMap, RasterSourceSpecification } from "maplibre-gl";
 
+import { isStyleReady } from "@/lib/mapStyleReady";
+
 import { SATELLITE_LAYER_ID } from "./esri";
 
 export const PHOTO_SOURCE_ID = "latest-photo";
 export const PHOTO_LAYER_ID = "latest-photo";
 
-export function photoSourceSpec(tileUrl: string): RasterSourceSpecification {
+export function photoSourceSpec(
+  tileUrl: string,
+  bounds?: [number, number, number, number] | null,
+): RasterSourceSpecification {
   return {
     type: "raster",
     tiles: [tileUrl],
     // The api asks the tile server for scale=2, i.e. 512 px tiles.
     tileSize: 512,
+    // Only the farm's box. Without it MapLibre asks the tile server for every
+    // tile on screen, and each one outside the farm is a render that comes
+    // back empty, competing with the index tiles for the same server.
+    ...(bounds ? { bounds } : {}),
     attribution: "Contains modified Copernicus Sentinel data",
   };
 }
@@ -34,9 +43,16 @@ function layerAboveBase(map: MapLibreMap): string | undefined {
  * call it on every change. A map whose style is still loading is retried once
  * it settles.
  */
-export function applyLatestPhoto(map: MapLibreMap, tileUrl: string | null, visible: boolean): void {
-  if (!map.isStyleLoaded()) {
-    map.once("idle", () => applyLatestPhoto(map, tileUrl, visible));
+export function applyLatestPhoto(
+  map: MapLibreMap,
+  tileUrl: string | null,
+  visible: boolean,
+  bounds?: [number, number, number, number] | null,
+): void {
+  // The style, not its tiles: see `whenStyleReady`. Waiting for `idle` here
+  // put the photo, and everything gated the same way, behind every tile.
+  if (!isStyleReady(map)) {
+    map.once("load", () => applyLatestPhoto(map, tileUrl, visible, bounds));
     return;
   }
   const source = map.getSource(PHOTO_SOURCE_ID) as { tiles?: string[] } | undefined;
@@ -45,7 +61,9 @@ export function applyLatestPhoto(map: MapLibreMap, tileUrl: string | null, visib
     map.removeSource(PHOTO_SOURCE_ID);
   }
   if (!tileUrl) return;
-  if (!map.getSource(PHOTO_SOURCE_ID)) map.addSource(PHOTO_SOURCE_ID, photoSourceSpec(tileUrl));
+  if (!map.getSource(PHOTO_SOURCE_ID)) {
+    map.addSource(PHOTO_SOURCE_ID, photoSourceSpec(tileUrl, bounds));
+  }
   if (!map.getLayer(PHOTO_LAYER_ID)) {
     map.addLayer(
       { id: PHOTO_LAYER_ID, type: "raster", source: PHOTO_SOURCE_ID },

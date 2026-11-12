@@ -88,6 +88,7 @@ export function HoldingScreen({
             holding={h.boundary}
             block={h.block_boundary}
             photoTileUrl={photo?.tile_url ?? null}
+            photoBounds={photo?.bounds ?? null}
             showPhoto={showPhoto}
             onBaseDate={setBaseDate}
           />

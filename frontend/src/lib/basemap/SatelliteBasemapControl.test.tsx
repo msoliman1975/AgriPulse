@@ -32,7 +32,7 @@ describe("SatelliteBasemapControl", () => {
 
   it("shows the sharp base by default and says a newer photo exists", () => {
     renderControl();
-    expect(apply).toHaveBeenLastCalledWith(map, "https://tiles/x", false);
+    expect(apply).toHaveBeenLastCalledWith(map, "https://tiles/x", false, null);
     expect(screen.getByRole("radio", { name: "Sharp (older)" })).toHaveAttribute(
       "aria-checked",
       "true",
@@ -44,7 +44,7 @@ describe("SatelliteBasemapControl", () => {
   it("lays the latest photo on when picked, dates both images, and remembers it", () => {
     renderControl();
     fireEvent.click(screen.getByRole("radio", { name: "Latest (10 m)" }));
-    expect(apply).toHaveBeenLastCalledWith(map, "https://tiles/x", true);
+    expect(apply).toHaveBeenLastCalledWith(map, "https://tiles/x", true, null);
     expect(screen.getByText(/Sentinel-2 photo of Nov 8, 2026/)).toBeInTheDocument();
     expect(screen.getByText(/high-res image of Apr 19, 2020/)).toBeInTheDocument();
     expect(window.localStorage.getItem("agripulse.basemap.v2")).toBe("latest");
@@ -54,7 +54,7 @@ describe("SatelliteBasemapControl", () => {
     renderControl(null);
     expect(screen.queryByRole("radiogroup")).toBeNull();
     expect(screen.getByText("Satellite image of Apr 19, 2020")).toBeInTheDocument();
-    expect(apply).toHaveBeenLastCalledWith(map, null, false);
+    expect(apply).toHaveBeenLastCalledWith(map, null, false, null);
   });
 
   it("renders nothing when there is neither a photo nor a date", () => {
