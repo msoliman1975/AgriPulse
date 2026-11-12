@@ -4146,9 +4146,21 @@ global:
       #   per-block fetching); the tile URLs they return render, not 404/500,
       #   on the tile server.
       #   Rollback: api to 033de0e.
-      tag: "de15345"
+      # b02551e = #828 (and #827, a script only), api and workers. Public
+      #   migration 0103 adds the 27 Medjool v2 scouting signals and five
+      #   scout forms (D14), and scopes them plus the 15 signals and two forms
+      #   of 0098 to date_palm.medjool (D21). They switch on by themselves for
+      #   Medjool blocks; no tree reads them yet. No code change beyond the
+      #   migration; the frontend stays at de15345.
+      #   Watch: the migration job reaches 0103; GET
+      #   /platform/signals/definitions?crop_path=date_palm.medjool lists 42
+      #   Medjool-scoped rows; the scout app on a Medjool block offers them.
+      #   Rollback: api to de15345 and workers to 033de0e, then
+      #   `alembic -n public downgrade 0102` to remove the rows (leaving 0103
+      #   under the old image is also safe: it adds rows only).
+      tag: "b02551e"
     workers:
-      tag: "033de0e"
+      tag: "b02551e"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
