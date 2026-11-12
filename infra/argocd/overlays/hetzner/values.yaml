@@ -4158,7 +4158,15 @@ global:
       #   Rollback: api to de15345 and workers to 033de0e, then
       #   `alembic -n public downgrade 0102` to remove the rows (leaving 0103
       #   under the old image is also safe: it adds rows only).
-      tag: "b02551e"
+      # 957a299 = #830, api only (workers stay b02551e). The latest-photo
+      #   tile URL uses one stretch window per band (red 0.42, green 0.34,
+      #   blue 0.26) instead of 0..0.35 for all three, which clipped red and
+      #   rendered the photo orange. No migration; the only backend change
+      #   since b02551e.
+      #   Watch: /farms/{id}/latest-photo answers 200; its tile_url carries
+      #   three rescale params and renders in natural colours.
+      #   Rollback: api to b02551e.
+      tag: "957a299"
     workers:
       tag: "b02551e"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
@@ -4888,7 +4896,15 @@ global:
       #   Watch: Farm Health / Console / farm pages draw the photo and both
       #   dates; drawing a block still works; no new console errors.
       #   Rollback: this tag alone back to 033de0e.
-      tag: "de15345"
+      # 957a299 = #830, frontend, see the api note. Maps open on the sharp
+      #   base; the 10 m Sentinel-2 photo is one click away ("Latest (10 m)")
+      #   and the control says a newer photo exists. With the photo off, its
+      #   source loads no tiles, which also takes the slow photo tiles out of
+      #   the console's way until #831 fixes the paint gating itself.
+      #   Watch: Farm Console index colours paint promptly with the default
+      #   view; the switch shows both dates.
+      #   Rollback: this tag alone back to de15345.
+      tag: "957a299"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
