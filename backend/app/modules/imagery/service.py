@@ -118,11 +118,10 @@ def latest_photo_tile_url(
 
 def _bounds(row: dict[str, Any]) -> tuple[float, float, float, float] | None:
     """The farm's box from a row carrying west/south/east/north, if complete."""
-    values = [row.get(k) for k in ("west", "south", "east", "north")]
-    if any(v is None for v in values):
+    west, south, east, north = (row.get(k) for k in ("west", "south", "east", "north"))
+    if west is None or south is None or east is None or north is None:
         return None
-    west, south, east, north = (float(v) for v in values)
-    return (west, south, east, north)
+    return (float(west), float(south), float(east), float(north))
 
 
 def rgb_band_indexes(bands: Sequence[str]) -> tuple[int, int, int] | None:
