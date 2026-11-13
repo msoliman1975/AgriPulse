@@ -34,6 +34,9 @@ class ResolvedActivity:
     dosage: str | None
     notes: str | None
     start_time: Any  # datetime.time | None
+    activity_code: str | None = None
+    title: str | None = None
+    title_ar: str | None = None
 
 
 def _stage_start_date(
@@ -118,6 +121,9 @@ def resolve_schedule(
                 dosage=a.get("dosage"),
                 notes=a.get("notes"),
                 start_time=a.get("start_time"),
+                activity_code=a.get("code"),
+                title=a.get("title"),
+                title_ar=a.get("title_ar"),
             )
         )
 

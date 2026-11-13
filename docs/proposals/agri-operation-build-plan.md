@@ -175,7 +175,8 @@ the promotion procedure in `CLAUDE.md`.
 
 | # | PR | Main contents | Tests | Deploy |
 |---|---|---|---|---|
-| 1 | Manual content model | Public migration (3.1), backfill codes, titles (en/ar), evidence tiers and source trees for the seeded mango and date palm manuals; upsert-by-code in `replace_full_tree`; schemas; apply copies titles; tenant migration for `plan_activities.title/title_ar` | unit: resolver unchanged; integration: save keeps ids, backfill values, apply writes titles | api + workers |
+| 1 | Manual content model | Public migration (3.1), backfill codes, titles (en/ar), evidence tiers and source trees for the seeded mango, potato and Medjool manuals; the current editor carries codes and new fields through a save; upsert-by-code in `replace_full_tree`; schemas; apply copies titles; tenant migration for `plan_activities.title/title_ar` | unit: resolver unchanged; integration: save keeps ids, backfill values, apply writes titles | api + workers |
+| 1b | Arabic manual text | `notes_ar`, `product_name_ar`, `dosage_ar` for the seeded manuals (E3); Medjool from the manual's Arabic edition | integration: no live manual activity without Arabic | api (before farm launch) |
 | 2 | Tenant manual read API + capabilities | Catalog and manual endpoints, `plan_allocation.*` capabilities in RBAC yaml + frontend `capabilities.ts`, varieties-preview endpoint | integration: drafts hidden, caps enforced | api |
 | 3 | Saved plans backend | Tenant migration (3.2, 3.3), resolver extensions (exclusions, edits, customs, overrides), service + router, board-reschedule override hook, soft-delete on allocation delete, audit events | unit: resolver matrix; integration: re-apply keeps board moves and done rows, two allocations per season, C3 rejection, F4 | api + workers |
 | 4 | Manual revisions | `revision` bump on publish, `manual-changes` diff, `publish-impact` count | unit: diff by code; integration: outdated flag after publish | api |
@@ -227,8 +228,10 @@ The loop is self-paced. Each iteration:
 
 | # | PR | State | Link | Deployed |
 |---|---|---|---|---|
-| 0 | Build plan | in review | | n/a |
-| 1 | Manual content model | not started | | |
+| 0 | Build plan | in review (with PR 1) | [#848](https://github.com/msoliman1975/AgriPulse/pull/848) | n/a |
+| 1 | Manual content model | in review | [#848](https://github.com/msoliman1975/AgriPulse/pull/848) | |
+| 1b | Arabic manual text | `notes_ar`, `product_name_ar`, `dosage_ar` for the seeded manuals (E3); Medjool from the manual's Arabic edition | integration: no live manual activity without Arabic | api (before farm launch) |
+| 1b | Arabic manual text | not started | | |
 | 2 | Tenant manual read API + capabilities | not started | | |
 | 3 | Saved plans backend | not started | | |
 | 4 | Manual revisions | not started | | |
