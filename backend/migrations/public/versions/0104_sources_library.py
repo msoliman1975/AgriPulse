@@ -55,8 +55,8 @@ def upgrade() -> None:
             language text,
             notes text,
             is_active boolean NOT NULL DEFAULT true,
-            created_at timestamptz NOT NULL DEFAULT now(),
-            updated_at timestamptz NOT NULL DEFAULT now(),
+            created_at timestamptz NOT NULL DEFAULT public.app_now(),
+            updated_at timestamptz NOT NULL DEFAULT public.app_now(),
             created_by uuid,
             updated_by uuid
         );
@@ -70,7 +70,7 @@ def upgrade() -> None:
             document_code text NOT NULL,
             document_title text,
             ref_number integer NOT NULL CHECK (ref_number > 0),
-            created_at timestamptz NOT NULL DEFAULT now(),
+            created_at timestamptz NOT NULL DEFAULT public.app_now(),
             UNIQUE (document_code, ref_number)
         );
         CREATE INDEX ix_source_aliases_source ON public.source_aliases (source_id);
@@ -87,7 +87,7 @@ def upgrade() -> None:
             confidence text NOT NULL
                 CHECK (confidence IN ('high', 'medium', 'low', 'expert_inference')),
             note text,
-            created_at timestamptz NOT NULL DEFAULT now(),
+            created_at timestamptz NOT NULL DEFAULT public.app_now(),
             created_by uuid,
             UNIQUE (source_id, entity_type, entity_key, detail)
         );

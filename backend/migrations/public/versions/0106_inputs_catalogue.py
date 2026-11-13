@@ -92,8 +92,8 @@ def upgrade() -> None:
             crop_paths text[] NOT NULL DEFAULT '{{}}',
             notes text,
             is_active boolean NOT NULL DEFAULT true,
-            created_at timestamptz NOT NULL DEFAULT now(),
-            updated_at timestamptz NOT NULL DEFAULT now(),
+            created_at timestamptz NOT NULL DEFAULT public.app_now(),
+            updated_at timestamptz NOT NULL DEFAULT public.app_now(),
             created_by uuid,
             updated_by uuid
         );
@@ -117,7 +117,7 @@ def upgrade() -> None:
             context text,
             reference text,
             sort_order integer NOT NULL DEFAULT 0,
-            created_at timestamptz NOT NULL DEFAULT now(),
+            created_at timestamptz NOT NULL DEFAULT public.app_now(),
             CHECK (value IS NOT NULL OR value_min IS NOT NULL OR value_max IS NOT NULL),
             CHECK (value_min IS NULL OR value_max IS NULL OR value_min <= value_max),
             CHECK (unit <> 'other' OR unit_note IS NOT NULL)
