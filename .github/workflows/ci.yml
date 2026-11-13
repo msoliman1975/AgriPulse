@@ -111,8 +111,13 @@ jobs:
     # Telling a timeout from a concurrency cancel: a timeout runs the FULL cap
     # (20m16s against a 20 min limit) and shows zero FAILED/ERROR lines; a
     # concurrency cancel lands at an arbitrary short time (5-9 min observed).
+    #
+    # 50, not 35. By 2026-11 the suite had grown to ~35 min: two runs on
+    # 2026-11-12 finished just inside the cap, and both attempts on PR #836
+    # were killed at 98-99% before the last module and session teardown ran.
+    # Same reasoning as above; still well short of an hour for a hung job.
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 50
     continue-on-error: true
     defaults:
       run:

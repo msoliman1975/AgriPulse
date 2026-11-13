@@ -10,6 +10,7 @@ Skipped if Docker / testcontainers are not available â€” the marker
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
@@ -28,6 +29,27 @@ except ImportError:  # pragma: no cover
     PostgresContainer = None  # type: ignore[assignment]
     RedisContainer = None  # type: ignore[assignment]
     wait_for_logs = None  # type: ignore[assignment]
+
+
+_log = logging.getLogger(__name__)
+
+
+def _stop_quietly(container: object) -> None:
+    """Stop a session container without letting cleanup fail the run.
+
+    ``container.stop()`` makes docker-py issue
+    ``DELETE /containers/<id>?v=True&force=True``. For the TimescaleDB
+    container (``shm_size=1g``) at the end of a 25-35 minute CI run, that
+    request has exceeded docker-py's 60 s read timeout, so pytest reported
+    ``1 error`` at teardown of whichever test ran last, with every test
+    passed. The runner is discarded after the job and Ryuk
+    (``TESTCONTAINERS_RYUK_DISABLED=false`` in ci.yml) reaps the container
+    anyway, so a slow or failed removal is logged, not raised.
+    """
+    try:
+        container.stop()  # type: ignore[attr-defined]
+    except Exception as exc:  # requests ReadTimeout, docker APIError, ...
+        _log.warning("Ignoring error stopping test container %r: %r", container, exc)
 
 
 # Image with TimescaleDB + PostGIS already installed; pgcrypto and citext
@@ -75,7 +97,7 @@ def postgres_container() -> Iterator[object]:
     try:
         yield container
     finally:
-        container.stop()
+        _stop_quietly(container)
 
 
 @pytest.fixture(scope="session")
@@ -87,7 +109,7 @@ def redis_container() -> Iterator[object]:
     try:
         yield container
     finally:
-        container.stop()
+        _stop_quietly(container)
 
 
 @pytest.fixture(scope="session")
@@ -105,7 +127,7 @@ def mailhog_container() -> Iterator[object]:
     try:
         yield container
     finally:
-        container.stop()
+        _stop_quietly(container)
 
 
 @pytest.fixture(scope="session", autouse=True)
