@@ -11,7 +11,8 @@
     "decisionTrees": "Decision trees",
     "bulk": "Bulk Updates",
     "fieldAccess": "Field access",
-    "blockHealth": "Block health"
+    "blockHealth": "Block health",
+    "inputs": "Inputs"
   },
   "noAccess": {
     "title": "Settings",

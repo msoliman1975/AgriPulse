@@ -18,6 +18,7 @@ import enDecisionTrees from "./locales/en/decisionTrees.json";
 import enDecisionTreesBeta from "./locales/en/decisionTreesBeta.json";
 import enDecisionTreesEstate from "./locales/en/decisionTreesEstate.json";
 import enSources from "./locales/en/sources.json";
+import enInputs from "./locales/en/inputs.json";
 import enBulkUpdates from "./locales/en/bulkUpdates.json";
 import enActionCenter from "./locales/en/actionCenter.json";
 import enUsers from "./locales/en/users.json";
@@ -45,6 +46,7 @@ import arDecisionTrees from "./locales/ar/decisionTrees.json";
 import arDecisionTreesBeta from "./locales/ar/decisionTreesBeta.json";
 import arDecisionTreesEstate from "./locales/ar/decisionTreesEstate.json";
 import arSources from "./locales/ar/sources.json";
+import arInputs from "./locales/ar/inputs.json";
 import arBulkUpdates from "./locales/ar/bulkUpdates.json";
 import arActionCenter from "./locales/ar/actionCenter.json";
 import arUsers from "./locales/ar/users.json";
@@ -85,6 +87,7 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           decisionTreesBeta: enDecisionTreesBeta,
           decisionTreesEstate: enDecisionTreesEstate,
           sources: enSources,
+          inputs: enInputs,
           bulkUpdates: enBulkUpdates,
           actionCenter: enActionCenter,
           users: enUsers,
@@ -114,6 +117,7 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           decisionTreesBeta: arDecisionTreesBeta,
           decisionTreesEstate: arDecisionTreesEstate,
           sources: arSources,
+          inputs: arInputs,
           bulkUpdates: arBulkUpdates,
           actionCenter: arActionCenter,
           users: arUsers,

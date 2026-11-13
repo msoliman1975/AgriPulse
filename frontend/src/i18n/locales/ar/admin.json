@@ -17,7 +17,8 @@
     "platformAlerts": "تنبيهات المنصة",
     "usage": "استخدام المنتج",
     "healthDefinition": "قاعدة صحة القطعة",
-    "sources": "المراجع"
+    "sources": "المراجع",
+    "inputs": "المُدخلات"
   },
   "crops": {
     "title": "دليل المحاصيل",

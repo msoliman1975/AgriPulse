@@ -1,0 +1,1739 @@
+{
+ "organic_list": "Not yet checked. Manual 1.7, 13 #5: the list of organic inputs permitted under Egyptian Law 12/2020 was not retrieved; check every input with the certifying body.",
+ "inputs": [
+  {
+   "code": "manure_well_matured",
+   "name_en": "Well-matured manure",
+   "name_ar": "سماد عضوي تام التحلل",
+   "category": "organic_fertiliser",
+   "active_ingredient": null,
+   "methods": [
+    "soil_mix"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [
+    {
+     "crop_path": "date_palm.medjool",
+     "value": null,
+     "value_min": 10,
+     "value_max": 15,
+     "unit": "kg/plant",
+     "unit_note": "per planting hole",
+     "context": "planting hole of about 1 m³ filled with topsoil mixed with manure; at least 15-20 cm soil between manure and roots",
+     "section": "7.2 #4"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": null,
+     "value_min": 10,
+     "value_max": 15,
+     "unit": "kg/plant",
+     "unit_note": "per planting hole",
+     "context": "holes prepared 1-2 months ahead, manure kept 15-20 cm away from the roots",
+     "section": "8.3 #3"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": null,
+     "value_min": 10,
+     "value_max": 15,
+     "unit": "kg/plant",
+     "unit_note": "per planting hole",
+     "context": "dig and prepare planting holes; topsoil + manure, 1-2 months before planting",
+     "section": "8.8 W-8 to W-4 Task 1"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": null,
+     "value_min": 10,
+     "value_max": 15,
+     "unit": "kg/plant",
+     "unit_note": "per planting hole",
+     "context": "prepare planting holes 1-2 months before spring planting",
+     "section": "12.2 weeks 2-9 (week 2 Task 4; weeks 3-4 Task 5; weeks 5 Task 6; weeks 6-9 Task 9)"
+    }
+   ],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 2,
+     "section": "7.2 #4",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 2,
+     "section": "8.8 W-8 to W-4 Task 1",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 3,
+     "section": "12.2 weeks 2-9 (week 2 Task 4; weeks 3-4 Task 5; weeks 5 Task 6; weeks 6-9 Task 9)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 3,
+     "section": "12.2 weeks 32-37 (prepare planting holes before autumn planting, 'same specification as spring')",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 3,
+     "section": "8.3 #3",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 33,
+     "section": "12.2 weeks 37-41 field sanitation ('manage manure heaps')",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 37,
+     "section": "7.2 #4",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 37,
+     "section": "8.8 W-8 to W-4 Task 1",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "10.4 #1 (Bayoud spreads with manure; do not bring it from infected regions)",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "12.2 weeks 37-41 field sanitation ('manage manure heaps')",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "9.7 #7 (manure stores must be managed: rhinoceros beetle larvae develop in dung heaps; manure carries Bayoud)",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "animal_manure",
+   "name_en": "Animal manure",
+   "name_ar": "سماد حيواني",
+   "category": "organic_fertiliser",
+   "active_ingredient": null,
+   "methods": [
+    "basin"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 50,
+     "value_min": null,
+     "value_max": null,
+     "unit": "kg/plant",
+     "unit_note": null,
+     "context": "Dakhla Oasis Medjool trial, applied alone",
+     "section": "9.7 #1"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 25,
+     "value_min": null,
+     "value_max": null,
+     "unit": "kg/plant",
+     "unit_note": null,
+     "context": "Dakhla trial, mixed with filter mud 25 kg/palm",
+     "section": "9.7 #1"
+    }
+   ],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 10,
+     "section": "9.7 #1",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 10,
+     "section": "9.7 #2",
+     "confidence": "high"
+    }
+   ]
+  },
+  {
+   "code": "poultry_manure",
+   "name_en": "Poultry manure",
+   "name_ar": "سماد دواجن",
+   "category": "organic_fertiliser",
+   "active_ingredient": null,
+   "methods": [
+    "basin"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 50,
+     "value_min": null,
+     "value_max": null,
+     "unit": "kg/plant",
+     "unit_note": null,
+     "context": "Dakhla Oasis Medjool trial, applied alone",
+     "section": "9.7 #1"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 25,
+     "value_min": null,
+     "value_max": null,
+     "unit": "kg/plant",
+     "unit_note": null,
+     "context": "Dakhla trial, mixed with filter mud 25 kg/palm (best treatment per 9.7 #2)",
+     "section": "9.7 #1"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 25,
+     "value_min": null,
+     "value_max": null,
+     "unit": "kg/plant",
+     "unit_note": null,
+     "context": "Egyptian Medjool trial (Dakhla): best = filter mud 25 kg + poultry manure 25 kg per palm; end of October-December window",
+     "section": "12.2 weeks 44-52 Task 5"
+    }
+   ],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 10,
+     "section": "12.2 weeks 44-52 Task 5",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 10,
+     "section": "9.7 #1",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 10,
+     "section": "9.7 #2",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 31,
+     "section": "12.2 weeks 44-52 Task 5",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 42,
+     "section": "12.2 weeks 44-52 Task 5",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "filter_mud",
+   "name_en": "Filter mud",
+   "name_ar": "طينة المرشحات",
+   "category": "organic_fertiliser",
+   "active_ingredient": null,
+   "methods": [
+    "basin"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 50,
+     "value_min": null,
+     "value_max": null,
+     "unit": "kg/plant",
+     "unit_note": null,
+     "context": "Dakhla Oasis Medjool trial, applied alone",
+     "section": "9.7 #1"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 25,
+     "value_min": null,
+     "value_max": null,
+     "unit": "kg/plant",
+     "unit_note": null,
+     "context": "Dakhla trial, mixed with animal manure 25 kg or poultry manure 25 kg per palm",
+     "section": "9.7 #1"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 25,
+     "value_min": null,
+     "value_max": null,
+     "unit": "kg/plant",
+     "unit_note": null,
+     "context": "best = filter mud 25 kg + poultry manure 25 kg per palm; end of October-December window",
+     "section": "12.2 weeks 44-52 Task 5"
+    }
+   ],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 10,
+     "section": "12.2 weeks 44-52 Task 5",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 10,
+     "section": "9.7 #1",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 10,
+     "section": "9.7 #2",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 31,
+     "section": "12.2 weeks 44-52 Task 5",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 42,
+     "section": "12.2 weeks 44-52 Task 5",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "compost",
+   "name_en": "Compost",
+   "name_ar": "كمبوست",
+   "category": "organic_fertiliser",
+   "active_ingredient": null,
+   "methods": [
+    "basin"
+   ],
+   "crop_paths": [],
+   "notes": "Manual 1.7, 9.7 #5: On organic Medjool in south-eastern Morocco, the farmers' practice was 50 kg of compost per palm",
+   "doses": [
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 50,
+     "value_min": null,
+     "value_max": null,
+     "unit": "kg/plant",
+     "unit_note": null,
+     "context": "farmers' practice on organic Medjool, south-eastern Morocco",
+     "section": "9.7 #5"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 50,
+     "value_min": null,
+     "value_max": null,
+     "unit": "kg/plant",
+     "unit_note": "additional to the 50 kg base",
+     "context": "a further 50 kg of compost in addition to the farmers' practice improved soil and leaf nutrients",
+     "section": "9.7 #5"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 50,
+     "value_min": null,
+     "value_max": null,
+     "unit": "kg/plant",
+     "unit_note": null,
+     "context": "organic Medjool practice in Morocco; 1 application per year, end of October-December window",
+     "section": "12.2 weeks 44-52 Task 5"
+    }
+   ],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 10,
+     "section": "12.2 weeks 44-52 Task 5",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 10,
+     "section": "12.2 weeks 44-52 Task 5 ('Never use untreated compost of unknown origin')",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 31,
+     "section": "12.2 weeks 44-52 Task 5",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 31,
+     "section": "12.2 weeks 44-52 Task 5 ('Never use untreated compost of unknown origin')",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 31,
+     "section": "9.7 #3",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 31,
+     "section": "9.7 #5",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 42,
+     "section": "12.2 weeks 44-52 Task 5",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 42,
+     "section": "12.2 weeks 44-52 Task 5 ('Never use untreated compost of unknown origin')",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 42,
+     "section": "9.7 #6 (warns against untreated compost of unknown origin as a source of infection)",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "compost_tea",
+   "name_en": "Compost tea",
+   "name_ar": "شاي الكمبوست",
+   "category": "organic_fertiliser",
+   "active_ingredient": null,
+   "methods": [
+    "basin"
+   ],
+   "crop_paths": [],
+   "notes": "Manual 1.7, 9.7 #3: Compost and compost tea were studied on Mejhoul (Medjool) under organic cultivation in Morocco",
+   "doses": [
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 15,
+     "value_min": null,
+     "value_max": null,
+     "unit": "L/plant/week",
+     "unit_note": null,
+     "context": "from April to October, added to the farmers' 50 kg compost practice",
+     "section": "9.7 #5"
+    }
+   ],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 31,
+     "section": "9.7 #3",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 31,
+     "section": "9.7 #5",
+     "confidence": "high"
+    }
+   ]
+  },
+  {
+   "code": "decomposed_treated_organic_fertiliser",
+   "name_en": "Decomposed, treated organic fertiliser",
+   "name_ar": "سماد عضوي متحلل ومعالج",
+   "category": "organic_fertiliser",
+   "active_ingredient": null,
+   "methods": [
+    "basin",
+    "soil_mix"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [
+    {
+     "crop_path": "date_palm.medjool",
+     "value": null,
+     "value_min": 5,
+     "value_max": null,
+     "unit": "kg/plant/year_of_age",
+     "unit_note": null,
+     "context": "UAE calendar; 'not less than 5 kg per year of palm age'; spread in the basin at the end of October-December and mixed into the surface soil",
+     "section": "9.7 #6"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": null,
+     "value_min": null,
+     "value_max": 50,
+     "unit": "kg/plant",
+     "unit_note": null,
+     "context": "'up to about 50 kg per palm for palms over 10 years'",
+     "section": "9.7 #6"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": null,
+     "value_min": 5,
+     "value_max": null,
+     "unit": "kg/plant/year_of_age",
+     "unit_note": null,
+     "context": "'at least 5 kg per year of palm age'; 1 application per year",
+     "section": "12.2 weeks 44-52 Task 5"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": null,
+     "value_min": null,
+     "value_max": 50,
+     "unit": "kg/plant",
+     "unit_note": null,
+     "context": "'up to about 50 kg per palm over 10 years'",
+     "section": "12.2 weeks 44-52 Task 5"
+    }
+   ],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 10,
+     "section": "12.2 weeks 44-52 Task 5",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 31,
+     "section": "12.2 weeks 44-52 Task 5",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 42,
+     "section": "12.2 weeks 44-52 Task 5",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 42,
+     "section": "9.7 #6",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "foliar_potassium",
+   "name_en": "Foliar potassium",
+   "name_ar": "الرش الورقي بالبوتاسيوم",
+   "category": "foliar_nutrient",
+   "active_ingredient": "potassium (K)",
+   "methods": [
+    "foliar",
+    "spray"
+   ],
+   "crop_paths": [],
+   "notes": "Manual 1.7, 9.7 #8: Use only inputs permitted by the organic certifier. Manual 1.7, 12.2 weeks 19, 23, 27: Use only if the K source is permitted by the organic certifier.",
+   "doses": [
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 800,
+     "value_min": null,
+     "value_max": null,
+     "unit": "mg/L",
+     "unit_note": "mg/L K",
+     "context": "applied in May, June and July; +31% total yield",
+     "section": "9.7 #4"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": null,
+     "value_min": 0.5,
+     "value_max": 0.75,
+     "unit": "%",
+     "unit_note": "% K",
+     "context": "Egyptian Medjool study, El-Minia, sandy soil",
+     "section": "9.7 #8"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 0.75,
+     "value_min": null,
+     "value_max": null,
+     "unit": "%",
+     "unit_note": "% K",
+     "context": "0.75% K with salicylic acid at 100 ppm gave the best results",
+     "section": "9.7 #8"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 800,
+     "value_min": null,
+     "value_max": null,
+     "unit": "mg/L",
+     "unit_note": "mg/L K",
+     "context": "optional; three sprays in May, June and July",
+     "section": "12.2 week 19 Task 6; week 23 Task 5; week 27 Task 5"
+    }
+   ],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 19,
+     "section": "12.2 week 19 Task 6; week 23 Task 5; week 27 Task 5",
+     "confidence": "low"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 19,
+     "section": "9.7 #4",
+     "confidence": "low"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 35,
+     "section": "9.7 #8",
+     "confidence": "high"
+    }
+   ]
+  },
+  {
+   "code": "salicylic_acid",
+   "name_en": "Salicylic acid",
+   "name_ar": "حمض السالسيليك",
+   "category": "growth_regulator",
+   "active_ingredient": "salicylic acid",
+   "methods": [
+    "foliar",
+    "spray"
+   ],
+   "crop_paths": [],
+   "notes": "Manual 1.7, 9.7 #8: Use only inputs permitted by the organic certifier.",
+   "doses": [
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 100,
+     "value_min": null,
+     "value_max": null,
+     "unit": "ppm",
+     "unit_note": null,
+     "context": "with foliar potassium 0.75% K; best results in the Egyptian Medjool study (El-Minia)",
+     "section": "9.7 #8"
+    }
+   ],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 35,
+     "section": "9.7 #8",
+     "confidence": "high"
+    }
+   ]
+  },
+  {
+   "code": "bacillus_thuringiensis",
+   "name_en": "Bacillus thuringiensis (Bt)",
+   "name_ar": "Bacillus thuringiensis (Bt)",
+   "category": "biological_agent",
+   "active_ingredient": "Bacillus thuringiensis",
+   "methods": [
+    "dust",
+    "spray"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 250,
+     "value_min": null,
+     "value_max": null,
+     "unit": "g/100 L",
+     "unit_note": "as Agarin (Bt product)",
+     "context": "lesser date moth, Egyptian oases",
+     "section": "10.2 #2"
+    }
+   ],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 20,
+     "section": "10.2 #1 (Bt dust at pollination or Bt spray two weeks after pollination, Iraq)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 20,
+     "section": "12.2 week 13 Task 10 (Bt spray two weeks after reference pollination)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 20,
+     "section": "12.2 weeks 6-9 Task 8; weeks 10-13 Task 9 (Bt dust at pollination)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 33,
+     "section": "10.2 #2",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7_annex_b",
+     "ref": 11,
+     "section": "Annex B Lesser date moth, 'How to detect'",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "spinosad",
+   "name_en": "Spinosad",
+   "name_ar": "السبينوساد",
+   "category": "biological_agent",
+   "active_ingredient": "spinosad",
+   "methods": [
+    "spray"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 25,
+     "value_min": null,
+     "value_max": null,
+     "unit": "g/100 L",
+     "unit_note": null,
+     "context": "lesser date moth, Egyptian oases",
+     "section": "10.2 #2"
+    }
+   ],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 33,
+     "section": "10.2 #2",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "trichogramma_evanescens",
+   "name_en": "Trichogramma evanescens",
+   "name_ar": "طفيل البيض Trichogramma evanescens",
+   "category": "biological_agent",
+   "active_ingredient": "Trichogramma evanescens (egg parasitoid)",
+   "methods": [
+    "release"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 1,
+     "value_min": null,
+     "value_max": null,
+     "unit": "cards/plant",
+     "unit_note": null,
+     "context": "3-4 monthly releases from mid-March, Egyptian oases",
+     "section": "10.2 #2"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 1,
+     "value_min": null,
+     "value_max": null,
+     "unit": "cards/plant",
+     "unit_note": null,
+     "context": "monthly from mid-March; 1 release per month, 3-4 releases per season",
+     "section": "12.2 week 11 Task 13; week 15 Task 8; week 19 Task 7; week 23 Task 6"
+    }
+   ],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 33,
+     "section": "10.2 #2",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 33,
+     "section": "12.2 week 11 Task 13; week 15 Task 8; week 19 Task 7; week 23 Task 6",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "stethorus_gilvifrons",
+   "name_en": "Stethorus gilvifrons",
+   "name_ar": "المفترس Stethorus gilvifrons",
+   "category": "biological_agent",
+   "active_ingredient": "Stethorus gilvifrons (predator)",
+   "methods": [
+    "release"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 20,
+     "section": "10.3 #1",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 20,
+     "section": "12.2 weeks 14-34, every 2 weeks (dust mite scouting task; 'biological option')",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 21,
+     "section": "12.2 weeks 14-34, every 2 weeks (dust mite scouting task; 'biological option')",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "12.2 weeks 14-34, every 2 weeks (dust mite scouting task; 'biological option')",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 63,
+     "section": "12.2 weeks 14-34, every 2 weeks (dust mite scouting task; 'biological option')",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "sulphur",
+   "name_en": "Sulphur",
+   "name_ar": "الكبريت",
+   "category": "mineral_or_botanical_treatment",
+   "active_ingredient": "sulphur",
+   "methods": [
+    "dust"
+   ],
+   "crop_paths": [],
+   "notes": "Manual 1.7, 12.2 week 27 Task 7: confirm with the organic certifier",
+   "doses": [
+    {
+     "crop_path": "date_palm.medjool",
+     "value": null,
+     "value_min": 100,
+     "value_max": 150,
+     "unit": "g/plant",
+     "unit_note": null,
+     "context": "dusting bunches early in July against dust mite (Iraq, FAO)",
+     "section": "10.3 #5"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": null,
+     "value_min": 100,
+     "value_max": 150,
+     "unit": "g/plant",
+     "unit_note": null,
+     "context": "dust bunches early in July; once",
+     "section": "12.2 week 27 Task 7"
+    }
+   ],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "10.3 #5",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "12.2 week 27 Task 7",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "wettable_sulphur",
+   "name_en": "Wettable sulphur",
+   "name_ar": "الكبريت القابل للبلل",
+   "category": "mineral_or_botanical_treatment",
+   "active_ingredient": "sulphur",
+   "methods": [
+    "spray"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 63,
+     "section": "10.3 #6 (two to four sprays between late June and mid-August, Tunisian oases)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7_annex_b",
+     "ref": 15,
+     "section": "Annex B Date palm dust mite, 'Biology'",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "bordeaux_mixture",
+   "name_en": "Bordeaux mixture",
+   "name_ar": "مزيج بوردو",
+   "category": "mineral_or_botanical_treatment",
+   "active_ingredient": null,
+   "methods": [
+    "spray"
+   ],
+   "crop_paths": [],
+   "notes": "Manual 1.7, 12.2 weeks 1, 2, 42: confirm the product with the organic certifier",
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "10.4 #2 (protect cuts, black scorch)",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "10.4 #3 (spray after harvest and one month before spathe emergence, Khamedj)",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "12.2 week 1 Task 4; week 2 Task 5; week 42 Task 6 (2 sprays per year)",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "copper_product",
+   "name_en": "Copper product",
+   "name_ar": "مستحضر نحاسي",
+   "category": "mineral_or_botanical_treatment",
+   "active_ingredient": "copper",
+   "methods": [
+    "spray"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "10.4 #2 (protect cuts with Bordeaux mixture or a copper product)",
+     "confidence": "high"
+    }
+   ]
+  },
+  {
+   "code": "copper_lime_mixture",
+   "name_en": "Copper--lime mixture",
+   "name_ar": "خليط نحاس--جير",
+   "category": "mineral_or_botanical_treatment",
+   "active_ingredient": "copper, lime",
+   "methods": [
+    "spray"
+   ],
+   "crop_paths": [],
+   "notes": "Manual 1.7, 12.2 weeks 1, 2, 42: confirm the product with the organic certifier",
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "10.4 #3",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "12.2 week 1 Task 4; week 2 Task 5; week 42 Task 6",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "mineral_oils",
+   "name_en": "Mineral oils",
+   "name_ar": "الزيوت المعدنية",
+   "category": "mineral_or_botanical_treatment",
+   "active_ingredient": "mineral oil",
+   "methods": [
+    "spray"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "10.4 #7 (used in young plantations against white scale)",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "pheromone_trap_rpw",
+   "name_en": "Pheromone trap (Red Palm Weevil)",
+   "name_ar": "مصائد فرمونية",
+   "category": "trap_or_bait",
+   "active_ingredient": "pheromone",
+   "methods": [
+    "trap"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [
+    {
+     "crop_path": "date_palm.medjool",
+     "value": null,
+     "value_min": 0.5,
+     "value_max": 1.0,
+     "unit": "traps/ha",
+     "unit_note": null,
+     "context": "0.5 trap/ha (Iran) to 1.0 trap/ha (Saudi Arabia); serviced every 7-15 days",
+     "section": "10.1 #2"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": 1,
+     "value_min": null,
+     "value_max": null,
+     "unit": "other",
+     "unit_note": "trap per 100 m",
+     "context": "pheromone-food traps where infestation is suspected or confirmed; on the ground, shaded, food kept wet",
+     "section": "10.1 #6"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": null,
+     "value_min": 1,
+     "value_max": 4,
+     "unit": "traps/ha",
+     "unit_note": null,
+     "context": "Al-Ahsa, depending on pest intensity; serviced every two weeks",
+     "section": "10.1 #12"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": null,
+     "value_min": 1,
+     "value_max": 4,
+     "unit": "traps/ha",
+     "unit_note": null,
+     "context": "depending on pest intensity; serviced every 7-15 days; on the ground, shaded, near orchard edges",
+     "section": "12.2 weeks 1-52 (Task 2 in weeks 1-9; Task 3 in weeks 10-52)"
+    },
+    {
+     "crop_path": "date_palm.medjool",
+     "value": null,
+     "value_min": 1,
+     "value_max": 4,
+     "unit": "traps/ha",
+     "unit_note": null,
+     "context": "Al-Ahsa, depending on pest intensity; serviced every two weeks",
+     "section": "Annex A section 4 #7"
+    }
+   ],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 8,
+     "section": "10.1 #1 (mass trapping)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 8,
+     "section": "10.1 #2",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 8,
+     "section": "12.2 weeks 1-52 (Task 2 in weeks 1-9; Task 3 in weeks 10-52)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 8,
+     "section": "8.8 W0 Task 6; Years 2-3 Task 4; Years 3-5 Task 5 (trap servicing)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 8,
+     "section": "8.8 W7-month 12 Task 4 (trap servicing)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 9,
+     "section": "8.8 W0 Task 6; Years 2-3 Task 4; Years 3-5 Task 5 (trap servicing)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 36,
+     "section": "10.1 #1 (mass trapping)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 36,
+     "section": "10.1 #2",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 36,
+     "section": "12.2 weeks 1-52 (Task 2 in weeks 1-9; Task 3 in weeks 10-52)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "10.1 #6",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "12.2 weeks 1-52 (Task 2 in weeks 1-9; Task 3 in weeks 10-52)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 51,
+     "section": "10.1 #12",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 51,
+     "section": "10.1 #13 (trap catches and temperature)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 51,
+     "section": "12.2 weeks 1-52 (Task 2 in weeks 1-9; Task 3 in weeks 10-52)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 55,
+     "section": "10.1 #12",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 55,
+     "section": "12.2 weeks 1-52 (Task 2 in weeks 1-9; Task 3 in weeks 10-52)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 57,
+     "section": "10.1 #13 (trap catches and temperature)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7_annex_a",
+     "ref": 2,
+     "section": "Annex A section 7 (visual inspection + trap network)",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7_annex_a",
+     "ref": 7,
+     "section": "Annex A section 4 #7",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7_annex_a",
+     "ref": 9,
+     "section": "Annex A section 7 (visual inspection + trap network)",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7_annex_a",
+     "ref": 22,
+     "section": "Annex A section 8 #6 (pheromone traps for population trend)",
+     "confidence": "expert_inference"
+    },
+    {
+     "doc": "medjool_manual_1_7_annex_a",
+     "ref": 27,
+     "section": "Annex A section 8 #6 (pheromone traps for population trend)",
+     "confidence": "expert_inference"
+    },
+    {
+     "doc": "medjool_manual_1_7_annex_a",
+     "ref": 30,
+     "section": "Annex A section 8 #6 (pheromone traps for population trend)",
+     "confidence": "expert_inference"
+    },
+    {
+     "doc": "medjool_manual_1_7_annex_b",
+     "ref": 7,
+     "section": "Annex B Red Palm Weevil, 'How to detect'",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "food_bait",
+   "name_en": "Food bait",
+   "name_ar": "طعم غذائي",
+   "category": "trap_or_bait",
+   "active_ingredient": null,
+   "methods": [
+    "trap"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 8,
+     "section": "10.1 #2 (food bait and water renewed every 7-15 days)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 8,
+     "section": "12.2 weeks 1-52 trap servicing task",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 36,
+     "section": "10.1 #2 (food bait and water renewed every 7-15 days)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 36,
+     "section": "12.2 weeks 1-52 trap servicing task",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "10.1 #6 (pheromone-food traps, food kept wet)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 44,
+     "section": "12.2 weeks 1-52 trap servicing task",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 51,
+     "section": "10.1 #12 (traps with pheromone, water and food bait)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 51,
+     "section": "12.2 weeks 1-52 trap servicing task",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 55,
+     "section": "10.1 #12 (traps with pheromone, water and food bait)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 55,
+     "section": "12.2 weeks 1-52 trap servicing task",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "pheromone_trap_oryctes_elegans",
+   "name_en": "Pheromone traps for O. elegans",
+   "name_ar": "مصائد الفرمون لـ O. elegans",
+   "category": "trap_or_bait",
+   "active_ingredient": "pheromone",
+   "methods": [
+    "trap"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7_annex_b",
+     "ref": 32,
+     "section": "Annex B Rhinoceros beetles, 'How to detect' (need fresh date palm tissue)",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "paper_bag",
+   "name_en": "Paper bag",
+   "name_ar": "كيس ورقي",
+   "category": "bag_or_cover",
+   "active_ingredient": null,
+   "methods": [
+    "cover"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 5,
+     "section": "12.2 weeks 6-9 Task 7; weeks 10-13 Task 8",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 5,
+     "section": "9.1 #5 (over the female inflorescence at pollination when low temperatures are expected)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 6,
+     "section": "12.2 weeks 6-9 Task 7; weeks 10-13 Task 8",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 6,
+     "section": "9.1 #5 (over the female inflorescence at pollination when low temperatures are expected)",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "open_ended_bags",
+   "name_en": "Open-ended bags",
+   "name_ar": "أكياس مفتوحة الطرف",
+   "category": "bag_or_cover",
+   "active_ingredient": null,
+   "methods": [
+    "cover"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 6,
+     "section": "12.2 week 27 Task 6; week 28 Task 6 ('open-ended or porous bags')",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 16,
+     "section": "12.2 week 27 Task 6; week 28 Task 6 ('open-ended or porous bags')",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 16,
+     "section": "9.4 #1 (applied at Khalal, left until harvest)",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 33,
+     "section": "12.2 week 27 Task 6; week 28 Task 6 ('open-ended or porous bags')",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 39,
+     "section": "12.2 week 27 Task 6; week 28 Task 6 ('open-ended or porous bags')",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 45,
+     "section": "12.2 week 27 Task 6; week 28 Task 6 ('open-ended or porous bags')",
+     "confidence": "high"
+    }
+   ]
+  },
+  {
+   "code": "polyethylene_bags",
+   "name_en": "Polyethylene bags",
+   "name_ar": "أكياس البولي إيثيلين",
+   "category": "bag_or_cover",
+   "active_ingredient": "polyethylene",
+   "methods": [
+    "cover"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 18,
+     "section": "9.4 #2",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "brown_wrapping_paper",
+   "name_en": "Brown wrapping paper",
+   "name_ar": "ورق التغليف البني",
+   "category": "bag_or_cover",
+   "active_ingredient": null,
+   "methods": [
+    "cover"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 18,
+     "section": "9.4 #3",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "net_bags",
+   "name_en": "Net bags",
+   "name_ar": "أكياس شبكية",
+   "category": "bag_or_cover",
+   "active_ingredient": null,
+   "methods": [
+    "cover"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 29,
+     "section": "9.4 #4 (Arizona, against birds)",
+     "confidence": "low"
+    }
+   ]
+  },
+  {
+   "code": "white_cotton_bag",
+   "name_en": "Lightweight white cotton bag whose upper portion is waterproof",
+   "name_ar": "كيس قطني أبيض خفيف جزؤه العلوي مقاوم للماء",
+   "category": "bag_or_cover",
+   "active_ingredient": "cotton",
+   "methods": [
+    "cover"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 5,
+     "section": "9.4 #5",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 45,
+     "section": "9.4 #5",
+     "confidence": "high"
+    }
+   ]
+  },
+  {
+   "code": "cloth_bag",
+   "name_en": "Cloth bag",
+   "name_ar": "كيس قماشي",
+   "category": "bag_or_cover",
+   "active_ingredient": null,
+   "methods": [
+    "cover"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 5,
+     "section": "9.4 #5 (USA)",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 45,
+     "section": "9.4 #5 (USA)",
+     "confidence": "high"
+    }
+   ]
+  },
+  {
+   "code": "shade_net",
+   "name_en": "Shade net",
+   "name_ar": "شبك التظليل",
+   "category": "bag_or_cover",
+   "active_ingredient": null,
+   "methods": [
+    "cover"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 2,
+     "section": "8.4 #1 (shade-net cover for young palms)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 2,
+     "section": "8.8 W0 Task 4",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 3,
+     "section": "8.4 #1 (shade-net cover for young palms)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 3,
+     "section": "8.8 W0 Task 4",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 5,
+     "section": "9.4 #5 (bunch wrapped in shade net, Israel)",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 45,
+     "section": "9.4 #5 (bunch wrapped in shade net, Israel)",
+     "confidence": "high"
+    }
+   ]
+  },
+  {
+   "code": "net_bags_80pct",
+   "name_en": "80% net bags",
+   "name_ar": "أكياس شبكية 80%",
+   "category": "bag_or_cover",
+   "active_ingredient": null,
+   "methods": [
+    "cover"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 6,
+     "section": "9.4 #6 (FAO calendar; Kimri to Khalal, before Rutab)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 39,
+     "section": "9.4 #6 (FAO calendar; Kimri to Khalal, before Rutab)",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "white_plastic_net_bags_tazmit",
+   "name_en": "White plastic net bags with 2 mm holes ('Tazmit')",
+   "name_ar": "أكياس شبكية بلاستيكية بيضاء بفتحات 2 مم («التزميت»)",
+   "category": "bag_or_cover",
+   "active_ingredient": null,
+   "methods": [
+    "cover"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 6,
+     "section": "12.2 week 27 Task 6; week 28 Task 6",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 16,
+     "section": "12.2 week 27 Task 6; week 28 Task 6",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 33,
+     "section": "12.2 week 27 Task 6; week 28 Task 6",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 33,
+     "section": "9.4 #7 (Egyptian oases; July best)",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 39,
+     "section": "12.2 week 27 Task 6; week 28 Task 6",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 45,
+     "section": "12.2 week 27 Task 6; week 28 Task 6",
+     "confidence": "high"
+    },
+    {
+     "doc": "medjool_manual_1_7_annex_b",
+     "ref": 35,
+     "section": "Annex B Carob moth, 'How to detect' (bagging bunches)",
+     "confidence": "low"
+    }
+   ]
+  },
+  {
+   "code": "hessian_wrapping",
+   "name_en": "Hessian wrapping",
+   "name_ar": "لف الخيش",
+   "category": "bag_or_cover",
+   "active_ingredient": "hessian",
+   "methods": [
+    "cover"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 2,
+     "section": "8.4 #1",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 2,
+     "section": "8.8 W0 Task 4",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 3,
+     "section": "8.4 #1",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 3,
+     "section": "8.8 W0 Task 4",
+     "confidence": "medium"
+    }
+   ]
+  },
+  {
+   "code": "tent_of_date_leaves",
+   "name_en": "Tent of date leaves",
+   "name_ar": "خيمة من سعف النخيل",
+   "category": "bag_or_cover",
+   "active_ingredient": null,
+   "methods": [
+    "cover"
+   ],
+   "crop_paths": [],
+   "notes": null,
+   "doses": [],
+   "links": [
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 2,
+     "section": "8.4 #1",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 2,
+     "section": "8.8 W0 Task 4",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 3,
+     "section": "8.4 #1",
+     "confidence": "medium"
+    },
+    {
+     "doc": "medjool_manual_1_7",
+     "ref": 3,
+     "section": "8.8 W0 Task 4",
+     "confidence": "medium"
+    }
+   ]
+  }
+ ]
+}

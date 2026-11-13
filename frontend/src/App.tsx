@@ -92,6 +92,7 @@ import { PlatformRolesPage } from "@/modules/admin/pages/PlatformRolesPage";
 import { PlatformUsagePage } from "@/modules/admin/pages/PlatformUsagePage";
 import { PlatformSignalsPage } from "@/modules/admin/pages/PlatformSignalsPage";
 import { PlatformSourcesPage } from "@/modules/sources/PlatformSourcesPage";
+import { InputsCataloguePage } from "@/modules/inputs/InputsCataloguePage";
 import { PlatformDefaultsPage } from "@/modules/admin/pages/PlatformDefaultsPage";
 import { PlatformBackfillPage } from "@/modules/admin/pages/PlatformBackfillPage";
 import { ObserverSceneDetailPage } from "@/modules/admin/pages/ObserverSceneDetailPage";
@@ -400,6 +401,7 @@ export function App(): ReactNode {
                   <Route path="workers" element={<ResourcesWorkersPage />} />
                   <Route path="field-access" element={<FieldAccessPage />} />
                   <Route path="equipment" element={<ResourcesEquipmentPage />} />
+                  <Route path="inputs" element={<InputsCataloguePage scope="tenant" />} />
                   <Route path="rules" element={<RulesConfigPage />} />
                   {/* Decision Trees moved to the top-level /decision-trees
                       surface — keep old Settings deep links working. */}
@@ -433,6 +435,7 @@ export function App(): ReactNode {
                 <Route path="catalog" element={<PlatformCatalogPage />} />
                 <Route path="signals" element={<PlatformSignalsPage />} />
                 <Route path="sources" element={<PlatformSourcesPage />} />
+                <Route path="inputs" element={<InputsCataloguePage scope="platform" />} />
                 <Route path="crops/:cropId/attributes" element={<PlatformCropAttributesPage />} />
                 {/* The platform catalogue, edited by a platform admin. Same
                     three pages the tenant surface mounts at /decision-trees —

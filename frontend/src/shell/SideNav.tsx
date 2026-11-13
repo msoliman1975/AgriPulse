@@ -286,6 +286,13 @@ export function SideNav({ variant = "rail" }: { variant?: SideNavVariant }): Rea
           activePathPrefix="/platform/sources"
           collapsed={collapsed}
         />
+        <SideNavItem
+          to="/platform/inputs"
+          label={t("nav.inputs")}
+          icon={<GearIcon className="h-4 w-4" />}
+          activePathPrefix="/platform/inputs"
+          collapsed={collapsed}
+        />
         {/* The 33 platform trees are database rows now (public migration
             0085), so this is where they are edited. A tenant admin sees the
             same pages at /decision-trees for their own trees and cannot edit
