@@ -4171,9 +4171,23 @@ global:
       #   photo layer asks only for tiles over the farm. No migration.
       #   Watch: /farms/{id}/latest-photo answers 200 with photo.bounds.
       #   Rollback: api to 957a299.
-      tag: "5be0f66"
+      # 5ee27fc = #838 and #839, api and workers. Tree readiness (D15): two
+      #   read-only routes, GET /platform/decision-trees/beta/{id}/readiness
+      #   (per block for a tenant caller, counts only for a platform caller)
+      #   and GET .../readiness-summary (counts per active tenant, platform
+      #   admins only). They read the tree's requirements from its definition
+      #   and assess each targeted block with the sweep's own context; nothing
+      #   is written. The compiler keeps the optional readiness_note_en/ar.
+      #   #839 is tree definition files only. No migration. Workers move with
+      #   the api so the sweep runs the same compiler (b02551e..5ee27fc has no
+      #   other worker change).
+      #   Watch: both routes answer 200; readiness-summary latency, since it
+      #   loops every active tenant and loads each targeted block's context
+      #   (block_limit 500 per tenant); no errors in the api log.
+      #   Rollback: api to 5be0f66, workers to b02551e.
+      tag: "5ee27fc"
     workers:
-      tag: "b02551e"
+      tag: "5ee27fc"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4920,7 +4934,17 @@ global:
       #   smooth class edges, with Latest (10 m) on and off; cell highlights
       #   and filters still update.
       #   Rollback: this tag alone back to 957a299 (api may stay).
-      tag: "5be0f66"
+      # 5ee27fc = #838, frontend, see the api note. The Beta designer gains a
+      #   fifth tab, Readiness: "Before it can run" (the tree's note and its
+      #   requirements), then per block (tenant) ready / partial / not ready
+      #   with what is missing and fix links for block editors, or counts per
+      #   tenant (platform). EN and AR.
+      #   Needs the api at 5ee27fc; an older api answers 404 and the tab shows
+      #   "Could not check readiness".
+      #   Watch: the Readiness tab loads for a Medjool tree as platform admin
+      #   and as a tenant; the other four tabs are unchanged.
+      #   Rollback: this tag alone back to 5be0f66.
+      tag: "5ee27fc"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
