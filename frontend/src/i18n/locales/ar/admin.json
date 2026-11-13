@@ -1012,7 +1012,8 @@
       "sizes": "فئات الحجم",
       "attributes": "الخصائص",
       "health": "الصحة",
-      "signals": "الإشارات"
+      "signals": "الإشارات",
+      "reference": "القيم المرجعية"
     },
     "level": {
       "crop": "محصول",
@@ -1073,6 +1074,39 @@
       "everyCrop_one": "{{count}} أخرى تنطبق على كل المحاصيل",
       "everyCrop_other": "{{count}} أخرى تنطبق على كل المحاصيل",
       "saveFailed": "تعذّر حفظ ارتباط المحصول."
+    },
+    "reference": {
+      "loadFailed": "تعذّر تحميل القيم المرجعية.",
+      "intro": "قيم مرجعية محددة النوع لمسار هذا المحصول. يحدد المسار ما يختلف عن المستوى الأعلى فقط، ويرث الباقي. تذكر كل قيمة مراجعها.",
+      "group": {
+        "salinity": "تحمّل الملوحة",
+        "yield": "الإنتاج والحمل المتوقعان",
+        "spacing": "المسافات"
+      },
+      "key": {
+        "soil_ece_threshold_ds_m": "حد ملوحة التربة (ECe)",
+        "yield_loss_pct_per_ds_m": "نقص الإنتاج لكل dS/m فوق الحد",
+        "irrigation_water_ecw_max_ds_m": "ملوحة مياه الري دون نقص الإنتاج (ECw)",
+        "leaching_requirement_pct": "احتياج الغسيل",
+        "yield_per_plant_kg": "الإنتاج لكل نبات",
+        "fruit_weight_g": "وزن الثمرة",
+        "bunches_per_plant": "عدد العذوق لكل نبات",
+        "row_spacing_m": "المسافة بين الصفوف",
+        "in_row_spacing_m": "المسافة داخل الصف",
+        "plants_per_ha": "عدد النباتات في الهكتار"
+      },
+      "derived": "من المسافات",
+      "inherited": "من {{path}}",
+      "edit": "تعديل",
+      "set": "تحديد هنا",
+      "clear": "مسح",
+      "value": "القيمة",
+      "min": "الأدنى",
+      "max": "الأعلى",
+      "note": "ملاحظة",
+      "save": "حفظ",
+      "cancel": "إلغاء",
+      "saveFailed": "تعذّر الحفظ."
     }
   },
   "sizeClasses": {
