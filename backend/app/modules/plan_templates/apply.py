@@ -34,6 +34,10 @@ class ResolvedActivity:
     dosage: str | None
     notes: str | None
     start_time: Any  # datetime.time | None
+    input_id: Any = None  # UUID | None (D20)
+    dose_value: Any = None
+    dose_value_max: Any = None
+    dose_unit: str | None = None
 
 
 def _stage_start_date(
@@ -118,6 +122,10 @@ def resolve_schedule(
                 dosage=a.get("dosage"),
                 notes=a.get("notes"),
                 start_time=a.get("start_time"),
+                input_id=a.get("input_id"),
+                dose_value=a.get("dose_value"),
+                dose_value_max=a.get("dose_value_max"),
+                dose_unit=a.get("dose_unit"),
             )
         )
 
@@ -125,3 +133,23 @@ def resolve_schedule(
 
 
 __all__ = ["ResolvedActivity", "resolve_schedule"]
+
+
+def format_dose(value: Any, value_max: Any, unit: str | None) -> str | None:
+    """ "100-150 g/plant", "50 kg/plant": the free-text ``dosage`` for a structured dose.
+
+    Written into ``plan_activities.dosage`` when the template activity has
+    a structured dose but no text, so screens that read only the text still
+    show it (D20).
+    """
+    if unit is None or (value is None and value_max is None):
+        return None
+
+    def num(x: Any) -> str:
+        return format(x.normalize() if hasattr(x, "normalize") else x, "f").rstrip(".")
+
+    if value is not None and value_max is not None:
+        amount = f"{num(value)}-{num(value_max)}"
+    else:
+        amount = num(value if value is not None else value_max)
+    return f"{amount} {unit}"

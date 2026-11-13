@@ -62,6 +62,10 @@ def _activity_dict(a: PlanTemplateActivity) -> dict[str, Any]:
         "duration_days": a.duration_days,
         "product_name": a.product_name,
         "dosage": a.dosage,
+        "input_id": a.input_id,
+        "dose_value": a.dose_value,
+        "dose_value_max": a.dose_value_max,
+        "dose_unit": a.dose_unit,
         "notes": a.notes,
         "start_time": a.start_time,
         "sort_order": a.sort_order,
@@ -203,6 +207,10 @@ class PlanTemplatesRepository:
                     duration_days=int(a.get("duration_days", 1)),
                     product_name=a.get("product_name"),
                     dosage=a.get("dosage"),
+                    input_id=a.get("input_id"),
+                    dose_value=a.get("dose_value"),
+                    dose_value_max=a.get("dose_value_max"),
+                    dose_unit=a.get("dose_unit"),
                     notes=a.get("notes"),
                     start_time=a.get("start_time"),
                     sort_order=int(a.get("sort_order", 0)),
@@ -427,6 +435,7 @@ class PlanTemplatesRepository:
                 bindparam("farm", type_=PG_UUID(as_uuid=True)),
                 bindparam("tpl", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                bindparam("input_id", type_=PG_UUID(as_uuid=True)),
             ),
             {
                 "id": plan_id,
@@ -460,6 +469,16 @@ class PlanTemplatesRepository:
         )
         return int(getattr(res, "rowcount", 0) or 0)
 
+    async def input_names(self, input_ids: set[UUID]) -> dict[UUID, str]:
+        """English names of catalogue inputs (public 0106), for applied plans."""
+        if not input_ids:
+            return {}
+        rows = await self._public.execute(
+            text("SELECT id, name_en FROM public.inputs WHERE id = ANY(:ids)"),
+            {"ids": list(input_ids)},
+        )
+        return {r.id: r.name_en for r in rows}
+
     async def insert_plan_activity(
         self,
         *,
@@ -477,6 +496,10 @@ class PlanTemplatesRepository:
         notes: str | None,
         start_time: Any,
         actor_user_id: UUID | None,
+        input_id: UUID | None = None,
+        dose_value: Any = None,
+        dose_value_max: Any = None,
+        dose_unit: str | None = None,
     ) -> None:
         assert self._tenant is not None
         await self._tenant.execute(
@@ -486,11 +509,13 @@ class PlanTemplatesRepository:
                     (plan_id, farm_id, block_id, activity_type, scheduled_date,
                      duration_days, start_time, product_name, dosage, notes,
                      status, source, applied_template_id, template_activity_id,
-                     anchored_stage_code, created_by, updated_by)
+                     anchored_stage_code, created_by, updated_by,
+                     input_id, dose_value, dose_value_max, dose_unit)
                 VALUES
                     (:plan, :farm, :block, :atype, :sched, :dur, :stime, :pname,
                      :dosage, :notes, 'scheduled', 'template', :tpl, :tact,
-                     :stage, :actor, :actor)
+                     :stage, :actor, :actor,
+                     :input_id, :dose_value, :dose_value_max, :dose_unit)
                 """
             ).bindparams(
                 bindparam("plan", type_=PG_UUID(as_uuid=True)),
@@ -515,6 +540,10 @@ class PlanTemplatesRepository:
                 "tact": template_activity_id,
                 "stage": anchored_stage_code,
                 "actor": actor_user_id,
+                "input_id": input_id,
+                "dose_value": dose_value,
+                "dose_value_max": dose_value_max,
+                "dose_unit": dose_unit,
             },
         )
 

@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.modules.audit import AuditService, get_audit_service
-from app.modules.plan_templates.apply import resolve_schedule
+from app.modules.plan_templates.apply import format_dose, resolve_schedule
 from app.modules.plan_templates.errors import (
     PlanTemplateConflictError,
     PlanTemplateNotFoundError,
@@ -291,6 +291,9 @@ class PlanTemplatesService:
             template_id=template_id,
             actor_user_id=actor_user_id,
         )
+        input_names = await self._repo.input_names(
+            {a.input_id for b in per_block for a in b["resolved"] if a.input_id}
+        )
         blocks_applied = 0
         activities_created = 0
         skipped = 0
@@ -312,11 +315,17 @@ class PlanTemplatesService:
                     scheduled_date=a.scheduled_date,
                     duration_days=a.duration_days,
                     anchored_stage_code=a.anchored_stage_code,
-                    product_name=a.product_name,
-                    dosage=a.dosage,
+                    # Screens that read only the free-text fields still show
+                    # the input and its dose (D20): fill them when empty.
+                    product_name=a.product_name or input_names.get(a.input_id),
+                    dosage=a.dosage or format_dose(a.dose_value, a.dose_value_max, a.dose_unit),
                     notes=a.notes,
                     start_time=a.start_time,
                     actor_user_id=actor_user_id,
+                    input_id=a.input_id,
+                    dose_value=a.dose_value,
+                    dose_value_max=a.dose_value_max,
+                    dose_unit=a.dose_unit,
                 )
                 activities_created += 1
             blocks_applied += 1

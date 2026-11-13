@@ -1,3 +1,4 @@
+import type { DoseUnit } from "./inputs";
 import { apiClient } from "./client";
 
 // ---- Shared types ---------------------------------------------------------
@@ -60,6 +61,11 @@ export interface PlanTemplateActivity {
   duration_days: number;
   product_name: string | null;
   dosage: string | null;
+  /** D20: an input from the catalogue and a structured dose. */
+  input_id?: string | null;
+  dose_value?: string | number | null;
+  dose_value_max?: string | number | null;
+  dose_unit?: DoseUnit | null;
   notes: string | null;
   start_time: string | null;
   sort_order: number;
@@ -107,6 +113,10 @@ export interface ActivityInput {
   duration_days: number;
   product_name?: string | null;
   dosage?: string | null;
+  input_id?: string | null;
+  dose_value?: number | null;
+  dose_value_max?: number | null;
+  dose_unit?: DoseUnit | null;
   notes?: string | null;
   sort_order: number;
 }

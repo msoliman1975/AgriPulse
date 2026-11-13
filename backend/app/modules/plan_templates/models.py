@@ -12,12 +12,14 @@ template to a farm's matching-crop blocks, materialising the existing
 from __future__ import annotations
 
 from datetime import time
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import (
     CheckConstraint,
     ForeignKey,
     Integer,
+    Numeric,
     Text,
     Time,
     UniqueConstraint,
@@ -135,6 +137,15 @@ class PlanTemplateActivity(Base, TimestampedMixin):
     duration_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
     product_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     dosage: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # D20: an input from the catalogue (public 0106) and a structured dose.
+    input_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("public.inputs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    dose_value: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
+    dose_value_max: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
+    dose_unit: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     start_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
