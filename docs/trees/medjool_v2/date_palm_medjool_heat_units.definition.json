@@ -4,6 +4,8 @@
   "name_ar": "نخيل المجدول — الوحدات الحرارية (GDD) والنضج على النخلة",
   "description_en": "Late in the season, checks whether Medjool fruit has had enough heat to ripen on the palm, and what to do if not. Source: Medjool Decision Trees v2 (original definition).",
   "description_ar": "في آخر الموسم، تفحص هل نالت ثمار المجدول حرارة كافية لتنضج على النخلة، وماذا يُفعل إن لم تنل. المصدر: أشجار قرار المجدول، الإصدار 2 (التعريف الأصلي).",
+  "readiness_note_en": "Needs the block's growth stage, the farm's weather for heat units, and scout records of bagging and the ripening stage.",
+  "readiness_note_ar": "تحتاج إلى مرحلة النمو للقطعة، وطقس المزرعة لحساب الوحدات الحرارية، وسجلات الاستكشاف للتكييس ومرحلة النضج.",
   "scope": "block",
   "crop_path": "date_palm.medjool",
   "country_codes": [

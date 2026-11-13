@@ -4,6 +4,8 @@
   "name_ar": "نخيل المجدول — تعفن النورات (الخامج) والجرافيولا",
   "description_en": "Khamedj rots spathes and destroys the bunch; it depends mainly on February–March rain and is worst on heavy, saline, poorly drained soils. Graphiola needs 10–12 hours of leaf wetness, so it is rare in the dry Western Desert. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly. Choice made where the page named a check but not its test, approved by the owner: heavy or saline soil is clay, clay loam or silty clay, or a moderately or strongly saline block.",
   "description_ar": "الخامج يعفّن الطلع ويتلف العذق؛ ويعتمد أساسًا على أمطار فبراير–مارس ويشتد في التربة الثقيلة الملحية سيئة الصرف. والجرافيولا تحتاج 10–12 ساعة ابتلال، فهي نادرة في الصحراء الغربية الجافة. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا. اختيار حيث ذكرت الصفحة الفحص دون طريقته، وافق عليه المالك: التربة الثقيلة أو المالحة هي طينية أو طينية لومية أو طينية سلتية، أو قطعة متوسطة أو شديدة الملوحة.",
+  "readiness_note_en": "Needs the block's growth stage, salinity class and soil texture, the farm's weather, and scout records of spathe rot and leaf spots.",
+  "readiness_note_ar": "تحتاج إلى مرحلة النمو وفئة الملوحة وقوام التربة في القطعة، وطقس المزرعة، وسجلات الاستكشاف لعفن الطلع وتبقع الأوراق.",
   "scope": "block",
   "crop_path": "date_palm.medjool",
   "country_codes": [

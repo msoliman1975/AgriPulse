@@ -214,6 +214,15 @@ def test_arabic_labels_carry_no_english_codes(code: str) -> None:
         assert not _CODE_WORDS.search(rule.get("text_ar") or ""), rule["code"]
 
 
+@pytest.mark.parametrize("code", sorted(DEFS))
+def test_has_a_bilingual_readiness_note(code: str) -> None:
+    """D15: each tree says what it needs before it can run, in both languages."""
+    d = DEFS[code]
+    assert d.get("readiness_note_en"), code
+    assert d.get("readiness_note_ar"), code
+    assert not re.search(r"[A-Za-z]", d["readiness_note_ar"]), d["readiness_note_ar"]
+
+
 # ---------------------------------------------------------------- fuzz
 _IDX = ["ndvi", "savi", "msavi", "bsi", "ndmi", "ndre", "gndvi", "cwsi", "smi", "lst"]
 _STAGES = ["dormancy", "pollination", "fruit_set", "kimri", "khalal", "rutab", "tamar"]

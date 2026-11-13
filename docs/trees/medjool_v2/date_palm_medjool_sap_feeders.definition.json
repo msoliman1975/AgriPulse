@@ -4,6 +4,8 @@
   "name_ar": "نخيل المجدول — الدوباس والقشرية البيضاء",
   "description_en": "Two sap-feeding insects that yellow the fronds: white scale (present in Egypt all year) and Dubas bug (a watch item for the Western Desert). Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly.",
   "description_ar": "حشرتان ماصتان تصفّران السعف: القشرية البيضاء (موجودة في مصر طوال العام) والدوباس (بند مراقبة للصحراء الغربية). المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا.",
+  "readiness_note_en": "Needs the block's growth stage, the farm's weather, scout records of scale per leaflet and honeydew, and the NDRE grid.",
+  "readiness_note_ar": "تحتاج إلى مرحلة النمو للقطعة، وطقس المزرعة، وسجلات الاستكشاف لعدد الحشرات القشرية على الوريقة والندوة العسلية، وشبكة مؤشر النيتروجين.",
   "scope": "block",
   "crop_path": "date_palm.medjool",
   "country_codes": [

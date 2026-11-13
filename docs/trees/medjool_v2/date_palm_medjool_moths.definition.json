@@ -4,6 +4,8 @@
   "name_ar": "نخيل المجدول — دودة البلح الصغرى وفراشات المخازن",
   "description_en": "Covers the moth that attacks flowers and young fruit, and the moths that attack dates in storage. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly.",
   "description_ar": "يغطي الفراشة التي تهاجم الأزهار والثمار الصغيرة، والفراشات التي تهاجم التمور في المخازن. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا.",
+  "readiness_note_en": "Needs the block's growth stage and scout records: hollow fruit seen, dates in storage, and the last biological spray.",
+  "readiness_note_ar": "تحتاج إلى مرحلة النمو للقطعة وسجلات الاستكشاف: الثمار المجوفة، والتمور المخزنة، وآخر رش حيوي.",
   "scope": "block",
   "crop_path": "date_palm.medjool",
   "country_codes": [

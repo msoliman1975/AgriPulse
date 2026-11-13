@@ -4,6 +4,8 @@
   "name_ar": "نخيل المجدول — المطر عند التلقيح والنضج",
   "description_en": "Rain is rare in the Western Desert but costly at two moments: just after pollination and on ripening fruit. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly.",
   "description_ar": "المطر نادر في الصحراء الغربية لكنه مكلف في لحظتين: بعد التلقيح مباشرة وعلى الثمار الناضجة. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا.",
+  "readiness_note_en": "Needs the block's growth stage, the farm's weather, and a scout record of whether the bunches are bagged.",
+  "readiness_note_ar": "تحتاج إلى مرحلة النمو للقطعة، وطقس المزرعة، وسجل استكشاف يبيّن تكييس السباطات.",
   "scope": "block",
   "crop_path": "date_palm.medjool",
   "country_codes": [

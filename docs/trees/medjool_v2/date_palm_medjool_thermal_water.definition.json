@@ -4,6 +4,8 @@
   "name_ar": "نخيل المجدول — الحالة المائية الحرارية",
   "description_en": "A water-status tree for thermal data from a drone thermal camera. A well-watered palm is cooler than a thirsty one. Neither 10 m nor 3 m satellite imagery has a thermal band, so this tree waits for drone flights. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly.",
   "description_ar": "شجرة حالة مائية لبيانات الكاميرا الحرارية على المسيّرة. النخلة المروية جيدًا أبرد من العطشى. لا تحمل صور الأقمار بدقة 10 م ولا 3 م نطاقًا حراريًا، فتنتظر هذه الشجرة رحلات المسيّرة. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا.",
+  "readiness_note_en": "Needs thermal and moisture imagery (LST, CWSI, SMI), the farm's water balance and its weather.",
+  "readiness_note_ar": "تحتاج إلى صور الحرارة والرطوبة الفضائية، والميزان المائي للمزرعة، وطقسها.",
   "scope": "block",
   "crop_path": "date_palm.medjool",
   "country_codes": [

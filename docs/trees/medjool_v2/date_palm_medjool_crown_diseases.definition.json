@@ -4,6 +4,8 @@
   "name_ar": "نخيل المجدول — أمراض التاج والسعف والأوعية",
   "description_en": "Differential for diseases a scout can see on fronds and the crown: black scorch and leaf base rot (both recorded in New Valley), Fusarium wilt and the quarantine Bayoud pattern, Al-Wijam (not in Egypt) and brittle leaf disease. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly.",
   "description_ar": "تشخيص تفريقي للأمراض التي يراها المستكشف على السعف والتاج: اللفحة السوداء وتعفن قواعد الأوراق (مسجّلان في الوادي الجديد)، وذبول الفيوزاريوم ونمط البيوض الحجري، والوجام (غير موجود في مصر)، ومرض الأوراق الهشة. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا.",
+  "readiness_note_en": "Needs scout records of the crown and leaf symptoms on its checklist, and the block's NDVI grid to locate weak cells. Without scout records it stays silent.",
+  "readiness_note_ar": "تحتاج إلى سجلات الاستكشاف لأعراض القمة والسعف الواردة في قائمتها، وشبكة مؤشر الغطاء للقطعة لتحديد الخلايا الضعيفة. تبقى صامتة دون سجلات استكشاف.",
   "scope": "block",
   "crop_path": "date_palm.medjool",
   "country_codes": [
