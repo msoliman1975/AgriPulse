@@ -4185,9 +4185,21 @@ global:
       #   loops every active tenant and loads each targeted block's context
       #   (block_limit 500 per tenant); no errors in the api log.
       #   Rollback: api to 5be0f66, workers to b02551e.
+      # f840a77 = #841, workers only (beat runs the workers image). The five
+      #   daily Beat tasks (phenology advance, weather risk, SPI, eval-run
+      #   prune, superseded-grid cleanup) were 86400 s intervals; Beat keeps
+      #   its schedule in /tmp, so every workers deploy restarted their 24 h
+      #   wait and they rarely ran (QA Medjool blocks never got a growth
+      #   stage). They are now crontabs at fixed UTC times: phenology 00:15,
+      #   weather risk 03:05, SPI 03:35, prune 04:05, grid cleanup 04:35.
+      #   No migration; the api stays 5ee27fc.
+      #   Watch: the beat log sends phenology.advance_growth_stages at 00:15
+      #   UTC and the light worker logs phenology_advance_done; QA Medjool
+      #   blocks then show a growth stage (post_harvest in November).
+      #   Rollback: workers to 5ee27fc.
       tag: "5ee27fc"
     workers:
-      tag: "5ee27fc"
+      tag: "f840a77"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
