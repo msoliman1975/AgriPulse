@@ -44,8 +44,10 @@ async def _seed_template(session: AsyncSession) -> tuple:
     await session.execute(
         text(
             "INSERT INTO public.plan_template_activities "
-            "(template_id, activity_type, anchor, stage_code, offset_days, sort_order) "
-            "VALUES (:t, 'fertilizing', 'stage', 'post_harvest_flush', 7, 2)"
+            "(template_id, code, activity_type, title, title_ar, anchor, stage_code, "
+            " offset_days, sort_order) "
+            "VALUES (:t, 'fertilizing-1', 'fertilizing', 'Post-harvest flush', "
+            " 'دفعة ما بعد الحصاد', 'stage', 'post_harvest_flush', 7, 2)"
         ).bindparams(bindparam("t", type_=PG_UUID(as_uuid=True))),
         {"t": tid},
     )
@@ -150,6 +152,8 @@ async def test_preview_and_apply_stage_anchored(admin_session: AsyncSession) -> 
     assert preview["total_activities"] == 2
     acts = preview["blocks"][0]["activities"]
     stage_act = next(a for a in acts if a["anchored_stage_code"] == "post_harvest_flush")
+    assert stage_act["activity_code"] == "fertilizing-1"
+    assert stage_act["title"] == "Post-harvest flush"
     # mango post_harvest_flush start_doy '09-16' + 7 days. The stage moved
     # from 07-16 in migration 0073, which gave mango a `maturation` stage for
     # the harvest months the flush used to cover.
@@ -183,13 +187,16 @@ async def test_preview_and_apply_stage_anchored(admin_session: AsyncSession) -> 
     stage_row = (
         await admin_session.execute(
             text(
-                "SELECT anchored_stage_code FROM plan_activities "
+                "SELECT anchored_stage_code, title, title_ar FROM plan_activities "
                 "WHERE applied_template_id = :t AND anchored_stage_code IS NOT NULL"
             ).bindparams(bindparam("t", type_=PG_UUID(as_uuid=True))),
             {"t": template_id},
         )
-    ).scalar_one()
-    assert stage_row == "post_harvest_flush"
+    ).one()
+    assert stage_row.anchored_stage_code == "post_harvest_flush"
+    # Titles are copied from the manual (tenant 0101).
+    assert stage_row.title == "Post-harvest flush"
+    assert stage_row.title_ar == "دفعة ما بعد الحصاد"
     await admin_session.execute(text("SET search_path TO public"))
     await admin_session.commit()
 

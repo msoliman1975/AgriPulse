@@ -50,8 +50,23 @@ export interface PlanTemplateMilestone {
   sort_order: number;
 }
 
-export interface PlanTemplateActivity {
+export type EvidenceTier = "eg_fao" | "eg" | "generic" | "manual";
+
+/** Content fields an operation manual activity carries (public 0104). */
+export interface ManualActivityContent {
+  title?: string | null;
+  title_ar?: string | null;
+  product_name_ar?: string | null;
+  dosage_ar?: string | null;
+  notes_ar?: string | null;
+  evidence_tier?: EvidenceTier | null;
+  source_tree_code?: string | null;
+}
+
+export interface PlanTemplateActivity extends ManualActivityContent {
   id: string;
+  /** Stable within the manual across edits; saved plans refer to it. */
+  code: string;
   activity_type: string;
   anchor: ActivityAnchor;
   milestone_id: string | null;
@@ -78,6 +93,9 @@ export interface PlanTemplateSummary {
   description: string | null;
   description_ar: string | null;
   status: TemplateStatus;
+  /** Bumped on every publish. */
+  revision: number;
+  published_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -97,7 +115,9 @@ export interface MilestoneInput {
   sort_order: number;
 }
 
-export interface ActivityInput {
+export interface ActivityInput extends ManualActivityContent {
+  /** Keep the code of an existing activity; omit for a new one. */
+  code?: string | null;
   activity_type: PlanActivityType;
   anchor: ActivityAnchor;
   // milestone-anchored: the milestone's *code* (resolved to an id on write).
@@ -217,7 +237,10 @@ export interface ApplyRequest {
 
 export interface ResolvedActivityPreview {
   template_activity_id: string;
+  activity_code?: string | null;
   activity_type: string;
+  title?: string | null;
+  title_ar?: string | null;
   scheduled_date: string;
   duration_days: number;
   anchored_stage_code: string | null;

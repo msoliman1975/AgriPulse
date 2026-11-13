@@ -10,7 +10,7 @@ from datetime import date
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import bindparam, delete, select, text
+from sqlalchemy import bindparam, select, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,6 +35,8 @@ def _template_dict(t: PlanTemplate) -> dict[str, Any]:
         "description": t.description,
         "description_ar": t.description_ar,
         "status": t.status,
+        "revision": t.revision,
+        "published_at": t.published_at,
         "created_at": t.created_at,
         "updated_at": t.updated_at,
     }
@@ -54,7 +56,10 @@ def _milestone_dict(m: PlanTemplateMilestone) -> dict[str, Any]:
 def _activity_dict(a: PlanTemplateActivity) -> dict[str, Any]:
     return {
         "id": a.id,
+        "code": a.code,
         "activity_type": a.activity_type,
+        "title": a.title,
+        "title_ar": a.title_ar,
         "anchor": a.anchor,
         "milestone_id": a.milestone_id,
         "stage_code": a.stage_code,
@@ -63,9 +68,34 @@ def _activity_dict(a: PlanTemplateActivity) -> dict[str, Any]:
         "product_name": a.product_name,
         "dosage": a.dosage,
         "notes": a.notes,
+        "product_name_ar": a.product_name_ar,
+        "dosage_ar": a.dosage_ar,
+        "notes_ar": a.notes_ar,
+        "evidence_tier": a.evidence_tier,
+        "source_tree_code": a.source_tree_code,
         "start_time": a.start_time,
         "sort_order": a.sort_order,
     }
+
+
+# Activity fields written from an authoring payload (everything but ids).
+_ACTIVITY_CONTENT_FIELDS = (
+    "activity_type",
+    "title",
+    "title_ar",
+    "offset_days",
+    "duration_days",
+    "product_name",
+    "dosage",
+    "notes",
+    "product_name_ar",
+    "dosage_ar",
+    "notes_ar",
+    "evidence_tier",
+    "source_tree_code",
+    "start_time",
+    "sort_order",
+)
 
 
 class PlanTemplatesRepository:
@@ -154,7 +184,7 @@ class PlanTemplatesRepository:
         ).first()
         return row.id if row is not None else None
 
-    async def _insert_children(
+    async def _write_children(
         self,
         *,
         template_id: UUID,
@@ -162,54 +192,93 @@ class PlanTemplatesRepository:
         activities: list[dict[str, Any]],
         actor_user_id: UUID | None,
     ) -> None:
-        """Insert milestones then activities, resolving each milestone-anchored
-        activity's ``milestone_code`` to the freshly-minted milestone id."""
-        code_to_id: dict[str, UUID] = {}
-        for m in milestones:
-            mid = uuid7()
-            code_to_id[m["code"]] = mid
-            self._public.add(
-                PlanTemplateMilestone(
-                    id=mid,
-                    template_id=template_id,
-                    code=m["code"],
-                    name=m["name"],
-                    name_ar=m.get("name_ar"),
-                    day_from_start=int(m["day_from_start"]),
-                    sort_order=int(m.get("sort_order", 0)),
-                    created_by=actor_user_id,
-                    updated_by=actor_user_id,
+        """Upsert milestones and activities by ``code`` (B3).
+
+        Rows whose code is still present keep their id, so saved plans and
+        plan activities that point at them stay valid. Rows whose code is gone
+        are deleted. Every activity in ``activities`` must already carry a
+        ``code`` (the service assigns missing ones).
+        """
+        existing_ms = {
+            m.code: m
+            for m in (
+                await self._public.execute(
+                    select(PlanTemplateMilestone).where(
+                        PlanTemplateMilestone.template_id == template_id
+                    )
                 )
             )
+            .scalars()
+            .all()
+        }
+        existing_acts = {
+            a.code: a
+            for a in (
+                await self._public.execute(
+                    select(PlanTemplateActivity).where(
+                        PlanTemplateActivity.template_id == template_id
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        }
+
+        code_to_id: dict[str, UUID] = {}
+        for m in milestones:
+            ms_row = existing_ms.pop(m["code"], None)
+            if ms_row is None:
+                ms_row = PlanTemplateMilestone(
+                    id=uuid7(),
+                    template_id=template_id,
+                    code=m["code"],
+                    created_by=actor_user_id,
+                )
+                self._public.add(ms_row)
+            ms_row.name = m["name"]
+            ms_row.name_ar = m.get("name_ar")
+            ms_row.day_from_start = int(m["day_from_start"])
+            ms_row.sort_order = int(m.get("sort_order", 0))
+            ms_row.updated_by = actor_user_id
+            code_to_id[m["code"]] = ms_row.id
         # Persist milestones before the activities that FK-reference them so the
         # constraint holds regardless of unit-of-work insert ordering.
-        if milestones:
-            await self._public.flush()
+        await self._public.flush()
+
         for a in activities:
             milestone_id: UUID | None = None
             if a.get("anchor") == "milestone":
                 mcode = a.get("milestone_code")
                 if mcode is not None:
                     milestone_id = code_to_id.get(str(mcode))
-            self._public.add(
-                PlanTemplateActivity(
+            act_row = existing_acts.pop(a["code"], None)
+            if act_row is None:
+                act_row = PlanTemplateActivity(
                     id=uuid7(),
                     template_id=template_id,
-                    activity_type=a["activity_type"],
-                    anchor=a["anchor"],
-                    milestone_id=milestone_id,
-                    stage_code=a.get("stage_code") if a.get("anchor") == "stage" else None,
-                    offset_days=int(a.get("offset_days", 0)),
-                    duration_days=int(a.get("duration_days", 1)),
-                    product_name=a.get("product_name"),
-                    dosage=a.get("dosage"),
-                    notes=a.get("notes"),
-                    start_time=a.get("start_time"),
-                    sort_order=int(a.get("sort_order", 0)),
+                    code=a["code"],
                     created_by=actor_user_id,
-                    updated_by=actor_user_id,
                 )
-            )
+                self._public.add(act_row)
+            act_row.anchor = a["anchor"]
+            act_row.milestone_id = milestone_id
+            act_row.stage_code = a.get("stage_code") if a.get("anchor") == "stage" else None
+            for field in _ACTIVITY_CONTENT_FIELDS:
+                value = a.get(field)
+                if field in ("offset_days", "sort_order"):
+                    value = int(value or 0)
+                elif field == "duration_days":
+                    value = int(value or 1)
+                setattr(act_row, field, value)
+            act_row.updated_by = actor_user_id
+
+        # Activities first: a removed milestone cascades to activities still
+        # pointing at it, and none should by now.
+        for stale_act in existing_acts.values():
+            await self._public.delete(stale_act)
+        await self._public.flush()
+        for stale_ms in existing_ms.values():
+            await self._public.delete(stale_ms)
 
     async def create_full_tree(
         self,
@@ -238,7 +307,8 @@ class PlanTemplatesRepository:
                 updated_by=actor_user_id,
             )
         )
-        await self._insert_children(
+        await self._public.flush()
+        await self._write_children(
             template_id=template_id,
             milestones=milestones,
             activities=activities,
@@ -256,14 +326,8 @@ class PlanTemplatesRepository:
         activities: list[dict[str, Any]],
         actor_user_id: UUID | None,
     ) -> None:
-        """Atomically replace a template's header + children. ``status`` is not
-        touched here (publish/archive are separate transitions)."""
-        await self._public.execute(
-            delete(PlanTemplateActivity).where(PlanTemplateActivity.template_id == template.id)
-        )
-        await self._public.execute(
-            delete(PlanTemplateMilestone).where(PlanTemplateMilestone.template_id == template.id)
-        )
+        """Replace a template's header + children, keeping children ids by code.
+        ``status`` is not touched here (publish/archive are separate transitions)."""
         template.code = header["code"]
         template.name = header["name"]
         template.name_ar = header.get("name_ar")
@@ -275,7 +339,7 @@ class PlanTemplatesRepository:
         template.description_ar = header.get("description_ar")
         template.updated_by = actor_user_id
         await self._public.flush()
-        await self._insert_children(
+        await self._write_children(
             template_id=template.id,
             milestones=milestones,
             activities=activities,
@@ -286,6 +350,11 @@ class PlanTemplatesRepository:
     async def set_status(
         self, *, template: PlanTemplate, status: str, actor_user_id: UUID | None
     ) -> None:
+        if status == "published":
+            # Every publish is a new revision (B4, H6), including a re-publish
+            # after edits to an already published manual.
+            template.revision = (template.revision or 0) + 1
+            template.published_at = await self._public.scalar(text("SELECT public.app_now()"))
         template.status = status
         template.updated_by = actor_user_id
         await self._public.flush()
@@ -472,6 +541,8 @@ class PlanTemplatesRepository:
         scheduled_date: date,
         duration_days: int,
         anchored_stage_code: str | None,
+        title: str | None = None,
+        title_ar: str | None = None,
         product_name: str | None,
         dosage: str | None,
         notes: str | None,
@@ -486,11 +557,11 @@ class PlanTemplatesRepository:
                     (plan_id, farm_id, block_id, activity_type, scheduled_date,
                      duration_days, start_time, product_name, dosage, notes,
                      status, source, applied_template_id, template_activity_id,
-                     anchored_stage_code, created_by, updated_by)
+                     anchored_stage_code, title, title_ar, created_by, updated_by)
                 VALUES
                     (:plan, :farm, :block, :atype, :sched, :dur, :stime, :pname,
                      :dosage, :notes, 'scheduled', 'template', :tpl, :tact,
-                     :stage, :actor, :actor)
+                     :stage, :title, :title_ar, :actor, :actor)
                 """
             ).bindparams(
                 bindparam("plan", type_=PG_UUID(as_uuid=True)),
@@ -514,6 +585,8 @@ class PlanTemplatesRepository:
                 "tpl": template_id,
                 "tact": template_activity_id,
                 "stage": anchored_stage_code,
+                "title": title,
+                "title_ar": title_ar,
                 "actor": actor_user_id,
             },
         )

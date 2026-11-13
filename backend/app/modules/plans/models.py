@@ -81,6 +81,9 @@ class PlanActivity(Base, TimestampedMixin):
         nullable=True,
     )
     activity_type: Mapped[str] = mapped_column(Text, nullable=False)
+    # Copied from the operation manual when applied (tenant 0101).
+    title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    title_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     scheduled_date: Mapped[date_type] = mapped_column(Date, nullable=False)
     duration_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
     start_time: Mapped[time | None] = mapped_column(Time, nullable=True)

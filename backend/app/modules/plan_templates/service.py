@@ -68,6 +68,9 @@ class PlanTemplatesService:
         milestone_codes = [m.code for m in payload.milestones]
         if len(milestone_codes) != len(set(milestone_codes)):
             raise PlanTemplateValidationError(reason="Duplicate milestone codes in template.")
+        activity_codes = [a.code for a in payload.activities if a.code]
+        if len(activity_codes) != len(set(activity_codes)):
+            raise PlanTemplateValidationError(reason="Duplicate activity codes in template.")
         milestone_set = set(milestone_codes)
 
         needs_stages = any(a.anchor == "stage" for a in payload.activities)
@@ -104,6 +107,7 @@ class PlanTemplatesService:
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         milestones = [m.model_dump() for m in payload.milestones]
         activities = [a.model_dump() for a in payload.activities]
+        assign_activity_codes(activities)
         return milestones, activities
 
     async def create_template(
@@ -254,7 +258,10 @@ class PlanTemplatesService:
                     "activities": [
                         {
                             "template_activity_id": a.template_activity_id,
+                            "activity_code": a.activity_code,
                             "activity_type": a.activity_type,
+                            "title": a.title,
+                            "title_ar": a.title_ar,
                             "scheduled_date": a.scheduled_date,
                             "duration_days": a.duration_days,
                             "anchored_stage_code": a.anchored_stage_code,
@@ -309,6 +316,8 @@ class PlanTemplatesService:
                     template_id=template_id,
                     template_activity_id=a.template_activity_id,
                     activity_type=a.activity_type,
+                    title=a.title,
+                    title_ar=a.title_ar,
                     scheduled_date=a.scheduled_date,
                     duration_days=a.duration_days,
                     anchored_stage_code=a.anchored_stage_code,
@@ -340,6 +349,20 @@ class PlanTemplatesService:
             "activities_created": activities_created,
             "skipped": skipped,
         }
+
+
+def assign_activity_codes(activities: list[dict[str, Any]]) -> None:
+    """Give every activity without a ``code`` one that is unused in the list:
+    ``<activity_type>-<n>``, the same shape the 0104 backfill used."""
+    taken = {str(a["code"]) for a in activities if a.get("code")}
+    for a in activities:
+        if a.get("code"):
+            continue
+        n = 1
+        while f"{a['activity_type']}-{n}" in taken:
+            n += 1
+        a["code"] = f"{a['activity_type']}-{n}"
+        taken.add(a["code"])
 
 
 def get_plan_templates_service(
