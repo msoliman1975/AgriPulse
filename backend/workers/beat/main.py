@@ -9,12 +9,33 @@ can run faster than production without touching code.
 
 from __future__ import annotations
 
+from celery.schedules import crontab
+
 from app.core.settings import get_settings
 from workers.celery_factory import build_celery
 
 app = build_celery("beat")
 
 _settings = get_settings()
+
+_DAY_SECONDS = 86400
+
+
+def _daily_at(seconds: int, *, hour: int, minute: int) -> float | crontab:
+    """A once-a-day task at a fixed UTC time, or the configured interval.
+
+    Beat keeps its schedule in a file under /tmp, so every restart (every
+    workers deploy) forgets when each task last ran. A plain 86400-second
+    interval then waits a full day from each restart, and with deploys more
+    often than daily the task never runs: blocks never advance their growth
+    stage. A crontab is due at its clock time whatever happened before, so a
+    restart costs at most the one run it straddles. Dev overlays that shorten
+    the interval keep it.
+    """
+    if seconds == _DAY_SECONDS:
+        return crontab(hour=hour, minute=minute)
+    return float(seconds)
+
 
 app.conf.beat_schedule = {
     "farms.farm_scope_consistency_check": {
@@ -28,7 +49,7 @@ app.conf.beat_schedule = {
     # recommendation engine reads the resulting stage unchanged.
     "phenology.advance_growth_stages": {
         "task": "phenology.advance_growth_stages",
-        "schedule": float(_settings.phenology_advance_seconds),
+        "schedule": _daily_at(_settings.phenology_advance_seconds, hour=0, minute=15),
         "options": {"queue": "light"},
     },
     # IH-6: DB -> Keycloak reconciler. Re-asserts each provisioned user's
@@ -102,7 +123,7 @@ app.conf.beat_schedule = {
     # PR-R2). Light queue — pure accumulation math.
     "weather.compute_risk_daily_sweep": {
         "task": "weather.compute_risk_daily_sweep",
-        "schedule": float(_settings.weather_risk_compute_seconds),
+        "schedule": _daily_at(_settings.weather_risk_compute_seconds, hour=3, minute=5),
         "options": {"queue": "light"},
     },
     # PR-F (sunset rules engine): the rules-based alerts sweep is
@@ -151,7 +172,7 @@ app.conf.beat_schedule = {
     # farms too arid to fit are skipped outright.
     "weather.compute_spi_sweep": {
         "task": "weather.compute_spi_sweep",
-        "schedule": float(_settings.weather_spi_sweep_seconds),
+        "schedule": _daily_at(_settings.weather_spi_sweep_seconds, hour=3, minute=35),
         "options": {"queue": "light"},
     },
     # Recommendations engine: ask which tenants are due, then walk every
@@ -175,7 +196,7 @@ app.conf.beat_schedule = {
     # dig through a compressed hypertable.
     "recommendations.prune_eval_runs": {
         "task": "recommendations.prune_eval_runs",
-        "schedule": float(_settings.recommendations_eval_run_prune_seconds),
+        "schedule": _daily_at(_settings.recommendations_eval_run_prune_seconds, hour=4, minute=5),
         "kwargs": {"retention_days": _settings.recommendations_eval_run_retention_days},
         "options": {"queue": "light"},
     },
@@ -204,7 +225,7 @@ app.conf.beat_schedule = {
     # reason this is out of band rather than inline with the apply.
     "grid.cleanup_superseded_grids": {
         "task": "grid.cleanup_superseded_grids",
-        "schedule": float(_settings.grid_cleanup_superseded_seconds),
+        "schedule": _daily_at(_settings.grid_cleanup_superseded_seconds, hour=4, minute=35),
         "kwargs": {"retention_days": _settings.grid_superseded_retention_days},
         "options": {"queue": "heavy"},
     },
