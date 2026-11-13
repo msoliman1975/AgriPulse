@@ -411,3 +411,30 @@ async def test_real_run_results_are_empty_before_the_tree_is_on_the_sweep(
     rows = await repo.list_real_run_results(tree_id=made["tree"]["id"])
 
     assert rows == []
+
+
+@pytest.mark.asyncio
+async def test_readiness_reads_the_tree_and_every_targeted_block(admin_session: Any) -> None:
+    """D15 on a real tenant: the tree reads NDVI, both blocks have it, nothing is written."""
+    seeded = await _seed(admin_session)
+    made = await _make_tree(admin_session, seeded)
+
+    before = await _counts(admin_session)
+    result = await made["service"].readiness(
+        tree_id=made["tree"]["id"],
+        tenant_session=admin_session,
+        tenant_schema=seeded["schema"],
+    )
+    after = await _counts(admin_session)
+
+    assert before == after
+    assert {"kind": "index", "key": "ndvi"} in result["requirements"]
+    assert result["blocks_targeted"] == result["blocks_assessed"] >= 2
+    seeded_blocks = {
+        str(b["block_id"]): b
+        for b in result["blocks"]
+        if str(b["block_id"]) in {str(x) for x in seeded["blocks"]}
+    }
+    assert len(seeded_blocks) == 2
+    assert all(b["status"] == "ready" for b in seeded_blocks.values())
+    assert result["counts"]["ready"] >= 2

@@ -917,6 +917,9 @@ def compile_folding_tree(spec: dict[str, Any], *, known_codes: Container[str]) -
         "name_ar": spec.get("name_ar"),
         "description_en": spec.get("description_en"),
         "description_ar": spec.get("description_ar"),
+        # D15: a short bilingual "Before it can run" note for growers.
+        "readiness_note_en": spec.get("readiness_note_en"),
+        "readiness_note_ar": spec.get("readiness_note_ar"),
         "crop_code": spec.get("crop_code"),
         "crop_path": crop_paths[0] if crop_paths else None,
         "crop_paths": crop_paths,

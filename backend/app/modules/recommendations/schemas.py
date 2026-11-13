@@ -1504,6 +1504,72 @@ class EstateDryRunStartResponse(BaseModel):
     state: str = "running"
 
 
+class ReadinessRequirement(BaseModel):
+    """One piece of block data a tree reads (D15)."""
+
+    kind: Literal[
+        "block_field", "crop_attribute", "signal", "index", "weather", "water_balance", "grid"
+    ]
+    key: str
+
+
+class ReadinessBlock(BaseModel):
+    block_id: UUID
+    block_code: str | None = None
+    block_name: str | None = None
+    block_name_ar: str | None = None
+    farm_id: UUID | None = None
+    farm_name: str | None = None
+    farm_name_ar: str | None = None
+    status: Literal["ready", "partial", "not_ready"]
+    met: int
+    total: int
+    missing: list[ReadinessRequirement]
+
+
+class ReadinessCounts(BaseModel):
+    ready: int = 0
+    partial: int = 0
+    not_ready: int = 0
+
+
+class TreeReadinessResponse(BaseModel):
+    """GET /platform/decision-trees/beta/{tree_id}/readiness.
+
+    ``blocks`` is filled for a tenant's own caller only. A platform caller
+    sees the counts: which blocks lack what is the tenant's business.
+    """
+
+    tree_id: UUID
+    tree_code: str
+    version_id: UUID | None = None
+    requirements: list[ReadinessRequirement]
+    readiness_note_en: str | None = None
+    readiness_note_ar: str | None = None
+    blocks_targeted: int
+    blocks_assessed: int
+    counts: ReadinessCounts
+    blocks: list[ReadinessBlock] = Field(default_factory=list)
+
+
+class ReadinessTenantCounts(BaseModel):
+    tenant_id: UUID
+    tenant_name: str | None = None
+    blocks_targeted: int
+    counts: ReadinessCounts
+    error: str | None = None
+
+
+class TreeReadinessSummaryResponse(BaseModel):
+    """GET .../readiness-summary: counts per tenant, for platform admins."""
+
+    tree_id: UUID
+    requirements: list[ReadinessRequirement]
+    readiness_note_en: str | None = None
+    readiness_note_ar: str | None = None
+    tenants: list[ReadinessTenantCounts]
+
+
 class EstateDryRunSummary(BaseModel):
     """One run, without its report document."""
 

@@ -819,6 +819,92 @@ class FoldingTreeAuthorService:
         platform, tenant = await self._repo.finding_catalogue_rows(tenant_schema=tenant_schema)
         return resolve_findings(platform, tenant)
 
+    async def readiness(
+        self,
+        *,
+        tree_id: UUID,
+        tenant_session: AsyncSession,
+        tenant_schema: str | None,
+        block_limit: int = 500,
+    ) -> dict[str, Any]:
+        """D15: what the tree reads, and which of the tenant's blocks have it.
+
+        Only blocks the tree targets are assessed: a block on another crop
+        is not "not ready", it is not this tree's block. Each block is
+        checked against the same context the sweep builds for it, so a block
+        reported ready is one where every check can see its data. Reads only.
+        """
+        from sqlalchemy import text
+
+        from app.modules.recommendations.readiness import (
+            assess,
+            extract_requirements,
+            summarise,
+        )
+        from app.modules.recommendations.service import tree_targets_block
+
+        tree, compiled, version_id = await self._resolve_run_body(
+            tree_id=tree_id, definition=None, version_id=None, tenant_schema=tenant_schema
+        )
+        requirements = extract_requirements(compiled)
+        repo = RecommendationsRepository(tenant_session=tenant_session, public_session=self._public)
+        candidates = await repo.list_blocks_for_targeting()
+        targeted = [
+            row
+            for row in candidates
+            if tree_targets_block(
+                compiled,
+                crop_path=row.get("crop_path"),
+                crop_id=row.get("crop_id"),
+                country_code=row.get("country_code"),
+                soil_texture=row.get("soil_texture"),
+            )
+        ]
+        needs_grid = any(r.kind == "grid" for r in requirements)
+        with_grid: set[Any] = set()
+        if needs_grid and targeted:
+            result = await tenant_session.execute(
+                text(
+                    "SELECT DISTINCT block_id FROM grid_configs "
+                    "WHERE deleted_at IS NULL AND superseded_at IS NULL"
+                )
+            )
+            with_grid = {row[0] for row in result}
+
+        blocks: list[dict[str, Any]] = []
+        for row in targeted[:block_limit]:
+            ctx, _targeting, _latest = await self._dry_run_context(
+                compiled=compiled,
+                repo=repo,
+                block_id=row["block_id"],
+                tenant_session=tenant_session,
+            )
+            verdict = assess(requirements, ctx, has_grid=row["block_id"] in with_grid)
+            blocks.append(
+                {
+                    "block_id": row["block_id"],
+                    "block_code": row.get("block_code"),
+                    "block_name": row.get("block_name"),
+                    "block_name_ar": row.get("block_name_ar"),
+                    "farm_id": row.get("farm_id"),
+                    "farm_name": row.get("farm_name"),
+                    "farm_name_ar": row.get("farm_name_ar"),
+                    **verdict,
+                }
+            )
+        return {
+            "tree_id": tree_id,
+            "tree_code": str(tree["code"]),
+            "version_id": version_id,
+            "requirements": [r.as_dict() for r in requirements],
+            "readiness_note_en": compiled.get("readiness_note_en"),
+            "readiness_note_ar": compiled.get("readiness_note_ar"),
+            "blocks_targeted": len(targeted),
+            "blocks_assessed": len(blocks),
+            "counts": summarise(blocks),
+            "blocks": blocks,
+        }
+
     async def _dry_run_context(
         self,
         *,

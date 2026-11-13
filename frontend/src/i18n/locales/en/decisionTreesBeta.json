@@ -45,7 +45,8 @@
       "canvas": "Canvas",
       "targeting": "Targeting",
       "combinations": "Combinations",
-      "dryRun": "Dry run"
+      "dryRun": "Dry run",
+      "readiness": "Readiness"
     },
     "save": "Save draft",
     "saving": "Saving…",
@@ -505,5 +506,47 @@
       "noBetaTrees": "No beta tree is published. After this switch, no tenant gets any decision-tree results."
     },
     "skipped": "The last switch skipped {{n}} tenant schemas that are behind on migrations. Their old items are still open: {{schemas}}."
+  },
+  "readiness": {
+    "saveFirst": "Save the tree first; readiness is read from the saved definition.",
+    "loading": "Checking blocks…",
+    "loadFailed": "Could not check readiness.",
+    "beforeTitle": "Before it can run",
+    "noRequirements": "This tree reads no block data, so every targeted block is ready.",
+    "blocksTitle": "Blocks this tree targets ({{count}})",
+    "filter": "Show",
+    "filterAll": "All blocks",
+    "truncated": "Showing the first {{assessed}} of {{targeted}} blocks.",
+    "met": "{{met}} of {{total}} in place",
+    "missing": "Missing:",
+    "noBlocks": "No block in this tenant matches the tree's targeting.",
+    "noTenants": "No tenant has a block this tree targets.",
+    "tenantsTitle": "Tenants",
+    "platformNote": "Counts only. Each tenant sees its own blocks and what they lack.",
+    "tenantError": "Could not check",
+    "blocksTargeted": "{{count}} blocks targeted",
+    "status": {
+      "ready": "Ready",
+      "partial": "Partial",
+      "not_ready": "Not ready"
+    },
+    "kind": {
+      "block_field": "Block field",
+      "crop_attribute": "Crop attribute",
+      "signal": "Scout record",
+      "index": "Satellite index",
+      "weather": "Farm weather",
+      "water_balance": "Water balance",
+      "grid": "Cell grid"
+    },
+    "fix": {
+      "block_field": "Edit block",
+      "crop_attribute": "Edit block",
+      "signal": "Open block",
+      "index": "Open block",
+      "weather": "Open block",
+      "water_balance": "Open block",
+      "grid": "Open block"
+    }
   }
 }

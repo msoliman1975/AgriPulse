@@ -105,6 +105,8 @@ from app.modules.recommendations.schemas import (
     TreeParameterOverrideResponse,
     TreeParameterOverridesResponse,
     TreeParameterOverrideUpsertRequest,
+    TreeReadinessResponse,
+    TreeReadinessSummaryResponse,
     TreeRunCandidateFarm,
     VerdictReasoningResponse,
 )
@@ -2226,6 +2228,105 @@ async def list_estate_dry_runs_route(
         return await EstateDryRunRepository(tenant_session=session).list_runs(
             tree_id=tree_id, limit=limit
         )
+
+
+@router.get(
+    _BETA_PREFIX + "/{tree_id}/readiness",
+    response_model=TreeReadinessResponse,
+    summary="What the tree reads, and which blocks have it (D15). Reads only.",
+)
+async def tree_readiness_route(
+    tree_id: UUID,
+    tenant_id: UUID | None = Query(default=None),
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> dict[str, Any]:
+    """Per block for the tenant's own caller; counts only for a platform caller."""
+    from app.modules.recommendations.folding_report import tenant_scoped_session
+
+    _ensure_authoring_scope(context)
+    resolved_tenant, tenant_schema = await _estate_tenant(context, public_session, tenant_id)
+    service = FoldingTreeAuthorService(public_session=public_session, tenant_id=resolved_tenant)
+    try:
+        async with tenant_scoped_session(tenant_schema) as session:
+            result = await service.readiness(
+                tree_id=tree_id, tenant_session=session, tenant_schema=tenant_schema
+            )
+    except Exception as exc:
+        mapped = _map_beta_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+    if context.tenant_id is None:
+        result["blocks"] = []
+    return result
+
+
+@router.get(
+    _BETA_PREFIX + "/{tree_id}/readiness-summary",
+    response_model=TreeReadinessSummaryResponse,
+    summary="Readiness counts per tenant, for platform admins (D15). Reads only.",
+)
+async def tree_readiness_summary_route(
+    tree_id: UUID,
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> dict[str, Any]:
+    """Counts across every active tenant. Never which block lacks what."""
+    from app.core.errors import APIError
+    from app.modules.recommendations.folding_report import tenant_scoped_session
+
+    if context.tenant_id is not None or context.platform_role is None:
+        raise APIError(
+            status_code=status.HTTP_403_FORBIDDEN,
+            title="Platform admins only",
+            detail="Readiness across tenants is a platform view; a tenant reads its own.",
+            type_="https://agripulse.cloud/problems/forbidden",
+        )
+    tenants = (
+        await public_session.execute(
+            text(
+                "SELECT id, name, schema_name FROM public.tenants "
+                "WHERE status = 'active' ORDER BY name"
+            )
+        )
+    ).all()
+    requirements: list[dict[str, Any]] = []
+    notes: dict[str, Any] = {}
+    rows: list[dict[str, Any]] = []
+    for tid, name, schema in tenants:
+        service = FoldingTreeAuthorService(public_session=public_session, tenant_id=tid)
+        try:
+            async with tenant_scoped_session(schema) as session:
+                result = await service.readiness(
+                    tree_id=tree_id, tenant_session=session, tenant_schema=schema
+                )
+        except Exception as exc:
+            mapped = _map_beta_error(exc)
+            if mapped is not None and not requirements:
+                raise mapped from exc
+            rows.append(
+                {
+                    "tenant_id": tid,
+                    "tenant_name": name,
+                    "blocks_targeted": 0,
+                    "counts": {},
+                    "error": type(exc).__name__,
+                }
+            )
+            continue
+        requirements = result["requirements"]
+        notes = {k: result.get(k) for k in ("readiness_note_en", "readiness_note_ar")}
+        if result["blocks_targeted"]:
+            rows.append(
+                {
+                    "tenant_id": tid,
+                    "tenant_name": name,
+                    "blocks_targeted": result["blocks_targeted"],
+                    "counts": result["counts"],
+                }
+            )
+    return {"tree_id": tree_id, "requirements": requirements, **notes, "tenants": rows}
 
 
 @router.get(
