@@ -166,6 +166,7 @@ async def test_six_correlated_indices_on_one_block_are_one_card(admin_session: A
         today=date(2026, 8, 25),
     )
     await admin_session.commit()
+    await admin_session.execute(text(f'SET search_path TO "{seed["schema"]}", public'))
 
     ac = ActionCenterRepository(tenant_session=admin_session)
     rows = await ac.list_items(farm_id=seed["farm_id"])
@@ -196,6 +197,7 @@ async def test_severity_still_splits_the_card(admin_session: Any) -> None:
         repo, block_id=block, severity="critical", indices=("ndwi",), today=date(2026, 8, 26)
     )
     await admin_session.commit()
+    await admin_session.execute(text(f'SET search_path TO "{seed["schema"]}", public'))
 
     assert warn_id != crit_id
     ac = ActionCenterRepository(tenant_session=admin_session)
@@ -226,6 +228,7 @@ async def test_the_card_says_signals_and_the_drill_down_names_them(
         today=date(2026, 8, 27),
     )
     await admin_session.commit()
+    await admin_session.execute(text(f'SET search_path TO "{seed["schema"]}", public'))
 
     service = ActionCenterServiceImpl(tenant_session=admin_session)
     response = await service.list_items(farm_id=seed["farm_id"], group_by="none")

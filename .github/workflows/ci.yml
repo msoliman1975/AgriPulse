@@ -140,7 +140,20 @@ jobs:
       - name: pytest integration
         # Requires Docker daemon for testcontainers. ubuntu-24.04 ships
         # Docker; we just need to be able to talk to it.
-        run: uv run --python .venv/bin/python pytest tests/integration -m integration
+        #
+        # `-n 3`: three pytest-xdist workers. The session fixtures in
+        # tests/integration/conftest.py are per worker, so each worker starts
+        # its own Postgres, Redis and MailHog and shares no state with the
+        # others. Most of the suite's time is the database building a fresh
+        # tenant schema per test (~1.3 s of DDL, serialised inside one server,
+        # so it does not speed up with more clients). Separate servers do run
+        # it in parallel: measured locally, 25 min serial vs 12.5 min here.
+        #
+        # `--dist loadfile` keeps each file on one worker, so module-level
+        # fixtures (e.g. a tenant shared across a file) still work. A test that
+        # passes alone but fails here is depending on what an earlier file left
+        # behind; fix the leak rather than dropping `-n`.
+        run: uv run --python .venv/bin/python pytest tests/integration -m integration -n 3 --dist loadfile
         env:
           # testcontainers occasionally needs the runtime to find its
           # ryuk reaper image; keep defaults.
