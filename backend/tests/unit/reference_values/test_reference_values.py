@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from app.modules.reference_values.keys import BY_KEY, plants_per_ha, resolve
 from app.modules.reference_values.router import ReferenceValueRequest
 
-_MIG = Path(__file__).parents[3] / "migrations/public/versions/0105_crop_reference_values.py"
+_MIG = Path(__file__).parents[3] / "migrations/public/versions/0106_crop_reference_values.py"
 _spec = importlib.util.spec_from_file_location("mig0105", _MIG)
 assert _spec is not None
 assert _spec.loader is not None

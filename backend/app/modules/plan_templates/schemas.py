@@ -16,6 +16,8 @@ from app.modules.plans.schemas import ActivityType
 
 TemplateStatus = Literal["draft", "published", "archived"]
 ActivityAnchor = Literal["start", "milestone", "stage"]
+EvidenceTier = Literal["eg_fao", "eg", "generic", "manual"]
+ACTIVITY_CODE_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,63}$"
 
 
 class PlanTemplateMilestoneResponse(BaseModel):
@@ -33,7 +35,10 @@ class PlanTemplateActivityResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    code: str
     activity_type: str
+    title: str | None = None
+    title_ar: str | None = None
     anchor: ActivityAnchor
     milestone_id: UUID | None = None
     stage_code: str | None = None
@@ -42,6 +47,11 @@ class PlanTemplateActivityResponse(BaseModel):
     product_name: str | None = None
     dosage: str | None = None
     notes: str | None = None
+    product_name_ar: str | None = None
+    dosage_ar: str | None = None
+    notes_ar: str | None = None
+    evidence_tier: EvidenceTier | None = None
+    source_tree_code: str | None = None
     start_time: time | None = None
     sort_order: int = 0
 
@@ -64,6 +74,8 @@ class PlanTemplateSummary(BaseModel):
     description: str | None = None
     description_ar: str | None = None
     status: TemplateStatus
+    revision: int = 0
+    published_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -91,7 +103,12 @@ class PlanTemplateMilestoneInput(BaseModel):
 class PlanTemplateActivityInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    # Stable id within the template. Omit for a new activity: one is generated
+    # on save. Keep it when editing so saved plans keep pointing at it (B3).
+    code: str | None = Field(default=None, pattern=ACTIVITY_CODE_PATTERN)
     activity_type: ActivityType
+    title: str | None = Field(default=None, max_length=255)
+    title_ar: str | None = Field(default=None, max_length=255)
     anchor: ActivityAnchor = "start"
     # For milestone-anchored activities, the milestone's *code* (resolved to
     # an id on write). For stage-anchored, stage_code.
@@ -102,6 +119,11 @@ class PlanTemplateActivityInput(BaseModel):
     product_name: str | None = Field(default=None, max_length=255)
     dosage: str | None = Field(default=None, max_length=255)
     notes: str | None = None
+    product_name_ar: str | None = Field(default=None, max_length=255)
+    dosage_ar: str | None = Field(default=None, max_length=255)
+    notes_ar: str | None = None
+    evidence_tier: EvidenceTier | None = None
+    source_tree_code: str | None = Field(default=None, max_length=128)
     start_time: time | None = None
     sort_order: int = 0
 
@@ -144,7 +166,10 @@ class PlanTemplateApplyRequest(BaseModel):
 
 class ResolvedActivityPreview(BaseModel):
     template_activity_id: UUID
+    activity_code: str | None = None
     activity_type: str
+    title: str | None = None
+    title_ar: str | None = None
     scheduled_date: date
     duration_days: int
     anchored_stage_code: str | None = None

@@ -137,6 +137,9 @@ class ActivityResponse(BaseModel):
     # carries the phenology stage it was scheduled at.
     source: str = "manual"
     anchored_stage_code: str | None = None
+    # Copied from the operation manual (tenant 0101); null on manual rows.
+    title: str | None = None
+    title_ar: str | None = None
 
 
 class CalendarResponse(BaseModel):

@@ -11,11 +11,12 @@ template to a farm's matching-crop blocks, materialising the existing
 
 from __future__ import annotations
 
-from datetime import time
+from datetime import datetime, time
 from uuid import UUID
 
 from sqlalchemy import (
     CheckConstraint,
+    DateTime,
     ForeignKey,
     Integer,
     Text,
@@ -59,6 +60,10 @@ class PlanTemplate(Base, TimestampedMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     description_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'draft'"))
+    # Bumped on every publish (public 0104); saved plans record the revision
+    # they last applied so farms can be told the manual changed (B4).
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class PlanTemplateMilestone(Base, TimestampedMixin):
@@ -112,6 +117,11 @@ class PlanTemplateActivity(Base, TimestampedMixin):
             name="ck_plan_template_activity_stage_ref",
         ),
         CheckConstraint("duration_days >= 1", name="ck_plan_template_activity_duration"),
+        CheckConstraint(
+            "evidence_tier IS NULL OR evidence_tier IN ('eg_fao', 'eg', 'generic', 'manual')",
+            name="ck_plan_template_activity_evidence_tier",
+        ),
+        UniqueConstraint("template_id", "code", name="uq_plan_template_activity_code"),
         {"schema": "public"},
     )
 
@@ -123,7 +133,16 @@ class PlanTemplateActivity(Base, TimestampedMixin):
         ForeignKey("public.plan_templates.id", ondelete="CASCADE"),
         nullable=False,
     )
+    # Stable within the template across platform edits (public 0104, B3):
+    # saved plans and plan activities refer to manual activities by code.
+    code: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default=text("'act-' || replace(gen_random_uuid()::text, '-', '')"),
+    )
     activity_type: Mapped[str] = mapped_column(Text, nullable=False)
+    title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    title_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     anchor: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'start'"))
     milestone_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -136,6 +155,13 @@ class PlanTemplateActivity(Base, TimestampedMixin):
     product_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     dosage: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    product_name_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    dosage_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # eg_fao | eg | generic | manual (public 0104, E2).
+    evidence_tier: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Decision tree that covers the same work (E2, F1).
+    source_tree_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     start_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
 
