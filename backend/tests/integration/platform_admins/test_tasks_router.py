@@ -10,6 +10,7 @@ by the caller.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID, uuid4
@@ -18,6 +19,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -75,6 +77,31 @@ class _Tenant:
     schema_name: str
 
 
+_created_tenants: list[UUID] = []
+
+
+@pytest.fixture(autouse=True)
+async def _drop_schemaless_tenants(admin_session: AsyncSession) -> AsyncIterator[None]:
+    """Delete the tenants rows ``_tenant`` made once the test is done.
+
+    They have no schema behind them, so any multi-tenant sweep that runs later
+    in the same session (grid cleanup, alert sweeps, imagery invalidation)
+    would count them as failed tenants. Serial CI only got away with it because
+    ``platform_admins`` sorts after every module that runs a sweep.
+    """
+    yield
+    if _created_tenants:
+        await admin_session.rollback()
+        await admin_session.execute(
+            text("DELETE FROM public.tenants WHERE id = ANY(:ids)").bindparams(
+                bindparam("ids", type_=ARRAY(PG_UUID(as_uuid=True)))
+            ),
+            {"ids": list(_created_tenants)},
+        )
+        await admin_session.commit()
+        _created_tenants.clear()
+
+
 async def _tenant(session: AsyncSession, *, status: str = "active") -> _Tenant:
     """A tenants row, deliberately without a tenant schema behind it.
 
@@ -102,6 +129,7 @@ async def _tenant(session: AsyncSession, *, status: str = "active") -> _Tenant:
         },
     )
     await session.commit()
+    _created_tenants.append(tenant_id)
     return _Tenant(tenant_id=tenant_id, slug=slug, schema_name=schema_name)
 
 
