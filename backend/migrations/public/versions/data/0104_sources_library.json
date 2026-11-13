@@ -1,0 +1,2250 @@
+{
+ "documents": {
+  "medjool_manual_1_7": "Organic Medjool manual, edition 1.7 — section 14, scientific references",
+  "medjool_manual_1_7_annex_a": "Organic Medjool manual, edition 1.7 — Annex A sources",
+  "medjool_manual_1_7_annex_b": "Organic Medjool manual, edition 1.7 — Annex B sources",
+  "medjool_trees_v2": "Medjool decision trees v2 — sources"
+ },
+ "sources": [
+  {
+   "citation": "FAO (2002). Date Palm Cultivation. FAO Plant Production and Protection Paper 156, Rev.1. Zaid, A. & Arias-Jiménez, E.J. (eds.) --- Table of contents",
+   "url": "https://www.fao.org/4/y4360e/y4360e00.htm",
+   "doi": null,
+   "year": 2002,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     1
+    ]
+   ]
+  },
+  {
+   "citation": "FAO (2002). Date Palm Cultivation --- Chapter V: Date Palm Propagation",
+   "url": "https://www.fao.org/4/y4360e/y4360e09.htm",
+   "doi": null,
+   "year": 2002,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     2
+    ]
+   ]
+  },
+  {
+   "citation": "FAO (2002). Date Palm Cultivation --- Chapter VI: Land Preparation, Planting Operation and Fertilisation Requirements",
+   "url": "https://www.fao.org/4/y4360e/y4360e0a.htm",
+   "doi": null,
+   "year": 2002,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     3
+    ]
+   ]
+  },
+  {
+   "citation": "FAO (2002). Date Palm Cultivation --- Chapter VII: Date Palm Irrigation",
+   "url": "https://www.fao.org/4/y4360e/y4360e0b.htm",
+   "doi": null,
+   "year": 2002,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     4
+    ]
+   ]
+  },
+  {
+   "citation": "FAO (2002). Date Palm Cultivation --- Chapter VIII: Pollination and Bunch Management",
+   "url": "https://www.fao.org/4/y4360e/y4360e0c.htm",
+   "doi": null,
+   "year": 2002,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     5
+    ],
+    [
+     "medjool_trees_v2",
+     40
+    ]
+   ]
+  },
+  {
+   "citation": "FAO (2002). Date Palm Cultivation --- Chapter XI: Date Palm Technical Calendar",
+   "url": "https://www.fao.org/4/y4360e/y4360e0f.htm",
+   "doi": null,
+   "year": 2002,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     6
+    ]
+   ]
+  },
+  {
+   "citation": "FAO (1993). Date palm products --- Introduction (bunch management of Deglet Noor)",
+   "url": "https://www.fao.org/4/t0681e/t0681e02.htm",
+   "doi": null,
+   "year": 1993,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     7
+    ]
+   ]
+  },
+  {
+   "citation": "FAO (2020). Red Palm Weevil: Guidelines on management practices. Rome. ISBN 978-92-5-132189-8",
+   "url": "https://openknowledge.fao.org/server/api/core/bitstreams/9dea1914-74dd-4662-9816-a11df9710822/content",
+   "doi": null,
+   "year": 2020,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     8
+    ]
+   ]
+  },
+  {
+   "citation": "FAO Regional Office for the Near East (2025). FAO unveils innovative strategies for Red Palm Weevil management in Egypt (Dakhla, New Valley workshop)",
+   "url": "https://www.fao.org/neareast/news/details/fao-unveils-innovative-strategies-for-red-palm-weevil-management-in-egypt/en",
+   "doi": null,
+   "year": 2025,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     9
+    ]
+   ]
+  },
+  {
+   "citation": "PLOS One (2026). Enhanced soil attributes, yield and fruit quality of Medjool date palm in response to filter mud/cake for drylands sustainability (Dakhla Oasis, New Valley, Egypt)",
+   "url": "https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0343806",
+   "doi": null,
+   "year": 2026,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     10
+    ]
+   ]
+  },
+  {
+   "citation": "Frontiers in Sustainable Food Systems (2023). Effect of period of receptivity and air temperature on parthenocarpic phenomenon of 'Assiane' date palm cultivar",
+   "url": "https://www.frontiersin.org/journals/sustainable-food-systems/articles/10.3389/fsufs.2023.1326141/full",
+   "doi": "10.3389/fsufs.2023.1326141",
+   "year": 2023,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     11
+    ]
+   ]
+  },
+  {
+   "citation": "Saudi Journal of Biological Sciences (2022). Effect of pollination time, hour of daytime, pollen storage temperature and duration on pollen viability, germinability and fruit set of date palm cv. 'Deglet Nour'",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8847947/",
+   "doi": null,
+   "year": 2022,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     12
+    ]
+   ]
+  },
+  {
+   "citation": "Plants (MDPI) (2025). Effect of Pollen Storage Duration on Stainability, Fruit Set, and Physical Traits in Date Palm Cultivar 'Mejhoul'",
+   "url": "https://doi.org/10.3390/plants14203189",
+   "doi": "10.3390/plants14203189",
+   "year": 2025,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     13
+    ]
+   ]
+  },
+  {
+   "citation": "ResearchGate figure: Different Medjool date palm fruiting stages from pollination date (PD) at 10 April",
+   "url": "https://www.researchgate.net/figure/Different-Medjool-date-palm-fruiting-stages-from-pollination-date-PD-at-10-of-April_fig2_340604506",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     14
+    ]
+   ]
+  },
+  {
+   "citation": "Frontiers in Sustainable Food Systems (2025). Quality preservation of date palm fruits at the Khalal stage: a review",
+   "url": "https://www.frontiersin.org/journals/sustainable-food-systems/articles/10.3389/fsufs.2025.1558985/full",
+   "doi": "10.3389/fsufs.2025.1558985",
+   "year": 2025,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     15
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     60
+    ],
+    [
+     "medjool_trees_v2",
+     41
+    ]
+   ]
+  },
+  {
+   "citation": "Seed and Plant Journal (AREEO, Iran). Effect of Bunch Bagging on Ripening Rate and Control of Sunburn Disorder in Date Palm Fruit cv. Medjool",
+   "url": "https://spj.areeo.ac.ir/article_130719.html?lang=en",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     16
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     35
+    ],
+    [
+     "medjool_trees_v2",
+     42
+    ]
+   ]
+  },
+  {
+   "citation": "Northern Territory Government, Australia (2013). Agnote D35: Date Palm (Phoenix dactylifera) --- Bhat & Kenna",
+   "url": "https://daf.nt.gov.au/publications/publications-search/publications-database/primary-industry/fruit/686.pdf",
+   "doi": null,
+   "year": 2013,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     17
+    ],
+    [
+     "medjool_trees_v2",
+     43
+    ]
+   ]
+  },
+  {
+   "citation": "Saudi Journal of Biological Sciences (2021). Commercial techniques for preserving date palm fruit quality and safety: A review",
+   "url": "https://www.sciencedirect.com/science/article/pii/S1319562X21002965",
+   "doi": null,
+   "year": 2021,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     18
+    ]
+   ]
+  },
+  {
+   "citation": "Research Square (preprint). Enhancing quality attributes of Medjool fruits via foliar applications",
+   "url": "https://www.researchsquare.com/article/rs-9761754/v1",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     19
+    ]
+   ]
+  },
+  {
+   "citation": "Journal of Entomology (2017). Integrated Pest Management of Date Palm Fruit Pests: A Review",
+   "url": "https://scialert.net/fulltext/?doi=je.2017.112.121",
+   "doi": null,
+   "year": 2017,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     20
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     11
+    ],
+    [
+     "medjool_trees_v2",
+     25
+    ]
+   ]
+  },
+  {
+   "citation": "Sanad, Elhalawany, Abou-Setta & El-khateeb (2017). Partial survey of date palm dust mite, Oligonychus afrasiaticus, in Egypt including historical trait. Acarines 11: 53--55",
+   "url": "https://www.academia.edu/35783186/Partial_Survey_of_Date_Palm_Dust_Mite_Oligonychus_afrasiaticus_McGregor_in_Egypt_Including_Historical_Trait",
+   "doi": null,
+   "year": 2017,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     21
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     12
+    ]
+   ]
+  },
+  {
+   "citation": "State Information Service, Egypt. President Sisi issues the Organic Farming Law (Law No. 12 of 2020)",
+   "url": "https://sis.gov.eg/en/media-center/news/approved-by-hr-sisi-issues-organic-farming-law/",
+   "doi": null,
+   "year": 2020,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     22
+    ]
+   ]
+  },
+  {
+   "citation": "KCOA Africa (2021). Egyptian policies and laws on organic agriculture --- summary of Law 12/2020 (Articles 3--13) and sector status (English)",
+   "url": "https://kcoa-africa.org/wp-content/uploads/2025/10/KHNA-EG-20-Egyptian-National-Law-on-Organic-Agriculture_excerpt-transalted-to-English-2.pdf",
+   "doi": null,
+   "year": 2021,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     23
+    ]
+   ]
+  },
+  {
+   "citation": "FreshPlaza. \"Across Egypt, Medjool harvest is projected to reach at least 60,000 tonnes\"",
+   "url": "https://www.freshplaza.com/north-america/article/9856716/across-egypt-medjool-harvest-is-projected-to-reach-at-least-60-000-tonnes/",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     24
+    ]
+   ]
+  },
+  {
+   "citation": "Environmental Technology & Innovation (2021). Evaluation of underground water quality for drinking and irrigation purposes in New Valley Governorate, Egypt",
+   "url": "https://www.sciencedirect.com/science/article/abs/pii/S2352186421001346",
+   "doi": null,
+   "year": 2021,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     25
+    ]
+   ]
+  },
+  {
+   "citation": "Wikipedia. Medjool",
+   "url": "https://en.wikipedia.org/wiki/Medjool",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     26
+    ]
+   ]
+  },
+  {
+   "citation": "Euro-Mediterranean Journal for Environmental Integration (2025). Irrigation water requirements of date palms in the Arab region: influencing factors, climate change effect, and sustainable irrigation practices",
+   "url": "https://link.springer.com/article/10.1007/s41207-025-00959-z",
+   "doi": "10.1007/s41207-025-00959-z",
+   "year": 2025,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     27
+    ]
+   ]
+  },
+  {
+   "citation": "AL-Omran, Eid & Alshammari (2019). Crop water requirements of date palm based on actual applied water and Penman--Monteith calculations in Saudi Arabia. Applied Water Science 9: 69",
+   "url": "https://d-nb.info/1184699615/34",
+   "doi": null,
+   "year": 2019,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     28
+    ]
+   ]
+  },
+  {
+   "citation": "Farm Progress. Major Medjool date acreage expansion underway in Yuma County (Arizona)",
+   "url": "https://www.farmprogress.com/orchard-crops/major-medjool-date-acreage-expansion-underway-in-yuma-county",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     29
+    ]
+   ]
+  },
+  {
+   "citation": "Arizona State University Arboretum. Date Palm --- Date Gardening (date growing calendar, R. Harris)",
+   "url": "https://www.asu.edu/fm/documents/arboretum/DatePalm_DateGardening.pdf",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     30
+    ]
+   ]
+  },
+  {
+   "citation": "Hakimi et al. (2024). Effects of compost and compost tea on soil properties and nutrient uptake of the Moroccan date palm cultivar 'Mejhoul' under organic cultivation. Journal of Ecological Engineering 25(7): 224--240",
+   "url": "https://www.researchgate.net/publication/381116178_Effects_of_Compost_and_Compost_Tea_on_Soil_Properties_and_Nutrient_Uptake_of_the_Moroccan_Date_Palm_Cultivar_Mejhoul_under_Organic_Cultivation",
+   "doi": null,
+   "year": 2024,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     31
+    ]
+   ]
+  },
+  {
+   "citation": "International Journal of Tropical Insect Science (2026). Sustainable insect management for date palm in arid Gulf agro-ecosystems: challenges, bioinsecticides, and emerging innovations",
+   "url": "https://link.springer.com/article/10.1007/s42690-026-01783-w",
+   "doi": "10.1007/s42690-026-01783-w",
+   "year": 2026,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     32
+    ]
+   ]
+  },
+  {
+   "citation": "Abdel-Rahman, A.G. (2007). Insect pest control in organic date palm production in Egypt. 4th Symposium on Date Palm in Saudi Arabia, King Faisal University, Hofuf, pp. 1356--1360",
+   "url": "https://www.researchgate.net/publication/333278260_Insect_Pest_Control_in_Organic_Date_Palm_Production_in_Egypt_The_4th_Symposium_on_Date_Palm_in_Saudi_Arabia_Challenges_of_Processing_Marketing_and_Pests_Control_King_Faisal_University_-_Hofuf_Kingdom_",
+   "doi": null,
+   "year": 2007,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     33
+    ]
+   ]
+  },
+  {
+   "citation": "FAO GIAHS. Egypt --- Siwa Oasis Dates System",
+   "url": "https://www.fao.org/giahs/giahs-around-the-world/egypt-siwa-oasis-dates-system/en",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     34
+    ]
+   ]
+  },
+  {
+   "citation": "Ibrahim, Al-Abasi, Abd Elazez & Gadalla (2025). Medjool date palm growth and productivity in relation to spraying some nutrients and antioxidants (El-Minia, Egypt). Future of Agriculture 2: 13--25",
+   "url": "https://www.futurejournals.org/media/p5qiqepg/ibrahim-et-al-13-25-fatma.pdf",
+   "doi": null,
+   "year": 2025,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     35
+    ]
+   ]
+  },
+  {
+   "citation": "FAO, CIHEAM & NEPPO (2017). Current Situation of Red Palm Weevil in the NENA Region --- Scientific Consultation and High-Level Meeting on RPW Management, Rome, 29--31 March 2017",
+   "url": "https://openknowledge.fao.org/server/api/core/bitstreams/bb876ab1-8428-4749-9889-ba1db35e2cbe/content",
+   "doi": null,
+   "year": 2017,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     36
+    ]
+   ]
+  },
+  {
+   "citation": "FAO (2002). Date Palm Cultivation --- Chapter X: Establishment of a Modern Date Plantation",
+   "url": "https://www.fao.org/4/y4360e/y4360e0e.htm",
+   "doi": null,
+   "year": 2002,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     37
+    ]
+   ]
+  },
+  {
+   "citation": "FAO (2002). Date Palm Cultivation --- Chapter I: Botanical and Systematic Description of the Date Palm",
+   "url": "https://www.fao.org/4/y4360e/y4360e05.htm",
+   "doi": null,
+   "year": 2002,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     38
+    ]
+   ]
+  },
+  {
+   "citation": "Robinson, M.L. University of Nevada, Reno Extension FS-02-99 (Pub. 3217). The Date Palm Gardening Guide for Southern Nevada",
+   "url": "https://extension.unr.edu/publication.aspx?PubID=3217",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     39
+    ]
+   ]
+  },
+  {
+   "citation": "Frontiers in Plant Science (2025). Field evaluation of tissue culture-derived and offshoot-grown date palm cultivars: a comparative analysis of vegetative and fruit attributes",
+   "url": "https://www.frontiersin.org/journals/plant-science/articles/10.3389/fpls.2025.1516983/full",
+   "doi": "10.3389/fpls.2025.1516983",
+   "year": 2025,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     40
+    ]
+   ]
+  },
+  {
+   "citation": "Agriculture.Institute. Propagation Techniques for Date Palms: From Seeds to Tissue Culture",
+   "url": "https://agriculture.institute/production-tech-fruit-crops/propagation-techniques-date-palms-seeds-tissue-culture/",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     41
+    ]
+   ]
+  },
+  {
+   "citation": "Al Mashhadani, A.S. (2014). The calendar of date palm care in Abu Dhabi Emirate. Fifth International Date Palm Conference, Abu Dhabi",
+   "url": "https://www.academia.edu/7286073/_THE_CALENDAR_OF_DATE_PALM_CARE_IN_ABU_DHABI_EMIRATE",
+   "doi": null,
+   "year": 2014,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     42
+    ]
+   ]
+  },
+  {
+   "citation": "Al-Amoud, A.I. (2006). Date palm response to subsurface drip irrigation (Helwa, Gassim, Saudi Arabia). CSBE/SCGAB Paper 06-204",
+   "url": "https://www.academia.edu/98885505/Date_Palm_Response_to_Subsurface_Drip_Irrigation",
+   "doi": null,
+   "year": 2006,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     43
+    ]
+   ]
+  },
+  {
+   "citation": "FAO (2002). Date Palm Cultivation --- Chapter XII: Diseases and Pests of Date Palm",
+   "url": "https://www.fao.org/4/y4360e/y4360e0g.htm",
+   "doi": null,
+   "year": 2002,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     44
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     43
+    ],
+    [
+     "medjool_trees_v2",
+     23
+    ]
+   ]
+  },
+  {
+   "citation": "FAO (2002). Date Palm Cultivation --- Chapter IX: Date Harvesting, Packinghouse Management and Marketing Aspects",
+   "url": "https://www.fao.org/4/y4360e/y4360e0d.htm",
+   "doi": null,
+   "year": 2002,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     45
+    ]
+   ]
+  },
+  {
+   "citation": "FAO (2002). Date Palm Cultivation --- Chapter IV: Climatic Requirements of Date Palm",
+   "url": "https://www.fao.org/4/y4360e/y4360e08.htm",
+   "doi": null,
+   "year": 2002,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     46
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     59
+    ],
+    [
+     "medjool_trees_v2",
+     39
+    ]
+   ]
+  },
+  {
+   "citation": "FAO Irrigation and Drainage Paper 29, Annex 1: Crop salt tolerance data (Maas & Grattan 1999), Table A1.2",
+   "url": "https://www.fao.org/4/y4263e/y4263e0e.htm",
+   "doi": null,
+   "year": 1999,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     47
+    ],
+    [
+     "medjool_trees_v2",
+     8
+    ]
+   ]
+  },
+  {
+   "citation": "Allbed, Kumar & Aldakheel (2014). Assessing soil salinity using soil salinity and vegetation indices derived from IKONOS imagery in a date palm dominated region (Al-Hassa). Geoderma 230--231: 1--8",
+   "url": "https://doi.org/10.1016/j.geoderma.2014.03.025",
+   "doi": "10.1016/j.geoderma.2014.03.025",
+   "year": 2014,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     48
+    ],
+    [
+     "medjool_trees_v2",
+     9
+    ]
+   ]
+  },
+  {
+   "citation": "Dahy, Issa & Saleous (2021). Detecting and mapping mature, medium and young date palms in Abu Dhabi using a hierarchical integrated approach. Remote Sensing Applications: Society and Environment 23: 100584",
+   "url": "https://doi.org/10.1016/j.rsase.2021.100584",
+   "doi": "10.1016/j.rsase.2021.100584",
+   "year": 2021,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     49
+    ],
+    [
+     "medjool_trees_v2",
+     44
+    ]
+   ]
+  },
+  {
+   "citation": "Chouari, W. (2024). Assessment of vegetation cover changes and the contributing factors in the Al-Ahsa Oasis using NDVI. Regional Sustainability 5(1): 100111",
+   "url": "https://doi.org/10.1016/j.regsus.2024.03.005",
+   "doi": "10.1016/j.regsus.2024.03.005",
+   "year": 2024,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     50
+    ]
+   ]
+  },
+  {
+   "citation": "Aldawood et al. (2022). Effects of trap locations, pheromone source and temperature on red palm weevil surveillance. Florida Entomologist 105(1)",
+   "url": "https://doi.org/10.1653/024.105.0109",
+   "doi": "10.1653/024.105.0109",
+   "year": 2022,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     51
+    ],
+    [
+     "medjool_manual_1_7_annex_a",
+     16
+    ],
+    [
+     "medjool_trees_v2",
+     18
+    ]
+   ]
+  },
+  {
+   "citation": "Bannari et al. (2017). Water stress detection as an indicator of red palm weevil attack using WorldView-3 data. IGARSS 2017",
+   "url": "https://www.researchgate.net/publication/318658411_Water_stress_detection_as_an_indicator_of_red_palm_weevil_attack_using_worldview-3_data",
+   "doi": null,
+   "year": 2017,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     52
+    ],
+    [
+     "medjool_manual_1_7_annex_a",
+     25
+    ],
+    [
+     "medjool_trees_v2",
+     4
+    ]
+   ]
+  },
+  {
+   "citation": "Mendel, Voet, Nazarian, Dobrinin & Ment (2024). Comprehensive analysis of management strategies for red palm weevil in date palm settings, emphasizing sensor-based infestation detection. Agriculture 14: 260",
+   "url": "https://doi.org/10.3390/agriculture14020260",
+   "doi": "10.3390/agriculture14020260",
+   "year": 2024,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     53
+    ],
+    [
+     "medjool_trees_v2",
+     10
+    ]
+   ]
+  },
+  {
+   "citation": "Delalieux et al. (2023). Red palm weevil detection in date palm using temporal UAV imagery. Remote Sensing 15: 1380",
+   "url": "https://doi.org/10.3390/rs15051380",
+   "doi": "10.3390/rs15051380",
+   "year": 2023,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     54
+    ],
+    [
+     "medjool_manual_1_7_annex_a",
+     22
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     6
+    ],
+    [
+     "medjool_trees_v2",
+     5
+    ]
+   ]
+  },
+  {
+   "citation": "Abdel-Banat & El-Shafie (2023). Management of the red palm weevil in date palm plantations in Al-Ahsa Oasis of Saudi Arabia. CABI Plant Health Cases",
+   "url": "https://doi.org/10.1079/planthealthcases.2023.0001",
+   "doi": "10.1079/planthealthcases.2023.0001",
+   "year": 2023,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     55
+    ],
+    [
+     "medjool_manual_1_7_annex_a",
+     7
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     4
+    ],
+    [
+     "medjool_trees_v2",
+     16
+    ]
+   ]
+  },
+  {
+   "citation": "Eissa et al. (2023). The socioeconomic impact assessment of red palm weevil in Egypt and Saudi Arabia: an ex-ante evaluation. ICARDA",
+   "url": "https://repo.mel.cgiar.org/items/a79aa1b3-c757-425e-84e0-8ccced18ed9f",
+   "doi": null,
+   "year": 2023,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     56
+    ],
+    [
+     "medjool_manual_1_7_annex_a",
+     11
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     2
+    ]
+   ]
+  },
+  {
+   "citation": "Efficacy of aggregation pheromone in trapping red palm weevil in date palms in Damietta, Egypt. Egyptian Academic Journal of Biological Sciences (C) 7(1): 51--59 (2015)",
+   "url": "https://doi.org/10.21608/eajbsc.2015.13702",
+   "doi": "10.21608/eajbsc.2015.13702",
+   "year": 2015,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     57
+    ],
+    [
+     "medjool_manual_1_7_annex_a",
+     18
+    ],
+    [
+     "medjool_trees_v2",
+     19
+    ]
+   ]
+  },
+  {
+   "citation": "Hussien, Mahgoub, Mohamed & Hussien (2007). Infestation potential of Ephestia cautella and E. calidella on certain Egyptian date varieties. Egyptian Journal of Agricultural Research 85(3): 899--905",
+   "url": "https://ejar.journals.ekb.eg/article_226422.html",
+   "doi": null,
+   "year": 2007,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     58
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     36
+    ],
+    [
+     "medjool_trees_v2",
+     26
+    ]
+   ]
+  },
+  {
+   "citation": "Attia, S.A. (2015). Seasonal abundance of Parlatoria blanchardii and the associated parasitoid on date palm in Qalioubiya Governorate. Egyptian Journal of Agricultural Research 93(4): 1055--1067",
+   "url": "https://ejar.journals.ekb.eg/",
+   "doi": null,
+   "year": 2015,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     59
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     25
+    ],
+    [
+     "medjool_trees_v2",
+     31
+    ]
+   ]
+  },
+  {
+   "citation": "El-Morsi, Abo Rehab & Abd-Elmalek (2012). Pathological studies on fungal diseases of date palm in New Valley Governorate. Egyptian Journal of Phytopathology 40(1): 59--72",
+   "url": "https://ejp.journals.ekb.eg/article_105286.html",
+   "doi": null,
+   "year": 2012,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     60
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     42
+    ],
+    [
+     "medjool_trees_v2",
+     14
+    ]
+   ]
+  },
+  {
+   "citation": "El-Shazly et al. (2009). Some internal changes in date palm trees as a result of infestation with red palm weevil. Journal of Agricultural Sciences, Mansoura University 34(4): 3965--3973",
+   "url": "https://jppp.journals.ekb.eg/",
+   "doi": null,
+   "year": 2009,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     61
+    ]
+   ]
+  },
+  {
+   "citation": "Gameel, Osman & Gameel (2025). The positive impact of correcting date palm farmers' mistakes that hinder the control of the red palm weevil (New Valley). Egyptian International Journal of Palms 5(1): 41--52",
+   "url": "https://esjp.journals.ekb.eg/article_409387.html",
+   "doi": null,
+   "year": 2025,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     62
+    ],
+    [
+     "medjool_manual_1_7_annex_a",
+     9
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     3
+    ],
+    [
+     "medjool_trees_v2",
+     15
+    ]
+   ]
+  },
+  {
+   "citation": "Ben Chaaban et al. (2011). Seasonal dynamics of the old world date mite Oligonychus afrasiaticus in Tunisian oases. Bulletin of Insectology 64(1): 15--21",
+   "url": "https://archive.bulletinofinsectology.org/pdfarticles/vol64-2011-015-021benchaaban.pdf",
+   "doi": null,
+   "year": 2011,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     63
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     15
+    ],
+    [
+     "medjool_trees_v2",
+     21
+    ]
+   ]
+  },
+  {
+   "citation": "Mokhtar & Al Nabhani (2010). Temperature-dependent development of dubas bug, Ommatissus lybicus. European Journal of Entomology 107",
+   "url": "https://www.eje.cz/pdfs/eje/2010/04/22.pdf",
+   "doi": null,
+   "year": 2010,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     64
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     18
+    ],
+    [
+     "medjool_trees_v2",
+     30
+    ]
+   ]
+  },
+  {
+   "citation": "Al Shidi et al. (2018). Does solar radiation affect the distribution of dubas bug infestation? Agriculture 8: 107",
+   "url": "https://doi.org/10.3390/agriculture8070107",
+   "doi": "10.3390/agriculture8070107",
+   "year": 2018,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     65
+    ],
+    [
+     "medjool_trees_v2",
+     29
+    ]
+   ]
+  },
+  {
+   "citation": "Latifian & Amani (2021). Decision-making system for the management of date inflorescence rot caused by Mauginiella scaettae. Journal of Crop Protection 10(3): 433--445",
+   "url": "https://jcp.modares.ac.ir/article-3-51340-en.pdf",
+   "doi": null,
+   "year": 2021,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     66
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     47
+    ],
+    [
+     "medjool_trees_v2",
+     32
+    ]
+   ]
+  },
+  {
+   "citation": "Elliott, M.L. UF/IFAS EDIS PP-216 (rev. 2015). Graphiola leaf spot (false smut) of palm",
+   "url": "https://doi.org/10.32473/edis-pp140-2006",
+   "doi": "10.32473/edis-pp140-2006",
+   "year": 2015,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     67
+    ],
+    [
+     "medjool_trees_v2",
+     33
+    ]
+   ]
+  },
+  {
+   "citation": "Alhudaib et al. (2007). Identification of a phytoplasma associated with Al-Wijam and its putative vector in Saudi Arabia. Bulletin of Insectology 60(2): 285--286",
+   "url": "https://archive.bulletinofinsectology.org/pdfarticles/vol60-2007-285-286alhudaib.pdf",
+   "doi": null,
+   "year": 2007,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     68
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     57
+    ],
+    [
+     "medjool_trees_v2",
+     37
+    ]
+   ]
+  },
+  {
+   "citation": "UK Defra Plant Health (2024). Red Palm Weevil factsheet",
+   "url": "https://planthealthportal.defra.gov.uk/assets/factsheets/Red_Palm_Weevil_Factsheet_2024.pdf",
+   "doi": null,
+   "year": 2024,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     69
+    ],
+    [
+     "medjool_manual_1_7_annex_a",
+     2
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     1
+    ],
+    [
+     "medjool_trees_v2",
+     11
+    ]
+   ]
+  },
+  {
+   "citation": "Mohamed & Sayed (2013). Effect of ECO2-Fume gas against Ephestia cautella at El-Kharga Oasis, New Valley. Egyptian Journal of Agricultural Research 91(1): 197--206",
+   "url": "https://ejar.journals.ekb.eg/article_160997_d96753408f0067e99cc9efd032267514.pdf",
+   "doi": null,
+   "year": 2013,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     70
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     37
+    ],
+    [
+     "medjool_trees_v2",
+     27
+    ]
+   ]
+  },
+  {
+   "citation": "Karimi et al. (2026). An assessment of the potential of multispectral Sentinel-2 imagery for detecting Dubas bug infestations. Journal of Agricultural Machinery 16(3): 365--381",
+   "url": "https://jame.um.ac.ir/article_46965_a81fd14f84d7df07fbc3c49bcd9e705f.pdf",
+   "doi": null,
+   "year": 2026,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     71
+    ],
+    [
+     "medjool_manual_1_7_annex_a",
+     32
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     20
+    ],
+    [
+     "medjool_trees_v2",
+     28
+    ]
+   ]
+  },
+  {
+   "citation": "Kahramanoglu, I. & Usanmaz, S. (2019). Preharvest and postharvest treatments for increasing the rate of ripening of date palm fruit (Phoenix dactylifera L.) cv. Medjool. Progress in Nutrition 21(1): 215--224",
+   "url": "https://doi.org/10.23751/pn.v21i1.7817",
+   "doi": "10.23751/pn.v21i1.7817",
+   "year": 2019,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     72
+    ],
+    [
+     "medjool_trees_v2",
+     45
+    ]
+   ]
+  },
+  {
+   "citation": "Swingle, W.T. (1904). The date palm and its utilization in the Southwestern States. USDA Bureau of Plant Industry, Bulletin No. 53",
+   "url": "https://distantreader.org/stacks/trust/uc2/uc2_ark+=13960=t73t9fp34.txt",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     73
+    ]
+   ]
+  },
+  {
+   "citation": "Faci, M. & Benziouche, S.E. (2021). Contribution to monitoring the influence of air temperature on some phenological stages of the date palm (cultivar 'Deglet Nour') in Biskra. Journal of the Saudi Society of Agricultural Sciences 20: 248--256",
+   "url": "https://www.sciencedirect.com/science/article/pii/S1658077X21000199",
+   "doi": null,
+   "year": 2021,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     74
+    ]
+   ]
+  },
+  {
+   "citation": "Faci, M. (2022). Thermal requirements for the ripening of date palms in Biskra (South-East Algeria). Revista Agrária Acadêmica 5(3): 82--93",
+   "url": "https://doi.org/10.32406/v5n3/2022/82-93/agrariacad",
+   "doi": "10.32406/v5n3/2022/82-93/agrariacad",
+   "year": 2022,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     75
+    ]
+   ]
+  },
+  {
+   "citation": "Rekis, A., Elbar, D. & Laiadi, Z. (2024). The maturity of the dates and the sum of the temperatures. Acta Universitatis Sapientiae, Agriculture and Environment 16: 41--47",
+   "url": "https://doi.org/10.47745/ausae-2024-0004",
+   "doi": "10.47745/ausae-2024-0004",
+   "year": 2024,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     76
+    ]
+   ]
+  },
+  {
+   "citation": "Iqbal, Z., Munir, M., Alshoaibi, A. & Alqahtani, N.K. (2025). Environmental drivers of date fruit unripening syndrome in dryland regions of Saudi Arabia. Frontiers in Plant Science 16: 1587061",
+   "url": "https://doi.org/10.3389/fpls.2025.1587061",
+   "doi": "10.3389/fpls.2025.1587061",
+   "year": 2025,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     77
+    ]
+   ]
+  },
+  {
+   "citation": "Aseeri, I.A., Omar, A.K., Shareef, H.J. & Aly, K.M. (2021). Clean agriculture for the safe production of date palm fruit (Phoenix dactylifera L. cv. Sewi) under Egyptian conditions. Applied Ecology and Environmental Research 19(5): 3551--3561",
+   "url": "http://dx.doi.org/10.15666/aeer/1905_35513561",
+   "doi": "10.15666/aeer/1905_35513561",
+   "year": 2021,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     78
+    ]
+   ]
+  },
+  {
+   "citation": "Goubi, A. et al. (2025). Pomological, nutritional and biochemical characteristics of native dates (Phoenix dactylifera) cv. Mejhoul sampled at different climatic areas in Morocco. International Journal of Agriculture & Biology 33: 330302",
+   "url": "https://doi.org/10.17957/IJAB/15.2278",
+   "doi": "10.17957/ijab/15.2278",
+   "year": 2025,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     79
+    ]
+   ]
+  },
+  {
+   "citation": "Stino, R.G., El-Shenawy, I., Ahmed, D.M., Shaaban, S.A. & Khoudair, A.A. Enhancing quality attributes of Medjool fruits via foliar applications. Research Square preprint (not peer-reviewed)",
+   "url": "https://doi.org/10.21203/rs.3.rs-9761754/v1",
+   "doi": "10.21203/rs.3.rs-9761754/v1",
+   "year": null,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     80
+    ]
+   ]
+  },
+  {
+   "citation": "Bhat, V. & Kenna, G. (2013). Date Palm (Phoenix dactylifera). Agnote D35, Northern Territory Government, Australia",
+   "url": "https://daf.nt.gov.au/__data/assets/pdf_file/0008/232946/686.pdf",
+   "doi": null,
+   "year": 2013,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     81
+    ]
+   ]
+  },
+  {
+   "citation": "Zaid, A. & Oihabi, A. Mejhoul cultivar: origin and distribution (presentation)",
+   "url": "https://iraqi-datepalms.net/wp-content/uploads/2024/01/Mejhoul-cultivar-Origin-distribution.pdf",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7",
+     82
+    ]
+   ]
+  },
+  {
+   "citation": "Embrapa 2024 --- Alert on the red palm weevil",
+   "url": "https://ainfo.cnptia.embrapa.br/digital/bitstream/doc/1169157/1/Alert-on-the-red-palm-weevil...2024.pdf",
+   "doi": null,
+   "year": 2024,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     1
+    ]
+   ]
+  },
+  {
+   "citation": "EPPO Global Database --- Rhynchophorus ferrugineus datasheet",
+   "url": "https://gd.eppo.int/taxon/RHYCFE/datasheet",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     3
+    ]
+   ]
+  },
+  {
+   "citation": "Hellenic Plant Protection Journal 5(1), 2012 --- RPW biology review (temperature, fecundity, generations)",
+   "url": "https://www.bpi.gr/files/journal/2012/january/Volume%205%20-%20Issue%201%20%28January%202012%29.pdf",
+   "doi": null,
+   "year": 2012,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     4
+    ]
+   ]
+  },
+  {
+   "citation": "Dembilio et al. 2012, Bulletin of Entomological Research 102(1) --- lower temperature thresholds for oviposition and egg hatching",
+   "url": "https://repositori.uji.es/xmlui/handle/10234/67321?show=full",
+   "doi": null,
+   "year": 2012,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     5
+    ],
+    [
+     "medjool_manual_1_7_annex_b",
+     5
+    ],
+    [
+     "medjool_trees_v2",
+     17
+    ]
+   ]
+  },
+  {
+   "citation": "Screening date palm cultivars for resistance to RPW --- Florida Entomologist 97(4)",
+   "url": "https://bioone.org/journals/florida-entomologist/volume-97/issue-4/024.097.0427/Screening-Date-Palm-Cultivars-for-Resistance-to-Red-Palm-Weevil/10.1653/024.097.0427.full",
+   "doi": "10.1653/024.097.0427",
+   "year": null,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     6
+    ]
+   ]
+  },
+  {
+   "citation": "Comprehensive analysis of management strategies for RPW in date palm, emphasizing sensor-based detection --- Agriculture 2024 14(2):260",
+   "url": "https://www.mdpi.com/2077-0472/14/2/260",
+   "doi": null,
+   "year": 2024,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     8
+    ]
+   ]
+  },
+  {
+   "citation": "EPPO --- R. ferrugineus distribution in Egypt",
+   "url": "https://gd.eppo.int/taxon/RHYCFE/distribution/EG",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     10
+    ]
+   ]
+  },
+  {
+   "citation": "UN Egypt / FAO press release 2024 --- RPW in Egypt",
+   "url": "https://egypt.un.org/en/node/279819",
+   "doi": null,
+   "year": 2024,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     12
+    ]
+   ]
+  },
+  {
+   "citation": "FAO --- Framework Strategy for Eradication of RPW (Rome scientific consultation, March 2017)",
+   "url": "https://openknowledge.fao.org/server/api/core/bitstreams/e4850a27-53e5-4abc-a852-d680a9da292e/content",
+   "doi": null,
+   "year": 2017,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     13
+    ]
+   ]
+  },
+  {
+   "citation": "El-Faki, El-Shafie & Al-Hajhoj 2015, The Canadian Entomologist --- early detection using temperature differentials",
+   "url": "https://www.cambridge.org/core/journals/canadian-entomologist/article/potentials-for-early-detection-of-red-palm-weevil-coleoptera-curculionidaeinfested-date-palm-arecaceae-using-temperature-differentials/11F16930714A384D29016A61FF1AD0BA",
+   "doi": null,
+   "year": 2015,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     14
+    ]
+   ]
+  },
+  {
+   "citation": "RPW: global invasion, current management options, challenges and future prospects --- IntechOpen",
+   "url": "https://www.intechopen.com/chapters/73021",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     15
+    ]
+   ]
+  },
+  {
+   "citation": "Status of pheromone-trap-captured RPW from date gardens in Saudi Arabia",
+   "url": "https://www.researchgate.net/publication/313629646_Status_of_pheromone_trap_captured_red_palm_weevils_from_date_gardens_in_Saudi_Arabia",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     17
+    ]
+   ]
+  },
+  {
+   "citation": "Egyptian J. Plant Protection & Pathology --- temperature of infested vs healthy palms by month and hour",
+   "url": "https://journals.ekb.eg/article_166844.html",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     19
+    ],
+    [
+     "medjool_trees_v2",
+     20
+    ]
+   ]
+  },
+  {
+   "citation": "Ge et al. 2015, PLoS ONE --- potential distribution of R. ferrugineus (CLIMEX) under warming",
+   "url": "https://ideas.repec.org/a/plo/pone00/0141111.html",
+   "doi": null,
+   "year": 2015,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     20
+    ]
+   ]
+  },
+  {
+   "citation": "Coconut tree stress detection as an indicator of RPW attack using Sentinel data --- IJBES",
+   "url": "https://ijbes.utm.my/index.php/ijbes/article/view/459",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     21
+    ]
+   ]
+  },
+  {
+   "citation": "Bannari, Mohamed & Peddle 2016, IGARSS --- biophysiological spectral indices for RPW stress (WorldView-3)",
+   "url": "https://ieeexplore.ieee.org/document/7729908/",
+   "doi": null,
+   "year": 2016,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     23
+    ]
+   ]
+  },
+  {
+   "citation": "A novel remote sensing approach to recognize and monitor RPW in date palm trees --- arXiv 2203.14476 (preprint)",
+   "url": "https://arxiv.org/pdf/2203.14476",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     24
+    ]
+   ]
+  },
+  {
+   "citation": "Modeling water stress as an indicator of RPW infestation using field sampling, WorldView-3 reflectance and laboratory analysis",
+   "url": "https://sustainability.uob.edu.bh/sdg_research/modeling-water-stress-as-an-indicator-of-red-palm-weevil-infestation-using-field-sampling-worldview-3-reflectance-and-laboratory-analysis-2",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     26
+    ]
+   ]
+  },
+  {
+   "citation": "BELSPO STEREO --- PALMWATCH project (RPW detection with remote sensing)",
+   "url": "https://eo.belspo.be/en/stereo-in-action/projects/red-palm-weevil-infection-detection-remote-sensing",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     27
+    ]
+   ]
+  },
+  {
+   "citation": "Golomb, Soroker et al. 2015 --- Detection of RPW-infected trees using thermal imaging (Hebrew Univ.)",
+   "url": "https://cris.huji.ac.il/en/publications/detection-of-red-palm-weevil-infected-trees-using-thermal-imaging/",
+   "doi": null,
+   "year": 2015,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     28
+    ]
+   ]
+  },
+  {
+   "citation": "Early detection of RPW infestations using deep-learning classification of acoustic signals (Al-Ahsa) --- arXiv 2308.15829",
+   "url": "https://arxiv.org/pdf/2308.15829",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     29
+    ]
+   ]
+  },
+  {
+   "citation": "CNN-aided optical-fiber distributed acoustic sensing for early RPW detection: a field experiment (KAUST)",
+   "url": "https://doaj.org/article/46a9e03d57884597bf53cec587a41dd7",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     30
+    ]
+   ]
+  },
+  {
+   "citation": "Ashry et al. 2020, Scientific Reports --- Early detection of RPW using distributed optical sensor",
+   "url": "https://www.nature.com/articles/s41598-020-60171-7",
+   "doi": null,
+   "year": 2020,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_a",
+     31
+    ]
+   ]
+  },
+  {
+   "citation": "AgriPulse Red Palm Weevil research review (companion page, 32 sources)",
+   "url": "https://claude.ai/artifact/JzzTnwLwV5CmTvKWcxqg3r",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     7
+    ]
+   ]
+  },
+  {
+   "citation": "PestInfo wiki --- Batrachedra amydraula (generations, damage)",
+   "url": "https://wiki.pestinfo.org/wiki/Batrachedra_amydraula",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     8
+    ],
+    [
+     "medjool_trees_v2",
+     24
+    ]
+   ]
+  },
+  {
+   "citation": "ESA 2006 --- Lesser date moth biology and control in the UAE",
+   "url": "https://esa.confex.com/esa/2006/techprogram/paper_25058.htm",
+   "doi": null,
+   "year": 2006,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     9
+    ]
+   ]
+  },
+  {
+   "citation": "J. Entomological Society of Iran --- Batrachedra amydraula development at constant temperature",
+   "url": "https://jaenph.areeo.ac.ir/article_109461.html?lang=en",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     10
+    ]
+   ]
+  },
+  {
+   "citation": "Brazilian Journal of Biology --- Oligonychus afrasiaticus temperature and fruit damage",
+   "url": "https://www.scielo.br/j/bjb/a/CQ6jSvrZpDP3PFfSpHnTg3L/?lang=en",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     13
+    ],
+    [
+     "medjool_trees_v2",
+     22
+    ]
+   ]
+  },
+  {
+   "citation": "Agronomy 2023 --- date palm dust mite damage and control",
+   "url": "https://doaj.org/article/ff8e505b23ab4cc88af28d53f9cec963",
+   "doi": null,
+   "year": 2023,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     14
+    ]
+   ]
+  },
+  {
+   "citation": "Dubas bug history: first described from Siwa oasis, Egypt (iraqi-datepalms.net review)",
+   "url": "https://iraqi-datepalms.net/?p=16321",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     16
+    ]
+   ]
+  },
+  {
+   "citation": "Agriculture 2018, 8(7):107 --- Dubas bug generations and climate drivers",
+   "url": "https://www.mdpi.com/2077-0472/8/7/107/htm",
+   "doi": null,
+   "year": 2018,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     17
+    ]
+   ]
+  },
+  {
+   "citation": "Al-Kindi et al. --- PeerJ preprint: remote sensing and GIS for Dubas bug; honeydew and sooty mould",
+   "url": "https://peerj.com/preprints/2716",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     19
+    ]
+   ]
+  },
+  {
+   "citation": "Al-Kindi et al. 2017, PLOS ONE --- environmental variables and Dubas bug infestation, Oman",
+   "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5448759/",
+   "doi": null,
+   "year": 2017,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     21
+    ]
+   ]
+  },
+  {
+   "citation": "Al-Kindi et al. 2017, PLOS ONE --- human practices and Dubas bug, satellite-derived palm density",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5293203",
+   "doi": null,
+   "year": 2017,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     22
+    ]
+   ]
+  },
+  {
+   "citation": "Correlation between date palm white scale incidence and abiotic factors (Egypt)",
+   "url": "https://journals.ekb.eg/article_118208.html",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     23
+    ]
+   ]
+  },
+  {
+   "citation": "Egyptian J. Agricultural Research --- P. blanchardi field generations, Luxor",
+   "url": "https://ejar.journals.ekb.eg/article_156354.html",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     24
+    ]
+   ]
+  },
+  {
+   "citation": "Vikaspedia (ICAR) --- insect pests of date palm in arid regions",
+   "url": "https://en.vikaspedia.in/viewcontent/agriculture/crop-production/integrated-pest-managment/ipm-for-commercial-crops/insect-pests-of-date-palm-in-arid-region?lgn=en",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     26
+    ]
+   ]
+  },
+  {
+   "citation": "International Pest Control --- biology, ecology and management of the longhorn date palm stem borer",
+   "url": "https://international-pest-control.com/wordpress/biology-ecology-management-longhorn-date-palm-stem-borer-jebusaea-hammerschmidti-coleoptera-cerambycidae/",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     27
+    ]
+   ]
+  },
+  {
+   "citation": "IOBC-WPRS --- damage description and quantification of Jebusaea hammerschmidti on date palm",
+   "url": "https://iobc-wprs.org/product/description-and-quantification-of-damage-from-the-insect-jebusaea-hammerschmidti-reiche-1877-coleoptera-cerambycidae-on-date-palm/",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     28
+    ]
+   ]
+  },
+  {
+   "citation": "IPM for date palm in Saudi Arabia (CORE)",
+   "url": "https://core.ac.uk/works/33832075",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     29
+    ]
+   ]
+  },
+  {
+   "citation": "Khuzestan, Iran --- Oryctes species in date orchards (Applied Research in Plant Protection)",
+   "url": "https://arpp.tabrizu.ac.ir/article_17804.html?lang=en",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     30
+    ]
+   ]
+  },
+  {
+   "citation": "Wikipedia --- Oryctes agamemnon (encyclopedic)",
+   "url": "https://en.wikipedia.org/wiki/Oryctes_agamemnon",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     31
+    ]
+   ]
+  },
+  {
+   "citation": "Bedford et al. 2015 --- Dynastid beetle pests (book chapter)",
+   "url": "https://researchers.mq.edu.au/en/publications/dynastid-beetle-pests/",
+   "doi": null,
+   "year": 2015,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     32
+    ]
+   ]
+  },
+  {
+   "citation": "Carob moth on dates, Biskra --- Université de Biskra journal",
+   "url": "https://revues.univ-biskra.dz/index.php/cds/article/view/1459/1382",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     33
+    ]
+   ]
+  },
+  {
+   "citation": "Mortazavi et al., J. Plant Protection Research 55(2) --- carob moth thermal mortality_14_Mortazavi.pdf)",
+   "url": "https://journals.pan.pl//Content/89619/PDF/JPPR_55(2",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     34
+    ]
+   ]
+  },
+  {
+   "citation": "EPPO --- F. o. albedinis in Egypt: absent, unreliable record",
+   "url": "https://gd.eppo.int/taxon/FUSAAL/distribution/EG",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     38
+    ],
+    [
+     "medjool_trees_v2",
+     36
+    ]
+   ]
+  },
+  {
+   "citation": "EPPO --- F. o. albedinis in Algeria: restricted distribution",
+   "url": "https://gd.eppo.int/taxon/FUSAAL/distribution/DZ",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     39
+    ]
+   ]
+  },
+  {
+   "citation": "EPPO Global Database --- Fusarium oxysporum f. sp. albedinis datasheet",
+   "url": "https://gd.eppo.int/taxon/FUSAAL/datasheet",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     40
+    ]
+   ]
+  },
+  {
+   "citation": "Wikipedia --- Bayoud disease (history and losses)",
+   "url": "https://en.wikipedia.org/wiki/Bayoud_disease",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     41
+    ]
+   ]
+  },
+  {
+   "citation": "Plant Disease 2014 --- black scorch (T. punctulata) on date palm, UAE",
+   "url": "https://apsnet.org/publications/plantdisease/2014/October/Pages/98_10_1437.2.aspx",
+   "doi": null,
+   "year": 2014,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     44
+    ]
+   ]
+  },
+  {
+   "citation": "Assiut Univ. --- leaf base rot and black scorch in date palm nurseries, New Valley",
+   "url": "https://www.aun.edu.eg/agriculture/occurrence-and-control-leaf-base-rot-and-black-scorch-disease-nurseries-date-palm-new-valley",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     45
+    ]
+   ]
+  },
+  {
+   "citation": "Iraqi Academic Scientific Journals --- Mauginiella scaettae inflorescence rot",
+   "url": "https://iasj.rdd.edu.iq/journals/uploads/2025/01/15/31f095f3eb23a2a73f602ccf2f80256e.pdf",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     46
+    ]
+   ]
+  },
+  {
+   "citation": "UF/IFAS EDIS PP140 --- Graphiola leaf spot (false smut) of palms",
+   "url": "https://edis.ifas.ufl.edu/publication/PP140/pdf",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     48
+    ]
+   ]
+  },
+  {
+   "citation": "Plant Disease 1996 --- Graphiola leaf spot report and humidity",
+   "url": "https://www.apsnet.org/publications/plantdisease/backissues/Documents/1996Abstracts/PD_80_0823C.htm",
+   "doi": null,
+   "year": 1996,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     49
+    ]
+   ]
+  },
+  {
+   "citation": "FAO AGRIS --- reaction of date palm varieties to Graphiola leaf spot (India)",
+   "url": "https://agris.fao.org/search/en/records/65de20456eef00c2ce9fdfe0",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     50
+    ]
+   ]
+  },
+  {
+   "citation": "PMC8310299 --- Fusarium species associated with date palm decline",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8310299",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     51
+    ]
+   ]
+  },
+  {
+   "citation": "Int. J. Molecular Sciences 2019 --- sudden decline syndrome, UAE",
+   "url": "https://0-www-mdpi-com.brum.beds.ac.uk/1422-0067/20/4/923",
+   "doi": null,
+   "year": 2019,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     52
+    ]
+   ]
+  },
+  {
+   "citation": "Toxins 2021, 13(7):463 --- Fusarium proliferatum and date palm",
+   "url": "https://www.mdpi.com/2072-6651/13/7/463",
+   "doi": null,
+   "year": 2021,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     53
+    ]
+   ]
+  },
+  {
+   "citation": "New Disease Reports --- first report of brittle leaf disease in Algeria",
+   "url": "https://www.ndrs.org.uk/article.php?id=13006",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     54
+    ]
+   ]
+  },
+  {
+   "citation": "J. Plant Pathology --- manganese and brittle leaf disease of date palm",
+   "url": "https://www.sipav.org/en/16/Archive/733",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     55
+    ],
+    [
+     "medjool_trees_v2",
+     38
+    ]
+   ]
+  },
+  {
+   "citation": "J. Plant Pathology --- brittle leaf disease in Tunisia: biotic or abiotic?",
+   "url": "https://www.sipav.org/en/16/Archive/1012",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     56
+    ]
+   ]
+  },
+  {
+   "citation": "Arab J. Biotechnology 2017 --- phytoplasma groups in Saudi date palms",
+   "url": "https://arjb.journals.ekb.eg/article_428500.html",
+   "doi": null,
+   "year": 2017,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_manual_1_7_annex_b",
+     58
+    ]
+   ]
+  },
+  {
+   "citation": "ESA SentiWiki --- Sentinel-2 MSI bands (10 m visible/NIR; 20 m red edge and SWIR)",
+   "url": "https://sentiwiki.copernicus.eu/web/s2-mission",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_trees_v2",
+     1
+    ]
+   ]
+  },
+  {
+   "citation": "Planet --- PlanetScope SuperDove: 3 m, 8 bands 431--885 nm including red edge 697--713 nm; no SWIR, no thermal",
+   "url": "https://docs.planet.com/data/imagery/planetscope/",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_trees_v2",
+     2
+    ]
+   ]
+  },
+  {
+   "citation": "Mulley et al. 2019, Agriculture 9:26 --- multisensor remote sensing of a date palm farm",
+   "url": "https://doi.org/10.3390/agriculture9020026",
+   "doi": "10.3390/agriculture9020026",
+   "year": 2019,
+   "kind": "article",
+   "aliases": [
+    [
+     "medjool_trees_v2",
+     6
+    ]
+   ]
+  },
+  {
+   "citation": "AgriPulse Medjool index workbook v2.0 (3 m) --- inferential bands",
+   "url": null,
+   "doi": null,
+   "year": null,
+   "kind": "internal",
+   "aliases": [
+    [
+     "medjool_trees_v2",
+     7
+    ]
+   ]
+  },
+  {
+   "citation": "Organic Medjool Manual, Edition 1.6 (Western Desert of Egypt)",
+   "url": "https://claude.ai/artifact/Tgmz6W4Sq6vz1xg9cwhvqV",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_trees_v2",
+     12
+    ]
+   ]
+  },
+  {
+   "citation": "Cohen et al. 2012, Precision Agriculture 13 --- aerial thermal imaging of palm water status",
+   "url": "https://www.researchgate.net/publication/251306799_Use_of_aerial_thermal_imaging_to_estimate_water_status_of_palm_trees",
+   "doi": null,
+   "year": 2012,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_trees_v2",
+     13
+    ]
+   ]
+  },
+  {
+   "citation": "Date palm pollination and rain --- PMC8847947",
+   "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8847947/",
+   "doi": null,
+   "year": null,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_trees_v2",
+     34
+    ]
+   ]
+  },
+  {
+   "citation": "Int. J. Mol. Sci. 2019 --- sudden decline syndrome of date palm, UAE",
+   "url": "https://www.mdpi.com/1422-0067/20/4/923",
+   "doi": null,
+   "year": 2019,
+   "kind": "web",
+   "aliases": [
+    [
+     "medjool_trees_v2",
+     35
+    ]
+   ]
+  }
+ ]
+}

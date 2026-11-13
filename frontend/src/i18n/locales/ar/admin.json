@@ -16,7 +16,8 @@
     "platformDecisionTreesBeta": "المصمم التجريبي",
     "platformAlerts": "تنبيهات المنصة",
     "usage": "استخدام المنتج",
-    "healthDefinition": "قاعدة صحة القطعة"
+    "healthDefinition": "قاعدة صحة القطعة",
+    "sources": "المراجع"
   },
   "crops": {
     "title": "دليل المحاصيل",

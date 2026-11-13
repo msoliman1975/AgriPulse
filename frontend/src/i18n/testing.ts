@@ -17,6 +17,7 @@ import enWeatherRisk from "./locales/en/weatherRisk.json";
 import enDecisionTrees from "./locales/en/decisionTrees.json";
 import enDecisionTreesBeta from "./locales/en/decisionTreesBeta.json";
 import enDecisionTreesEstate from "./locales/en/decisionTreesEstate.json";
+import enSources from "./locales/en/sources.json";
 import enBulkUpdates from "./locales/en/bulkUpdates.json";
 import enActionCenter from "./locales/en/actionCenter.json";
 import enUsers from "./locales/en/users.json";
@@ -43,6 +44,7 @@ import arWeatherRisk from "./locales/ar/weatherRisk.json";
 import arDecisionTrees from "./locales/ar/decisionTrees.json";
 import arDecisionTreesBeta from "./locales/ar/decisionTreesBeta.json";
 import arDecisionTreesEstate from "./locales/ar/decisionTreesEstate.json";
+import arSources from "./locales/ar/sources.json";
 import arBulkUpdates from "./locales/ar/bulkUpdates.json";
 import arActionCenter from "./locales/ar/actionCenter.json";
 import arUsers from "./locales/ar/users.json";
@@ -82,6 +84,7 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           decisionTrees: enDecisionTrees,
           decisionTreesBeta: enDecisionTreesBeta,
           decisionTreesEstate: enDecisionTreesEstate,
+          sources: enSources,
           bulkUpdates: enBulkUpdates,
           actionCenter: enActionCenter,
           users: enUsers,
@@ -110,6 +113,7 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           decisionTrees: arDecisionTrees,
           decisionTreesBeta: arDecisionTreesBeta,
           decisionTreesEstate: arDecisionTreesEstate,
+          sources: arSources,
           bulkUpdates: arBulkUpdates,
           actionCenter: arActionCenter,
           users: arUsers,

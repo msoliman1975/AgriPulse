@@ -91,6 +91,7 @@ import { PlatformCropsPage } from "@/modules/admin/pages/PlatformCropsPage";
 import { PlatformRolesPage } from "@/modules/admin/pages/PlatformRolesPage";
 import { PlatformUsagePage } from "@/modules/admin/pages/PlatformUsagePage";
 import { PlatformSignalsPage } from "@/modules/admin/pages/PlatformSignalsPage";
+import { PlatformSourcesPage } from "@/modules/sources/PlatformSourcesPage";
 import { PlatformDefaultsPage } from "@/modules/admin/pages/PlatformDefaultsPage";
 import { PlatformBackfillPage } from "@/modules/admin/pages/PlatformBackfillPage";
 import { ObserverSceneDetailPage } from "@/modules/admin/pages/ObserverSceneDetailPage";
@@ -431,6 +432,7 @@ export function App(): ReactNode {
                 <Route path="crops" element={<PlatformCropsPage />} />
                 <Route path="catalog" element={<PlatformCatalogPage />} />
                 <Route path="signals" element={<PlatformSignalsPage />} />
+                <Route path="sources" element={<PlatformSourcesPage />} />
                 <Route path="crops/:cropId/attributes" element={<PlatformCropAttributesPage />} />
                 {/* The platform catalogue, edited by a platform admin. Same
                     three pages the tenant surface mounts at /decision-trees —

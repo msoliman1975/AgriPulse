@@ -16,7 +16,8 @@
     "platformDecisionTreesBeta": "Beta designer",
     "platformAlerts": "Platform alerts",
     "usage": "Product usage",
-    "healthDefinition": "Block health rule"
+    "healthDefinition": "Block health rule",
+    "sources": "Sources"
   },
   "crops": {
     "title": "Crop catalog",
