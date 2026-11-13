@@ -118,6 +118,7 @@ export const ROUTE_MANIFEST: RouteObject[] = [
       { path: "crops" },
       { path: "catalog" },
       { path: "signals" },
+      { path: "sources" },
       { path: "crops/:cropId/attributes" },
       { path: "decision-trees-beta" },
       { path: "decision-trees-beta/:code" },
