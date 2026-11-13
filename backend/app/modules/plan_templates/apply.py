@@ -34,6 +34,9 @@ class ResolvedActivity:
     dosage: str | None
     notes: str | None
     start_time: Any  # datetime.time | None
+    activity_code: str | None = None
+    title: str | None = None
+    title_ar: str | None = None
     input_id: Any = None  # UUID | None (D20)
     dose_value: Any = None
     dose_value_max: Any = None
@@ -122,6 +125,9 @@ def resolve_schedule(
                 dosage=a.get("dosage"),
                 notes=a.get("notes"),
                 start_time=a.get("start_time"),
+                activity_code=a.get("code"),
+                title=a.get("title"),
+                title_ar=a.get("title_ar"),
                 input_id=a.get("input_id"),
                 dose_value=a.get("dose_value"),
                 dose_value_max=a.get("dose_value_max"),

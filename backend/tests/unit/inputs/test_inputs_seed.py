@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from app.modules.inputs.schemas import Category, InputCreateRequest, InputDose, Method, Unit
 
-_DATA = Path(__file__).parents[3] / "migrations/public/versions/data/0106_medjool_inputs.json"
+_DATA = Path(__file__).parents[3] / "migrations/public/versions/data/0107_medjool_inputs.json"
 SEED = json.loads(_DATA.read_text(encoding="utf-8"))
 DOCS = {"medjool_manual_1_7", "medjool_manual_1_7_annex_a", "medjool_manual_1_7_annex_b"}
 

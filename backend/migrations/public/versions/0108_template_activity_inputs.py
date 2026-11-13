@@ -1,7 +1,7 @@
 """Plan-template activities link to an input with a structured dose (D20).
 
 ``product_name`` and ``dosage`` stay as free text for context; a template
-activity may now also name an input from the catalogue (public 0106) and a
+activity may now also name an input from the catalogue (public 0107) and a
 dose: a value, an optional upper bound for a range, and a unit from the
 catalogue's unit list. Existing rows are untouched.
 """
@@ -12,8 +12,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0107"
-down_revision: str | Sequence[str] | None = "0106"
+revision: str = "0108"
+down_revision: str | Sequence[str] | None = "0107"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

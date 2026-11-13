@@ -114,6 +114,16 @@ export function PlanTemplateEditorPage(): ReactNode {
     setActivities(
       d.activities.map((a) => ({
         key: nextKey(),
+        // Carried through unchanged so a save here keeps the activity's code
+        // and the content fields this editor doesn't show.
+        code: a.code,
+        title: a.title ?? null,
+        title_ar: a.title_ar ?? null,
+        product_name_ar: a.product_name_ar ?? null,
+        dosage_ar: a.dosage_ar ?? null,
+        notes_ar: a.notes_ar ?? null,
+        evidence_tier: a.evidence_tier ?? null,
+        source_tree_code: a.source_tree_code ?? null,
         activity_type: a.activity_type as PlanActivityType,
         anchor: a.anchor,
         milestone_code: a.milestone_id ? (msById.get(a.milestone_id) ?? null) : null,
@@ -168,6 +178,14 @@ export function PlanTemplateEditorPage(): ReactNode {
         sort_order: i,
       })),
       activities: activities.map((a, i) => ({
+        code: a.code ?? null,
+        title: a.title ?? null,
+        title_ar: a.title_ar ?? null,
+        product_name_ar: a.product_name_ar ?? null,
+        dosage_ar: a.dosage_ar ?? null,
+        notes_ar: a.notes_ar ?? null,
+        evidence_tier: a.evidence_tier ?? null,
+        source_tree_code: a.source_tree_code ?? null,
         activity_type: a.activity_type,
         anchor: a.anchor,
         milestone_code: a.anchor === "milestone" ? (a.milestone_code ?? null) : null,
