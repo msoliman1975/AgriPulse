@@ -29,12 +29,12 @@ from pathlib import Path
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0104"
-down_revision: str | Sequence[str] | None = "0103"
+revision: str = "0105"
+down_revision: str | Sequence[str] | None = "0104"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-_DATA = Path(__file__).parent / "data" / "0104_sources_library.json"
+_DATA = Path(__file__).parent / "data" / "0105_sources_library.json"
 
 
 def upgrade() -> None:
