@@ -2,8 +2,8 @@
   "code": "date_palm_medjool_data_readiness",
   "name_en": "Date palm Medjool — data readiness",
   "name_ar": "نخيل المجدول — جاهزية البيانات",
-  "description_en": "Checks the two block records the health trees depend on: palm size and soil salinity class. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly. Palm size is read from the block's palm phase: new planting = small, juvenile and onset of fruiting = medium, bearing = large.",
-  "description_ar": "يفحص سجلي القطعة اللذين تعتمد عليهما أشجار الصحة: حجم النخيل وفئة ملوحة التربة. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا. يُقرأ حجم النخيل من طور النخلة في القطعة: زراعة جديدة = صغير، يافع وبداية الإثمار = متوسط، مثمر = كبير.",
+  "description_en": "Checks the two block records the health trees depend on: palm size and soil salinity class. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly. Palm size is read from the block's palm phase: new planting = small, juvenile and onset of fruiting = medium, bearing = large. The size-mismatch check (recorded size against the NDVI bands) is switched off (owner decision D32) until Medjool bands are measured.",
+  "description_ar": "يفحص سجلي القطعة اللذين تعتمد عليهما أشجار الصحة: حجم النخيل وفئة ملوحة التربة. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا. يُقرأ حجم النخيل من طور النخلة في القطعة: زراعة جديدة = صغير، يافع وبداية الإثمار = متوسط، مثمر = كبير. فحص عدم تطابق الحجم (الحجم المسجّل مقابل نطاقات مؤشر الغطاء) معطّل بقرار المالك حتى تُقاس نطاقات المجدول.",
   "readiness_note_en": "Checks the block itself: its salinity class, the palm phase on its crop, and whether NDVI imagery has arrived. It is the tree that tells you what the others lack.",
   "readiness_note_ar": "تفحص القطعة نفسها: فئة الملوحة، وطور النخلة في محصولها، ووصول صور مؤشر الغطاء. هي الشجرة التي تخبرك بما ينقص الأشجار الأخرى.",
   "scope": "block",
@@ -17,20 +17,7 @@
     "palm_size_mismatch",
     "salinity_missing"
   ],
-  "parameters": {
-    "medium_ndvi_floor": {
-      "type": "number",
-      "default": 0.3,
-      "min": -2.0,
-      "max": 3.0
-    },
-    "large_ndvi_floor": {
-      "type": "number",
-      "default": 0.5,
-      "min": -2.0,
-      "max": 3.0
-    }
-  },
+  "parameters": {},
   "nodes": {
     "n_has_size": {
       "label_en": "Is palm size recorded?",
@@ -83,8 +70,8 @@
       "on_miss": "n_small"
     },
     "n_large_ndvi": {
-      "label_en": "Does NDVI read below even the medium band?",
-      "label_ar": "هل NDVI دون نطاق المتوسطة حتى؟",
+      "label_en": "Does NDVI read below even the medium band? (band off until Medjool bands are measured)",
+      "label_ar": "هل NDVI دون نطاق المتوسطة حتى؟ (النطاق معطّل حتى تُقاس نطاقات المجدول)",
       "condition": {
         "tree": {
           "op": "lt",
@@ -93,10 +80,7 @@
             "index_code": "ndvi",
             "key": "mean"
           },
-          "right": {
-            "source": "params",
-            "name": "medium_ndvi_floor"
-          }
+          "right": -1000
         }
       },
       "on_match": "r_mismatch",
@@ -122,8 +106,8 @@
       "on_miss": "n_sal"
     },
     "n_small_ndvi": {
-      "label_en": "Does NDVI read at the large band?",
-      "label_ar": "هل NDVI عند نطاق الكبيرة؟",
+      "label_en": "Does NDVI read at the large band? (band off until Medjool bands are measured)",
+      "label_ar": "هل NDVI عند نطاق الكبيرة؟ (النطاق معطّل حتى تُقاس نطاقات المجدول)",
       "condition": {
         "tree": {
           "op": "ge",
@@ -132,10 +116,7 @@
             "index_code": "ndvi",
             "key": "mean"
           },
-          "right": {
-            "source": "params",
-            "name": "large_ndvi_floor"
-          }
+          "right": 1000
         }
       },
       "on_match": "r_mismatch",

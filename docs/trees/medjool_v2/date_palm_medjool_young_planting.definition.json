@@ -2,8 +2,8 @@
   "code": "date_palm_medjool_young_planting",
   "name_en": "Date palm Medjool — new plantings",
   "name_ar": "نخيل المجدول — الزراعات الجديدة",
-  "description_en": "Care from planting to first fruiting: establishment gaps, first-summer irrigation on sand and monthly weevil checks at the palm base. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly. Palm size is read from the block's palm phase: new planting = small, juvenile and onset of fruiting = medium, bearing = large.",
-  "description_ar": "الرعاية من الزراعة حتى أول إثمار: فجوات التأسيس، وري الصيف الأول على الرمل، وفحص السوسة الشهري عند قاعدة النخلة. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا. يُقرأ حجم النخيل من طور النخلة في القطعة: زراعة جديدة = صغير، يافع وبداية الإثمار = متوسط، مثمر = كبير.",
+  "description_en": "Care from planting to first fruiting: establishment gaps, first-summer irrigation on sand and monthly weevil checks at the palm base. Source: Medjool Decision Trees v2, rebuilt from the published page; the tree's structure, findings, parameters and card texts match it exactly. Palm size is read from the block's palm phase: new planting = small, juvenile and onset of fruiting = medium, bearing = large. The establishment-gaps check (BSI above and MSAVI below the seedling band) is switched off (owner decision D32) until Medjool bands are measured.",
+  "description_ar": "الرعاية من الزراعة حتى أول إثمار: فجوات التأسيس، وري الصيف الأول على الرمل، وفحص السوسة الشهري عند قاعدة النخلة. المصدر: أشجار قرار المجدول، الإصدار 2، أُعيد بناؤها من الصفحة المنشورة؛ يطابقها هيكل الشجرة ونتائجها ومعاملاتها ونصوص بطاقاتها تمامًا. يُقرأ حجم النخيل من طور النخلة في القطعة: زراعة جديدة = صغير، يافع وبداية الإثمار = متوسط، مثمر = كبير. فحص فجوات التأسيس (التربة العارية فوق نطاق الشتلات ومؤشر الحيوية دونه) معطّل بقرار المالك حتى تُقاس نطاقات المجدول.",
   "readiness_note_en": "Needs the palm phase on the block's crop and its soil texture, the farm's weather, MSAVI and BSI imagery, and scout records of weevil inspections.",
   "readiness_note_ar": "تحتاج إلى طور النخلة في محصول القطعة وقوام التربة، وطقس المزرعة، وصور مؤشري الغطاء والتربة العارية، وسجلات الاستكشاف لفحص السوسة.",
   "scope": "block",
@@ -18,18 +18,6 @@
     "young_rpw_check_due"
   ],
   "parameters": {
-    "small_bsi_ceiling": {
-      "type": "number",
-      "default": 0.3,
-      "min": -2.0,
-      "max": 3.0
-    },
-    "small_msavi_floor": {
-      "type": "number",
-      "default": 0.05,
-      "min": -2.0,
-      "max": 3.0
-    },
     "hot_c": {
       "type": "number",
       "default": 40.0,
@@ -64,8 +52,8 @@
       "on_miss": "n_stop"
     },
     "n_bsi": {
-      "label_en": "Is bare ground (BSI) above the seedling band?",
-      "label_ar": "هل التربة العارية (BSI) فوق نطاق الشتلات؟",
+      "label_en": "Is bare ground (BSI) above the seedling band? (band off until Medjool bands are measured)",
+      "label_ar": "هل التربة العارية (BSI) فوق نطاق الشتلات؟ (النطاق معطّل حتى تُقاس نطاقات المجدول)",
       "condition": {
         "tree": {
           "op": "gt",
@@ -74,18 +62,15 @@
             "index_code": "bsi",
             "key": "mean"
           },
-          "right": {
-            "source": "params",
-            "name": "small_bsi_ceiling"
-          }
+          "right": 1000
         }
       },
       "on_match": "n_msavi",
       "on_miss": "n_sandy"
     },
     "n_msavi": {
-      "label_en": "Is MSAVI also below the seedling band?",
-      "label_ar": "هل MSAVI أيضًا دون نطاق الشتلات؟",
+      "label_en": "Is MSAVI also below the seedling band? (band off until Medjool bands are measured)",
+      "label_ar": "هل MSAVI أيضًا دون نطاق الشتلات؟ (النطاق معطّل حتى تُقاس نطاقات المجدول)",
       "condition": {
         "tree": {
           "op": "lt",
@@ -94,10 +79,7 @@
             "index_code": "msavi",
             "key": "mean"
           },
-          "right": {
-            "source": "params",
-            "name": "small_msavi_floor"
-          }
+          "right": -1000
         }
       },
       "on_match": "r_gaps",

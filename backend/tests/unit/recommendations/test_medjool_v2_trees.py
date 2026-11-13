@@ -223,6 +223,30 @@ def test_has_a_bilingual_readiness_note(code: str) -> None:
     assert not re.search(r"[A-Za-z]", d["readiness_note_ar"]), d["readiness_note_ar"]
 
 
+def test_canopy_band_backup_is_off_for_every_palm_size() -> None:
+    """D32: no measured Medjool bands, so tree 01 judges only against history."""
+    nodes = DEFS["date_palm_medjool_canopy_diagnosis"]["nodes"]
+    for size in ("small", "medium", "large", "none"):
+        band = nodes[f"n_b_{size}"]["set"]
+        assert all(band[k] == -1000 for k in band if k.endswith("_floor")), size
+        assert band["bsi_ceiling"] == 1000, size
+    params = DEFS["date_palm_medjool_canopy_diagnosis"]["parameters"]
+    assert not [p for p in params if p.endswith(("_floor", "_ceiling"))]
+
+
+@pytest.mark.parametrize(
+    "code", ["date_palm_medjool_young_planting", "date_palm_medjool_data_readiness"]
+)
+def test_other_band_checks_are_off(code: str) -> None:
+    """D32: trees 12 and 13 read no workbook band either."""
+    d = DEFS[code]
+    assert not [p for p in d["parameters"] if p.endswith(("_floor", "_ceiling"))]
+    for node in d["nodes"].values():
+        right = (node.get("condition") or {}).get("tree", {}).get("right")
+        if isinstance(right, int | float) and abs(right) == 1000:
+            assert "band off" in node["label_en"]
+
+
 # ---------------------------------------------------------------- fuzz
 _IDX = ["ndvi", "savi", "msavi", "bsi", "ndmi", "ndre", "gndvi", "cwsi", "smi", "lst"]
 _STAGES = ["dormancy", "pollination", "fruit_set", "kimri", "khalal", "rutab", "tamar"]
