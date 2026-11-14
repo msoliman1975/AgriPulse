@@ -4,6 +4,7 @@ import {
   BLOCK_FIELDS,
   CROP_ATTRIBUTE_KEYS,
   INDICES_KEYS,
+  REFERENCE_KEYS,
   SIGNAL_KEYS,
   WEATHER_RISK_CODES,
   WEATHER_RISK_CROP_PREFIX,
@@ -293,6 +294,51 @@ describe("crop_attribute source", () => {
       code: "",
       key: "value",
     });
+  });
+});
+
+// Reference values (D18): a closed list on both sides, mirrored from
+// backend/app/modules/reference_values/keys.py.
+describe("reference source", () => {
+  it("parses and round-trips a reference ref", () => {
+    const raw = {
+      op: "gt",
+      left: { source: "reference", key: "soil_ece_threshold_ds_m", field: "value" },
+      right: 3,
+    };
+    expect(term(parseConditionTree(raw)).left).toEqual({
+      source: "reference",
+      key: "soil_ece_threshold_ds_m",
+      field: "value",
+    });
+    expect(serializeCondition(parseConditionTree(raw))).toEqual(raw);
+  });
+
+  it("defaults the field to 'value' like the backend parser", () => {
+    const t = term(
+      parseConditionTree({
+        op: "lt",
+        left: { source: "reference", key: "yield_per_plant_kg" },
+        right: 60,
+      }),
+    );
+    expect(t.left).toEqual({ source: "reference", key: "yield_per_plant_kg", field: "value" });
+  });
+
+  it("rejects a key or field outside the closed lists", () => {
+    expect(REFERENCE_KEYS).toContain("soil_ece_threshold_ds_m");
+    for (const left of [
+      { source: "reference", key: "not_a_key" },
+      { source: "reference", key: "yield_per_plant_kg", field: "median" },
+    ]) {
+      expect(parseConditionTree({ op: "gt", left, right: 1 }).kind).toBe("unsupported");
+    }
+  });
+
+  it("compares as a number and has a default ref", () => {
+    const ref = defaultValueRef("reference");
+    expect(ref).toEqual({ source: "reference", key: "soil_ece_threshold_ds_m", field: "value" });
+    expect(leftOperandType(ref)).toBe("number");
   });
 });
 

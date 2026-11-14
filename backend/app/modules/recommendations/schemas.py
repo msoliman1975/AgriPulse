@@ -1508,7 +1508,14 @@ class ReadinessRequirement(BaseModel):
     """One piece of block data a tree reads (D15)."""
 
     kind: Literal[
-        "block_field", "crop_attribute", "signal", "index", "weather", "water_balance", "grid"
+        "block_field",
+        "crop_attribute",
+        "reference",
+        "signal",
+        "index",
+        "weather",
+        "water_balance",
+        "grid",
     ]
     key: str
 

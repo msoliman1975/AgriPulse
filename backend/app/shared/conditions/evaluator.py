@@ -44,6 +44,7 @@ from app.shared.conditions.models import (
     GridValueRef,
     IndicesValueRef,
     ParamsValueRef,
+    ReferenceValueRef,
     SignalsValueRef,
     ValueRef,
     VarsValueRef,
@@ -204,6 +205,9 @@ def _resolve(  # noqa: PLR0911, PLR0912 - dispatch over ValueRef kinds
         # Already typed by the loader per the definition's value_type, so no
         # coercion here — an unknown code fails closed like every other source.
         return ctx.crop_attributes.get(ref.code)
+    if isinstance(ref, ReferenceValueRef):
+        # Decimals from the loader; a key the crop does not set is None.
+        return (ctx.reference_values.get(ref.key) or {}).get(ref.field)
     if isinstance(ref, ParamsValueRef):
         return ctx.params.get(ref.name)
     if isinstance(ref, FindingsValueRef):
@@ -244,6 +248,8 @@ def _ref_key(ref: ValueRef) -> str:  # noqa: PLR0911 - dispatch over ValueRef ki
         return f"grid.{ref.index_code}.{ref.field}"
     if isinstance(ref, CropAttributeValueRef):
         return f"crop_attribute.{ref.code}.{ref.key}"
+    if isinstance(ref, ReferenceValueRef):
+        return f"reference.{ref.key}.{ref.field}"
     if isinstance(ref, ParamsValueRef):
         return f"params.{ref.name}"
     if isinstance(ref, FindingsValueRef):

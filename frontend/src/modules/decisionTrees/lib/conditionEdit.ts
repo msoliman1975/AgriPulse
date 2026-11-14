@@ -268,6 +268,24 @@ export const CROP_ATTRIBUTE_KEYS = ["value"] as const;
 // GET /api/v1/crops/attribute-definitions. That is why this file carries no
 // CROP_ATTRIBUTE_CODES constant — adding one would immediately be wrong.
 
+// The crop's reference values (D18, D23). Mirrors KEYS in
+// backend/app/modules/reference_values/keys.py; a closed list in code on both
+// sides, which the tree compiler enforces.
+export const REFERENCE_KEYS = [
+  "soil_ece_threshold_ds_m",
+  "yield_loss_pct_per_ds_m",
+  "irrigation_water_ecw_max_ds_m",
+  "leaching_requirement_pct",
+  "yield_per_plant_kg",
+  "fruit_weight_g",
+  "bunches_per_plant",
+  "row_spacing_m",
+  "in_row_spacing_m",
+] as const;
+// Mirrors REFERENCE_FIELDS in backend/app/shared/conditions/context.py: the
+// single value, or either end of a range.
+export const REFERENCE_FIELDS = ["value", "value_min", "value_max"] as const;
+
 // Sub-block grid spatial-anomaly fields (G-4). Mirrors GRID_FIELDS in
 // backend/app/shared/conditions/context.py.
 export const GRID_FIELDS = [
@@ -306,6 +324,7 @@ export type ValueRefSource =
   | "signals"
   | "grid"
   | "crop_attribute"
+  | "reference"
   | "params";
 
 export type ValueRef =
@@ -326,6 +345,11 @@ export type ValueRef =
   | { source: "signals"; code: string; key: (typeof SIGNAL_KEYS)[number] }
   | { source: "grid"; index_code: string; field: (typeof GRID_FIELDS)[number] }
   | { source: "crop_attribute"; code: string; key: (typeof CROP_ATTRIBUTE_KEYS)[number] }
+  | {
+      source: "reference";
+      key: (typeof REFERENCE_KEYS)[number];
+      field: (typeof REFERENCE_FIELDS)[number];
+    }
   | { source: "params"; name: string };
 
 // The right-hand side of a comparison can be a literal (number, string,
@@ -524,6 +548,17 @@ function parseValueRef(raw: unknown): ValueRef | null {
       key: key as (typeof CROP_ATTRIBUTE_KEYS)[number],
     };
   }
+  if (source === "reference") {
+    const key = raw.key as string;
+    const field = (raw.field ?? "value") as string;
+    if (!(REFERENCE_KEYS as readonly string[]).includes(key)) return null;
+    if (!(REFERENCE_FIELDS as readonly string[]).includes(field)) return null;
+    return {
+      source: "reference",
+      key: key as (typeof REFERENCE_KEYS)[number],
+      field: field as (typeof REFERENCE_FIELDS)[number],
+    };
+  }
   if (source === "params") {
     const name = typeof raw.name === "string" ? raw.name : "";
     return { source: "params", name };
@@ -617,6 +652,8 @@ function serializeValueRef(ref: ValueRef): Record<string, unknown> {
       return { source: "grid", index_code: ref.index_code, field: ref.field };
     case "crop_attribute":
       return { source: "crop_attribute", code: ref.code, key: ref.key };
+    case "reference":
+      return { source: "reference", key: ref.key, field: ref.field };
     case "params":
       return { source: "params", name: ref.name };
   }
@@ -949,6 +986,8 @@ export function defaultValueRef(source: ValueRefSource): ValueRef {
       // Empty code: the builder fills it from the fetched catalog, the same
       // way `signals` starts blank.
       return { source: "crop_attribute", code: "", key: "value" };
+    case "reference":
+      return { source: "reference", key: "soil_ece_threshold_ds_m", field: "value" };
     case "params":
       return { source: "params", name: "" };
   }

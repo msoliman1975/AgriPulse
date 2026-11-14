@@ -137,7 +137,7 @@ def evidence_label(key: str, locale: str = DEFAULT_LOCALE) -> str:
         # something a reader should be shown.
         if family == "block":
             return _table(_BLOCK_FIELD_LABELS, locale).get(parts[1]) or _humanise(parts[1])
-        if family in {"crop_attribute", "params"}:
+        if family in {"crop_attribute", "params", "reference"}:
             return _humanise(parts[1])
         return key
 

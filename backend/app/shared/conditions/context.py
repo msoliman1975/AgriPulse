@@ -195,6 +195,10 @@ class SignalEntry:
 # ref shape or migrating a single stored condition.
 CROP_ATTRIBUTE_KEYS: tuple[str, ...] = ("value",)
 
+# Allowed fields for a reference value-ref (D18): the single value, or the
+# low or high end when the catalogue stores a range ("60-72 kg/plant").
+REFERENCE_FIELDS: tuple[str, ...] = ("value", "value_min", "value_max")
+
 
 # Allowed keys for a `findings` value-ref (unified decision-tree engine,
 # decision 8). One key, and deliberately only one: a condition may ask
@@ -316,6 +320,11 @@ class ConditionContext:
     # source. A plain dict rather than an entry dataclass: unlike indices or
     # signals there is exactly one value per code and no derived companions.
     crop_attributes: dict[str, Any] = field(default_factory=dict)
+    # The crop's reference values (D18, D23) for the block's current crop
+    # path, deepest path winning: {key: {"value", "value_min", "value_max"}}
+    # as Decimals. Empty when the block has no crop or the catalogue sets
+    # nothing, so `{source: reference}` predicates fail closed.
+    reference_values: dict[str, dict[str, Any]] = field(default_factory=dict)
     # Decision-tree parameter values (PR-B): {name: value} resolved
     # from the tree's `parameters:` defaults, layered with tenant
     # overrides in PR-C. The alerts engine leaves this empty.
@@ -351,6 +360,7 @@ class ConditionContext:
         grid: dict[str, GridAnomalyEntry] | None = None,
         crop_attributes: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
+        reference_values: dict[str, dict[str, Any]] | None = None,
     ) -> ConditionContext:
         """Build a context from the ``BlockSignals`` shape the alerts
         engine already loads. ``weather`` and ``signals`` are optional —
@@ -393,6 +403,7 @@ class ConditionContext:
             grid=grid or {},
             crop_attributes=dict(crop_attributes or {}),
             params=dict(params or {}),
+            reference_values=dict(reference_values or {}),
         )
 
 

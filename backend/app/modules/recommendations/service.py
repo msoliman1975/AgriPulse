@@ -83,6 +83,7 @@ from app.modules.recommendations.status_codes import (
     STATUS_DEFINITIONS,
     worst,
 )
+from app.modules.reference_values.snapshot import load_reference_snapshot
 from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
 from app.modules.weather.snapshot import load_index_snapshot as load_weather_index_snapshot
 from app.modules.weather.snapshot import load_risk_snapshot as load_weather_risk_snapshot
@@ -133,6 +134,8 @@ class _BlockEvaluation:
     # honest value for a block the water-balance sweep has not written, which
     # is what a fail-closed predicate needs to see.
     water_balance: Any = None
+    # The crop's reference values (D18); defaulted for the same reason.
+    reference_values: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def cell_context(self, cell_means: Any) -> ConditionContext:
         """Block context with this cell's imagery means swapped in."""
@@ -151,6 +154,7 @@ class _BlockEvaluation:
             signals=self.signals,
             grid=self.grid,
             crop_attributes=self.crop_attributes,
+            reference_values=self.reference_values,
         )
 
 
@@ -1482,6 +1486,9 @@ class RecommendationsServiceImpl:
         crop_attributes = await load_crop_attribute_snapshot(
             self._tenant, block_crop_id=block_crop_id
         )
+        # The crop's reference values (D18) for its current path. Empty for
+        # a block with no crop, so `{source: reference}` fails closed.
+        reference_values = await load_reference_snapshot(self._public, crop_path=crop_path)
         ctx = ConditionContext.from_block_signals(
             block_id=str(block_id),
             block_attributes={
@@ -1497,6 +1504,7 @@ class RecommendationsServiceImpl:
             signals=signals,
             grid=grid,
             crop_attributes=crop_attributes,
+            reference_values=reference_values,
         )
 
         # PR-C: bulk-load the parameter overrides for every tree the sweep
@@ -1563,6 +1571,7 @@ class RecommendationsServiceImpl:
             signals=signals,
             grid=grid,
             crop_attributes=crop_attributes,
+            reference_values=reference_values,
             ctx=ctx,
             block_trees=block_trees,
             cell_trees=cell_trees,
@@ -4536,6 +4545,7 @@ class DecisionTreesAuthorService:
             crop_attributes=await load_crop_attribute_snapshot(
                 tenant_session, block_crop_id=dry_run_block_crop_id
             ),
+            reference_values=await load_reference_snapshot(self._public, crop_path=crop_path),
         )
 
         # Targeting is reported, not enforced. The block picker already filters
