@@ -4229,9 +4229,30 @@ global:
       #   answer 200 as platform admin (publish-impact loops active tenants,
       #   counts only); board reschedules still work.
       #   Rollback: api and workers to e842760. New tables/columns can stay.
-      tag: "2f6c07d"
+      # 751b318 = #846, #847, #855 and #857, api and workers (Medjool step
+      #   4). #844 (sources library, public 0105) and #845 (crop reference
+      #   values, public 0106) already shipped in 2f6c07d.
+      #   - Inputs catalogue (D20): public 0108 adds inputs and input_doses
+      #     (34 Medjool inputs, 36 doses, all unverified); GET /api/v1/inputs.
+      #     inputs.tenant_id is in the purge registry. (#855 moved it from
+      #     0107, which #852 had taken.)
+      #   - Template inputs (D20): public 0109 and tenant 0104 add input_id
+      #     and a structured dose to plan template activities and plan
+      #     activities; apply copies them and fills empty product/dosage text.
+      #   - #857: the phenology sweep skips crops on deleted blocks. One such
+      #     block made every run fail with BlockNotFoundError, so the QA
+      #     Medjool tenant never got growth stages.
+      #   All migrations are additive and run on PreSync. Workers move with
+      #   the api for #857 and the shared models.
+      #   Watch: migrate PreSync succeeds (public head 0109, tenant head
+      #   0104); GET /inputs?crop_path=date_palm.medjool answers 200 with 34
+      #   inputs; GET /plan-templates/{id} shows input_id and dose fields;
+      #   phenology.advance_for_tenant succeeds for qa-medjool.
+      #   Rollback: api and workers to 2f6c07d. New tables/columns can stay;
+      #   the old image never reads them.
+      tag: "751b318"
     workers:
-      tag: "2f6c07d"
+      tag: "751b318"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4996,7 +5017,19 @@ global:
       #   Watch: open a manual in Platform > Plan templates, save without
       #   changes, and the activities keep their titles.
       #   Rollback: frontend to 5ee27fc together with the api.
-      tag: "e842760"
+      # 751b318 = #844-#847, frontend, see the api note. New pages: Platform >
+      #   Sources (/platform/sources) and Inputs (/platform/inputs, also
+      #   /settings/inputs for tenants); a Reference values tab in the crop
+      #   catalogue; the plan template editor gains an input picker and dose
+      #   fields on each activity. EN and AR. #852's frontend change (new
+      #   capability names, no screen) rides along.
+      #   Must ship with the api at 751b318: an older api answers 404 on the
+      #   new routes, and an older api drops the input fields on save.
+      #   Watch: the three pages load as platform admin; open a manual in
+      #   Platform > Plan templates, save without changes, and the activities
+      #   keep their titles and doses.
+      #   Rollback: frontend to e842760 together with the api.
+      tag: "751b318"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
