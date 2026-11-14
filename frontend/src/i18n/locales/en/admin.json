@@ -1012,7 +1012,8 @@
       "sizes": "Size classes",
       "attributes": "Attributes",
       "health": "Health",
-      "signals": "Signals"
+      "signals": "Signals",
+      "reference": "Reference values"
     },
     "level": {
       "crop": "Crop",
@@ -1073,6 +1074,39 @@
       "everyCrop_one": "{{count}} more applies to every crop",
       "everyCrop_other": "{{count}} more apply to every crop",
       "saveFailed": "Could not save the crop scope."
+    },
+    "reference": {
+      "loadFailed": "Could not load reference values.",
+      "intro": "Typed reference values for this crop path. A path sets only what differs from the level above; the rest is inherited. Each value names its sources.",
+      "group": {
+        "salinity": "Salt tolerance",
+        "yield": "Expected yield and load",
+        "spacing": "Spacing"
+      },
+      "key": {
+        "soil_ece_threshold_ds_m": "Soil salinity threshold (ECe)",
+        "yield_loss_pct_per_ds_m": "Yield loss per dS/m above threshold",
+        "irrigation_water_ecw_max_ds_m": "Irrigation water salinity, no yield loss (ECw)",
+        "leaching_requirement_pct": "Leaching requirement",
+        "yield_per_plant_kg": "Yield per plant",
+        "fruit_weight_g": "Fruit weight",
+        "bunches_per_plant": "Bunches per plant",
+        "row_spacing_m": "Row spacing",
+        "in_row_spacing_m": "In-row spacing",
+        "plants_per_ha": "Plants per hectare"
+      },
+      "derived": "From spacing",
+      "inherited": "From {{path}}",
+      "edit": "Edit",
+      "set": "Set here",
+      "clear": "Clear",
+      "value": "Value",
+      "min": "Min",
+      "max": "Max",
+      "note": "Note",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saveFailed": "Could not save."
     }
   },
   "sizeClasses": {
