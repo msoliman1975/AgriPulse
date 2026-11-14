@@ -4278,9 +4278,19 @@ global:
       #   Rollback: api and workers to 39364b6. A block already set to the
       #   new class would then fail the old API's response schema; tenant
       #   0105's downgrade folds it back into strongly_saline.
-      tag: "7ccd806"
+      # 7a27d30 = #863, api and workers (Agri Operation 1b and 8;
+      #   7ccd806..7a27d30 is #863 alone). Public 0110 is data only: it fills
+      #   notes_ar, product_name_ar and dosage_ar for the 79 activities of the
+      #   seeded mango, potato and Medjool manuals, and only where empty, so
+      #   Arabic an author already wrote stays. No code change on the api.
+      #   Watch: migrate PreSync succeeds (public head 0110); GET
+      #   /plan-templates/{id}/authoring-view for a mango manual shows
+      #   notes_ar on its activities.
+      #   Rollback: api and workers to 7ccd806. 0110's downgrade clears only
+      #   the values it wrote; leaving them in place is harmless.
+      tag: "7a27d30"
     workers:
-      tag: "7ccd806"
+      tag: "7a27d30"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -5079,7 +5089,20 @@ global:
       #   Watch: the Beta designer opens and its five tabs work; picking the
       #   new source in a condition shows the reference keys.
       #   Rollback: frontend to 39364b6 together with the api.
-      tag: "7ccd806"
+      # 7a27d30 = #863, frontend (Agri Operation 8). New Platform > Operation
+      #   manuals (/platform/operation-manuals): the manual laid out by growth
+      #   stage and edited in place, with Arabic fields, evidence, source tree,
+      #   input and dose; start and milestone anchors under More anchors; a
+      #   variety switcher; Publish shows the change diff and how many farms
+      #   and saved plans use the manual first. The platform nav item now
+      #   reads Operation manuals and opens it; the old editor still answers
+      #   at /platform/plan-templates. It saves the same whole-tree body as
+      #   the old editor, so no api change is needed (works on 7ccd806 too).
+      #   Watch: Operation manuals lists the manuals and a mango manual opens
+      #   by stage with its activities; the Beta designer's tabs are unchanged.
+      #   Do not save or publish a seeded manual as a check.
+      #   Rollback: this tag alone back to 7ccd806.
+      tag: "7a27d30"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
