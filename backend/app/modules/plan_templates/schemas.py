@@ -7,12 +7,32 @@ the whole-tree PUT (PR-E3). The apply request/response live in PR-E2.
 from __future__ import annotations
 
 from datetime import date, datetime, time
-from typing import Any, Literal
+from decimal import Decimal
+from typing import Any, Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.modules.plans.schemas import ActivityType
+
+# The inputs catalogue's dose units (public 0108/0109 CHECK). Repeated here
+# rather than imported: module boundaries let schemas import only another
+# module's service, and the database CHECK is the shared source of truth.
+DoseUnit = Literal[
+    "kg/plant",
+    "g/plant",
+    "L/plant/week",
+    "cards/plant",
+    "kg/plant/year_of_age",
+    "g/100 L",
+    "mg/L",
+    "%",
+    "ppm",
+    "traps/ha",
+    "kg/ha",
+    "L/ha",
+    "other",
+]
 
 TemplateStatus = Literal["draft", "published", "archived"]
 ActivityAnchor = Literal["start", "milestone", "stage"]
@@ -46,6 +66,10 @@ class PlanTemplateActivityResponse(BaseModel):
     duration_days: int = 1
     product_name: str | None = None
     dosage: str | None = None
+    input_id: UUID | None = None
+    dose_value: Decimal | None = None
+    dose_value_max: Decimal | None = None
+    dose_unit: DoseUnit | None = None
     notes: str | None = None
     product_name_ar: str | None = None
     dosage_ar: str | None = None
@@ -146,6 +170,12 @@ class PlanTemplateActivityInput(BaseModel):
     duration_days: int = Field(default=1, ge=1)
     product_name: str | None = Field(default=None, max_length=255)
     dosage: str | None = Field(default=None, max_length=255)
+    # D20: an input from the catalogue and a structured dose. A dose needs a
+    # unit and a unit needs a dose; a range needs value <= value_max.
+    input_id: UUID | None = None
+    dose_value: Decimal | None = Field(default=None, ge=0)
+    dose_value_max: Decimal | None = Field(default=None, ge=0)
+    dose_unit: DoseUnit | None = None
     notes: str | None = None
     product_name_ar: str | None = Field(default=None, max_length=255)
     dosage_ar: str | None = Field(default=None, max_length=255)
@@ -154,6 +184,19 @@ class PlanTemplateActivityInput(BaseModel):
     source_tree_code: str | None = Field(default=None, max_length=128)
     start_time: time | None = None
     sort_order: int = 0
+
+    @model_validator(mode="after")
+    def _dose_shape(self) -> Self:
+        has_amount = self.dose_value is not None or self.dose_value_max is not None
+        if has_amount != (self.dose_unit is not None):
+            raise ValueError("a dose needs both an amount and a unit")
+        if (
+            self.dose_value is not None
+            and self.dose_value_max is not None
+            and self.dose_value > self.dose_value_max
+        ):
+            raise ValueError("dose_value is above dose_value_max")
+        return self
 
 
 class PlanTemplateWriteRequest(BaseModel):

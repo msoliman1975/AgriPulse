@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -10,6 +11,7 @@ import {
   type PlanActivityType,
   type PlanTemplateWriteRequest,
 } from "@/api/planTemplates";
+import { DOSE_UNITS, listInputs, type DoseUnit, type Input } from "@/api/inputs";
 import { CropPathFilter } from "@/modules/reports/components/CropPathFilter";
 import { Card } from "@/components/Card";
 import { Field, FIELD_CONTROL_CLASS } from "@/components/Field";
@@ -33,7 +35,7 @@ interface MilestoneRow extends MilestoneInput {
   // model, so the control always has a string to bind to.
   name_ar: string;
 }
-interface ActivityRow extends ActivityInput {
+export interface ActivityRow extends ActivityInput {
   key: string;
 }
 
@@ -130,6 +132,10 @@ export function PlanTemplateEditorPage(): ReactNode {
         duration_days: a.duration_days,
         product_name: a.product_name,
         dosage: a.dosage,
+        input_id: a.input_id ?? null,
+        dose_value: a.dose_value == null ? null : Number(a.dose_value),
+        dose_value_max: a.dose_value_max == null ? null : Number(a.dose_value_max),
+        dose_unit: a.dose_unit ?? null,
         notes: a.notes,
         sort_order: a.sort_order,
       })),
@@ -138,6 +144,11 @@ export function PlanTemplateEditorPage(): ReactNode {
   }, [detailQuery.data, loaded]);
 
   const phenology = useTemplatePhenology(cropPath);
+  // D20: the inputs offered are those that apply to the template's crop.
+  const inputsQuery = useQuery({
+    queryKey: ["inputs", "template", cropPath] as const,
+    queryFn: () => listInputs({ cropPath: cropPath ?? undefined }),
+  });
   const stageOptions = phenology.data?.stages ?? [];
   const { i18n } = useTranslation();
   const isAr = i18n.language === "ar";
@@ -183,6 +194,12 @@ export function PlanTemplateEditorPage(): ReactNode {
         duration_days: Math.max(1, Number(a.duration_days) || 1),
         product_name: a.product_name?.trim() || null,
         dosage: a.dosage?.trim() || null,
+        input_id: a.input_id || null,
+        // A dose is saved only with a unit; the API refuses one without.
+        dose_value: a.dose_unit ? (a.dose_value ?? null) : null,
+        dose_value_max: a.dose_unit ? (a.dose_value_max ?? null) : null,
+        dose_unit:
+          a.dose_unit && (a.dose_value != null || a.dose_value_max != null) ? a.dose_unit : null,
         notes: a.notes?.trim() || null,
         sort_order: i,
       })),
@@ -554,6 +571,7 @@ export function PlanTemplateEditorPage(): ReactNode {
                     value={a.product_name ?? ""}
                     onChange={(e) => set({ product_name: e.target.value })}
                   />
+                  <ActivityInputFields row={a} inputs={inputsQuery.data ?? []} onChange={set} />
                   <button
                     type="button"
                     onClick={() => setActivities((prev) => prev.filter((_, i) => i !== idx))}
@@ -680,5 +698,93 @@ function TimelinePreview({
         </div>
       ) : null}
     </Card>
+  );
+}
+
+/**
+ * D20: an input from the catalogue and a structured dose. Choosing an input
+ * with one recommended dose offers it; the free-text product name stays for
+ * context and is filled from the input when empty.
+ */
+export function ActivityInputFields({
+  row,
+  inputs,
+  onChange,
+}: {
+  row: ActivityRow;
+  inputs: Input[];
+  onChange: (patch: Partial<ActivityRow>) => void;
+}): ReactNode {
+  const { t, i18n } = useTranslation("planTemplates");
+  const ar = i18n.language.startsWith("ar");
+  const num = (s: string): number | null => (s.trim() === "" ? null : Number(s));
+  const pick = (id: string): void => {
+    const input = inputs.find((i) => i.id === id);
+    const only = input && input.doses.length === 1 ? input.doses[0] : undefined;
+    onChange({
+      input_id: id || null,
+      product_name: row.product_name?.trim()
+        ? row.product_name
+        : (input?.name_en ?? row.product_name),
+      ...(only && only.unit !== "other" && !row.dose_unit
+        ? {
+            dose_value:
+              only.value != null
+                ? Number(only.value)
+                : only.value_min != null
+                  ? Number(only.value_min)
+                  : null,
+            dose_value_max:
+              only.value_max != null && only.value == null ? Number(only.value_max) : null,
+            dose_unit: only.unit,
+          }
+        : {}),
+    });
+  };
+  return (
+    <>
+      <select
+        className="input w-44"
+        aria-label={t("editor.field.input")}
+        value={row.input_id ?? ""}
+        onChange={(e) => pick(e.target.value)}
+      >
+        <option value="">{t("editor.field.noInput")}</option>
+        {inputs.map((i) => (
+          <option key={i.id} value={i.id}>
+            {ar ? (i.name_ar ?? i.name_en) : i.name_en}
+          </option>
+        ))}
+      </select>
+      <input
+        className="input w-16"
+        inputMode="decimal"
+        aria-label={t("editor.field.doseValue")}
+        placeholder={t("editor.field.doseValue")}
+        value={row.dose_value ?? ""}
+        onChange={(e) => onChange({ dose_value: num(e.target.value) })}
+      />
+      <input
+        className="input w-16"
+        inputMode="decimal"
+        aria-label={t("editor.field.doseMax")}
+        placeholder={t("editor.field.doseMax")}
+        value={row.dose_value_max ?? ""}
+        onChange={(e) => onChange({ dose_value_max: num(e.target.value) })}
+      />
+      <select
+        className="input w-28"
+        aria-label={t("editor.field.doseUnit")}
+        value={row.dose_unit ?? ""}
+        onChange={(e) => onChange({ dose_unit: (e.target.value || null) as DoseUnit | null })}
+      >
+        <option value="">{t("editor.field.noUnit")}</option>
+        {DOSE_UNITS.filter((u) => u !== "other").map((u) => (
+          <option key={u} value={u}>
+            {u}
+          </option>
+        ))}
+      </select>
+    </>
   );
 }

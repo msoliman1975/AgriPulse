@@ -69,6 +69,10 @@ def _activity_dict(a: PlanTemplateActivity) -> dict[str, Any]:
         "duration_days": a.duration_days,
         "product_name": a.product_name,
         "dosage": a.dosage,
+        "input_id": a.input_id,
+        "dose_value": a.dose_value,
+        "dose_value_max": a.dose_value_max,
+        "dose_unit": a.dose_unit,
         "notes": a.notes,
         "product_name_ar": a.product_name_ar,
         "dosage_ar": a.dosage_ar,
@@ -89,6 +93,11 @@ _ACTIVITY_CONTENT_FIELDS = (
     "duration_days",
     "product_name",
     "dosage",
+    # D20: an input from the catalogue and a structured dose.
+    "input_id",
+    "dose_value",
+    "dose_value_max",
+    "dose_unit",
     "notes",
     "product_name_ar",
     "dosage_ar",
@@ -579,6 +588,16 @@ class PlanTemplatesRepository:
         )
         return int(getattr(res, "rowcount", 0) or 0)
 
+    async def input_names(self, input_ids: set[UUID]) -> dict[UUID, str]:
+        """English names of catalogue inputs (public 0107), for applied plans."""
+        if not input_ids:
+            return {}
+        rows = await self._public.execute(
+            text("SELECT id, name_en FROM public.inputs WHERE id = ANY(:ids)"),
+            {"ids": list(input_ids)},
+        )
+        return {r.id: r.name_en for r in rows}
+
     async def insert_plan_activity(
         self,
         *,
@@ -598,6 +617,10 @@ class PlanTemplatesRepository:
         notes: str | None,
         start_time: Any,
         actor_user_id: UUID | None,
+        input_id: UUID | None = None,
+        dose_value: Any = None,
+        dose_value_max: Any = None,
+        dose_unit: str | None = None,
     ) -> None:
         assert self._tenant is not None
         await self._tenant.execute(
@@ -607,11 +630,13 @@ class PlanTemplatesRepository:
                     (plan_id, farm_id, block_id, activity_type, scheduled_date,
                      duration_days, start_time, product_name, dosage, notes,
                      status, source, applied_template_id, template_activity_id,
-                     anchored_stage_code, title, title_ar, created_by, updated_by)
+                     anchored_stage_code, title, title_ar, created_by, updated_by,
+                     input_id, dose_value, dose_value_max, dose_unit)
                 VALUES
                     (:plan, :farm, :block, :atype, :sched, :dur, :stime, :pname,
                      :dosage, :notes, 'scheduled', 'template', :tpl, :tact,
-                     :stage, :title, :title_ar, :actor, :actor)
+                     :stage, :title, :title_ar, :actor, :actor,
+                     :input_id, :dose_value, :dose_value_max, :dose_unit)
                 """
             ).bindparams(
                 bindparam("plan", type_=PG_UUID(as_uuid=True)),
@@ -620,6 +645,7 @@ class PlanTemplatesRepository:
                 bindparam("tpl", type_=PG_UUID(as_uuid=True)),
                 bindparam("tact", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                bindparam("input_id", type_=PG_UUID(as_uuid=True)),
             ),
             {
                 "plan": plan_id,
@@ -638,6 +664,10 @@ class PlanTemplatesRepository:
                 "title": title,
                 "title_ar": title_ar,
                 "actor": actor_user_id,
+                "input_id": input_id,
+                "dose_value": dose_value,
+                "dose_value_max": dose_value_max,
+                "dose_unit": dose_unit,
             },
         )
 
