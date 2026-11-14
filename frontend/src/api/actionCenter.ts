@@ -205,6 +205,15 @@ export interface ActionItem {
   activity_id: string | null;
   scheduled_date: string | null;
 
+  /** F1 (Agri Operation): a saved plan already covers this recommendation.
+   *  Set when, as it opened, the block had a live planned activity whose
+   *  manual activity names the same tree within 14 days. Optional: older
+   *  api builds do not send them. */
+  planned_activity_id?: string | null;
+  planned_date?: string | null;
+  planned_title?: string | null;
+  planned_title_ar?: string | null;
+
   /** Lifecycle timestamps. An alert fills the first two, a recommendation the
    *  next two; each leaves the other pair null. One shared `closed_at` would
    *  report an applied recommendation and a resolved alert as one event. */

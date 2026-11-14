@@ -246,5 +246,5 @@ The loop is self-paced. Each iteration:
 | 6 | Plan tab | merged | [#856](https://github.com/msoliman1975/AgriPulse/pull/856) | 39364b6 via [#859](https://github.com/msoliman1975/AgriPulse/pull/859), verified 2026-11-14 (frontend + Beta designer; farm screens not exercised in prod) |
 | 7 | Board integration | merged | [#856](https://github.com/msoliman1975/AgriPulse/pull/856) | 39364b6 via [#859](https://github.com/msoliman1975/AgriPulse/pull/859), verified 2026-11-14 (frontend + Beta designer; farm screens not exercised in prod) |
 | 8 | Platform manual editor | in review (with 1b) | [#863](https://github.com/msoliman1975/AgriPulse/pull/863) | |
-| 9 | Decision-tree dedupe | not started | | |
+| 9 | Decision-tree dedupe | in review | | |
 | 10 | Cleanup | not started | | |

@@ -103,7 +103,9 @@
     "applied": "طُبِّقت {{when}}",
     "dismissed": "رُفِضت {{when}}",
     "deferredUntil": "مؤجَّلة حتى {{when}}",
-    "snoozedUntil": "مؤجَّلة حتى {{when}}"
+    "snoozedUntil": "مؤجَّلة حتى {{when}}",
+    "alreadyPlanned": "مخطط بالفعل",
+    "alreadyPlannedOn": "مخطط بالفعل · {{date}}"
   },
   "why": {
     "title": "سبب التفعيل",

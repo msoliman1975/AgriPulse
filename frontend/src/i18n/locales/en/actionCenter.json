@@ -103,7 +103,9 @@
     "applied": "applied {{when}}",
     "dismissed": "dismissed {{when}}",
     "deferredUntil": "deferred until {{when}}",
-    "snoozedUntil": "snoozed until {{when}}"
+    "snoozedUntil": "snoozed until {{when}}",
+    "alreadyPlanned": "Already planned",
+    "alreadyPlannedOn": "Already planned · {{date}}"
   },
   "why": {
     "title": "Why this fired",

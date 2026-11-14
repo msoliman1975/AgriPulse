@@ -124,7 +124,8 @@ items AS (
         r.occurrence_count            AS occurrence_count,
         r.day_streak                  AS day_streak,
         r.first_seen_at               AS first_seen_at,
-        r.last_seen_at                AS last_seen_at
+        r.last_seen_at                AS last_seen_at,
+        r.plan_activity_id            AS planned_activity_id
     FROM recommendations r
     WHERE r.deleted_at IS NULL AND r.group_parent_id IS NULL
     UNION ALL
@@ -165,7 +166,8 @@ items AS (
         a.occurrence_count            AS occurrence_count,
         a.day_streak                  AS day_streak,
         a.first_seen_at               AS first_seen_at,
-        a.last_seen_at                AS last_seen_at
+        a.last_seen_at                AS last_seen_at,
+        NULL::uuid                    AS planned_activity_id
     FROM alerts a
     JOIN blocks b ON b.id = a.block_id
     WHERE a.deleted_at IS NULL AND a.group_parent_id IS NULL
@@ -180,10 +182,17 @@ SELECT
     cg.ordinal, cg.total,
     act.id                 AS activity_id,
     act.assigned_membership_id AS assigned_membership_id,
-    act.scheduled_date     AS scheduled_date
+    act.scheduled_date     AS scheduled_date,
+    pln.scheduled_date     AS planned_date,
+    pln.title              AS planned_title,
+    pln.title_ar           AS planned_title_ar
 FROM items i
 JOIN blocks bl ON bl.id = i.block_id
 LEFT JOIN cell_geo cg ON cg.id = i.cell_id
+-- F1 (Agri Operation): the planned activity that already covers this
+-- recommendation, set when it opened. A deleted activity no longer counts.
+LEFT JOIN plan_activities pln
+  ON pln.id = i.planned_activity_id AND pln.deleted_at IS NULL
 -- Newest linked activity wins: re-dispatching an item writes a second
 -- activity rather than mutating the first, so the audit trail keeps both.
 LEFT JOIN LATERAL (
@@ -373,14 +382,12 @@ class ActionCenterRepository:
         that lands on a different person each time it is retried is worse than
         one that is merely arbitrary, and the caller is told it defaulted.
         """
-        stmt = text(
-            """
+        stmt = text("""
             SELECT membership_id FROM farm_scopes
             WHERE farm_id = :f AND revoked_at IS NULL
             ORDER BY membership_id
             LIMIT 1
-            """
-        ).bindparams(bindparam("f", type_=PG_UUID(as_uuid=True)))
+            """).bindparams(bindparam("f", type_=PG_UUID(as_uuid=True)))
         return (await self._tenant.execute(stmt, {"f": farm_id})).scalar_one_or_none()
 
     async def link_alert_activity(self, *, alert_id: UUID, activity_id: UUID) -> None:
