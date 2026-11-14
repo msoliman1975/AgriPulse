@@ -4288,9 +4288,20 @@ global:
       #   notes_ar on its activities.
       #   Rollback: api and workers to 7ccd806. 0110's downgrade clears only
       #   the values it wrote; leaving them in place is harmless.
-      tag: "7a27d30"
+      # a892dc8 = #866, api and workers (Medjool step 4b-3, D23). Tenant 0106
+      #   adds row_spacing_m, in_row_spacing_m and plant_count to blocks (all
+      #   optional, positive). Block create, update and read carry them, and a
+      #   read derives plants_per_ha_from_spacing (10,000 m2 over each plant's
+      #   area) and plants_per_ha_from_count (count over the mapped area);
+      #   nothing derived is stored. Additive migration, runs on PreSync.
+      #   Workers move with the api so both run the same Block model.
+      #   Watch: migrate PreSync succeeds (tenant head 0106); GET a block
+      #   returns the five new keys (null until a layout is recorded).
+      #   Rollback: api and workers to 7a27d30. The new columns can stay; the
+      #   old image never reads them.
+      tag: "a892dc8"
     workers:
-      tag: "7a27d30"
+      tag: "a892dc8"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -5102,7 +5113,15 @@ global:
       #   by stage with its activities; the Beta designer's tabs are unchanged.
       #   Do not save or publish a seeded manual as a check.
       #   Rollback: this tag alone back to 7ccd806.
-      tag: "7a27d30"
+      # a892dc8 = #866, frontend, see the api note. The block form gains row
+      #   spacing, in-row spacing and plant count, with the spacing's density
+      #   shown live (10 x 8 m: 125 per ha); the block page header shows the
+      #   count and the layout. EN and AR.
+      #   Needs the api at a892dc8: an older api rejects the new fields on save.
+      #   Watch: edit a block, the three fields show; saving without changes
+      #   still works.
+      #   Rollback: frontend to 7a27d30 together with the api.
+      tag: "a892dc8"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
