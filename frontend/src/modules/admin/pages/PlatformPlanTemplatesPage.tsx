@@ -31,7 +31,16 @@ function statusKind(status: TemplateStatus): "ok" | "neutral" | "warn" {
  * crop-keyed agriculture plan templates. List + status filter; rows open
  * the whole-tree editor. Guarded by `plan_template.manage` on the API.
  */
-export function PlatformPlanTemplatesPage(): ReactNode {
+export function PlatformPlanTemplatesPage({
+  basePath = "/platform/plan-templates",
+  title,
+  subtitle,
+}: {
+  /** Where rows and "New" link to: the old editor or the Agri Operation one. */
+  basePath?: string;
+  title?: string;
+  subtitle?: string;
+} = {}): ReactNode {
   const { t } = useTranslation("planTemplates");
   const [filter, setFilter] = useState<TemplateStatus | "all">("all");
   const templates = usePlanTemplates(filter === "all" ? undefined : filter);
@@ -39,9 +48,9 @@ export function PlatformPlanTemplatesPage(): ReactNode {
   return (
     <Page>
       <PageHeader
-        title={t("list.title")}
-        subtitle={t("list.subtitle")}
-        actions={<LinkButton to="/platform/plan-templates/new">{t("list.newButton")}</LinkButton>}
+        title={title ?? t("list.title")}
+        subtitle={subtitle ?? t("list.subtitle")}
+        actions={<LinkButton to={`${basePath}/new`}>{t("list.newButton")}</LinkButton>}
       />
 
       <Toolbar
@@ -91,15 +100,13 @@ export function PlatformPlanTemplatesPage(): ReactNode {
         rowKey={(tpl) => tpl.id}
         state={queryState(templates)}
         filtered={filter !== "all"}
-        rowHref={(tpl) => `/platform/plan-templates/${tpl.id}`}
+        rowHref={(tpl) => `${basePath}/${tpl.id}`}
         caption={t("list.title")}
         errorMessage={t("list.loadFailed")}
         empty={
           <EmptyState
             message={t("list.empty")}
-            action={
-              <LinkButton to="/platform/plan-templates/new">{t("list.newButton")}</LinkButton>
-            }
+            action={<LinkButton to={`${basePath}/new`}>{t("list.newButton")}</LinkButton>}
           />
         }
         noResults={

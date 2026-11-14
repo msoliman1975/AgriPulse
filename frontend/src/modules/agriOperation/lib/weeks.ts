@@ -98,7 +98,9 @@ function noOverlap(windows: StageWindow[]): StageWindow[] {
  * the layout can't place).
  */
 export function activityWeek(
-  activity: Pick<PlanTemplateActivity, "anchor" | "stage_code" | "offset_days">,
+  activity: Pick<PlanTemplateActivity, "anchor" | "offset_days"> & {
+    stage_code?: string | null;
+  },
   layout: SeasonLayout,
 ): number | null {
   const offset = activity.offset_days ?? 0;

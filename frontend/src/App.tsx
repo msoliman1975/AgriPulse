@@ -42,6 +42,8 @@ import { MyHoldingsPage } from "@/modules/investors/pages/MyHoldingsPage";
 import { InsightsPage } from "@/modules/insights/pages/InsightsPage";
 import { BoardPage } from "@/modules/board/pages/BoardPage";
 import { AgriOperationPage } from "@/modules/agriOperation/pages/AgriOperationPage";
+import { ManualEditorPage } from "@/modules/agriOperation/pages/ManualEditorPage";
+import { ManualListPage } from "@/modules/agriOperation/pages/ManualListPage";
 import { FarmHealthViewPage } from "@/modules/farmHealth/pages/FarmHealthViewPage";
 import { FarmTimelinePage } from "@/modules/timeline/pages/FarmTimelinePage";
 import { ActionCenterPage } from "@/modules/actionCenter/pages/ActionCenterPage";
@@ -462,6 +464,9 @@ export function App(): ReactNode {
                 <Route path="observer/scenes/:jobId" element={<ObserverSceneDetailPage />} />
                 <Route path="plan-templates/new" element={<PlanTemplateEditorPage />} />
                 <Route path="plan-templates/:id" element={<PlanTemplateEditorPage />} />
+                <Route path="operation-manuals" element={<ManualListPage />} />
+                <Route path="operation-manuals/new" element={<ManualEditorPage />} />
+                <Route path="operation-manuals/:id" element={<ManualEditorPage />} />
                 <Route path="admins" element={<PlatformAdminsPage />} />
                 <Route path="roles" element={<PlatformRolesPage />} />
                 <Route path="usage" element={<PlatformUsagePage />} />
