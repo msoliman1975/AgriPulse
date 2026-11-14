@@ -243,7 +243,7 @@ The loop is self-paced. Each iteration:
 | 2 | Tenant manual read API + capabilities | in review | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | |
 | 3 | Saved plans backend | in review | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | |
 | 4 | Manual revisions | in review | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | |
-| 5 | Agri Operation page + Catalog tab | not started | | |
+| 5 | Agri Operation page + Catalog tab | in review | | |
 | 6 | Plan tab | not started | | |
 | 7 | Board integration | not started | | |
 | 8 | Platform manual editor | not started | | |

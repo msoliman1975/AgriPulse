@@ -25,6 +25,8 @@ import enUsers from "./locales/en/users.json";
 import enFarmHealth from "./locales/en/farmHealth.json";
 import enTimeline from "./locales/en/timeline.json";
 import enInvestors from "./locales/en/investors.json";
+import enAgriOperation from "./locales/en/agriOperation.json";
+import enPlanTemplates from "./locales/en/planTemplates.json";
 import enReports from "./locales/en/reports.json";
 import enFieldAccess from "./locales/en/fieldAccess.json";
 import enIntegrationsHealth from "./locales/en/integrationsHealth.json";
@@ -53,6 +55,8 @@ import arUsers from "./locales/ar/users.json";
 import arFarmHealth from "./locales/ar/farmHealth.json";
 import arTimeline from "./locales/ar/timeline.json";
 import arInvestors from "./locales/ar/investors.json";
+import arAgriOperation from "./locales/ar/agriOperation.json";
+import arPlanTemplates from "./locales/ar/planTemplates.json";
 import arReports from "./locales/ar/reports.json";
 import arFieldAccess from "./locales/ar/fieldAccess.json";
 import arIntegrationsHealth from "./locales/ar/integrationsHealth.json";
@@ -94,6 +98,8 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           farmHealth: enFarmHealth,
           timeline: enTimeline,
           investors: enInvestors,
+          agriOperation: enAgriOperation,
+          planTemplates: enPlanTemplates,
           reports: enReports,
           fieldAccess: enFieldAccess,
           integrationsHealth: enIntegrationsHealth,
@@ -124,6 +130,8 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           farmHealth: arFarmHealth,
           timeline: arTimeline,
           investors: arInvestors,
+          agriOperation: arAgriOperation,
+          planTemplates: arPlanTemplates,
           reports: arReports,
           fieldAccess: arFieldAccess,
           integrationsHealth: arIntegrationsHealth,
@@ -149,6 +157,8 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
         "users",
         "timeline",
         "investors",
+        "agriOperation",
+        "planTemplates",
       ],
       interpolation: { escapeValue: false },
       react: { useSuspense: false },

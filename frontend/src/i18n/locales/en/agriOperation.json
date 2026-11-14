@@ -1,0 +1,44 @@
+{
+  "title": "Agri Operation",
+  "subtitle": "Operation manuals for your crops, and the plans you build from them.",
+  "pickFarm": "Pick a farm to see its operation manuals.",
+  "noAccess": "You don't have access to operation manuals on this farm.",
+  "catalog": {
+    "crop": "Crop",
+    "manual": "Operation manual",
+    "variety": "Show weeks for",
+    "cropCalendar": "Crop calendar (no variety)",
+    "published": "Published",
+    "cycle": "{{weeks}}-week cycle",
+    "activities_one": "{{count}} activity",
+    "activities_other": "{{count}} activities",
+    "readOnly": "Written by the AgriPulse agronomy team. You can change any of it for your own plan without changing the manual.",
+    "empty": "No operation manual is published for your crops yet. The agronomy team adds manuals crop by crop."
+  },
+  "manual": {
+    "noActivities": "This manual has no activities yet.",
+    "filterStages": "Show activities for a stage",
+    "allStages": "All stages",
+    "weeks": "Week {{from}}–{{to}}",
+    "weekShort": "Wk {{n}}",
+    "ribbonLabel": "Growth stages across a {{weeks}}-week season",
+    "fromStart": "From the start date",
+    "fromStartHint": "Timed from the date you give each block, not from a growth stage.",
+    "anchorStage": "At {{stage}}",
+    "anchorStageOffset": "{{stage}} {{days}} days",
+    "anchorStart": "Start date +{{days}} days",
+    "anchorMilestone": "Milestone +{{days}} days",
+    "product": "Product",
+    "dosage": "Dosage",
+    "notes": "Notes",
+    "source": "Source",
+    "sourceManual": "Operation manual",
+    "sourceTree": "Decision tree {{code}}"
+  },
+  "evidence": {
+    "eg_fao": "FAO Egypt",
+    "eg": "Egyptian field data",
+    "generic": "Generic data",
+    "manual": "Crop manual"
+  }
+}

@@ -41,6 +41,7 @@ import { InvestorsPage } from "@/modules/investors/pages/InvestorsPage";
 import { MyHoldingsPage } from "@/modules/investors/pages/MyHoldingsPage";
 import { InsightsPage } from "@/modules/insights/pages/InsightsPage";
 import { BoardPage } from "@/modules/board/pages/BoardPage";
+import { AgriOperationPage } from "@/modules/agriOperation/pages/AgriOperationPage";
 import { FarmHealthViewPage } from "@/modules/farmHealth/pages/FarmHealthViewPage";
 import { FarmTimelinePage } from "@/modules/timeline/pages/FarmTimelinePage";
 import { ActionCenterPage } from "@/modules/actionCenter/pages/ActionCenterPage";
@@ -282,6 +283,9 @@ export function App(): ReactNode {
                   redirect keeps old deep-links working. */}
                 <Route path="/plan/:farmId" element={<RedirectPlanToBoard />} />
                 <Route path="/board/:farmId" element={<BoardPage />} />
+                {/* Agri Operation: operation manuals and saved plans
+                  (docs/proposals/agri-operation-build-plan.md). */}
+                <Route path="/agri-operation/:farmId" element={<AgriOperationPage />} />
                 {/* Farm Timeline — the replay surface. Farm-scoped like the
                   rest of the workspace; the block is a control on the page,
                   not a route segment, because changing scope must not push

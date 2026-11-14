@@ -38,6 +38,7 @@ import enBulkUpdates from "./locales/en/bulkUpdates.json";
 import enFarmHealth from "./locales/en/farmHealth.json";
 import enTimeline from "./locales/en/timeline.json";
 import enInvestors from "./locales/en/investors.json";
+import enAgriOperation from "./locales/en/agriOperation.json";
 import arCommon from "./locales/ar/common.json";
 import arAuth from "./locales/ar/auth.json";
 import arAccount from "./locales/ar/account.json";
@@ -74,6 +75,7 @@ import arBulkUpdates from "./locales/ar/bulkUpdates.json";
 import arFarmHealth from "./locales/ar/farmHealth.json";
 import arTimeline from "./locales/ar/timeline.json";
 import arInvestors from "./locales/ar/investors.json";
+import arAgriOperation from "./locales/ar/agriOperation.json";
 
 export type SupportedLanguage = "en" | "ar";
 
@@ -121,6 +123,7 @@ const resources = {
     farmHealth: enFarmHealth,
     timeline: enTimeline,
     investors: enInvestors,
+    agriOperation: enAgriOperation,
   },
   ar: {
     common: arCommon,
@@ -159,6 +162,7 @@ const resources = {
     farmHealth: arFarmHealth,
     timeline: arTimeline,
     investors: arInvestors,
+    agriOperation: arAgriOperation,
   },
 } as const;
 
@@ -205,6 +209,7 @@ void i18n
       "bulkUpdates",
       "timeline",
       "investors",
+      "agriOperation",
     ],
     interpolation: { escapeValue: false },
     detection: {

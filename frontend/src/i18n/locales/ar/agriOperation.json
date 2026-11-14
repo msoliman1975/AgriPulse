@@ -1,0 +1,48 @@
+{
+  "title": "العمليات الزراعية",
+  "subtitle": "أدلة التشغيل لمحاصيلك، والخطط التي تبنيها منها.",
+  "pickFarm": "اختر مزرعة لعرض أدلة التشغيل الخاصة بها.",
+  "noAccess": "ليست لديك صلاحية الاطلاع على أدلة التشغيل في هذه المزرعة.",
+  "catalog": {
+    "crop": "المحصول",
+    "manual": "دليل التشغيل",
+    "variety": "عرض الأسابيع لـ",
+    "cropCalendar": "تقويم المحصول (بدون صنف)",
+    "published": "منشور",
+    "cycle": "دورة من {{weeks}} أسبوعًا",
+    "activities_zero": "لا توجد عمليات",
+    "activities_one": "عملية واحدة",
+    "activities_two": "عمليتان",
+    "activities_few": "{{count}} عمليات",
+    "activities_many": "{{count}} عملية",
+    "activities_other": "{{count}} عملية",
+    "readOnly": "أعدّه فريق الزراعة في AgriPulse. يمكنك تعديل أي جزء منه في خطتك دون أن يتغير الدليل.",
+    "empty": "لم يُنشر بعد دليل تشغيل لمحاصيلك. يضيف فريق الزراعة الأدلة محصولًا تلو الآخر."
+  },
+  "manual": {
+    "noActivities": "لا توجد عمليات في هذا الدليل بعد.",
+    "filterStages": "عرض عمليات مرحلة معينة",
+    "allStages": "كل المراحل",
+    "weeks": "الأسبوع {{from}}–{{to}}",
+    "weekShort": "أسبوع {{n}}",
+    "ribbonLabel": "مراحل النمو على موسم من {{weeks}} أسبوعًا",
+    "fromStart": "من تاريخ البدء",
+    "fromStartHint": "تُحسب من التاريخ الذي تحدده لكل قطعة، لا من مرحلة نمو.",
+    "anchorStage": "عند {{stage}}",
+    "anchorStageOffset": "{{stage}} {{days}} يوم",
+    "anchorStart": "تاريخ البدء +{{days}} يوم",
+    "anchorMilestone": "المعلم +{{days}} يوم",
+    "product": "المنتج",
+    "dosage": "الجرعة",
+    "notes": "ملاحظات",
+    "source": "المصدر",
+    "sourceManual": "دليل التشغيل",
+    "sourceTree": "شجرة القرار {{code}}"
+  },
+  "evidence": {
+    "eg_fao": "الفاو مصر",
+    "eg": "بيانات حقلية مصرية",
+    "generic": "بيانات عامة",
+    "manual": "دليل المحصول"
+  }
+}
