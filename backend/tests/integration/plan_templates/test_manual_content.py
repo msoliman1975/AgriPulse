@@ -242,7 +242,9 @@ async def test_seeded_manuals_have_arabic_text(admin_session: AsyncSession) -> N
     ).all()
     missing = [g for g in gaps if g.no_notes or g.no_product or g.no_dosage]
     assert missing == []
-    assert len(gaps) == 6 * 16 + 3 * 12 + 31 + 20
+    # Mango (6 x 16), potato (3 x 12), Medjool 1.3 (31 + 20) and the Medjool
+    # 1.7 drafts from public 0111 (43 + 21), which the same Arabic check covers.
+    assert len(gaps) == 6 * 16 + 3 * 12 + 31 + 20 + 43 + 21
 
     leaked = (
         await admin_session.execute(
