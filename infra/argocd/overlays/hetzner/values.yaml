@@ -4212,9 +4212,26 @@ global:
       #   still works.
       #   Rollback: api to 5ee27fc, workers to f840a77. The new columns can
       #   stay; the old image never reads them.
-      tag: "e842760"
+      # 2f6c07d = #852, api and workers (Agri Operation PRs 2-4, the backend
+      #   wave). Read routes for operation manuals (catalog, manual, authoring
+      #   view), saved plans under /farms/{id}/plan-allocations (preview, save
+      #   = apply, read, replace, delete, manual-changes) and publish-impact.
+      #   Tenant 0102 adds plan_allocations and plan_activities.allocation_id /
+      #   activity_key / date_overridden (source check allows 'custom'); tenant
+      #   0103 adds plan_allocations.manual_snapshot; public 0107 adds
+      #   plan_templates.published_snapshot (backfilled for published
+      #   manuals). All additive, on PreSync. New caps plan_allocation.read /
+      #   .manage. A board reschedule of a saved-plan row now also writes a
+      #   date override into that plan. The frontend stays e842760: no screen
+      #   uses these routes yet.
+      #   Watch: migrate PreSync succeeds (public head 0107, tenant head
+      #   0103); GET /plan-templates/{id}/authoring-view and /publish-impact
+      #   answer 200 as platform admin (publish-impact loops active tenants,
+      #   counts only); board reschedules still work.
+      #   Rollback: api and workers to e842760. New tables/columns can stay.
+      tag: "2f6c07d"
     workers:
-      tag: "e842760"
+      tag: "2f6c07d"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
