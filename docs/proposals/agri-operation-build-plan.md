@@ -245,7 +245,7 @@ The loop is self-paced. Each iteration:
 | 4 | Manual revisions | merged | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | 2f6c07d via [#854](https://github.com/msoliman1975/AgriPulse/pull/854), verified 2026-11-14 |
 | 5 | Agri Operation page + Catalog tab | in review | [#856](https://github.com/msoliman1975/AgriPulse/pull/856) | |
 | 6 | Plan tab | in review | [#856](https://github.com/msoliman1975/AgriPulse/pull/856) | |
-| 7 | Board integration | not started | | |
+| 7 | Board integration | in review | [#856](https://github.com/msoliman1975/AgriPulse/pull/856) | |
 | 8 | Platform manual editor | not started | | |
 | 9 | Decision-tree dedupe | not started | | |
 | 10 | Cleanup | not started | | |

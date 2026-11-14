@@ -57,6 +57,12 @@ export interface PlanActivity {
   // stage-anchored template rows, anchored_stage_code is the stage it landed on.
   source?: string;
   anchored_stage_code?: string | null;
+  // Agri Operation: the manual activity's title, the saved plan the row came
+  // from, and whether its date was moved off the plan's default.
+  title?: string | null;
+  title_ar?: string | null;
+  allocation_id?: string | null;
+  date_overridden?: boolean;
 }
 
 export interface PlanCreatePayload {

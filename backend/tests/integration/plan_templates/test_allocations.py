@@ -139,7 +139,32 @@ async def _complete_and_move(session, schema, allocation_id):  # type: ignore[no
         tenant_schema=schema,
     )
     await session.commit()
+
+    # The board shows which rows came from a saved plan and which were moved.
+    from app.modules.plans.repository import PlansRepository
+
+    await session.execute(text(f"SET search_path TO {schema}, public"))
+    board = await PlansRepository(session).list_board_activities(
+        farm_id=await _farm_of(session, done.id),
+        from_date=START - timedelta(days=400),
+        to_date=START + timedelta(days=800),
+    )
+    by_id = {row["id"]: row for row in board}
+    assert by_id[moved.id]["allocation_id"] == allocation_id
+    assert by_id[moved.id]["date_overridden"] is True
+    assert by_id[done.id]["date_overridden"] is False
     return new_date
+
+
+async def _farm_of(session, activity_id):  # type: ignore[no-untyped-def]
+    return (
+        await session.execute(
+            text("SELECT farm_id FROM plan_activities WHERE id = :id").bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True))
+            ),
+            {"id": activity_id},
+        )
+    ).scalar_one()
 
 
 async def _reapply_as_read(svc, session, schema, farm_id, allocation_id, block_id, new_date):  # type: ignore[no-untyped-def]
