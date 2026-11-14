@@ -443,6 +443,11 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
     OwnedTable("field_flags", owner_column="farm_id", order=20),
     OwnedTable("recommendations", owner_column="farm_id", order=20, fk=False),
     OwnedTable("plan_activities", owner_column="farm_id", order=30),
+    # Agri Operation saved plans: plan_activities.allocation_id is SET NULL, and
+    # each saved plan references the season's vegetation_plans row, so it goes
+    # between the two. A purged block simply drops out of a saved plan's
+    # blocks list the next time it is applied (the crop gate rejects it).
+    OwnedTable("plan_allocations", owner_column="farm_id", order=35),
     OwnedTable("vegetation_plans", owner_column="farm_id", order=40),
     # W2-C: the availability link, not the worker. Deleting the link is what
     # "this farm is gone" means for a tenant-level roster; the worker row
