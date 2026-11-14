@@ -678,6 +678,7 @@ const SALINITY_VALUES = [
   "slightly_saline",
   "moderately_saline",
   "strongly_saline",
+  "very_strongly_saline",
 ] as const;
 const RISK_LEVEL_VALUES = ["low", "moderate", "high"] as const;
 const GRID_SEVERITY_VALUES = ["warning", "critical"] as const;

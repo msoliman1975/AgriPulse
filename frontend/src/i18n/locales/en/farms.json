@@ -126,7 +126,8 @@
     "non_saline": "Non-saline",
     "slightly_saline": "Slightly saline",
     "moderately_saline": "Moderately saline",
-    "strongly_saline": "Strongly saline"
+    "strongly_saline": "Strongly saline",
+    "very_strongly_saline": "Very strongly saline"
   },
   "status": {
     "active": "Active",

@@ -259,7 +259,13 @@ _SOILS = [
     "silty_loam",
     "silty_clay",
 ]
-_SAL = ["non_saline", "slightly_saline", "moderately_saline", "strongly_saline"]
+_SAL = [
+    "non_saline",
+    "slightly_saline",
+    "moderately_saline",
+    "strongly_saline",
+    "very_strongly_saline",
+]
 
 
 def _d(x: float | None) -> Decimal | None:

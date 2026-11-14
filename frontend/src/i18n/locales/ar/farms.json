@@ -126,7 +126,8 @@
     "non_saline": "غير ملحية",
     "slightly_saline": "قليلة الملوحة",
     "moderately_saline": "متوسطة الملوحة",
-    "strongly_saline": "شديدة الملوحة"
+    "strongly_saline": "شديدة الملوحة",
+    "very_strongly_saline": "شديدة الملوحة جدًا"
   },
   "status": {
     "active": "نشطة",

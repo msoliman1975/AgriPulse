@@ -46,6 +46,7 @@ const SALINITY: SalinityClass[] = [
   "slightly_saline",
   "moderately_saline",
   "strongly_saline",
+  "very_strongly_saline",
 ];
 
 interface Props {

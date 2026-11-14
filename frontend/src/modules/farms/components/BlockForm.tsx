@@ -42,6 +42,7 @@ const SALINITY_CLASSES: SalinityClass[] = [
   "slightly_saline",
   "moderately_saline",
   "strongly_saline",
+  "very_strongly_saline",
 ];
 
 const CODE_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/;
