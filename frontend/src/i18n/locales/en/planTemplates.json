@@ -74,7 +74,13 @@
       "anchor": "Anchor",
       "offset": "Offset (days)",
       "duration": "Duration",
-      "product": "Product (optional)"
+      "product": "Product (optional)",
+      "input": "Input",
+      "noInput": "No catalogue input",
+      "doseValue": "Dose",
+      "doseMax": "to",
+      "doseUnit": "Unit",
+      "noUnit": "Unit"
     },
     "addMilestone": "Add milestone",
     "noMilestones": "No milestones. Add one to anchor activities to a named day.",
