@@ -11,7 +11,8 @@
     "decisionTrees": "أشجار القرار",
     "bulk": "التحديثات المجمّعة",
     "fieldAccess": "الدخول الميداني",
-    "blockHealth": "صحة القطعة"
+    "blockHealth": "صحة القطعة",
+    "inputs": "المُدخلات"
   },
   "noAccess": {
     "title": "الإعدادات",

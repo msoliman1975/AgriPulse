@@ -70,6 +70,8 @@ export function SettingsLayout(): ReactNode {
     // question: not "who works here" but "who can open the app".
     { to: "/settings/field-access", labelKey: "nav.fieldAccess", show: canFieldEnrol },
     { to: "/settings/equipment", labelKey: "nav.equipment", show: canResources },
+    // Everyone reads the catalogue; only tenant.manage_settings adds to it.
+    { to: "/settings/inputs", labelKey: "nav.inputs", show: true },
     // Decision Trees promoted to the top-level /decision-trees surface
     // (reached from the gear/Configs menu), no longer a Settings tab.
   ];

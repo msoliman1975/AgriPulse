@@ -24,6 +24,7 @@ import enDecisionTrees from "./locales/en/decisionTrees.json";
 import enDecisionTreesBeta from "./locales/en/decisionTreesBeta.json";
 import enDecisionTreesEstate from "./locales/en/decisionTreesEstate.json";
 import enSources from "./locales/en/sources.json";
+import enInputs from "./locales/en/inputs.json";
 import enSettings from "./locales/en/settings.json";
 import enIntegrationsHealth from "./locales/en/integrationsHealth.json";
 import enIntegrations from "./locales/en/integrations.json";
@@ -59,6 +60,7 @@ import arDecisionTrees from "./locales/ar/decisionTrees.json";
 import arDecisionTreesBeta from "./locales/ar/decisionTreesBeta.json";
 import arDecisionTreesEstate from "./locales/ar/decisionTreesEstate.json";
 import arSources from "./locales/ar/sources.json";
+import arInputs from "./locales/ar/inputs.json";
 import arSettings from "./locales/ar/settings.json";
 import arIntegrationsHealth from "./locales/ar/integrationsHealth.json";
 import arIntegrations from "./locales/ar/integrations.json";
@@ -104,6 +106,7 @@ const resources = {
     decisionTreesBeta: enDecisionTreesBeta,
     decisionTreesEstate: enDecisionTreesEstate,
     sources: enSources,
+    inputs: enInputs,
     users: enUsers,
     settings: enSettings,
     integrationsHealth: enIntegrationsHealth,
@@ -141,6 +144,7 @@ const resources = {
     decisionTreesBeta: arDecisionTreesBeta,
     decisionTreesEstate: arDecisionTreesEstate,
     sources: arSources,
+    inputs: arInputs,
     users: arUsers,
     settings: arSettings,
     integrationsHealth: arIntegrationsHealth,
@@ -188,6 +192,7 @@ void i18n
       "decisionTreesBeta",
       "decisionTreesEstate",
       "sources",
+      "inputs",
       "users",
       "settings",
       "integrationsHealth",

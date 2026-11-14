@@ -166,6 +166,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
         register_subscribers as register_imagery_subscribers,
     )
     from app.modules.indices.router import router as indices_router
+    from app.modules.inputs.router import router as inputs_router
     from app.modules.insights.router import router as insights_router
     from app.modules.integrations.router import router as integrations_router
     from app.modules.integrations_health.router import (
@@ -265,6 +266,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     app.include_router(platform_defaults_router)
     app.include_router(sources_router)
     app.include_router(reference_values_router)
+    app.include_router(inputs_router)
     app.include_router(health_definitions_router)
     app.include_router(platform_admins_router)
     app.include_router(platform_tenant_integrations_router)

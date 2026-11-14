@@ -17,7 +17,8 @@
     "platformAlerts": "Platform alerts",
     "usage": "Product usage",
     "healthDefinition": "Block health rule",
-    "sources": "Sources"
+    "sources": "Sources",
+    "inputs": "Inputs"
   },
   "crops": {
     "title": "Crop catalog",
