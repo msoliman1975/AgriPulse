@@ -24,3 +24,16 @@ export const TYPE_CLASS: Record<string, string> = {
 export function stageName(stage: PhenologyStage, lang: string): string {
   return localizedField(lang, stage.name_en ?? stage.code, stage.name_ar) ?? stage.code;
 }
+
+// Stage colours cycle through the app's stage tokens in phenological order.
+export const STAGE_COLORS = [
+  "bg-ap-stage-post",
+  "bg-ap-stage-flow",
+  "bg-ap-stage-frset",
+  "bg-ap-stage-frdev",
+  "bg-ap-stage-ripen",
+  "bg-ap-stage-harv",
+  "bg-ap-primary-soft",
+  "bg-ap-warn-soft",
+  "bg-ap-crit-soft",
+];

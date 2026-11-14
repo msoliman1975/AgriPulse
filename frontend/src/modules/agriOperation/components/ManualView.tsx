@@ -12,21 +12,8 @@ import { useTranslation } from "react-i18next";
 import type { OperationManual } from "@/api/agriOperation";
 import type { PlanTemplateActivity } from "@/api/planTemplates";
 import { localizedField } from "@/lib/localizedField";
-import { stageName, TYPE_CLASS } from "../lib/manualStyle";
+import { STAGE_COLORS, stageName, TYPE_CLASS } from "../lib/manualStyle";
 import { activityWeek, seasonLayout, stripEvidenceTags, type StageWindow } from "../lib/weeks";
-
-// Stage colours cycle through the app's stage tokens in phenological order.
-const STAGE_COLORS = [
-  "bg-ap-stage-post",
-  "bg-ap-stage-flow",
-  "bg-ap-stage-frset",
-  "bg-ap-stage-frdev",
-  "bg-ap-stage-ripen",
-  "bg-ap-stage-harv",
-  "bg-ap-primary-soft",
-  "bg-ap-warn-soft",
-  "bg-ap-crit-soft",
-];
 
 interface ManualViewProps {
   manual: OperationManual;
@@ -176,7 +163,7 @@ function FilterButton({
   );
 }
 
-function StageRibbon({
+export function StageRibbon({
   layout,
   total,
   colorOf,

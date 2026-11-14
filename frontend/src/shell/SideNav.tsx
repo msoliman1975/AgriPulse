@@ -315,10 +315,10 @@ export function SideNav({ variant = "rail" }: { variant?: SideNavVariant }): Rea
           collapsed={collapsed}
         />
         <SideNavItem
-          to="/platform/plan-templates"
-          label={t("nav.planTemplates")}
+          to="/platform/operation-manuals"
+          label={t("nav.operationManuals")}
           icon={<PlanIcon className="h-4 w-4" />}
-          activePathPrefix="/platform/plan-templates"
+          activePathPrefix="/platform/operation-manuals"
           collapsed={collapsed}
         />
         <SideNavItem
