@@ -413,7 +413,8 @@ class RecommendationsRepository:
         rows = (
             (
                 await self._public.execute(
-                    text("""
+                    text(
+                        """
                     SELECT t.id   AS tree_id,
                            t.code AS tree_code,
                            t.tenant_id,
@@ -452,7 +453,8 @@ class RecommendationsRepository:
                       AND (t.tenant_id IS NULL OR t.tenant_id = :tid)
                       AND (:only_code IS NULL OR t.code = :only_code)
                     ORDER BY t.code
-                    """).bindparams(
+                    """
+                    ).bindparams(
                         bindparam("tid", type_=PG_UUID(as_uuid=True)),
                         # Typed explicitly: an untyped NULL bind leaves
                         # Postgres unable to infer the parameter's type and
@@ -584,7 +586,8 @@ class RecommendationsRepository:
         rows = (
             (
                 await self._public.execute(
-                    text("""
+                    text(
+                        """
                     SELECT t.id, t.code, t.tenant_id,
                            t.name_en, t.name_ar,
                            t.description_en, t.description_ar,
@@ -599,7 +602,8 @@ class RecommendationsRepository:
                       AND (t.tenant_id IS NULL OR t.tenant_id = :tid)
                       AND (:stage IS NULL OR t.stage = :stage)
                     ORDER BY t.tenant_id NULLS FIRST, t.code
-                    """).bindparams(
+                    """
+                    ).bindparams(
                         bindparam("tid", type_=PG_UUID(as_uuid=True)),
                         # Typed explicitly: an untyped NULL bind leaves
                         # Postgres unable to infer the parameter's type and
@@ -620,14 +624,16 @@ class RecommendationsRepository:
         rows = (
             (
                 await self._public.execute(
-                    text("""
+                    text(
+                        """
                     SELECT id, tree_id, version, tree_yaml, definition,
                            tree_compiled, compiled_hash, published_at, notes,
                            created_at, updated_at
                     FROM public.decision_tree_versions
                     WHERE tree_id = :tid
                     ORDER BY version DESC
-                    """).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                    """
+                    ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
                     {"tid": tree_id},
                 )
             )
@@ -640,13 +646,15 @@ class RecommendationsRepository:
         row = (
             (
                 await self._public.execute(
-                    text("""
+                    text(
+                        """
                     SELECT id, tree_id, version, tree_yaml, definition,
                            tree_compiled, compiled_hash, published_at, notes,
                            created_at, updated_at
                     FROM public.decision_tree_versions
                     WHERE tree_id = :tid AND version = :v
-                    """).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                    """
+                    ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
                     {"tid": tree_id, "v": version},
                 )
             )
@@ -745,7 +753,8 @@ class RecommendationsRepository:
         """
         row = (
             await self._public.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO public.decision_trees
                         (code, tenant_id, name_en, name_ar,
                          description_en, description_ar,
@@ -758,7 +767,8 @@ class RecommendationsRepository:
                             :soil_textures, :scope, :stage, :applicable_regions,
                             TRUE, :actor, :actor)
                     RETURNING id
-                    """).bindparams(
+                    """
+                ).bindparams(
                     bindparam("tenant_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("crop_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("actor", type_=PG_UUID(as_uuid=True)),
@@ -812,7 +822,8 @@ class RecommendationsRepository:
         ), "a version row stores exactly one of tree_yaml and definition"
         row = (
             await self._public.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO public.decision_tree_versions
                         (tree_id, version, tree_yaml, definition, tree_compiled,
                          compiled_hash, notes, published_at, published_by)
@@ -820,7 +831,8 @@ class RecommendationsRepository:
                             CAST(:compiled AS jsonb),
                             :hash, :notes, :published_at, :published_by)
                     RETURNING id
-                    """).bindparams(
+                    """
+                ).bindparams(
                     bindparam("tid", type_=PG_UUID(as_uuid=True)),
                     bindparam("published_by", type_=PG_UUID(as_uuid=True)),
                 ),
@@ -941,7 +953,8 @@ class RecommendationsRepository:
         row = (
             (
                 await self._public.execute(
-                    text("""
+                    text(
+                        """
                     SELECT id, tree_id, version, tree_yaml, definition,
                            tree_compiled, compiled_hash, published_at, notes,
                            created_at, updated_at
@@ -949,7 +962,8 @@ class RecommendationsRepository:
                     WHERE tree_id = :tid
                     ORDER BY version DESC
                     LIMIT 1
-                    """).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                    """
+                    ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
                     {"tid": tree_id},
                 )
             )
@@ -1055,7 +1069,8 @@ class RecommendationsRepository:
         the name / description / crop. The version's compiled JSON is
         the audit record; the tree row holds the human-friendly latest."""
         await self._public.execute(
-            text("""
+            text(
+                """
                 UPDATE public.decision_trees
                    SET name_en = :name_en,
                        name_ar = :name_ar,
@@ -1067,7 +1082,8 @@ class RecommendationsRepository:
                        updated_by = :actor,
                        updated_at = public.app_now()
                  WHERE id = :tid
-                """).bindparams(
+                """
+            ).bindparams(
                 bindparam("tid", type_=PG_UUID(as_uuid=True)),
                 bindparam("crop_id", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
@@ -1108,7 +1124,8 @@ class RecommendationsRepository:
         multi-axis targeting sets + execution scope so the structured
         pickers are the source of truth for crop/country/soil/scope."""
         await self._public.execute(
-            text("""
+            text(
+                """
                 UPDATE public.decision_trees
                    SET name_en = :name_en,
                        name_ar = :name_ar,
@@ -1123,7 +1140,8 @@ class RecommendationsRepository:
                        updated_by = :actor,
                        updated_at = public.app_now()
                  WHERE id = :tid
-                """).bindparams(
+                """
+            ).bindparams(
                 bindparam("tid", type_=PG_UUID(as_uuid=True)),
                 bindparam("crop_id", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
@@ -1426,12 +1444,14 @@ class RecommendationsRepository:
     ) -> bool:
         """Turn a tree off for a farm. Returns False if it was already off."""
         inserted = await self._tenant.execute(
-            text("""
+            text(
+                """
                 INSERT INTO farm_tree_exclusions (farm_id, tree_id, disabled_by)
                 VALUES (:fid, :tid, :actor)
                 ON CONFLICT (farm_id, tree_id) DO NOTHING
                 RETURNING tree_id
-                """).bindparams(
+                """
+            ).bindparams(
                 bindparam("fid", type_=PG_UUID(as_uuid=True)),
                 bindparam("tid", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
@@ -1470,7 +1490,8 @@ class RecommendationsRepository:
         """
         if excluded:
             result = await self._tenant.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO farm_tree_exclusions (farm_id, tree_id, disabled_by, source)
                     SELECT f.id, :tid, :actor, 'tenant'
                       FROM farms f
@@ -1483,7 +1504,8 @@ class RecommendationsRepository:
                        SET source = 'tenant'
                      WHERE farm_tree_exclusions.source <> 'tenant'
                     RETURNING farm_id, (xmax = 0) AS inserted
-                    """).bindparams(
+                    """
+                ).bindparams(
                     bindparam("tid", type_=PG_UUID(as_uuid=True)),
                     bindparam("actor", type_=PG_UUID(as_uuid=True)),
                 ),
@@ -1508,7 +1530,8 @@ class RecommendationsRepository:
         """
         row = (
             await self._tenant.execute(
-                text("""
+                text(
+                    """
                     SELECT count(*) AS total,
                            count(*) FILTER (
                              WHERE NOT EXISTS (
@@ -1518,7 +1541,8 @@ class RecommendationsRepository:
                            ) AS running
                       FROM farms f
                      WHERE f.deleted_at IS NULL
-                    """).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
+                    """
+                ).bindparams(bindparam("tid", type_=PG_UUID(as_uuid=True))),
                 {"tid": tree_id},
             )
         ).one()
@@ -1551,7 +1575,8 @@ class RecommendationsRepository:
         self, *, tenant_id: UUID, tree_id: UUID, version: int, actor_user_id: UUID | None
     ) -> None:
         await self._public.execute(
-            text("""
+            text(
+                """
                 INSERT INTO public.tenant_tree_version_pins
                     (tenant_id, tree_id, version, pinned_at, pinned_by)
                 VALUES (:tid, :tree, :ver, public.app_now(), :actor)
@@ -1559,7 +1584,8 @@ class RecommendationsRepository:
                    SET version = EXCLUDED.version,
                        pinned_at = EXCLUDED.pinned_at,
                        pinned_by = EXCLUDED.pinned_by
-                """).bindparams(
+                """
+            ).bindparams(
                 bindparam("tid", type_=PG_UUID(as_uuid=True)),
                 bindparam("tree", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
@@ -1605,7 +1631,8 @@ class RecommendationsRepository:
             else "(tree_id, param_name) WHERE farm_id IS NULL"
         )
         await self._tenant.execute(
-            text(f"""
+            text(
+                f"""
                 INSERT INTO tree_parameter_overrides
                     (tree_id, param_name, farm_id, value, created_by, updated_by)
                 VALUES (:tid, :n, :farm, CAST(:v AS jsonb), :actor, :actor)
@@ -1613,7 +1640,8 @@ class RecommendationsRepository:
                 SET value = EXCLUDED.value,
                     updated_by = EXCLUDED.updated_by,
                     updated_at = public.app_now()
-                """).bindparams(  # noqa: S608
+                """  # noqa: S608
+            ).bindparams(
                 bindparam("tid", type_=PG_UUID(as_uuid=True)),
                 bindparam("farm", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
@@ -1697,7 +1725,8 @@ class RecommendationsRepository:
         savepoint = await self._tenant.begin_nested()
         try:
             await self._tenant.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO recommendations (
                         id, block_id, cell_id, farm_id, tree_id, tree_code,
                         tree_version,
@@ -1740,7 +1769,8 @@ class RecommendationsRepository:
                                    pa.id
                           LIMIT 1)
                     )
-                    """).bindparams(
+                    """
+                ).bindparams(
                     bindparam("id", type_=PG_UUID(as_uuid=True)),
                     bindparam("block_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("cell_id", type_=PG_UUID(as_uuid=True)),
@@ -1919,7 +1949,8 @@ class RecommendationsRepository:
         cell is firing again, which is exactly what un-clears it.
         """
         await self._tenant.execute(
-            text("""
+            text(
+                """
                 UPDATE recommendations
                    SET group_parent_id = :parent, group_key = :key,
                        tree_version = :version,
@@ -1928,7 +1959,8 @@ class RecommendationsRepository:
                        cleared_at = NULL,
                        updated_at = public.app_now(), updated_by = :actor
                  WHERE id = :id
-                """).bindparams(
+                """
+            ).bindparams(
                 bindparam("id", type_=PG_UUID(as_uuid=True)),
                 bindparam("parent", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
@@ -2022,7 +2054,8 @@ class RecommendationsRepository:
         rows = (
             (
                 await self._tenant.execute(
-                    text("""
+                    text(
+                        """
                         SELECT r.id, r.cell_id, r.severity, r.state,
                                r.text_en, r.text_ar,
                                r.created_at, r.last_seen_at, r.cleared_at,
@@ -2034,7 +2067,8 @@ class RecommendationsRepository:
                           LEFT JOIN grid_cells gc ON gc.id = r.cell_id
                          WHERE r.group_parent_id = :p AND r.deleted_at IS NULL
                          ORDER BY r.cleared_at NULLS FIRST, gc.row_idx, gc.col_idx
-                        """).bindparams(bindparam("p", type_=PG_UUID(as_uuid=True))),
+                        """
+                    ).bindparams(bindparam("p", type_=PG_UUID(as_uuid=True))),
                     {"p": parent_id},
                 )
             )
@@ -2101,7 +2135,8 @@ class RecommendationsRepository:
         row = (
             (
                 await self._tenant.execute(
-                    text("""
+                    text(
+                        """
                     SELECT id, block_id, cell_id,
                            (SELECT row_idx FROM grid_cells WHERE id = recommendations.cell_id)
                                AS cell_row,
@@ -2119,7 +2154,8 @@ class RecommendationsRepository:
                            created_at, updated_at
                     FROM recommendations
                     WHERE id = :id AND deleted_at IS NULL
-                    """).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+                    """
+                    ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
                     {"id": recommendation_id},
                 )
             )
@@ -2246,13 +2282,15 @@ class RecommendationsRepository:
         details: dict[str, Any] | None,
     ) -> None:
         await self._tenant.execute(
-            text("""
+            text(
+                """
                 INSERT INTO recommendations_history
                     (recommendation_id, block_id, cell_id, farm_id, from_state,
                      to_state, actor_user_id, details)
                 VALUES (:rec, :block, :cell, :farm, :from_state, :to_state,
                         :actor, CAST(:details AS jsonb))
-                """).bindparams(
+                """
+            ).bindparams(
                 bindparam("rec", type_=PG_UUID(as_uuid=True)),
                 bindparam("block", type_=PG_UUID(as_uuid=True)),
                 bindparam("cell", type_=PG_UUID(as_uuid=True)),
@@ -2280,7 +2318,8 @@ class RecommendationsRepository:
         rows = (
             (
                 await self._tenant.execute(
-                    text("""
+                    text(
+                        """
                         SELECT DISTINCT ON (index_code)
                                index_code, time, mean, baseline_deviation
                         FROM block_index_aggregates
@@ -2289,7 +2328,8 @@ class RecommendationsRepository:
                           -- later scene. Live, this is a no-op.
                           AND time <= public.app_now()
                         ORDER BY index_code, time DESC
-                        """).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                        """
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
                     {"block_id": block_id},
                 )
             )
@@ -2371,7 +2411,8 @@ class RecommendationsRepository:
         rows = (
             (
                 await self._tenant.execute(
-                    text("""
+                    text(
+                        """
                         SELECT obs.cell_id, obs.index_code, obs.product_id,
                                obs.time, obs.mean
                         FROM block_grid_aggregates obs
@@ -2389,7 +2430,8 @@ class RecommendationsRepository:
                               ) <= :window
                             )
                           )
-                        """).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                        """
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
                     {
                         "block_id": block_id,
                         "ref": ref,
@@ -2423,7 +2465,8 @@ class RecommendationsRepository:
         return (
             (
                 await self._tenant.execute(
-                    text(f"""
+                    text(
+                        f"""
                         SELECT DISTINCT ON (obs.cell_id, obs.index_code)
                                obs.cell_id, obs.index_code, obs.time, obs.mean,
                                obs.product_id, obs.valid_pixel_pct
@@ -2444,7 +2487,8 @@ class RecommendationsRepository:
                           AND obs.time <= public.app_now()
                           {window}
                         ORDER BY obs.cell_id, obs.index_code, obs.time DESC
-                        """).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                        """
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
                     (
                         {"block_id": block_id, "lookback_days": LATEST_LOOKBACK_DAYS}
                         if lookback
@@ -2472,7 +2516,8 @@ class RecommendationsRepository:
         rows = (
             (
                 await self._tenant.execute(
-                    text("""
+                    text(
+                        """
                         SELECT index_code, time, mean
                         FROM block_index_aggregates
                         WHERE block_id = :block_id
@@ -2480,7 +2525,8 @@ class RecommendationsRepository:
                           AND time >= public.app_now() - make_interval(days => :window_days)
                           AND time <= public.app_now()
                         ORDER BY index_code, time
-                        """).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                        """
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
                     {"block_id": block_id, "window_days": window_days},
                 )
             )
@@ -2560,14 +2606,16 @@ class RecommendationsRepository:
         which crops the tree runs on."""
         row = (
             await self._tenant.execute(
-                text("""
+                text(
+                    """
                     SELECT id AS block_crop_id, crop_id, growth_stage, crop_path
                     FROM block_crops
                     WHERE block_id = :block_id
                       AND is_current = TRUE
                       AND deleted_at IS NULL
                     LIMIT 1
-                    """).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                    """
+                ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
                 {"block_id": block_id},
             )
         ).first()
@@ -2598,7 +2646,8 @@ class RecommendationsRepository:
             return set()
         rows = (
             await self._public.execute(
-                text("""
+                text(
+                    """
                     SELECT DISTINCT d.code
                     FROM public.crop_attribute_definitions d
                     WHERE d.is_active = TRUE
@@ -2609,7 +2658,8 @@ class RecommendationsRepository:
                              OR starts_with(t.p, d.path || '.')
                              OR starts_with(d.path, t.p || '.')
                       )
-                    """),
+                    """
+                ),
                 {"paths": list(paths)},
             )
         ).all()
@@ -2651,7 +2701,8 @@ class RecommendationsRepository:
         rows = (
             (
                 await self._tenant.execute(
-                    text("""
+                    text(
+                        """
                         SELECT b.id AS block_id,
                                COALESCE(NULLIF(b.name, ''), b.code) AS label,
                                NULLIF(b.name_ar, '') AS label_ar,
@@ -2672,7 +2723,8 @@ class RecommendationsRepository:
                            AND b.active_from <= (public.app_now())::date
                            AND (b.active_to IS NULL OR b.active_to > (public.app_now())::date)
                          ORDER BY b.code
-                        """).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                        """
+                    ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
                     {"farm_id": farm_id},
                 )
             )
@@ -2731,7 +2783,11 @@ class RecommendationsRepository:
         these through ``tree_targets_block`` so the dropdown only offers blocks
         the tree would actually fire on.
         """
-        rows = (await self._tenant.execute(text("""
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        """
                     SELECT b.id          AS block_id,
                            b.name        AS block_name,
                            b.name_ar     AS block_name_ar,
@@ -2754,7 +2810,13 @@ class RecommendationsRepository:
                       AND b.active_from <= (public.app_now())::date
                       AND (b.active_to IS NULL OR b.active_to > (public.app_now())::date)
                     ORDER BY f.name, b.code
-                    """))).mappings().all()
+                    """
+                    )
+                )
+            )
+            .mappings()
+            .all()
+        )
         return [dict(r) for r in rows]
 
     async def get_grid_cell_labels(self, *, block_id: UUID) -> dict[UUID, tuple[int, int]]:
@@ -2770,7 +2832,8 @@ class RecommendationsRepository:
         rows = (
             (
                 await self._tenant.execute(
-                    text("""
+                    text(
+                        """
                         SELECT gc.id, gc.row_idx, gc.col_idx
                         FROM grid_cells gc
                         JOIN grid_configs cfg
@@ -2778,7 +2841,8 @@ class RecommendationsRepository:
                          AND cfg.deleted_at IS NULL
                          AND cfg.superseded_at IS NULL
                         WHERE cfg.block_id = :block_id
-                        """).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                        """
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
                     {"block_id": block_id},
                 )
             )
@@ -2794,11 +2858,13 @@ class RecommendationsRepository:
         ``close_eval_run`` once the work is done."""
         run_id = (
             await self._tenant.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO decision_tree_eval_runs (kind, actor_user_id)
                     VALUES (:kind, :actor)
                     RETURNING id
-                    """),
+                    """
+                ),
                 {"kind": kind, "actor": actor_user_id},
             )
         ).scalar_one()
@@ -2825,7 +2891,8 @@ class RecommendationsRepository:
         mid-run, and the row already knows when it opened.
         """
         await self._tenant.execute(
-            text("""
+            text(
+                """
                 UPDATE decision_tree_eval_runs
                    SET finished_at = public.app_now(),
                        duration_ms =
@@ -2839,7 +2906,8 @@ class RecommendationsRepository:
                        outcome = :outcome,
                        error = :error
                  WHERE id = :run_id
-                """).bindparams(bindparam("run_id", type_=PG_UUID(as_uuid=True))),
+                """
+            ).bindparams(bindparam("run_id", type_=PG_UUID(as_uuid=True))),
             {
                 "run_id": run_id,
                 "blocks": blocks_evaluated,
@@ -2893,7 +2961,8 @@ class RecommendationsRepository:
             for r in rows
         ]
         await self._tenant.execute(
-            text("""
+            text(
+                """
                 INSERT INTO decision_tree_eval_traces (
                     run_id, farm_id, block_id, cell_id,
                     tree_id, tree_code, tree_version, scope, status,
@@ -2911,7 +2980,8 @@ class RecommendationsRepository:
                     CAST(:finding_set AS jsonb), :matched_rule,
                     CAST(:registered_by AS jsonb)
                 )
-                """).bindparams(
+                """
+            ).bindparams(
                 bindparam("run_id", type_=PG_UUID(as_uuid=True)),
                 bindparam("farm_id", type_=PG_UUID(as_uuid=True)),
                 bindparam("block_id", type_=PG_UUID(as_uuid=True)),
@@ -2928,7 +2998,8 @@ class RecommendationsRepository:
         rows = (
             (
                 await self._tenant.execute(
-                    text("""
+                    text(
+                        """
                     SELECT id, kind, actor_user_id, started_at, finished_at,
                            duration_ms, blocks_evaluated, trees_evaluated,
                            trees_skipped, recommendations_opened, alerts_opened,
@@ -2936,7 +3007,8 @@ class RecommendationsRepository:
                     FROM decision_tree_eval_runs
                     ORDER BY started_at DESC, id DESC
                     LIMIT :limit
-                    """),
+                    """
+                    ),
                     {"limit": limit},
                 )
             )
@@ -3011,7 +3083,8 @@ class RecommendationsRepository:
         row = (
             (
                 await self._tenant.execute(
-                    text("""
+                    text(
+                        """
                     SELECT t.*,
                            COALESCE(b.name, b.code) AS block_name,
                            COALESCE(NULLIF(b.name_ar, ''), b.name, b.code)
@@ -3021,7 +3094,8 @@ class RecommendationsRepository:
                     LEFT JOIN blocks b ON b.id = t.block_id
                     LEFT JOIN grid_cells c ON c.id = t.cell_id
                     WHERE t.id = :trace_id
-                    """).bindparams(bindparam("trace_id", type_=PG_UUID(as_uuid=True))),
+                    """
+                    ).bindparams(bindparam("trace_id", type_=PG_UUID(as_uuid=True))),
                     {"trace_id": trace_id},
                 )
             )
@@ -3102,14 +3176,16 @@ class RecommendationsRepository:
         """
         return _rowcount(
             await self._tenant.execute(
-                text("""
+                text(
+                    """
                     UPDATE decision_tree_block_verdicts
                        SET valid_to = CAST(:at AS timestamptz),
                            updated_at = CAST(:at AS timestamptz)
                      WHERE block_id = :block_id
                        AND valid_to IS NULL
                        AND NOT (tree_id = ANY(CAST(:tree_ids AS uuid[])))
-                    """).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                    """
+                ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
                 {"block_id": block_id, "tree_ids": tree_ids, "at": at},
             )
         )
@@ -3126,7 +3202,8 @@ class RecommendationsRepository:
         """
         return _rowcount(
             await self._tenant.execute(
-                text("""
+                text(
+                    """
                     UPDATE decision_tree_block_verdicts
                        SET valid_to = CAST(:at AS timestamptz),
                            updated_at = CAST(:at AS timestamptz)
@@ -3135,7 +3212,8 @@ class RecommendationsRepository:
                        AND cell_id IS NOT NULL
                        AND valid_to IS NULL
                        AND NOT (cell_id = ANY(CAST(:seen AS uuid[])))
-                    """).bindparams(
+                    """
+                ).bindparams(
                     bindparam("block_id", type_=PG_UUID(as_uuid=True)),
                     bindparam("tree_id", type_=PG_UUID(as_uuid=True)),
                 ),
@@ -3152,7 +3230,8 @@ class RecommendationsRepository:
         rows = (
             (
                 await self._tenant.execute(
-                    text("""
+                    text(
+                        """
                         SELECT id, block_id, cell_id, scope, tree_id, tree_code,
                                tree_version, leaf_node_id, kind, status_code,
                                severity, text_en, text_ar, valid_from, valid_to,
@@ -3160,7 +3239,8 @@ class RecommendationsRepository:
                           FROM decision_tree_block_verdicts
                          WHERE block_id = :block_id AND valid_to IS NULL
                          ORDER BY tree_code, cell_id NULLS FIRST
-                        """).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
+                        """
+                    ).bindparams(bindparam("block_id", type_=PG_UUID(as_uuid=True))),
                     {"block_id": block_id},
                 )
             )

@@ -382,12 +382,14 @@ class ActionCenterRepository:
         that lands on a different person each time it is retried is worse than
         one that is merely arbitrary, and the caller is told it defaulted.
         """
-        stmt = text("""
+        stmt = text(
+            """
             SELECT membership_id FROM farm_scopes
             WHERE farm_id = :f AND revoked_at IS NULL
             ORDER BY membership_id
             LIMIT 1
-            """).bindparams(bindparam("f", type_=PG_UUID(as_uuid=True)))
+            """
+        ).bindparams(bindparam("f", type_=PG_UUID(as_uuid=True)))
         return (await self._tenant.execute(stmt, {"f": farm_id})).scalar_one_or_none()
 
     async def link_alert_activity(self, *, alert_id: UUID, activity_id: UUID) -> None:

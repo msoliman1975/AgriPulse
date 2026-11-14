@@ -55,14 +55,16 @@ async def _seed(session: Any) -> dict[str, Any]:
 
     farm_id = (
         await session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO farms (code, name, country_code, boundary, boundary_utm,
                                    centroid, area_m2)
                 VALUES ('F1-FARM', 'F1 farm', 'EG', ST_GeomFromText(:p, 4326),
                         ST_Transform(ST_GeomFromText(:p, 4326), 32636),
                         ST_SetSRID(ST_MakePoint(31.25, 30.05), 4326), 100000)
                 RETURNING id
-                """),
+                """
+            ),
             {"p": _POLY},
         )
     ).scalar_one()
@@ -71,7 +73,8 @@ async def _seed(session: Any) -> dict[str, Any]:
         blocks.append(
             (
                 await session.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO blocks (farm_id, code, boundary, boundary_utm,
                                             centroid, area_m2, aoi_hash)
                         VALUES (:f, :c, ST_GeomFromText(:p, 4326),
@@ -79,7 +82,8 @@ async def _seed(session: Any) -> dict[str, Any]:
                                 ST_SetSRID(ST_MakePoint(31.25, 30.05), 4326),
                                 100000, :c)
                         RETURNING id
-                        """),
+                        """
+                    ),
                     {"f": farm_id, "c": code, "p": _POLY},
                 )
             ).scalar_one()
@@ -130,14 +134,16 @@ async def _plan_activity(
     await _use_tenant(session)
     return (
         await session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO plan_activities (plan_id, farm_id, block_id, activity_type,
                                              scheduled_date, status,
                                              template_activity_id, title)
                 VALUES (:plan, :farm, :block, 'spraying', :on, :status, :tpl,
                         'Spray against hopper')
                 RETURNING id
-                """).bindparams(
+                """
+            ).bindparams(
                 bindparam("plan", type_=PG_UUID(as_uuid=True)),
                 bindparam("farm", type_=PG_UUID(as_uuid=True)),
                 bindparam("block", type_=PG_UUID(as_uuid=True)),
