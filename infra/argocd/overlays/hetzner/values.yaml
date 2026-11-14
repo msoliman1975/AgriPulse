@@ -4243,7 +4243,10 @@ global:
       #     block made every run fail with BlockNotFoundError, so the QA
       #     Medjool tenant never got growth stages.
       #   All migrations are additive and run on PreSync. Workers move with
-      #   the api for #857 and the shared models.
+      #   the api for #857 and the shared models. The frontend stays e842760
+      #   for now (main CI for 751b318 was cancelled by #856 before the
+      #   frontend image was built); its editor has no input fields, and no
+      #   template has inputs yet, so nothing is lost on save.
       #   Watch: migrate PreSync succeeds (public head 0109, tenant head
       #   0104); GET /inputs?crop_path=date_palm.medjool answers 200 with 34
       #   inputs; GET /plan-templates/{id} shows input_id and dose fields;
@@ -5017,19 +5020,7 @@ global:
       #   Watch: open a manual in Platform > Plan templates, save without
       #   changes, and the activities keep their titles.
       #   Rollback: frontend to 5ee27fc together with the api.
-      # 751b318 = #844-#847, frontend, see the api note. New pages: Platform >
-      #   Sources (/platform/sources) and Inputs (/platform/inputs, also
-      #   /settings/inputs for tenants); a Reference values tab in the crop
-      #   catalogue; the plan template editor gains an input picker and dose
-      #   fields on each activity. EN and AR. #852's frontend change (new
-      #   capability names, no screen) rides along.
-      #   Must ship with the api at 751b318: an older api answers 404 on the
-      #   new routes, and an older api drops the input fields on save.
-      #   Watch: the three pages load as platform admin; open a manual in
-      #   Platform > Plan templates, save without changes, and the activities
-      #   keep their titles and doses.
-      #   Rollback: frontend to e842760 together with the api.
-      tag: "751b318"
+      tag: "e842760"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
