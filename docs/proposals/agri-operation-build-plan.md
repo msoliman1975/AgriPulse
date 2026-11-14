@@ -238,13 +238,13 @@ The loop is self-paced. Each iteration:
 |---|---|---|---|---|
 | 0 | Build plan | merged | [#848](https://github.com/msoliman1975/AgriPulse/pull/848) | n/a |
 | 1 | Manual content model | merged | [#848](https://github.com/msoliman1975/AgriPulse/pull/848) | e842760 via [#850](https://github.com/msoliman1975/AgriPulse/pull/850), verified 2026-11-14 |
-| 1b | Arabic manual text | in review | [#863](https://github.com/msoliman1975/AgriPulse/pull/863) | |
+| 1b | Arabic manual text | merged | [#863](https://github.com/msoliman1975/AgriPulse/pull/863) | 7a27d30 via [#865](https://github.com/msoliman1975/AgriPulse/pull/865), verified 2026-11-14 (all 183 activities of the 11 published manuals have Arabic) |
 | 2 | Tenant manual read API + capabilities | merged | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | 2f6c07d via [#854](https://github.com/msoliman1975/AgriPulse/pull/854), verified 2026-11-14 |
 | 3 | Saved plans backend | merged | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | 2f6c07d via [#854](https://github.com/msoliman1975/AgriPulse/pull/854), verified 2026-11-14 |
 | 4 | Manual revisions | merged | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | 2f6c07d via [#854](https://github.com/msoliman1975/AgriPulse/pull/854), verified 2026-11-14 |
 | 5 | Agri Operation page + Catalog tab | merged | [#856](https://github.com/msoliman1975/AgriPulse/pull/856) | 39364b6 via [#859](https://github.com/msoliman1975/AgriPulse/pull/859), verified 2026-11-14 (frontend + Beta designer; farm screens not exercised in prod) |
 | 6 | Plan tab | merged | [#856](https://github.com/msoliman1975/AgriPulse/pull/856) | 39364b6 via [#859](https://github.com/msoliman1975/AgriPulse/pull/859), verified 2026-11-14 (frontend + Beta designer; farm screens not exercised in prod) |
 | 7 | Board integration | merged | [#856](https://github.com/msoliman1975/AgriPulse/pull/856) | 39364b6 via [#859](https://github.com/msoliman1975/AgriPulse/pull/859), verified 2026-11-14 (frontend + Beta designer; farm screens not exercised in prod) |
-| 8 | Platform manual editor | in review (with 1b) | [#863](https://github.com/msoliman1975/AgriPulse/pull/863) | |
-| 9 | Decision-tree dedupe | not started | | |
+| 8 | Platform manual editor | merged | [#863](https://github.com/msoliman1975/AgriPulse/pull/863) | 7a27d30 via [#865](https://github.com/msoliman1975/AgriPulse/pull/865), verified 2026-11-14 (frontend + Beta designer; Operation manuals list and editor opened read-only) |
+| 9 | Decision-tree dedupe | in review | [#867](https://github.com/msoliman1975/AgriPulse/pull/867) | |
 | 10 | Cleanup | not started | | |

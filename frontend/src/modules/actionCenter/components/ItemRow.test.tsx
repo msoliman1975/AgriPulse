@@ -48,8 +48,8 @@ function item(over: Partial<ActionItem> = {}): ActionItem {
     detail_ar: null,
     tree_code: "mango_pest_v1",
     tree_description_en: null,
-  tree_description_ar: null,
-  tree_version: 2,
+    tree_description_ar: null,
+    tree_version: 2,
     confidence: "0.82",
     created_at: "2026-08-12T06:00:00Z",
     valid_until: null,
@@ -636,5 +636,32 @@ describe("ItemRow — the why panel", () => {
     renderExpanded(item({ actions: {}, tree_path: [] }));
     expect(screen.queryByText("Immediate")).not.toBeInTheDocument();
     expect(screen.queryByText("How the tree got here")).not.toBeInTheDocument();
+  });
+});
+
+describe("ItemRow — already planned (F1)", () => {
+  beforeEach(async () => {
+    await setupTestI18n("en");
+  });
+
+  it("marks an item a saved plan covers and opens that activity on the board", () => {
+    renderRow(
+      item({
+        planned_activity_id: "pa-9",
+        planned_date: "2026-08-15",
+        planned_title: "Spray against mango leafhopper",
+      }),
+    );
+    const pill = screen.getByText("Already planned · 2026-08-15");
+    expect(pill.closest("span[title]")).toHaveAttribute("title", "Spray against mango leafhopper");
+    expect(screen.getByRole("link", { name: "Open on board" })).toHaveAttribute(
+      "href",
+      "/board/f1?activity=pa-9&lane=b1",
+    );
+  });
+
+  it("says nothing when no plan covers it", () => {
+    renderRow(item());
+    expect(screen.queryByText(/Already planned/)).not.toBeInTheDocument();
   });
 });

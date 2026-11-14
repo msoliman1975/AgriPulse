@@ -110,6 +110,10 @@ export function ItemRow({
   // Same _ar-or-_en choice the rest of this row makes.
   const treeDescription = (isAr ? item.tree_description_ar : item.tree_description_en) || null;
   const detail = itemDetail(item, isAr);
+  // F1: the saved-plan activity that already covers this item, if any. Open on
+  // board goes to the dispatched activity first, else to the planned one.
+  const plannedTitle = (isAr ? item.planned_title_ar : null) || item.planned_title || null;
+  const boardActivity = item.activity_id ?? item.planned_activity_id ?? null;
   const {
     is_group: isGroup,
     member_count: memberCount,
@@ -154,6 +158,17 @@ export function ItemRow({
           </Pill>
           <span className="text-card-title font-semibold">{itemTitle(item, isAr)}</span>
           <Pill kind={SEV_PILL[item.severity] ?? "neutral"}>{t(`severity.${item.severity}`)}</Pill>
+          {/* F1: a saved plan already has this work on the board, so the row
+              is not new work. The planned activity's title says which. */}
+          {item.planned_activity_id ? (
+            <span title={plannedTitle ?? undefined}>
+              <Pill kind="info">
+                {item.planned_date
+                  ? t("row.alreadyPlannedOn", { date: item.planned_date })
+                  : t("row.alreadyPlanned")}
+              </Pill>
+            </span>
+          ) : null}
           {/* What makes this row different from a single finding: it stands for
               N cells that all hit the same leaf at the same severity. Shown
               next to the severity because the two are read together. */}
@@ -348,9 +363,9 @@ export function ItemRow({
             size="sm"
             variant="ghost"
             to={
-              item.activity_id === null
-                ? `/board/${item.farm_id}?lane=${item.block_id}`
-                : `/board/${item.farm_id}?activity=${item.activity_id}&lane=${item.block_id}`
+              boardActivity
+                ? `/board/${item.farm_id}?activity=${boardActivity}&lane=${item.block_id}`
+                : `/board/${item.farm_id}?lane=${item.block_id}`
             }
           >
             {t("actions.openOnBoard")}

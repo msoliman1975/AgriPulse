@@ -342,6 +342,13 @@ def to_item(row: dict[str, Any], *, now: datetime) -> ActionItem:
         assigned_membership_id=row.get("assigned_membership_id"),
         activity_id=row.get("activity_id"),
         scheduled_date=row.get("scheduled_date"),
+        # Only while the activity still exists (the join drops a deleted one).
+        planned_activity_id=(
+            row.get("planned_activity_id") if row.get("planned_date") is not None else None
+        ),
+        planned_date=row.get("planned_date"),
+        planned_title=row.get("planned_title"),
+        planned_title_ar=row.get("planned_title_ar"),
         acknowledged_at=row.get("acknowledged_at"),
         resolved_at=row.get("resolved_at"),
         applied_at=row.get("applied_at"),

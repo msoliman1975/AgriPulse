@@ -234,6 +234,15 @@ class ActionItem(BaseModel):
     activity_id: UUID | None = None
     scheduled_date: date | None = None
 
+    # F1 (Agri Operation): a recommendation a saved plan already covers. Set
+    # when the planned activity (same block, its manual activity names this
+    # tree, within 14 days) existed as the recommendation opened. The queue
+    # shows it as "Already planned" rather than as new work.
+    planned_activity_id: UUID | None = None
+    planned_date: date | None = None
+    planned_title: str | None = None
+    planned_title_ar: str | None = None
+
     # When each lifecycle step happened, in the item's own vocabulary. An alert
     # fills the first two, a recommendation the second two, and each kind
     # leaves the other pair NULL — one shared "closed_at" would report an

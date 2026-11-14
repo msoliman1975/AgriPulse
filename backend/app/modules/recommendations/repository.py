@@ -1736,7 +1736,7 @@ class RecommendationsRepository:
                         created_by, updated_by,
                         group_key, group_parent_id, is_group,
                         first_seen_at, last_seen_at, last_seen_day,
-                        finding_set
+                        finding_set, plan_activity_id
                     ) VALUES (
                         :id, :block_id, :cell_id, :farm_id, :tree_id, :tree_code,
                         :tree_version,
@@ -1748,7 +1748,26 @@ class RecommendationsRepository:
                         :actor, :actor,
                         :group_key, :group_parent_id, :is_group,
                         public.app_now(), public.app_now(), CAST(:today AS date),
-                        CAST(:finding_set AS jsonb)
+                        CAST(:finding_set AS jsonb),
+                        -- F1 (Agri Operation): the live planned activity that
+                        -- already covers this tree on this block, copied from
+                        -- a manual activity whose source_tree_code is the
+                        -- tree's code, still scheduled or in progress, within
+                        -- 14 days of today; the nearest date wins.
+                        (SELECT pa.id
+                           FROM plan_activities pa
+                           JOIN public.plan_template_activities pta
+                             ON pta.id = pa.template_activity_id
+                          WHERE pa.block_id = :block_id
+                            AND pa.deleted_at IS NULL
+                            AND pa.status IN ('scheduled', 'in_progress')
+                            AND pta.source_tree_code = :tree_code
+                            AND abs(pa.scheduled_date
+                                    - COALESCE(CAST(:today AS date), CURRENT_DATE)) <= 14
+                          ORDER BY abs(pa.scheduled_date
+                                       - COALESCE(CAST(:today AS date), CURRENT_DATE)),
+                                   pa.id
+                          LIMIT 1)
                     )
                     """
                 ).bindparams(
