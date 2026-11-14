@@ -23,6 +23,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { StatusBanner } from "@/components/StatusBanner";
 import { mapAsyncState, queryState, resolveErrorMessage } from "@/components/asyncState";
+import { needsArabic } from "@/lib/arabicRequired";
 import { localizedField } from "@/lib/localizedField";
 import { useCapability } from "@/rbac/useCapability";
 import { useBetaTrees, useCreateBetaTree } from "@/queries/decisionTreesBeta";
@@ -68,8 +69,15 @@ export function BetaTreeListPage(): ReactNode {
         : taken.has(trimmedCode)
           ? t("list.create.duplicate")
           : null;
+  // D26: a platform tree is created with its Arabic name. A tenant's own
+  // trees may stay English.
+  const nameArMissing = scope === "platform" && needsArabic(nameEn, nameAr);
   const cannotCreate =
-    trimmedCode === "" || nameEn.trim() === "" || Boolean(codeError) || create.isPending;
+    trimmedCode === "" ||
+    nameEn.trim() === "" ||
+    nameArMissing ||
+    Boolean(codeError) ||
+    create.isPending;
 
   /**
    * A new tree starts from the starter body, not from an empty one.
@@ -249,7 +257,11 @@ export function BetaTreeListPage(): ReactNode {
                   />
                 )}
               </Field>
-              <Field label={t("list.create.nameAr")}>
+              <Field
+                label={t("list.create.nameAr")}
+                required={scope === "platform"}
+                error={nameArMissing ? t("common:errors.arabicRequired") : undefined}
+              >
                 {(props) => (
                   <input
                     {...props}

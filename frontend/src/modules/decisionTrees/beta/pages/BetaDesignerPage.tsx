@@ -531,6 +531,8 @@ export function BetaDesignerPage(): ReactNode {
                       onChangeKind={onChangeKind}
                       onDeclareCode={onDeclareCode}
                       onDelete={doc?.root === selectedNodeId ? undefined : onDeleteNode}
+                      requireArabic={scope === "platform"}
+                      savedNode={latest?.definition?.nodes?.[selectedNodeId] ?? null}
                     />
                   ) : null}
                 </div>
@@ -557,6 +559,7 @@ export function BetaDesignerPage(): ReactNode {
                 rules={rules}
                 readOnly={readOnly}
                 onChangeRules={onChangeRules}
+                requireArabic={scope === "platform"}
               />
             ) : null}
 

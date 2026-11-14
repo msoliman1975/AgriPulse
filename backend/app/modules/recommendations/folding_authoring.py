@@ -31,6 +31,7 @@ Design: docs/proposals/unified-decision-tree-engine.md sections 4, 5, 6.5, 9.
 
 from __future__ import annotations
 
+import json
 from collections import Counter
 from dataclasses import replace
 from datetime import datetime
@@ -42,6 +43,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import get_logger
 from app.modules.audit import get_audit_service
 from app.modules.recommendations.findings import FindingDef, resolve_findings
+from app.modules.recommendations.folding_arabic import check_tree_arabic
 from app.modules.recommendations.folding_compiler import (
     CompileError,
     FoldingCompileError,
@@ -277,6 +279,20 @@ class FoldingTreeAuthorService:
         codes = await self.known_codes(tenant_schema=tenant_schema)
         return compile_folding_tree(definition, known_codes=codes)
 
+    def _require_arabic(self, definition: dict[str, Any], previous: dict[str, Any] | None) -> None:
+        """D26: a platform tree carries Arabic beside every English text.
+
+        Platform scope only (``tenant_id is None``); a tenant's own trees may
+        stay English. Only text that is new or changed against ``previous``
+        is checked, so an untouched legacy tree resaves. Raised as a compile
+        error so the designer lists each one beside its node.
+        """
+        if self._tenant_id is not None:
+            return
+        errors = check_tree_arabic(definition, previous)
+        if errors:
+            raise FoldingCompileError(errors)
+
     async def create_tree(
         self,
         *,
@@ -303,6 +319,7 @@ class FoldingTreeAuthorService:
             raise BetaTreeCodeExistsError(code)
 
         compiled = await self._compile(definition, tenant_schema=tenant_schema)
+        self._require_arabic(definition, None)
         if compiled.get("code") != code:
             raise FoldingCompileError(
                 [
@@ -391,6 +408,11 @@ class FoldingTreeAuthorService:
         latest = await self._repo.get_latest_version(tree_id=tree_id)
         if latest is not None and latest["compiled_hash"] == compiled_hash:
             return await self.get_tree(tree_id)
+        previous = _previous_body(latest)
+        if latest is None or previous is not None:
+            # A version with no readable body cannot say what changed, so it
+            # is not held to the rule rather than having every text judged new.
+            self._require_arabic(definition, previous)
 
         next_version = (latest["version"] if latest is not None else 0) + 1
         version_id = await self._repo.insert_version(
@@ -1157,6 +1179,27 @@ def _serialize_walk_path(walk: Any) -> list[dict[str, Any]]:
         }
         for step in walk.path
     ]
+
+
+def _previous_body(latest: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The body a new draft is compared against for the D26 Arabic check.
+
+    The stored definition, falling back to the compiled body (which keeps the
+    same names, nodes, combinations and parameters) for a row without one.
+    ``None`` when there is no version or it holds neither.
+    """
+    if latest is None:
+        return None
+    for key in ("definition", "tree_compiled"):
+        body = latest.get(key)
+        if isinstance(body, str):
+            try:
+                body = json.loads(body)
+            except ValueError:
+                body = None
+        if isinstance(body, dict):
+            return body
+    return None
 
 
 def get_folding_tree_author_service(

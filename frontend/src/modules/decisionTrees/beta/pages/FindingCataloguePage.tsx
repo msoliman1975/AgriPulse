@@ -29,6 +29,7 @@ import { StatusBanner } from "@/components/StatusBanner";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { Tooltip } from "@/components/Tooltip";
 import { queryState, resolveErrorMessage } from "@/components/asyncState";
+import { needsArabic } from "@/lib/arabicRequired";
 import { localizedField } from "@/lib/localizedField";
 import { useCapability } from "@/rbac/useCapability";
 import {
@@ -359,6 +360,19 @@ function FindingForm({
   const clauseArError = useMemo(() => clauseError(clauseAr, t), [clauseAr, t]);
   const nameEnError = useMemo(() => nameError(nameEn, t), [nameEn, t]);
   const nameArError = useMemo(() => nameError(nameAr, t), [nameAr, t]);
+  // D26: a platform finding's description is saved in both languages. The
+  // server's rule: new or changed English needs Arabic; a seeded row whose
+  // English description is left alone may stay English-only. A tenant's own
+  // codes may stay English.
+  const descriptionArError =
+    source === "platform" &&
+    needsArabic(
+      descriptionEn,
+      descriptionAr,
+      existing ? { en: existing.description_en, ar: existing.description_ar } : null,
+    )
+      ? t("common:errors.arabicRequired")
+      : null;
 
   const invalid =
     Boolean(codeError) ||
@@ -366,6 +380,7 @@ function FindingForm({
     Boolean(clauseArError) ||
     Boolean(nameEnError) ||
     Boolean(nameArError) ||
+    Boolean(descriptionArError) ||
     saving;
 
   return (
@@ -468,7 +483,11 @@ function FindingForm({
               />
             )}
           </Field>
-          <Field label={t("catalogue.form.descriptionAr")}>
+          <Field
+            label={t("catalogue.form.descriptionAr")}
+            error={descriptionArError}
+            required={source === "platform" && descriptionEn.trim() !== ""}
+          >
             {(props) => (
               <textarea
                 {...props}

@@ -70,6 +70,7 @@ from app.modules.signals.schemas import (
     _coerce_aggregation_for_value_kind,
 )
 from app.shared import clock
+from app.shared.arabic_required import ArabicRequiredError, is_blank, missing_arabic
 from app.shared.db.ids import uuid7
 from app.shared.storage.client import (
     PresignedUpload,
@@ -95,6 +96,55 @@ def _assert_categorical_ar_matches(values: list[str] | None, values_ar: list[str
                 "categorical_values, in the same order."
             )
         )
+
+
+# D26: the English/Arabic pairs a platform signal or template must fill.
+_DEFINITION_TEXT_PAIRS: tuple[tuple[str, str], ...] = (
+    ("name", "name_ar"),
+    ("description", "description_ar"),
+    ("unit", "unit_ar"),
+)
+_TEMPLATE_TEXT_PAIRS: tuple[tuple[str, str], ...] = (
+    ("name", "name_ar"),
+    ("description", "description_ar"),
+)
+
+
+def _require_platform_arabic(
+    tenant_schema: str | None,
+    after: dict[str, Any],
+    pairs: tuple[tuple[str, str], ...],
+    *,
+    before: dict[str, Any] | None = None,
+) -> None:
+    """D26: a platform signal or template is saved with Arabic beside English.
+
+    Platform writes are the ones with no tenant schema (the
+    ``/platform/signals/...`` routes run on the admin session, see the router).
+    A tenant's own custom signals stay optional: a tenant may run English only.
+    The rule refuses only text this save makes new or changes, so an existing
+    English-only row resaved untouched still saves.
+    """
+    if tenant_schema is not None:
+        return
+    missing = missing_arabic(after, pairs, before=before)
+    values = after.get("categorical_values")
+    if values and (before is None or values != before.get("categorical_values")):
+        values_ar = after.get("categorical_values_ar")
+        if (
+            not isinstance(values_ar, list)
+            or len(values_ar) != len(values)
+            or any(is_blank(v) for v in values_ar)
+        ):
+            missing.append(("categorical_values", "categorical_values_ar"))
+    elif (
+        before is not None
+        and before.get("categorical_values_ar")
+        and not after.get("categorical_values_ar")
+    ):
+        missing.append(("categorical_values", "categorical_values_ar"))
+    if missing:
+        raise ArabicRequiredError(missing)
 
 
 def _normalize_crop_paths(paths: list[str] | None) -> list[str]:
@@ -377,6 +427,20 @@ class SignalsServiceImpl:
         if value_min is not None and value_max is not None and value_min > value_max:
             raise InvalidSignalValueError(detail="value_min must be ≤ value_max.")
         _assert_categorical_ar_matches(categorical_values, categorical_values_ar)
+        _require_platform_arabic(
+            tenant_schema,
+            {
+                "name": name,
+                "name_ar": name_ar,
+                "description": description,
+                "description_ar": description_ar,
+                "unit": unit,
+                "unit_ar": unit_ar,
+                "categorical_values": categorical_values,
+                "categorical_values_ar": categorical_values_ar,
+            },
+            _DEFINITION_TEXT_PAIRS,
+        )
         # CS-1 D3 — non-numeric value_kinds always use `latest`. The
         # schema-layer coercion runs here (not in the Pydantic model)
         # because the relevant value_kind comes from the request body
@@ -442,6 +506,12 @@ class SignalsServiceImpl:
                 updates.get("categorical_values", existing["categorical_values"]),
                 updates["categorical_values_ar"],
             )
+        _require_platform_arabic(
+            tenant_schema,
+            {**existing, **updates},
+            _DEFINITION_TEXT_PAIRS,
+            before=existing,
+        )
         if "crop_paths" in updates:
             updates["crop_paths"] = _normalize_crop_paths(updates["crop_paths"])
         # CS-1 D3 — if the caller is changing aggregation, coerce
@@ -908,6 +978,16 @@ class SignalsServiceImpl:
         tenant_schema: str | None,
     ) -> tuple[dict[str, Any], tuple[dict[str, Any], ...]]:
         self._validate_template_members(members)
+        _require_platform_arabic(
+            tenant_schema,
+            {
+                "name": name,
+                "name_ar": name_ar,
+                "description": description,
+                "description_ar": description_ar,
+            },
+            _TEMPLATE_TEXT_PAIRS,
+        )
         await self._assert_all_definitions_exist(members)
 
         template_id = uuid7()
@@ -947,6 +1027,9 @@ class SignalsServiceImpl:
         existing = await self._repo.get_template(template_id=template_id)
         if existing is None:
             raise SignalTemplateNotFoundError(template_id)
+        _require_platform_arabic(
+            tenant_schema, {**existing, **updates}, _TEMPLATE_TEXT_PAIRS, before=existing
+        )
 
         repo_members: tuple[tuple[UUID, int, bool], ...] | None = None
         if members is not None:

@@ -38,7 +38,8 @@ import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Pill, type PillKind } from "@/components/Pill";
 import { StatusBanner } from "@/components/StatusBanner";
-import { queryState } from "@/components/asyncState";
+import { queryState, resolveErrorMessage } from "@/components/asyncState";
+import { needsArabic } from "@/lib/arabicRequired";
 import { useCapability } from "@/rbac/useCapability";
 import { SourcesMarker } from "@/modules/sources/SourcesMarker";
 
@@ -322,6 +323,12 @@ function InputForm({
   const [notes, setNotes] = useState(input?.notes ?? "");
   const [active, setActive] = useState(input?.is_active ?? true);
   const [doses, setDoses] = useState<InputDose[]>(input?.doses ?? []);
+  // D26: a platform input carries an Arabic name. A tenant's own inputs may
+  // stay English, and so may a seeded platform input whose English name is
+  // left as it was (the server's rule).
+  const nameArMissing =
+    scope === "platform" &&
+    needsArabic(nameEn, nameAr, input ? { en: input.name_en, ar: input.name_ar } : null);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -388,7 +395,11 @@ function InputForm({
             />
           )}
         </Field>
-        <Field label={t("nameAr")}>
+        <Field
+          label={t("nameAr")}
+          required={scope === "platform"}
+          error={nameArMissing ? t("common:errors.arabicRequired") : undefined}
+        >
           {(p) => (
             <input
               {...p}
@@ -569,13 +580,13 @@ function InputForm({
         ) : null}
         {save.isError ? (
           <StatusBanner kind="crit" className="sm:col-span-2">
-            {t("saveFailed")}
+            {resolveErrorMessage(save.error, t("saveFailed"))}
           </StatusBanner>
         ) : null}
         <div className="flex gap-2 sm:col-span-2">
           <Button
             type="submit"
-            disabled={save.isPending || !nameEn.trim() || (!input && !code.trim())}
+            disabled={save.isPending || !nameEn.trim() || nameArMissing || (!input && !code.trim())}
           >
             {t("save")}
           </Button>

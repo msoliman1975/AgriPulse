@@ -53,6 +53,22 @@ class AllocatedActivity:
     dose_value: Any = None
     dose_value_max: Any = None
     dose_unit: str | None = None
+    # D26: the Arabic notes travel with the English ones (tenant 0108).
+    notes_ar: str | None = None
+
+
+def _edited_notes_ar(edits: dict[str, Any], manual_notes_ar: str | None) -> str | None:
+    """The Arabic notes for an allocated activity.
+
+    The farm's own Arabic when it wrote one. When it rewrote only the English
+    notes, the manual's Arabic no longer says the same thing, so it is dropped
+    and the reader falls back to the farm's English.
+    """
+    if "notes_ar" in edits:
+        return edits.get("notes_ar")
+    if "notes" in edits:
+        return None
+    return manual_notes_ar
 
 
 def custom_key(custom: dict[str, Any]) -> str:
@@ -137,6 +153,7 @@ def resolve_allocation(
                 product_name=edits.get("product_name", r.product_name),
                 dosage=edits.get("dosage", r.dosage),
                 notes=edits.get("notes", r.notes),
+                notes_ar=_edited_notes_ar(edits, r.notes_ar),
                 start_time=r.start_time,
                 date_overridden=bool(override),
                 default_date=r.scheduled_date,

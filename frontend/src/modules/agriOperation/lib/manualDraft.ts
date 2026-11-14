@@ -6,10 +6,12 @@
 
 import type {
   ActivityInput,
+  ManualActivityContent,
   PlanActivityType,
   PlanTemplateDetail,
   PlanTemplateWriteRequest,
 } from "@/api/planTemplates";
+import { needsArabic } from "@/lib/arabicRequired";
 
 export interface MilestoneDraft {
   key: string;
@@ -177,6 +179,37 @@ export function toWriteRequest(d: ManualDraft): PlanTemplateWriteRequest {
       sort_order: i,
     })),
   };
+}
+
+/** The English/Arabic pairs on a manual activity (D26). */
+export const ACTIVITY_ARABIC_PAIRS = [
+  ["title", "title_ar"],
+  ["notes", "notes_ar"],
+  ["product_name", "product_name_ar"],
+  ["dosage", "dosage_ar"],
+] as const;
+
+export type ActivityArabicField = (typeof ACTIVITY_ARABIC_PAIRS)[number][1];
+
+type ActivityTexts = ManualActivityContent & {
+  product_name?: string | null;
+  dosage?: string | null;
+  notes?: string | null;
+};
+
+/**
+ * The Arabic fields this activity is missing (D26), judged as the server
+ * judges it: English that is new or changed against `saved` (the stored
+ * activity with the same code; null for a new one) needs Arabic, and a seeded
+ * activity whose English is left alone may stay English-only.
+ */
+export function activityArabicMissing(
+  a: ActivityTexts,
+  saved: ActivityTexts | null,
+): ActivityArabicField[] {
+  return ACTIVITY_ARABIC_PAIRS.filter(([en, ar]) =>
+    needsArabic(a[en], a[ar], saved ? { en: saved[en], ar: saved[ar] } : null),
+  ).map(([, ar]) => ar);
 }
 
 /** What blocks a save, as i18n keys in the planTemplates namespace. */

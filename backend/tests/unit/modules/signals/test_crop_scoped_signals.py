@@ -110,6 +110,7 @@ class TestServiceKeepsWindowForLatest:
         await _impl(repo).create_definition(
             code="rpw_frass",
             name="RPW frass",
+            name_ar="نشارة سوسة النخيل",
             description=None,
             value_kind="boolean",
             unit=None,

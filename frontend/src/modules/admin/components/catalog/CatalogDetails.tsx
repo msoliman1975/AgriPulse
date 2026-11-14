@@ -18,6 +18,7 @@ import type { IndexCode } from "@/api/indices";
 import type { ClassificationDepth, Crop, CropVariety, CropVarietyStrain } from "@/api/crops";
 import { Button } from "@/components/Button";
 import { Field, FIELD_CONTROL_CLASS } from "@/components/Field";
+import { needsArabic } from "@/lib/arabicRequired";
 import { apiMsg } from "@/modules/admin/lib/apiMsg";
 import { useUpdateCrop, useUpdateStrain, useUpdateVariety } from "@/queries/cropCatalog";
 
@@ -136,7 +137,7 @@ export function CropDetailsForm({
             />
           )}
         </Field>
-        <Field label={t("crops.form.nameAr")}>
+        <Field label={t("crops.form.nameAr")} required>
           {(props) => (
             <input
               {...props}
@@ -344,11 +345,17 @@ export function NodeDetailsForm({
   const [nameEn, setNameEn] = useState(node.name_en);
   const [nameAr, setNameAr] = useState(node.name_ar ?? "");
   const [saved, setSaved] = useState(false);
+  const [tried, setTried] = useState(false);
 
   const mutation = level === "variety" ? updateVariety : updateStrain;
+  // D26: renaming needs the Arabic name too. A seeded node without one still
+  // saves while its English name is left as it was (the server's rule).
+  const arabicMissing = needsArabic(nameEn, nameAr, { en: node.name_en, ar: node.name_ar });
 
   const submit = (): void => {
     setSaved(false);
+    setTried(true);
+    if (arabicMissing) return;
     const patch = { name_en: nameEn.trim(), name_ar: nameAr.trim() || null };
     const opts = { onSuccess: () => setSaved(true) };
     if (level === "variety") updateVariety.mutate({ varietyId: node.id, patch }, opts);
@@ -378,7 +385,11 @@ export function NodeDetailsForm({
             />
           )}
         </Field>
-        <Field label={t("crops.form.nameAr")}>
+        <Field
+          label={t("crops.form.nameAr")}
+          required
+          error={tried && arabicMissing ? t("common:errors.arabicRequired") : undefined}
+        >
           {(props) => (
             <input
               {...props}
