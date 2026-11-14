@@ -147,6 +147,7 @@ ignore = [
 # Modules below use sqlalchemy `text()` with statically-composed SQL
 # (CTEs, optional WHERE clauses) and bound params for all user input.
 # S608 flags the f-string/concat pattern conservatively; suppressed per file.
+"app/modules/crop_documents/repository.py" = ["S608"]
 "app/modules/iam/users_service.py" = ["S608"]
 "app/modules/integrations_health/providers_service.py" = ["S608"]
 "app/modules/integrations_health/service.py" = ["S608"]
@@ -389,6 +390,7 @@ source_modules = [
   "app.modules.observer",
   "app.modules.action_center",
   "app.modules.billing",
+  "app.modules.crop_documents",
 ]
 forbidden_modules = [
   "app.modules.farms.repository",

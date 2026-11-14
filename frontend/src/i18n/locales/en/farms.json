@@ -368,5 +368,29 @@
       "derived": "automatic",
       "imported": "imported"
     }
+  },
+  "cropDocuments": {
+    "heading": "Documents",
+    "loading": "Loading documents…",
+    "loadFailed": "Could not load documents.",
+    "empty": "No documents for this block's crop yet.",
+    "noCrop": "Assign a crop to see its documents.",
+    "edition": "Edition {{edition}}",
+    "appliesTo": "For {{path}}",
+    "view": "View",
+    "download": "Download",
+    "linkFailed": "Could not open the document. Try again.",
+    "kind": {
+      "manual": "Manual",
+      "guide": "Guide",
+      "standard": "Standard",
+      "report": "Report",
+      "other": "Other"
+    },
+    "language": {
+      "en": "English",
+      "ar": "Arabic",
+      "other": "Other language"
+    }
   }
 }

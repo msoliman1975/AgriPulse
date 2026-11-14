@@ -154,6 +154,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     from app.modules.backfill.router import router as backfill_router
     from app.modules.billing.public_router import router as public_trial_router
     from app.modules.billing.trials_router import router as platform_trials_router
+    from app.modules.crop_documents.router import router as crop_documents_router
     from app.modules.farms.blocks_summary_router import router as farms_blocks_summary_router
     from app.modules.farms.config_router import router as farms_config_router
     from app.modules.farms.router import router as farms_router
@@ -266,6 +267,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     app.include_router(platform_defaults_router)
     app.include_router(sources_router)
     app.include_router(reference_values_router)
+    app.include_router(crop_documents_router)
     app.include_router(inputs_router)
     app.include_router(health_definitions_router)
     app.include_router(platform_admins_router)

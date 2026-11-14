@@ -25,6 +25,7 @@ import { useCapability } from "@/rbac/useCapability";
 import { AreaDisplay } from "../components/AreaDisplay";
 import { ArchiveButton } from "../components/ArchiveButton";
 import { AttachmentsTab } from "../components/AttachmentsTab";
+import { CropDocumentsCard } from "../components/CropDocumentsCard";
 import { CropPicker } from "../components/CropPicker";
 import { MapPreview } from "../components/MapPreview";
 
@@ -38,6 +39,7 @@ export function BlockDetailPage(): JSX.Element {
   const canReadImagery = useCapability("imagery.read", { farmId });
   const canReadIndex = useCapability("index.read", { farmId });
   const canReadWeather = useCapability("weather.read", { farmId });
+  const canReadDocuments = useCapability("crop_document.download", { farmId });
 
   const [block, setBlock] = useState<BlockDetail | null>(null);
   const [farmNames, setFarmNames] = useState<{ name: string; name_ar: string | null } | null>(null);
@@ -284,6 +286,8 @@ export function BlockDetailPage(): JSX.Element {
           </ul>
         )}
       </Card>
+
+      {canReadDocuments ? <CropDocumentsCard blockId={block.id} /> : null}
 
       <AttachmentsTab ownerKind="block" ownerId={block.id} farmId={farmId} />
 
