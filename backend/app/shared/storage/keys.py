@@ -21,14 +21,7 @@ _SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 _MAX_FILENAME_LEN = 80
 
 
-def build_attachment_key(
-    *,
-    tenant_id: UUID,
-    owner_kind: OwnerKind,
-    owner_id: UUID,
-    attachment_id: UUID,
-    original_filename: str,
-) -> str:
+def _safe_filename(original_filename: str) -> str:
     safe = _SAFE_FILENAME_RE.sub("_", original_filename).strip("._-") or "file"
     if len(safe) > _MAX_FILENAME_LEN:
         # Preserve extension when truncating.
@@ -37,4 +30,25 @@ def build_attachment_key(
             safe = f"{stem[: _MAX_FILENAME_LEN - len(ext) - 1]}.{ext}"
         else:
             safe = safe[:_MAX_FILENAME_LEN]
+    return safe
+
+
+def build_crop_document_key(*, document_id: UUID, original_filename: str) -> str:
+    """Key for a platform crop document (decision D29).
+
+    Crop documents belong to no tenant, so they sit under ``platform/`` and
+    never under a ``tenants/<uuid>`` prefix that a tenant purge would sweep.
+    """
+    return f"platform/crop-documents/{document_id}/{_safe_filename(original_filename)}"
+
+
+def build_attachment_key(
+    *,
+    tenant_id: UUID,
+    owner_kind: OwnerKind,
+    owner_id: UUID,
+    attachment_id: UUID,
+    original_filename: str,
+) -> str:
+    safe = _safe_filename(original_filename)
     return f"tenants/{tenant_id}/{owner_kind}/{owner_id}/attachments/{attachment_id}/{safe}"

@@ -375,6 +375,12 @@ capabilities:
     scope: farm
     status: active
 
+  # --- Crop documents (D29) ----------------------------------------------
+  crop_document.download:
+    description: View and download the crop documents (manuals, guides) a block's crop inherits.
+    scope: farm
+    status: active
+
   # --- Resources (workers + equipment catalog) -------------------------
   resource.read:
     description: View workers and equipment on a farm.

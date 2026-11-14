@@ -67,7 +67,7 @@ class Crop(Base, TimestampedMixin):
     default_growing_season_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     gdd_base_temp_c: Mapped[Decimal | None] = mapped_column(Numeric(4, 1), nullable=True)
     gdd_upper_temp_c: Mapped[Decimal | None] = mapped_column(Numeric(4, 1), nullable=True)
-    # Heat units (D17, public 0112): how this crop counts GDD and from when.
+    # Heat units (D17, public 0113): how this crop counts GDD and from when.
     # Inherited by varieties and strains, deepest non-null wins; see
     # ``app.modules.farms.heat_units``. CHECKs pin the vocabularies.
     gdd_method: Mapped[str | None] = mapped_column(Text, nullable=True)

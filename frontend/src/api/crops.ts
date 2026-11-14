@@ -4,7 +4,7 @@ import { apiClient } from "./client";
 export type ClassificationDepth = "crop_only" | "variety" | "variety_strain";
 
 // Heat units (decision D17). Mirrors GDD_METHODS / GDD_START_KINDS in
-// backend/app/modules/farms/heat_units.py and the CHECKs in public 0112.
+// backend/app/modules/farms/heat_units.py and the CHECKs in public 0113.
 export const GDD_METHODS = ["mean", "max", "min_max_cutoff"] as const;
 export type GddMethod = (typeof GDD_METHODS)[number];
 export const GDD_START_KINDS = ["date", "planting", "stage"] as const;

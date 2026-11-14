@@ -294,16 +294,16 @@ def test_service_merges_a_partial_patch_with_the_row() -> None:
     _validate_gdd_start({"gdd_method": "mean"}, existing=row)
 
 
-# ---- the Medjool seed (public 0112) --------------------------------------------
+# ---- the Medjool seed (public 0113) --------------------------------------------
 
 
 def test_medjool_counts_by_the_mean_from_a_stage_its_calendar_has() -> None:
-    seed = _load("0112_crop_heat_units")
+    seed = _load("0113_crop_heat_units")
     catalogue = _load("0097_medjool_organic_catalogue")
     codes = {s["code"] for s in catalogue.MEDJOOL_STAGES["stages"]}
     assert "pollination" in codes
-    assert seed.revision == "0112"
-    assert seed.down_revision == "0111"
+    assert seed.revision == "0113"
+    assert seed.down_revision == "0112"
     validate_start("stage", "pollination")
 
 

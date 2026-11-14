@@ -1,7 +1,7 @@
 """Heat units configured per crop (D17).
 
 The crop catalogue sets a GDD base and optional upper temperature on the crop
-(``gdd_base_temp_c`` / ``gdd_upper_temp_c``), and, from public 0112, how heat
+(``gdd_base_temp_c`` / ``gdd_upper_temp_c``), and, from public 0113, how heat
 is counted (``gdd_method``) and from when (``gdd_start_kind`` /
 ``gdd_start_value``) on the crop, variety and strain. A tree reads the result
 as ``{source: heat_units, key: total | today | days_since_start}``.
@@ -70,7 +70,7 @@ class HeatUnitConfig:
 def validate_start(kind: str | None, value: str | None) -> None:
     """Raise ``ValueError`` unless ``(kind, value)`` is a valid start.
 
-    Mirrors the ``ck_*_gdd_start`` CHECKs in public 0112, so the catalogue
+    Mirrors the ``ck_*_gdd_start`` CHECKs in public 0113, so the catalogue
     editor gets a 422 naming the problem instead of an IntegrityError.
     """
     if kind is None:

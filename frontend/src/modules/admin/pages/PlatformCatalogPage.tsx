@@ -38,6 +38,7 @@ import { Toolbar } from "@/components/Toolbar";
 import { queryState } from "@/components/asyncState";
 import { AttributesPanel } from "@/modules/admin/components/catalog/CatalogAttributes";
 import { CreateCropForm, CreateNodeForm } from "@/modules/admin/components/catalog/CatalogCreate";
+import { DocumentsPanel } from "@/modules/admin/components/catalog/CatalogDocuments";
 import { HealthPanel } from "@/modules/admin/components/catalog/CatalogHealth";
 import { ReferenceValuesPanel } from "@/modules/admin/components/catalog/CatalogReferenceValues";
 import { SignalsPanel } from "@/modules/admin/components/catalog/CatalogSignals";
@@ -68,6 +69,7 @@ const TABS = [
   "sizes",
   "attributes",
   "reference",
+  "documents",
   "health",
   "signals",
 ] as const;
@@ -320,6 +322,7 @@ function Inspector({
         {tab === "reference" ? (
           <ReferenceValuesPanel cropPath={path} canManage={canManage} />
         ) : null}
+        {tab === "documents" ? <DocumentsPanel cropPath={path} canManage={canManage} /> : null}
         {tab === "health" ? <HealthPanel cropPath={path} canManage={canManage} /> : null}
         {tab === "signals" ? <SignalsPanel cropPath={path} canManage={canManageSignals} /> : null}
       </div>

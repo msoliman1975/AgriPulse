@@ -105,7 +105,7 @@ class CountryUpdateRequest(BaseModel):
 
 # ---------- Crops -----------------------------------------------------------
 
-# Heat units (D17, public 0112). Mirrors the CHECKs; the pair rule (a value
+# Heat units (D17, public 0113). Mirrors the CHECKs; the pair rule (a value
 # only with a kind, MM-DD for 'date', a stage code for 'stage') is checked in
 # the service against the merged row, since a PATCH may send one of the two.
 GddMethod = Literal["mean", "max", "min_max_cutoff"]

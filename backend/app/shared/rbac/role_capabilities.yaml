@@ -118,6 +118,7 @@ roles:
       - plan.manage
       - plan_template.apply
       - plan_allocation.manage
+      - crop_document.download
       - plan_activity.complete
       - resource.read
       - resource.manage
@@ -212,6 +213,7 @@ roles:
       - plan.manage
       - plan_template.apply
       - plan_allocation.manage
+      - crop_document.download
       - plan_activity.complete
       - resource.read
       - resource.manage
