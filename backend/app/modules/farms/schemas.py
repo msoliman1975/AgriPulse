@@ -700,6 +700,10 @@ class BlockCreateRequest(BaseModel):
     soil_texture: SoilTexture | None = None
     salinity_class: SalinityClass | None = None
     soil_ph: Decimal | None = Field(default=None, ge=0, le=14)
+    # Planting layout as planted (D23). Spacing in metres, count of plants.
+    row_spacing_m: Decimal | None = Field(default=None, gt=0, le=1000)
+    in_row_spacing_m: Decimal | None = Field(default=None, gt=0, le=1000)
+    plant_count: int | None = Field(default=None, ge=0, le=100_000_000)
     # U-4b: per-block agronomist, referenced by tenant membership_id.
     agronomist_membership_id: UUID | None = None
     notes: str | None = None
@@ -739,6 +743,9 @@ class BlockUpdateRequest(BaseModel):
     soil_texture: SoilTexture | None = None
     salinity_class: SalinityClass | None = None
     soil_ph: Decimal | None = Field(default=None, ge=0, le=14)
+    row_spacing_m: Decimal | None = Field(default=None, gt=0, le=1000)
+    in_row_spacing_m: Decimal | None = Field(default=None, gt=0, le=1000)
+    plant_count: int | None = Field(default=None, ge=0, le=100_000_000)
     agronomist_membership_id: UUID | None = None
     notes: str | None = None
     tags: list[str] | None = None
@@ -790,6 +797,14 @@ class BlockResponse(BaseModel):
     soil_texture: SoilTexture | None
     salinity_class: SalinityClass | None
     soil_ph: Decimal | None
+    # Planting layout (D23) and the densities derived from it on read: from
+    # the spacing (what the layout holds) and from the count over the mapped
+    # area (what the block holds).
+    row_spacing_m: Decimal | None = None
+    in_row_spacing_m: Decimal | None = None
+    plant_count: int | None = None
+    plants_per_ha_from_spacing: Decimal | None = None
+    plants_per_ha_from_count: Decimal | None = None
     agronomist_membership_id: UUID | None
     notes: str | None
     tags: list[str]
