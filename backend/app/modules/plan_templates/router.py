@@ -17,6 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import APIError
 from app.modules.plan_templates.schemas import (
     AppliableTemplate,
+    ManualCatalogItem,
+    OperationManualResponse,
     PlanTemplateApplyRequest,
     PlanTemplateApplyResponse,
     PlanTemplateDetail,
@@ -79,6 +81,38 @@ async def list_appliable(
     _ensure_tenant(context)
     _require(context, "plan_template.read", farm_id)
     return await service.list_appliable(farm_id=farm_id)
+
+
+@router.get(
+    "/plan-templates/catalog",
+    response_model=list[ManualCatalogItem],
+    summary="Published operation manuals a farm can browse, optionally for one crop.",
+)
+async def list_catalog(
+    farm_id: UUID = Query(...),
+    crop: str | None = Query(default=None, max_length=64),
+    context: RequestContext = Depends(get_current_context),
+    service: PlanTemplatesService = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    _require(context, "plan_template.read", farm_id)
+    return await service.list_catalog(crop=crop)
+
+
+@router.get(
+    "/plan-templates/{template_id}/manual",
+    response_model=OperationManualResponse,
+    summary="A published operation manual with its stages, for a farm (read-only).",
+)
+async def get_manual(
+    template_id: UUID,
+    farm_id: UUID = Query(...),
+    context: RequestContext = Depends(get_current_context),
+    service: PlanTemplatesService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    _require(context, "plan_template.read", farm_id)
+    return await service.get_manual(template_id=template_id, published_only=True)
 
 
 @router.post(
@@ -192,6 +226,19 @@ async def admin_get_template(
 ) -> dict[str, Any]:
     del context
     return await service.get_full_tree(template_id=template_id)
+
+
+@router.get(
+    "/plan-templates/{template_id}/authoring-view",
+    response_model=OperationManualResponse,
+    summary="Any manual (drafts included) with its stages per variety, for authoring.",
+)
+async def admin_get_manual(
+    template_id: UUID,
+    context: RequestContext = Depends(requires_capability("plan_template.manage")),
+    service: PlanTemplatesService = Depends(_service),
+) -> dict[str, Any]:
+    return await service.get_manual(template_id=template_id, published_only=False)
 
 
 @router.put(

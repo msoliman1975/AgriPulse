@@ -11,6 +11,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import bindparam, select, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -420,6 +421,40 @@ class PlanTemplatesRepository:
                 resolved = strain.phenology_stages_override
         stages = (resolved or {}).get("stages") or []
         return bool(crop.is_perennial), stages
+
+    async def list_varieties(self, *, crop_code: str) -> list[dict[str, Any]]:
+        """Active varieties of a crop, for the per-variety stage preview (H5)."""
+        rows = (
+            (
+                await self._public.execute(
+                    text(
+                        "SELECT v.code, v.path, v.name_en, v.name_ar "
+                        "FROM public.crop_varieties v "
+                        "JOIN public.crops c ON c.id = v.crop_id AND c.deleted_at IS NULL "
+                        "WHERE c.code = :c AND v.deleted_at IS NULL AND v.is_active "
+                        "ORDER BY v.name_en"
+                    ),
+                    {"c": crop_code},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]
+
+    async def count_activities(self, *, template_ids: list[UUID]) -> dict[UUID, int]:
+        if not template_ids:
+            return {}
+        rows = (
+            await self._public.execute(
+                text(
+                    "SELECT template_id, count(*) AS n FROM public.plan_template_activities "
+                    "WHERE template_id = ANY(:ids) GROUP BY template_id"
+                ).bindparams(bindparam("ids", type_=ARRAY(PG_UUID(as_uuid=True)))),
+                {"ids": template_ids},
+            )
+        ).all()
+        return {r.template_id: int(r.n) for r in rows}
 
     # ---- Apply (tenant) -----------------------------------------------
 

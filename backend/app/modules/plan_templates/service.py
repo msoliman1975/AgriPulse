@@ -161,6 +161,65 @@ class PlanTemplatesService:
             raise PlanTemplateNotFoundError(template_id)
         await self._repo.soft_delete(template=template, actor_user_id=actor_user_id)
 
+    # ---- Operation manual reads (tenant catalog + platform preview) ---------
+
+    async def list_catalog(self, *, crop: str | None = None) -> list[dict[str, Any]]:
+        """Published manuals only (E4), optionally for one crop (first path
+        segment), each with its activity count."""
+        templates = await self._repo.list_templates(status_filter=("published",))
+        if crop:
+            templates = [t for t in templates if t["crop_path"].split(".")[0] == crop]
+        counts = await self._repo.count_activities(template_ids=[t["id"] for t in templates])
+        return [{**t, "activity_count": counts.get(t["id"], 0)} for t in templates]
+
+    async def variety_phenology(self, *, crop_path: str) -> list[dict[str, Any]]:
+        """Resolved stages for each variety a manual applies to (H5).
+
+        A crop-level manual covers every active variety of the crop, plus the
+        crop's own calendar for blocks without a variety. A variety-level
+        manual covers that variety only.
+        """
+        segments = [s for s in crop_path.split(".") if s]
+        if not segments:
+            return []
+        out: list[dict[str, Any]] = []
+        if len(segments) == 1:
+            is_perennial, stages = await self._repo.resolve_phenology_for_path(
+                crop_path=segments[0]
+            )
+            out.append(
+                {
+                    "path": segments[0],
+                    "name_en": None,
+                    "name_ar": None,
+                    "is_perennial": is_perennial,
+                    "stages": stages,
+                }
+            )
+        prefix = ".".join(segments[:2])
+        for v in await self._repo.list_varieties(crop_code=segments[0]):
+            if len(segments) >= 2 and v["path"] != prefix:
+                continue
+            is_perennial, stages = await self._repo.resolve_phenology_for_path(crop_path=v["path"])
+            out.append({**v, "is_perennial": is_perennial, "stages": stages})
+        return out
+
+    async def get_manual(self, *, template_id: UUID, published_only: bool) -> dict[str, Any]:
+        """The full manual with its resolved stages and per-variety stages.
+        Farms only ever see published manuals (E4)."""
+        tree = await self.get_full_tree(template_id=template_id)
+        if published_only and tree["status"] != "published":
+            raise PlanTemplateNotFoundError(template_id)
+        is_perennial, stages = await self._repo.resolve_phenology_for_path(
+            crop_path=tree["crop_path"]
+        )
+        return {
+            **tree,
+            "is_perennial": is_perennial,
+            "stages": stages,
+            "varieties": await self.variety_phenology(crop_path=tree["crop_path"]),
+        }
+
     async def list_appliable(self, *, farm_id: UUID) -> list[dict[str, Any]]:
         """Published templates that match at least one of the farm's current
         block crops, each with the blocks it fits + planting-date defaults."""

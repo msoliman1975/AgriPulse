@@ -60,6 +60,8 @@ export type Capability =
   | "plan.manage"
   | "plan.read"
   | "plan_activity.complete"
+  | "plan_allocation.manage"
+  | "plan_allocation.read"
   | "plan_template.apply"
   | "plan_template.manage"
   | "plan_template.read"
@@ -146,6 +148,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "index.read",
     "plan.read",
     "plan_template.read",
+    "plan_allocation.read",
     "platform.observe_pipeline",
     "platform.read",
     "platform.read_usage",
@@ -209,7 +212,9 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan.read",
     "plan_activity.complete",
     "plan_template.apply",
+    "plan_allocation.manage",
     "plan_template.read",
+    "plan_allocation.read",
     "recommendation.act",
     "recommendation.read",
     "resource.manage",
@@ -301,7 +306,9 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan.read",
     "plan_activity.complete",
     "plan_template.apply",
+    "plan_allocation.manage",
     "plan_template.read",
+    "plan_allocation.read",
     "recommendation.act",
     "recommendation.read",
     "resource.manage",
@@ -408,7 +415,9 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan.read",
     "plan_activity.complete",
     "plan_template.apply",
+    "plan_allocation.manage",
     "plan_template.read",
+    "plan_allocation.read",
     "recommendation.act",
     "recommendation.read",
     "resource.manage",
@@ -455,6 +464,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan.read",
     "plan_activity.complete",
     "plan_template.read",
+    "plan_allocation.read",
     "recommendation.act",
     "recommendation.read",
     "resource.read",
@@ -492,6 +502,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan.read",
     "plan_activity.complete",
     "plan_template.read",
+    "plan_allocation.read",
     "recommendation.read",
     "resource.read",
     "scouting.record",
@@ -519,6 +530,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan.read",
     "plan_activity.complete",
     "plan_template.read",
+    "plan_allocation.read",
     "recommendation.read",
     "resource.read",
     "scouting.record",
@@ -546,6 +558,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "notification.write_inbox",
     "plan.read",
     "plan_template.read",
+    "plan_allocation.read",
     "recommendation.read",
     "resource.read",
     "scouting.visit.read",

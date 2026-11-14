@@ -124,17 +124,19 @@ its still-scheduled rows (F4); nothing is hard-deleted.
 
 Platform (cap `plan_template.manage`), existing routes kept, plus:
 
-- `GET /v1/plan-templates/{id}/varieties-preview` → resolved stage windows and
-  week numbers per variety under the manual's crop (H5).
+- `GET /v1/plan-templates/{id}/authoring-view` → the manual (drafts
+  included) with its resolved stages and the resolved stages of every variety
+  it covers (H5). The client turns stage starts into week numbers.
 - `GET /v1/plan-templates/{id}/publish-impact` → diff since the last
   published revision (by code) and the count of farms with active
   allocations (H6). Cross-tenant count only, no farm names (H7).
 
 Tenant:
 
-- `GET /v1/plan-templates/catalog?crop_path=` and
-  `GET /v1/plan-templates/{id}/manual` (cap `plan_template.read`): published
-  manuals only (E4), full tree + resolved stages.
+- `GET /v1/plan-templates/catalog?farm_id=&crop=` and
+  `GET /v1/plan-templates/{id}/manual?farm_id=` (cap `plan_template.read` on
+  the farm): published manuals only (E4); the manual carries the full tree,
+  its resolved stages and the stages per variety it covers.
 - `GET|POST /v1/farms/{farm_id}/plan-allocations`,
   `GET|PATCH|DELETE /v1/plan-allocations/{id}`,
   `POST /v1/plan-allocations/preview` (unsaved state → per-block dated
@@ -228,11 +230,11 @@ The loop is self-paced. Each iteration:
 
 | # | PR | State | Link | Deployed |
 |---|---|---|---|---|
-| 0 | Build plan | in review (with PR 1) | [#848](https://github.com/msoliman1975/AgriPulse/pull/848) | n/a |
-| 1 | Manual content model | in review | [#848](https://github.com/msoliman1975/AgriPulse/pull/848) | |
+| 0 | Build plan | merged | [#848](https://github.com/msoliman1975/AgriPulse/pull/848) | n/a |
+| 1 | Manual content model | merged | [#848](https://github.com/msoliman1975/AgriPulse/pull/848) | e842760 via [#850](https://github.com/msoliman1975/AgriPulse/pull/850), verified 2026-11-14 |
 | 1b | Arabic manual text | `notes_ar`, `product_name_ar`, `dosage_ar` for the seeded manuals (E3); Medjool from the manual's Arabic edition | integration: no live manual activity without Arabic | api (before farm launch) |
 | 1b | Arabic manual text | not started | | |
-| 2 | Tenant manual read API + capabilities | not started | | |
+| 2 | Tenant manual read API + capabilities | in review | | |
 | 3 | Saved plans backend | not started | | |
 | 4 | Manual revisions | not started | | |
 | 5 | Agri Operation page + Catalog tab | not started | | |

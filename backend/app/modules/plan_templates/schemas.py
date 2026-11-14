@@ -87,6 +87,34 @@ class PlanTemplateDetail(PlanTemplateSummary):
     activities: list[PlanTemplateActivityResponse] = Field(default_factory=list)
 
 
+class ManualCatalogItem(PlanTemplateSummary):
+    """A published operation manual in the farm catalog."""
+
+    activity_count: int = 0
+
+
+class VarietyPhenology(BaseModel):
+    """Resolved phenology for one variety (or the crop's own calendar when
+    ``name_en`` is null). ``stages`` carries each stage's ``advance`` rule;
+    the client turns it into weeks (H5)."""
+
+    path: str
+    code: str | None = None
+    name_en: str | None = None
+    name_ar: str | None = None
+    is_perennial: bool = False
+    stages: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class OperationManualResponse(PlanTemplateDetail):
+    """A manual as the Agri Operation views show it: the tree, the stages
+    resolved for its own crop path, and the stages per variety it covers."""
+
+    is_perennial: bool = False
+    stages: list[dict[str, Any]] = Field(default_factory=list)
+    varieties: list[VarietyPhenology] = Field(default_factory=list)
+
+
 # ---- Authoring (whole-tree write; used by PR-E3) ---------------------------
 
 
