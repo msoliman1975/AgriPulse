@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.modules.plans.schemas import ActivityType
 
-# The inputs catalogue's dose units (public 0107/0108 CHECK). Repeated here
+# The inputs catalogue's dose units (public 0108/0109 CHECK). Repeated here
 # rather than imported: module boundaries let schemas import only another
 # module's service, and the database CHECK is the shared source of truth.
 DoseUnit = Literal[

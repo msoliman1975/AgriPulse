@@ -1,6 +1,6 @@
 """Plan activities carry the input and dose of the template activity (D20).
 
-``input_id`` names a row of ``public.inputs`` (public 0107). There is no
+``input_id`` names a row of ``public.inputs`` (public 0108). There is no
 foreign key: tenant schemas do not reference public rows by FK, as with
 ``farm_scopes.farm_id``. Existing activities are untouched and keep their
 free-text ``product_name`` and ``dosage``.
@@ -12,8 +12,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0102"
-down_revision: str | Sequence[str] | None = "0101"
+revision: str = "0104"
+down_revision: str | Sequence[str] | None = "0103"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
