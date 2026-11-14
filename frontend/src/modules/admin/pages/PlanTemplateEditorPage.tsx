@@ -28,6 +28,7 @@ import {
   useTemplatePhenology,
   useUpdatePlanTemplate,
 } from "@/queries/planTemplates";
+import { SourcesMarker } from "@/modules/sources/SourcesMarker";
 
 interface MilestoneRow extends MilestoneInput {
   key: string;
@@ -572,6 +573,14 @@ export function PlanTemplateEditorPage(): ReactNode {
                     onChange={(e) => set({ product_name: e.target.value })}
                   />
                   <ActivityInputFields row={a} inputs={inputsQuery.data ?? []} onChange={set} />
+                  {/* D27: the sources this activity cites, keyed by template and activity
+                      code so the link survives revisions. */}
+                  {code && a.code ? (
+                    <SourcesMarker
+                      entityType="plan_template_activity"
+                      entityKey={`${code}/${a.code}`}
+                    />
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => setActivities((prev) => prev.filter((_, i) => i !== idx))}
