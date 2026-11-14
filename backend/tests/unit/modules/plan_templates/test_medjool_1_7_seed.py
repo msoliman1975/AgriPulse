@@ -34,7 +34,8 @@ def _migration():  # type: ignore[no-untyped-def]
     spec = importlib.util.spec_from_file_location(
         "m0111", _VERSIONS / "0111_medjool_plan_templates_1_7.py"
     )
-    assert spec and spec.loader
+    assert spec is not None
+    assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -47,9 +48,7 @@ def _input_codes() -> set[str]:
 
 def _manual_refs() -> set[int]:
     data = json.loads((_VERSIONS / "data" / "0105_sources_library.json").read_text("utf-8"))
-    return {
-        n for s in data["sources"] for doc, n in s["aliases"] if doc == "medjool_manual_1_7"
-    }
+    return {n for s in data["sources"] for doc, n in s["aliases"] if doc == "medjool_manual_1_7"}
 
 
 @pytest.fixture(scope="module")
@@ -75,8 +74,10 @@ def test_every_row_uses_known_values(m, key: str) -> None:  # type: ignore[no-un
     for r in rows:
         where = f"{key}/{r['code']}"
         assert r["activity_type"] in activity_types, where
-        assert r["title"] and r["title_ar"], where
-        assert r["notes"] and r["notes_ar"], where
+        assert r["title"], where
+        assert r["title_ar"], where
+        assert r["notes"], where
+        assert r["notes_ar"], where
         assert r["duration_days"] >= 1, where
         if key == "bearing":
             assert r["stage_code"] in _STAGES, where

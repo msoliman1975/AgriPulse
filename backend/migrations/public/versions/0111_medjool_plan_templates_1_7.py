@@ -157,9 +157,7 @@ def upgrade() -> None:
             input_id = None
             if row["input_code"]:
                 input_id = conn.execute(
-                    sa.text(
-                        "SELECT id FROM public.inputs WHERE code = :c AND tenant_id IS NULL"
-                    ),
+                    sa.text("SELECT id FROM public.inputs WHERE code = :c AND tenant_id IS NULL"),
                     {"c": row["input_code"]},
                 ).scalar()
             conn.execute(
