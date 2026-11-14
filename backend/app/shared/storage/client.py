@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import lru_cache
 from typing import Any, Protocol
+from urllib.parse import quote
 
 import boto3
 from botocore.client import Config
@@ -73,6 +74,8 @@ class StorageClient(Protocol):
         *,
         key: str,
         expires_seconds: int | None = None,
+        response_content_disposition: str | None = None,
+        response_content_type: str | None = None,
     ) -> PresignedDownload: ...
 
     def head_object(self, *, key: str) -> dict[str, Any]: ...
@@ -156,11 +159,21 @@ class _Boto3StorageClient:
         *,
         key: str,
         expires_seconds: int | None = None,
+        response_content_disposition: str | None = None,
+        response_content_type: str | None = None,
     ) -> PresignedDownload:
         expires = expires_seconds or self._default_expires
+        params: dict[str, Any] = {"Bucket": self._bucket, "Key": key}
+        # S3 signs these into the URL and answers with them as headers, which
+        # is how one stored object serves both "view" (inline) and "download"
+        # (attachment) without a second copy.
+        if response_content_disposition is not None:
+            params["ResponseContentDisposition"] = response_content_disposition
+        if response_content_type is not None:
+            params["ResponseContentType"] = response_content_type
         url: str = self._client.generate_presigned_url(
             "get_object",
-            Params={"Bucket": self._bucket, "Key": key},
+            Params=params,
             ExpiresIn=expires,
             HttpMethod="GET",
         )
@@ -203,6 +216,18 @@ class _Boto3StorageClient:
             Body=body,
             ContentType=content_type,
         )
+
+
+def content_disposition(filename: str, *, inline: bool) -> str:
+    """An RFC 6266 ``Content-Disposition`` value that survives any filename.
+
+    The ASCII ``filename=`` is a fallback for old clients; ``filename*`` carries
+    the real name UTF-8 percent-encoded, so an Arabic title downloads as itself.
+    """
+    disposition = "inline" if inline else "attachment"
+    fallback = "".join(c if 32 <= ord(c) < 127 and c not in '"\\' else "_" for c in filename)
+    encoded = quote(filename, safe="")
+    return f"{disposition}; filename=\"{fallback or 'file'}\"; filename*=UTF-8''{encoded}"
 
 
 @lru_cache(maxsize=1)

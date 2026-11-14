@@ -1015,7 +1015,8 @@
       "attributes": "Attributes",
       "health": "Health",
       "signals": "Signals",
-      "reference": "Reference values"
+      "reference": "Reference values",
+      "documents": "Documents"
     },
     "level": {
       "crop": "Crop",
@@ -1109,6 +1110,54 @@
       "save": "Save",
       "cancel": "Cancel",
       "saveFailed": "Could not save."
+    },
+    "documents": {
+      "loadFailed": "Could not load documents.",
+      "intro": "Manuals, guides and standards for this crop path. A document set on a crop shows on every variety and strain below it, and on their blocks for users allowed to download crop documents. Uploading with an existing code adds a new edition; the previous one stays as history.",
+      "here": "On this path",
+      "noneHere": "No documents set on this path.",
+      "inheritedHeading": "Inherited from above",
+      "inherited": "From {{path}}",
+      "history": "Earlier editions and retired documents ({{count}})",
+      "superseded": "Superseded",
+      "retired": "Retired",
+      "edition": "Edition {{edition}}",
+      "view": "View",
+      "download": "Download",
+      "newEdition": "New edition",
+      "retire": "Retire",
+      "restore": "Restore",
+      "linkFailed": "Could not open the document.",
+      "saveFailed": "Could not save.",
+      "uploadHeading": "Upload a document",
+      "newEditionHeading": "New edition of {{code}}",
+      "supersedeNote": "The current edition will be kept as history, not deleted.",
+      "code": "Document code",
+      "codeHint": "Stable across editions, e.g. medjool_organic_manual_en.",
+      "codeInvalid": "Use lowercase letters, digits, '_', '.' or '-', starting with a letter or digit.",
+      "editionLabel": "Edition",
+      "titleEn": "Title (English)",
+      "titleAr": "Title (Arabic)",
+      "languageLabel": "Document language",
+      "kindLabel": "Kind",
+      "file": "File (PDF, Word, Excel, PowerPoint, text; up to 15 MB)",
+      "tooLarge": "The file is larger than 15 MB.",
+      "upload": "Upload",
+      "uploading": "Uploading…",
+      "uploadFailed": "Upload failed.",
+      "cancel": "Cancel",
+      "kind": {
+        "manual": "Manual",
+        "guide": "Guide",
+        "standard": "Standard",
+        "report": "Report",
+        "other": "Other"
+      },
+      "language": {
+        "en": "English",
+        "ar": "Arabic",
+        "other": "Other language"
+      }
     }
   },
   "sizeClasses": {

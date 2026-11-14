@@ -27,6 +27,7 @@ export type Capability =
   | "crop_assignment.create"
   | "crop_assignment.delete"
   | "crop_assignment.update"
+  | "crop_document.download"
   | "decision_tree.manage"
   | "decision_tree.read"
   | "farm.attachment.read"
@@ -213,6 +214,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan_activity.complete",
     "plan_template.apply",
     "plan_allocation.manage",
+    "crop_document.download",
     "plan_template.read",
     "plan_allocation.read",
     "recommendation.act",
@@ -307,6 +309,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan_activity.complete",
     "plan_template.apply",
     "plan_allocation.manage",
+    "crop_document.download",
     "plan_template.read",
     "plan_allocation.read",
     "recommendation.act",
