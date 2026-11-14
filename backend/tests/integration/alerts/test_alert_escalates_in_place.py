@@ -145,6 +145,7 @@ async def test_a_leaf_republished_at_a_higher_severity_escalates_the_open_row(
         row_id=alert_id, severity="critical", group_key=crit_key, action_type="spray"
     )
     await admin_session.commit()
+    await admin_session.execute(text(f"SET search_path TO {seed['schema']}, public"))
 
     row = await _row(admin_session, alert_id)
     assert row["severity"] == "critical"
@@ -194,6 +195,7 @@ async def test_de_escalation_is_written_too(admin_session: Any) -> None:
         row_id=alert_id, severity="warning", group_key=warn_key, action_type="irrigate"
     )
     await admin_session.commit()
+    await admin_session.execute(text(f"SET search_path TO {seed['schema']}, public"))
 
     assert (await _row(admin_session, alert_id))["severity"] == "warning"
 
@@ -231,6 +233,7 @@ async def test_an_unchanged_leaf_writes_nothing(admin_session: Any) -> None:
         today=today,
     )
     await admin_session.commit()
+    await admin_session.execute(text(f"SET search_path TO {seed['schema']}, public"))
     before = (
         await admin_session.execute(
             text("SELECT updated_at FROM alerts WHERE id = :id"), {"id": alert_id}
@@ -241,6 +244,7 @@ async def test_an_unchanged_leaf_writes_nothing(admin_session: Any) -> None:
         row_id=alert_id, severity="warning", group_key=key, action_type="scout"
     )
     await admin_session.commit()
+    await admin_session.execute(text(f"SET search_path TO {seed['schema']}, public"))
 
     after = (
         await admin_session.execute(

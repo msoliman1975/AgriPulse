@@ -104,7 +104,15 @@ async def _refresh_all(around: datetime) -> None:
                     text(
                         f"CALL refresh_continuous_aggregate('public.\"{view}\"', CAST(:s AS timestamptz), CAST(:e AS timestamptz))"
                     ),
-                    {"s": around - timedelta(days=2), "e": around + timedelta(days=2)},
+                    # Never past now - 1 hour, where the production policy
+                    # stops: a watermark ahead of the clock hides fresh events
+                    # from test_usage_caggs_realtime later in the session.
+                    {
+                        "s": around - timedelta(days=2),
+                        "e": min(
+                            around + timedelta(days=2), datetime.now(UTC) - timedelta(hours=1)
+                        ),
+                    },
                 )
     finally:
         await engine.dispose()
