@@ -23,7 +23,7 @@ import { Skeleton } from "@/components/Skeleton";
 import { StatusBanner } from "@/components/StatusBanner";
 import { resolveErrorMessage } from "@/components/asyncState";
 import { localizedField, localizedName } from "@/lib/localizedField";
-import { ActivityInputFields } from "@/modules/admin/pages/PlanTemplateEditorPage";
+import { ActivityInputFields } from "../components/ActivityInputFields";
 import { CropPathFilter } from "@/modules/reports/components/CropPathFilter";
 import { useAuthoringManual, usePublishImpact } from "@/queries/agriOperation";
 import {
@@ -35,6 +35,7 @@ import {
   useTemplatePhenology,
   useUpdatePlanTemplate,
 } from "@/queries/planTemplates";
+import { trackFeature } from "@/telemetry";
 import { StageRibbon } from "../components/ManualView";
 import {
   draftFromDetail,
@@ -144,6 +145,7 @@ export function ManualEditorPage(): ReactNode {
       create.mutate(body, {
         onSuccess: (saved) => {
           setDirty(false);
+          trackFeature("operation_manual", { props: { action: "manual_created" } });
           navigate(`/platform/operation-manuals/${saved.id}`);
         },
         onError: (e) => setError(e.message),
@@ -153,6 +155,7 @@ export function ManualEditorPage(): ReactNode {
         onSuccess: (saved) => {
           setDraft(draftFromDetail(saved));
           setDirty(false);
+          trackFeature("operation_manual", { props: { action: "manual_saved" } });
         },
         onError: (e) => setError(e.message),
       });
@@ -224,7 +227,10 @@ export function ManualEditorPage(): ReactNode {
           onCancel={() => setPublishing(false)}
           onConfirm={() =>
             publish.mutate(templateId, {
-              onSuccess: () => setPublishing(false),
+              onSuccess: () => {
+                setPublishing(false);
+                trackFeature("operation_manual", { props: { action: "manual_published" } });
+              },
               onError: (e) => setError(e.message),
             })
           }

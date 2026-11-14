@@ -100,8 +100,6 @@ import { PlatformDefaultsPage } from "@/modules/admin/pages/PlatformDefaultsPage
 import { PlatformBackfillPage } from "@/modules/admin/pages/PlatformBackfillPage";
 import { ObserverSceneDetailPage } from "@/modules/admin/pages/ObserverSceneDetailPage";
 import { PlatformObserverPage } from "@/modules/admin/pages/PlatformObserverPage";
-import { PlatformPlanTemplatesPage } from "@/modules/admin/pages/PlatformPlanTemplatesPage";
-import { PlanTemplateEditorPage } from "@/modules/admin/pages/PlanTemplateEditorPage";
 import { PlatformAlertsPage } from "@/modules/admin/pages/PlatformAlertsPage";
 import { PlatformAdminsPage } from "@/modules/admin/pages/PlatformAdminsPage";
 import { PlatformHealthPage } from "@/modules/admin/pages/PlatformHealthPage";
@@ -120,6 +118,13 @@ function RedirectDecisionTreeDetail(): ReactNode {
 function RedirectSettingsDecisionTree(): ReactNode {
   const { code = "" } = useParams<{ code: string }>();
   return <Navigate to={`/decision-trees/${code}`} replace />;
+}
+
+// The plan template editor was replaced by Operation manuals (Agri
+// Operation PR 10, decision H2). Old links open the same manual there.
+function RedirectPlanTemplate(): ReactNode {
+  const { id = "" } = useParams<{ id: string }>();
+  return <Navigate to={`/platform/operation-manuals/${id}`} replace />;
 }
 
 function RedirectLegacyAdminTenant(): ReactNode {
@@ -458,12 +463,18 @@ export function App(): ReactNode {
                 <Route path="decision-trees-beta/:code/estate" element={<EstateDryRunPage />} />
                 <Route path="decision-trees-beta/:code/runs" element={<BetaRunResultsPage />} />
                 <Route path="decision-tree-findings" element={<FindingCataloguePage />} />
-                <Route path="plan-templates" element={<PlatformPlanTemplatesPage />} />
+                <Route
+                  path="plan-templates"
+                  element={<Navigate to="/platform/operation-manuals" replace />}
+                />
                 <Route path="backfill" element={<PlatformBackfillPage />} />
                 <Route path="observer" element={<PlatformObserverPage />} />
                 <Route path="observer/scenes/:jobId" element={<ObserverSceneDetailPage />} />
-                <Route path="plan-templates/new" element={<PlanTemplateEditorPage />} />
-                <Route path="plan-templates/:id" element={<PlanTemplateEditorPage />} />
+                <Route
+                  path="plan-templates/new"
+                  element={<Navigate to="/platform/operation-manuals/new" replace />}
+                />
+                <Route path="plan-templates/:id" element={<RedirectPlanTemplate />} />
                 <Route path="operation-manuals" element={<ManualListPage />} />
                 <Route path="operation-manuals/new" element={<ManualEditorPage />} />
                 <Route path="operation-manuals/:id" element={<ManualEditorPage />} />

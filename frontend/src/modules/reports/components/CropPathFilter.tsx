@@ -98,6 +98,30 @@ export function CropPathFilter({ value, onChange, scope = "tenant" }: Props): Re
     };
   }, [varietyId, scope]);
 
+  // Show an initial value (an editor opening a saved path such as
+  // "mango.keitt"): once each level's list loads, select the entry that
+  // matches that level of the path. Selection only; nothing is emitted, so
+  // the value the parent holds is unchanged.
+  const segments = value ? value.split(".") : [];
+  const cropCode = segments[0] ?? null;
+  const varietyPath = segments.length >= 2 ? segments.slice(0, 2).join(".") : null;
+  const strainPath = segments.length >= 3 ? segments.slice(0, 3).join(".") : null;
+  useEffect(() => {
+    if (cropId || !cropCode) return;
+    const crop = crops.find((c) => c.code === cropCode);
+    if (crop) setCropId(crop.id);
+  }, [crops, cropCode, cropId]);
+  useEffect(() => {
+    if (varietyId || !varietyPath) return;
+    const variety = varieties.find((v) => v.path === varietyPath);
+    if (variety) setVarietyId(variety.id);
+  }, [varieties, varietyPath, varietyId]);
+  useEffect(() => {
+    if (strainId || !strainPath) return;
+    const strain = strains.find((x) => x.path === strainPath);
+    if (strain) setStrainId(strain.id);
+  }, [strains, strainPath, strainId]);
+
   const isAr = i18n.language === "ar";
   const cropLabel = (c: Crop): string => (isAr ? c.name_ar || c.name_en : c.name_en);
   const varietyLabel = (v: CropVariety): string => (isAr ? (v.name_ar ?? v.name_en) : v.name_en);

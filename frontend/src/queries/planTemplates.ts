@@ -1,19 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
-  applyTemplate,
   archivePlanTemplate,
   createPlanTemplate,
   deletePlanTemplate,
   getPlanTemplate,
   listAppliableTemplates,
   listPlanTemplates,
-  previewTemplateApply,
   publishPlanTemplate,
   resolveTemplatePhenology,
   updatePlanTemplate,
-  type ApplyRequest,
-  type ApplyResponse,
   type PlanTemplateDetail,
   type PlanTemplateWriteRequest,
   type TemplateStatus,
@@ -86,7 +82,7 @@ export function useDeletePlanTemplate() {
   });
 }
 
-// ---- Tenant apply ---------------------------------------------------------
+// ---- Tenant read ----------------------------------------------------------
 
 export function useAppliableTemplates(farmId: string | null) {
   return useQuery({
@@ -96,16 +92,3 @@ export function useAppliableTemplates(farmId: string | null) {
     staleTime: 30_000,
   });
 }
-
-export function useApplyTemplate(farmId: string | null) {
-  const qc = useQueryClient();
-  return useMutation<ApplyResponse, Error, { templateId: string; body: ApplyRequest }>({
-    mutationFn: ({ templateId, body }) => applyTemplate(templateId, body),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["board", farmId] });
-      void qc.invalidateQueries({ queryKey: ["plans", farmId] });
-    },
-  });
-}
-
-export { previewTemplateApply };

@@ -27,16 +27,16 @@ function statusKind(status: TemplateStatus): "ok" | "neutral" | "warn" {
 }
 
 /**
- * /platform/plan-templates — PlatformAdmin authors the catalog of
+ * Platform > Operation manuals list (mounted by ManualListPage) — PlatformAdmin authors the catalog of
  * crop-keyed agriculture plan templates. List + status filter; rows open
  * the whole-tree editor. Guarded by `plan_template.manage` on the API.
  */
 export function PlatformPlanTemplatesPage({
-  basePath = "/platform/plan-templates",
+  basePath = "/platform/operation-manuals",
   title,
   subtitle,
 }: {
-  /** Where rows and "New" link to: the old editor or the Agri Operation one. */
+  /** Where rows and "New" link to. */
   basePath?: string;
   title?: string;
   subtitle?: string;
