@@ -5020,7 +5020,19 @@ global:
       #   Watch: open a manual in Platform > Plan templates, save without
       #   changes, and the activities keep their titles.
       #   Rollback: frontend to 5ee27fc together with the api.
-      tag: "e842760"
+      # 751b318 = #844-#847, frontend (api and workers already at 751b318).
+      #   New pages: Platform > Sources (/platform/sources) and Inputs
+      #   (/platform/inputs, also /settings/inputs for tenants); a Reference
+      #   values tab in the crop catalogue; the plan template editor gains an
+      #   input picker and dose fields on each activity. EN and AR. #852's
+      #   frontend change (new capability names, no screen) rides along.
+      #   Needs the api at 751b318 or later (the new routes, and the input
+      #   fields on template save).
+      #   Watch: the three pages load as platform admin; open a manual in
+      #   Platform > Plan templates, save without changes, and the activities
+      #   keep their titles and doses; the Beta designer's tabs are unchanged.
+      #   Rollback: this tag alone back to e842760.
+      tag: "751b318"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
