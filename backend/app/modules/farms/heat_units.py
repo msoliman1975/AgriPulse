@@ -18,7 +18,7 @@ Resolution:
 * the base and upper temperatures are the crop's own (they are not
   overridden per variety).
 * a start date on the block's crop assignment (``block_crops.gdd_start_date``,
-  tenant 0108) wins over the crop's start rule.
+  tenant 0109) wins over the crop's start rule.
 
 Fail closed: no crop, no method, no base, no start, a start in the future, or
 no farm all give ``{}``, so every ``heat_units`` predicate is false.

@@ -28,6 +28,7 @@ import { Pill } from "@/components/Pill";
 import { StatusBanner } from "@/components/StatusBanner";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import type { Finding } from "@/api/decisionTreesBeta";
+import { needsArabic } from "@/lib/arabicRequired";
 
 import {
   ACTION_TYPES,
@@ -53,6 +54,8 @@ interface CombinationsTabProps {
   rules: readonly CombinationRule[];
   readOnly?: boolean;
   onChangeRules: (rules: CombinationRule[]) => void;
+  /** D26: a platform tree's card text is saved in English and Arabic. */
+  requireArabic?: boolean;
 }
 
 export function CombinationsTab({
@@ -63,6 +66,7 @@ export function CombinationsTab({
   rules,
   readOnly = false,
   onChangeRules,
+  requireArabic = false,
 }: CombinationsTabProps): JSX.Element {
   const { t, i18n } = useTranslation("decisionTreesBeta");
   const statusLabel = useFindingStatusLabel();
@@ -236,6 +240,7 @@ export function CombinationsTab({
       {editing ? (
         <RuleForm
           rule={editing.index === null ? null : rules[editing.index]}
+          requireArabic={requireArabic}
           declaredCodes={declaredCodes}
           findings={findings}
           otherKeys={rules.filter((_, i) => i !== editing.index).map((r) => findingSetKey(r.codes))}
@@ -269,8 +274,10 @@ function RuleForm({
   onCancel,
   onSave,
   onRemove,
+  requireArabic = false,
 }: {
   rule: CombinationRule | null;
+  requireArabic?: boolean;
   declaredCodes: readonly string[];
   findings: readonly Finding[];
   otherKeys: readonly string[];
@@ -287,7 +294,12 @@ function RuleForm({
   const [textAr, setTextAr] = useState(rule?.text_ar ?? "");
 
   const duplicate = codes.length > 0 && otherKeys.includes(findingSetKey(codes));
-  const invalid = codes.length === 0 || duplicate;
+  // D26, judged as the server does: new or changed English card text needs
+  // Arabic; a seeded rule whose English is left alone may stay English-only.
+  const textArMissing =
+    requireArabic &&
+    needsArabic(textEn, textAr, rule ? { en: rule.text_en, ar: rule.text_ar } : null);
+  const invalid = codes.length === 0 || duplicate || textArMissing;
 
   const toggle = (code: string): void =>
     setCodes((prev) =>
@@ -388,7 +400,11 @@ function RuleForm({
             />
           )}
         </Field>
-        <Field label={t("combinations.form.textAr")}>
+        <Field
+          label={t("combinations.form.textAr")}
+          required={requireArabic && textEn.trim() !== ""}
+          error={textArMissing ? t("common:errors.arabicRequired") : undefined}
+        >
           {(props) => (
             <textarea
               {...props}

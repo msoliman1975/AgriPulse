@@ -100,6 +100,7 @@ from app.modules.farms.validity import (
 from app.modules.investors.service import block_holding_conflicts
 from app.modules.weather.snapshot import load_gdd_since
 from app.shared import clock
+from app.shared.arabic_required import merged, require_arabic
 from app.shared.db.ids import uuid7
 from app.shared.eventbus import EventBus, get_default_bus
 from app.shared.keycloak.client import KeycloakAdminClient, get_keycloak_client
@@ -3460,6 +3461,7 @@ class FarmServiceImpl:
         if crop is None:
             raise CropNotFoundError(crop_id)
         code = fields["code"]
+        require_arabic(fields, _ATTRIBUTE_TEXT_PAIRS)
         if code in RESERVED_ATTRIBUTE_CODES:
             raise CropAttributeReservedCodeError(code)
         fields = self._normalized_gates(fields)
@@ -3498,6 +3500,8 @@ class FarmServiceImpl:
         definition = await self._repo.get_crop_attribute_definition(definition_id=definition_id)
         if definition is None:
             raise CropAttributeDefinitionNotFoundError(definition_id)
+        before = _names_of(definition, _ATTRIBUTE_TEXT_PAIRS)
+        require_arabic(merged(before, fields), _ATTRIBUTE_TEXT_PAIRS, before=before)
         fields = self._normalized_gates(fields)
         # ``value_type`` is immutable, so the consistency rules are re-checked
         # against the stored type merged with whatever the patch changes —
@@ -3744,6 +3748,7 @@ class FarmServiceImpl:
         self, *, fields: dict[str, Any], actor_user_id: UUID | None
     ) -> dict[str, Any]:
         code = fields["code"]
+        require_arabic(fields, _CROP_NAME_PAIRS)
         _validate_catalog_payloads(
             phenology=fields.get("phenology_stages"),
             size_classes=fields.get("size_classes"),
@@ -3769,6 +3774,8 @@ class FarmServiceImpl:
         crop = await self._repo.get_crop(crop_id=crop_id)
         if crop is None:
             raise CropNotFoundError(crop_id)
+        before = _names_of(crop, _CROP_NAME_PAIRS)
+        require_arabic(merged(before, fields), _CROP_NAME_PAIRS, before=before)
         is_perennial = fields.get("is_perennial", crop.is_perennial)
         gdd_base = fields.get("gdd_base_temp_c", crop.gdd_base_temp_c)
         _validate_catalog_payloads(
@@ -3801,6 +3808,7 @@ class FarmServiceImpl:
         crop = await self._repo.get_crop(crop_id=crop_id)
         if crop is None:
             raise CropNotFoundError(crop_id)
+        require_arabic({"name_en": name_en, "name_ar": name_ar}, _CROP_NAME_PAIRS)
         overrides = overrides or {}
         _validate_catalog_payloads(
             phenology=overrides.get("phenology_stages_override"),
@@ -3834,6 +3842,8 @@ class FarmServiceImpl:
         variety = await self._repo.get_variety(variety_id=variety_id)
         if variety is None:
             raise CropVarietyNotFoundError(variety_id)
+        before = _names_of(variety, _CROP_NAME_PAIRS)
+        require_arabic(merged(before, fields), _CROP_NAME_PAIRS, before=before)
         crop = await self._repo.get_crop(crop_id=variety.crop_id)
         _validate_catalog_payloads(
             phenology=fields.get("phenology_stages_override"),
@@ -3865,6 +3875,7 @@ class FarmServiceImpl:
         variety = await self._repo.get_variety(variety_id=crop_variety_id)
         if variety is None:
             raise CropVarietyNotFoundError(crop_variety_id)
+        require_arabic({"name_en": name_en, "name_ar": name_ar}, _CROP_NAME_PAIRS)
         overrides = overrides or {}
         crop = await self._repo.get_crop(crop_id=variety.crop_id)
         _validate_catalog_payloads(
@@ -3899,6 +3910,8 @@ class FarmServiceImpl:
         strain = await self._repo.get_strain(strain_id=strain_id)
         if strain is None:
             raise CropStrainNotFoundError(strain_id)
+        before = _names_of(strain, _CROP_NAME_PAIRS)
+        require_arabic(merged(before, fields), _CROP_NAME_PAIRS, before=before)
         variety = await self._repo.get_variety(variety_id=strain.crop_variety_id)
         crop = await self._repo.get_crop(crop_id=variety.crop_id) if variety is not None else None
         _validate_catalog_payloads(
@@ -4089,6 +4102,23 @@ def _log_to_dict(row: Any) -> dict[str, Any]:
         "changed_at": row.changed_at,
         "changed_by": row.changed_by,
     }
+
+
+# D26: the English/Arabic pairs a platform catalogue save must fill. Crop,
+# variety and strain share the name pair; phenology stages and size classes
+# already require ``name_ar`` in their own schemas (``farms/phenology.py``).
+_CROP_NAME_PAIRS: tuple[tuple[str, str], ...] = (("name_en", "name_ar"),)
+_ATTRIBUTE_TEXT_PAIRS: tuple[tuple[str, str], ...] = (
+    ("name_en", "name_ar"),
+    ("description_en", "description_ar"),
+    ("unit_en", "unit_ar"),
+    ("group_name_en", "group_name_ar"),
+)
+
+
+def _names_of(row: Any, pairs: Sequence[tuple[str, str]]) -> dict[str, Any]:
+    """The stored English/Arabic texts of an ORM row, for the D26 check."""
+    return {name: getattr(row, name, None) for pair in pairs for name in pair}
 
 
 def _validate_catalog_payloads(

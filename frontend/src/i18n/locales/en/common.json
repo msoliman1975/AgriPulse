@@ -89,7 +89,8 @@
     "generic": "Something went wrong. Please try again.",
     "unauthorized": "Your session has ended. Sign in again.",
     "forbidden": "You do not have permission to perform this action.",
-    "notFound": "We could not find what you were looking for."
+    "notFound": "We could not find what you were looking for.",
+    "arabicRequired": "Arabic is required. Platform content is saved in English and Arabic."
   },
   "actions": {
     "retry": "Retry",

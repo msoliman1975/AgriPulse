@@ -11,6 +11,9 @@ from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.auth.context import PlatformRole
 
@@ -66,7 +69,7 @@ async def test_full_catalog_authoring_roundtrip() -> None:
         # Add a variety → path derives from crop code.
         rv = await client.post(
             f"/api/v1/admin/crops/{crop_id}/varieties",
-            json={"code": "waha", "name_en": "Waha"},
+            json={"code": "waha", "name_en": "Waha", "name_ar": "واحة"},
         )
         assert rv.status_code == 201, rv.text
         variety = rv.json()
@@ -76,7 +79,7 @@ async def test_full_catalog_authoring_roundtrip() -> None:
         # Add a strain → path derives from variety path.
         rs = await client.post(
             f"/api/v1/admin/crop-varieties/{variety_id}/strains",
-            json={"code": "early", "name_en": "Early Waha"},
+            json={"code": "early", "name_en": "Early Waha", "name_ar": "واحة مبكرة"},
         )
         assert rs.status_code == 201, rs.text
         assert rs.json()["path"] == f"{code}.waha.early"
@@ -84,7 +87,7 @@ async def test_full_catalog_authoring_roundtrip() -> None:
         # Duplicate variety code under the same crop → 409.
         dupv = await client.post(
             f"/api/v1/admin/crops/{crop_id}/varieties",
-            json={"code": "waha", "name_en": "Waha again"},
+            json={"code": "waha", "name_en": "Waha again", "name_ar": "واحة"},
         )
         assert dupv.status_code == 409
 
@@ -95,6 +98,20 @@ async def test_full_catalog_authoring_roundtrip() -> None:
         )
         assert ru.status_code == 200
         assert ru.json()["name_en"] == "Waha (renamed)"
+
+        # D26: a new variety without Arabic fails at save, naming the field.
+        missing = await client.post(
+            f"/api/v1/admin/crops/{crop_id}/varieties",
+            json={"code": "noar", "name_en": "No Arabic"},
+        )
+        assert missing.status_code == 422, missing.text
+        assert missing.json()["missing_arabic"] == ["name_ar"]
+
+        # D26: blanking the existing Arabic name is refused too.
+        blank = await client.patch(
+            f"/api/v1/admin/crop-varieties/{variety_id}", json={"name_ar": "  "}
+        )
+        assert blank.status_code == 422, blank.text
 
         # Retire the crop → hidden by default, visible with include_inactive.
         rr = await client.patch(f"/api/v1/admin/crops/{crop_id}", json={"is_active": False})
@@ -179,6 +196,47 @@ async def test_create_perennial_crop_rejects_days_from_planting() -> None:
             },
         )
         assert r.status_code == 422, r.text
+
+
+@pytest.mark.asyncio
+async def test_legacy_variety_without_arabic_still_resaves(admin_session: AsyncSession) -> None:
+    """D26 backward compatibility: a seeded English-only variety keeps saving
+    while its English name is untouched, and is held to the rule once it is
+    renamed."""
+    crop_id = uuid4()
+    variety_id = uuid4()
+    code = f"legacy-{crop_id.hex[:6]}"
+    await admin_session.execute(
+        text(
+            "INSERT INTO public.crops "
+            "(id, code, name_en, name_ar, category, is_perennial, is_active) "
+            "VALUES (:id, :code, 'Legacy crop', 'محصول قديم', 'cereal', FALSE, TRUE)"
+        ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+        {"id": crop_id, "code": code},
+    )
+    await admin_session.execute(
+        text(
+            "INSERT INTO public.crop_varieties (id, crop_id, code, name_en, path, is_active) "
+            "VALUES (:vid, :cid, 'old', 'Old variety', :path, TRUE)"
+        ).bindparams(
+            bindparam("vid", type_=PG_UUID(as_uuid=True)),
+            bindparam("cid", type_=PG_UUID(as_uuid=True)),
+        ),
+        {"vid": variety_id, "cid": crop_id, "path": f"{code}.old"},
+    )
+    await admin_session.commit()
+
+    async with _platform_client() as client:
+        ok = await client.patch(
+            f"/api/v1/admin/crop-varieties/{variety_id}", json={"is_active": False}
+        )
+        assert ok.status_code == 200, ok.text
+
+        renamed = await client.patch(
+            f"/api/v1/admin/crop-varieties/{variety_id}", json={"name_en": "Renamed"}
+        )
+        assert renamed.status_code == 422, renamed.text
+        assert renamed.json()["missing_arabic"] == ["name_ar"]
 
 
 @pytest.mark.asyncio

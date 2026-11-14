@@ -18,6 +18,7 @@ import { Card } from "@/components/Card";
 import { Field } from "@/components/Field";
 import { Pill } from "@/components/Pill";
 import type { Finding } from "@/api/decisionTreesBeta";
+import { needsArabic } from "@/lib/arabicRequired";
 
 import { FINDING_SEVERITIES, type FindingSeverity } from "../lib/betaConstants";
 import {
@@ -55,6 +56,15 @@ interface BetaNodePanelProps {
   onChangeKind: (kind: BetaNodeKind) => void;
   onDeclareCode: (code: string) => void;
   onDelete?: () => void;
+  /**
+   * D26: a platform tree is saved with an Arabic label beside every English
+   * one. When set, the Arabic label is marked required and a missing one is
+   * flagged here, judged against `savedNode` (this node in the latest stored
+   * version) the way the server judges it: an untouched English-only label on
+   * a seeded tree is left alone.
+   */
+  requireArabic?: boolean;
+  savedNode?: BetaNode | null;
 }
 
 export function BetaNodePanel({
@@ -69,9 +79,18 @@ export function BetaNodePanel({
   onChangeKind,
   onDeclareCode,
   onDelete,
+  requireArabic = false,
+  savedNode = null,
 }: BetaNodePanelProps): JSX.Element {
   const { t } = useTranslation("decisionTreesBeta");
   const kind = betaNodeKind(node);
+  const labelArMissing =
+    requireArabic &&
+    needsArabic(
+      node.label_en,
+      node.label_ar,
+      savedNode ? { en: savedNode.label_en, ar: savedNode.label_ar } : null,
+    );
 
   return (
     <Card
@@ -105,7 +124,11 @@ export function BetaNodePanel({
             />
           )}
         </Field>
-        <Field label={t("node.labelAr")}>
+        <Field
+          label={t("node.labelAr")}
+          required={requireArabic && Boolean(node.label_en?.trim())}
+          error={labelArMissing ? t("common:errors.arabicRequired") : undefined}
+        >
           {(props) => (
             <input
               {...props}

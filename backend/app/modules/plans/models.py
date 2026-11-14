@@ -90,6 +90,8 @@ class PlanActivity(Base, TimestampedMixin):
     product_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     dosage: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Copied from the operation manual when applied (tenant 0108, D26).
+    notes_ar: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'scheduled'"))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)

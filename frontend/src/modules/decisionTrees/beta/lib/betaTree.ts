@@ -704,12 +704,14 @@ export function writeTargeting(yaml: string, next: BetaTargeting): string {
 // ---- Starter ----------------------------------------------------------
 
 /** The smallest publishable beta tree: a condition, one register on the
- *  match side, and a single stop that both routes reach. */
+ *  match side, and a single stop that both routes reach. Every English text
+ *  has its Arabic beside it, because a platform tree is refused without
+ *  (D26) and a starter the author cannot save would be a poor start. */
 export const STARTER_BETA_YAML = `code: REPLACE_ME
 name_en: New beta tree
 name_ar: شجرة تجريبية جديدة
 description_en: One paragraph — what it checks and why.
-description_ar: ""
+description_ar: فقرة واحدة — ماذا تفحص ولماذا.
 
 registers:
   - dry
@@ -720,6 +722,7 @@ root: cond_1
 nodes:
   cond_1:
     label_en: Is leaf water low?
+    label_ar: هل ماء الورق منخفض؟
     condition:
       tree:
         op: lt
@@ -730,6 +733,7 @@ nodes:
 
   reg_1:
     label_en: Record low leaf water
+    label_ar: سجّل انخفاض ماء الورق
     register:
       code: dry
       severity: warning
@@ -737,6 +741,7 @@ nodes:
 
   stop_1:
     label_en: End
+    label_ar: النهاية
     stop: true
 `;
 

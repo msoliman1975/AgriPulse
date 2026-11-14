@@ -162,6 +162,18 @@ describe("ManualEditorPage", () => {
       target: { value: "Acetamiprid" },
     });
     expect(screen.getByText("You have unsaved changes.")).toBeTruthy();
+
+    // D26: the changed product needs its Arabic name before the save goes out.
+    fireEvent.click(save);
+    expect(
+      within(flowering).getAllByText(
+        "Arabic is required. Platform content is saved in English and Arabic.",
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(api.updatePlanTemplate).not.toHaveBeenCalled();
+    fireEvent.change(within(flowering).getByLabelText("Product (Arabic)"), {
+      target: { value: "أسيتاميبريد" },
+    });
     fireEvent.click(save);
 
     await waitFor(() => expect(api.updatePlanTemplate).toHaveBeenCalled());
@@ -170,6 +182,7 @@ describe("ManualEditorPage", () => {
     expect(body.activities[0]).toMatchObject({
       code: "spraying-1",
       product_name: "Acetamiprid",
+      product_name_ar: "أسيتاميبريد",
       stage_code: "flowering",
       offset_days: 7,
     });

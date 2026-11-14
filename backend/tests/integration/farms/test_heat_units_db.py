@@ -1,6 +1,6 @@
 """Heat units configured per crop (D17) against the database.
 
-Public 0112 (columns, CHECKs, the Medjool seed) and tenant 0108 (the block's
+Public 0112 (columns, CHECKs, the Medjool seed) and tenant 0109 (the block's
 own start), then the loader the tree context builders call: the crop's base
 from the catalogue, the method and start inherited down to Medjool, the start
 read from the latest transition into the pollination stage, and the farm's
@@ -189,7 +189,7 @@ async def test_loader_counts_medjool_from_the_latest_pollination(
     )
     assert snap == {"total": Decimal("28"), "today": Decimal("10"), "days_since_start": 3}
 
-    # The block's own start (tenant 0108) wins over the stage.
+    # The block's own start (tenant 0109) wins over the stage.
     await admin_session.execute(
         text("UPDATE block_crops SET gdd_start_date = '2026-03-03' WHERE id = :id").bindparams(
             bindparam("id", type_=_UUID)

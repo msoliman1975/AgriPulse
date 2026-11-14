@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Field, FIELD_CONTROL_CLASS } from "@/components/Field";
+import { needsArabic } from "@/lib/arabicRequired";
 import { apiMsg } from "@/modules/admin/lib/apiMsg";
 import { useCreateCrop, useCreateStrain, useCreateVariety } from "@/queries/cropCatalog";
 
@@ -80,7 +81,7 @@ export function CreateCropForm({
             />
           )}
         </Field>
-        <Field label={t("crops.form.nameAr")}>
+        <Field label={t("crops.form.nameAr")} required>
           {(props) => (
             <input
               {...props}
@@ -131,13 +132,19 @@ export function CreateNodeForm({
   const [code, setCode] = useState("");
   const [nameEn, setNameEn] = useState("");
   const [nameAr, setNameAr] = useState("");
+  const [tried, setTried] = useState(false);
   const mutation = level === "variety" ? createVariety : createStrain;
+  // D26: a variety or strain is saved with its Arabic name; the API refuses
+  // one without, so say so beside the input before the round trip.
+  const arabicMissing = needsArabic(nameEn, nameAr);
 
   const submit = (): void => {
+    setTried(true);
+    if (arabicMissing) return;
     const payload = {
       code: code.trim(),
       name_en: nameEn.trim(),
-      name_ar: nameAr.trim() || null,
+      name_ar: nameAr.trim(),
     };
     // The server derives the path; taking it from the response rather than
     // concatenating avoids the console selecting a node that doesn't exist.
@@ -187,7 +194,11 @@ export function CreateNodeForm({
             />
           )}
         </Field>
-        <Field label={t("crops.form.nameAr")}>
+        <Field
+          label={t("crops.form.nameAr")}
+          required
+          error={tried && arabicMissing ? t("common:errors.arabicRequired") : undefined}
+        >
           {(props) => (
             <input
               {...props}
@@ -195,6 +206,7 @@ export function CreateNodeForm({
               value={nameAr}
               dir="rtl"
               onChange={(e) => setNameAr(e.target.value)}
+              required
             />
           )}
         </Field>

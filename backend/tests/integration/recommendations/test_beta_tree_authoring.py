@@ -20,6 +20,8 @@ Three things are checked that nothing else can check:
 
 from __future__ import annotations
 
+import copy
+import json
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -71,6 +73,7 @@ def _definition(code: str, *, text_en: str = "first", registers: bool = False) -
             },
             "n_switch": {
                 "label_en": "How low is the canopy?",
+                "label_ar": "ما مدى انخفاض المظلة؟",
                 "switch": {
                     # The key that YAML turns into the boolean True. Stored as
                     # JSON it stays a string, which is the change this whole
@@ -80,7 +83,7 @@ def _definition(code: str, *, text_en: str = "first", registers: bool = False) -
                     "default": "n_stop",
                 },
             },
-            "n_stop": {"label_en": "End of the walk", "stop": True},
+            "n_stop": {"label_en": "End of the walk", "label_ar": "نهاية المسار", "stop": True},
         },
     }
     if registers:
@@ -88,6 +91,7 @@ def _definition(code: str, *, text_en: str = "first", registers: bool = False) -
         definition["nodes"]["n_start"]["next"] = "n_register"
         definition["nodes"]["n_register"] = {
             "label_en": "Leaf water is low",
+            "label_ar": "ماء الورق منخفض",
             "register": {"code": TEST_CODES[0], "severity": "warning"},
             "next": "n_switch",
         }
@@ -664,3 +668,55 @@ async def test_the_platform_still_cannot_open_a_tenants_tree(
     with pytest.raises(BetaTreeNotFoundError):
         await platform.get_tree(tree["id"])
     assert code not in {row["code"] for row in await platform.list_trees()}
+
+
+# ---- D26: Arabic beside English on platform trees ----------------------
+
+
+@pytest.mark.asyncio
+async def test_platform_tree_without_arabic_fails_at_save(admin_session: AsyncSession) -> None:
+    """A new platform tree with an English-only label is a 422 naming the node,
+    and nothing is written."""
+    service = await _service(admin_session)
+    code = _code("no_arabic")
+    definition = _definition(code)
+    del definition["nodes"]["n_stop"]["label_ar"]
+
+    with pytest.raises(FoldingCompileError) as caught:
+        await service.create_tree(code=code, definition=definition, notes=None, actor_user_id=None)
+    assert [(e.rule, e.node_ids) for e in caught.value.errors] == [("arabic-missing", ("n_stop",))]
+    count = (
+        await admin_session.execute(
+            text("SELECT count(*) AS n FROM public.decision_trees WHERE code = :c"),
+            {"c": code},
+        )
+    ).scalar_one()
+    assert count == 0
+
+
+@pytest.mark.asyncio
+async def test_untouched_english_only_label_still_resaves(admin_session: AsyncSession) -> None:
+    """Backward compatibility: a stored version with an English-only label (a
+    seeded tree) takes a new draft that leaves that label alone."""
+    service = await _service(admin_session)
+    code = _code("legacy_label")
+    tree = await service.create_tree(
+        code=code, definition=_definition(code), notes=None, actor_user_id=None
+    )
+    legacy = _definition(code)
+    del legacy["nodes"]["n_stop"]["label_ar"]
+    await admin_session.execute(
+        text(
+            "UPDATE public.decision_tree_versions SET definition = CAST(:d AS jsonb) "
+            "WHERE tree_id = CAST(:t AS uuid)"
+        ),
+        {"d": json.dumps(legacy), "t": str(tree["id"])},
+    )
+    await admin_session.commit()
+
+    moved = copy.deepcopy(legacy)
+    moved["nodes"]["n_stop"]["ui"] = {"x": 40, "y": 80}
+    out = await service.append_version(
+        tree_id=tree["id"], definition=moved, notes=None, actor_user_id=None
+    )
+    assert out["draft_version"] == 2

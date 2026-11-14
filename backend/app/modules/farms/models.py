@@ -581,7 +581,7 @@ class BlockCrop(Base, TimestampedMixin):
     effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
     planting_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     actual_harvest_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    # Per-block heat-unit start (D17, tenant 0108). When set it wins over
+    # Per-block heat-unit start (D17, tenant 0109). When set it wins over
     # the crop's gdd_start rule; null follows the crop.
     gdd_start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     # Canopy size pick from the crop's resolved ``size_classes`` lookup; a

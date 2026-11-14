@@ -109,7 +109,10 @@ async def test_save_keeps_ids_by_code(admin_session: AsyncSession) -> None:
             "mango-codes-1",
             [
                 PlanTemplateActivityInput(
-                    activity_type="soil_prep", anchor="start", title="Land prep"
+                    activity_type="soil_prep",
+                    anchor="start",
+                    title="Land prep",
+                    title_ar="تجهيز الأرض",
                 ),
                 PlanTemplateActivityInput(
                     activity_type="fertilizing",

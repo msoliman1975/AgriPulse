@@ -140,6 +140,8 @@ class ActivityResponse(BaseModel):
     # Copied from the operation manual (tenant 0101); null on manual rows.
     title: str | None = None
     title_ar: str | None = None
+    # Arabic notes copied from the manual (tenant 0108, D26).
+    notes_ar: str | None = None
     # Agri Operation saved plan the row came from, and whether its date was
     # moved away from the plan's default (tenant 0102).
     allocation_id: UUID | None = None
