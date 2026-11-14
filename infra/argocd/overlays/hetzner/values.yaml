@@ -4314,9 +4314,19 @@ global:
       #   list answers 200 with the planned_* keys.
       #   Rollback: api and workers to a892dc8. The column can stay; the old
       #   image never reads or writes it.
-      tag: "fa5460d"
+      # 2f112c5 = #870, api and workers (Medjool step 5, D13). Public 0111
+      #   seeds two DRAFT plan templates for Organic Medjool manual Edition
+      #   1.7: medjool-organic-bearing-eg-1-7 (43 activities) and
+      #   medjool-organic-new-planting-eg-1-7 (21), with English and Arabic
+      #   text, catalogue inputs and doses, source trees, and source links
+      #   (plan_template_activity). Drafts only: no tenant sees them until
+      #   they are published through the API. Workers move with the api.
+      #   Watch: migrate PreSync succeeds (public head 0111); GET
+      #   /plan-templates?crop_path=date_palm.medjool lists both drafts.
+      #   Rollback: api and workers to fa5460d; the draft rows can stay.
+      tag: "2f112c5"
     workers:
-      tag: "fa5460d"
+      tag: "2f112c5"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -5144,7 +5154,12 @@ global:
       #   Watch: the Action Center loads and its rows render; the Beta
       #   designer's tabs are unchanged.
       #   Rollback: this tag alone back to a892dc8.
-      tag: "fa5460d"
+      # 2f112c5 = #870, frontend, see the api note. The plan template editor
+      #   shows each activity's sources (Sources marker, D27).
+      #   Watch: open a Medjool 1.7 template in Platform > Plan templates; the
+      #   activities show their sources.
+      #   Rollback: frontend to fa5460d.
+      tag: "2f112c5"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
