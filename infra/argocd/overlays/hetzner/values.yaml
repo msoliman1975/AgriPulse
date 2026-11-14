@@ -4299,9 +4299,24 @@ global:
       #   returns the five new keys (null until a layout is recorded).
       #   Rollback: api and workers to 7a27d30. The new columns can stay; the
       #   old image never reads them.
-      tag: "a892dc8"
+      # fa5460d = #867, api and workers (Agri Operation 9, F1;
+      #   a892dc8..fa5460d is #867 alone). Tenant 0107 adds
+      #   recommendations.plan_activity_id (nullable, ON DELETE SET NULL).
+      #   When the engine opens a recommendation, its INSERT links the live
+      #   plan activity on the same block whose manual activity names the
+      #   tree (source_tree_code), scheduled or in progress, within 14 days;
+      #   one scalar subquery, no extra round trip. The Action Center returns
+      #   planned_activity_id, planned_date and title. No engine switch, no
+      #   tree publish. Additive migration, runs on PreSync. Workers move with
+      #   the api because the sweep writes recommendations.
+      #   Watch: migrate PreSync succeeds (tenant head 0107); the sweep's
+      #   recommendation inserts do not slow noticeably; the Action Center
+      #   list answers 200 with the planned_* keys.
+      #   Rollback: api and workers to a892dc8. The column can stay; the old
+      #   image never reads or writes it.
+      tag: "fa5460d"
     workers:
-      tag: "a892dc8"
+      tag: "fa5460d"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -5121,7 +5136,15 @@ global:
       #   Watch: edit a block, the three fields show; saving without changes
       #   still works.
       #   Rollback: frontend to 7a27d30 together with the api.
-      tag: "a892dc8"
+      # fa5460d = #867, frontend (Agri Operation 9). An Action Center row a
+      #   saved plan already covers shows "Already planned · date" (title on
+      #   hover), and Open on board goes to that activity when the item has
+      #   not been dispatched. EN and AR. The fields are optional in the
+      #   client, so it also renders against an older api.
+      #   Watch: the Action Center loads and its rows render; the Beta
+      #   designer's tabs are unchanged.
+      #   Rollback: this tag alone back to a892dc8.
+      tag: "fa5460d"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
