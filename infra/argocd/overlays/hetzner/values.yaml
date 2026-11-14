@@ -4197,9 +4197,24 @@ global:
       #   UTC and the light worker logs phenology_advance_done; QA Medjool
       #   blocks then show a growth stage (post_harvest in November).
       #   Rollback: workers to 5ee27fc.
-      tag: "5ee27fc"
+      # e842760 = #848, api and workers (Agri Operation PR 1). Operation
+      #   manual content: public 0104 adds a stable code, title/title_ar,
+      #   Arabic notes/product/dosage, evidence tier and source tree to each
+      #   manual activity, plus revision/published_at on manuals, and backfills
+      #   codes and EN/AR titles for the live mango, potato and Medjool
+      #   manuals. Tenant 0101 adds title/title_ar to plan_activities; apply
+      #   copies them. A manual save now keeps activity ids by code. Both
+      #   migrations are additive and run on PreSync. Workers move with the
+      #   api so both run the same models.
+      #   Watch: the migrate PreSync job succeeds (public head 0104, tenant
+      #   head 0101); GET /api/v1/plan-templates/{id} as platform admin shows
+      #   code and title on each activity; applying a manual on the board
+      #   still works.
+      #   Rollback: api to 5ee27fc, workers to f840a77. The new columns can
+      #   stay; the old image never reads them.
+      tag: "e842760"
     workers:
-      tag: "f840a77"
+      tag: "e842760"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -4956,7 +4971,15 @@ global:
       #   Watch: the Readiness tab loads for a Medjool tree as platform admin
       #   and as a tenant; the other four tabs are unchanged.
       #   Rollback: this tag alone back to 5be0f66.
-      tag: "5ee27fc"
+      # e842760 = #848, frontend, see the api note. The platform plan template
+      #   editor sends each activity's code and the new content fields back
+      #   on save, so a save keeps titles, Arabic text, evidence and source.
+      #   Must ship with the api at e842760: an older editor would blank the
+      #   new fields on save.
+      #   Watch: open a manual in Platform > Plan templates, save without
+      #   changes, and the activities keep their titles.
+      #   Rollback: frontend to 5ee27fc together with the api.
+      tag: "e842760"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
