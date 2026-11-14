@@ -48,6 +48,11 @@ class AllocatedActivity:
     start_time: Any
     date_overridden: bool
     default_date: date
+    # D20: the catalogue input and structured dose of a manual activity.
+    input_id: Any = None
+    dose_value: Any = None
+    dose_value_max: Any = None
+    dose_unit: str | None = None
 
 
 def custom_key(custom: dict[str, Any]) -> str:
@@ -135,6 +140,10 @@ def resolve_allocation(
                 start_time=r.start_time,
                 date_overridden=bool(override),
                 default_date=r.scheduled_date,
+                input_id=r.input_id,
+                dose_value=r.dose_value,
+                dose_value_max=r.dose_value_max,
+                dose_unit=r.dose_unit,
             )
         )
 

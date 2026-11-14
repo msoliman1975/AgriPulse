@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import type { ActivityType, BoardActivity } from "@/api/plans";
 import { useDateLocale } from "@/hooks/useDateLocale";
-import { localizedName } from "@/lib/localizedField";
+import { localizedField, localizedName } from "@/lib/localizedField";
 
 /** Color hint per activity type, using the design system's ap activity tokens
  *  (soft wash + token text + soft border). Keep keys aligned with backend
@@ -60,8 +60,10 @@ export function ActivityChip({ activity, onClick }: ActivityChipProps): ReactNod
   const dayLabel = format(parseISO(activity.scheduled_date), "EEE", { locale: dateLocale });
   const isCompleted = activity.status === "completed";
   const isSkipped = activity.status === "skipped";
-  const fromTemplate = activity.source === "template";
+  const fromPlan = Boolean(activity.allocation_id);
+  const fromTemplate = activity.source === "template" && !fromPlan;
   const stageCode = activity.anchored_stage_code ?? null;
+  const title = localizedField(i18n.language, activity.title ?? null, activity.title_ar);
 
   return (
     <button
@@ -73,11 +75,27 @@ export function ActivityChip({ activity, onClick }: ActivityChipProps): ReactNod
         isCompleted && "opacity-60 line-through",
         isSkipped && "opacity-40 line-through",
       )}
-      title={`${t(`type.${activity.activity_type}`)} — ${activity.scheduled_date}`}
+      title={`${title ?? t(`type.${activity.activity_type}`)} — ${activity.scheduled_date}`}
     >
       <span className="flex items-center gap-1 font-medium">
         <span aria-hidden="true">{icon}</span>
         <span className="truncate">{t(`type.${activity.activity_type}`)}</span>
+        {fromPlan ? (
+          <span
+            className="rounded bg-ap-primary-soft px-1 text-[9px] font-semibold uppercase text-ap-primary"
+            title={t("template.fromPlan")}
+          >
+            {t("template.planBadge")}
+          </span>
+        ) : null}
+        {activity.date_overridden ? (
+          <span
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-ap-ink"
+            role="img"
+            aria-label={t("template.moved")}
+            title={t("template.moved")}
+          />
+        ) : null}
         {fromTemplate ? (
           <span
             className="rounded bg-ap-accent/15 px-1 text-[9px] font-semibold uppercase text-ap-accent"
@@ -88,6 +106,7 @@ export function ActivityChip({ activity, onClick }: ActivityChipProps): ReactNod
         ) : null}
         <span className="ms-auto text-[10px] uppercase text-ap-muted">{dayLabel}</span>
       </span>
+      {title ? <span className="truncate text-[11px] text-ap-ink">{title}</span> : null}
       {stageCode ? (
         <span className="truncate text-[10px] text-ap-muted" title={stageCode}>
           {t("template.atStage", { stage: stageCode })}

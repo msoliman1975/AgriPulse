@@ -7,7 +7,13 @@
     "badge": "Tpl",
     "fromTemplate": "Generated from a plan template",
     "atStage": "scheduled at {{stage}}",
-    "applyButton": "Apply template"
+    "applyButton": "Apply template",
+    "planBadge": "Plan",
+    "fromPlan": "From a saved Agri Operation plan",
+    "fromPlanDetail": "From a saved Agri Operation plan.",
+    "openAgriOperation": "Open in Agri Operation",
+    "moved": "Date moved from the plan",
+    "agriOperationLink": "Plan from a manual"
   },
   "nav": {
     "prev": "Prev",

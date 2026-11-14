@@ -9,6 +9,7 @@ template's still-scheduled rows, preserves manual + completed rows.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from typing import Any
 from uuid import UUID
 
@@ -584,6 +585,9 @@ class PlanTemplatesService:
             allocation_id=allocation_id, actor_user_id=actor_user_id
         )
         kept_keys = await self._repo.allocation_kept_keys(allocation_id=allocation_id)
+        input_names = await self._repo.input_names(
+            {a.input_id for b in resolved["blocks"] for a in b["activities"] if a.input_id}
+        )
         created = kept = skipped = 0
         for b in resolved["blocks"]:
             skipped += len(b["skipped"])
@@ -591,13 +595,20 @@ class PlanTemplatesService:
                 if (b["block_id"], a.activity_key) in kept_keys:
                     kept += 1
                     continue
+                # Same fallbacks as a template apply (D20): the input's name and
+                # the structured dose fill in a missing product or dosage text.
+                row = replace(
+                    a,
+                    product_name=a.product_name or input_names.get(a.input_id),
+                    dosage=a.dosage or format_dose(a.dose_value, a.dose_value_max, a.dose_unit),
+                )
                 await self._repo.insert_allocated_activity(
                     allocation_id=allocation_id,
                     plan_id=plan_id,
                     farm_id=farm_id,
                     block_id=b["block_id"],
                     template_id=payload.template_id,
-                    activity=a,
+                    activity=row,
                     actor_user_id=actor_user_id,
                 )
                 created += 1

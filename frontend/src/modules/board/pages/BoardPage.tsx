@@ -14,6 +14,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 
 import type { ActivityType, BoardActivity, BoardBlock, BoardResourceChip } from "@/api/plans";
 import { Card } from "@/components/Card";
+import { LinkButton } from "@/components/LinkButton";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/Skeleton";
@@ -29,7 +30,6 @@ import { useScheduleRecommendation } from "@/queries/recScheduling";
 
 import { ActivityChip } from "../components/ActivityChip";
 import { ActivityDetailDialog } from "../components/ActivityDetailDialog";
-import { ApplyTemplateDialog } from "../components/ApplyTemplateDialog";
 import { BoardCell, type RecDropPayload } from "../components/BoardCell";
 import { BoardFilters } from "../components/BoardFilters";
 import { BoardMobileList } from "../components/BoardMobileList";
@@ -178,7 +178,6 @@ export function BoardPage(): ReactNode {
     columnUnit: "day" | "month";
   } | null>(null);
   const [openActivity, setOpenActivity] = useState<BoardActivity | null>(null);
-  const [applyTemplateOpen, setApplyTemplateOpen] = useState(false);
 
   // Open the deep-linked activity once the board data is available, re-anchoring
   // the window so it is actually visible. Runs once: the guard ref stops it from
@@ -347,15 +346,11 @@ export function BoardPage(): ReactNode {
         subtitle={t("subtitle")}
         actions={
           <div className="flex items-center gap-2">
-            {canManage ? (
-              <button
-                type="button"
-                onClick={() => setApplyTemplateOpen(true)}
-                className="rounded-md border border-ap-primary px-3 py-1.5 text-sm font-medium text-ap-primary hover:bg-ap-primary-soft"
-              >
-                {t("template.applyButton")}
-              </button>
-            ) : null}
+            {/* Applying a manual moved to Agri Operation, where it is saved
+            and can be edited (decisions A2 + G2). */}
+            <LinkButton variant="secondary" size="sm" to={`/agri-operation/${farmId}`}>
+              {t("template.agriOperationLink")}
+            </LinkButton>
             <SeasonSelect year={selectedYear} years={seasonYears} onChange={changeSeasonYear} />
             <ViewModeToggle mode={viewMode} onChange={changeViewMode} />
             <RangeNavigator label={rangeLabel} onShift={shiftAnchor} onToday={onTodayPressed} />
@@ -495,9 +490,6 @@ export function BoardPage(): ReactNode {
           activity={openActivity}
           onClose={() => setOpenActivity(null)}
         />
-      ) : null}
-      {applyTemplateOpen ? (
-        <ApplyTemplateDialog farmId={farmId} onClose={() => setApplyTemplateOpen(false)} />
       ) : null}
     </Page>
   );

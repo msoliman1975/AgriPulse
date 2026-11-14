@@ -14,6 +14,7 @@ import {
   LandUnitsIcon,
   PanelToggleIcon,
   PlanIcon,
+  AgriOperationIcon,
   RecommendationsIcon,
   ReportsIcon,
   RulesIcon,
@@ -421,6 +422,17 @@ export function SideNav({ variant = "rail" }: { variant?: SideNavVariant }): Rea
             icon={<PlanIcon className="h-4 w-4" />}
             disabled={!hasFarm}
             activePathPrefix="/board/"
+            collapsed={collapsed}
+          />
+          {/* Agri Operation: operation manuals and the saved plans built from
+          them (docs/proposals/agri-operation-build-plan.md, decision A1). Next
+          to Plan because saving a plan writes to that board. */}
+          <SideNavItem
+            to={hasFarm ? `/agri-operation/${farmSegment}` : "#"}
+            label={t("common:workspaceNav.agriOperation")}
+            icon={<AgriOperationIcon className="h-4 w-4" />}
+            disabled={!hasFarm}
+            activePathPrefix="/agri-operation/"
             collapsed={collapsed}
           />
           {/* The replay surface. Sits after Plan because it is read-only

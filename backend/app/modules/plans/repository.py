@@ -306,6 +306,7 @@ class PlansRepository:
                           a.completed_at, a.completed_by,
                           a.created_at, a.updated_at,
                           a.source, a.anchored_stage_code, a.title, a.title_ar,
+                          a.allocation_id, a.date_overridden,
                           COALESCE(
                             (
                               SELECT json_agg(
@@ -363,7 +364,8 @@ class PlansRepository:
                                a.product_name, a.dosage,
                                a.notes, a.status, a.completed_at, a.completed_by,
                                a.created_at, a.updated_at,
-                               a.source, a.anchored_stage_code, a.title, a.title_ar
+                               a.source, a.anchored_stage_code, a.title, a.title_ar,
+                          a.allocation_id, a.date_overridden
                         FROM plan_activities a
                         WHERE a.farm_id = :farm_id
                           AND a.deleted_at IS NULL

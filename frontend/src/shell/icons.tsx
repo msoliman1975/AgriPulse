@@ -138,6 +138,18 @@ export function PlanIcon(props: IconProps): ReactNode {
   );
 }
 
+export function AgriOperationIcon(props: IconProps): ReactNode {
+  // A clipboard with a leaf: the operation manual a plan is built from.
+  return (
+    <svg {...base(props)}>
+      <rect x="5" y="4" width="14" height="17" rx="2" />
+      <path d="M9 4V3h6v1" />
+      <path d="M9 15c0-3 2-5 6-5 0 4-2 6-6 6" />
+      <path d="M9 17l2.5-2.5" />
+    </svg>
+  );
+}
+
 export function AlertsIcon(props: IconProps): ReactNode {
   return (
     <svg {...base(props)}>

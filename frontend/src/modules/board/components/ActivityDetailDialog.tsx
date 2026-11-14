@@ -4,8 +4,10 @@ import { useTranslation } from "react-i18next";
 
 import type { ActivityType, BoardActivity } from "@/api/plans";
 import type { Resource } from "@/api/resources";
+import { Link } from "react-router-dom";
+
 import { Modal } from "@/components/Modal";
-import { localizedName } from "@/lib/localizedField";
+import { localizedField, localizedName } from "@/lib/localizedField";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useCapability } from "@/rbac/useCapability";
 import { useDeleteActivity, useUpdateActivity } from "@/queries/plans";
@@ -45,7 +47,7 @@ export function ActivityDetailDialog({
   activity,
   onClose,
 }: ActivityDetailDialogProps): ReactNode {
-  const { t } = useTranslation("board");
+  const { t, i18n } = useTranslation("board");
   const canComplete = useCapability("plan_activity.complete");
   const canManage = useCapability("plan.manage");
   const update = useUpdateActivity();
@@ -70,8 +72,21 @@ export function ActivityDetailDialog({
   return (
     <Modal open onClose={onClose} labelledBy="activity-detail-title" className="max-w-md">
       <h2 id="activity-detail-title" className="text-base font-semibold text-ap-ink">
-        {t(`type.${activity.activity_type}`)}
+        {localizedField(i18n.language, activity.title ?? null, activity.title_ar) ??
+          t(`type.${activity.activity_type}`)}
       </h2>
+      {activity.title ? (
+        <p className="text-xs text-ap-muted">{t(`type.${activity.activity_type}`)}</p>
+      ) : null}
+      {activity.allocation_id ? (
+        <p className="mt-1 text-xs text-ap-muted">
+          {t("template.fromPlanDetail")}{" "}
+          <Link className="font-medium text-ap-primary underline" to={`/agri-operation/${_farmId}`}>
+            {t("template.openAgriOperation")}
+          </Link>
+          {activity.date_overridden ? ` · ${t("template.moved")}` : ""}
+        </p>
+      ) : null}
 
       {mode === "view" ? (
         <ViewBody activity={activity} />

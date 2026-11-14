@@ -7,7 +7,13 @@
     "badge": "قالب",
     "fromTemplate": "مُولّد من قالب خطة",
     "atStage": "مُجدول عند {{stage}}",
-    "applyButton": "تطبيق قالب"
+    "applyButton": "تطبيق قالب",
+    "planBadge": "خطة",
+    "fromPlan": "من خطة محفوظة في العمليات الزراعية",
+    "fromPlanDetail": "من خطة محفوظة في العمليات الزراعية.",
+    "openAgriOperation": "افتح في العمليات الزراعية",
+    "moved": "تم تغيير التاريخ عن الخطة",
+    "agriOperationLink": "خطة من دليل"
   },
   "nav": {
     "prev": "السابق",
