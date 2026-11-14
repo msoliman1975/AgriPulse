@@ -22,6 +22,7 @@ export type TelemetryEventName =
   | "session_start";
 
 export type TelemetryFeature =
+  | "agri_operation"
   | "alerts"
   | "backfill_console"
   | "block_create"
@@ -36,6 +37,7 @@ export type TelemetryFeature =
   | "imagery_config"
   | "index_chart"
   | "insights"
+  | "operation_manual"
   | "plan_template"
   | "platform_admin"
   | "recommendations"
@@ -48,6 +50,7 @@ export type TelemetryFeature =
   | "weather_config";
 
 export type TelemetryFlow =
+  | "agri_operation_plan"
   | "backfill_run"
   | "block_bulk_upload"
   | "decision_tree_authoring"
@@ -68,6 +71,7 @@ export const ALLOWED_PROPS: Record<TelemetryEventName, readonly string[]> = {
 } as const;
 
 export const FEATURES: readonly TelemetryFeature[] = [
+  "agri_operation",
   "alerts",
   "backfill_console",
   "block_create",
@@ -82,6 +86,7 @@ export const FEATURES: readonly TelemetryFeature[] = [
   "imagery_config",
   "index_chart",
   "insights",
+  "operation_manual",
   "plan_template",
   "platform_admin",
   "recommendations",
@@ -97,6 +102,7 @@ export const FEATURES: readonly TelemetryFeature[] = [
 /** `timeoutMinutes` is what the server-side abandonment query uses; the client
  * never enforces it, because the case we care about is the user who left. */
 export const FLOWS: Record<TelemetryFlow, { timeoutMinutes: number; steps: readonly string[] }> = {
+  agri_operation_plan: { timeoutMinutes: 60, steps: ["blocks", "operations", "season", "calendar"] },
   backfill_run: { timeoutMinutes: 30, steps: ["select_farm", "select_range", "preview", "submit"] },
   block_bulk_upload: { timeoutMinutes: 30, steps: ["pick_files", "map_columns", "reconcile", "commit"] },
   decision_tree_authoring: { timeoutMinutes: 120, steps: ["open", "edit", "dry_run", "publish"] },

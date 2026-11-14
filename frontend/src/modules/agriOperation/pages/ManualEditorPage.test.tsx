@@ -33,6 +33,11 @@ vi.mock("@/api/agriOperation", async (importOriginal) => ({
   getAuthoringManual: api.getAuthoringManual,
   getPublishImpact: api.getPublishImpact,
 }));
+const sources = vi.hoisted(() => ({ listSourceLinks: vi.fn(async () => []) }));
+vi.mock("@/api/sources", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  listSourceLinks: sources.listSourceLinks,
+}));
 vi.mock("@/api/inputs", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   listInputs: vi.fn(async () => []),
@@ -144,6 +149,12 @@ describe("ManualEditorPage", () => {
     expect(within(flowering).getByText("Spray against mango leafhopper")).toBeTruthy();
     const pre = screen.getByRole("heading", { name: "Pre-flowering" }).closest("section")!;
     expect(within(pre).getByText("No activities in this stage.")).toBeTruthy();
+
+    // D27: each saved activity asks for its sources by manual and activity code.
+    expect(sources.listSourceLinks).toHaveBeenCalledWith(
+      "plan_template_activity",
+      "mango-keitt-eg/spraying-1",
+    );
 
     const save = screen.getByRole("button", { name: "Save draft" });
     expect(save).toHaveProperty("disabled", true);

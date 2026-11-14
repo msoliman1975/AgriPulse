@@ -9,13 +9,14 @@ planned activity. Only a real database can prove the lookup and the join.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import bindparam, text
+from sqlalchemy import bindparam, event, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from app.modules.action_center.repository import ActionCenterRepository
@@ -30,6 +31,26 @@ _POLY = "POLYGON((31.2 30.0,31.3 30.0,31.3 30.1,31.2 30.1,31.2 30.0))"
 _TREE = "t_hopper_f1"
 _TODAY = date(2026, 3, 10)
 _SHARED: dict[str, Any] = {}
+
+
+@pytest.fixture(autouse=True)
+def _tenant_search_path(admin_session: Any) -> Iterator[None]:
+    """Set the tenant search path at the start of every transaction.
+
+    A commit hands the connection back to the pool and the next statement may
+    get another one, which does not carry an earlier `SET search_path`. Tests
+    here commit and then read, so they only passed while the pool happened to
+    hand the same connection back.
+    """
+
+    def _set(_session: Any, _transaction: Any, connection: Any) -> None:
+        schema = _SHARED.get("schema")
+        if schema:
+            connection.exec_driver_sql(f'SET search_path TO "{schema}", public')
+
+    event.listen(admin_session.sync_session, "after_begin", _set)
+    yield
+    event.remove(admin_session.sync_session, "after_begin", _set)
 
 
 async def _use_tenant(session: Any) -> None:

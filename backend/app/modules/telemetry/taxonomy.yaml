@@ -76,6 +76,11 @@ features:
   - weather_chart
   - board
   - plan_template
+  # Agri Operation: a farm saving a plan (action plan_saved, count = blocks),
+  # and the platform manual editor (manual_created, manual_saved,
+  # manual_published). The wizard itself is the agri_operation_plan flow.
+  - agri_operation
+  - operation_manual
   - alerts
   - recommendations
   - decision_tree_authoring
@@ -103,3 +108,7 @@ flows:
   decision_tree_authoring:
     timeout_minutes: 120
     steps: [open, edit, dry_run, publish]
+  agri_operation_plan:
+    # The four-step saved-plan wizard; complete is the save.
+    timeout_minutes: 60
+    steps: [blocks, operations, season, calendar]

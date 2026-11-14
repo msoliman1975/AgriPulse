@@ -3,7 +3,7 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -21,6 +21,8 @@ import { StatusBanner } from "@/components/StatusBanner";
 import { resolveErrorMessage } from "@/components/asyncState";
 import { localizedField, localizedName } from "@/lib/localizedField";
 import { useSaveSavedPlan } from "@/queries/agriOperation";
+import { trackFeature } from "@/telemetry";
+import { useFlow } from "@/telemetry/useFlow";
 import { TYPE_CLASS } from "../lib/manualStyle";
 import {
   draftProblems,
@@ -35,6 +37,8 @@ import { stageName } from "../lib/manualStyle";
 import { WeekCalendar } from "./WeekCalendar";
 
 type Step = 1 | 2 | 3 | 4;
+// Step names as the telemetry taxonomy lists them (flow agri_operation_plan).
+const STEP_NAMES = { 1: "blocks", 2: "operations", 3: "season", 4: "calendar" } as const;
 
 interface PlanWizardProps {
   farmId: string;
@@ -56,6 +60,18 @@ export function PlanWizard({
   const [step, setStep] = useState<Step>(1);
   const [result, setResult] = useState<AllocationApplyResult | null>(null);
   const save = useSaveSavedPlan(farmId);
+  // Telemetry: how far people get through the wizard, and how often a new
+  // plan or an edit is saved. No farm content travels, only step names.
+  // useFlow returns a new object each render; its callbacks are stable.
+  const flow = useFlow("agri_operation_plan");
+  const { start: startFlow, step: stepFlow } = flow;
+  const editing = Boolean(draft.id);
+  useEffect(() => {
+    startFlow(editing ? "edit" : "new");
+  }, [startFlow, editing]);
+  useEffect(() => {
+    stepFlow(STEP_NAMES[step]);
+  }, [stepFlow, step]);
 
   const blocks = useQuery({
     queryKey: ["blocks", farmId, "agri_operation"],
@@ -215,7 +231,19 @@ export function PlanWizard({
             <Button
               disabled={save.isPending || !preview.data || preview.data.rejected_blocks.length > 0}
               onClick={() =>
-                save.mutate({ id: draft.id, body: request }, { onSuccess: (r) => setResult(r) })
+                save.mutate(
+                  { id: draft.id, body: request },
+                  {
+                    onSuccess: (r) => {
+                      setResult(r);
+                      flow.complete();
+                      trackFeature("agri_operation", {
+                        farm_id: farmId,
+                        props: { action: "plan_saved", count: draft.blockIds.length },
+                      });
+                    },
+                  },
+                )
               }
             >
               {draft.id ? t("plan.saveChanges") : t("plan.apply")}

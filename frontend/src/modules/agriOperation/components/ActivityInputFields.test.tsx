@@ -7,7 +7,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { Input } from "@/api/inputs";
 import { setupTestI18n } from "@/i18n/testing";
 
-import { ActivityInputFields, type ActivityRow } from "./PlanTemplateEditorPage";
+import { ActivityInputFields, type ActivityRow } from "./ActivityInputFields";
 
 const SULPHUR = {
   id: "i1",

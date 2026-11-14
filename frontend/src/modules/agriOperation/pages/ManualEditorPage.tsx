@@ -23,7 +23,7 @@ import { Skeleton } from "@/components/Skeleton";
 import { StatusBanner } from "@/components/StatusBanner";
 import { resolveErrorMessage } from "@/components/asyncState";
 import { localizedField, localizedName } from "@/lib/localizedField";
-import { ActivityInputFields } from "@/modules/admin/pages/PlanTemplateEditorPage";
+import { ActivityInputFields } from "../components/ActivityInputFields";
 import { CropPathFilter } from "@/modules/reports/components/CropPathFilter";
 import { useAuthoringManual, usePublishImpact } from "@/queries/agriOperation";
 import {
@@ -35,6 +35,8 @@ import {
   useTemplatePhenology,
   useUpdatePlanTemplate,
 } from "@/queries/planTemplates";
+import { SourcesMarker } from "@/modules/sources/SourcesMarker";
+import { trackFeature } from "@/telemetry";
 import { StageRibbon } from "../components/ManualView";
 import {
   draftFromDetail,
@@ -144,6 +146,7 @@ export function ManualEditorPage(): ReactNode {
       create.mutate(body, {
         onSuccess: (saved) => {
           setDirty(false);
+          trackFeature("operation_manual", { props: { action: "manual_created" } });
           navigate(`/platform/operation-manuals/${saved.id}`);
         },
         onError: (e) => setError(e.message),
@@ -153,6 +156,7 @@ export function ManualEditorPage(): ReactNode {
         onSuccess: (saved) => {
           setDraft(draftFromDetail(saved));
           setDirty(false);
+          trackFeature("operation_manual", { props: { action: "manual_saved" } });
         },
         onError: (e) => setError(e.message),
       });
@@ -224,7 +228,10 @@ export function ManualEditorPage(): ReactNode {
           onCancel={() => setPublishing(false)}
           onConfirm={() =>
             publish.mutate(templateId, {
-              onSuccess: () => setPublishing(false),
+              onSuccess: () => {
+                setPublishing(false);
+                trackFeature("operation_manual", { props: { action: "manual_published" } });
+              },
               onError: (e) => setError(e.message),
             })
           }
@@ -375,6 +382,7 @@ export function ManualEditorPage(): ReactNode {
                   stages={stages}
                   milestones={draft.milestones.map((m) => m.code).filter(Boolean)}
                   moreAnchors={moreAnchors}
+                  manualCode={detail.data?.code ?? null}
                   inputs={inputs.data ?? []}
                   onChange={(patch) => editActivity(a.key, patch)}
                   onRemove={() =>
@@ -434,6 +442,7 @@ export function ManualEditorPage(): ReactNode {
                     stages={stages}
                     milestones={draft.milestones.map((m) => m.code).filter(Boolean)}
                     moreAnchors
+                    manualCode={detail.data?.code ?? null}
                     inputs={inputs.data ?? []}
                     onChange={(patch) => editActivity(a.key, patch)}
                     onRemove={() =>
@@ -636,6 +645,7 @@ function ActivityEditorRow({
   stages,
   milestones,
   moreAnchors,
+  manualCode,
   inputs,
   onChange,
   onRemove,
@@ -645,6 +655,8 @@ function ActivityEditorRow({
   stages: PhenologyStage[];
   milestones: string[];
   moreAnchors: boolean;
+  /** The saved manual's code; source links are keyed by it (D27). */
+  manualCode: string | null;
   inputs: Parameters<typeof ActivityInputFields>[0]["inputs"];
   onChange: (patch: Partial<ActivityDraft>) => void;
   onRemove: () => void;
@@ -820,6 +832,17 @@ function ActivityEditorRow({
               ))}
             </select>
           </label>
+          {/* D27: the sources this activity cites, keyed by manual and
+              activity code so the link survives revisions. Renders nothing
+              when there are none. */}
+          {manualCode && a.code ? (
+            <div className="sm:col-span-2 lg:col-span-4">
+              <SourcesMarker
+                entityType="plan_template_activity"
+                entityKey={`${manualCode}/${a.code}`}
+              />
+            </div>
+          ) : null}
           <div className="flex items-end sm:col-span-2 lg:col-span-2">
             <Button size="sm" variant="ghost" onClick={onRemove}>
               {t("editor.removeActivity")}
