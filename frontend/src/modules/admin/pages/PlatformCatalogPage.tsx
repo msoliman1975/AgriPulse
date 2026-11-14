@@ -295,9 +295,19 @@ function Inspector({
       <div key={path}>
         {tab === "details" ? (
           chain.strain ? (
-            <NodeDetailsForm node={chain.strain} level="strain" canManage={canManage} />
+            <NodeDetailsForm
+              node={chain.strain}
+              level="strain"
+              canManage={canManage}
+              chain={chain}
+            />
           ) : chain.variety ? (
-            <NodeDetailsForm node={chain.variety} level="variety" canManage={canManage} />
+            <NodeDetailsForm
+              node={chain.variety}
+              level="variety"
+              canManage={canManage}
+              chain={chain}
+            />
           ) : (
             <CropDetailsForm crop={chain.crop} canManage={canManage} />
           )

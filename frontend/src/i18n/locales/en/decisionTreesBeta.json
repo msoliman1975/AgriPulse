@@ -533,6 +533,7 @@
     "kind": {
       "block_field": "Block field",
       "crop_attribute": "Crop attribute",
+      "heat_units": "Heat units",
       "signal": "Scout record",
       "index": "Satellite index",
       "weather": "Farm weather",
@@ -542,6 +543,7 @@
     "fix": {
       "block_field": "Edit block",
       "crop_attribute": "Edit block",
+      "heat_units": "Open block",
       "signal": "Open block",
       "index": "Open block",
       "weather": "Open block",

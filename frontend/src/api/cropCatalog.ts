@@ -12,6 +12,7 @@ import type {
   CropAttributeOption,
   CropVariety,
   CropVarietyStrain,
+  HeatUnitSettings,
 } from "./crops";
 
 // Crop-level agronomic settings shared by create and update.
@@ -19,7 +20,7 @@ import type {
 // The GDD temperatures read back as strings (JSON has no decimal type) but are
 // written as numbers, which is what a numeric input yields; pydantic accepts
 // either. Ranges are the server's: base 0–40 °C, upper 0–60 °C.
-interface CropSettingsPayload {
+interface CropSettingsPayload extends HeatUnitSettings {
   is_perennial?: boolean;
   scientific_name?: string | null;
   classification_depth?: ClassificationDepth;
@@ -94,7 +95,7 @@ export interface SizeClassPayload {
 // `default_thresholds` is the odd one out — it shallow-merges per key rather
 // than replacing. It is also, today, read by nothing: `resolve_thresholds()`
 // has no callers anywhere in the backend.
-export interface TaxonomyOverridePayload {
+export interface TaxonomyOverridePayload extends HeatUnitSettings {
   phenology_stages_override?: { stages: PhenologyStagePayload[] } | null;
   size_classes_override?: { classes: SizeClassPayload[] } | null;
   default_thresholds?: Record<string, unknown> | null;

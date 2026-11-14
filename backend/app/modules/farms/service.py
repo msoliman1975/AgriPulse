@@ -84,6 +84,7 @@ from app.modules.farms.events import (
     FarmReactivatedV1,
     FarmUpdatedV1,
 )
+from app.modules.farms.heat_units import validate_start as validate_heat_unit_start
 from app.modules.farms.models import BlockCrop, Crop
 from app.modules.farms.phenology import (
     validate_phenology_payload,
@@ -3749,6 +3750,7 @@ class FarmServiceImpl:
             is_perennial=bool(fields.get("is_perennial", False)),
             has_gdd_base=fields.get("gdd_base_temp_c") is not None,
         )
+        _validate_gdd_start(fields, existing=None)
         if await self._repo.crop_code_exists(code=code):
             raise CropCatalogConflictError(level="crop", code=code)
         out = await self._repo.create_crop(fields=fields)
@@ -3775,6 +3777,7 @@ class FarmServiceImpl:
             is_perennial=bool(is_perennial),
             has_gdd_base=gdd_base is not None,
         )
+        _validate_gdd_start(fields, existing=crop)
         out = await self._repo.update_crop(crop=crop, fields=fields)
         await self._audit_catalog(
             event_type="farms.crop_updated",
@@ -3805,6 +3808,7 @@ class FarmServiceImpl:
             is_perennial=crop.is_perennial,
             has_gdd_base=crop.gdd_base_temp_c is not None,
         )
+        _validate_gdd_start(overrides, existing=None)
         if await self._repo.variety_code_exists(crop_id=crop_id, code=code):
             raise CropCatalogConflictError(level="variety", code=code)
         out = await self._repo.create_variety(
@@ -3837,6 +3841,7 @@ class FarmServiceImpl:
             is_perennial=bool(crop.is_perennial) if crop else False,
             has_gdd_base=crop.gdd_base_temp_c is not None if crop else False,
         )
+        _validate_gdd_start(fields, existing=variety)
         out = await self._repo.update_variety(variety=variety, fields=fields)
         await self._audit_catalog(
             event_type="farms.crop_variety_updated",
@@ -3868,6 +3873,7 @@ class FarmServiceImpl:
             is_perennial=bool(crop.is_perennial) if crop else False,
             has_gdd_base=crop.gdd_base_temp_c is not None if crop else False,
         )
+        _validate_gdd_start(overrides, existing=None)
         if await self._repo.strain_code_exists(crop_variety_id=crop_variety_id, code=code):
             raise CropCatalogConflictError(level="strain", code=code)
         out = await self._repo.create_strain(
@@ -3901,6 +3907,7 @@ class FarmServiceImpl:
             is_perennial=bool(crop.is_perennial) if crop else False,
             has_gdd_base=crop.gdd_base_temp_c is not None if crop else False,
         )
+        _validate_gdd_start(fields, existing=strain)
         out = await self._repo.update_strain(strain=strain, fields=fields)
         await self._audit_catalog(
             event_type="farms.crop_strain_updated",
@@ -4103,6 +4110,29 @@ def _validate_catalog_payloads(
         if size_classes is not None:
             validate_size_classes_payload(size_classes)
     except ValueError as exc:  # pydantic.ValidationError is a ValueError
+        raise CropCatalogValidationError(reason=str(exc)) from exc
+
+
+def _validate_gdd_start(fields: dict[str, Any], *, existing: Any | None) -> None:
+    """Check the heat-unit start pair (D17) as it will be stored, mapping to 422.
+
+    A PATCH may send only the kind or only the value, so the pair is merged
+    with the row first. Changing the kind clears a value the request does
+    not send: 'planting' takes none, and a date is not a stage code.
+    """
+    if "gdd_start_kind" not in fields and "gdd_start_value" not in fields:
+        return
+    kind = fields.get("gdd_start_kind", getattr(existing, "gdd_start_kind", None))
+    if "gdd_start_value" in fields:
+        value = fields["gdd_start_value"]
+    elif "gdd_start_kind" in fields and kind != getattr(existing, "gdd_start_kind", None):
+        value = None
+        fields["gdd_start_value"] = None
+    else:
+        value = getattr(existing, "gdd_start_value", None)
+    try:
+        validate_heat_unit_start(kind, value)
+    except ValueError as exc:
         raise CropCatalogValidationError(reason=str(exc)) from exc
 
 

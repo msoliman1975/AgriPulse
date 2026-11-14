@@ -19,7 +19,15 @@ import type { ClassificationDepth, Crop, CropVariety, CropVarietyStrain } from "
 import { Button } from "@/components/Button";
 import { Field, FIELD_CONTROL_CLASS } from "@/components/Field";
 import { apiMsg } from "@/modules/admin/lib/apiMsg";
+import {
+  resolveHeatUnits,
+  resolvePhenology,
+  type TaxonomyChain,
+} from "@/modules/admin/lib/cropTaxonomy";
+import { heatUnitDraft, heatUnitPatch, heatUnitStartError } from "@/modules/admin/lib/heatUnits";
 import { useUpdateCrop, useUpdateStrain, useUpdateVariety } from "@/queries/cropCatalog";
+
+import { HeatUnitFields } from "./CatalogHeatUnits";
 
 const DEPTHS: ClassificationDepth[] = ["crop_only", "variety", "variety_strain"];
 
@@ -87,9 +95,11 @@ export function CropDetailsForm({
   const [gddBase, setGddBase] = useState(crop.gdd_base_temp_c ?? "");
   const [gddUpper, setGddUpper] = useState(crop.gdd_upper_temp_c ?? "");
   const [indices, setIndices] = useState<string[]>(crop.relevant_indices);
+  const [heat, setHeat] = useState(() => heatUnitDraft(crop));
   const [saved, setSaved] = useState(false);
 
   const disabled = !canManage;
+  const stageCodes = (crop.phenology_stages?.stages ?? []).map((s) => s.code);
 
   const submit = (): void => {
     setSaved(false);
@@ -106,6 +116,7 @@ export function CropDetailsForm({
           default_growing_season_days: num(seasonDays),
           gdd_base_temp_c: num(gddBase),
           gdd_upper_temp_c: num(gddUpper),
+          ...heatUnitPatch(heat),
           relevant_indices: indices,
         },
       },
@@ -259,7 +270,7 @@ export function CropDetailsForm({
                 max={40}
                 className={FIELD_CONTROL_CLASS}
                 value={gddBase}
-                disabled={disabled || perennial}
+                disabled={disabled}
                 onChange={(e) => setGddBase(e.target.value)}
               />
             )}
@@ -274,7 +285,7 @@ export function CropDetailsForm({
                 max={60}
                 className={FIELD_CONTROL_CLASS}
                 value={gddUpper}
-                disabled={disabled || perennial}
+                disabled={disabled}
                 onChange={(e) => setGddUpper(e.target.value)}
               />
             )}
@@ -284,6 +295,14 @@ export function CropDetailsForm({
           <p className="mt-1 text-[11px] text-ap-muted">{t("catalog.gddPerennialNote")}</p>
         ) : null}
       </fieldset>
+
+      <HeatUnitFields
+        draft={heat}
+        onChange={setHeat}
+        disabled={disabled}
+        inherits={false}
+        stageCodes={stageCodes}
+      />
 
       <fieldset className="rounded-md border border-ap-line p-3">
         <legend className="px-1 text-xs font-medium text-ap-ink">
@@ -321,7 +340,11 @@ export function CropDetailsForm({
       ) : null}
 
       {canManage ? (
-        <Button type="submit" size="sm" disabled={updateCrop.isPending}>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={updateCrop.isPending || heatUnitStartError(heat) !== null}
+        >
           {updateCrop.isPending ? t("crops.form.saving") : t("crops.form.save")}
         </Button>
       ) : null}
@@ -333,23 +356,38 @@ export function NodeDetailsForm({
   node,
   level,
   canManage,
+  chain,
 }: {
   node: CropVariety | CropVarietyStrain;
   level: "variety" | "strain";
   canManage: boolean;
+  /** The selected chain, for the stage codes a heat-unit start may name. */
+  chain?: TaxonomyChain;
 }): ReactNode {
   const { t } = useTranslation("admin");
   const updateVariety = useUpdateVariety();
   const updateStrain = useUpdateStrain();
   const [nameEn, setNameEn] = useState(node.name_en);
   const [nameAr, setNameAr] = useState(node.name_ar ?? "");
+  const [heat, setHeat] = useState(() => heatUnitDraft(node));
   const [saved, setSaved] = useState(false);
 
   const mutation = level === "variety" ? updateVariety : updateStrain;
+  const stageCodes = chain ? (resolvePhenology(chain).value ?? []).map((s) => s.code) : [];
+  // The chain above this node: what an empty field inherits.
+  const parent = chain
+    ? resolveHeatUnits(
+        level === "strain" ? { crop: chain.crop, variety: chain.variety } : { crop: chain.crop },
+      )
+    : undefined;
 
   const submit = (): void => {
     setSaved(false);
-    const patch = { name_en: nameEn.trim(), name_ar: nameAr.trim() || null };
+    const patch = {
+      name_en: nameEn.trim(),
+      name_ar: nameAr.trim() || null,
+      ...heatUnitPatch(heat),
+    };
     const opts = { onSuccess: () => setSaved(true) };
     if (level === "variety") updateVariety.mutate({ varietyId: node.id, patch }, opts);
     else updateStrain.mutate({ strainId: node.id, patch }, opts);
@@ -392,6 +430,15 @@ export function NodeDetailsForm({
         </Field>
       </div>
 
+      <HeatUnitFields
+        draft={heat}
+        onChange={setHeat}
+        disabled={!canManage}
+        inherits
+        stageCodes={stageCodes}
+        parent={parent}
+      />
+
       <p className="text-[11px] text-ap-muted">{t("catalog.nodeSettingsNote")}</p>
 
       {mutation.isError ? (
@@ -406,7 +453,11 @@ export function NodeDetailsForm({
       ) : null}
 
       {canManage ? (
-        <Button type="submit" size="sm" disabled={mutation.isPending}>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={mutation.isPending || heatUnitStartError(heat) !== null}
+        >
           {mutation.isPending ? t("crops.form.saving") : t("crops.form.save")}
         </Button>
       ) : null}

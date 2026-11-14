@@ -286,6 +286,11 @@ export const REFERENCE_KEYS = [
 // single value, or either end of a range.
 export const REFERENCE_FIELDS = ["value", "value_min", "value_max"] as const;
 
+// Heat units for the block's crop (D17). Mirrors HEAT_UNIT_KEYS in
+// backend/app/shared/conditions/context.py: total since the crop's start,
+// today's value, and whole days since the start. All numeric.
+export const HEAT_UNIT_KEYS = ["total", "today", "days_since_start"] as const;
+
 // Sub-block grid spatial-anomaly fields (G-4). Mirrors GRID_FIELDS in
 // backend/app/shared/conditions/context.py.
 export const GRID_FIELDS = [
@@ -325,6 +330,7 @@ export type ValueRefSource =
   | "grid"
   | "crop_attribute"
   | "reference"
+  | "heat_units"
   | "params";
 
 export type ValueRef =
@@ -350,6 +356,7 @@ export type ValueRef =
       key: (typeof REFERENCE_KEYS)[number];
       field: (typeof REFERENCE_FIELDS)[number];
     }
+  | { source: "heat_units"; key: (typeof HEAT_UNIT_KEYS)[number] }
   | { source: "params"; name: string };
 
 // The right-hand side of a comparison can be a literal (number, string,
@@ -559,6 +566,11 @@ function parseValueRef(raw: unknown): ValueRef | null {
       field: field as (typeof REFERENCE_FIELDS)[number],
     };
   }
+  if (source === "heat_units") {
+    const key = raw.key as string;
+    if (!(HEAT_UNIT_KEYS as readonly string[]).includes(key)) return null;
+    return { source: "heat_units", key: key as (typeof HEAT_UNIT_KEYS)[number] };
+  }
   if (source === "params") {
     const name = typeof raw.name === "string" ? raw.name : "";
     return { source: "params", name };
@@ -654,6 +666,8 @@ function serializeValueRef(ref: ValueRef): Record<string, unknown> {
       return { source: "crop_attribute", code: ref.code, key: ref.key };
     case "reference":
       return { source: "reference", key: ref.key, field: ref.field };
+    case "heat_units":
+      return { source: "heat_units", key: ref.key };
     case "params":
       return { source: "params", name: ref.name };
   }
@@ -989,6 +1003,8 @@ export function defaultValueRef(source: ValueRefSource): ValueRef {
       return { source: "crop_attribute", code: "", key: "value" };
     case "reference":
       return { source: "reference", key: "soil_ece_threshold_ds_m", field: "value" };
+    case "heat_units":
+      return { source: "heat_units", key: "total" };
     case "params":
       return { source: "params", name: "" };
   }

@@ -1929,6 +1929,9 @@ async def admin_create_variety(
             "default_thresholds": payload.default_thresholds,
             "phenology_stages_override": payload.phenology_stages_override,
             "size_classes_override": payload.size_classes_override,
+            "gdd_method": payload.gdd_method,
+            "gdd_start_kind": payload.gdd_start_kind,
+            "gdd_start_value": payload.gdd_start_value,
         },
         actor_user_id=context.user_id,
     )
@@ -1990,6 +1993,9 @@ async def admin_create_strain(
             "default_thresholds": payload.default_thresholds,
             "phenology_stages_override": payload.phenology_stages_override,
             "size_classes_override": payload.size_classes_override,
+            "gdd_method": payload.gdd_method,
+            "gdd_start_kind": payload.gdd_start_kind,
+            "gdd_start_value": payload.gdd_start_value,
         },
         actor_user_id=context.user_id,
     )

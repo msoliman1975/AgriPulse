@@ -14,6 +14,9 @@ export interface BlockCropAssignment {
   season_label: string;
   planting_date: string | null;
   actual_harvest_date: string | null;
+  /** This block's own heat-unit start (D17), winning over the crop's rule.
+   *  Null follows the crop catalogue. */
+  gdd_start_date?: string | null;
   growth_stage: string | null;
   growth_stage_updated_at: string | null;
   /** When true the daily phenology sweep leaves this assignment alone, so a
@@ -226,7 +229,11 @@ export async function recordGrowthStage(
 export async function updateBlockCrop(
   blockId: string,
   blockCropId: string,
-  fields: { growth_stage_locked?: boolean; notes?: string | null },
+  fields: {
+    growth_stage_locked?: boolean;
+    gdd_start_date?: string | null;
+    notes?: string | null;
+  },
 ): Promise<BlockCropAssignment> {
   const { data } = await apiClient.patch<BlockCropAssignment>(
     `/v1/blocks/${blockId}/crop-assignments/${blockCropId}`,

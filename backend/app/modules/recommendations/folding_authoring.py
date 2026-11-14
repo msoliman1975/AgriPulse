@@ -928,6 +928,7 @@ class FoldingTreeAuthorService:
         an author dry-running a beta tree sees data the sweep would not.
         """
         from app.modules.farms.attribute_snapshot import load_crop_attribute_snapshot
+        from app.modules.farms.heat_units import load_heat_units_snapshot
         from app.modules.grid.snapshot import load_snapshot as load_grid_snapshot
         from app.modules.recommendations.service import (
             _merge_index_trends,
@@ -997,6 +998,9 @@ class FoldingTreeAuthorService:
                 tenant_session, block_crop_id=block_crop_id
             ),
             reference_values=await load_reference_snapshot(self._public, crop_path=crop_path),
+            heat_units=await load_heat_units_snapshot(
+                tenant_session, self._public, block_crop_id=block_crop_id, farm_id=farm_id
+            ),
         )
         # Targeting is reported, never enforced. The block picker already
         # filters to blocks this tree targets, so an author cannot reach a

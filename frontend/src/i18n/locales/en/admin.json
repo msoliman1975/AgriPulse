@@ -1029,14 +1029,14 @@
     "seasonDays": "Default growing season (days)",
     "cycle": "Cycle and degree days",
     "gddBase": "GDD base temperature (°C)",
-    "gddBaseHint": "Required before any stage can advance on degree days.",
+    "gddBaseHint": "Required before any stage can advance on degree days, and for heat units.",
     "gddUpper": "GDD upper cut-off (°C)",
     "gddUpperHint": "Optional. Caps how much a hot day can contribute.",
-    "gddPerennialNote": "A perennial advances on calendar windows, so degree days don't apply to it.",
+    "gddPerennialNote": "A perennial advances stages on calendar windows, so degree days don't move its stages. Heat units still count with these temperatures.",
     "relevantIndices": "Relevant indices",
     "relevantIndicesHint": "Which remote-sensing indices this crop surfaces.",
     "saved": "Saved.",
-    "nodeSettingsNote": "A variety or strain carries no agronomic settings of its own — everything else it can hold is an override of the crop's, on the tabs above.",
+    "nodeSettingsNote": "Apart from heat units above, a variety or strain carries no agronomic settings of its own — everything else it can hold is an override of the crop's, on the tabs above.",
     "ownLadder": "own",
     "stagesHeading": "Stage calendar — {{node}}",
     "sizesHeading": "Size classes — {{node}}",
@@ -1409,5 +1409,36 @@
       "overrideCount_other": "{{count}} values are set here.",
       "removed": "Removed. This path now takes every value from the level above."
     }
+  },
+  "heatUnits": {
+    "heading": "Heat units",
+    "intro": "How trees count this crop's heat (degree days) with the base and upper temperatures above, and from when. Varieties and strains inherit what they leave empty.",
+    "unset": "Not set",
+    "inherit": "Inherit",
+    "inheritedSummary": "Inherited when left empty: method {{method}}, counting from {{start}}.",
+    "method": "Method",
+    "methodOption": {
+      "mean": "Mean",
+      "max": "Maximum",
+      "min_max_cutoff": "Min/max with cut-off"
+    },
+    "methodHint": {
+      "mean": "(Tmax + Tmin) / 2 − base, never below 0.",
+      "max": "Tmax − base, never below 0.",
+      "min_max_cutoff": "Tmin and Tmax held between base and upper, then the mean − base."
+    },
+    "startKind": "Count from",
+    "startKindOption": {
+      "date": "Calendar date",
+      "planting": "Planting date",
+      "stage": "Start of a stage"
+    },
+    "startDate": "Date (MM-DD)",
+    "startDateHint": "The most recent one on or before today.",
+    "startStage": "Stage",
+    "startStageHint": "The latest time the block entered this stage.",
+    "plantingHint": "The planting date on the block's crop assignment.",
+    "errorDate": "Enter the start date as MM-DD, for example 03-01.",
+    "errorStage": "Choose the stage to count from."
   }
 }

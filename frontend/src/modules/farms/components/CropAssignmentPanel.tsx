@@ -12,6 +12,7 @@ import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { CropPicker } from "@/modules/farms/components/CropPicker";
 import { AttributeInput, CropAttributesCard } from "@/modules/farms/components/CropAttributesCard";
 import { GrowthStageControl } from "@/modules/farms/components/GrowthStageControl";
+import { HeatUnitStartControl } from "@/modules/farms/components/HeatUnitStartControl";
 import {
   buildPayload,
   isRequired as attributeRequired,
@@ -227,6 +228,9 @@ export function CropAssignmentPanel({ blockId, farmId, onAssigned }: Props): Rea
               {/* The stage belongs to this assignment too, and it is the gate
                   most decision trees branch on — seven of them today. */}
               <GrowthStageControl blockId={blockId} farmId={farmId} assignment={current} />
+              {/* Heat units (D17) count from the crop's start unless the block
+                  sets its own, e.g. an orchard pollinated late. */}
+              <HeatUnitStartControl blockId={blockId} farmId={farmId} assignment={current} />
               {/* Crop fields belong to *this* assignment, which is why they sit
                   inside the current card rather than beside the block. */}
               <CropAttributesCard blockCropId={current.id} farmId={farmId} />

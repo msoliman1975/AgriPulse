@@ -3,7 +3,23 @@ import { apiClient } from "./client";
 // Exact depth a block assignment for this crop must specify.
 export type ClassificationDepth = "crop_only" | "variety" | "variety_strain";
 
-export interface Crop {
+// Heat units (decision D17). Mirrors GDD_METHODS / GDD_START_KINDS in
+// backend/app/modules/farms/heat_units.py and the CHECKs in public 0112.
+export const GDD_METHODS = ["mean", "max", "min_max_cutoff"] as const;
+export type GddMethod = (typeof GDD_METHODS)[number];
+export const GDD_START_KINDS = ["date", "planting", "stage"] as const;
+export type GddStartKind = (typeof GDD_START_KINDS)[number];
+
+/** How a node counts heat units and from when. Null inherits from the level
+ *  above (deepest non-null wins); the start kind and value travel together:
+ *  `date` takes MM-DD, `stage` a stage code, `planting` nothing. */
+export interface HeatUnitSettings {
+  gdd_method?: GddMethod | null;
+  gdd_start_kind?: GddStartKind | null;
+  gdd_start_value?: string | null;
+}
+
+export interface Crop extends HeatUnitSettings {
   id: string;
   code: string;
   name_en: string;
@@ -44,7 +60,7 @@ export interface SizeClass {
  * inherits, and the nearest ancestor with a non-null value wins: a strain
  * falls back to its variety, not straight to the crop.
  */
-export interface TaxonomyOverrides {
+export interface TaxonomyOverrides extends HeatUnitSettings {
   phenology_stages_override?: { stages: PhenologyStage[] } | null;
   size_classes_override?: { classes: SizeClass[] } | null;
   default_thresholds?: Record<string, unknown> | null;

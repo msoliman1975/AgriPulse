@@ -26,6 +26,7 @@ import {
   BLOCK_FIELDS,
   CROP_ATTRIBUTE_KEYS,
   GRID_FIELDS,
+  HEAT_UNIT_KEYS,
   REFERENCE_FIELDS,
   REFERENCE_KEYS,
   INDEX_CODES,
@@ -591,6 +592,7 @@ function ValueRefEditor({
         "grid",
         "crop_attribute",
         "reference",
+        "heat_units",
       ]
     : [
         "indices",
@@ -603,6 +605,7 @@ function ValueRefEditor({
         "grid",
         "crop_attribute",
         "reference",
+        "heat_units",
         "params",
       ];
 
@@ -1056,6 +1059,30 @@ function SourceSpecificFields({
           ))}
         </select>
         <FieldHint text={hint("referenceField", value.field)} />
+      </>
+    );
+  }
+  if (value.source === "heat_units") {
+    // Counted the crop's way (D17): its base and upper temperatures, its
+    // method and its start, all set in the crop catalogue.
+    return (
+      <>
+        <select
+          disabled={readOnly}
+          value={value.key}
+          onChange={(e) =>
+            onChange({ ...value, key: e.target.value as (typeof HEAT_UNIT_KEYS)[number] })
+          }
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+          aria-label={t("editor.condition.heatUnitKey")}
+        >
+          {HEAT_UNIT_KEYS.map((k) => (
+            <option key={k} value={k}>
+              {t(`editor.condition.heatUnitKeyOption.${k}`)}
+            </option>
+          ))}
+        </select>
+        <FieldHint text={hint("heatUnitKey", value.key)} />
       </>
     );
   }

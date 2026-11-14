@@ -105,6 +105,12 @@ class CountryUpdateRequest(BaseModel):
 
 # ---------- Crops -----------------------------------------------------------
 
+# Heat units (D17, public 0112). Mirrors the CHECKs; the pair rule (a value
+# only with a kind, MM-DD for 'date', a stage code for 'stage') is checked in
+# the service against the merged row, since a PATCH may send one of the two.
+GddMethod = Literal["mean", "max", "min_max_cutoff"]
+GddStartKind = Literal["date", "planting", "stage"]
+
 
 class CropResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -119,6 +125,9 @@ class CropResponse(BaseModel):
     default_growing_season_days: int | None
     gdd_base_temp_c: Decimal | None = None
     gdd_upper_temp_c: Decimal | None = None
+    gdd_method: GddMethod | None = None
+    gdd_start_kind: GddStartKind | None = None
+    gdd_start_value: str | None = None
     relevant_indices: list[str]
     phenology_stages: dict[str, Any] | None = None
     default_thresholds: dict[str, Any] | None = None
@@ -143,6 +152,9 @@ class CropVarietyResponse(BaseModel):
     default_thresholds: dict[str, Any] | None = None
     phenology_stages_override: dict[str, Any] | None = None
     size_classes_override: dict[str, Any] | None = None
+    gdd_method: GddMethod | None = None
+    gdd_start_kind: GddStartKind | None = None
+    gdd_start_value: str | None = None
     is_active: bool = True
 
 
@@ -160,6 +172,9 @@ class CropVarietyStrainResponse(BaseModel):
     default_thresholds: dict[str, Any] | None = None
     phenology_stages_override: dict[str, Any] | None = None
     size_classes_override: dict[str, Any] | None = None
+    gdd_method: GddMethod | None = None
+    gdd_start_kind: GddStartKind | None = None
+    gdd_start_value: str | None = None
     is_active: bool = True
 
 
@@ -189,6 +204,9 @@ class CropCreateRequest(BaseModel):
     default_growing_season_days: int | None = Field(default=None, ge=1, le=400)
     gdd_base_temp_c: Decimal | None = Field(default=None, ge=0, le=40)
     gdd_upper_temp_c: Decimal | None = Field(default=None, ge=0, le=60)
+    gdd_method: GddMethod | None = None
+    gdd_start_kind: GddStartKind | None = None
+    gdd_start_value: str | None = Field(default=None, max_length=32)
     relevant_indices: list[str] = Field(default_factory=lambda: ["ndvi"])
     # Validated for shape here; the perennial/annual cross-check happens in
     # the service (it needs the resolved ``is_perennial``).
@@ -216,6 +234,9 @@ class CropUpdateRequest(BaseModel):
     default_growing_season_days: int | None = Field(default=None, ge=1, le=400)
     gdd_base_temp_c: Decimal | None = Field(default=None, ge=0, le=40)
     gdd_upper_temp_c: Decimal | None = Field(default=None, ge=0, le=60)
+    gdd_method: GddMethod | None = None
+    gdd_start_kind: GddStartKind | None = None
+    gdd_start_value: str | None = Field(default=None, max_length=32)
     relevant_indices: list[str] | None = None
     phenology_stages: dict[str, Any] | None = None
     default_thresholds: dict[str, Any] | None = None
@@ -232,6 +253,9 @@ class CropVarietyCreateRequest(BaseModel):
     default_thresholds: dict[str, Any] | None = None
     phenology_stages_override: dict[str, Any] | None = None
     size_classes_override: dict[str, Any] | None = None
+    gdd_method: GddMethod | None = None
+    gdd_start_kind: GddStartKind | None = None
+    gdd_start_value: str | None = Field(default=None, max_length=32)
 
     @field_validator("code")
     @classmethod
@@ -247,6 +271,9 @@ class CropVarietyUpdateRequest(BaseModel):
     default_thresholds: dict[str, Any] | None = None
     phenology_stages_override: dict[str, Any] | None = None
     size_classes_override: dict[str, Any] | None = None
+    gdd_method: GddMethod | None = None
+    gdd_start_kind: GddStartKind | None = None
+    gdd_start_value: str | None = Field(default=None, max_length=32)
     is_active: bool | None = None
 
 
@@ -259,6 +286,9 @@ class CropStrainCreateRequest(BaseModel):
     default_thresholds: dict[str, Any] | None = None
     phenology_stages_override: dict[str, Any] | None = None
     size_classes_override: dict[str, Any] | None = None
+    gdd_method: GddMethod | None = None
+    gdd_start_kind: GddStartKind | None = None
+    gdd_start_value: str | None = Field(default=None, max_length=32)
 
     @field_validator("code")
     @classmethod
@@ -274,6 +304,9 @@ class CropStrainUpdateRequest(BaseModel):
     default_thresholds: dict[str, Any] | None = None
     phenology_stages_override: dict[str, Any] | None = None
     size_classes_override: dict[str, Any] | None = None
+    gdd_method: GddMethod | None = None
+    gdd_start_kind: GddStartKind | None = None
+    gdd_start_value: str | None = Field(default=None, max_length=32)
     is_active: bool | None = None
 
 
@@ -1039,6 +1072,9 @@ class BlockCropUpdateRequest(BaseModel):
     canopy_size_class: str | None = None
     growth_stage_locked: bool | None = None
     actual_harvest_date: date | None = None
+    # Heat units (D17): this block's own start, winning over the crop's
+    # gdd_start rule. Null clears it, so the block follows the crop again.
+    gdd_start_date: date | None = None
     status: BlockCropStatus | None = None
     notes: str | None = None
 
@@ -1063,6 +1099,7 @@ class BlockCropResponse(BaseModel):
     validity_state: str = "past"
     planting_date: date | None
     actual_harvest_date: date | None
+    gdd_start_date: date | None = None
     canopy_size_class: str | None = None
     growth_stage: str | None
     growth_stage_updated_at: datetime | None

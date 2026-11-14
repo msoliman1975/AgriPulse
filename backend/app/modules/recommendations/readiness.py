@@ -24,6 +24,7 @@ Kind = Literal[
     "block_field",
     "crop_attribute",
     "reference",
+    "heat_units",
     "signal",
     "index",
     "weather",
@@ -38,6 +39,7 @@ _KIND_ORDER: dict[str, int] = {
     "block_field": 0,
     "crop_attribute": 1,
     "reference": 1,
+    "heat_units": 1,
     "signal": 2,
     "water_balance": 3,
     "index": 4,
@@ -78,6 +80,10 @@ def _requirement(ref: dict[str, Any]) -> Requirement | None:  # noqa: PLR0911
         return Requirement("crop_attribute", str(ref["code"]))
     if source == "reference" and ref.get("key"):
         return Requirement("reference", str(ref["key"]))
+    if source == "heat_units":
+        # One requirement whatever key is read: total, today and days since
+        # start all come from the same crop setting and the same weather.
+        return Requirement("heat_units", "total")
     if source == "signals" and ref.get("code"):
         return Requirement("signal", str(ref["code"]))
     if source == "indices" and ref.get("index_code"):
@@ -111,6 +117,10 @@ def _present(  # noqa: PLR0911 - one return per kind reads clearest
         # Set in the crop catalogue for this crop path, as a value or a range.
         entry = ctx.reference_values.get(req.key) or {}
         return any(v is not None for v in entry.values())
+    if req.kind == "heat_units":
+        # The crop sets a method, base and start, the start is known, and
+        # the farm has at least one day with both temperatures since it.
+        return ctx.heat_units.get("total") is not None
     if req.kind == "signal":
         # The snapshot holds a signal only when it applies to the block and
         # has a record. An answer older than its window keeps its time but

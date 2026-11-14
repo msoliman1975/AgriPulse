@@ -76,7 +76,8 @@ export function ReadinessTab({ treeId, scope, canFix }: Props): ReactNode {
 
 export function RequirementLabel({ req }: { req: ReadinessRequirement }): ReactNode {
   const { t } = useTranslation("decisionTreesBeta");
-  if (req.kind === "weather" || req.kind === "water_balance") {
+  // One requirement per tree whatever is read, so the key says nothing.
+  if (req.kind === "weather" || req.kind === "water_balance" || req.kind === "heat_units") {
     return <>{t(`readiness.kind.${req.kind}`)}</>;
   }
   return (

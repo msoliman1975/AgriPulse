@@ -67,6 +67,12 @@ class Crop(Base, TimestampedMixin):
     default_growing_season_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     gdd_base_temp_c: Mapped[Decimal | None] = mapped_column(Numeric(4, 1), nullable=True)
     gdd_upper_temp_c: Mapped[Decimal | None] = mapped_column(Numeric(4, 1), nullable=True)
+    # Heat units (D17, public 0112): how this crop counts GDD and from when.
+    # Inherited by varieties and strains, deepest non-null wins; see
+    # ``app.modules.farms.heat_units``. CHECKs pin the vocabularies.
+    gdd_method: Mapped[str | None] = mapped_column(Text, nullable=True)
+    gdd_start_kind: Mapped[str | None] = mapped_column(Text, nullable=True)
+    gdd_start_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     relevant_indices: Mapped[list[str]] = mapped_column(
         ARRAY(Text),
         nullable=False,
@@ -121,6 +127,10 @@ class CropVariety(Base, TimestampedMixin):
     default_thresholds: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     phenology_stages_override: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     size_classes_override: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    # Heat-unit overrides (D17); null inherits from the level above.
+    gdd_method: Mapped[str | None] = mapped_column(Text, nullable=True)
+    gdd_start_kind: Mapped[str | None] = mapped_column(Text, nullable=True)
+    gdd_start_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
 
 
@@ -156,6 +166,10 @@ class CropVarietyStrain(Base, TimestampedMixin):
     default_thresholds: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     phenology_stages_override: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     size_classes_override: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    # Heat-unit overrides (D17); null inherits from the level above.
+    gdd_method: Mapped[str | None] = mapped_column(Text, nullable=True)
+    gdd_start_kind: Mapped[str | None] = mapped_column(Text, nullable=True)
+    gdd_start_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
 
 
@@ -567,6 +581,9 @@ class BlockCrop(Base, TimestampedMixin):
     effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
     planting_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     actual_harvest_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Per-block heat-unit start (D17, tenant 0108). When set it wins over
+    # the crop's gdd_start rule; null follows the crop.
+    gdd_start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     # Canopy size pick from the crop's resolved ``size_classes`` lookup; a
     # block-source field for the recommendation engine (small -> SAVI path).
     canopy_size_class: Mapped[str | None] = mapped_column(Text, nullable=True)
