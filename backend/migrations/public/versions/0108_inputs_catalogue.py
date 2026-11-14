@@ -14,7 +14,7 @@ allowed on an organic farm. This adds:
   and/or a range with a unit, the context ("in the basin, end of October"),
   and the crop path it applies to.
 
-Medjool seed (`data/0107_medjool_inputs.json`): only inputs and doses the
+Medjool seed (`data/0108_medjool_inputs.json`): only inputs and doses the
 manual 1.7 names, each dose with the manual row it comes from and linked to
 that row's sources and confidence (D27). Rows from the manual's annexes
 cite the annex's own source list, so their links resolve against it. Every Medjool input is marked
@@ -32,12 +32,12 @@ from pathlib import Path
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0107"
-down_revision: str | Sequence[str] | None = "0106"
+revision: str = "0108"
+down_revision: str | Sequence[str] | None = "0107"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-_DATA = Path(__file__).parent / "data" / "0107_medjool_inputs.json"
+_DATA = Path(__file__).parent / "data" / "0108_medjool_inputs.json"
 
 CATEGORIES = (
     "organic_fertiliser",
