@@ -17,6 +17,7 @@ from app.shared.conditions.context import (
     CROP_ATTRIBUTE_KEYS,
     FINDING_KEYS,
     GRID_FIELDS,
+    HEAT_UNIT_KEYS,
     REFERENCE_FIELDS,
     SIGNAL_KEYS,
     WATER_BALANCE_FIELDS,
@@ -267,6 +268,21 @@ class ReferenceValueRef:
 
 
 @dataclass(frozen=True, slots=True)
+class HeatUnitsValueRef:
+    """``{"source":"heat_units","key":"total"}``
+
+    Heat units for the block's current crop (D17), counted with the crop's
+    own base and upper temperatures and its ``gdd_method``, from its
+    ``gdd_start`` (or the block's own start date). ``key`` is ``total``
+    (since the start), ``today`` or ``days_since_start``. A crop that sets
+    no method, base or start resolves to ``None`` and fails closed.
+    """
+
+    source: Literal["heat_units"]
+    key: str  # one of HEAT_UNIT_KEYS
+
+
+@dataclass(frozen=True, slots=True)
 class FindingsValueRef:
     """``{"source":"findings","code":"dry","key":"registered"}``
 
@@ -320,6 +336,7 @@ ValueRef = (
     | GridValueRef
     | CropAttributeValueRef
     | ReferenceValueRef
+    | HeatUnitsValueRef
     | ParamsValueRef
     | FindingsValueRef
     | VarsValueRef
@@ -418,6 +435,11 @@ def parse_value_ref(raw: Any) -> ValueRef:  # noqa: PLR0911, PLR0912, PLR0915 - 
         if ref_field not in REFERENCE_FIELDS:
             raise ConditionParseError(f"reference ref 'field' must be one of {REFERENCE_FIELDS}")
         return ReferenceValueRef(source="reference", key=ref_key, field=ref_field)
+    if source == "heat_units":
+        hu_key = raw.get("key")
+        if not isinstance(hu_key, str) or hu_key not in HEAT_UNIT_KEYS:
+            raise ConditionParseError(f"heat_units ref 'key' must be one of {HEAT_UNIT_KEYS}")
+        return HeatUnitsValueRef(source="heat_units", key=hu_key)
     if source == "params":
         name = raw.get("name")
         if not isinstance(name, str) or not name:

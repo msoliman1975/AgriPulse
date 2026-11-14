@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   BLOCK_FIELDS,
   CROP_ATTRIBUTE_KEYS,
+  HEAT_UNIT_KEYS,
   INDICES_KEYS,
   REFERENCE_KEYS,
   SIGNAL_KEYS,
@@ -338,6 +339,31 @@ describe("reference source", () => {
   it("compares as a number and has a default ref", () => {
     const ref = defaultValueRef("reference");
     expect(ref).toEqual({ source: "reference", key: "soil_ece_threshold_ds_m", field: "value" });
+    expect(leftOperandType(ref)).toBe("number");
+  });
+});
+
+// Heat units (D17): a closed list on both sides, mirrored from HEAT_UNIT_KEYS
+// in backend/app/shared/conditions/context.py.
+describe("heat_units source", () => {
+  it("parses and round-trips every key", () => {
+    expect(HEAT_UNIT_KEYS).toEqual(["total", "today", "days_since_start"]);
+    for (const key of HEAT_UNIT_KEYS) {
+      const raw = { op: "ge", left: { source: "heat_units", key }, right: 1800 };
+      expect(term(parseConditionTree(raw)).left).toEqual({ source: "heat_units", key });
+      expect(serializeCondition(parseConditionTree(raw))).toEqual(raw);
+    }
+  });
+
+  it("rejects a key outside the closed list", () => {
+    for (const left of [{ source: "heat_units", key: "base18" }, { source: "heat_units" }]) {
+      expect(parseConditionTree({ op: "gt", left, right: 1 }).kind).toBe("unsupported");
+    }
+  });
+
+  it("compares as a number and has a default ref", () => {
+    const ref = defaultValueRef("heat_units");
+    expect(ref).toEqual({ source: "heat_units", key: "total" });
     expect(leftOperandType(ref)).toBe("number");
   });
 });

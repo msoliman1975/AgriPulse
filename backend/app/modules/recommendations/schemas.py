@@ -1511,6 +1511,7 @@ class ReadinessRequirement(BaseModel):
         "block_field",
         "crop_attribute",
         "reference",
+        "heat_units",
         "signal",
         "index",
         "weather",

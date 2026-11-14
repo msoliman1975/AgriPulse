@@ -102,6 +102,21 @@ _TRUE = {"en": "yes", "ar": "نعم"}
 _FALSE = {"en": "no", "ar": "لا"}
 
 
+# `heat_units.<key>` (D17): a closed list, so each key has its own words.
+_HEAT_UNIT_LABELS: dict[str, dict[str, str]] = {
+    "en": {
+        "total": "Heat units since start",
+        "today": "Heat units today",
+        "days_since_start": "Days since heat-unit start",
+    },
+    "ar": {
+        "total": "الوحدات الحرارية منذ البداية",
+        "today": "الوحدات الحرارية اليوم",
+        "days_since_start": "الأيام منذ بداية حساب الوحدات الحرارية",
+    },
+}
+
+
 def _table(source: dict[str, dict[str, str]], locale: str) -> dict[str, str]:
     return source.get(locale) or source[DEFAULT_LOCALE]
 
@@ -137,6 +152,8 @@ def evidence_label(key: str, locale: str = DEFAULT_LOCALE) -> str:
         # something a reader should be shown.
         if family == "block":
             return _table(_BLOCK_FIELD_LABELS, locale).get(parts[1]) or _humanise(parts[1])
+        if family == "heat_units":
+            return _table(_HEAT_UNIT_LABELS, locale).get(parts[1]) or _humanise(parts[1])
         if family in {"crop_attribute", "params", "reference"}:
             return _humanise(parts[1])
         return key

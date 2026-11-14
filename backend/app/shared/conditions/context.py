@@ -199,6 +199,12 @@ CROP_ATTRIBUTE_KEYS: tuple[str, ...] = ("value",)
 # low or high end when the catalogue stores a range ("60-72 kg/plant").
 REFERENCE_FIELDS: tuple[str, ...] = ("value", "value_min", "value_max")
 
+# Allowed keys for a heat_units value-ref (D17): heat units accumulated since
+# the crop's start (total), today's value, and whole days since the start.
+# Computed per block from the crop's base, upper cutoff and method; see
+# ``app.modules.farms.heat_units``. A closed list, checked at parse time.
+HEAT_UNIT_KEYS: tuple[str, ...] = ("total", "today", "days_since_start")
+
 
 # Allowed keys for a `findings` value-ref (unified decision-tree engine,
 # decision 8). One key, and deliberately only one: a condition may ask
@@ -325,6 +331,11 @@ class ConditionContext:
     # as Decimals. Empty when the block has no crop or the catalogue sets
     # nothing, so `{source: reference}` predicates fail closed.
     reference_values: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Heat units for the block's current crop (D17): {"total": Decimal |
+    # None, "today": Decimal | None, "days_since_start": int}. Empty when the
+    # crop sets no method, base or start, or the start is unknown, so
+    # `{source: heat_units}` predicates fail closed.
+    heat_units: dict[str, Any] = field(default_factory=dict)
     # Decision-tree parameter values (PR-B): {name: value} resolved
     # from the tree's `parameters:` defaults, layered with tenant
     # overrides in PR-C. The alerts engine leaves this empty.
@@ -361,6 +372,7 @@ class ConditionContext:
         crop_attributes: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
         reference_values: dict[str, dict[str, Any]] | None = None,
+        heat_units: dict[str, Any] | None = None,
     ) -> ConditionContext:
         """Build a context from the ``BlockSignals`` shape the alerts
         engine already loads. ``weather`` and ``signals`` are optional —
@@ -404,6 +416,7 @@ class ConditionContext:
             crop_attributes=dict(crop_attributes or {}),
             params=dict(params or {}),
             reference_values=dict(reference_values or {}),
+            heat_units=dict(heat_units or {}),
         )
 
 

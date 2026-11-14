@@ -419,7 +419,8 @@
         "crop_attribute": "Crop field",
         "params": "Tree parameter",
         "water_balance": "Crop water balance",
-        "reference": "Crop reference value"
+        "reference": "Crop reference value",
+        "heat_units": "Heat units"
       },
       "hint": {
         "source": {
@@ -432,7 +433,8 @@
           "grid": "Where inside the block the anomaly is, and how bad the worst patch is.",
           "crop_attribute": "Per-crop data recorded on the block's crop assignment.",
           "params": "A named threshold this tree declares, so it can be re-tuned without editing the logic.",
-          "reference": "A value the crop catalogue sets for the block's crop, such as its salt tolerance or expected yield, inherited down to the variety."
+          "reference": "A value the crop catalogue sets for the block's crop, such as its salt tolerance or expected yield, inherited down to the variety.",
+          "heat_units": "Heat accumulated by the block's crop, counted with the base and upper temperatures, method and start the crop catalogue sets for it, from the farm's daily minimum and maximum temperatures."
         },
         "indexCode": {
           "ndvi": "Canopy greenness and vigour. Saturates on dense canopy and is noisy over bare soil.",
@@ -544,6 +546,11 @@
           "value": "The single value, when the catalogue gives one.",
           "value_min": "The low end, when the catalogue gives a range.",
           "value_max": "The high end, when the catalogue gives a range."
+        },
+        "heatUnitKey": {
+          "total": "Heat units added up from the start to today. Days missing a temperature are skipped.",
+          "today": "Today's heat units only. Empty until today's temperatures arrive.",
+          "days_since_start": "Whole days since the start: 0 on the start day."
         }
       },
       "waterBalanceField": "Water balance field",
@@ -553,6 +560,12 @@
         "value": "Value",
         "value_min": "Range low",
         "value_max": "Range high"
+      },
+      "heatUnitKey": "Heat units value",
+      "heatUnitKeyOption": {
+        "total": "Total since start",
+        "today": "Today",
+        "days_since_start": "Days since start"
       }
     },
     "delete": {

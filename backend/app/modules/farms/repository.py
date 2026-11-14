@@ -1315,6 +1315,9 @@ class FarmsRepository:
             default_thresholds=overrides.get("default_thresholds"),
             phenology_stages_override=overrides.get("phenology_stages_override"),
             size_classes_override=overrides.get("size_classes_override"),
+            gdd_method=overrides.get("gdd_method"),
+            gdd_start_kind=overrides.get("gdd_start_kind"),
+            gdd_start_value=overrides.get("gdd_start_value"),
         )
         self._public.add(row)
         await self._public.flush()
@@ -1350,6 +1353,9 @@ class FarmsRepository:
             default_thresholds=overrides.get("default_thresholds"),
             phenology_stages_override=overrides.get("phenology_stages_override"),
             size_classes_override=overrides.get("size_classes_override"),
+            gdd_method=overrides.get("gdd_method"),
+            gdd_start_kind=overrides.get("gdd_start_kind"),
+            gdd_start_value=overrides.get("gdd_start_value"),
         )
         self._public.add(row)
         await self._public.flush()
@@ -2477,6 +2483,7 @@ def _block_crop_to_dict(bc: BlockCrop) -> dict[str, Any]:
         "season_label": bc.season_label,
         "planting_date": bc.planting_date,
         "actual_harvest_date": bc.actual_harvest_date,
+        "gdd_start_date": bc.gdd_start_date,
         "canopy_size_class": bc.canopy_size_class,
         "growth_stage": bc.growth_stage,
         "growth_stage_updated_at": bc.growth_stage_updated_at,
@@ -2549,6 +2556,9 @@ def _crop_dict(r: Crop) -> dict[str, Any]:
         "default_growing_season_days": r.default_growing_season_days,
         "gdd_base_temp_c": r.gdd_base_temp_c,
         "gdd_upper_temp_c": r.gdd_upper_temp_c,
+        "gdd_method": r.gdd_method,
+        "gdd_start_kind": r.gdd_start_kind,
+        "gdd_start_value": r.gdd_start_value,
         "relevant_indices": list(r.relevant_indices or []),
         "phenology_stages": r.phenology_stages,
         "default_thresholds": r.default_thresholds,
@@ -2604,6 +2614,9 @@ def _variety_dict(r: CropVariety) -> dict[str, Any]:
         "default_thresholds": r.default_thresholds,
         "phenology_stages_override": r.phenology_stages_override,
         "size_classes_override": r.size_classes_override,
+        "gdd_method": r.gdd_method,
+        "gdd_start_kind": r.gdd_start_kind,
+        "gdd_start_value": r.gdd_start_value,
         "is_active": r.is_active,
     }
 
@@ -2620,6 +2633,9 @@ def _strain_dict(r: CropVarietyStrain) -> dict[str, Any]:
         "default_thresholds": r.default_thresholds,
         "phenology_stages_override": r.phenology_stages_override,
         "size_classes_override": r.size_classes_override,
+        "gdd_method": r.gdd_method,
+        "gdd_start_kind": r.gdd_start_kind,
+        "gdd_start_value": r.gdd_start_value,
         "is_active": r.is_active,
     }
 

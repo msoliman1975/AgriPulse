@@ -19,6 +19,7 @@ const BETA_TREES = "/v1/platform/decision-trees/beta";
 export type ReadinessKind =
   | "block_field"
   | "crop_attribute"
+  | "heat_units"
   | "signal"
   | "index"
   | "weather"
@@ -28,6 +29,7 @@ export type ReadinessKind =
 export const READINESS_KINDS: readonly ReadinessKind[] = [
   "block_field",
   "crop_attribute",
+  "heat_units",
   "signal",
   "water_balance",
   "index",

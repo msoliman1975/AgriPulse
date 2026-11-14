@@ -569,6 +569,7 @@
     "kind": {
       "block_field": "حقل القطعة",
       "crop_attribute": "صفة المحصول",
+      "heat_units": "الوحدات الحرارية",
       "signal": "سجل استكشاف",
       "index": "مؤشر فضائي",
       "weather": "طقس المزرعة",
@@ -578,6 +579,7 @@
     "fix": {
       "block_field": "تعديل القطعة",
       "crop_attribute": "تعديل القطعة",
+      "heat_units": "فتح القطعة",
       "signal": "فتح القطعة",
       "index": "فتح القطعة",
       "weather": "فتح القطعة",

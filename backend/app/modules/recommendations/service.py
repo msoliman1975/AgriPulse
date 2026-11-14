@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import get_logger
 from app.modules.audit import AuditService, get_audit_service
 from app.modules.farms.attribute_snapshot import load_crop_attribute_snapshot
+from app.modules.farms.heat_units import load_heat_units_snapshot
 from app.modules.grid.snapshot import load_snapshot as load_grid_snapshot
 from app.modules.recommendations.cell_features import CELL_FEATURE_KEYS
 from app.modules.recommendations.engine import (
@@ -137,6 +138,8 @@ class _BlockEvaluation:
     water_balance: Any = None
     # The crop's reference values (D18); defaulted for the same reason.
     reference_values: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Heat units for the block's crop (D17); defaulted for the same reason.
+    heat_units: dict[str, Any] = field(default_factory=dict)
 
     def cell_context(self, cell_means: Any) -> ConditionContext:
         """Block context with this cell's imagery means swapped in."""
@@ -156,6 +159,7 @@ class _BlockEvaluation:
             grid=self.grid,
             crop_attributes=self.crop_attributes,
             reference_values=self.reference_values,
+            heat_units=self.heat_units,
         )
 
 
@@ -1490,6 +1494,12 @@ class RecommendationsServiceImpl:
         # The crop's reference values (D18) for its current path. Empty for
         # a block with no crop, so `{source: reference}` fails closed.
         reference_values = await load_reference_snapshot(self._public, crop_path=crop_path)
+        # Heat units (D17) counted the crop's way from its start. Empty for a
+        # block with no crop, or a crop with no method, base or start, so
+        # `{source: heat_units}` fails closed.
+        heat_units = await load_heat_units_snapshot(
+            self._tenant, self._public, block_crop_id=block_crop_id, farm_id=farm_id
+        )
         ctx = ConditionContext.from_block_signals(
             block_id=str(block_id),
             block_attributes={
@@ -1506,6 +1516,7 @@ class RecommendationsServiceImpl:
             grid=grid,
             crop_attributes=crop_attributes,
             reference_values=reference_values,
+            heat_units=heat_units,
         )
 
         # PR-C: bulk-load the parameter overrides for every tree the sweep
@@ -1573,6 +1584,7 @@ class RecommendationsServiceImpl:
             grid=grid,
             crop_attributes=crop_attributes,
             reference_values=reference_values,
+            heat_units=heat_units,
             ctx=ctx,
             block_trees=block_trees,
             cell_trees=cell_trees,
@@ -4547,6 +4559,12 @@ class DecisionTreesAuthorService:
                 tenant_session, block_crop_id=dry_run_block_crop_id
             ),
             reference_values=await load_reference_snapshot(self._public, crop_path=crop_path),
+            heat_units=await load_heat_units_snapshot(
+                tenant_session,
+                self._public,
+                block_crop_id=dry_run_block_crop_id,
+                farm_id=farm_id,
+            ),
         )
 
         # Targeting is reported, not enforced. The block picker already filters

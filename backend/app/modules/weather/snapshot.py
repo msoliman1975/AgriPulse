@@ -455,6 +455,43 @@ async def load_gdd_since(
     return _to_decimal(row["gdd_total"])
 
 
+async def load_daily_temperatures(
+    session: AsyncSession,
+    *,
+    farm_id: UUID,
+    since: date,
+    until: date,
+) -> list[tuple[date, Decimal | None, Decimal | None]]:
+    """``(date, temp_min_c, temp_max_c)`` per day for ``farm_id`` over ``[since, until]``.
+
+    The input to per-crop heat units (D17, ``farms.heat_units``), which
+    apply the crop's own base, upper cutoff and method. Rows are returned
+    as stored, NULLs included; the caller skips a day missing either value.
+
+    ``session`` must already be bound to the tenant schema.
+    """
+    rows = (
+        (
+            await session.execute(
+                text(
+                    """
+            SELECT date, temp_min_c, temp_max_c
+            FROM weather_derived_daily
+            WHERE farm_id = :farm_id
+              AND date >= :since
+              AND date <= :until
+            ORDER BY date
+            """
+                ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
+                {"farm_id": farm_id, "since": since, "until": until},
+            )
+        )
+        .mappings()
+        .all()
+    )
+    return [(r["date"], _to_decimal(r["temp_min_c"]), _to_decimal(r["temp_max_c"])) for r in rows]
+
+
 def _to_decimal(value: Any) -> Decimal | None:
     if value is None:
         return None

@@ -369,6 +369,17 @@
       "imported": "imported"
     }
   },
+  "heatUnitStart": {
+    "heading": "Heat units start",
+    "followCrop": "Follows the crop catalogue's start.",
+    "override": "Counting from {{date}} on this block.",
+    "label": "Start date for this block",
+    "hint": "Leave empty to follow the crop's start (a date, planting or a stage). Set it when this block's season differs, for example when it was pollinated late.",
+    "save": "Save",
+    "clear": "Follow the crop",
+    "saving": "Saving…",
+    "failed": "Could not save the start date."
+  },
   "cropDocuments": {
     "heading": "Documents",
     "loading": "Loading documents…",

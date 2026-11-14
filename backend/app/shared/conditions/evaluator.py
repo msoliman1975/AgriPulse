@@ -42,6 +42,7 @@ from app.shared.conditions.models import (
     CropAttributeValueRef,
     FindingsValueRef,
     GridValueRef,
+    HeatUnitsValueRef,
     IndicesValueRef,
     ParamsValueRef,
     ReferenceValueRef,
@@ -208,6 +209,9 @@ def _resolve(  # noqa: PLR0911, PLR0912 - dispatch over ValueRef kinds
     if isinstance(ref, ReferenceValueRef):
         # Decimals from the loader; a key the crop does not set is None.
         return (ctx.reference_values.get(ref.key) or {}).get(ref.field)
+    if isinstance(ref, HeatUnitsValueRef):
+        # Decimal totals and an int day count from the loader; {} gives None.
+        return ctx.heat_units.get(ref.key)
     if isinstance(ref, ParamsValueRef):
         return ctx.params.get(ref.name)
     if isinstance(ref, FindingsValueRef):
@@ -231,7 +235,7 @@ def resolve_ref(ref: ValueRef, ctx: ConditionContext) -> Any:
     return _resolve(ref, ctx)
 
 
-def _ref_key(ref: ValueRef) -> str:  # noqa: PLR0911 - dispatch over ValueRef kinds
+def _ref_key(ref: ValueRef) -> str:  # noqa: PLR0911, PLR0912 - dispatch over ValueRef kinds
     if isinstance(ref, IndicesValueRef):
         return f"indices.{ref.index_code}.{ref.key}"
     if isinstance(ref, WeatherValueRef):
@@ -250,6 +254,8 @@ def _ref_key(ref: ValueRef) -> str:  # noqa: PLR0911 - dispatch over ValueRef ki
         return f"crop_attribute.{ref.code}.{ref.key}"
     if isinstance(ref, ReferenceValueRef):
         return f"reference.{ref.key}.{ref.field}"
+    if isinstance(ref, HeatUnitsValueRef):
+        return f"heat_units.{ref.key}"
     if isinstance(ref, ParamsValueRef):
         return f"params.{ref.name}"
     if isinstance(ref, FindingsValueRef):

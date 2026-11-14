@@ -12,7 +12,15 @@
 // other node inheriting the same one. So every resolver here returns the
 // source level alongside the value.
 
-import type { Crop, CropVariety, CropVarietyStrain, PhenologyStage, SizeClass } from "@/api/crops";
+import type {
+  Crop,
+  CropVariety,
+  CropVarietyStrain,
+  GddMethod,
+  GddStartKind,
+  PhenologyStage,
+  SizeClass,
+} from "@/api/crops";
 
 /** Which level supplied a resolved value. */
 export type TaxonomyLevel = "crop" | "variety" | "strain";
@@ -75,6 +83,42 @@ export function resolveSizeClasses(chain: TaxonomyChain): Resolved<SizeClass[]> 
   const crop = chain.crop.size_classes;
   if (crop != null) return { value: crop.classes, source: "crop" };
   return { value: null, source: null };
+}
+
+export interface HeatUnitStart {
+  kind: GddStartKind;
+  value: string | null;
+}
+
+/**
+ * Mirrors `farms/heat_units.resolve_config` (D17): the method and the start
+ * each resolve deepest non-null wins, separately; the start kind and value
+ * travel together. Base and upper temperatures are the crop's own.
+ */
+export function resolveHeatUnits(chain: TaxonomyChain): {
+  method: Resolved<GddMethod>;
+  start: Resolved<HeatUnitStart>;
+} {
+  const levels: [TaxonomyLevel, Crop | CropVariety | CropVarietyStrain | null | undefined][] = [
+    ["strain", chain.strain],
+    ["variety", chain.variety],
+    ["crop", chain.crop],
+  ];
+  let method: Resolved<GddMethod> = { value: null, source: null };
+  let start: Resolved<HeatUnitStart> = { value: null, source: null };
+  for (const [level, node] of levels) {
+    if (!node) continue;
+    if (method.source === null && node.gdd_method != null) {
+      method = { value: node.gdd_method, source: level };
+    }
+    if (start.source === null && node.gdd_start_kind != null) {
+      start = {
+        value: { kind: node.gdd_start_kind, value: node.gdd_start_value ?? null },
+        source: level,
+      };
+    }
+  }
+  return { method, start };
 }
 
 /**
