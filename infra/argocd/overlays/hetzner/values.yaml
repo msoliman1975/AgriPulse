@@ -4324,9 +4324,38 @@ global:
       #   Watch: migrate PreSync succeeds (public head 0111); GET
       #   /plan-templates?crop_path=date_palm.medjool lists both drafts.
       #   Rollback: api and workers to fa5460d; the draft rows can stay.
-      tag: "2f112c5"
+      # 13a8eca = #871, #873, #876, #874 and #875, api and workers
+      #   (2f112c5..13a8eca). #871 and #873 are frontend and test changes only
+      #   for the api (a telemetry taxonomy entry).
+      #   #876 (D26): new or changed platform content needs Arabic beside its
+      #   English (crop names, inputs, signals, findings, platform Beta trees,
+      #   operation manuals); tenant content stays optional. The API answers 422 problem "arabic-required" with
+      #   missing_arabic. Seeded rows without Arabic still save while their
+      #   English is unchanged. Tenant 0108 adds plan_activities.notes_ar,
+      #   copied from the manual when a plan is applied.
+      #   #874 (D29): public 0112 adds crop_documents (manuals and guides on a
+      #   crop path, inherited down it, with editions); upload/edit under
+      #   /admin/crop-documents (multipart, 15 MiB cap, under the ingress's
+      #   16m), block read under /blocks/{id}/crop-documents with the new
+      #   crop_document.download capability (TenantOwner, TenantAdmin).
+      #   Files go to the uploads bucket under platform/crop-documents/;
+      #   links are presigned for 5 minutes.
+      #   #875 (D17): public 0113 adds gdd_method / gdd_start_kind /
+      #   gdd_start_value on crops, varieties and strains (date_palm.medjool:
+      #   mean from the pollination stage); tenant 0109 adds a per-block start
+      #   override. New tree condition source {source: heat_units} (total,
+      #   today, days_since_start), computed per block from daily weather.
+      #   No published tree reads it yet.
+      #   All four migrations are additive and run on PreSync.
+      #   Watch: migrate PreSync succeeds (public head 0113, tenant head
+      #   0109); the sweep's per-block time does not grow noticeably; GET
+      #   /admin/crop-documents?crop_path=date_palm.medjool answers 200; a
+      #   catalogue edit without Arabic answers 422 arabic-required.
+      #   Rollback: api and workers to 2f112c5. The new tables and columns can
+      #   stay; the old image never reads them.
+      tag: "13a8eca"
     workers:
-      tag: "2f112c5"
+      tag: "13a8eca"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -5159,7 +5188,20 @@ global:
       #   Watch: open a Medjool 1.7 template in Platform > Plan templates; the
       #   activities show their sources.
       #   Rollback: frontend to fa5460d.
-      tag: "2f112c5"
+      # 13a8eca = #871, #876, #874 and #875, frontend, see the api note.
+      #   #871: the old plan template editor and apply dialog are gone;
+      #   /platform/plan-templates redirects to Operation manuals.
+      #   #876: forms for platform content require the Arabic field and say
+      #   so (EN and AR). #874: a Documents tab in the crop catalogue (upload,
+      #   new edition, retire) and a Documents card on the block page (View,
+      #   Download). #875: heat-unit fields in the crop catalogue, a heat
+      #   units start card on the block page, and a Heat units source in the
+      #   Beta designer's condition editor.
+      #   Needs the api at 13a8eca (new routes and fields).
+      #   Watch: the Beta designer opens and its tabs work; the crop catalogue
+      #   shows Documents; a block page renders.
+      #   Rollback: frontend to 2f112c5 together with the api.
+      tag: "13a8eca"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
