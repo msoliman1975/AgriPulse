@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+from typing import Any
 from uuid import uuid4
 
 import pytest
 
-from app.shared.realtime import publish_to_user, subscribe
+from app.shared.realtime import _channel, _get_sync_client, publish_to_user, subscribe
 
 pytestmark = [pytest.mark.integration]
 
@@ -29,6 +30,22 @@ async def test_publish_to_user_reaches_subscribe_within_a_second() -> None:
     # subscription is active before we publish.
     primer = await asyncio.wait_for(gen.__anext__(), timeout=3.0)
     assert primer.startswith(": connected")
+
+    # `subscribe()` sends SUBSCRIBE and yields the primer without waiting for
+    # Redis to confirm it, so a publish straight after can land before the
+    # subscription exists and be dropped. That is fine for the product (the
+    # push is best-effort and the inbox reloads on reconnect) but makes this
+    # test a race, one that loses on a loaded runner. Wait until Redis counts
+    # the subscriber.
+    channel = _channel(tenant_id, user_id)
+    for _ in range(100):
+        counts: Any = _get_sync_client().pubsub_numsub(channel)  # sync client: a list
+        numsub = dict(counts)
+        if numsub.get(channel, 0) >= 1:
+            break
+        await asyncio.sleep(0.03)
+    else:
+        pytest.fail("Redis never registered the subscription")
 
     payload = {"id": "abc", "title": "hello"}
     publish_to_user(tenant_id=tenant_id, user_id=user_id, payload=payload)

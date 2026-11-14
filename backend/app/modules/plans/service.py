@@ -539,11 +539,15 @@ class PlansServiceImpl:
                 raise InvalidActivityTransitionError(current_status=current, action=state_action)
             changes["status"] = new_status
 
+        moved_on_board = _is_saved_plan_move(before, changes)
+        changes.update({"date_overridden": True} if moved_on_board else {})
+
         after = await self._repo.update_activity(
             activity_id=activity_id, changes=changes, actor_user_id=actor_user_id
         )
         if after is None:
             raise ActivityNotFoundError(activity_id)
+        await self._keep_saved_plan_move(before, changes, moved=moved_on_board)
 
         plan = await self._repo.get_plan(plan_id=before["plan_id"])
         farm_id = plan["farm_id"] if plan is not None else None
@@ -584,6 +588,18 @@ class PlansServiceImpl:
                 )
             )
         return after
+
+    async def _keep_saved_plan_move(
+        self, before: dict[str, Any], changes: dict[str, Any], *, moved: bool
+    ) -> None:
+        if not moved:
+            return
+        await self._repo.record_allocation_override(
+            allocation_id=before["allocation_id"],
+            block_id=before["block_id"],
+            activity_key=before["activity_key"],
+            scheduled_date=changes["scheduled_date"],
+        )
 
     async def delete_activity(
         self,
@@ -633,6 +649,17 @@ class PlansServiceImpl:
         to_date: date_type,
     ) -> tuple[dict[str, Any], ...]:
         return await self._repo.list_calendar(farm_id=farm_id, from_date=from_date, to_date=to_date)
+
+
+def _is_saved_plan_move(before: dict[str, Any], changes: dict[str, Any]) -> bool:
+    """A new date for an activity that came from an Agri Operation saved plan.
+    The move is kept in that plan so editing it later keeps the date (C4)."""
+    return bool(
+        "scheduled_date" in changes
+        and changes["scheduled_date"] != before["scheduled_date"]
+        and before.get("allocation_id") is not None
+        and before.get("activity_key")
+    )
 
 
 def get_plans_service(*, tenant_session: AsyncSession) -> PlansServiceImpl:

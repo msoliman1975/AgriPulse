@@ -81,6 +81,7 @@ dev = [
   "pytest>=8.3,<10",
   "pytest-asyncio>=0.25,<2",
   "pytest-cov>=6.0,<8",
+  "pytest-xdist>=3.6,<4",
   "anyio>=4.6,<5",
   "freezegun>=1.5,<2",
   "testcontainers[postgres,redis]>=4.8,<5",

@@ -43,7 +43,7 @@ class ResolvedActivity:
     dose_unit: str | None = None
 
 
-def _stage_start_date(
+def stage_start_date(
     advance: dict[str, Any],
     *,
     is_perennial: bool,
@@ -93,7 +93,7 @@ def resolve_schedule(
         elif anchor == "stage":
             stage = stages_by_code.get(a.get("stage_code"))
             start = (
-                _stage_start_date(
+                stage_start_date(
                     stage["advance"],
                     is_perennial=is_perennial,
                     planting_date=planting_date,
@@ -138,7 +138,7 @@ def resolve_schedule(
     return resolved, skipped
 
 
-__all__ = ["ResolvedActivity", "resolve_schedule"]
+__all__ = ["ResolvedActivity", "format_dose", "resolve_schedule", "stage_start_date"]
 
 
 def format_dose(value: Any, value_max: Any, unit: str | None) -> str | None:

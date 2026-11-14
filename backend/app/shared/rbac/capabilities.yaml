@@ -366,6 +366,14 @@ capabilities:
     description: Apply a plan template to a farm's matching-crop blocks.
     scope: farm
     status: active
+  plan_allocation.read:
+    description: View a farm's saved Agri Operation plans (operation manuals allocated to blocks).
+    scope: farm
+    status: active
+  plan_allocation.manage:
+    description: Create, edit, apply, or delete a farm's saved Agri Operation plans.
+    scope: farm
+    status: active
 
   # --- Resources (workers + equipment catalog) -------------------------
   resource.read:

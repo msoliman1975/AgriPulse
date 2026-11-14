@@ -74,7 +74,10 @@ The code keeps the `plan_templates` names; users see **"Operation manual"**
   from (E2, F1).
 
 `plan_templates` gains `revision` int (bumped on every publish) and
-`published_at` (B4, H6).
+`published_at` (B4, H6), and `published_snapshot` (public 0107): the
+manual's activities by code at its last publish. A saved plan keeps
+`manual_snapshot` (tenant 0103), the manual as it last applied it. Diffs by
+code feed the Publish step (H6) and the farm's "manual updated" (B4).
 
 `replace_full_tree` upserts activities **by code** instead of delete +
 insert, so ids survive a save. Activities whose code disappears are
@@ -124,22 +127,27 @@ its still-scheduled rows (F4); nothing is hard-deleted.
 
 Platform (cap `plan_template.manage`), existing routes kept, plus:
 
-- `GET /v1/plan-templates/{id}/varieties-preview` → resolved stage windows and
-  week numbers per variety under the manual's crop (H5).
+- `GET /v1/plan-templates/{id}/authoring-view` → the manual (drafts
+  included) with its resolved stages and the resolved stages of every variety
+  it covers (H5). The client turns stage starts into week numbers.
 - `GET /v1/plan-templates/{id}/publish-impact` → diff since the last
   published revision (by code) and the count of farms with active
   allocations (H6). Cross-tenant count only, no farm names (H7).
 
 Tenant:
 
-- `GET /v1/plan-templates/catalog?crop_path=` and
-  `GET /v1/plan-templates/{id}/manual` (cap `plan_template.read`): published
-  manuals only (E4), full tree + resolved stages.
-- `GET|POST /v1/farms/{farm_id}/plan-allocations`,
-  `GET|PATCH|DELETE /v1/plan-allocations/{id}`,
-  `POST /v1/plan-allocations/preview` (unsaved state → per-block dated
-  schedule, C2), `POST /v1/plan-allocations/{id}/apply`,
-  `GET /v1/plan-allocations/{id}/manual-changes` (B4).
+- `GET /v1/plan-templates/catalog?farm_id=&crop=` and
+  `GET /v1/plan-templates/{id}/manual?farm_id=` (cap `plan_template.read` on
+  the farm): published manuals only (E4); the manual carries the full tree,
+  its resolved stages and the stages per variety it covers.
+- Saved plans, all under `/v1/farms/{farm_id}/plan-allocations`:
+  `GET` (list), `POST` (save a new plan and apply it), `POST .../preview`
+  (unsaved state → per-block dated schedule, rejected blocks, codes the
+  manual no longer has; C2, C3), `GET|PUT|DELETE .../{id}` (read, replace and
+  re-apply, delete with soft delete of still-scheduled rows; F4). Saving
+  always applies. Each saved plan reports `manual_updated` when its manual
+  was published again after it was applied (B4); the change diff lands in
+  PR 4.
 - New capabilities (F3): `plan_allocation.read`, `plan_allocation.manage`,
   granted to the roles that hold `plan_template.apply` today.
 
@@ -228,13 +236,13 @@ The loop is self-paced. Each iteration:
 
 | # | PR | State | Link | Deployed |
 |---|---|---|---|---|
-| 0 | Build plan | in review (with PR 1) | [#848](https://github.com/msoliman1975/AgriPulse/pull/848) | n/a |
-| 1 | Manual content model | in review | [#848](https://github.com/msoliman1975/AgriPulse/pull/848) | |
+| 0 | Build plan | merged | [#848](https://github.com/msoliman1975/AgriPulse/pull/848) | n/a |
+| 1 | Manual content model | merged | [#848](https://github.com/msoliman1975/AgriPulse/pull/848) | e842760 via [#850](https://github.com/msoliman1975/AgriPulse/pull/850), verified 2026-11-14 |
 | 1b | Arabic manual text | `notes_ar`, `product_name_ar`, `dosage_ar` for the seeded manuals (E3); Medjool from the manual's Arabic edition | integration: no live manual activity without Arabic | api (before farm launch) |
 | 1b | Arabic manual text | not started | | |
-| 2 | Tenant manual read API + capabilities | not started | | |
-| 3 | Saved plans backend | not started | | |
-| 4 | Manual revisions | not started | | |
+| 2 | Tenant manual read API + capabilities | in review | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | |
+| 3 | Saved plans backend | in review | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | |
+| 4 | Manual revisions | in review | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | |
 | 5 | Agri Operation page + Catalog tab | not started | | |
 | 6 | Plan tab | not started | | |
 | 7 | Board integration | not started | | |

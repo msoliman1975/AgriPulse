@@ -86,7 +86,13 @@ async def _refresh(session: AsyncSession) -> None:
     # cannot run inside a transaction block, so it needs its own autocommit
     # connection either way — which is exactly what the purge engine does.
     start = TODAY - timedelta(days=10)
-    end = TODAY + timedelta(days=1)
+    # Stop where the production policy stops (end_offset => 1 hour), never in
+    # the future. Materialising past now moves the aggregate's watermark ahead
+    # of the clock, and real-time aggregation only covers data newer than the
+    # watermark: test_usage_caggs_realtime then cannot see a fresh event if it
+    # runs after this file in the same session. Today's seeded rows still read
+    # correctly, through the real-time half of the view.
+    end = min(TODAY + timedelta(days=1), datetime.now(UTC) - timedelta(hours=1))
     engine = create_async_engine(str(get_settings().database_url), isolation_level="AUTOCOMMIT")
     try:
         async with engine.connect() as conn:

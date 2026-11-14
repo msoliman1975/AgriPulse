@@ -8,7 +8,7 @@ from datetime import date as date_type
 from datetime import datetime, time
 from uuid import UUID
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, Text, Time, text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Text, Time, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -108,3 +108,11 @@ class PlanActivity(Base, TimestampedMixin):
     template_activity_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     # Phenology stage this activity was anchored to (for the board badge).
     anchored_stage_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Agri Operation saved plan this row came from (tenant 0102). activity_key
+    # is the manual activity's code or ``custom:<id>``; date_overridden marks a
+    # date moved on the calendar or the board, which re-apply keeps (C4).
+    allocation_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    activity_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    date_overridden: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )

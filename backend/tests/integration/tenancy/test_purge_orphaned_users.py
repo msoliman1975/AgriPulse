@@ -15,6 +15,7 @@ at all.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
@@ -31,6 +32,29 @@ pytestmark = [pytest.mark.integration]
 
 _UID = bindparam("uid", type_=PG_UUID(as_uuid=True))
 _TID = bindparam("tid", type_=PG_UUID(as_uuid=True))
+
+
+@pytest.fixture(autouse=True)
+async def _retire_purged_tenants(admin_session: AsyncSession) -> AsyncIterator[None]:
+    """Mark tenants this file purged as deleted once each test is done.
+
+    ``purge_tenant`` drops the schema on its own committed connection, while
+    the status change rides on the test's session and is rolled back with it.
+    Left alone, that is an ``active`` tenant with no schema, and any later
+    sweep across all tenants (imagery boundary invalidation, grid cleanup)
+    fails on it. Serial CI only passed because ``tenancy`` sorts after every
+    module that runs such a sweep.
+    """
+    yield
+    await admin_session.rollback()
+    await admin_session.execute(
+        text(
+            "UPDATE public.tenants t SET deleted_at = now() "
+            "WHERE t.slug LIKE 'orph-%' AND t.deleted_at IS NULL "
+            "  AND NOT EXISTS (SELECT 1 FROM pg_namespace n WHERE n.nspname = t.schema_name)"
+        )
+    )
+    await admin_session.commit()
 
 
 def _slug(prefix: str) -> str:

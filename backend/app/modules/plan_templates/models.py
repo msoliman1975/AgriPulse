@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime, time
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import (
@@ -26,6 +27,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -66,6 +68,8 @@ class PlanTemplate(Base, TimestampedMixin):
     # they last applied so farms can be told the manual changed (B4).
     revision: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Activities by code as of the last publish (public 0107, H6).
+    published_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
 
 class PlanTemplateMilestone(Base, TimestampedMixin):

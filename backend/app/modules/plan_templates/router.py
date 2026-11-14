@@ -16,13 +16,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import APIError
 from app.modules.plan_templates.schemas import (
+    AllocationApplyResult,
+    AllocationPreviewResponse,
+    AllocationResponse,
+    AllocationWriteRequest,
     AppliableTemplate,
+    ManualCatalogItem,
+    ManualChangesResponse,
+    OperationManualResponse,
     PlanTemplateApplyRequest,
     PlanTemplateApplyResponse,
     PlanTemplateDetail,
     PlanTemplatePreviewResponse,
     PlanTemplateSummary,
     PlanTemplateWriteRequest,
+    PublishImpactResponse,
     ResolvedPhenologyResponse,
 )
 from app.modules.plan_templates.service import (
@@ -81,6 +89,38 @@ async def list_appliable(
     return await service.list_appliable(farm_id=farm_id)
 
 
+@router.get(
+    "/plan-templates/catalog",
+    response_model=list[ManualCatalogItem],
+    summary="Published operation manuals a farm can browse, optionally for one crop.",
+)
+async def list_catalog(
+    farm_id: UUID = Query(...),
+    crop: str | None = Query(default=None, max_length=64),
+    context: RequestContext = Depends(get_current_context),
+    service: PlanTemplatesService = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    _require(context, "plan_template.read", farm_id)
+    return await service.list_catalog(crop=crop)
+
+
+@router.get(
+    "/plan-templates/{template_id}/manual",
+    response_model=OperationManualResponse,
+    summary="A published operation manual with its stages, for a farm (read-only).",
+)
+async def get_manual(
+    template_id: UUID,
+    farm_id: UUID = Query(...),
+    context: RequestContext = Depends(get_current_context),
+    service: PlanTemplatesService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    _require(context, "plan_template.read", farm_id)
+    return await service.get_manual(template_id=template_id, published_only=True)
+
+
 @router.post(
     "/plan-templates/{template_id}/preview",
     response_model=PlanTemplatePreviewResponse,
@@ -122,6 +162,142 @@ async def apply(
         season_label=payload.season_label,
         season_year=payload.season_year,
         blocks=payload.blocks,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )
+
+
+# ---------- Saved plans (Agri Operation allocations) ------------------------
+#
+# Farm-scoped paths so the capability check is on the farm in the URL. Saving
+# a plan applies it (regenerates its still-scheduled activities).
+
+
+@router.get(
+    "/farms/{farm_id}/plan-allocations",
+    response_model=list[AllocationResponse],
+    summary="A farm's saved Agri Operation plans.",
+)
+async def list_allocations(
+    farm_id: UUID,
+    context: RequestContext = Depends(get_current_context),
+    service: PlanTemplatesService = Depends(_service),
+) -> list[dict[str, Any]]:
+    _ensure_tenant(context)
+    _require(context, "plan_allocation.read", farm_id)
+    return await service.list_allocations(farm_id=farm_id)
+
+
+@router.post(
+    "/farms/{farm_id}/plan-allocations/preview",
+    response_model=AllocationPreviewResponse,
+    summary="The dated schedule a saved plan would produce, per block (no writes).",
+)
+async def preview_allocation(
+    farm_id: UUID,
+    payload: AllocationWriteRequest,
+    context: RequestContext = Depends(get_current_context),
+    service: PlanTemplatesService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    _require(context, "plan_allocation.read", farm_id)
+    return await service.preview_allocation(farm_id=farm_id, payload=payload)
+
+
+@router.post(
+    "/farms/{farm_id}/plan-allocations",
+    response_model=AllocationApplyResult,
+    status_code=status.HTTP_201_CREATED,
+    summary="Save a new plan from an operation manual and apply it to its blocks.",
+)
+async def create_allocation(
+    farm_id: UUID,
+    payload: AllocationWriteRequest,
+    context: RequestContext = Depends(get_current_context),
+    service: PlanTemplatesService = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    _require(context, "plan_allocation.manage", farm_id)
+    return await service.save_allocation(
+        farm_id=farm_id,
+        allocation_id=None,
+        payload=payload,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )
+
+
+@router.get(
+    "/farms/{farm_id}/plan-allocations/{allocation_id}",
+    response_model=AllocationResponse,
+    summary="One saved plan.",
+)
+async def get_allocation(
+    farm_id: UUID,
+    allocation_id: UUID,
+    context: RequestContext = Depends(get_current_context),
+    service: PlanTemplatesService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    _require(context, "plan_allocation.read", farm_id)
+    return await service.get_allocation(farm_id=farm_id, allocation_id=allocation_id)
+
+
+@router.get(
+    "/farms/{farm_id}/plan-allocations/{allocation_id}/manual-changes",
+    response_model=ManualChangesResponse,
+    summary="What changed in the manual since this saved plan was applied.",
+)
+async def get_manual_changes(
+    farm_id: UUID,
+    allocation_id: UUID,
+    context: RequestContext = Depends(get_current_context),
+    service: PlanTemplatesService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    _require(context, "plan_allocation.read", farm_id)
+    return await service.manual_changes(farm_id=farm_id, allocation_id=allocation_id)
+
+
+@router.put(
+    "/farms/{farm_id}/plan-allocations/{allocation_id}",
+    response_model=AllocationApplyResult,
+    summary="Replace a saved plan and re-apply it.",
+)
+async def update_allocation(
+    farm_id: UUID,
+    allocation_id: UUID,
+    payload: AllocationWriteRequest,
+    context: RequestContext = Depends(get_current_context),
+    service: PlanTemplatesService = Depends(_service),
+) -> dict[str, Any]:
+    schema = _ensure_tenant(context)
+    _require(context, "plan_allocation.manage", farm_id)
+    return await service.save_allocation(
+        farm_id=farm_id,
+        allocation_id=allocation_id,
+        payload=payload,
+        actor_user_id=context.user_id,
+        tenant_schema=schema,
+    )
+
+
+@router.delete(
+    "/farms/{farm_id}/plan-allocations/{allocation_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a saved plan and its still-scheduled activities.",
+)
+async def delete_allocation(
+    farm_id: UUID,
+    allocation_id: UUID,
+    context: RequestContext = Depends(get_current_context),
+    service: PlanTemplatesService = Depends(_service),
+) -> None:
+    schema = _ensure_tenant(context)
+    _require(context, "plan_allocation.manage", farm_id)
+    await service.delete_allocation(
+        farm_id=farm_id,
+        allocation_id=allocation_id,
         actor_user_id=context.user_id,
         tenant_schema=schema,
     )
@@ -192,6 +368,32 @@ async def admin_get_template(
 ) -> dict[str, Any]:
     del context
     return await service.get_full_tree(template_id=template_id)
+
+
+@router.get(
+    "/plan-templates/{template_id}/authoring-view",
+    response_model=OperationManualResponse,
+    summary="Any manual (drafts included) with its stages per variety, for authoring.",
+)
+async def admin_get_manual(
+    template_id: UUID,
+    context: RequestContext = Depends(requires_capability("plan_template.manage")),
+    service: PlanTemplatesService = Depends(_service),
+) -> dict[str, Any]:
+    return await service.get_manual(template_id=template_id, published_only=False)
+
+
+@router.get(
+    "/plan-templates/{template_id}/publish-impact",
+    response_model=PublishImpactResponse,
+    summary="What changed since the last publish, and how many farms use the manual.",
+)
+async def admin_publish_impact(
+    template_id: UUID,
+    context: RequestContext = Depends(requires_capability("plan_template.manage")),
+    service: PlanTemplatesService = Depends(_service),
+) -> dict[str, Any]:
+    return await service.publish_impact(template_id=template_id)
 
 
 @router.put(

@@ -111,6 +111,34 @@ class PlanTemplateDetail(PlanTemplateSummary):
     activities: list[PlanTemplateActivityResponse] = Field(default_factory=list)
 
 
+class ManualCatalogItem(PlanTemplateSummary):
+    """A published operation manual in the farm catalog."""
+
+    activity_count: int = 0
+
+
+class VarietyPhenology(BaseModel):
+    """Resolved phenology for one variety (or the crop's own calendar when
+    ``name_en`` is null). ``stages`` carries each stage's ``advance`` rule;
+    the client turns it into weeks (H5)."""
+
+    path: str
+    code: str | None = None
+    name_en: str | None = None
+    name_ar: str | None = None
+    is_perennial: bool = False
+    stages: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class OperationManualResponse(PlanTemplateDetail):
+    """A manual as the Agri Operation views show it: the tree, the stages
+    resolved for its own crop path, and the stages per variety it covers."""
+
+    is_perennial: bool = False
+    stages: list[dict[str, Any]] = Field(default_factory=list)
+    varieties: list[VarietyPhenology] = Field(default_factory=list)
+
+
 # ---- Authoring (whole-tree write; used by PR-E3) ---------------------------
 
 
@@ -263,3 +291,176 @@ class ResolvedPhenologyResponse(BaseModel):
     crop_path: str
     is_perennial: bool = False
     stages: list[dict[str, Any]] = Field(default_factory=list)
+
+
+# ---- Saved plans (Agri Operation allocations; PR 3) -------------------------
+
+StartMode = Literal["same", "per_block"]
+CustomAnchor = Literal["week", "stage"]
+CUSTOM_KEY_PATTERN = r"^custom:[A-Za-z0-9_-]{1,64}$"
+
+
+class AllocationActivityEdit(BaseModel):
+    """The farm's own product, dosage and notes for a manual activity (D1).
+    A field left out keeps the manual's value."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    product_name: str | None = Field(default=None, max_length=255)
+    dosage: str | None = Field(default=None, max_length=255)
+    notes: str | None = Field(default=None, max_length=4000)
+    product_name_ar: str | None = Field(default=None, max_length=255)
+    dosage_ar: str | None = Field(default=None, max_length=255)
+    notes_ar: str | None = Field(default=None, max_length=4000)
+
+
+class AllocationCustomActivity(BaseModel):
+    """An activity added for this saved plan only (D2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str = Field(pattern=CUSTOM_KEY_PATTERN)
+    activity_type: ActivityType
+    title: str = Field(min_length=1, max_length=255)
+    title_ar: str | None = Field(default=None, max_length=255)
+    anchor: CustomAnchor = "week"
+    week: int | None = Field(default=None, ge=1, le=104)
+    stage_code: str | None = Field(default=None, max_length=64)
+    offset_days: int = Field(default=0, ge=-365, le=730)
+    duration_days: int = Field(default=1, ge=1, le=60)
+    product_name: str | None = Field(default=None, max_length=255)
+    dosage: str | None = Field(default=None, max_length=255)
+    notes: str | None = Field(default=None, max_length=4000)
+
+
+class AllocationBlock(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    block_id: UUID
+    start_date: date
+
+
+class AllocationWriteRequest(BaseModel):
+    """Create or replace a saved plan. Saving applies it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    template_id: UUID
+    season_label: str = Field(min_length=1, max_length=64)
+    season_year: int = Field(ge=2000, le=2100)
+    start_mode: StartMode = "same"
+    blocks: list[AllocationBlock] = Field(min_length=1, max_length=500)
+    excluded_codes: list[str] = Field(default_factory=list, max_length=500)
+    activity_edits: dict[str, AllocationActivityEdit] = Field(default_factory=dict)
+    custom_activities: list[AllocationCustomActivity] = Field(default_factory=list, max_length=200)
+    # {block_id: {activity_key: date}}
+    date_overrides: dict[UUID, dict[str, date]] = Field(default_factory=dict)
+
+
+class AllocatedActivityPreview(BaseModel):
+    activity_key: str
+    source: Literal["template", "custom"]
+    template_activity_id: UUID | None = None
+    activity_type: str
+    title: str | None = None
+    title_ar: str | None = None
+    scheduled_date: date
+    default_date: date
+    date_overridden: bool = False
+    duration_days: int = 1
+    anchored_stage_code: str | None = None
+    product_name: str | None = None
+    dosage: str | None = None
+    notes: str | None = None
+
+
+class AllocationBlockSchedule(BaseModel):
+    block_id: UUID
+    block_code: str | None = None
+    crop_path: str | None = None
+    start_date: date
+    activities: list[AllocatedActivityPreview] = Field(default_factory=list)
+    skipped: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AllocationPreviewResponse(BaseModel):
+    template_id: UUID
+    blocks: list[AllocationBlockSchedule] = Field(default_factory=list)
+    # Blocks whose crop doesn't match the manual (C3); apply refuses them.
+    rejected_blocks: list[dict[str, Any]] = Field(default_factory=list)
+    # Codes the plan refers to that the manual no longer has.
+    missing_codes: list[str] = Field(default_factory=list)
+    total_activities: int = 0
+
+
+class AllocationResponse(BaseModel):
+    id: UUID
+    farm_id: UUID
+    plan_id: UUID
+    template_id: UUID
+    template_code: str | None = None
+    template_name: str | None = None
+    template_name_ar: str | None = None
+    crop_path: str | None = None
+    template_revision: int = 0
+    # The manual has been published again since this plan was applied (B4).
+    manual_updated: bool = False
+    season_label: str
+    season_year: int
+    start_mode: StartMode
+    blocks: list[AllocationBlock] = Field(default_factory=list)
+    excluded_codes: list[str] = Field(default_factory=list)
+    activity_edits: dict[str, AllocationActivityEdit] = Field(default_factory=dict)
+    custom_activities: list[AllocationCustomActivity] = Field(default_factory=list)
+    date_overrides: dict[UUID, dict[str, date]] = Field(default_factory=dict)
+    applied_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AllocationApplyResult(BaseModel):
+    allocation: AllocationResponse
+    activities_created: int = 0
+    activities_kept: int = 0
+    skipped: int = 0
+
+
+# ---- Manual revisions (PR 4) -------------------------------------------------
+
+
+class ManualChangeItem(BaseModel):
+    code: str
+    title: str | None = None
+    title_ar: str | None = None
+    activity_type: str | None = None
+    # For a changed activity: which fields changed.
+    fields: list[str] = Field(default_factory=list)
+
+
+class ManualDiff(BaseModel):
+    # False when there is nothing to compare against (never published, or a
+    # saved plan applied before snapshots existed).
+    comparable: bool = True
+    added: list[ManualChangeItem] = Field(default_factory=list)
+    removed: list[ManualChangeItem] = Field(default_factory=list)
+    changed: list[ManualChangeItem] = Field(default_factory=list)
+
+
+class ManualChangesResponse(ManualDiff):
+    """GET .../plan-allocations/{id}/manual-changes (B4)."""
+
+    allocation_id: UUID
+    template_id: UUID
+    applied_revision: int
+    current_revision: int
+    manual_updated: bool
+
+
+class PublishImpactResponse(ManualDiff):
+    """GET /plan-templates/{id}/publish-impact (H6). Counts only (H7)."""
+
+    template_id: UUID
+    revision: int
+    published_at: datetime | None = None
+    farms: int = 0
+    saved_plans: int = 0
