@@ -83,7 +83,11 @@
       "boundaryInvalid": "Boundary is not a valid polygon.",
       "boundarySelfIntersect": "Boundary self-intersects."
     },
-    "identity": "Farm details"
+    "identity": "Farm details",
+    "rowSpacing": "Row spacing (m)",
+    "inRowSpacing": "In-row spacing (m)",
+    "plantCount": "Plant count",
+    "spacingDensity": "{{value}} plants per hectare from this spacing"
   },
   "farmType": {
     "commercial": "Commercial",
@@ -176,7 +180,10 @@
       "block": "Block",
       "pivot": "Pivot",
       "pivot_sector": "Pivot sector"
-    }
+    },
+    "plantCount_one": "{{count}} plant",
+    "plantCount_other": "{{count}} plants",
+    "spacingLayout": "{{row}} × {{inRow}} m ({{density}} per ha)"
   },
   "autoGrid": {
     "heading": "Auto-grid blocks",

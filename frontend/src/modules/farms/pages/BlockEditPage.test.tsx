@@ -60,6 +60,25 @@ describe("BlockEditPage", () => {
     expect(document.documentElement.getAttribute("dir")).toBe("ltr");
   });
 
+  it("pre-fills the planting layout and shows the spacing density (D23)", async () => {
+    getBlockMock.mockResolvedValueOnce({
+      ...(await getBlockMock.getMockImplementation()?.()),
+      row_spacing_m: "10.00",
+      in_row_spacing_m: "8.00",
+      plant_count: 240,
+    });
+    await setupTestI18n("en");
+    renderAtRoute(<BlockEditPage />, {
+      route: `/farms/${FARM_ID}/blocks/${BLOCK_ID}/edit`,
+      path: "/farms/:farmId/blocks/:blockId/edit",
+    });
+    await waitFor(() => expect(screen.getByLabelText("Row spacing (m)")).toHaveValue(10));
+    expect(screen.getByLabelText("In-row spacing (m)")).toHaveValue(8);
+    expect(screen.getByLabelText("Plant count")).toHaveValue(240);
+    // 10,000 m² / (10 m × 8 m), the manual's Medjool layout.
+    expect(screen.getByText("125 plants per hectare from this spacing")).toBeInTheDocument();
+  });
+
   it("renders the heading in Arabic (RTL)", async () => {
     await setupTestI18n("ar");
     renderAtRoute(<BlockEditPage />, {

@@ -88,6 +88,20 @@ export function BlockForm({
   const [soilPh, setSoilPh] = useState<string>(
     initial?.soil_ph != null ? String(initial.soil_ph) : "",
   );
+  const [rowSpacing, setRowSpacing] = useState<string>(
+    initial?.row_spacing_m != null ? String(initial.row_spacing_m) : "",
+  );
+  const [inRowSpacing, setInRowSpacing] = useState<string>(
+    initial?.in_row_spacing_m != null ? String(initial.in_row_spacing_m) : "",
+  );
+  const [plantCount, setPlantCount] = useState<string>(
+    initial?.plant_count != null ? String(initial.plant_count) : "",
+  );
+  // What the layout holds: 10,000 m² over the area each plant takes.
+  const spacingDensity =
+    Number(rowSpacing) > 0 && Number(inRowSpacing) > 0
+      ? 10000 / (Number(rowSpacing) * Number(inRowSpacing))
+      : null;
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [drawnPolygon, setDrawnPolygon] = useState<Polygon | null>(initialBoundary ?? null);
   const [uploadedPolygon, setUploadedPolygon] = useState<Polygon | null>(null);
@@ -151,6 +165,9 @@ export function BlockForm({
       soil_texture: soilTexture || null,
       salinity_class: salinityClass || null,
       soil_ph: soilPh ? Number(soilPh) : null,
+      row_spacing_m: rowSpacing ? Number(rowSpacing) : null,
+      in_row_spacing_m: inRowSpacing ? Number(inRowSpacing) : null,
+      plant_count: plantCount ? Number(plantCount) : null,
       agronomist_membership_id: agronomistMembershipId,
       notes: notes || null,
       tags: [],
@@ -284,6 +301,55 @@ export function BlockForm({
             step={0.1}
             value={soilPh}
             onChange={(e) => setSoilPh(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="label" htmlFor="block-row-spacing">
+            {t("form.rowSpacing")}
+          </label>
+          <input
+            id="block-row-spacing"
+            className="input"
+            type="number"
+            min={0.01}
+            step={0.01}
+            value={rowSpacing}
+            onChange={(e) => setRowSpacing(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="label" htmlFor="block-in-row-spacing">
+            {t("form.inRowSpacing")}
+          </label>
+          <input
+            id="block-in-row-spacing"
+            className="input"
+            type="number"
+            min={0.01}
+            step={0.01}
+            value={inRowSpacing}
+            onChange={(e) => setInRowSpacing(e.target.value)}
+          />
+          {spacingDensity != null ? (
+            <p className="mt-1 text-xs text-ap-muted">
+              {t("form.spacingDensity", {
+                value: spacingDensity.toLocaleString(i18n.language, { maximumFractionDigits: 1 }),
+              })}
+            </p>
+          ) : null}
+        </div>
+        <div>
+          <label className="label" htmlFor="block-plant-count">
+            {t("form.plantCount")}
+          </label>
+          <input
+            id="block-plant-count"
+            className="input"
+            type="number"
+            min={0}
+            step={1}
+            value={plantCount}
+            onChange={(e) => setPlantCount(e.target.value)}
           />
         </div>
         {canReadMembers ? (

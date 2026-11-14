@@ -166,6 +166,20 @@ export function BlockDetailPage(): JSX.Element {
           <>
             <AreaDisplay areaM2={Number(block.area_m2)} /> ·{" "}
             {block.irrigation_system ? t(`irrigationSystem.${block.irrigation_system}`) : "—"}
+            {block.plant_count != null ? (
+              <> · {t("block.plantCount", { count: block.plant_count })}</>
+            ) : null}
+            {block.plants_per_ha_from_spacing != null ? (
+              <>
+                {" "}
+                ·{" "}
+                {t("block.spacingLayout", {
+                  row: Number(block.row_spacing_m),
+                  inRow: Number(block.in_row_spacing_m),
+                  density: Number(block.plants_per_ha_from_spacing),
+                })}
+              </>
+            ) : null}
           </>
         }
         actions={
