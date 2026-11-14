@@ -4262,9 +4262,25 @@ global:
       #   saving a plan in Agri Operation answers 201 and its rows appear on
       #   the board with a Plan badge.
       #   Rollback: api and workers to 751b318.
-      tag: "39364b6"
+      # 7ccd806 = #861 and #862, api and workers (Medjool step 4b-2, D18).
+      #   #861: tenant 0105 widens ck_blocks_salinity_class to FAO's fifth
+      #   class, very_strongly_saline (ECe above 16 dS/m, manual 1.7, 4.1 #7);
+      #   the block API accepts it. #862: a new tree condition source,
+      #   {source: reference, key, field}, reads the crop's reference values
+      #   (crop_reference_values, deepest path winning); the sweep, the
+      #   explain/dry-run path and the Beta designer dry run load one public
+      #   query per block for it; both compilers reject an unknown key;
+      #   readiness lists it as a requirement. No published tree reads it yet.
+      #   The migration is additive (a wider check) and runs on PreSync.
+      #   Watch: migrate PreSync succeeds (tenant head 0105); the sweep's
+      #   per-block time does not grow noticeably (one extra indexed query);
+      #   PUT a block with salinity_class very_strongly_saline answers 200.
+      #   Rollback: api and workers to 39364b6. A block already set to the
+      #   new class would then fail the old API's response schema; tenant
+      #   0105's downgrade folds it back into strongly_saline.
+      tag: "7ccd806"
     workers:
-      tag: "39364b6"
+      tag: "7ccd806"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -5054,7 +5070,16 @@ global:
       #   Watch: Agri Operation opens on a farm, the Catalog shows a manual and
       #   the Plan tab lists saved plans; the board header links to it.
       #   Rollback: this tag back to 751b318 (api may stay).
-      tag: "39364b6"
+      # 7ccd806 = #861 and #862, frontend, see the api note. The block form,
+      #   the map panels and the condition editor offer "Very strongly saline"
+      #   (AR "شديدة الملوحة جدًا"); the Beta designer's condition editor gains
+      #   a "Crop reference value" source with key and field pickers.
+      #   Needs the api at 7ccd806: an older api rejects the new class on
+      #   save, and an older compiler rejects the new source.
+      #   Watch: the Beta designer opens and its five tabs work; picking the
+      #   new source in a condition shows the reference keys.
+      #   Rollback: frontend to 39364b6 together with the api.
+      tag: "7ccd806"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
