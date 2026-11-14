@@ -48,16 +48,18 @@ def upgrade() -> None:
                 ADD CONSTRAINT ck_{table}_gdd_method
                     CHECK (gdd_method IS NULL
                            OR gdd_method IN ('mean', 'max', 'min_max_cutoff')),
+                -- COALESCE: a CHECK passes on NULL, and a regex on a NULL value
+                -- is NULL, so a kind without a value would otherwise slip in.
                 ADD CONSTRAINT ck_{table}_gdd_start
-                    CHECK (
+                    CHECK (COALESCE(
                         (gdd_start_kind IS NULL AND gdd_start_value IS NULL)
                         OR (gdd_start_kind = 'planting' AND gdd_start_value IS NULL)
                         OR (gdd_start_kind = 'date'
                             AND gdd_start_value
                                 ~ '^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')
                         OR (gdd_start_kind = 'stage'
-                            AND gdd_start_value ~ '^[A-Za-z0-9][A-Za-z0-9_-]{{0,31}}$')
-                    );
+                            AND gdd_start_value ~ '^[A-Za-z0-9][A-Za-z0-9_-]{{0,31}}$'),
+                        false));
             """
         )
     # Base 18 C was seeded in 0006; only fill it if someone cleared it.
