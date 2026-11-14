@@ -91,6 +91,9 @@ export function BlockEditPage(): JSX.Element {
             soil_texture: block.soil_texture,
             salinity_class: block.salinity_class,
             soil_ph: block.soil_ph,
+            row_spacing_m: block.row_spacing_m,
+            in_row_spacing_m: block.in_row_spacing_m,
+            plant_count: block.plant_count,
             agronomist_membership_id: block.agronomist_membership_id,
             notes: block.notes,
           }}

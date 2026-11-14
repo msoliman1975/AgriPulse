@@ -83,7 +83,11 @@
       "boundaryInvalid": "الحدود ليست مضلعًا صحيحًا.",
       "boundarySelfIntersect": "الحدود تتقاطع مع نفسها."
     },
-    "identity": "بيانات المزرعة"
+    "identity": "بيانات المزرعة",
+    "rowSpacing": "المسافة بين الصفوف (م)",
+    "inRowSpacing": "المسافة داخل الصف (م)",
+    "plantCount": "عدد النباتات",
+    "spacingDensity": "{{value}} نبات لكل هكتار بهذه المسافات"
   },
   "farmType": {
     "commercial": "تجارية",
@@ -176,7 +180,14 @@
       "block": "قطعة",
       "pivot": "ري محوري",
       "pivot_sector": "قطاع محور"
-    }
+    },
+    "plantCount_zero": "{{count}} نبات",
+    "plantCount_one": "نبات واحد",
+    "plantCount_two": "نباتان",
+    "plantCount_few": "{{count}} نباتات",
+    "plantCount_many": "{{count}} نباتًا",
+    "plantCount_other": "{{count}} نبات",
+    "spacingLayout": "{{row}} × {{inRow}} م ({{density}} لكل هكتار)"
   },
   "autoGrid": {
     "heading": "تقسيم آلي إلى شبكة",

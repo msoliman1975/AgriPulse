@@ -51,6 +51,14 @@ export interface Block {
   soil_texture: SoilTexture | null;
   salinity_class: SalinityClass | null;
   soil_ph: number | null;
+  // Planting layout as planted (D23), and the densities the API derives:
+  // from the spacing (what the layout holds) and from the count over the
+  // mapped area (what the block holds).
+  row_spacing_m?: number | null;
+  in_row_spacing_m?: number | null;
+  plant_count?: number | null;
+  plants_per_ha_from_spacing?: number | null;
+  plants_per_ha_from_count?: number | null;
   // U-4b: per-block agronomist, referenced by tenant membership_id.
   agronomist_membership_id: string | null;
   notes: string | null;
@@ -81,6 +89,9 @@ export interface BlockCreatePayload {
   soil_texture?: SoilTexture | null;
   salinity_class?: SalinityClass | null;
   soil_ph?: number | null;
+  row_spacing_m?: number | null;
+  in_row_spacing_m?: number | null;
+  plant_count?: number | null;
   agronomist_membership_id?: string | null;
   notes?: string | null;
   tags?: string[];

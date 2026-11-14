@@ -406,6 +406,10 @@ class Block(Base, TimestampedMixin):
     soil_texture: Mapped[str | None] = mapped_column(Text, nullable=True)
     salinity_class: Mapped[str | None] = mapped_column(Text, nullable=True)
     soil_ph: Mapped[Decimal | None] = mapped_column(Numeric(3, 1), nullable=True)
+    # Planting layout as planted (D23, tenant 0106); densities are derived.
+    row_spacing_m: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    in_row_spacing_m: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    plant_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     soil_ec_ds_per_m: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     soil_organic_matter_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     last_soil_test_date: Mapped[date | None] = mapped_column(Date, nullable=True)
