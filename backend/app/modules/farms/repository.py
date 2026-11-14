@@ -1713,12 +1713,18 @@ class FarmsRepository:
         ``is_current`` flag: the sweep runs daily, and a flag that only moves
         when someone assigns a crop would keep advancing the growth stage of an
         assignment that ended months ago.
+
+        Only crops on live blocks: deleting a block leaves its crop rows, and
+        the stage log refuses a deleted block, so one would abort the run.
         """
         today = clock.today()
         rows = (
             (
                 await self._tenant.execute(
-                    select(BlockCrop).where(
+                    select(BlockCrop)
+                    .join(Block, Block.id == BlockCrop.block_id)
+                    .where(
+                        Block.deleted_at.is_(None),
                         BlockCrop.effective_from <= today,
                         or_(
                             BlockCrop.effective_to.is_(None),
