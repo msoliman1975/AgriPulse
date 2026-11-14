@@ -177,3 +177,27 @@ async def test_auto_advance_sets_derived_stage_and_respects_lock(
     ).scalar_one()
     assert locked_stage == "veg_flush"  # untouched
     await admin_session.execute(text("SET search_path TO public"))
+    await admin_session.commit()
+
+    # A soft-deleted block whose crop row is still live is skipped, not fatal:
+    # the stage log refuses a deleted block, which used to abort the whole
+    # tenant's run.
+    await admin_session.execute(text(f"SET search_path TO {schema}, public"))
+    await admin_session.execute(
+        text(
+            "UPDATE block_crops SET growth_stage = NULL, growth_stage_locked = FALSE "
+            "WHERE id = :id"
+        ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+        {"id": bc_id},
+    )
+    await admin_session.execute(
+        text("UPDATE blocks SET deleted_at = now() WHERE id = :id").bindparams(
+            bindparam("id", type_=PG_UUID(as_uuid=True))
+        ),
+        {"id": block_id},
+    )
+    await admin_session.execute(text("SET search_path TO public"))
+    await admin_session.commit()
+
+    res4 = await _advance_for_tenant_async(schema)
+    assert res4 == {"evaluated": 0, "advanced": 0, "no_stages": 0}, res4
