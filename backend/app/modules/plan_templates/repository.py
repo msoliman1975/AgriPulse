@@ -555,7 +555,6 @@ class PlanTemplatesRepository:
                 bindparam("farm", type_=PG_UUID(as_uuid=True)),
                 bindparam("tpl", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
-                bindparam("input_id", type_=PG_UUID(as_uuid=True)),
             ),
             {
                 "id": plan_id,
@@ -646,6 +645,7 @@ class PlanTemplatesRepository:
                 bindparam("tpl", type_=PG_UUID(as_uuid=True)),
                 bindparam("tact", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                bindparam("input_id", type_=PG_UUID(as_uuid=True)),
             ),
             {
                 "plan": plan_id,

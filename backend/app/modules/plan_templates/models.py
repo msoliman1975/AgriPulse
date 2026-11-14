@@ -160,12 +160,10 @@ class PlanTemplateActivity(Base, TimestampedMixin):
     duration_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
     product_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     dosage: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # D20: an input from the catalogue (public 0107) and a structured dose.
-    input_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("public.inputs.id", ondelete="SET NULL"),
-        nullable=True,
-    )
+    # D20: an input from the catalogue (public 0108) and a structured dose.
+    # The FK to public.inputs lives in migration 0109 only: inputs has no ORM
+    # model, so naming it here breaks the metadata on flush.
+    input_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     dose_value: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
     dose_value_max: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
     dose_unit: Mapped[str | None] = mapped_column(Text, nullable=True)
