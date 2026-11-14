@@ -142,3 +142,36 @@ async def test_authoring_view_shows_drafts_and_every_variety(admin_session: Asyn
     }
     # Keitt runs on its own, later calendar (variety override).
     assert stage_start["mango.keitt"] != stage_start["mango.zebda"]
+
+
+@pytest.mark.asyncio
+async def test_saved_plan_routes_check_capabilities(admin_session: AsyncSession) -> None:
+    tenant, context, farm_id, block_id = await _bootstrap(admin_session, "pt-alloc-routes")
+    keitt_id = await _template_id(admin_session, "mango-keitt-eg")
+    body = {
+        "template_id": keitt_id,
+        "season_label": "2026",
+        "season_year": 2026,
+        "blocks": [{"block_id": block_id, "start_date": "2026-03-01"}],
+    }
+    async with AsyncClient(transport=ASGITransport(app=_app(context)), base_url="http://t") as c:
+        listed = await c.get(f"/api/v1/farms/{farm_id}/plan-allocations")
+        assert listed.status_code == 200, listed.text
+        assert listed.json() == []
+        # The bootstrap block has no crop, so it can't take a mango manual (C3).
+        preview = await c.post(f"/api/v1/farms/{farm_id}/plan-allocations/preview", json=body)
+        assert preview.status_code == 200, preview.text
+        assert preview.json()["rejected_blocks"][0]["block_id"] == block_id
+        refused = await c.post(f"/api/v1/farms/{farm_id}/plan-allocations", json=body)
+        assert refused.status_code == 422, refused.text
+        missing = await c.get(f"/api/v1/farms/{farm_id}/plan-allocations/{uuid4()}")
+        assert missing.status_code == 404
+
+    outsider = make_context(
+        user_id=uuid4(), tenant_id=tenant.tenant_id, tenant_role=TenantRole.BILLING_ADMIN
+    )
+    async with AsyncClient(transport=ASGITransport(app=_app(outsider)), base_url="http://t") as c:
+        assert (await c.get(f"/api/v1/farms/{farm_id}/plan-allocations")).status_code == 403
+        assert (
+            await c.post(f"/api/v1/farms/{farm_id}/plan-allocations", json=body)
+        ).status_code == 403

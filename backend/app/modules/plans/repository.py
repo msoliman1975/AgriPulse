@@ -193,6 +193,36 @@ class PlansRepository:
         )
         return await self.get_activity(activity_id=activity_id)
 
+    async def record_allocation_override(
+        self,
+        *,
+        allocation_id: UUID,
+        block_id: UUID,
+        activity_key: str,
+        scheduled_date: date_type,
+    ) -> None:
+        """Keep a board reschedule in the saved plan the row came from, so
+        editing that plan later keeps the moved date (Agri Operation C4)."""
+        await self._session.execute(
+            text(
+                """
+                UPDATE plan_allocations
+                SET date_overrides = date_overrides || jsonb_build_object(
+                    CAST(:block AS text),
+                    COALESCE(date_overrides -> CAST(:block AS text), '{}'::jsonb)
+                    || jsonb_build_object(CAST(:key AS text), CAST(:d AS text))
+                )
+                WHERE id = :alloc AND deleted_at IS NULL
+                """
+            ).bindparams(bindparam("alloc", type_=PG_UUID(as_uuid=True))),
+            {
+                "alloc": allocation_id,
+                "block": str(block_id),
+                "key": activity_key,
+                "d": scheduled_date.isoformat(),
+            },
+        )
+
     async def soft_delete_activity(
         self,
         *,
@@ -389,6 +419,9 @@ def _activity_to_dict(row: PlanActivity) -> dict[str, Any]:
         "anchored_stage_code": row.anchored_stage_code,
         "title": row.title,
         "title_ar": row.title_ar,
+        "allocation_id": row.allocation_id,
+        "activity_key": row.activity_key,
+        "date_overridden": row.date_overridden,
     }
 
 

@@ -137,11 +137,14 @@ Tenant:
   `GET /v1/plan-templates/{id}/manual?farm_id=` (cap `plan_template.read` on
   the farm): published manuals only (E4); the manual carries the full tree,
   its resolved stages and the stages per variety it covers.
-- `GET|POST /v1/farms/{farm_id}/plan-allocations`,
-  `GET|PATCH|DELETE /v1/plan-allocations/{id}`,
-  `POST /v1/plan-allocations/preview` (unsaved state → per-block dated
-  schedule, C2), `POST /v1/plan-allocations/{id}/apply`,
-  `GET /v1/plan-allocations/{id}/manual-changes` (B4).
+- Saved plans, all under `/v1/farms/{farm_id}/plan-allocations`:
+  `GET` (list), `POST` (save a new plan and apply it), `POST .../preview`
+  (unsaved state → per-block dated schedule, rejected blocks, codes the
+  manual no longer has; C2, C3), `GET|PUT|DELETE .../{id}` (read, replace and
+  re-apply, delete with soft delete of still-scheduled rows; F4). Saving
+  always applies. Each saved plan reports `manual_updated` when its manual
+  was published again after it was applied (B4); the change diff lands in
+  PR 4.
 - New capabilities (F3): `plan_allocation.read`, `plan_allocation.manage`,
   granted to the roles that hold `plan_template.apply` today.
 
@@ -235,7 +238,7 @@ The loop is self-paced. Each iteration:
 | 1b | Arabic manual text | `notes_ar`, `product_name_ar`, `dosage_ar` for the seeded manuals (E3); Medjool from the manual's Arabic edition | integration: no live manual activity without Arabic | api (before farm launch) |
 | 1b | Arabic manual text | not started | | |
 | 2 | Tenant manual read API + capabilities | in review | | |
-| 3 | Saved plans backend | not started | | |
+| 3 | Saved plans backend | in review | | |
 | 4 | Manual revisions | not started | | |
 | 5 | Agri Operation page + Catalog tab | not started | | |
 | 6 | Plan tab | not started | | |

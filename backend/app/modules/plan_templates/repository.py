@@ -99,6 +99,14 @@ _ACTIVITY_CONTENT_FIELDS = (
 )
 
 
+_ALLOCATION_SELECT = (
+    "SELECT id, farm_id, plan_id, template_id, template_revision, season_label, "
+    "season_year, start_mode, blocks, excluded_codes, activity_edits, "
+    "custom_activities, date_overrides, applied_at, created_at, updated_at "
+    "FROM plan_allocations "
+)
+
+
 class PlanTemplatesRepository:
     """Public-schema catalog access. The service is the only consumer."""
 
@@ -622,6 +630,208 @@ class PlanTemplatesRepository:
                 "stage": anchored_stage_code,
                 "title": title,
                 "title_ar": title_ar,
+                "actor": actor_user_id,
+            },
+        )
+
+    # ---- Saved plans / allocations (tenant; Agri Operation PR 3) -------
+
+    async def get_allocation(self, *, allocation_id: UUID) -> dict[str, Any] | None:
+        assert self._tenant is not None
+        row = (
+            (
+                await self._tenant.execute(
+                    text(_ALLOCATION_SELECT + "WHERE id = :id AND deleted_at IS NULL").bindparams(
+                        bindparam("id", type_=PG_UUID(as_uuid=True))
+                    ),
+                    {"id": allocation_id},
+                )
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row is not None else None
+
+    async def list_allocations(self, *, farm_id: UUID) -> list[dict[str, Any]]:
+        assert self._tenant is not None
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        _ALLOCATION_SELECT + "WHERE farm_id = :farm AND deleted_at IS NULL "
+                        "ORDER BY season_year DESC, updated_at DESC"
+                    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                    {"farm": farm_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]
+
+    async def save_allocation(
+        self,
+        *,
+        allocation_id: UUID | None,
+        farm_id: UUID,
+        plan_id: UUID,
+        fields: dict[str, Any],
+        actor_user_id: UUID | None,
+    ) -> UUID:
+        """Insert (``allocation_id`` None) or replace a saved plan's content.
+        JSON fields are passed already serialised."""
+        assert self._tenant is not None
+        params = {
+            **fields,
+            "farm": farm_id,
+            "plan": plan_id,
+            "actor": actor_user_id,
+        }
+        uuid_params = [
+            bindparam("farm", type_=PG_UUID(as_uuid=True)),
+            bindparam("plan", type_=PG_UUID(as_uuid=True)),
+            bindparam("tpl", type_=PG_UUID(as_uuid=True)),
+            bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            bindparam("id", type_=PG_UUID(as_uuid=True)),
+        ]
+        if allocation_id is None:
+            allocation_id = uuid7()
+            sql = """
+                INSERT INTO plan_allocations
+                    (id, farm_id, plan_id, template_id, template_revision, season_label,
+                     season_year, start_mode, blocks, excluded_codes, activity_edits,
+                     custom_activities, date_overrides, applied_at, created_by, updated_by)
+                VALUES
+                    (:id, :farm, :plan, :tpl, :rev, :label, :year, :mode,
+                     CAST(:blocks AS jsonb), :excluded, CAST(:edits AS jsonb),
+                     CAST(:customs AS jsonb), CAST(:overrides AS jsonb),
+                     public.app_now(), :actor, :actor)
+                """
+        else:
+            sql = """
+                UPDATE plan_allocations SET
+                    plan_id = :plan, template_id = :tpl, template_revision = :rev,
+                    season_label = :label, season_year = :year, start_mode = :mode,
+                    blocks = CAST(:blocks AS jsonb), excluded_codes = :excluded,
+                    activity_edits = CAST(:edits AS jsonb),
+                    custom_activities = CAST(:customs AS jsonb),
+                    date_overrides = CAST(:overrides AS jsonb),
+                    applied_at = public.app_now(), updated_by = :actor
+                WHERE id = :id AND farm_id = :farm AND deleted_at IS NULL
+                """
+        await self._tenant.execute(
+            text(sql).bindparams(*uuid_params), {**params, "id": allocation_id}
+        )
+        return allocation_id
+
+    async def soft_delete_allocation(
+        self, *, allocation_id: UUID, actor_user_id: UUID | None
+    ) -> None:
+        assert self._tenant is not None
+        await self._tenant.execute(
+            text(
+                "UPDATE plan_allocations SET deleted_at = public.app_now(), updated_by = :actor "
+                "WHERE id = :id AND deleted_at IS NULL"
+            ).bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"id": allocation_id, "actor": actor_user_id},
+        )
+
+    async def soft_delete_allocation_scheduled(
+        self, *, allocation_id: UUID, actor_user_id: UUID | None
+    ) -> int:
+        """Soft-delete a saved plan's still-scheduled activities (re-apply and
+        delete, F4). Started, completed and skipped rows stay. Nothing is
+        hard-deleted."""
+        assert self._tenant is not None
+        res = await self._tenant.execute(
+            text(
+                "UPDATE plan_activities SET deleted_at = public.app_now(), updated_by = :actor "
+                "WHERE allocation_id = :id AND status = 'scheduled' AND deleted_at IS NULL"
+            ).bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"id": allocation_id, "actor": actor_user_id},
+        )
+        return int(getattr(res, "rowcount", 0) or 0)
+
+    async def allocation_kept_keys(self, *, allocation_id: UUID) -> set[tuple[UUID, str]]:
+        """(block_id, activity_key) of a saved plan's rows that work has
+        already touched (in progress, completed or skipped). Re-apply doesn't
+        recreate them."""
+        assert self._tenant is not None
+        rows = (
+            await self._tenant.execute(
+                text(
+                    "SELECT block_id, activity_key FROM plan_activities "
+                    "WHERE allocation_id = :id AND status <> 'scheduled' "
+                    "  AND deleted_at IS NULL AND activity_key IS NOT NULL"
+                ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+                {"id": allocation_id},
+            )
+        ).all()
+        return {(r.block_id, r.activity_key) for r in rows}
+
+    async def insert_allocated_activity(
+        self,
+        *,
+        allocation_id: UUID,
+        plan_id: UUID,
+        farm_id: UUID,
+        block_id: UUID,
+        template_id: UUID,
+        activity: Any,
+        actor_user_id: UUID | None,
+    ) -> None:
+        """Insert one ``AllocatedActivity`` as a scheduled plan activity."""
+        assert self._tenant is not None
+        await self._tenant.execute(
+            text(
+                """
+                INSERT INTO plan_activities
+                    (plan_id, farm_id, block_id, activity_type, scheduled_date,
+                     duration_days, start_time, product_name, dosage, notes,
+                     status, source, applied_template_id, template_activity_id,
+                     anchored_stage_code, title, title_ar, allocation_id,
+                     activity_key, date_overridden, created_by, updated_by)
+                VALUES
+                    (:plan, :farm, :block, :atype, :sched, :dur, :stime, :pname,
+                     :dosage, :notes, 'scheduled', :source, :tpl, :tact,
+                     :stage, :title, :title_ar, :alloc, :key, :overridden,
+                     :actor, :actor)
+                """
+            ).bindparams(
+                bindparam("plan", type_=PG_UUID(as_uuid=True)),
+                bindparam("farm", type_=PG_UUID(as_uuid=True)),
+                bindparam("block", type_=PG_UUID(as_uuid=True)),
+                bindparam("tpl", type_=PG_UUID(as_uuid=True)),
+                bindparam("tact", type_=PG_UUID(as_uuid=True)),
+                bindparam("alloc", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {
+                "plan": plan_id,
+                "farm": farm_id,
+                "block": block_id,
+                "atype": activity.activity_type,
+                "sched": activity.scheduled_date,
+                "dur": activity.duration_days,
+                "stime": activity.start_time,
+                "pname": activity.product_name,
+                "dosage": activity.dosage,
+                "notes": activity.notes,
+                "source": activity.source,
+                "tpl": template_id,
+                "tact": activity.template_activity_id,
+                "stage": activity.anchored_stage_code,
+                "title": activity.title,
+                "title_ar": activity.title_ar,
+                "alloc": allocation_id,
+                "key": activity.activity_key,
+                "overridden": activity.date_overridden,
                 "actor": actor_user_id,
             },
         )
