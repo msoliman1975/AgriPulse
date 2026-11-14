@@ -26,6 +26,8 @@ import {
   BLOCK_FIELDS,
   CROP_ATTRIBUTE_KEYS,
   GRID_FIELDS,
+  REFERENCE_FIELDS,
+  REFERENCE_KEYS,
   INDEX_CODES,
   INDICES_KEYS,
   THERMAL_INDEX_CODES,
@@ -588,6 +590,7 @@ function ValueRefEditor({
         "signals",
         "grid",
         "crop_attribute",
+        "reference",
       ]
     : [
         "indices",
@@ -599,6 +602,7 @@ function ValueRefEditor({
         "signals",
         "grid",
         "crop_attribute",
+        "reference",
         "params",
       ];
 
@@ -1013,6 +1017,45 @@ function SourceSpecificFields({
           ))}
         </select>
         <FieldHint text={hint("gridField", value.field)} />
+      </>
+    );
+  }
+  if (value.source === "reference") {
+    // A closed list, the same one the catalogue's Reference values tab edits;
+    // labels come from that tab so the two screens name a value the same way.
+    return (
+      <>
+        <select
+          disabled={readOnly}
+          value={value.key}
+          onChange={(e) =>
+            onChange({ ...value, key: e.target.value as (typeof REFERENCE_KEYS)[number] })
+          }
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+          aria-label={t("editor.condition.referenceKey")}
+        >
+          {REFERENCE_KEYS.map((k) => (
+            <option key={k} value={k}>
+              {t(`admin:catalog.reference.key.${k}`)}
+            </option>
+          ))}
+        </select>
+        <select
+          disabled={readOnly}
+          value={value.field}
+          onChange={(e) =>
+            onChange({ ...value, field: e.target.value as (typeof REFERENCE_FIELDS)[number] })
+          }
+          className="rounded-md border border-ap-line bg-white px-2 py-1 text-xs"
+          aria-label={t("editor.condition.referenceField")}
+        >
+          {REFERENCE_FIELDS.map((f) => (
+            <option key={f} value={f}>
+              {t(`editor.condition.referenceFieldOption.${f}`)}
+            </option>
+          ))}
+        </select>
+        <FieldHint text={hint("referenceField", value.field)} />
       </>
     );
   }

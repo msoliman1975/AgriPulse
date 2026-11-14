@@ -418,7 +418,8 @@
         "grid": "Grid anomaly",
         "crop_attribute": "Crop field",
         "params": "Tree parameter",
-        "water_balance": "Crop water balance"
+        "water_balance": "Crop water balance",
+        "reference": "Crop reference value"
       },
       "hint": {
         "source": {
@@ -430,7 +431,8 @@
           "signals": "Your own recorded observations, from your signal catalog.",
           "grid": "Where inside the block the anomaly is, and how bad the worst patch is.",
           "crop_attribute": "Per-crop data recorded on the block's crop assignment.",
-          "params": "A named threshold this tree declares, so it can be re-tuned without editing the logic."
+          "params": "A named threshold this tree declares, so it can be re-tuned without editing the logic.",
+          "reference": "A value the crop catalogue sets for the block's crop, such as its salt tolerance or expected yield, inherited down to the variety."
         },
         "indexCode": {
           "ndvi": "Canopy greenness and vigour. Saturates on dense canopy and is noisy over bare soil.",
@@ -537,9 +539,21 @@
           "precip_mm": "Rainfall that landed on the block, in mm.",
           "irrigation_mm": "Water recorded as applied, in mm. Zero when nothing was logged — check irrigation_logged before reading a zero as 'none applied'.",
           "irrigation_logged": "Whether any irrigation was actually recorded. Gate on this before acting on a deficit: a farm that never logs irrigation shows a permanent shortfall that is missing bookkeeping, not dry soil."
+        },
+        "referenceField": {
+          "value": "The single value, when the catalogue gives one.",
+          "value_min": "The low end, when the catalogue gives a range.",
+          "value_max": "The high end, when the catalogue gives a range."
         }
       },
-      "waterBalanceField": "Water balance field"
+      "waterBalanceField": "Water balance field",
+      "referenceKey": "Reference value",
+      "referenceField": "Reference field",
+      "referenceFieldOption": {
+        "value": "Value",
+        "value_min": "Range low",
+        "value_max": "Range high"
+      }
     },
     "delete": {
       "title": "Delete node?",

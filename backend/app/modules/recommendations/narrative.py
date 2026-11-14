@@ -136,6 +136,7 @@ _SOURCE_PREFIXES: frozenset[str] = frozenset(
         "block",
         "crop_attribute",
         "crop_attributes",
+        "reference",
         "grid",
         "water_balance",
         "params",

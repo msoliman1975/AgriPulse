@@ -42,6 +42,7 @@ from app.modules.recommendations.loader import (
     _validate_condition_ops,
     _validate_parameters_block,
     _validate_params_refs,
+    _validate_reference_refs,
     _validate_targeting,
 )
 
@@ -874,6 +875,7 @@ def check_folding_tree(spec: Any, *, known_codes: Container[str]) -> list[Compil
         parameters = _validate_parameters_block(spec, "<folding>")
         _validate_params_refs(nodes, parameters, "<folding>")
         _validate_condition_ops(nodes, "<folding>")
+        _validate_reference_refs(nodes, "<folding>")
     except DecisionTreeParseError as exc:
         errors.add("invalid-block", exc.reason, exc.reason)
 

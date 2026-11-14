@@ -165,6 +165,7 @@ def compile_tree(spec: dict[str, Any], *, source_path: str) -> dict[str, Any]:
     parameters_decl = _validate_parameters_block(spec, source_path)
     _validate_params_refs(nodes_raw, parameters_decl, source_path)
     _validate_condition_ops(nodes_raw, source_path)
+    _validate_reference_refs(nodes_raw, source_path)
 
     # Validate the optional scientific-provenance blocks (KB P1-A).
     # These are display/governance metadata only — the evaluator never
@@ -476,6 +477,43 @@ def _validate_params_refs(
         outcome = node.get("outcome")
         if isinstance(outcome, dict):
             _walk(outcome.get("parameters"))
+
+
+def _validate_reference_refs(nodes: dict[str, Any], source_path: str) -> None:
+    """Every ``{source: reference, key: x}`` must name a known reference key.
+
+    The keys are a closed list in code (``reference_values.keys``), so unlike
+    crop attributes they can be checked here, at compile time. A misspelled
+    key would otherwise resolve to None on every block and the branch would
+    fail closed for ever without a word.
+    """
+    from app.modules.reference_values.keys import BY_KEY
+
+    def _walk(value: Any) -> None:
+        if isinstance(value, dict):
+            if value.get("source") == "reference":
+                ref_key = value.get("key")
+                if not isinstance(ref_key, str) or ref_key not in BY_KEY:
+                    raise DecisionTreeParseError(
+                        path=source_path,
+                        detail=(
+                            f"reference ref {ref_key!r} is not a reference value key; "
+                            f"known keys: {', '.join(sorted(BY_KEY))}"
+                        ),
+                    )
+                return
+            for child in value.values():
+                _walk(child)
+        elif isinstance(value, list):
+            for item in value:
+                _walk(item)
+
+    for node in nodes.values():
+        if not isinstance(node, dict):
+            continue
+        condition = node.get("condition")
+        if isinstance(condition, dict):
+            _walk(condition.get("tree"))
 
 
 # Every operator ``app.shared.conditions.evaluator`` knows. The evaluator is

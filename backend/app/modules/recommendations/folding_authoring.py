@@ -933,6 +933,7 @@ class FoldingTreeAuthorService:
             _merge_index_trends,
             evaluate_targeting,
         )
+        from app.modules.reference_values.snapshot import load_reference_snapshot
         from app.modules.signals.snapshot import load_snapshot as load_signals_snapshot
         from app.modules.weather.snapshot import (
             load_index_snapshot as load_weather_index_snapshot,
@@ -995,6 +996,7 @@ class FoldingTreeAuthorService:
             crop_attributes=await load_crop_attribute_snapshot(
                 tenant_session, block_crop_id=block_crop_id
             ),
+            reference_values=await load_reference_snapshot(self._public, crop_path=crop_path),
         )
         # Targeting is reported, never enforced. The block picker already
         # filters to blocks this tree targets, so an author cannot reach a

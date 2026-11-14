@@ -17,6 +17,7 @@ from app.shared.conditions.context import (
     CROP_ATTRIBUTE_KEYS,
     FINDING_KEYS,
     GRID_FIELDS,
+    REFERENCE_FIELDS,
     SIGNAL_KEYS,
     WATER_BALANCE_FIELDS,
     WEATHER_INDEX_KEYS,
@@ -246,6 +247,26 @@ class CropAttributeValueRef:
 
 
 @dataclass(frozen=True, slots=True)
+class ReferenceValueRef:
+    """``{"source":"reference","key":"soil_ece_threshold_ds_m","field":"value"}``
+
+    Reads one of the crop's reference values (D18, D23): salt tolerance,
+    expected yield and load, spacing, as the crop catalogue sets them for
+    the block's current crop path, the deepest path winning. ``field`` is
+    ``value``, or ``value_min`` / ``value_max`` for a range.
+
+    ``key`` is a closed list, but one owned by the reference-values module,
+    which ``app.shared`` may not import. The tree compiler checks it
+    against that list, so a tree cannot be saved with a key nothing sets.
+    A key the crop does not set resolves to ``None`` and fails closed.
+    """
+
+    source: Literal["reference"]
+    key: str
+    field: str  # one of REFERENCE_FIELDS
+
+
+@dataclass(frozen=True, slots=True)
 class FindingsValueRef:
     """``{"source":"findings","code":"dry","key":"registered"}``
 
@@ -298,6 +319,7 @@ ValueRef = (
     | SignalsValueRef
     | GridValueRef
     | CropAttributeValueRef
+    | ReferenceValueRef
     | ParamsValueRef
     | FindingsValueRef
     | VarsValueRef
@@ -388,6 +410,14 @@ def parse_value_ref(raw: Any) -> ValueRef:  # noqa: PLR0911, PLR0912, PLR0915 - 
                 f"crop_attribute ref 'key' must be one of {CROP_ATTRIBUTE_KEYS}"
             )
         return CropAttributeValueRef(source="crop_attribute", code=code, key=key)
+    if source == "reference":
+        ref_key = raw.get("key")
+        if not isinstance(ref_key, str) or not ref_key:
+            raise ConditionParseError("reference ref missing 'key'")
+        ref_field = raw.get("field", "value")
+        if ref_field not in REFERENCE_FIELDS:
+            raise ConditionParseError(f"reference ref 'field' must be one of {REFERENCE_FIELDS}")
+        return ReferenceValueRef(source="reference", key=ref_key, field=ref_field)
     if source == "params":
         name = raw.get("name")
         if not isinstance(name, str) or not name:
