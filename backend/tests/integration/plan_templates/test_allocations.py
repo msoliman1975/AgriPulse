@@ -263,3 +263,97 @@ async def test_non_matching_block_is_refused(admin_session: AsyncSession) -> Non
             tenant_schema=schema,
         )
     await admin_session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_manual_updates_reach_the_publish_step_and_the_farm(
+    admin_session: AsyncSession,
+) -> None:
+    from app.modules.plan_templates.schemas import (
+        PlanTemplateActivityInput,
+        PlanTemplateWriteRequest,
+    )
+
+    def manual(acts: list[PlanTemplateActivityInput]) -> PlanTemplateWriteRequest:
+        return PlanTemplateWriteRequest(
+            code="mango-revisions", name="Mango revisions", crop_path="mango", activities=acts
+        )
+
+    schema = await _tenant_schema(admin_session, "pt-alloc-rev")
+    farm_id, block_id = await _seed_block(admin_session, schema)
+    svc = get_plan_templates_service(public_session=admin_session, tenant_session=admin_session)
+    v1 = [
+        PlanTemplateActivityInput(code="pruning-1", activity_type="pruning", anchor="start"),
+        PlanTemplateActivityInput(
+            code="fertilizing-1", activity_type="fertilizing", anchor="start", offset_days=7
+        ),
+    ]
+    created = await svc.create_template(payload=manual(v1), actor_user_id=None)
+    template_id = created["id"]
+    # Never published: nothing to compare against.
+    impact = await svc.publish_impact(template_id=template_id)
+    assert impact["comparable"] is False
+    await svc.set_status(template_id=template_id, status="published", actor_user_id=None)
+    await admin_session.commit()
+
+    await admin_session.execute(text(f"SET search_path TO {schema}, public"))
+    saved = await svc.save_allocation(
+        farm_id=farm_id,
+        allocation_id=None,
+        payload=AllocationWriteRequest(
+            template_id=template_id,
+            season_label="2026",
+            season_year=2026,
+            blocks=[{"block_id": block_id, "start_date": START}],
+        ),
+        actor_user_id=None,
+        tenant_schema=schema,
+    )
+    await admin_session.commit()
+    allocation_id = saved["allocation"]["id"]
+
+    # The platform edits the draft: changes one, drops one, adds one.
+    await svc.update_template(
+        template_id=template_id,
+        payload=manual(
+            [
+                PlanTemplateActivityInput(
+                    code="fertilizing-1",
+                    activity_type="fertilizing",
+                    anchor="start",
+                    offset_days=14,
+                ),
+                PlanTemplateActivityInput(activity_type="spraying", anchor="start"),
+            ]
+        ),
+        actor_user_id=None,
+    )
+    await admin_session.commit()
+    impact = await svc.publish_impact(template_id=template_id)
+    assert impact["comparable"] is True
+    assert impact["farms"] == 1
+    assert impact["saved_plans"] == 1
+    assert [a["code"] for a in impact["added"]] == ["spraying-1"]
+    assert [r["code"] for r in impact["removed"]] == ["pruning-1"]
+    assert impact["changed"][0]["fields"] == ["offset_days"]
+
+    # Until it is published again the farm sees no update.
+    await admin_session.execute(text(f"SET search_path TO {schema}, public"))
+    before = await svc.manual_changes(farm_id=farm_id, allocation_id=allocation_id)
+    assert before["manual_updated"] is False
+    await svc.set_status(template_id=template_id, status="published", actor_user_id=None)
+    await admin_session.commit()
+
+    await admin_session.execute(text(f"SET search_path TO {schema}, public"))
+    after = await svc.manual_changes(farm_id=farm_id, allocation_id=allocation_id)
+    assert after["manual_updated"] is True
+    assert after["applied_revision"] == 1
+    assert after["current_revision"] == 2
+    assert [a["code"] for a in after["added"]] == ["spraying-1"]
+    assert [r["code"] for r in after["removed"]] == ["pruning-1"]
+    view = await svc.get_allocation(farm_id=farm_id, allocation_id=allocation_id)
+    assert view["manual_updated"] is True
+    # Publish leaves nothing pending.
+    assert (await svc.publish_impact(template_id=template_id))["changed"] == []
+    await admin_session.execute(text("SET search_path TO public"))
+    await admin_session.commit()

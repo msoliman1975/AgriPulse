@@ -74,7 +74,10 @@ The code keeps the `plan_templates` names; users see **"Operation manual"**
   from (E2, F1).
 
 `plan_templates` gains `revision` int (bumped on every publish) and
-`published_at` (B4, H6).
+`published_at` (B4, H6), and `published_snapshot` (public 0107): the
+manual's activities by code at its last publish. A saved plan keeps
+`manual_snapshot` (tenant 0103), the manual as it last applied it. Diffs by
+code feed the Publish step (H6) and the farm's "manual updated" (B4).
 
 `replace_full_tree` upserts activities **by code** instead of delete +
 insert, so ids survive a save. Activities whose code disappears are
@@ -237,9 +240,9 @@ The loop is self-paced. Each iteration:
 | 1 | Manual content model | merged | [#848](https://github.com/msoliman1975/AgriPulse/pull/848) | e842760 via [#850](https://github.com/msoliman1975/AgriPulse/pull/850), verified 2026-11-14 |
 | 1b | Arabic manual text | `notes_ar`, `product_name_ar`, `dosage_ar` for the seeded manuals (E3); Medjool from the manual's Arabic edition | integration: no live manual activity without Arabic | api (before farm launch) |
 | 1b | Arabic manual text | not started | | |
-| 2 | Tenant manual read API + capabilities | in review | | |
-| 3 | Saved plans backend | in review | | |
-| 4 | Manual revisions | not started | | |
+| 2 | Tenant manual read API + capabilities | in review | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | |
+| 3 | Saved plans backend | in review | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | |
+| 4 | Manual revisions | in review | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | |
 | 5 | Agri Operation page + Catalog tab | not started | | |
 | 6 | Plan tab | not started | | |
 | 7 | Board integration | not started | | |

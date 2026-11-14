@@ -380,3 +380,44 @@ class AllocationApplyResult(BaseModel):
     activities_created: int = 0
     activities_kept: int = 0
     skipped: int = 0
+
+
+# ---- Manual revisions (PR 4) -------------------------------------------------
+
+
+class ManualChangeItem(BaseModel):
+    code: str
+    title: str | None = None
+    title_ar: str | None = None
+    activity_type: str | None = None
+    # For a changed activity: which fields changed.
+    fields: list[str] = Field(default_factory=list)
+
+
+class ManualDiff(BaseModel):
+    # False when there is nothing to compare against (never published, or a
+    # saved plan applied before snapshots existed).
+    comparable: bool = True
+    added: list[ManualChangeItem] = Field(default_factory=list)
+    removed: list[ManualChangeItem] = Field(default_factory=list)
+    changed: list[ManualChangeItem] = Field(default_factory=list)
+
+
+class ManualChangesResponse(ManualDiff):
+    """GET .../plan-allocations/{id}/manual-changes (B4)."""
+
+    allocation_id: UUID
+    template_id: UUID
+    applied_revision: int
+    current_revision: int
+    manual_updated: bool
+
+
+class PublishImpactResponse(ManualDiff):
+    """GET /plan-templates/{id}/publish-impact (H6). Counts only (H7)."""
+
+    template_id: UUID
+    revision: int
+    published_at: datetime | None = None
+    farms: int = 0
+    saved_plans: int = 0

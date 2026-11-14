@@ -21,6 +21,7 @@ from app.modules.plan_templates.models import (
     PlanTemplateMilestone,
 )
 from app.shared.db.ids import uuid7
+from app.shared.db.session import sanitize_tenant_schema
 
 
 def _template_dict(t: PlanTemplate) -> dict[str, Any]:
@@ -102,7 +103,7 @@ _ACTIVITY_CONTENT_FIELDS = (
 _ALLOCATION_SELECT = (
     "SELECT id, farm_id, plan_id, template_id, template_revision, season_label, "
     "season_year, start_mode, blocks, excluded_codes, activity_edits, "
-    "custom_activities, date_overrides, applied_at, created_at, updated_at "
+    "custom_activities, date_overrides, manual_snapshot, applied_at, created_at, updated_at "
     "FROM plan_allocations "
 )
 
@@ -357,9 +358,15 @@ class PlanTemplatesRepository:
         await self._public.flush()
 
     async def set_status(
-        self, *, template: PlanTemplate, status: str, actor_user_id: UUID | None
+        self,
+        *,
+        template: PlanTemplate,
+        status: str,
+        actor_user_id: UUID | None,
+        snapshot: dict[str, Any] | None = None,
     ) -> None:
         if status == "published":
+            template.published_snapshot = snapshot
             # Every publish is a new revision (B4, H6), including a re-publish
             # after edits to an already published manual.
             template.revision = (template.revision or 0) + 1
@@ -700,12 +707,13 @@ class PlanTemplatesRepository:
                 INSERT INTO plan_allocations
                     (id, farm_id, plan_id, template_id, template_revision, season_label,
                      season_year, start_mode, blocks, excluded_codes, activity_edits,
-                     custom_activities, date_overrides, applied_at, created_by, updated_by)
+                     custom_activities, date_overrides, manual_snapshot, applied_at,
+                     created_by, updated_by)
                 VALUES
                     (:id, :farm, :plan, :tpl, :rev, :label, :year, :mode,
                      CAST(:blocks AS jsonb), :excluded, CAST(:edits AS jsonb),
                      CAST(:customs AS jsonb), CAST(:overrides AS jsonb),
-                     public.app_now(), :actor, :actor)
+                     CAST(:snapshot AS jsonb), public.app_now(), :actor, :actor)
                 """
         else:
             sql = """
@@ -716,6 +724,7 @@ class PlanTemplatesRepository:
                     activity_edits = CAST(:edits AS jsonb),
                     custom_activities = CAST(:customs AS jsonb),
                     date_overrides = CAST(:overrides AS jsonb),
+                    manual_snapshot = CAST(:snapshot AS jsonb),
                     applied_at = public.app_now(), updated_by = :actor
                 WHERE id = :id AND farm_id = :farm AND deleted_at IS NULL
                 """
@@ -723,6 +732,41 @@ class PlanTemplatesRepository:
             text(sql).bindparams(*uuid_params), {**params, "id": allocation_id}
         )
         return allocation_id
+
+    async def count_template_usage(self, *, template_id: UUID) -> dict[str, int]:
+        """Farms and saved plans using a manual, across every active tenant
+        (H6). Counts only; which farms is never returned (H7)."""
+        schemas = (
+            (
+                await self._public.execute(
+                    text("SELECT schema_name FROM public.tenants WHERE status = 'active'")
+                )
+            )
+            .scalars()
+            .all()
+        )
+        farms = plans = 0
+        for name in schemas:
+            schema = sanitize_tenant_schema(str(name))
+            exists = await self._public.scalar(
+                text("SELECT to_regclass(:t) IS NOT NULL"),
+                {"t": f"{schema}.plan_allocations"},
+            )
+            if not exists:
+                continue
+            row = (
+                await self._public.execute(
+                    text(
+                        "SELECT count(DISTINCT farm_id) AS farms, count(*) AS plans "  # noqa: S608
+                        f'FROM "{schema}".plan_allocations '
+                        "WHERE template_id = :tpl AND deleted_at IS NULL"
+                    ).bindparams(bindparam("tpl", type_=PG_UUID(as_uuid=True))),
+                    {"tpl": template_id},
+                )
+            ).one()
+            farms += int(row.farms)
+            plans += int(row.plans)
+        return {"farms": farms, "saved_plans": plans}
 
     async def soft_delete_allocation(
         self, *, allocation_id: UUID, actor_user_id: UUID | None

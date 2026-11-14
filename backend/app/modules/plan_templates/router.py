@@ -22,6 +22,7 @@ from app.modules.plan_templates.schemas import (
     AllocationWriteRequest,
     AppliableTemplate,
     ManualCatalogItem,
+    ManualChangesResponse,
     OperationManualResponse,
     PlanTemplateApplyRequest,
     PlanTemplateApplyResponse,
@@ -29,6 +30,7 @@ from app.modules.plan_templates.schemas import (
     PlanTemplatePreviewResponse,
     PlanTemplateSummary,
     PlanTemplateWriteRequest,
+    PublishImpactResponse,
     ResolvedPhenologyResponse,
 )
 from app.modules.plan_templates.service import (
@@ -241,6 +243,22 @@ async def get_allocation(
     return await service.get_allocation(farm_id=farm_id, allocation_id=allocation_id)
 
 
+@router.get(
+    "/farms/{farm_id}/plan-allocations/{allocation_id}/manual-changes",
+    response_model=ManualChangesResponse,
+    summary="What changed in the manual since this saved plan was applied.",
+)
+async def get_manual_changes(
+    farm_id: UUID,
+    allocation_id: UUID,
+    context: RequestContext = Depends(get_current_context),
+    service: PlanTemplatesService = Depends(_service),
+) -> dict[str, Any]:
+    _ensure_tenant(context)
+    _require(context, "plan_allocation.read", farm_id)
+    return await service.manual_changes(farm_id=farm_id, allocation_id=allocation_id)
+
+
 @router.put(
     "/farms/{farm_id}/plan-allocations/{allocation_id}",
     response_model=AllocationApplyResult,
@@ -363,6 +381,19 @@ async def admin_get_manual(
     service: PlanTemplatesService = Depends(_service),
 ) -> dict[str, Any]:
     return await service.get_manual(template_id=template_id, published_only=False)
+
+
+@router.get(
+    "/plan-templates/{template_id}/publish-impact",
+    response_model=PublishImpactResponse,
+    summary="What changed since the last publish, and how many farms use the manual.",
+)
+async def admin_publish_impact(
+    template_id: UUID,
+    context: RequestContext = Depends(requires_capability("plan_template.manage")),
+    service: PlanTemplatesService = Depends(_service),
+) -> dict[str, Any]:
+    return await service.publish_impact(template_id=template_id)
 
 
 @router.put(

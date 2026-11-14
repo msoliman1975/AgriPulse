@@ -26,6 +26,7 @@ from app.modules.plan_templates.errors import (
     PlanTemplateValidationError,
 )
 from app.modules.plan_templates.repository import PlanTemplatesRepository
+from app.modules.plan_templates.revisions import diff_snapshots, snapshot_of
 from app.modules.plan_templates.schemas import AllocationWriteRequest, PlanTemplateWriteRequest
 from app.shared.crop_taxonomy import path_matches
 
@@ -156,7 +157,12 @@ class PlanTemplatesService:
         template = await self._repo.get_template(template_id=template_id)
         if template is None:
             raise PlanTemplateNotFoundError(template_id)
-        await self._repo.set_status(template=template, status=status, actor_user_id=actor_user_id)
+        snapshot = None
+        if status == "published":
+            snapshot = snapshot_of(await self.get_full_tree(template_id=template_id))
+        await self._repo.set_status(
+            template=template, status=status, actor_user_id=actor_user_id, snapshot=snapshot
+        )
         return await self.get_full_tree(template_id=template_id)
 
     async def delete_template(self, *, template_id: UUID, actor_user_id: UUID | None) -> None:
@@ -554,6 +560,7 @@ class PlanTemplatesService:
                     }
                 ),
                 "customs": json.dumps([c.model_dump() for c in payload.custom_activities]),
+                "snapshot": json.dumps(snapshot_of(tree), default=str),
                 "overrides": json.dumps(
                     {
                         str(block_id): {k: d.isoformat() for k, d in per_block.items()}
@@ -635,6 +642,38 @@ class PlanTemplatesService:
             await self._allocation_view(r)
             for r in await self._repo.list_allocations(farm_id=farm_id)
         ]
+
+    async def manual_changes(self, *, farm_id: UUID, allocation_id: UUID) -> dict[str, Any]:
+        """What changed in the manual since this saved plan was applied (B4)."""
+        row = await self._repo.get_allocation(allocation_id=allocation_id)
+        if row is None or row["farm_id"] != farm_id:
+            raise AllocationNotFoundError(allocation_id)
+        tree = await self.get_full_tree(template_id=row["template_id"])
+        current = int(tree.get("revision") or 0)
+        return {
+            "allocation_id": allocation_id,
+            "template_id": row["template_id"],
+            "applied_revision": row["template_revision"],
+            "current_revision": current,
+            "manual_updated": current > row["template_revision"],
+            **diff_snapshots(row.get("manual_snapshot"), snapshot_of(tree)),
+        }
+
+    async def publish_impact(self, *, template_id: UUID) -> dict[str, Any]:
+        """For the Publish step (H6): what changed since the last publish and
+        how many farms use the manual. Counts only, never which farms (H7)."""
+        template = await self._repo.get_template(template_id=template_id)
+        if template is None:
+            raise PlanTemplateNotFoundError(template_id)
+        tree = await self.get_full_tree(template_id=template_id)
+        usage = await self._repo.count_template_usage(template_id=template_id)
+        return {
+            "template_id": template_id,
+            "revision": template.revision or 0,
+            "published_at": template.published_at,
+            **usage,
+            **diff_snapshots(template.published_snapshot, snapshot_of(tree)),
+        }
 
     async def delete_allocation(
         self,
