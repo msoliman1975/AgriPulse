@@ -32,11 +32,17 @@ async def test_publish_to_user_reaches_subscribe_within_a_second() -> None:
     assert primer.startswith(": connected")
 
     # `subscribe()` sends SUBSCRIBE and yields the primer without waiting for
-    # Redis to confirm it, so a publish straight after can land before the
-    # subscription exists and be dropped. That is fine for the product (the
-    # push is best-effort and the inbox reloads on reconnect) but makes this
-    # test a race, one that loses on a loaded runner. Wait until Redis counts
-    # the subscriber.
+    # Redis to confirm it, so in principle a publish straight after can land
+    # before the subscription exists and be dropped. That is fine for the
+    # product (the push is best-effort and the inbox reloads on reconnect) but
+    # would make this test a race, so wait until Redis counts the subscriber.
+    #
+    # This test timed out once, in one of seven local 3-worker runs, before
+    # this wait existed; it has not been reproduced since. In every probed run
+    # (three full parallel runs, 300 solo runs under CPU load) Redis had the
+    # subscription registered within ~15 ms and delivered in ~2 ms, so this
+    # race is the one plausible cause found, not a proven one. If it times out
+    # again, the failure message below says which side lost the message.
     channel = _channel(tenant_id, user_id)
     for _ in range(100):
         counts: Any = _get_sync_client().pubsub_numsub(channel)  # sync client: a list
@@ -51,13 +57,31 @@ async def test_publish_to_user_reaches_subscribe_within_a_second() -> None:
     publish_to_user(tenant_id=tenant_id, user_id=user_id, payload=payload)
 
     # Pull frames until the inbox event arrives, skipping any keepalives.
-    async def _next_inbox_event() -> str:
+    seen: list[str] = []
+
+    async def _next_inbox_event_recording() -> str:
         while True:
             frame = await gen.__anext__()
+            seen.append(frame.split("\n", 1)[0])
             if frame.startswith("event: inbox"):
                 return frame
 
-    frame = await asyncio.wait_for(_next_inbox_event(), timeout=3.0)
+    # `asyncio.wait`, not `wait_for`: on timeout it leaves the reader running,
+    # so the subscriber count below is taken while the subscription is still
+    # open. `wait_for` would cancel into the generator, whose `finally`
+    # unsubscribes, and the count would always read 0.
+    reader = asyncio.ensure_future(_next_inbox_event_recording())
+    done, _ = await asyncio.wait({reader}, timeout=3.0)
+    if not done:
+        counts_after: Any = _get_sync_client().pubsub_numsub(channel)
+        reader.cancel()
+        pytest.fail(
+            "inbox event never arrived within 3 s. Redis subscribers on the channel "
+            f"at the deadline: {dict(counts_after).get(channel, 0)}; frames seen: "
+            f"{seen}. Subscribers >= 1 means the subscription was live and the read "
+            "side lost the message; 0 means the subscriber connection had dropped."
+        )
+    frame = reader.result()
     # frame format: "event: inbox\ndata: <json>\n\n"
     data_line = next(line for line in frame.split("\n") if line.startswith("data: "))
     decoded = json.loads(data_line.removeprefix("data: "))

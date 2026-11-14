@@ -120,14 +120,19 @@ async def test_batch_is_stored_with_server_stamped_identity(
     assert response.json()["accepted"] == 3
 
     rows = await _rows(admin_session, session_id)
-    assert [r["event_name"] for r in rows] == ["session_start", "page_view", "feature_used"]
+    # Order-free on purpose. These events carry no client `time`, so the server
+    # stamps all three with the same floored minute (see `_clamp_time`), and
+    # `ORDER BY time` then returns ties in whatever order Postgres likes. Their
+    # uuid7 ids are random within a millisecond, so they cannot break the tie.
+    assert sorted(r["event_name"] for r in rows) == ["feature_used", "page_view", "session_start"]
     for row in rows:
         assert row["user_id"] == user_id
         assert row["tenant_id"] == tenant_id
         assert row["actor_role"] == "TenantAdmin"
         assert row["is_platform_staff"] is False
         assert row["app_version"] == "abc1234"
-    assert rows[2]["props"] == {"index_code": "NDVI", "action": "zoom"}
+    by_name = {r["event_name"]: r for r in rows}
+    assert by_name["feature_used"]["props"] == {"index_code": "NDVI", "action": "zoom"}
 
 
 @pytest.mark.asyncio
@@ -203,7 +208,8 @@ async def test_unknown_event_is_dropped_but_the_batch_survives(
     assert response.status_code == 202
     assert body["accepted"] == 2
     assert body["rejected"] == 2
-    assert [r["event_name"] for r in await _rows(admin_session, session_id)] == [
+    # Order-free: same-minute server timestamps tie (see the first test).
+    assert sorted(r["event_name"] for r in await _rows(admin_session, session_id)) == [
         "page_view",
         "session_end",
     ]
