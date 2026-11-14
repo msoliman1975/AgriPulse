@@ -24,7 +24,7 @@ import asyncio
 import json
 import re
 from collections.abc import Coroutine
-from datetime import date, timedelta
+from datetime import timedelta
 from typing import Any
 from uuid import UUID
 
@@ -236,7 +236,7 @@ async def _write_trial_term(
     """
     from sqlalchemy import text
 
-    starts = date.today()
+    starts = clock.today()
     ends = starts + timedelta(days=trial_days)
     await session.execute(
         text(
