@@ -240,9 +240,9 @@ The loop is self-paced. Each iteration:
 | 1 | Manual content model | merged | [#848](https://github.com/msoliman1975/AgriPulse/pull/848) | e842760 via [#850](https://github.com/msoliman1975/AgriPulse/pull/850), verified 2026-11-14 |
 | 1b | Arabic manual text | `notes_ar`, `product_name_ar`, `dosage_ar` for the seeded manuals (E3); Medjool from the manual's Arabic edition | integration: no live manual activity without Arabic | api (before farm launch) |
 | 1b | Arabic manual text | not started | | |
-| 2 | Tenant manual read API + capabilities | in review | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | |
-| 3 | Saved plans backend | in review | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | |
-| 4 | Manual revisions | in review | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | |
+| 2 | Tenant manual read API + capabilities | merged | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | 2f6c07d via [#854](https://github.com/msoliman1975/AgriPulse/pull/854), verified 2026-11-14 |
+| 3 | Saved plans backend | merged | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | 2f6c07d via [#854](https://github.com/msoliman1975/AgriPulse/pull/854), verified 2026-11-14 |
+| 4 | Manual revisions | merged | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | 2f6c07d via [#854](https://github.com/msoliman1975/AgriPulse/pull/854), verified 2026-11-14 |
 | 5 | Agri Operation page + Catalog tab | in review | | |
 | 6 | Plan tab | not started | | |
 | 7 | Board integration | not started | | |
