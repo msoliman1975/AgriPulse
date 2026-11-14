@@ -870,12 +870,13 @@ class PlanTemplatesRepository:
                      duration_days, start_time, product_name, dosage, notes,
                      status, source, applied_template_id, template_activity_id,
                      anchored_stage_code, title, title_ar, allocation_id,
-                     activity_key, date_overridden, created_by, updated_by)
+                     activity_key, date_overridden, created_by, updated_by,
+                     input_id, dose_value, dose_value_max, dose_unit)
                 VALUES
                     (:plan, :farm, :block, :atype, :sched, :dur, :stime, :pname,
                      :dosage, :notes, 'scheduled', :source, :tpl, :tact,
                      :stage, :title, :title_ar, :alloc, :key, :overridden,
-                     :actor, :actor)
+                     :actor, :actor, :input_id, :dose_value, :dose_value_max, :dose_unit)
                 """
             ).bindparams(
                 bindparam("plan", type_=PG_UUID(as_uuid=True)),
@@ -885,6 +886,7 @@ class PlanTemplatesRepository:
                 bindparam("tact", type_=PG_UUID(as_uuid=True)),
                 bindparam("alloc", type_=PG_UUID(as_uuid=True)),
                 bindparam("actor", type_=PG_UUID(as_uuid=True)),
+                bindparam("input_id", type_=PG_UUID(as_uuid=True)),
             ),
             {
                 "plan": plan_id,
@@ -907,6 +909,10 @@ class PlanTemplatesRepository:
                 "key": activity.activity_key,
                 "overridden": activity.date_overridden,
                 "actor": actor_user_id,
+                "input_id": activity.input_id,
+                "dose_value": activity.dose_value,
+                "dose_value_max": activity.dose_value_max,
+                "dose_unit": activity.dose_unit,
             },
         )
 

@@ -382,3 +382,81 @@ async def test_manual_updates_reach_the_publish_step_and_the_farm(
     assert (await svc.publish_impact(template_id=template_id))["changed"] == []
     await admin_session.execute(text("SET search_path TO public"))
     await admin_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_saved_plan_carries_input_and_dose(admin_session: AsyncSession) -> None:
+    """D20: a manual activity's catalogue input and structured dose reach the
+    plan activity, and fill in missing product and dosage text, as a template
+    apply does."""
+    from decimal import Decimal
+
+    from app.modules.plan_templates.schemas import (
+        PlanTemplateActivityInput,
+        PlanTemplateWriteRequest,
+    )
+
+    schema = await _tenant_schema(admin_session, "pt-alloc-input")
+    farm_id, block_id = await _seed_block(admin_session, schema)
+    input_id, input_name = (
+        await admin_session.execute(
+            text(
+                "SELECT id, name_en FROM public.inputs WHERE tenant_id IS NULL "
+                "ORDER BY code LIMIT 1"
+            )
+        )
+    ).one()
+    svc = get_plan_templates_service(public_session=admin_session, tenant_session=admin_session)
+    created = await svc.create_template(
+        payload=PlanTemplateWriteRequest(
+            code="mango-input-dose",
+            name="Mango input and dose",
+            crop_path="mango",
+            activities=[
+                PlanTemplateActivityInput(
+                    activity_type="fertilizing",
+                    anchor="start",
+                    input_id=input_id,
+                    dose_value=Decimal("100"),
+                    dose_value_max=Decimal("150"),
+                    dose_unit="g/plant",
+                )
+            ],
+        ),
+        actor_user_id=None,
+    )
+    await svc.set_status(template_id=created["id"], status="published", actor_user_id=None)
+    await admin_session.commit()
+
+    await admin_session.execute(text(f"SET search_path TO {schema}, public"))
+    saved = await svc.save_allocation(
+        farm_id=farm_id,
+        allocation_id=None,
+        payload=AllocationWriteRequest(
+            template_id=created["id"],
+            season_label="2026",
+            season_year=2026,
+            blocks=[{"block_id": block_id, "start_date": START}],
+        ),
+        actor_user_id=None,
+        tenant_schema=schema,
+    )
+    await admin_session.commit()
+    await admin_session.execute(text(f"SET search_path TO {schema}, public"))
+    row = (
+        await admin_session.execute(
+            text(
+                "SELECT input_id, dose_value, dose_value_max, dose_unit, product_name, dosage "
+                "FROM plan_activities WHERE allocation_id = :a AND deleted_at IS NULL"
+            ).bindparams(bindparam("a", type_=PG_UUID(as_uuid=True))),
+            {"a": saved["allocation"]["id"]},
+        )
+    ).one()
+    assert row.input_id == input_id
+    assert row.dose_value == Decimal("100")
+    assert row.dose_value_max == Decimal("150")
+    assert row.dose_unit == "g/plant"
+    assert row.product_name == input_name
+    assert row.dosage == "100-150 g/plant"
+    await admin_session.execute(text("SET search_path TO public"))
+    await admin_session.commit()

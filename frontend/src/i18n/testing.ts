@@ -28,7 +28,6 @@ import enTimeline from "./locales/en/timeline.json";
 import enInvestors from "./locales/en/investors.json";
 import enAgriOperation from "./locales/en/agriOperation.json";
 import enBoard from "./locales/en/board.json";
-import enPlanTemplates from "./locales/en/planTemplates.json";
 import enReports from "./locales/en/reports.json";
 import enFieldAccess from "./locales/en/fieldAccess.json";
 import enIntegrationsHealth from "./locales/en/integrationsHealth.json";
@@ -60,7 +59,6 @@ import arTimeline from "./locales/ar/timeline.json";
 import arInvestors from "./locales/ar/investors.json";
 import arAgriOperation from "./locales/ar/agriOperation.json";
 import arBoard from "./locales/ar/board.json";
-import arPlanTemplates from "./locales/ar/planTemplates.json";
 import arReports from "./locales/ar/reports.json";
 import arFieldAccess from "./locales/ar/fieldAccess.json";
 import arIntegrationsHealth from "./locales/ar/integrationsHealth.json";
@@ -105,7 +103,6 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           investors: enInvestors,
           agriOperation: enAgriOperation,
           board: enBoard,
-          planTemplates: enPlanTemplates,
           reports: enReports,
           fieldAccess: enFieldAccess,
           integrationsHealth: enIntegrationsHealth,
@@ -139,7 +136,6 @@ export async function setupTestI18n(language: "en" | "ar" = "en"): Promise<void>
           investors: arInvestors,
           agriOperation: arAgriOperation,
           board: arBoard,
-          planTemplates: arPlanTemplates,
           reports: arReports,
           fieldAccess: arFieldAccess,
           integrationsHealth: arIntegrationsHealth,
