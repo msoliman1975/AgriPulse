@@ -510,7 +510,7 @@ TENANT_PUBLIC_OWNED: tuple[OwnedTable, ...] = (
         note="tenant-authored trees; decision_tree_versions cascades off this",
     ),
     OwnedTable("backfill_runs", owner_column="tenant_id", schema="public", order=10, fk=False),
-    # A tenant's own inputs (public migration 0107, D20); platform rows have
+    # A tenant's own inputs (public migration 0108, D20); platform rows have
     # tenant_id NULL and are untouched. input_doses cascades off inputs.
     OwnedTable(
         "inputs",
