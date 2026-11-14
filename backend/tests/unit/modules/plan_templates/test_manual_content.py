@@ -63,3 +63,26 @@ def test_backfill_titles_cover_every_seeded_activity() -> None:
         for title, title_ar in titles.values():
             assert title
             assert title_ar
+
+
+def test_arabic_data_covers_every_seeded_activity() -> None:
+    path = _MIGRATION.parent / "0110_operation_manual_arabic.py"
+    spec = importlib.util.spec_from_file_location("m0110", path)
+    assert spec is not None
+    assert spec.loader is not None
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    data = m.load()
+    assert {k: len(v) for k, v in data.items()} == {
+        "mango": 16,
+        "potato": 12,
+        "medjool_bearing": 31,
+        "medjool_new": 20,
+    }
+    for family, rows in data.items():
+        assert family in m.FAMILIES
+        for values in rows.values():
+            assert len(values) == 3
+            assert values[2]  # every activity has Arabic notes
+            assert "[EG" not in values[2]
+            assert "[GENERIC" not in values[2]

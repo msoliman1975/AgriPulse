@@ -184,7 +184,7 @@ the promotion procedure in `CLAUDE.md`.
 | # | PR | Main contents | Tests | Deploy |
 |---|---|---|---|---|
 | 1 | Manual content model | Public migration (3.1), backfill codes, titles (en/ar), evidence tiers and source trees for the seeded mango, potato and Medjool manuals; the current editor carries codes and new fields through a save; upsert-by-code in `replace_full_tree`; schemas; apply copies titles; tenant migration for `plan_activities.title/title_ar` | unit: resolver unchanged; integration: save keeps ids, backfill values, apply writes titles | api + workers |
-| 1b | Arabic manual text | `notes_ar`, `product_name_ar`, `dosage_ar` for the seeded manuals (E3); Medjool from the manual's Arabic edition | integration: no live manual activity without Arabic | api (before farm launch) |
+| 1b | Arabic manual text | `notes_ar`, `product_name_ar`, `dosage_ar` for the seeded manuals (E3); Medjool translated from the English seed (the manual's Arabic edition is not in the repo), using 0100's terms | integration: no live manual activity without Arabic | api (before farm launch) |
 | 2 | Tenant manual read API + capabilities | Catalog and manual endpoints, `plan_allocation.*` capabilities in RBAC yaml + frontend `capabilities.ts`, varieties-preview endpoint | integration: drafts hidden, caps enforced | api |
 | 3 | Saved plans backend | Tenant migration (3.2, 3.3), resolver extensions (exclusions, edits, customs, overrides), service + router, board-reschedule override hook, soft-delete on allocation delete, audit events | unit: resolver matrix; integration: re-apply keeps board moves and done rows, two allocations per season, C3 rejection, F4 | api + workers |
 | 4 | Manual revisions | `revision` bump on publish, `manual-changes` diff, `publish-impact` count | unit: diff by code; integration: outdated flag after publish | api |
@@ -238,14 +238,14 @@ The loop is self-paced. Each iteration:
 |---|---|---|---|---|
 | 0 | Build plan | merged | [#848](https://github.com/msoliman1975/AgriPulse/pull/848) | n/a |
 | 1 | Manual content model | merged | [#848](https://github.com/msoliman1975/AgriPulse/pull/848) | e842760 via [#850](https://github.com/msoliman1975/AgriPulse/pull/850), verified 2026-11-14 |
-| 1b | Arabic manual text | `notes_ar`, `product_name_ar`, `dosage_ar` for the seeded manuals (E3); Medjool from the manual's Arabic edition | integration: no live manual activity without Arabic | api (before farm launch) |
-| 1b | Arabic manual text | not started | | |
+| 1b | Arabic manual text | `notes_ar`, `product_name_ar`, `dosage_ar` for the seeded manuals (E3); Medjool translated from the English seed (the manual's Arabic edition is not in the repo), using 0100's terms | integration: no live manual activity without Arabic | api (before farm launch) |
+| 1b | Arabic manual text | in review | | |
 | 2 | Tenant manual read API + capabilities | merged | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | 2f6c07d via [#854](https://github.com/msoliman1975/AgriPulse/pull/854), verified 2026-11-14 |
 | 3 | Saved plans backend | merged | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | 2f6c07d via [#854](https://github.com/msoliman1975/AgriPulse/pull/854), verified 2026-11-14 |
 | 4 | Manual revisions | merged | [#852](https://github.com/msoliman1975/AgriPulse/pull/852) | 2f6c07d via [#854](https://github.com/msoliman1975/AgriPulse/pull/854), verified 2026-11-14 |
-| 5 | Agri Operation page + Catalog tab | in review | [#856](https://github.com/msoliman1975/AgriPulse/pull/856) | |
-| 6 | Plan tab | in review | [#856](https://github.com/msoliman1975/AgriPulse/pull/856) | |
-| 7 | Board integration | in review | [#856](https://github.com/msoliman1975/AgriPulse/pull/856) | |
+| 5 | Agri Operation page + Catalog tab | merged | [#856](https://github.com/msoliman1975/AgriPulse/pull/856) | 39364b6 via [#859](https://github.com/msoliman1975/AgriPulse/pull/859), verified 2026-11-14 (frontend + Beta designer; farm screens not exercised in prod) |
+| 6 | Plan tab | merged | [#856](https://github.com/msoliman1975/AgriPulse/pull/856) | 39364b6 via [#859](https://github.com/msoliman1975/AgriPulse/pull/859), verified 2026-11-14 (frontend + Beta designer; farm screens not exercised in prod) |
+| 7 | Board integration | merged | [#856](https://github.com/msoliman1975/AgriPulse/pull/856) | 39364b6 via [#859](https://github.com/msoliman1975/AgriPulse/pull/859), verified 2026-11-14 (frontend + Beta designer; farm screens not exercised in prod) |
 | 8 | Platform manual editor | not started | | |
 | 9 | Decision-tree dedupe | not started | | |
 | 10 | Cleanup | not started | | |

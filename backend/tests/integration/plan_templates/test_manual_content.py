@@ -219,3 +219,48 @@ async def test_each_publish_is_a_new_revision(admin_session: AsyncSession) -> No
     )
     await admin_session.commit()
     assert archived["revision"] == 2
+
+
+@pytest.mark.asyncio
+async def test_seeded_manuals_have_arabic_text(admin_session: AsyncSession) -> None:
+    """1b (E3): every live seeded activity with English notes, product or
+    dosage also has Arabic, and no evidence tag leaks into the Arabic."""
+    gaps = (
+        await admin_session.execute(
+            text(
+                "SELECT t.code, a.sort_order, "
+                "  (a.notes IS NOT NULL AND a.notes_ar IS NULL) AS no_notes, "
+                "  (a.product_name IS NOT NULL AND a.product_name_ar IS NULL) AS no_product, "
+                "  (a.dosage IS NOT NULL AND a.dosage_ar IS NULL) AS no_dosage "
+                "FROM public.plan_template_activities a "
+                "JOIN public.plan_templates t ON t.id = a.template_id "
+                "WHERE (t.code LIKE 'mango-%-eg' OR t.code LIKE 'potato-%-eg' "
+                "       OR t.code LIKE 'medjool-organic-%') "
+                "  AND t.code <> 'mango-season-eg' AND t.deleted_at IS NULL"
+            )
+        )
+    ).all()
+    missing = [g for g in gaps if g.no_notes or g.no_product or g.no_dosage]
+    assert missing == []
+    assert len(gaps) == 6 * 16 + 3 * 12 + 31 + 20
+
+    leaked = (
+        await admin_session.execute(
+            text(
+                "SELECT count(*) FROM public.plan_template_activities "
+                "WHERE notes_ar ~ '\\[(EG|GENERIC)'"
+            )
+        )
+    ).scalar_one()
+    assert leaked == 0
+
+    pbz = (
+        await admin_session.execute(
+            text(
+                "SELECT a.product_name_ar FROM public.plan_template_activities a "
+                "JOIN public.plan_templates t ON t.id = a.template_id "
+                "WHERE t.code = 'mango-zebda-eg' AND a.sort_order = 5"
+            )
+        )
+    ).scalar_one()
+    assert pbz == "باكلوبوترازول (PBZ)"
