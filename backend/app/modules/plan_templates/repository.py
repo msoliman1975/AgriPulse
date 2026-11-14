@@ -11,6 +11,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import bindparam, select, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +21,7 @@ from app.modules.plan_templates.models import (
     PlanTemplateMilestone,
 )
 from app.shared.db.ids import uuid7
+from app.shared.db.session import sanitize_tenant_schema
 
 
 def _template_dict(t: PlanTemplate) -> dict[str, Any]:
@@ -95,6 +97,14 @@ _ACTIVITY_CONTENT_FIELDS = (
     "source_tree_code",
     "start_time",
     "sort_order",
+)
+
+
+_ALLOCATION_SELECT = (
+    "SELECT id, farm_id, plan_id, template_id, template_revision, season_label, "
+    "season_year, start_mode, blocks, excluded_codes, activity_edits, "
+    "custom_activities, date_overrides, manual_snapshot, applied_at, created_at, updated_at "
+    "FROM plan_allocations "
 )
 
 
@@ -348,9 +358,15 @@ class PlanTemplatesRepository:
         await self._public.flush()
 
     async def set_status(
-        self, *, template: PlanTemplate, status: str, actor_user_id: UUID | None
+        self,
+        *,
+        template: PlanTemplate,
+        status: str,
+        actor_user_id: UUID | None,
+        snapshot: dict[str, Any] | None = None,
     ) -> None:
         if status == "published":
+            template.published_snapshot = snapshot
             # Every publish is a new revision (B4, H6), including a re-publish
             # after edits to an already published manual.
             template.revision = (template.revision or 0) + 1
@@ -420,6 +436,40 @@ class PlanTemplatesRepository:
                 resolved = strain.phenology_stages_override
         stages = (resolved or {}).get("stages") or []
         return bool(crop.is_perennial), stages
+
+    async def list_varieties(self, *, crop_code: str) -> list[dict[str, Any]]:
+        """Active varieties of a crop, for the per-variety stage preview (H5)."""
+        rows = (
+            (
+                await self._public.execute(
+                    text(
+                        "SELECT v.code, v.path, v.name_en, v.name_ar "
+                        "FROM public.crop_varieties v "
+                        "JOIN public.crops c ON c.id = v.crop_id AND c.deleted_at IS NULL "
+                        "WHERE c.code = :c AND v.deleted_at IS NULL AND v.is_active "
+                        "ORDER BY v.name_en"
+                    ),
+                    {"c": crop_code},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]
+
+    async def count_activities(self, *, template_ids: list[UUID]) -> dict[UUID, int]:
+        if not template_ids:
+            return {}
+        rows = (
+            await self._public.execute(
+                text(
+                    "SELECT template_id, count(*) AS n FROM public.plan_template_activities "
+                    "WHERE template_id = ANY(:ids) GROUP BY template_id"
+                ).bindparams(bindparam("ids", type_=ARRAY(PG_UUID(as_uuid=True)))),
+                {"ids": template_ids},
+            )
+        ).all()
+        return {r.template_id: int(r.n) for r in rows}
 
     # ---- Apply (tenant) -----------------------------------------------
 
@@ -587,6 +637,245 @@ class PlanTemplatesRepository:
                 "stage": anchored_stage_code,
                 "title": title,
                 "title_ar": title_ar,
+                "actor": actor_user_id,
+            },
+        )
+
+    # ---- Saved plans / allocations (tenant; Agri Operation PR 3) -------
+
+    async def get_allocation(self, *, allocation_id: UUID) -> dict[str, Any] | None:
+        assert self._tenant is not None
+        row = (
+            (
+                await self._tenant.execute(
+                    text(_ALLOCATION_SELECT + "WHERE id = :id AND deleted_at IS NULL").bindparams(
+                        bindparam("id", type_=PG_UUID(as_uuid=True))
+                    ),
+                    {"id": allocation_id},
+                )
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row is not None else None
+
+    async def list_allocations(self, *, farm_id: UUID) -> list[dict[str, Any]]:
+        assert self._tenant is not None
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        _ALLOCATION_SELECT + "WHERE farm_id = :farm AND deleted_at IS NULL "
+                        "ORDER BY season_year DESC, updated_at DESC"
+                    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                    {"farm": farm_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]
+
+    async def save_allocation(
+        self,
+        *,
+        allocation_id: UUID | None,
+        farm_id: UUID,
+        plan_id: UUID,
+        fields: dict[str, Any],
+        actor_user_id: UUID | None,
+    ) -> UUID:
+        """Insert (``allocation_id`` None) or replace a saved plan's content.
+        JSON fields are passed already serialised."""
+        assert self._tenant is not None
+        params = {
+            **fields,
+            "farm": farm_id,
+            "plan": plan_id,
+            "actor": actor_user_id,
+        }
+        uuid_params = [
+            bindparam("farm", type_=PG_UUID(as_uuid=True)),
+            bindparam("plan", type_=PG_UUID(as_uuid=True)),
+            bindparam("tpl", type_=PG_UUID(as_uuid=True)),
+            bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            bindparam("id", type_=PG_UUID(as_uuid=True)),
+        ]
+        if allocation_id is None:
+            allocation_id = uuid7()
+            sql = """
+                INSERT INTO plan_allocations
+                    (id, farm_id, plan_id, template_id, template_revision, season_label,
+                     season_year, start_mode, blocks, excluded_codes, activity_edits,
+                     custom_activities, date_overrides, manual_snapshot, applied_at,
+                     created_by, updated_by)
+                VALUES
+                    (:id, :farm, :plan, :tpl, :rev, :label, :year, :mode,
+                     CAST(:blocks AS jsonb), :excluded, CAST(:edits AS jsonb),
+                     CAST(:customs AS jsonb), CAST(:overrides AS jsonb),
+                     CAST(:snapshot AS jsonb), public.app_now(), :actor, :actor)
+                """
+        else:
+            sql = """
+                UPDATE plan_allocations SET
+                    plan_id = :plan, template_id = :tpl, template_revision = :rev,
+                    season_label = :label, season_year = :year, start_mode = :mode,
+                    blocks = CAST(:blocks AS jsonb), excluded_codes = :excluded,
+                    activity_edits = CAST(:edits AS jsonb),
+                    custom_activities = CAST(:customs AS jsonb),
+                    date_overrides = CAST(:overrides AS jsonb),
+                    manual_snapshot = CAST(:snapshot AS jsonb),
+                    applied_at = public.app_now(), updated_by = :actor
+                WHERE id = :id AND farm_id = :farm AND deleted_at IS NULL
+                """
+        await self._tenant.execute(
+            text(sql).bindparams(*uuid_params), {**params, "id": allocation_id}
+        )
+        return allocation_id
+
+    async def count_template_usage(self, *, template_id: UUID) -> dict[str, int]:
+        """Farms and saved plans using a manual, across every active tenant
+        (H6). Counts only; which farms is never returned (H7)."""
+        schemas = (
+            (
+                await self._public.execute(
+                    text("SELECT schema_name FROM public.tenants WHERE status = 'active'")
+                )
+            )
+            .scalars()
+            .all()
+        )
+        farms = plans = 0
+        for name in schemas:
+            schema = sanitize_tenant_schema(str(name))
+            exists = await self._public.scalar(
+                text("SELECT to_regclass(:t) IS NOT NULL"),
+                {"t": f"{schema}.plan_allocations"},
+            )
+            if not exists:
+                continue
+            row = (
+                await self._public.execute(
+                    text(
+                        "SELECT count(DISTINCT farm_id) AS farms, count(*) AS plans "  # noqa: S608
+                        f'FROM "{schema}".plan_allocations '
+                        "WHERE template_id = :tpl AND deleted_at IS NULL"
+                    ).bindparams(bindparam("tpl", type_=PG_UUID(as_uuid=True))),
+                    {"tpl": template_id},
+                )
+            ).one()
+            farms += int(row.farms)
+            plans += int(row.plans)
+        return {"farms": farms, "saved_plans": plans}
+
+    async def soft_delete_allocation(
+        self, *, allocation_id: UUID, actor_user_id: UUID | None
+    ) -> None:
+        assert self._tenant is not None
+        await self._tenant.execute(
+            text(
+                "UPDATE plan_allocations SET deleted_at = public.app_now(), updated_by = :actor "
+                "WHERE id = :id AND deleted_at IS NULL"
+            ).bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"id": allocation_id, "actor": actor_user_id},
+        )
+
+    async def soft_delete_allocation_scheduled(
+        self, *, allocation_id: UUID, actor_user_id: UUID | None
+    ) -> int:
+        """Soft-delete a saved plan's still-scheduled activities (re-apply and
+        delete, F4). Started, completed and skipped rows stay. Nothing is
+        hard-deleted."""
+        assert self._tenant is not None
+        res = await self._tenant.execute(
+            text(
+                "UPDATE plan_activities SET deleted_at = public.app_now(), updated_by = :actor "
+                "WHERE allocation_id = :id AND status = 'scheduled' AND deleted_at IS NULL"
+            ).bindparams(
+                bindparam("id", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {"id": allocation_id, "actor": actor_user_id},
+        )
+        return int(getattr(res, "rowcount", 0) or 0)
+
+    async def allocation_kept_keys(self, *, allocation_id: UUID) -> set[tuple[UUID, str]]:
+        """(block_id, activity_key) of a saved plan's rows that work has
+        already touched (in progress, completed or skipped). Re-apply doesn't
+        recreate them."""
+        assert self._tenant is not None
+        rows = (
+            await self._tenant.execute(
+                text(
+                    "SELECT block_id, activity_key FROM plan_activities "
+                    "WHERE allocation_id = :id AND status <> 'scheduled' "
+                    "  AND deleted_at IS NULL AND activity_key IS NOT NULL"
+                ).bindparams(bindparam("id", type_=PG_UUID(as_uuid=True))),
+                {"id": allocation_id},
+            )
+        ).all()
+        return {(r.block_id, r.activity_key) for r in rows}
+
+    async def insert_allocated_activity(
+        self,
+        *,
+        allocation_id: UUID,
+        plan_id: UUID,
+        farm_id: UUID,
+        block_id: UUID,
+        template_id: UUID,
+        activity: Any,
+        actor_user_id: UUID | None,
+    ) -> None:
+        """Insert one ``AllocatedActivity`` as a scheduled plan activity."""
+        assert self._tenant is not None
+        await self._tenant.execute(
+            text(
+                """
+                INSERT INTO plan_activities
+                    (plan_id, farm_id, block_id, activity_type, scheduled_date,
+                     duration_days, start_time, product_name, dosage, notes,
+                     status, source, applied_template_id, template_activity_id,
+                     anchored_stage_code, title, title_ar, allocation_id,
+                     activity_key, date_overridden, created_by, updated_by)
+                VALUES
+                    (:plan, :farm, :block, :atype, :sched, :dur, :stime, :pname,
+                     :dosage, :notes, 'scheduled', :source, :tpl, :tact,
+                     :stage, :title, :title_ar, :alloc, :key, :overridden,
+                     :actor, :actor)
+                """
+            ).bindparams(
+                bindparam("plan", type_=PG_UUID(as_uuid=True)),
+                bindparam("farm", type_=PG_UUID(as_uuid=True)),
+                bindparam("block", type_=PG_UUID(as_uuid=True)),
+                bindparam("tpl", type_=PG_UUID(as_uuid=True)),
+                bindparam("tact", type_=PG_UUID(as_uuid=True)),
+                bindparam("alloc", type_=PG_UUID(as_uuid=True)),
+                bindparam("actor", type_=PG_UUID(as_uuid=True)),
+            ),
+            {
+                "plan": plan_id,
+                "farm": farm_id,
+                "block": block_id,
+                "atype": activity.activity_type,
+                "sched": activity.scheduled_date,
+                "dur": activity.duration_days,
+                "stime": activity.start_time,
+                "pname": activity.product_name,
+                "dosage": activity.dosage,
+                "notes": activity.notes,
+                "source": activity.source,
+                "tpl": template_id,
+                "tact": activity.template_activity_id,
+                "stage": activity.anchored_stage_code,
+                "title": activity.title,
+                "title_ar": activity.title_ar,
+                "alloc": allocation_id,
+                "key": activity.activity_key,
+                "overridden": activity.date_overridden,
                 "actor": actor_user_id,
             },
         )
