@@ -24,7 +24,8 @@ export type SalinityClass =
   | "non_saline"
   | "slightly_saline"
   | "moderately_saline"
-  | "strongly_saline";
+  | "strongly_saline"
+  | "very_strongly_saline";
 
 // Land-unit polymorphism. A "block" row may represent a plain block, a
 // pivot (full-circle, center-pivot irrigation), or a pivot_sector (a

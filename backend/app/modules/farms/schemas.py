@@ -34,7 +34,13 @@ IrrigationSource = Literal["well", "canal", "nile", "mixed"]
 SoilTexture = Literal[
     "sandy", "sandy_loam", "loam", "clay_loam", "clay", "silty_loam", "silty_clay"
 ]
-SalinityClass = Literal["non_saline", "slightly_saline", "moderately_saline", "strongly_saline"]
+SalinityClass = Literal[
+    "non_saline",
+    "slightly_saline",
+    "moderately_saline",
+    "strongly_saline",
+    "very_strongly_saline",
+]
 BlockCropStatus = Literal["planned", "growing", "harvesting", "completed", "aborted"]
 
 AttachmentKind = Literal["photo", "deed", "soil_test_report", "map", "other"]

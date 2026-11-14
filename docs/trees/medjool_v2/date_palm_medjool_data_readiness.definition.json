@@ -145,7 +145,8 @@
             "non_saline",
             "slightly_saline",
             "moderately_saline",
-            "strongly_saline"
+            "strongly_saline",
+            "very_strongly_saline"
           ]
         }
       },

@@ -641,6 +641,7 @@ function EditForm({
               "slightly_saline",
               "moderately_saline",
               "strongly_saline",
+              "very_strongly_saline",
             ] as SalinityClass[]
           ).map((o) => (
             <option key={o} value={o}>
