@@ -17,6 +17,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { Toolbar } from "@/components/Toolbar";
 import { queryState } from "@/components/asyncState";
+import { needsArabic } from "@/lib/arabicRequired";
 import { useCapability } from "@/rbac/useCapability";
 import {
   useAdminCrops,
@@ -582,7 +583,7 @@ function CropForm({
             />
           )}
         </Field>
-        <Field label={t("crops.form.nameAr")}>
+        <Field label={t("crops.form.nameAr")} required>
           {(props) => (
             <input
               {...props}
@@ -687,6 +688,14 @@ function NodeForm({
   const [nameEn, setNameEn] = useState(node?.name_en ?? "");
   const [nameAr, setNameAr] = useState(node?.name_ar ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [tried, setTried] = useState(false);
+  // D26: new and renamed nodes carry an Arabic name; an untouched seeded node
+  // without one still saves (the server's rule).
+  const arabicMissing = needsArabic(
+    nameEn,
+    nameAr,
+    node ? { en: node.name_en, ar: node.name_ar } : null,
+  );
   const busy =
     createVariety.isPending ||
     updateVariety.isPending ||
@@ -695,12 +704,14 @@ function NodeForm({
 
   const submit = (): void => {
     setError(null);
+    setTried(true);
+    if (arabicMissing) return;
     const onError = (e: unknown): void => setError(apiMsg(e));
     const onSuccess = (): void => onClose();
     const createPayload = {
       code: code.trim(),
       name_en: nameEn.trim(),
-      name_ar: nameAr.trim() || null,
+      name_ar: nameAr.trim(),
     };
     const patch = { name_en: nameEn.trim(), name_ar: nameAr.trim() || null };
     if (level === "variety") {
@@ -751,7 +762,11 @@ function NodeForm({
             />
           )}
         </Field>
-        <Field label={t("crops.form.nameAr")}>
+        <Field
+          label={t("crops.form.nameAr")}
+          required
+          error={tried && arabicMissing ? t("common:errors.arabicRequired") : undefined}
+        >
           {(props) => (
             <input
               {...props}

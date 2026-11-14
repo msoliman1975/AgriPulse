@@ -91,6 +91,7 @@ from app.modules.weather.snapshot import load_snapshot as load_weather_snapshot
 from app.modules.weather.snapshot import load_water_balance_snapshot
 from app.shared import clock
 from app.shared.action_items import build_group_key
+from app.shared.arabic_required import require_arabic
 from app.shared.conditions import ConditionContext
 from app.shared.crop_taxonomy import path_matches
 from app.shared.db.ids import uuid7
@@ -5024,6 +5025,16 @@ class _PlatformFindingNotEditableError(_DecisionTreeAuthoringError):
         self.code = code
 
 
+# D26: the English/Arabic pairs a platform finding must fill. The clause and
+# name pairs are also required by the request schema; the check here catches
+# whitespace-only Arabic and the optional description.
+FINDING_TEXT_PAIRS: tuple[tuple[str, str], ...] = (
+    ("clause_en", "clause_ar"),
+    ("name_en", "name_ar"),
+    ("description_en", "description_ar"),
+)
+
+
 class FindingsCatalogueService:
     """Author the finding vocabulary, in one of two scopes.
 
@@ -5093,6 +5104,8 @@ class FindingsCatalogueService:
         )
         if existing is not None:
             raise _FindingCodeAlreadyExistsError(code)
+        if self._is_platform_scope:
+            require_arabic(payload, FINDING_TEXT_PAIRS)
 
         values = {**payload, "actor": actor_user_id}
         if self._is_platform_scope:
@@ -5116,7 +5129,11 @@ class FindingsCatalogueService:
     async def update(
         self, *, code: str, payload: Mapping[str, Any], actor_user_id: UUID | None
     ) -> dict[str, Any]:
-        await self._own_row_or_raise(code)
+        before = await self._own_row_or_raise(code)
+        if self._is_platform_scope:
+            # D26: only text this save makes new or changes needs Arabic, so a
+            # seeded row without an Arabic description still resaves.
+            require_arabic({**before, **payload}, FINDING_TEXT_PAIRS, before=before)
         values = {**payload, "code": code, "actor": actor_user_id}
         row = (
             await self._repo.update_platform(**values)

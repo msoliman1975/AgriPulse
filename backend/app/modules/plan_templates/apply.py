@@ -35,6 +35,7 @@ class ResolvedActivity:
     notes: str | None
     start_time: Any  # datetime.time | None
     activity_code: str | None = None
+    notes_ar: str | None = None
     title: str | None = None
     title_ar: str | None = None
     input_id: Any = None  # UUID | None (D20)
@@ -124,6 +125,7 @@ def resolve_schedule(
                 product_name=a.get("product_name"),
                 dosage=a.get("dosage"),
                 notes=a.get("notes"),
+                notes_ar=a.get("notes_ar"),
                 start_time=a.get("start_time"),
                 activity_code=a.get("code"),
                 title=a.get("title"),

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { PlanTemplateDetail } from "@/api/planTemplates";
 import {
+  activityArabicMissing,
   draftFromDetail,
   emptyManual,
   manualProblems,
@@ -137,5 +138,25 @@ describe("manualDraft", () => {
       "editor.err.stageRequired",
     ]);
     expect(manualProblems(draftFromDetail(detail))).toEqual([]);
+  });
+});
+
+describe("activityArabicMissing (D26)", () => {
+  const legacy = { title: "Copper spray", title_ar: "رش النحاس", product_name: "Copper" };
+
+  it("asks for Arabic on every English text of a new activity", () => {
+    expect(
+      activityArabicMissing({ title: "Prune", notes: "After harvest", dosage: "" }, null),
+    ).toEqual(["title_ar", "notes_ar"]);
+  });
+
+  it("leaves a seeded activity's untouched English-only product alone", () => {
+    expect(activityArabicMissing({ ...legacy }, legacy)).toEqual([]);
+  });
+
+  it("asks again once that product's English changes", () => {
+    expect(
+      activityArabicMissing({ ...legacy, product_name: "Copper oxychloride" }, legacy),
+    ).toEqual(["product_name_ar"]);
   });
 });

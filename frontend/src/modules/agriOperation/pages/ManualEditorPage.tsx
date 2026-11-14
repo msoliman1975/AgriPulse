@@ -45,6 +45,8 @@ import {
   newActivity,
   nextKey,
   toWriteRequest,
+  activityArabicMissing,
+  type ActivityArabicField,
   type ActivityDraft,
   type ManualDraft,
 } from "../lib/manualDraft";
@@ -54,6 +56,7 @@ import { activityWeek, seasonLayout } from "../lib/weeks";
 const EVIDENCE: EvidenceTier[] = ["eg_fao", "eg", "generic", "manual"];
 const INPUT = "rounded-md border border-ap-line bg-ap-panel px-2 py-1 text-sm text-ap-ink";
 const LABEL = "flex flex-col gap-1 text-xs font-semibold text-ap-muted";
+const REQUIRED_MARK = "after:ms-0.5 after:text-ap-crit after:content-['*']";
 
 export function ManualEditorPage(): ReactNode {
   const { t, i18n } = useTranslation("agriOperation");
@@ -133,12 +136,25 @@ export function ManualEditorPage(): ReactNode {
 
   const status = detail.data?.status ?? "draft";
   const problems = manualProblems(draft);
+  // D26: activity text is saved in English and Arabic. Judged against the
+  // stored activity with the same code, as the server does, so a seeded
+  // activity whose English is untouched may stay English-only.
+  const savedActivities = useMemo(
+    () => new Map((detail.data?.activities ?? []).map((a) => [a.code, a])),
+    [detail.data],
+  );
+  const arabicMissingOf = (a: ActivityDraft): ActivityArabicField[] =>
+    activityArabicMissing(a, a.code ? (savedActivities.get(a.code) ?? null) : null);
   const saving = create.isPending || update.isPending;
 
   function save(): void {
     setError(null);
     if (problems.length > 0) {
       setError(t(`planTemplates:${problems[0]}`));
+      return;
+    }
+    if (draft.activities.some((a) => arabicMissingOf(a).length > 0)) {
+      setError(t("common:errors.arabicRequired"));
       return;
     }
     const body = toWriteRequest(draft);
@@ -384,6 +400,7 @@ export function ManualEditorPage(): ReactNode {
                   moreAnchors={moreAnchors}
                   manualCode={detail.data?.code ?? null}
                   inputs={inputs.data ?? []}
+                  missingArabic={arabicMissingOf(a)}
                   onChange={(patch) => editActivity(a.key, patch)}
                   onRemove={() =>
                     edit({ activities: draft.activities.filter((x) => x.key !== a.key) })
@@ -444,6 +461,7 @@ export function ManualEditorPage(): ReactNode {
                     moreAnchors
                     manualCode={detail.data?.code ?? null}
                     inputs={inputs.data ?? []}
+                    missingArabic={arabicMissingOf(a)}
                     onChange={(patch) => editActivity(a.key, patch)}
                     onRemove={() =>
                       edit({ activities: draft.activities.filter((x) => x.key !== a.key) })
@@ -647,6 +665,7 @@ function ActivityEditorRow({
   moreAnchors,
   manualCode,
   inputs,
+  missingArabic,
   onChange,
   onRemove,
 }: {
@@ -658,6 +677,8 @@ function ActivityEditorRow({
   /** The saved manual's code; source links are keyed by it (D27). */
   manualCode: string | null;
   inputs: Parameters<typeof ActivityInputFields>[0]["inputs"];
+  /** The Arabic fields this activity still needs before it can be saved. */
+  missingArabic: ActivityArabicField[];
   onChange: (patch: Partial<ActivityDraft>) => void;
   onRemove: () => void;
 }): ReactNode {
@@ -669,28 +690,44 @@ function ActivityEditorRow({
   const field = (
     name: keyof ActivityDraft,
     label: string,
-    opts: { rtl?: boolean; area?: boolean } = {},
+    opts: { rtl?: boolean; area?: boolean; required?: boolean; missing?: boolean } = {},
   ): ReactNode => (
-    <label className={clsx(LABEL, opts.area && "sm:col-span-2")}>
-      {label}
-      {opts.area ? (
-        <textarea
-          className={INPUT}
-          rows={2}
-          dir={opts.rtl ? "rtl" : undefined}
-          value={(a[name] as string | null) ?? ""}
-          onChange={(e) => onChange({ [name]: e.target.value })}
-        />
-      ) : (
-        <input
-          className={INPUT}
-          dir={opts.rtl ? "rtl" : undefined}
-          value={(a[name] as string | null) ?? ""}
-          onChange={(e) => onChange({ [name]: e.target.value })}
-        />
-      )}
-    </label>
+    <div className={clsx("flex flex-col gap-1", opts.area && "sm:col-span-2")}>
+      <label className={LABEL}>
+        {/* The required mark is generated content, not text, so it stays out of
+            the control's accessible name (the rule `Field` follows too). */}
+        <span className={opts.required ? REQUIRED_MARK : undefined}>{label}</span>
+        {opts.area ? (
+          <textarea
+            className={INPUT}
+            rows={2}
+            dir={opts.rtl ? "rtl" : undefined}
+            value={(a[name] as string | null) ?? ""}
+            onChange={(e) => onChange({ [name]: e.target.value })}
+          />
+        ) : (
+          <input
+            className={INPUT}
+            dir={opts.rtl ? "rtl" : undefined}
+            value={(a[name] as string | null) ?? ""}
+            onChange={(e) => onChange({ [name]: e.target.value })}
+          />
+        )}
+      </label>
+      {opts.missing ? (
+        <p className="text-[11px] text-ap-crit">{t("common:errors.arabicRequired")}</p>
+      ) : null}
+    </div>
   );
+  // D26: the Arabic beside an English text that has one is required.
+  const arOpts = (
+    en: keyof ActivityDraft,
+    ar: ActivityArabicField,
+  ): { rtl: boolean; required: boolean; missing: boolean } => ({
+    rtl: true,
+    required: Boolean(((a[en] as string | null | undefined) ?? "").trim()),
+    missing: missingArabic.includes(ar),
+  });
   return (
     <li className="border-b border-ap-line last:border-b-0">
       <details open={!a.code}>
@@ -725,7 +762,7 @@ function ActivityEditorRow({
             </select>
           </label>
           {field("title", t("plan.ops.field.title"))}
-          {field("title_ar", t("editor.titleAr"), { rtl: true })}
+          {field("title_ar", t("editor.titleAr"), arOpts("title", "title_ar"))}
           <label className={LABEL}>
             {t("plan.ops.field.anchor")}
             <select
@@ -801,11 +838,18 @@ function ActivityEditorRow({
             <ActivityInputFields row={a} inputs={inputs} onChange={(patch) => onChange(patch)} />
           </div>
           {field("product_name", t("plan.ops.field.product_name"))}
-          {field("product_name_ar", t("editor.productAr"), { rtl: true })}
+          {field(
+            "product_name_ar",
+            t("editor.productAr"),
+            arOpts("product_name", "product_name_ar"),
+          )}
           {field("dosage", t("plan.ops.field.dosage"))}
-          {field("dosage_ar", t("editor.dosageAr"), { rtl: true })}
+          {field("dosage_ar", t("editor.dosageAr"), arOpts("dosage", "dosage_ar"))}
           {field("notes", t("plan.ops.field.notes"), { area: true })}
-          {field("notes_ar", t("editor.notesAr"), { rtl: true, area: true })}
+          {field("notes_ar", t("editor.notesAr"), {
+            ...arOpts("notes", "notes_ar"),
+            area: true,
+          })}
           <label className={LABEL}>
             {t("manual.source")}
             <input

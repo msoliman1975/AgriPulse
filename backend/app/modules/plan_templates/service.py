@@ -19,6 +19,7 @@ from app.core.logging import get_logger
 from app.modules.audit import AuditService, get_audit_service
 from app.modules.plan_templates.allocation import resolve_allocation
 from app.modules.plan_templates.apply import format_dose, resolve_schedule
+from app.modules.plan_templates.arabic import missing_manual_arabic
 from app.modules.plan_templates.errors import (
     AllocationBlocksRejectedError,
     AllocationNotFoundError,
@@ -29,7 +30,17 @@ from app.modules.plan_templates.errors import (
 from app.modules.plan_templates.repository import PlanTemplatesRepository
 from app.modules.plan_templates.revisions import diff_snapshots, snapshot_of
 from app.modules.plan_templates.schemas import AllocationWriteRequest, PlanTemplateWriteRequest
+from app.shared.arabic_required import ArabicRequiredError
 from app.shared.crop_taxonomy import path_matches
+
+
+def _require_manual_arabic(
+    payload: PlanTemplateWriteRequest, previous: dict[str, Any] | None
+) -> None:
+    """D26: refuse a manual save that adds English text without Arabic."""
+    missing = missing_manual_arabic(payload.model_dump(), previous)
+    if missing:
+        raise ArabicRequiredError(missing)
 
 
 class PlanTemplatesService:
@@ -122,6 +133,7 @@ class PlanTemplatesService:
         if await self._repo.get_template_by_code(code=payload.code) is not None:
             raise PlanTemplateConflictError(code=payload.code)
         await self._validate_tree(payload)
+        _require_manual_arabic(payload, None)
         milestones, activities = self._tree_dicts(payload)
         template_id = await self._repo.create_full_tree(
             header=payload.model_dump(exclude={"milestones", "activities"}),
@@ -142,6 +154,7 @@ class PlanTemplatesService:
             if clash is not None and clash.id != template_id:
                 raise PlanTemplateConflictError(code=payload.code)
         await self._validate_tree(payload)
+        _require_manual_arabic(payload, await self._repo.get_full_tree(template_id=template_id))
         milestones, activities = self._tree_dicts(payload)
         await self._repo.replace_full_tree(
             template=template,
@@ -399,6 +412,7 @@ class PlanTemplatesService:
                     product_name=a.product_name or input_names.get(a.input_id),
                     dosage=a.dosage or format_dose(a.dose_value, a.dose_value_max, a.dose_unit),
                     notes=a.notes,
+                    notes_ar=a.notes_ar,
                     start_time=a.start_time,
                     actor_user_id=actor_user_id,
                     input_id=a.input_id,

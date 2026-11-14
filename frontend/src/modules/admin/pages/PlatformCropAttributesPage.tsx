@@ -164,6 +164,7 @@ export function PlatformCropAttributesPage(): ReactNode {
             error={saveError}
             onSubmit={submit}
             onCancel={() => setEditing(null)}
+            original={editing.id ? (definitions.find((d) => d.id === editing.id) ?? null) : null}
           />
         </Card>
       ) : null}

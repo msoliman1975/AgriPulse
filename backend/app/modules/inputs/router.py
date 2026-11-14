@@ -31,6 +31,7 @@ from app.modules.inputs.schemas import (
     InputResponse,
     InputUpdateRequest,
 )
+from app.shared.arabic_required import merged, require_arabic
 from app.shared.auth.context import RequestContext
 from app.shared.auth.middleware import get_current_context
 from app.shared.db.session import get_admin_db_session
@@ -50,6 +51,11 @@ def _problem(code: int, title: str, detail: str, slug: str) -> APIError:
         detail=detail,
         type_=f"https://agripulse.cloud/problems/{slug}",
     )
+
+
+# D26: a platform input carries an Arabic name beside the English one. A
+# tenant's own inputs may stay English only.
+_NAME_PAIRS = (("name_en", "name_ar"),)
 
 
 def _ensure_can_write(context: RequestContext) -> None:
@@ -110,6 +116,8 @@ async def create_input(
     repo: InputsRepository = Depends(_repo),
 ) -> dict[str, Any]:
     _ensure_can_write(context)
+    if context.tenant_id is None:
+        require_arabic(payload.model_dump(), _NAME_PAIRS)
     if await repo.code_taken(payload.code, context.tenant_id):
         raise _problem(
             409,
@@ -142,8 +150,10 @@ async def update_input(
     repo: InputsRepository = Depends(_repo),
 ) -> dict[str, Any]:
     _ensure_can_write(context)
-    await _owned(repo, input_id, context)
+    existing = await _owned(repo, input_id, context)
     fields = payload.model_dump(exclude_unset=True)
+    if existing["tenant_id"] is None:
+        require_arabic(merged(existing, fields), _NAME_PAIRS, before=existing)
     await repo.update(input_id, fields, context.user_id)
     await get_audit_service().record_archive(
         event_type="catalog.input_updated",

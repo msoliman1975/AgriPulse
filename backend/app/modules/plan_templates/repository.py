@@ -617,6 +617,7 @@ class PlanTemplatesRepository:
         notes: str | None,
         start_time: Any,
         actor_user_id: UUID | None,
+        notes_ar: str | None = None,
         input_id: UUID | None = None,
         dose_value: Any = None,
         dose_value_max: Any = None,
@@ -631,12 +632,12 @@ class PlanTemplatesRepository:
                      duration_days, start_time, product_name, dosage, notes,
                      status, source, applied_template_id, template_activity_id,
                      anchored_stage_code, title, title_ar, created_by, updated_by,
-                     input_id, dose_value, dose_value_max, dose_unit)
+                     input_id, dose_value, dose_value_max, dose_unit, notes_ar)
                 VALUES
                     (:plan, :farm, :block, :atype, :sched, :dur, :stime, :pname,
                      :dosage, :notes, 'scheduled', 'template', :tpl, :tact,
                      :stage, :title, :title_ar, :actor, :actor,
-                     :input_id, :dose_value, :dose_value_max, :dose_unit)
+                     :input_id, :dose_value, :dose_value_max, :dose_unit, :notes_ar)
                 """
             ).bindparams(
                 bindparam("plan", type_=PG_UUID(as_uuid=True)),
@@ -663,6 +664,7 @@ class PlanTemplatesRepository:
                 "stage": anchored_stage_code,
                 "title": title,
                 "title_ar": title_ar,
+                "notes_ar": notes_ar,
                 "actor": actor_user_id,
                 "input_id": input_id,
                 "dose_value": dose_value,
@@ -871,12 +873,13 @@ class PlanTemplatesRepository:
                      status, source, applied_template_id, template_activity_id,
                      anchored_stage_code, title, title_ar, allocation_id,
                      activity_key, date_overridden, created_by, updated_by,
-                     input_id, dose_value, dose_value_max, dose_unit)
+                     input_id, dose_value, dose_value_max, dose_unit, notes_ar)
                 VALUES
                     (:plan, :farm, :block, :atype, :sched, :dur, :stime, :pname,
                      :dosage, :notes, 'scheduled', :source, :tpl, :tact,
                      :stage, :title, :title_ar, :alloc, :key, :overridden,
-                     :actor, :actor, :input_id, :dose_value, :dose_value_max, :dose_unit)
+                     :actor, :actor, :input_id, :dose_value, :dose_value_max, :dose_unit,
+                     :notes_ar)
                 """
             ).bindparams(
                 bindparam("plan", type_=PG_UUID(as_uuid=True)),
@@ -905,6 +908,7 @@ class PlanTemplatesRepository:
                 "stage": activity.anchored_stage_code,
                 "title": activity.title,
                 "title_ar": activity.title_ar,
+                "notes_ar": activity.notes_ar,
                 "alloc": allocation_id,
                 "key": activity.activity_key,
                 "overridden": activity.date_overridden,

@@ -263,6 +263,11 @@ def _validate_parameters_block(spec: dict[str, Any], source_path: str) -> dict[s
             "max": decl.get("max"),
             "values": list(decl.get("values") or []) if type_ == "enum" else None,
         }
+        # D26: the Arabic description beside the English one. Carried only
+        # when present, so a tree that never had one compiles to the same
+        # body (and hash) it always did.
+        if decl.get("description_ar") is not None:
+            normalized[name]["description_ar"] = decl.get("description_ar")
     return normalized
 
 

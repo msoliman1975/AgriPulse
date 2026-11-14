@@ -13,6 +13,7 @@ import type {
 import { Button } from "@/components/Button";
 import { Field, FIELD_CONTROL_CLASS } from "@/components/Field";
 import { FormFooter } from "@/components/FormFooter";
+import { needsArabic } from "@/lib/arabicRequired";
 
 /** Mirrors `CropAttributeValueType` in the backend schemas. */
 const VALUE_TYPES: CropAttributeValueType[] = [
@@ -123,10 +124,17 @@ interface Props {
   error: string | null;
   onSubmit: () => void;
   onCancel: () => void;
+  /** The stored definition when editing, so an untouched English-only label
+   *  on a seeded row is not held to the D26 Arabic rule. */
+  original?: CropAttributeDefinition | null;
 }
 
 /** Validation the server would apply, surfaced inline. */
-export function draftErrors(draft: EditorDraft, t: (k: string) => string): Record<string, string> {
+export function draftErrors(
+  draft: EditorDraft,
+  t: (k: string) => string,
+  original?: CropAttributeDefinition | null,
+): Record<string, string> {
   const errors: Record<string, string> = {};
   if (!CODE_RE.test(draft.code)) errors.code = t("cropAttrs.err.code");
   else if (RESERVED_CODES.has(draft.code)) errors.code = t("cropAttrs.err.reserved");
@@ -135,6 +143,20 @@ export function draftErrors(draft: EditorDraft, t: (k: string) => string): Recor
   // inside an otherwise-Arabic form, which is exactly what the paired
   // name_en/name_ar columns exist to prevent.
   if (!draft.name_ar.trim()) errors.name_ar = t("cropAttrs.err.required");
+  // D26: every English label carries Arabic, judged as the server does: new
+  // or changed English needs it, an untouched seeded label does not.
+  const pairs = [
+    ["description_en", "description_ar"],
+    ["unit_en", "unit_ar"],
+    ["group_name_en", "group_name_ar"],
+  ] as const;
+  for (const [en, ar] of pairs) {
+    if (
+      needsArabic(draft[en], draft[ar], original ? { en: original[en], ar: original[ar] } : null)
+    ) {
+      errors[ar] = t("common:errors.arabicRequired");
+    }
+  }
   if (SELECT_TYPES.has(draft.value_type) && draft.options.length === 0) {
     errors.options = t("cropAttrs.err.needOptions");
   }
@@ -166,10 +188,11 @@ export function CropAttributeEditor({
   error,
   onSubmit,
   onCancel,
+  original = null,
 }: Props): ReactNode {
   const { t } = useTranslation("admin");
   const [touched, setTouched] = useState(false);
-  const errors = touched ? draftErrors(draft, t) : {};
+  const errors = touched ? draftErrors(draft, t, original) : {};
   const set = (patch: Partial<EditorDraft>): void => onChange({ ...draft, ...patch });
 
   const gateTargets = siblings.filter(
@@ -356,7 +379,11 @@ export function CropAttributeEditor({
                 />
               )}
             </Field>
-            <Field label={t("cropAttrs.unitAr")}>
+            <Field
+              label={t("cropAttrs.unitAr")}
+              error={errors.unit_ar}
+              required={Boolean(draft.unit_en?.trim())}
+            >
               {(a11y) => (
                 <input
                   {...a11y}
@@ -462,7 +489,11 @@ export function CropAttributeEditor({
                 />
               )}
             </Field>
-            <Field label={t("cropAttrs.groupNameAr")}>
+            <Field
+              label={t("cropAttrs.groupNameAr")}
+              error={errors.group_name_ar}
+              required={Boolean(draft.group_name_en?.trim())}
+            >
               {(a11y) => (
                 <input
                   {...a11y}
@@ -522,7 +553,7 @@ export function CropAttributeEditor({
             disabled={saving}
             onClick={() => {
               setTouched(true);
-              if (Object.keys(draftErrors(draft, t)).length === 0) onSubmit();
+              if (Object.keys(draftErrors(draft, t, original)).length === 0) onSubmit();
             }}
           >
             {saving ? t("cropAttrs.saving") : t("cropAttrs.save")}
