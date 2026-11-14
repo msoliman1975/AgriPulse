@@ -52,7 +52,9 @@ async def _set_tenant_context(session: Any, tenant_schema: str) -> None:
 @shared_task(  # type: ignore[misc,untyped-decorator,unused-ignore]
     name="phenology.advance_for_tenant",
     bind=False,
-    ignore_result=True,
+    # Allowlisted for the admin task endpoint, which polls the result; a
+    # task that ignores its result reads PENDING there for ever.
+    ignore_result=False,
 )
 def advance_for_tenant(tenant_schema: str) -> dict[str, int]:
     return _run_task(_advance_for_tenant_async(tenant_schema))

@@ -110,6 +110,13 @@ TRIGGERABLE: tuple[TriggerableTask, ...] = (
         optional_params=("target_iso",),
     ),
     TriggerableTask(
+        name="phenology.advance_for_tenant",
+        queue="light",
+        summary="Move each block to its calendar- or age-derived growth stage. The daily "
+        "run is at 00:15 UTC; run it here when a block got its crop after that, or "
+        "a restart straddled the run.",
+    ),
+    TriggerableTask(
         name="grid.detect_anomalies_for_tenant",
         queue="light",
         summary="Re-run grid cell anomaly detection.",
