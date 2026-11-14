@@ -265,6 +265,7 @@ async def test_catalogue_api_sets_heat_units_down_the_taxonomy() -> None:
             json={
                 "code": "v1",
                 "name_en": "V1",
+                "name_ar": "صنف 1",
                 "gdd_start_kind": "date",
                 "gdd_start_value": "03-01",
             },
@@ -288,7 +289,7 @@ async def test_catalogue_api_sets_heat_units_down_the_taxonomy() -> None:
 
         rs = await client.post(
             f"/api/v1/admin/crop-varieties/{variety['id']}/strains",
-            json={"code": "s1", "name_en": "S1", "gdd_method": "max"},
+            json={"code": "s1", "name_en": "S1", "name_ar": "سلالة 1", "gdd_method": "max"},
         )
         assert rs.status_code == 201, rs.text
         assert rs.json()["gdd_method"] == "max"
