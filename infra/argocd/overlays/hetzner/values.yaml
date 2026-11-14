@@ -4253,9 +4253,18 @@ global:
       #   phenology.advance_for_tenant succeeds for qa-medjool.
       #   Rollback: api and workers to 2f6c07d. New tables/columns can stay;
       #   the old image never reads them.
-      tag: "751b318"
+      # 39364b6 = #856, api and workers (Agri Operation farm launch, PRs 5-7;
+      #   751b318..39364b6 is #856 alone). Board and calendar activities
+      #   return allocation_id and date_overridden; saved plans carry a manual
+      #   activity's catalogue input and structured dose, with the same
+      #   product/dosage fallbacks as a template apply. No migration.
+      #   Watch: the board loads and its activities carry allocation_id;
+      #   saving a plan in Agri Operation answers 201 and its rows appear on
+      #   the board with a Plan badge.
+      #   Rollback: api and workers to 751b318.
+      tag: "39364b6"
     workers:
-      tag: "751b318"
+      tag: "39364b6"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -5032,7 +5041,20 @@ global:
       #   Platform > Plan templates, save without changes, and the activities
       #   keep their titles and doses; the Beta designer's tabs are unchanged.
       #   Rollback: this tag alone back to e842760.
-      tag: "751b318"
+      # 39364b6 = #856, frontend (Agri Operation farm launch, PRs 5-7, GA).
+      #   New sidebar item Agri Operation (/agri-operation/:farmId): a Catalog
+      #   tab (operation manuals by crop and variety, stage ribbon, activities
+      #   by stage with evidence and source) and a Plan tab (saved plans and a
+      #   4-step wizard: blocks, operations, season and start date, calendar;
+      #   saving applies to the Plan board; read-only on phones). The board's
+      #   Apply template button is gone; board chips show the activity title,
+      #   a Plan badge and a moved-date dot. EN and AR.
+      #   Needs the api at 39364b6 (board fields); the plan-allocation routes
+      #   are live since 2f6c07d.
+      #   Watch: Agri Operation opens on a farm, the Catalog shows a manual and
+      #   the Plan tab lists saved plans; the board header links to it.
+      #   Rollback: this tag back to 751b318 (api may stay).
+      tag: "39364b6"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
