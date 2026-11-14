@@ -4229,9 +4229,33 @@ global:
       #   answer 200 as platform admin (publish-impact loops active tenants,
       #   counts only); board reschedules still work.
       #   Rollback: api and workers to e842760. New tables/columns can stay.
-      tag: "2f6c07d"
+      # 751b318 = #846, #847, #855 and #857, api and workers (Medjool step
+      #   4). #844 (sources library, public 0105) and #845 (crop reference
+      #   values, public 0106) already shipped in 2f6c07d.
+      #   - Inputs catalogue (D20): public 0108 adds inputs and input_doses
+      #     (34 Medjool inputs, 36 doses, all unverified); GET /api/v1/inputs.
+      #     inputs.tenant_id is in the purge registry. (#855 moved it from
+      #     0107, which #852 had taken.)
+      #   - Template inputs (D20): public 0109 and tenant 0104 add input_id
+      #     and a structured dose to plan template activities and plan
+      #     activities; apply copies them and fills empty product/dosage text.
+      #   - #857: the phenology sweep skips crops on deleted blocks. One such
+      #     block made every run fail with BlockNotFoundError, so the QA
+      #     Medjool tenant never got growth stages.
+      #   All migrations are additive and run on PreSync. Workers move with
+      #   the api for #857 and the shared models. The frontend stays e842760
+      #   for now (main CI for 751b318 was cancelled by #856 before the
+      #   frontend image was built); its editor has no input fields, and no
+      #   template has inputs yet, so nothing is lost on save.
+      #   Watch: migrate PreSync succeeds (public head 0109, tenant head
+      #   0104); GET /inputs?crop_path=date_palm.medjool answers 200 with 34
+      #   inputs; GET /plan-templates/{id} shows input_id and dose fields;
+      #   phenology.advance_for_tenant succeeds for qa-medjool.
+      #   Rollback: api and workers to 2f6c07d. New tables/columns can stay;
+      #   the old image never reads them.
+      tag: "751b318"
     workers:
-      tag: "2f6c07d"
+      tag: "751b318"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
