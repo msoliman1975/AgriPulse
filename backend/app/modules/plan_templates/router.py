@@ -1,6 +1,8 @@
 """Plan-templates REST API.
 
-E2 ships the tenant apply surface (appliable / preview / apply). E3 adds the
+E2 shipped the tenant apply surface; only `appliable` remains (the one-shot
+preview/apply endpoints were retired once saved plans replaced them, Agri
+Operation PR 10 follow-up). E3 adds the
 platform authoring surface (whole-tree CRUD + publish/archive) under the
 ``plan_template.manage`` capability.
 
@@ -24,10 +26,7 @@ from app.modules.plan_templates.schemas import (
     ManualCatalogItem,
     ManualChangesResponse,
     OperationManualResponse,
-    PlanTemplateApplyRequest,
-    PlanTemplateApplyResponse,
     PlanTemplateDetail,
-    PlanTemplatePreviewResponse,
     PlanTemplateSummary,
     PlanTemplateWriteRequest,
     PublishImpactResponse,
@@ -119,52 +118,6 @@ async def get_manual(
     _ensure_tenant(context)
     _require(context, "plan_template.read", farm_id)
     return await service.get_manual(template_id=template_id, published_only=True)
-
-
-@router.post(
-    "/plan-templates/{template_id}/preview",
-    response_model=PlanTemplatePreviewResponse,
-    summary="Dry-run the schedule a template would generate per block (no writes).",
-)
-async def preview(
-    template_id: UUID,
-    payload: PlanTemplateApplyRequest,
-    context: RequestContext = Depends(get_current_context),
-    service: PlanTemplatesService = Depends(_service),
-) -> dict[str, Any]:
-    _ensure_tenant(context)
-    _require(context, "plan_template.read", payload.farm_id)
-    return await service.preview(
-        template_id=template_id,
-        farm_id=payload.farm_id,
-        season_year=payload.season_year,
-        blocks=payload.blocks,
-    )
-
-
-@router.post(
-    "/plan-templates/{template_id}/apply",
-    response_model=PlanTemplateApplyResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Apply a template to a farm's matching blocks (idempotent per season).",
-)
-async def apply(
-    template_id: UUID,
-    payload: PlanTemplateApplyRequest,
-    context: RequestContext = Depends(get_current_context),
-    service: PlanTemplatesService = Depends(_service),
-) -> dict[str, Any]:
-    schema = _ensure_tenant(context)
-    _require(context, "plan_template.apply", payload.farm_id)
-    return await service.apply(
-        template_id=template_id,
-        farm_id=payload.farm_id,
-        season_label=payload.season_label,
-        season_year=payload.season_year,
-        blocks=payload.blocks,
-        actor_user_id=context.user_id,
-        tenant_schema=schema,
-    )
 
 
 # ---------- Saved plans (Agri Operation allocations) ------------------------
