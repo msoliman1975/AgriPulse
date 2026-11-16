@@ -13,8 +13,9 @@ The caller never names an investor: the row is found from the token's user.
 A holding the investor does not own answers 404, the same as a missing one.
 
 The response models are allowlists (see `InvestorApp*Response`). They carry
-no share, no other holdings, no notes, no contract numbers and nothing about
-farm health. `tests/unit/modules/investors` pins the exact field sets.
+no share, no other holdings, no notes and nothing about farm health. The
+investor's own contract reference and how they acquired the holding are shown
+(decision D3). `tests/unit/modules/investors` pins the exact field sets.
 """
 
 from __future__ import annotations

@@ -58,7 +58,9 @@ def _client(context: Any) -> AsyncClient:
     return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
 
-async def _sold_holding(env: ScoutingFixture, lon: float = _LON0) -> tuple[dict, dict]:
+async def _sold_holding(
+    env: ScoutingFixture, lon: float = _LON0, contract_ref: str | None = None
+) -> tuple[dict, dict]:
     """A holding with a current owner, and that owner."""
     async with _client(env.admin_context) as c:
         h = await c.post(
@@ -73,7 +75,11 @@ async def _sold_holding(env: ScoutingFixture, lon: float = _LON0) -> tuple[dict,
         assert inv.status_code == 201, inv.text
         own = await c.post(
             f"/api/v1/farms/{env.farm_id}/holdings/{h.json()['id']}/ownerships",
-            json={"investor_id": inv.json()["id"], "start_date": date.today().isoformat()},
+            json={
+                "investor_id": inv.json()["id"],
+                "start_date": date.today().isoformat(),
+                "contract_ref": contract_ref,
+            },
         )
         assert own.status_code == 201, own.text
     return h.json(), inv.json()
@@ -212,7 +218,7 @@ async def test_investor_reads_only_their_own_holdings(scouting_env: ScoutingFixt
 @pytest.mark.asyncio
 async def test_investor_responses_carry_no_staff_fields(scouting_env: ScoutingFixture) -> None:
     env = scouting_env
-    mine, investor = await _sold_holding(env)
+    mine, investor = await _sold_holding(env, contract_ref="AP-2026-017")
     body = await _login(env, investor["id"])
     me = make_context(
         user_id=UUID(body["investor"]["user_id"]),
@@ -222,8 +228,11 @@ async def test_investor_responses_carry_no_staff_fields(scouting_env: ScoutingFi
     async with _client(me) as c:
         one = (await c.get(f"/api/v1/investor/holdings/{mine['id']}")).json()
         who = (await c.get("/api/v1/investor/me")).json()
-    for leaked in ("share_pct", "notes_internal", "contract_ref", "block_area_m2", "status"):
+    for leaked in ("share_pct", "notes_internal", "block_area_m2", "status"):
         assert leaked not in one, leaked
+    # D3: the investor's own ownership facts are shown.
+    assert one["acquired_by"] == "purchase"
+    assert one["contract_ref"] == "AP-2026-017"
     # Build plan v2 (PR 2) shows investors their own status, type and contact
     # details on the Account screen; staff-only fields stay out.
     for leaked in ("notes_internal", "national_id_last4", "national_id_type", "user_id", "id"):

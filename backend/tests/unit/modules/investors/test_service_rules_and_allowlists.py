@@ -137,6 +137,9 @@ def test_investor_app_holding_fields_are_pinned() -> None:
         "start_date",
         "end_date",
         "period",
+        # D3 (build plan v2, PR 2b): their own ownership facts.
+        "acquired_by",
+        "contract_ref",
         "boundary",
         "block_boundary",
     }

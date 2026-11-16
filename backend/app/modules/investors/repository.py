@@ -887,6 +887,9 @@ class InvestorsRepository:
                      ELSE 'current'
                    END AS period,
                    h.id AS holding_id, h.code, h.name, h.name_ar, h.area_m2, h.tree_count,
+                   -- D3: the investor sees how they came to own it and their
+                   -- own contract's reference.
+                   o.acquired_by, o.contract_ref,
                    ST_AsGeoJSON(h.boundary)::jsonb AS boundary,
                    b.code AS block_code, b.name AS block_name, b.name_ar AS block_name_ar,
                    ST_AsGeoJSON(b.boundary)::jsonb AS block_boundary,
