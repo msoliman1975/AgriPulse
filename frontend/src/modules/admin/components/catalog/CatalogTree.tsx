@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Crop, CropVariety, CropVarietyStrain } from "@/api/crops";
+import { CropAvatar } from "@/components/CropAvatar";
 
 interface Props {
   crops: Crop[];
@@ -62,6 +63,7 @@ export function CatalogTree({
           <div key={crop.id}>
             <TreeRow
               level={0}
+              avatar={<CropAvatar name={crop.name_en} imageUrl={crop.crop_icon_url} size="xs" />}
               label={crop.name_en}
               secondary={crop.name_ar}
               code={crop.code}
@@ -167,6 +169,7 @@ const INDENT = ["ps-3", "ps-9", "ps-14"];
 
 function TreeRow({
   level,
+  avatar,
   label,
   secondary,
   code,
@@ -177,6 +180,7 @@ function TreeRow({
   onSelect,
 }: {
   level: 0 | 1 | 2;
+  avatar?: ReactNode;
   label: string;
   secondary?: string | null;
   code: string;
@@ -198,6 +202,7 @@ function TreeRow({
       } ${retired ? "opacity-60" : ""}`}
     >
       <span className="w-3 flex-shrink-0 text-[10px] text-ap-muted">{caret}</span>
+      {avatar}
       <span className="min-w-0 flex-1">
         <span className={level === 0 ? "text-sm font-medium text-ap-ink" : "text-sm text-ap-ink"}>
           {label}

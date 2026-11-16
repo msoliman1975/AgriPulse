@@ -1158,6 +1158,20 @@
         "ar": "Arabic",
         "other": "Other language"
       }
+    },
+    "image": {
+      "none": "No picture yet. Blocks and the investor app show the crop's first letter.",
+      "own": "Shown on blocks, the plan board and in the investor app.",
+      "inherited": "Uses the crop's picture. Upload one to give this variety its own.",
+      "upload": "Upload picture",
+      "replace": "Replace picture",
+      "uploading": "Uploading…",
+      "remove": "Remove picture",
+      "useCrops": "Use the crop's picture",
+      "hint": "PNG, JPEG or WebP, up to 5 MB. Cropped to a square.",
+      "imageType": "Use a PNG, JPEG or WebP file.",
+      "imageSize": "The file must be 5 MB or smaller.",
+      "failed": "The picture could not be saved. Try again."
     }
   },
   "sizeClasses": {

@@ -52,6 +52,7 @@ from app.modules.farms.models import (
 from app.modules.farms.planting import planting_densities
 from app.modules.farms.validity import is_active_on, state_on
 from app.shared import clock
+from app.shared.storage import crop_image_urls
 
 # Allowlists for dynamic UPDATE clauses — every column name interpolated
 # into an UPDATE … SET list MUST be in one of these sets. The router only
@@ -1119,7 +1120,35 @@ class FarmsRepository:
             stmt = stmt.where(CropVariety.is_active.is_(True))
         stmt = stmt.order_by(CropVariety.name_en)
         rows = (await self._public.execute(stmt)).scalars().all()
-        return [_variety_dict(r) for r in rows]
+        crop_key = await self._crop_image_key(crop_id)
+        return [_variety_dict(r, crop_image_key=crop_key) for r in rows]
+
+    async def _crop_image_key(self, crop_id: UUID) -> str | None:
+        """The crop's image key, which a variety without its own image shows."""
+        key: str | None = (
+            await self._public.execute(select(Crop.image_s3_key).where(Crop.id == crop_id))
+        ).scalar_one_or_none()
+        return key
+
+    async def crop_image_keys(
+        self, *, crop_ids: Sequence[UUID], variety_ids: Sequence[UUID]
+    ) -> tuple[dict[UUID, str | None], dict[UUID, str | None]]:
+        """Image keys for many crops and varieties, in two queries at most."""
+        crops: dict[UUID, str | None] = {}
+        varieties: dict[UUID, str | None] = {}
+        if crop_ids:
+            rows = await self._public.execute(
+                select(Crop.id, Crop.image_s3_key).where(Crop.id.in_(set(crop_ids)))
+            )
+            crops = {row.id: row.image_s3_key for row in rows}
+        if variety_ids:
+            rows = await self._public.execute(
+                select(CropVariety.id, CropVariety.image_s3_key).where(
+                    CropVariety.id.in_(set(variety_ids))
+                )
+            )
+            varieties = {row.id: row.image_s3_key for row in rows}
+        return crops, varieties
 
     async def list_variety_strains(
         self, *, crop_variety_id: UUID, include_inactive: bool = False
@@ -1322,7 +1351,7 @@ class FarmsRepository:
         self._public.add(row)
         await self._public.flush()
         await self._public.refresh(row)
-        return _variety_dict(row)
+        return _variety_dict(row, crop_image_key=await self._crop_image_key(crop_id))
 
     async def update_variety(
         self, *, variety: CropVariety, fields: dict[str, Any]
@@ -1331,7 +1360,7 @@ class FarmsRepository:
             setattr(variety, key, value)
         await self._public.flush()
         await self._public.refresh(variety)
-        return _variety_dict(variety)
+        return _variety_dict(variety, crop_image_key=await self._crop_image_key(variety.crop_id))
 
     async def create_strain(
         self,
@@ -2565,6 +2594,7 @@ def _crop_dict(r: Crop) -> dict[str, Any]:
         "size_classes": r.size_classes,
         "classification_depth": r.classification_depth,
         "is_active": r.is_active,
+        **crop_image_urls(r.image_s3_key),
     }
 
 
@@ -2602,7 +2632,7 @@ def crop_attribute_dict(r: CropAttributeDefinition) -> dict[str, Any]:
     }
 
 
-def _variety_dict(r: CropVariety) -> dict[str, Any]:
+def _variety_dict(r: CropVariety, *, crop_image_key: str | None = None) -> dict[str, Any]:
     return {
         "id": r.id,
         "crop_id": r.crop_id,
@@ -2618,6 +2648,9 @@ def _variety_dict(r: CropVariety) -> dict[str, Any]:
         "gdd_start_kind": r.gdd_start_kind,
         "gdd_start_value": r.gdd_start_value,
         "is_active": r.is_active,
+        # Resolved: the variety's own image first, then its crop's.
+        **crop_image_urls(crop_image_key, r.image_s3_key),
+        "has_own_image": bool(r.image_s3_key),
     }
 
 

@@ -898,6 +898,8 @@ class InvestorsRepository:
                    crop.variety_name_en, crop.variety_name_ar, crop.planting_date,
                    crop.stage_name_en, crop.stage_name_ar,
                    crop.stage_started_on, crop.stage_advance,
+                   -- Internal: the service turns these into image URLs.
+                   crop.crop_image_key, crop.variety_image_key,
                    season.season_label AS current_season
               FROM holding_ownerships o
               JOIN holdings h ON h.id = o.holding_id
@@ -914,7 +916,9 @@ class InvestorsRepository:
                        -- Read by the service to work out the expected end;
                        -- never sent to the investor.
                        stage.s -> 'advance' AS stage_advance,
-                       (bc.growth_stage_updated_at)::date AS stage_started_on
+                       (bc.growth_stage_updated_at)::date AS stage_started_on,
+                       c.image_s3_key AS crop_image_key,
+                       v.image_s3_key AS variety_image_key
                   FROM block_crops bc
                   JOIN public.crops c ON c.id = bc.crop_id
                   LEFT JOIN public.crop_varieties v ON v.id = bc.crop_variety_id

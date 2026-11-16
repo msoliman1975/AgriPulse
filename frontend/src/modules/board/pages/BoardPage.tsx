@@ -36,6 +36,7 @@ import { BoardMobileList } from "../components/BoardMobileList";
 import { BulkAddDialog, type SelectedCell } from "../components/BulkAddDialog";
 import { QuickAddDialog } from "../components/QuickAddDialog";
 import { RecommendationsRail } from "../components/RecommendationsRail";
+import { CropAvatar } from "@/components/CropAvatar";
 
 type ViewMode = "week" | "month" | "season";
 
@@ -706,10 +707,17 @@ function BoardGrid({
                 className="w-32 border-b border-e border-ap-line bg-ap-bg/30 p-2 text-start align-top font-medium text-ap-ink"
               >
                 <div
-                  className="truncate"
+                  className="flex items-center gap-1.5"
                   title={`${localizedName(i18n.language, block.name ?? block.code, block.name_ar)} (${block.code})`}
                 >
-                  {localizedName(i18n.language, block.name ?? block.code, block.name_ar)}
+                  {/* Only a block that grows something today gets an avatar: a
+                      lettered circle for a bare block would name no crop. */}
+                  {block.crop_icon_url ? (
+                    <CropAvatar name={block.code} imageUrl={block.crop_icon_url} size="xs" />
+                  ) : null}
+                  <span className="truncate">
+                    {localizedName(i18n.language, block.name ?? block.code, block.name_ar)}
+                  </span>
                 </div>
               </th>
               {columns.map((col) => {

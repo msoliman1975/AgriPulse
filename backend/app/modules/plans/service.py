@@ -35,6 +35,10 @@ from app.modules.plans.repository import PlansRepository
 from app.shared import clock
 from app.shared.db.ids import uuid7
 from app.shared.eventbus import EventBus, get_default_bus
+from app.shared.storage import crop_image_urls
+
+#: Storage keys the repository reads for the board; turned into URLs, never sent.
+_IMAGE_KEYS = frozenset({"crop_image_key", "variety_image_key"})
 
 
 class PlansService(Protocol):
@@ -490,7 +494,13 @@ class PlansServiceImpl:
             "farm_id": str(farm_id),
             "week_start": week_start.isoformat(),
             "weeks": weeks,
-            "blocks": blocks,
+            "blocks": [
+                {
+                    **{k: v for k, v in b.items() if k not in _IMAGE_KEYS},
+                    **crop_image_urls(b.get("crop_image_key"), b.get("variety_image_key")),
+                }
+                for b in blocks
+            ],
             "activities": activities,
         }
 

@@ -31,6 +31,9 @@ export interface Crop extends HeatUnitSettings {
   relevant_indices: string[];
   classification_depth: ClassificationDepth;
   is_active: boolean;
+  /** The crop's own picture (public 0114), 256 px and 64 px. */
+  crop_image_url?: string | null;
+  crop_icon_url?: string | null;
   /** Base temperature for growing-degree-day accumulation. A stage that
    *  advances on GDD is only valid when the crop sets this. */
   gdd_base_temp_c?: string | null;
@@ -75,6 +78,11 @@ export interface CropVariety extends TaxonomyOverrides {
   // Canonical hierarchical code "<crop>.<variety>".
   path: string;
   is_active: boolean;
+  /** Resolved picture: the variety's own, else its crop's. */
+  crop_image_url?: string | null;
+  crop_icon_url?: string | null;
+  /** True when the variety overrides its crop's picture. */
+  has_own_image?: boolean;
 }
 
 export interface CropVarietyStrain extends TaxonomyOverrides {

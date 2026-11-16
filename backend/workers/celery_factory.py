@@ -76,6 +76,8 @@ _TASK_PACKAGES: tuple[str, ...] = (
     # Self-serve trial provisioning, and the chase mail for a request that
     # has waited a working day with no decision.
     "app.modules.billing.tasks",
+    # Crop image renditions, enqueued by the API when an upload is finalized.
+    "app.modules.crop_images.tasks",
 )
 
 

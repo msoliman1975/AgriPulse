@@ -420,6 +420,10 @@ class InvestorAppHoldingResponse(BaseModel):
     variety_name_en: str | None = None
     variety_name_ar: str | None = None
     planting_date: date | None = None
+    # The crop's picture (variety override first): 256 px and 64 px WebP on a
+    # public URL. Not sensitive: the same image for every tenant.
+    crop_image_url: str | None = None
+    crop_icon_url: str | None = None
     # The block crop's current stage, by name only.
     stage_name_en: str | None = None
     stage_name_ar: str | None = None

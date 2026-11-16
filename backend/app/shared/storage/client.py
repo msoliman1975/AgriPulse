@@ -80,6 +80,8 @@ class StorageClient(Protocol):
 
     def head_object(self, *, key: str) -> dict[str, Any]: ...
 
+    def get_object(self, *, key: str) -> bytes: ...
+
     def delete_object(self, *, key: str) -> None: ...
 
     def put_object(
@@ -190,6 +192,18 @@ class _Boto3StorageClient:
             if code in ("404", "NoSuchKey", "NotFound"):
                 raise StorageObjectMissingError(self._bucket, key) from exc
             raise
+
+    def get_object(self, *, key: str) -> bytes:
+        """The object's bytes. For small objects only (crop image renditions)."""
+        try:
+            response = self._client.get_object(Bucket=self._bucket, Key=key)
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code")
+            if code in ("404", "NoSuchKey", "NotFound"):
+                raise StorageObjectMissingError(self._bucket, key) from exc
+            raise
+        body: bytes = response["Body"].read()
+        return body
 
     def delete_object(self, *, key: str) -> None:
         # S3 deletes are idempotent — but we surface the missing-object

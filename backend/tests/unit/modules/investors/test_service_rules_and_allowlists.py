@@ -121,6 +121,9 @@ def test_investor_app_holding_fields_are_pinned() -> None:
         "variety_name_en",
         "variety_name_ar",
         "planting_date",
+        # Build plan v2, PR 1: the crop's public picture, nothing tenant-specific.
+        "crop_image_url",
+        "crop_icon_url",
         "stage_name_en",
         "stage_name_ar",
         "stage_started_on",
@@ -150,3 +153,23 @@ def test_investor_app_version_fields_are_pinned() -> None:
         "latest_version",
         "download_url",
     }
+
+
+def test_investor_app_holding_turns_image_keys_into_urls() -> None:
+    """The crop image keys are read for the URLs and never reach the investor."""
+    from app.modules.investors.service import _with_stage_end
+
+    crop_key = "platform/crop-images/crops/" + str(_FARM) + "/" + str(_HOLDING) + "/original.png"
+    row = {
+        "crop_image_key": crop_key,
+        "variety_image_key": None,
+        "stage_advance": None,
+        "stage_name_en": None,
+        "stage_name_ar": None,
+    }
+    out = _with_stage_end(row)
+    assert "crop_image_key" not in out
+    assert "variety_image_key" not in out
+    assert out["crop_image_url"].endswith(f"/crops/{_FARM}/{_HOLDING}/256.webp")
+    assert out["crop_icon_url"].endswith(f"/crops/{_FARM}/{_HOLDING}/64.webp")
+    assert set(out) <= set(InvestorAppHoldingResponse.model_fields) | {"stage_expected_end"}

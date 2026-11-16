@@ -32,6 +32,7 @@ import {
   type ValidityState,
 } from "@/modules/farms/lib/assignmentValidity";
 import { useCapability } from "@/rbac/useCapability";
+import { CropAvatar } from "@/components/CropAvatar";
 
 interface Props {
   blockId: string;
@@ -213,7 +214,8 @@ export function CropAssignmentPanel({ blockId, farmId, onAssigned }: Props): Rea
         <div className="p-3">
           {current ? (
             <>
-              <div className="flex flex-wrap items-baseline gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <CropAvatar name={current.crop_path} imageUrl={current.crop_icon_url} size="sm" />
                 <span className="text-sm font-semibold text-ap-ink">{current.crop_path}</span>
                 <span className="text-[11px] text-ap-muted">
                   {current.effective_from}

@@ -166,6 +166,9 @@ export interface BoardBlock {
   name: string | null;
   name_ar: string | null;
   unit_type: string;
+  /** The crop the block grows today, as a picture (variety override first). */
+  crop_image_url?: string | null;
+  crop_icon_url?: string | null;
 }
 
 export interface BoardResourceChip {

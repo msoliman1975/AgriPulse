@@ -43,6 +43,9 @@ dependencies = [
   "rasterio>=1.3,<2",
   "numpy>=1.26,<3",
   "shapely>=2,<3",
+  # Crop image renditions (square WebP at 64/128/256 px), made by the light
+  # worker after a platform admin uploads a crop or variety image.
+  "pillow>=11,<13",
 
   # Background work
   "celery>=5.4,<5.7",
@@ -391,6 +394,7 @@ source_modules = [
   "app.modules.action_center",
   "app.modules.billing",
   "app.modules.crop_documents",
+  "app.modules.crop_images",
 ]
 forbidden_modules = [
   "app.modules.farms.repository",

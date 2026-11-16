@@ -136,6 +136,10 @@ class CropResponse(BaseModel):
     # crop_only | variety | variety_strain. Drives the picker depth.
     classification_depth: str = "crop_only"
     is_active: bool = True
+    # The crop's image (public 0114): 256 px and 64 px WebP renditions on a
+    # public, cacheable URL. Null when the crop has no image.
+    crop_image_url: str | None = None
+    crop_icon_url: str | None = None
 
 
 class CropVarietyResponse(BaseModel):
@@ -156,6 +160,11 @@ class CropVarietyResponse(BaseModel):
     gdd_start_kind: GddStartKind | None = None
     gdd_start_value: str | None = None
     is_active: bool = True
+    # Resolved image: the variety's own when it has one, else its crop's.
+    crop_image_url: str | None = None
+    crop_icon_url: str | None = None
+    # True when the variety overrides the crop's image.
+    has_own_image: bool = False
 
 
 class CropVarietyStrainResponse(BaseModel):
@@ -1109,6 +1118,9 @@ class BlockCropResponse(BaseModel):
     notes: str | None
     created_at: datetime
     updated_at: datetime
+    # The crop's image, the variety's override first (public 0114).
+    crop_image_url: str | None = None
+    crop_icon_url: str | None = None
 
 
 # ---------- Bulk crop assignment -------------------------------------------
@@ -1160,6 +1172,10 @@ class FarmCropAssignmentResponse(BaseModel):
     effective_from: date
     effective_to: date | None = None
     status: BlockCropStatus
+    crop_variety_id: UUID | None = None
+    # The crop's image, the variety's override first (public 0114).
+    crop_image_url: str | None = None
+    crop_icon_url: str | None = None
 
 
 class BulkCropCandidateCurrent(BaseModel):
