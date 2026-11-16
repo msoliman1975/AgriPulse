@@ -18,7 +18,7 @@ read: it means the holding has a current owner today.
 from __future__ import annotations
 
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from uuid import UUID
 
@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.modules.audit.service import AuditService, get_audit_service
+from app.modules.harvest.service import get_harvest_service
 from app.modules.iam.users_service import (
     AlreadyInAnotherTenantError,
     TenantUserAlreadyExistsError,
@@ -983,6 +984,40 @@ class InvestorsService:
             "photo": {"url": url, "taken_at": found["taken_at"]} if found and url else None,
         }
 
+    async def app_holding_harvest(
+        self,
+        *,
+        user_id: UUID | None,
+        keycloak_subject: str | None,
+        holding_id: UUID,
+        season: str | None = None,
+        email: str | None = None,
+    ) -> dict[str, Any]:
+        """The holding's share of the block's picks inside the ownership (D1, D2).
+
+        A future holding has none yet; a past one stops at its end date.
+        """
+        holding = await self.app_holding(
+            user_id=user_id, keycloak_subject=keycloak_subject, email=email, holding_id=holding_id
+        )
+        empty = {"holding_id": holding_id, **scale_harvest([], share=Decimal(0), season=None)}
+        if holding["start_date"] > clock.today():
+            return empty
+        picks = await get_harvest_service(
+            tenant_session=self._session, tenant_schema=self._schema or ""
+        ).picks_between(
+            block_id=holding["block_id"],
+            from_date=holding["start_date"],
+            to_date=holding.get("end_date"),
+        )
+        share = harvest_share(
+            holding_trees=holding.get("tree_count"),
+            block_trees=holding.get("block_plant_count"),
+            holding_area_m2=holding.get("area_m2"),
+            block_area_m2=holding.get("block_area_m2"),
+        )
+        return {"holding_id": holding_id, **scale_harvest(picks, share=share, season=season)}
+
     async def app_holding(
         self,
         *,
@@ -1026,6 +1061,81 @@ def ownership_window(holding: dict[str, Any], today: date) -> tuple[date, date] 
     start = max(season_start, holding["start_date"])
     end = min(season_end, holding["end_date"]) if holding.get("end_date") else season_end
     return (start, end) if start <= end else None
+
+
+_KG = Decimal("0.01")
+
+
+def harvest_share(
+    *,
+    holding_trees: int | None,
+    block_trees: int | None,
+    holding_area_m2: Decimal | None,
+    block_area_m2: Decimal | None,
+) -> Decimal:
+    """The holding's part of the block's harvest (decision D1).
+
+    By tree count when both the holding and the block have one, otherwise by
+    area. Never above 1: a holding cannot own more than its block.
+    """
+    if holding_trees and block_trees and holding_trees > 0 and block_trees > 0:
+        share = Decimal(holding_trees) / Decimal(block_trees)
+    elif holding_area_m2 and block_area_m2 and block_area_m2 > 0:
+        share = Decimal(holding_area_m2) / Decimal(block_area_m2)
+    else:
+        share = Decimal(0)
+    return min(share, Decimal(1))
+
+
+def scale_harvest(
+    picks: list[dict[str, Any]], *, share: Decimal, season: str | None
+) -> dict[str, Any]:
+    """The picks of one season, scaled to the holding, with totals (D1, D2)."""
+    seasons = sorted({p["season_label"] for p in picks}, reverse=True)
+    chosen = season if season in seasons else (seasons[0] if seasons else None)
+    out: list[dict[str, Any]] = []
+    total_weight = Decimal(0)
+    priced_weight = Decimal(0)
+    total_revenue = Decimal(0)
+    for pick in picks:
+        if pick["season_label"] != chosen:
+            continue
+        weight = (Decimal(pick["weight_kg"]) * share).quantize(_KG, rounding=ROUND_HALF_UP)
+        price = pick["price_per_kg"]
+        revenue = (
+            (weight * Decimal(price)).quantize(_KG, rounding=ROUND_HALF_UP)
+            if price is not None
+            else None
+        )
+        total_weight += weight
+        if revenue is not None:
+            priced_weight += weight
+            total_revenue += revenue
+        out.append(
+            {
+                "pick_no": pick["pick_no"],
+                "label": pick["label"],
+                "label_ar": pick["label_ar"],
+                "harvested_on": pick["harvested_on"],
+                "weight_kg": weight,
+                "price_per_kg": price,
+                "revenue": revenue,
+            }
+        )
+    any_price = priced_weight > 0
+    return {
+        "season": chosen,
+        "seasons": seasons,
+        "currency": next((p["currency"] for p in picks if p["season_label"] == chosen), None),
+        "picks": out,
+        "total_weight_kg": total_weight,
+        "total_revenue": total_revenue if any_price else None,
+        "average_price_per_kg": (
+            (total_revenue / priced_weight).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+            if any_price
+            else None
+        ),
+    }
 
 
 def _with_stage_end(row: dict[str, Any]) -> dict[str, Any]:

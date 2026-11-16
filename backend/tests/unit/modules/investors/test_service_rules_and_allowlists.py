@@ -279,3 +279,110 @@ def test_activities_window_is_clipped_to_the_ownership() -> None:
     # Ended before this season began: nothing to show.
     gone = {"current_season": "2026", "start_date": date(2024, 1, 1), "end_date": date(2025, 5, 1)}
     assert ownership_window(gone, today) is None
+
+
+# ---- Build plan v2, PR 6: harvest (D1, D2) ----------------------------------
+
+
+def test_investor_app_harvest_fields_are_pinned() -> None:
+    from app.modules.investors.schemas import InvestorAppHarvestPick, InvestorAppHarvestResponse
+
+    # Never the block's totals, never the share, never internal notes.
+    assert set(InvestorAppHarvestResponse.model_fields) == {
+        "holding_id",
+        "season",
+        "seasons",
+        "currency",
+        "picks",
+        "total_weight_kg",
+        "total_revenue",
+        "average_price_per_kg",
+    }
+    assert set(InvestorAppHarvestPick.model_fields) == {
+        "pick_no",
+        "label",
+        "label_ar",
+        "harvested_on",
+        "weight_kg",
+        "price_per_kg",
+        "revenue",
+    }
+
+
+def test_d1_split_by_trees_else_area_never_above_one() -> None:
+    from decimal import Decimal
+
+    from app.modules.investors.service import harvest_share
+
+    by_trees = harvest_share(
+        holding_trees=40,
+        block_trees=400,
+        holding_area_m2=Decimal("9999"),
+        block_area_m2=Decimal("1"),
+    )
+    assert by_trees == Decimal("0.1")
+    # Either count missing: area decides.
+    by_area = harvest_share(
+        holding_trees=40,
+        block_trees=None,
+        holding_area_m2=Decimal("250"),
+        block_area_m2=Decimal("1000"),
+    )
+    assert by_area == Decimal("0.25")
+    assert harvest_share(
+        holding_trees=0,
+        block_trees=400,
+        holding_area_m2=Decimal("250"),
+        block_area_m2=Decimal("1000"),
+    ) == Decimal("0.25")
+    assert harvest_share(
+        holding_trees=900, block_trees=400, holding_area_m2=None, block_area_m2=None
+    ) == Decimal("1")
+    assert harvest_share(
+        holding_trees=None, block_trees=None, holding_area_m2=None, block_area_m2=None
+    ) == Decimal("0")
+
+
+def test_d2_scaled_picks_gross_revenue_and_season_choice() -> None:
+    from datetime import date
+    from decimal import Decimal
+
+    from app.modules.investors.service import scale_harvest
+
+    def pick(n: int, season: str, kg: str, price: str | None) -> dict[str, object]:
+        return {
+            "pick_no": n,
+            "label": None,
+            "label_ar": None,
+            "harvested_on": date(2026, 10, n),
+            "weight_kg": Decimal(kg),
+            "price_per_kg": Decimal(price) if price else None,
+            "currency": "EGP",
+            "season_label": season,
+            "notes_internal": "staff only",
+        }
+
+    picks = [
+        pick(1, "2026", "1000", "10"),
+        pick(2, "2026", "500", None),
+        pick(1, "2025", "80", "5"),
+    ]
+    out = scale_harvest(picks, share=Decimal("0.1"), season=None)
+    assert out["season"] == "2026"
+    assert out["seasons"] == ["2026", "2025"]
+    assert [p["weight_kg"] for p in out["picks"]] == [Decimal("100.00"), Decimal("50.00")]
+    assert out["picks"][0]["revenue"] == Decimal("1000.00")
+    assert out["picks"][1]["revenue"] is None
+    assert out["total_weight_kg"] == Decimal("150.00")
+    assert out["total_revenue"] == Decimal("1000.00")
+    # Average over priced picks only.
+    assert out["average_price_per_kg"] == Decimal("10.0000")
+    assert all("notes_internal" not in p for p in out["picks"])
+
+    older = scale_harvest(picks, share=Decimal("0.1"), season="2025")
+    assert older["season"] == "2025"
+    assert older["total_revenue"] == Decimal("40.00")
+    # An unknown season falls back to the newest one.
+    assert scale_harvest(picks, share=Decimal("0.1"), season="1999")["season"] == "2026"
+    empty = scale_harvest([], share=Decimal("0.1"), season=None)
+    assert (empty["season"], empty["picks"], empty["total_revenue"]) == (None, [], None)

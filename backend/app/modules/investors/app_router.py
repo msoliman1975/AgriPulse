@@ -11,6 +11,8 @@ Mounted under /api/v1:
                                          investor_app.use
   GET /investor/holdings/{holding_id}/site-photo
                                          investor_app.use
+  GET /investor/holdings/{holding_id}/harvest?season=
+                                         investor_app.use
   GET /investor/app-version              investor_app.use
 
 The caller never names an investor: the row is found from the token's user.
@@ -27,7 +29,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import get_settings
@@ -35,6 +37,7 @@ from app.modules.imagery.service import get_imagery_service
 from app.modules.investors.router import _ensure_tenant
 from app.modules.investors.schemas import (
     InvestorAppActivity,
+    InvestorAppHarvestResponse,
     InvestorAppHoldingResponse,
     InvestorAppMeResponse,
     InvestorAppPhotoResponse,
@@ -162,6 +165,28 @@ async def investor_holding_site_photo(
         keycloak_subject=context.keycloak_subject,
         email=context.email,
         holding_id=holding_id,
+    )
+
+
+@router.get("/holdings/{holding_id}/harvest", response_model=InvestorAppHarvestResponse)
+async def investor_holding_harvest(
+    holding_id: UUID,
+    season: str | None = Query(default=None, max_length=64),
+    context: RequestContext = Depends(requires_capability("investor_app.use")),
+    service: InvestorsService = Depends(_service),
+) -> dict[str, Any]:
+    """The holding's share of the block's picks inside the ownership.
+
+    D1: split by tree count when the holding and the block both have one,
+    otherwise by area. D2: gross revenue, no costs. The block's own totals
+    and the share are never returned.
+    """
+    return await service.app_holding_harvest(
+        user_id=context.user_id,
+        keycloak_subject=context.keycloak_subject,
+        email=context.email,
+        holding_id=holding_id,
+        season=season,
     )
 
 

@@ -118,6 +118,20 @@ class HarvestRepository:
             ("b",),
         )
 
+    async def list_between(
+        self, *, block_id: UUID, from_date: date, to_date: date | None
+    ) -> list[dict[str, Any]]:
+        """Live picks on the block harvested in [from_date, to_date] (open end when None)."""
+        return await self._rows(
+            f"SELECT {_COLUMNS} FROM harvest_lots "  # noqa: S608 - fixed column list
+            "WHERE block_id = :b AND deleted_at IS NULL "
+            "AND harvested_on >= :f "
+            "AND (CAST(:t AS date) IS NULL OR harvested_on <= CAST(:t AS date)) "
+            "ORDER BY harvested_on, pick_no",
+            {"b": block_id, "f": from_date, "t": to_date},
+            ("b",),
+        )
+
     async def get(self, lot_id: UUID) -> dict[str, Any] | None:
         rows = await self._rows(
             f"SELECT {_COLUMNS} FROM harvest_lots "  # noqa: S608 - fixed column list
