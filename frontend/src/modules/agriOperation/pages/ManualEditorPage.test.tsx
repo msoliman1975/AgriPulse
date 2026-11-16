@@ -151,9 +151,14 @@ describe("ManualEditorPage", () => {
     expect(within(pre).getByText("No activities in this stage.")).toBeTruthy();
 
     // D27: each saved activity asks for its sources by manual and activity code.
-    expect(sources.listSourceLinks).toHaveBeenCalledWith(
-      "plan_template_activity",
-      "mango-keitt-eg/spraying-1",
+    // SourcesMarker fetches through useQuery, which starts after mount, so the
+    // call can land after the heading renders: wait for it rather than assert
+    // it at once (seen failing with 0 calls on a loaded CI runner).
+    await waitFor(() =>
+      expect(sources.listSourceLinks).toHaveBeenCalledWith(
+        "plan_template_activity",
+        "mango-keitt-eg/spraying-1",
+      ),
     );
 
     const save = screen.getByRole("button", { name: "Save draft" });
