@@ -185,7 +185,27 @@ def _wire_settings(
     cfg = Config(str(backend_root / "alembic.ini"), ini_section="public")
     command.upgrade(cfg, "head")
 
+    # Tenant schemas: record one real Alembic run, replay it for every other
+    # tenant (~0.45 s instead of ~1.1 s each). See _tenant_replay.py for why
+    # this stays faithful and how it checks itself.
+    from app.modules.tenancy.bootstrap import AlembicTenantMigrator
+
+    from ._tenant_replay import ReplayedTenantBootstrap, enabled
+
+    replay: ReplayedTenantBootstrap | None = None
+    patcher = pytest.MonkeyPatch()
+    if enabled():
+        replay = ReplayedTenantBootstrap(sync_url)
+        replay.record(AlembicTenantMigrator().bootstrap)
+        patcher.setattr(
+            AlembicTenantMigrator, "bootstrap", lambda _self, schema: replay.bootstrap(schema)
+        )
+
     yield
+
+    patcher.undo()
+    if replay is not None:
+        replay.dispose()
 
     # Drop async engine â€” keeps pytest from leaking pool connections.
     import asyncio
