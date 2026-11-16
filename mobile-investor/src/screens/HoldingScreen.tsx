@@ -2,11 +2,18 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { fetchLatestPhoto, type Holding, type LatestPhoto } from "@/api/client";
 import { HoldingMap } from "@/components/HoldingMap";
-import { formatDate, t, type Lang } from "@/i18n";
+import { formatDate, t, type Lang, type MessageKey } from "@/i18n";
+import { ActivitiesTab } from "@/screens/ActivitiesTab";
 import { DetailsTab } from "@/screens/DetailsTab";
 import { pick } from "@/screens/HoldingsScreen";
 
-type Tab = "map" | "details";
+type Tab = "map" | "details" | "activities";
+
+const TAB_LABEL: Record<Tab, MessageKey> = {
+  map: "tab.map",
+  details: "tab.details",
+  activities: "tab.activities",
+};
 
 export function HoldingScreen({
   lang,
@@ -50,7 +57,7 @@ export function HoldingScreen({
         </div>
       </header>
       <div className="tabs" role="tablist">
-        {(["map", "details"] as Tab[]).map((k) => (
+        {(["map", "details", "activities"] as Tab[]).map((k) => (
           <button
             key={k}
             type="button"
@@ -59,7 +66,7 @@ export function HoldingScreen({
             className={tab === k ? "tab tab-on" : "tab"}
             onClick={() => setTab(k)}
           >
-            {t(lang, k === "map" ? "tab.map" : "tab.details")}
+            {t(lang, TAB_LABEL[k])}
           </button>
         ))}
       </div>
@@ -109,8 +116,10 @@ export function HoldingScreen({
               : t(lang, "map.imagery")}
           </p>
         </div>
-      ) : (
+      ) : tab === "details" ? (
         <DetailsTab lang={lang} holding={h} />
+      ) : (
+        <ActivitiesTab lang={lang} holding={h} />
       )}
     </section>
   );
