@@ -462,6 +462,10 @@ class InvestorAppHoldingResponse(BaseModel):
     start_date: date
     end_date: date | None = None
     period: Literal["past", "current", "future"]
+    # D3 (build plan v2, PR 2b): how this ownership came about and the
+    # reference of the investor's own contract.
+    acquired_by: AcquiredBy
+    contract_ref: str | None = None
     boundary: dict[str, Any]
     block_boundary: dict[str, Any]
 
