@@ -5,14 +5,16 @@ import { HoldingMap } from "@/components/HoldingMap";
 import { formatDate, t, type Lang, type MessageKey } from "@/i18n";
 import { ActivitiesTab } from "@/screens/ActivitiesTab";
 import { DetailsTab } from "@/screens/DetailsTab";
+import { HarvestTab } from "@/screens/HarvestTab";
 import { pick } from "@/screens/HoldingsScreen";
 
-type Tab = "map" | "details" | "activities";
+type Tab = "map" | "details" | "activities" | "harvest";
 
 const TAB_LABEL: Record<Tab, MessageKey> = {
   map: "tab.map",
   details: "tab.details",
   activities: "tab.activities",
+  harvest: "tab.harvest",
 };
 
 export function HoldingScreen({
@@ -57,7 +59,7 @@ export function HoldingScreen({
         </div>
       </header>
       <div className="tabs" role="tablist">
-        {(["map", "details", "activities"] as Tab[]).map((k) => (
+        {(["map", "details", "activities", "harvest"] as Tab[]).map((k) => (
           <button
             key={k}
             type="button"
@@ -118,8 +120,10 @@ export function HoldingScreen({
         </div>
       ) : tab === "details" ? (
         <DetailsTab lang={lang} holding={h} />
-      ) : (
+      ) : tab === "activities" ? (
         <ActivitiesTab lang={lang} holding={h} />
+      ) : (
+        <HarvestTab lang={lang} holding={h} />
       )}
     </section>
   );

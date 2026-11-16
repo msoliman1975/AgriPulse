@@ -200,6 +200,6 @@ The loop is self-paced. Each iteration:
 | 5 | Harvest records | deployed | [#893](https://github.com/msoliman1975/AgriPulse/pull/893), merged `2f3fb84` | api and frontend `2f3fb84` (rollback api `d61349b`, frontend `a19ce55`); tenant 0111; harvest.manage: TenantOwner, TenantAdmin, FarmManager; harvest.read adds PlatformSupport, InvestmentManager, Agronomist, Viewer (owner to confirm) |
 | 6 | Investor harvest | deployed | [#895](https://github.com/msoliman1975/AgriPulse/pull/895), merged `d8f0143` | api `d8f0143` (rollback `2f3fb84`); D1 uses the block's `plant_count` from its planting layout |
 | 7 | App: list, map, details | deployed | [#897](https://github.com/msoliman1975/AgriPulse/pull/897), merged `9bfc0e0` | APK built by the CI `mobile` job; reaches investors with the PR 10 release. Map already zoomed and panned (MapLibre): rotation and tilt now off, "Back to my holding" button. D6 counts each block activity once across holdings |
-| 8 | App: Activities tab | not started | | |
+| 8 | App: Activities tab | deployed | [#899](https://github.com/msoliman1975/AgriPulse/pull/899), merged `f4500ee` | APK built by the CI `mobile` job; reaches investors with the PR 10 release. Shares the activities cache with the list's D6 stat. Known gap: Android back with a photo open closes the holding |
 | 9 | App: Harvest tab | not started | | |
 | 10 | Release | waiting on 7–9 | | |
