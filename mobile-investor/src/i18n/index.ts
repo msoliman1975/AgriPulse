@@ -59,6 +59,25 @@ export function formatDateTime(lang: Lang, ms: number): string {
   }).format(new Date(ms));
 }
 
+/**
+ * An amount in the tenant's currency (never hard-coded), whole units, with
+ * Western digits. An unknown code prints as "1,234 XYZ".
+ */
+export function formatMoney(lang: Lang, amount: number, currency: string | null): string {
+  if (!currency) return formatNumber(lang, amount, 0);
+  try {
+    return new Intl.NumberFormat(locale(lang), {
+      style: "currency",
+      currency,
+      currencyDisplay: lang === "ar" ? "symbol" : "code",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${formatNumber(lang, amount, 0)} ${currency}`;
+  }
+}
+
 /** One feddan is 4,200.83 m², the unit Egyptian growers use. */
 export const M2_PER_FEDDAN = 4200.83;
 

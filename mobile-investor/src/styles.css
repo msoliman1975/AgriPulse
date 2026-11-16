@@ -637,3 +637,77 @@ p {
   color: #fff;
   font-size: 0.85rem;
 }
+
+/* Harvest tab */
+.harvest-stats {
+  padding: 10px 6px;
+}
+.stat-plain {
+  text-align: center;
+}
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 96px;
+  padding: 0 2px;
+}
+.chart-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.chart-bar {
+  width: 100%;
+  max-width: 28px;
+  border-radius: 4px 4px 0 0;
+  background: var(--primary);
+}
+.chart-lbl {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+.pick-list {
+  list-style: none;
+  margin: 0;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+.pick:last-child {
+  border-bottom: none;
+}
+.pick-main {
+  flex: 1;
+  min-width: 0;
+}
+.pick-title {
+  display: block;
+  font-weight: 700;
+}
+.pick-nums {
+  text-align: end;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pick-weight {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.pick-revenue {
+  font-size: 0.8rem;
+  color: var(--primary);
+  font-weight: 700;
+}

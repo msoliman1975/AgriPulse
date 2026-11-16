@@ -161,6 +161,36 @@ export async function fetchSitePhoto(holdingId: string): Promise<SitePhoto | nul
   return body.photo ?? null;
 }
 
+/** One pick, already scaled to the holding (D1). Decimals arrive as strings. */
+export interface HarvestPick {
+  pick_no: number;
+  label: string | null;
+  label_ar: string | null;
+  harvested_on: string;
+  weight_kg: string;
+  price_per_kg: string | null;
+  /** Gross: weight x price, no costs (D2). */
+  revenue: string | null;
+}
+
+export interface Harvest {
+  holding_id: string;
+  season: string | null;
+  /** Seasons with picks inside the ownership, newest first. */
+  seasons: string[];
+  currency: string | null;
+  picks: HarvestPick[];
+  total_weight_kg: string;
+  total_revenue: string | null;
+  average_price_per_kg: string | null;
+}
+
+/** The holding's harvest for a season; the newest when season is null. */
+export const fetchHarvest = (holdingId: string, season: string | null): Promise<Harvest> =>
+  get<Harvest>(
+    `/investor/holdings/${holdingId}/harvest${season ? `?season=${encodeURIComponent(season)}` : ""}`,
+  );
+
 // ---- The last answers, kept for opening with no network --------------------
 
 const CALL_CACHE_PREFIX = "agripulse.investor.call.";
