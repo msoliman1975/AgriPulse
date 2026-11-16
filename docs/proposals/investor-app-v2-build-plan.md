@@ -191,7 +191,7 @@ The loop is self-paced. Each iteration:
 
 | # | PR | State | Link | Deployed |
 |---|---|---|---|---|
-| 0 | Build plan | open | | n/a |
+| 0 | Build plan | merged | [#882](https://github.com/msoliman1975/AgriPulse/pull/882) | n/a (docs) |
 | 1 | Crop image | not started | | |
 | 2 | Investor API additions | not started | | |
 | 2b | Ownership facts | not started | | |
