@@ -1,6 +1,6 @@
 # Investor app v2: build plan
 
-Status: **draft, waiting on owner decisions** (section 2). This file is the
+Status: **approved scope**. Owner approved D1–D6 as proposed on 2026-11-16. This file is the
 source of truth for the build loop: each PR updates the **Status** table at
 the end.
 
@@ -30,17 +30,17 @@ and the response allowlists pinned by `tests/unit/modules/investors`.
 
 ## 2. Decisions (owner answers)
 
-Each decision lists a proposed answer. A PR blocked by an **open** decision
-does not start; the loop stops and asks.
+Each decision lists the answer the owner approved. A decision added later
+starts as **open**; a PR it blocks does not start, and the loop stops and asks.
 
-| ID | Decision | Proposed | State | Blocks |
+| ID | Decision | Answer | State | Blocks |
 |---|---|---|---|---|
-| D1 | How a block's harvest is split across the holdings in it | By tree count when both the holding and block have one, otherwise by area | **open** | 6, 9 |
-| D2 | Do investors see revenue, or weight only | Gross revenue (weight x price), no costs | **open** | 6, 9 |
-| D3 | Do investors see `acquired_by` and `contract_ref` | `acquired_by` yes, `contract_ref` yes (it is their own contract) | **open** | 2b |
-| D4 | Activity fields visible to investors; skipped activities | Title and type, date, status, photos. No product, dosage or notes. Skipped hidden | **open** | 4 |
-| D5 | Photos to investors: automatic or staff-approved | Automatic, with a per-photo "hide from investors" switch for staff | **open** | 3, 4 |
-| D6 | The third portfolio stat tile | "Activities completed this season" across current holdings | **open** | 7 |
+| D1 | How a block's harvest is split across the holdings in it | By tree count when both the holding and block have one, otherwise by area | approved 2026-11-16 | 6, 9 |
+| D2 | Do investors see revenue, or weight only | Gross revenue (weight x price), no costs | approved 2026-11-16 | 6, 9 |
+| D3 | Do investors see `acquired_by` and `contract_ref` | `acquired_by` yes, `contract_ref` yes (it is their own contract) | approved 2026-11-16 | 2b |
+| D4 | Activity fields visible to investors; skipped activities | Title and type, date, status, photos. No product, dosage or notes. Skipped hidden | approved 2026-11-16 | 4 |
+| D5 | Photos to investors: automatic or staff-approved | Automatic, with a per-photo "hide from investors" switch for staff | approved 2026-11-16 | 3, 4 |
+| D6 | The third portfolio stat tile | "Activities completed this season" across current holdings | approved 2026-11-16 | 7 |
 
 Settled by design (not owner decisions):
 
@@ -194,12 +194,12 @@ The loop is self-paced. Each iteration:
 | 0 | Build plan | open | | n/a |
 | 1 | Crop image | not started | | |
 | 2 | Investor API additions | not started | | |
-| 2b | Ownership facts | blocked (D3) | | |
-| 3 | Activity photos | blocked (D5) | | |
-| 4 | Investor activities + site photo | blocked (D4, D5) | | |
+| 2b | Ownership facts | not started | | |
+| 3 | Activity photos | not started | | |
+| 4 | Investor activities + site photo | waiting on 3 | | |
 | 5 | Harvest records | not started | | |
-| 6 | Investor harvest | blocked (D1, D2) | | |
-| 7 | App: list, map, details | blocked (D6) | | |
+| 6 | Investor harvest | waiting on 5 | | |
+| 7 | App: list, map, details | waiting on 1, 2 | | |
 | 8 | App: Activities tab | waiting on 4 | | |
 | 9 | App: Harvest tab | waiting on 6 | | |
 | 10 | Release | waiting on 7–9 | | |
