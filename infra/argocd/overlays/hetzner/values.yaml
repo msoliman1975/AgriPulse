@@ -4413,7 +4413,16 @@ global:
       #   each activity; completing an activity without photos still works.
       #   Rollback: api to 69a3f30. The table can stay; the old image
       #   never reads it.
-      tag: "a19ce55"
+      # d61349b = #891, api only (a19ce55..d61349b is #891 plus the #890
+      #   promotion). Investor app v2 PR 4 (D4, D5): GET
+      #   /investor/holdings/{id}/activities (the season's activities on the
+      #   holding's block inside the ownership; no product/dosage/notes, no
+      #   skipped, no hidden photos) and GET /investor/holdings/{id}/site-photo
+      #   (newest visible block or activity photo). No migration, no new env.
+      #   Watch: both routes answer 200 for an investor and 404 for another
+      #   investor's holding; /investor/holdings unchanged.
+      #   Rollback: api to a19ce55.
+      tag: "d61349b"
     workers:
       tag: "8bfe412"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
