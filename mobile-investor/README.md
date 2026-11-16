@@ -91,8 +91,6 @@ job builds the same debug APK on every PR and keeps it as a run artifact.
 ## Not built yet
 
 - The Updates tab, the inbox and push (design phases 4 and 5).
-- Android back closes the holding even when a full-screen activity photo is
-  open.
 - The company logo (no logo field exists).
 - A download link for the update check: `INVESTOR_APP_DOWNLOAD_URL` on the
   api is empty until a download place is chosen.

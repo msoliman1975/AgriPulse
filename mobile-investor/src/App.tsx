@@ -20,6 +20,7 @@ import {
   sessionClaims,
   signOut,
 } from "@/auth/session";
+import { handleBack } from "@/backStack";
 import { dirOf, formatDateTime, t, type Lang } from "@/i18n";
 import { storedLang, storeLang } from "@/lang";
 import { AccountScreen } from "@/screens/AccountScreen";
@@ -132,6 +133,8 @@ export function App(): ReactNode {
   // Android back: close the holding first, then leave the app.
   useEffect(() => {
     const sub = CapApp.addListener("backButton", () => {
+      // An open layer (a full-screen photo) closes first.
+      if (handleBack()) return;
       if (open) setOpen(null);
       else void CapApp.minimizeApp();
     });
