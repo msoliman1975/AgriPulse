@@ -1,7 +1,8 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { ApiError, cachedCall, fetchActivities, type Activity, type ActivityPhoto, type Holding } from "@/api/client";
 import { formatDate, formatDateTime, ltr, t, type Lang, type MessageKey } from "@/i18n";
+import { onBack } from "@/backStack";
 import { activityDay, activitySummary, newestFirst } from "@/logic/activities";
 
 type Load =
@@ -113,6 +114,8 @@ function PhotoViewer({
   photo: ActivityPhoto;
   onClose: () => void;
 }): ReactNode {
+  // Android back closes the photo, not the holding behind it.
+  useEffect(() => onBack(onClose), [onClose]);
   return (
     <div className="viewer" role="dialog" aria-modal="true" onClick={onClose}>
       <img src={photo.url} alt="" />
@@ -129,6 +132,7 @@ function PhotoViewer({
 export function ActivitiesTab({ lang, holding: h }: { lang: Lang; holding: Holding }): ReactNode {
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [photo, setPhoto] = useState<ActivityPhoto | null>(null);
+  const closePhoto = useCallback(() => setPhoto(null), []);
   useEffect(() => {
     if (h.period === "future") return;
     let live = true;
@@ -169,7 +173,7 @@ export function ActivitiesTab({ lang, holding: h }: { lang: Lang; holding: Holdi
           <ActivityList lang={lang} list={load.list} onPhoto={setPhoto} />
         </>
       )}
-      {photo ? <PhotoViewer lang={lang} photo={photo} onClose={() => setPhoto(null)} /> : null}
+      {photo ? <PhotoViewer lang={lang} photo={photo} onClose={closePhoto} /> : null}
     </div>
   );
 }
