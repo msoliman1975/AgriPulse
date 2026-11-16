@@ -470,6 +470,43 @@ class InvestorAppHoldingResponse(BaseModel):
     block_boundary: dict[str, Any]
 
 
+class InvestorAppActivityPhoto(BaseModel):
+    """A field photo of an activity: short-lived links, never a storage key."""
+
+    thumb_url: str
+    url: str
+    taken_at: datetime | None = None
+
+
+class InvestorAppActivity(BaseModel):
+    """One activity on the holding's block (decision D4).
+
+    Title and type, date, status and photos. No product, dosage or notes;
+    skipped activities never appear. ``upcoming`` is a scheduled activity.
+    """
+
+    id: UUID
+    activity_type: str
+    title: str | None = None
+    title_ar: str | None = None
+    scheduled_date: date
+    status: Literal["upcoming", "in_progress", "completed"]
+    completed_at: datetime | None = None
+    photos: list[InvestorAppActivityPhoto] = Field(default_factory=list)
+
+
+class InvestorAppSitePhoto(BaseModel):
+    url: str
+    taken_at: datetime | None = None
+
+
+class InvestorAppSitePhotoResponse(BaseModel):
+    """GET /investor/holdings/{holding_id}/site-photo. ``photo`` may be null."""
+
+    holding_id: UUID
+    photo: InvestorAppSitePhoto | None = None
+
+
 class InvestorAppVersionResponse(BaseModel):
     """What the Android app compares its own version with at start."""
 

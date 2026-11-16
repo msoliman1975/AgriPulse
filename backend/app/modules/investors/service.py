@@ -17,13 +17,14 @@ read: it means the holding has a current owner today.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.modules.audit.service import AuditService, get_audit_service
 from app.modules.iam.users_service import (
     AlreadyInAnotherTenantError,
@@ -51,7 +52,7 @@ from app.modules.investors.stage_dates import (
 from app.shared import clock
 from app.shared.auth.context import TenantRole
 from app.shared.db.ids import uuid7
-from app.shared.storage import crop_image_urls
+from app.shared.storage import crop_image_urls, get_storage_client
 
 _MAX_VERTICES = 2000
 
@@ -115,6 +116,9 @@ def _shape_holding(row: dict[str, Any]) -> dict[str, Any]:
     )
     out["share_pct"] = row["share_pct"] if row["share_pct"] is not None else Decimal("0")
     return out
+
+
+_log = get_logger(__name__)
 
 
 class InvestorsService:
@@ -920,6 +924,65 @@ class InvestorsService:
         rows = await self._repo.investor_app_holdings(investor_id=investor["id"])
         return [_with_stage_end(r) for r in rows]
 
+    async def app_holding_activities(
+        self,
+        *,
+        user_id: UUID | None,
+        keycloak_subject: str | None,
+        holding_id: UUID,
+        email: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """The season's activities on the holding's block, inside the ownership.
+
+        Ownership is checked first, through the same read as the holding, so
+        someone else's holding answers 404.
+        """
+        holding = await self.app_holding(
+            user_id=user_id, keycloak_subject=keycloak_subject, email=email, holding_id=holding_id
+        )
+        window = ownership_window(holding, clock.today())
+        if window is None:
+            return []
+        rows = await self._repo.investor_block_activities(
+            block_id=holding["block_id"], from_date=window[0], to_date=window[1]
+        )
+        storage = get_storage_client()
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            status = _INVESTOR_STATUS.get(row["status"])
+            if status is None:
+                continue
+            photos = []
+            for photo in row["photos"] or []:
+                url = _photo_link(storage, photo["s3_key"])
+                if url:
+                    # No thumbnail renditions exist for activity photos yet:
+                    # the app scales the same image.
+                    photos.append({"thumb_url": url, "url": url, "taken_at": photo["taken_at"]})
+            out.append({**row, "status": status, "photos": photos})
+        return out
+
+    async def app_holding_site_photo(
+        self,
+        *,
+        user_id: UUID | None,
+        keycloak_subject: str | None,
+        holding_id: UUID,
+        email: str | None = None,
+    ) -> dict[str, Any]:
+        """The newest photo of the holding's block, up to the end of the ownership."""
+        holding = await self.app_holding(
+            user_id=user_id, keycloak_subject=keycloak_subject, email=email, holding_id=holding_id
+        )
+        found = await self._repo.investor_block_site_photo(
+            block_id=holding["block_id"], until=holding.get("end_date")
+        )
+        url = _photo_link(get_storage_client(), found["s3_key"]) if found else None
+        return {
+            "holding_id": holding_id,
+            "photo": {"url": url, "taken_at": found["taken_at"]} if found and url else None,
+        }
+
     async def app_holding(
         self,
         *,
@@ -936,6 +999,33 @@ class InvestorsService:
             # Someone else's holding answers exactly like a missing one.
             raise HoldingNotFoundError(holding_id)
         return _with_stage_end(rows[0])
+
+
+#: How long an investor's photo link stays valid. Short: the app asks again
+#: every time it opens the tab.
+INVESTOR_PHOTO_LINK_SECONDS = 600
+
+#: Activity status as the investor sees it. Skipped never gets here (D4).
+_INVESTOR_STATUS = {"scheduled": "upcoming", "in_progress": "in_progress", "completed": "completed"}
+
+
+def season_window(current_season: str | None, today: date) -> tuple[date, date]:
+    """The calendar year of the farm's active plan's season, else this year.
+
+    Plans carry a ``season_year`` and no start or end date, so the season is
+    that year, January to December.
+    """
+    digits = "".join(ch for ch in (current_season or "")[:4] if ch.isdigit())
+    year = int(digits) if len(digits) == 4 else today.year
+    return date(year, 1, 1), date(year, 12, 31)
+
+
+def ownership_window(holding: dict[str, Any], today: date) -> tuple[date, date] | None:
+    """The season clipped to the investor's ownership, or None when they do not meet."""
+    season_start, season_end = season_window(holding.get("current_season"), today)
+    start = max(season_start, holding["start_date"])
+    end = min(season_end, holding["end_date"]) if holding.get("end_date") else season_end
+    return (start, end) if start <= end else None
 
 
 def _with_stage_end(row: dict[str, Any]) -> dict[str, Any]:
@@ -956,6 +1046,17 @@ def _with_stage_end(row: dict[str, Any]) -> dict[str, Any]:
         else None
     )
     return out
+
+
+def _photo_link(storage: Any, key: str) -> str | None:
+    try:
+        link: str = storage.presign_download(
+            key=key, expires_seconds=INVESTOR_PHOTO_LINK_SECONDS
+        ).url
+    except Exception as exc:  # one broken link must not break the tab
+        _log.warning("investor_photo_link_failed", error=str(exc))
+        return None
+    return link
 
 
 def _uuid_or_none(value: Any) -> UUID | None:
