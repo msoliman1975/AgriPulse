@@ -193,7 +193,7 @@ The loop is self-paced. Each iteration:
 |---|---|---|---|---|
 | 0 | Build plan | merged | [#882](https://github.com/msoliman1975/AgriPulse/pull/882) | n/a (docs) |
 | 1 | Crop image | deployed | [#883](https://github.com/msoliman1975/AgriPulse/pull/883), merged `8bfe412` | api, workers, frontend `8bfe412` (rollback `09e94e2`); public 0114; ADR 0004 |
-| 2 | Investor API additions | not started | | |
+| 2 | Investor API additions | deployed | [#885](https://github.com/msoliman1975/AgriPulse/pull/885), merged `73f147f` | api `73f147f` (rollback `8bfe412`); workers and frontend unchanged at `8bfe412` |
 | 2b | Ownership facts | not started | | |
 | 3 | Activity photos | not started | | |
 | 4 | Investor activities + site photo | waiting on 3 | | |
