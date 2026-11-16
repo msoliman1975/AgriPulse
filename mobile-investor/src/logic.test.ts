@@ -62,3 +62,14 @@ describe("blockWithoutHolding", () => {
     expect(polys[0]).toEqual([block.coordinates[0], holding.coordinates[0]]);
   });
 });
+
+describe("app version", () => {
+  it("is the same in package.json, version.ts and the Android build", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { APP_VERSION } = await import("@/version");
+    const pkg = JSON.parse(readFileSync("package.json", "utf8")) as { version: string };
+    const gradle = readFileSync("android/app/build.gradle", "utf8");
+    expect(pkg.version).toBe(APP_VERSION);
+    expect(gradle).toContain(`versionName "${APP_VERSION}"`);
+  });
+});

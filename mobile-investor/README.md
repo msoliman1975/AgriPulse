@@ -1,7 +1,7 @@
 # AgriPulse Investor (Android)
 
 The read-only app for investors: their holdings, each holding on a satellite
-map, and its details. Phase 3 of `docs/proposals/investor-holdings-design.html`.
+map, its details, the season's field activities and the holding's harvest. Phase 3 of `docs/proposals/investor-holdings-design.html`.
 Capacitor 8 + React 18 + Vite, the same stack as Scout (`mobile/`).
 
 App id `cloud.agripulse.investor`. Version in three places, kept equal:
@@ -61,12 +61,38 @@ investors" screen and a sign-out button.
 ## What the app stores
 
 In Capacitor Preferences (the app's private storage): the session tokens, the
-chosen language, and the last `/investor/me` and `/investor/holdings`
-answers. With no network the app opens on those and says when they are from.
+chosen language, the last `/investor/me` and `/investor/holdings` answers,
+and the last answer of each holding's activities, site photo and harvest
+(per season) calls. With no network the app opens on those and says when they
+are from. Sign-out clears them all. Photo links are short-lived, so offline
+the photos do not show.
+
+## 0.2.0 (investor app v2)
+
+Build plan: `docs/proposals/investor-app-v2-build-plan.md`.
+
+- Holdings list: portfolio stats (current holdings, feddan owned now,
+  activities done this season), the crop picture on each card, a stage pill.
+- Map: no rotation or tilt; "Back to my holding".
+- Details: site photo, stage ribbon with today marked, expected harvest,
+  acquired by and contract reference.
+- Activities tab: the season's activities on the block, with field photos.
+- Harvest tab: the holding's share of each pick, totals and gross revenue in
+  the tenant's currency, by season.
+
+The api's `INVESTOR_APP_LATEST_VERSION` is 0.2.0; `INVESTOR_APP_MIN_VERSION`
+stays 0.1.0, because 0.1.0 still works against this api and there is no
+download link to send investors to yet. Raise the minimum only once
+`INVESTOR_APP_DOWNLOAD_URL` is set.
+
+Build it as above (`pnpm build`, `cap sync`, `assembleDebug`). CI's `mobile`
+job builds the same debug APK on every PR and keeps it as a run artifact.
 
 ## Not built yet
 
-- Updates and Harvest tabs, the inbox and push (design phases 4 and 5).
+- The Updates tab, the inbox and push (design phases 4 and 5).
+- Android back closes the holding even when a full-screen activity photo is
+  open.
 - The company logo (no logo field exists).
 - A download link for the update check: `INVESTOR_APP_DOWNLOAD_URL` on the
   api is empty until a download place is chosen.

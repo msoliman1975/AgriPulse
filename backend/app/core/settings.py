@@ -572,8 +572,10 @@ class Settings(BaseSettings):
     # A direct APK does not update itself, so the app asks for these at
     # start. Below the minimum it shows "Update required"; the link is where
     # the APK is downloaded. Empty link: no download place chosen yet.
+    # 0.2.0 (investor app v2) adds Activities and Harvest; 0.1.0 still works
+    # against this api, so the minimum stays until a download place exists.
     investor_app_min_version: str = "0.1.0"
-    investor_app_latest_version: str = "0.1.0"
+    investor_app_latest_version: str = "0.2.0"
     investor_app_download_url: str = ""
 
     # --- FCM (notifications push channel, scout app S2) ------------------
