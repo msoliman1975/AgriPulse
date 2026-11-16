@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import {
   ApiError,
+  clearCalls,
   compareVersions,
   fetchAppVersion,
   loadSnapshot,
@@ -89,6 +90,7 @@ export function App(): ReactNode {
   const doSignOut = useCallback(async () => {
     await signOut();
     await writeSnapshot(null);
+    await clearCalls();
     setSnapshot(null);
     setOpen(null);
     setTab("holdings");

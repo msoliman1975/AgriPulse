@@ -23,12 +23,28 @@ export interface Me {
   full_name_ar: string | null;
   preferred_language: "ar" | "en";
   company_name: string | null;
+  /** Absent from apis before investor app v2 (PR 2). */
+  status?: "not_invited" | "invited" | "active" | "suspended" | "archived";
+  investor_type?: "person" | "company";
+  email?: string;
+  phone?: string | null;
 }
 
 export interface Geometry {
   type: string;
   coordinates: unknown;
 }
+
+/** One stage of the crop's season, dated for this season when it can be. */
+export interface Stage {
+  code: string;
+  name_en: string | null;
+  name_ar: string | null;
+  expected_start: string | null;
+  expected_end: string | null;
+}
+
+export type AcquiredBy = "purchase" | "transfer" | "inheritance" | "other";
 
 export interface Holding {
   holding_id: string;
@@ -47,14 +63,22 @@ export interface Holding {
   variety_name_en: string | null;
   variety_name_ar: string | null;
   planting_date: string | null;
+  /** 256 px and 64 px crop pictures (public URLs); absent from older apis. */
+  crop_image_url?: string | null;
+  crop_icon_url?: string | null;
+  stage_code?: string | null;
   stage_name_en: string | null;
   stage_name_ar: string | null;
   stage_started_on: string | null;
   stage_expected_end: string | null;
+  stages?: Stage[];
+  expected_harvest_on?: string | null;
   current_season: string | null;
   start_date: string;
   end_date: string | null;
   period: "past" | "current" | "future";
+  acquired_by?: AcquiredBy;
+  contract_ref?: string | null;
   boundary: Geometry;
   block_boundary: Geometry;
 }
@@ -104,7 +128,81 @@ export async function fetchLatestPhoto(holdingId: string): Promise<LatestPhoto |
   }
 }
 
+/** A field photo of an activity: short-lived links. */
+export interface ActivityPhoto {
+  thumb_url: string;
+  url: string;
+  taken_at: string | null;
+}
+
+/** One activity on the holding's block this season (decision D4). */
+export interface Activity {
+  id: string;
+  activity_type: string;
+  title: string | null;
+  title_ar: string | null;
+  scheduled_date: string;
+  status: "upcoming" | "in_progress" | "completed";
+  completed_at: string | null;
+  photos: ActivityPhoto[];
+}
+
+/** The newest field photo on the holding's block. */
+export interface SitePhoto {
+  url: string;
+  taken_at: string | null;
+}
+
+export const fetchActivities = (holdingId: string): Promise<Activity[]> =>
+  get<Activity[]>(`/investor/holdings/${holdingId}/activities`);
+
+export async function fetchSitePhoto(holdingId: string): Promise<SitePhoto | null> {
+  const body = await get<{ photo: SitePhoto | null }>(`/investor/holdings/${holdingId}/site-photo`);
+  return body.photo ?? null;
+}
+
 // ---- The last answers, kept for opening with no network --------------------
+
+const CALL_CACHE_PREFIX = "agripulse.investor.call.";
+
+export interface Cached<T> {
+  data: T;
+  /** Epoch ms of the fetch. */
+  savedAt: number;
+  /** True when the network failed and this is the stored copy. */
+  offline: boolean;
+}
+
+/**
+ * One call with the same offline rule as /me and /holdings: a fresh answer
+ * is stored; on a network failure the stored one comes back, marked
+ * offline. An HTTP error (404, 403) is not a network failure and is thrown.
+ */
+export async function cachedCall<T>(key: string, fetcher: () => Promise<T>): Promise<Cached<T>> {
+  try {
+    const data = await fetcher();
+    const savedAt = Date.now();
+    await Preferences.set({
+      key: CALL_CACHE_PREFIX + key,
+      value: JSON.stringify({ data, savedAt }),
+    });
+    return { data, savedAt, offline: false };
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    const { value } = await Preferences.get({ key: CALL_CACHE_PREFIX + key });
+    if (!value) throw err;
+    const stored = JSON.parse(value) as { data: T; savedAt: number };
+    return { ...stored, offline: true };
+  }
+}
+
+/** Drop every stored call (sign-out). */
+export async function clearCalls(): Promise<void> {
+  const { keys } = await Preferences.keys();
+  await Promise.all(
+    keys.filter((k) => k.startsWith(CALL_CACHE_PREFIX)).map((key) => Preferences.remove({ key })),
+  );
+}
 
 const CACHE_KEY = "agripulse.investor.cache";
 
