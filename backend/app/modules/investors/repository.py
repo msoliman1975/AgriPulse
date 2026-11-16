@@ -897,7 +897,9 @@ class InvestorsRepository:
                    crop.crop_name_en, crop.crop_name_ar,
                    crop.variety_name_en, crop.variety_name_ar, crop.planting_date,
                    crop.stage_name_en, crop.stage_name_ar,
-                   crop.stage_started_on, crop.stage_advance,
+                   crop.stage_code, crop.stage_started_on, crop.stage_advance,
+                   -- Internal: the service lays the season out from it.
+                   crop.stage_list,
                    -- Internal: the service turns these into image URLs.
                    crop.crop_image_key, crop.variety_image_key,
                    season.season_label AS current_season
@@ -910,13 +912,16 @@ class InvestorsRepository:
                        v.name_en AS variety_name_en, v.name_ar AS variety_name_ar,
                        bc.planting_date,
                        -- The stage's name from the variety's own stage list,
-                       -- else the crop's. Only the name: never the code.
+                       -- else the crop's.
                        stage.s ->> 'name_en' AS stage_name_en,
                        stage.s ->> 'name_ar' AS stage_name_ar,
                        -- Read by the service to work out the expected end;
                        -- never sent to the investor.
                        stage.s -> 'advance' AS stage_advance,
                        (bc.growth_stage_updated_at)::date AS stage_started_on,
+                       bc.growth_stage AS stage_code,
+                       COALESCE(v.phenology_stages_override, c.phenology_stages) -> 'stages'
+                         AS stage_list,
                        c.image_s3_key AS crop_image_key,
                        v.image_s3_key AS variety_image_key
                   FROM block_crops bc
