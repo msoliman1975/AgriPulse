@@ -4392,7 +4392,13 @@ global:
       #   Watch: /investor/holdings answers 200 for an investor; the investor
       #   app (current APK) still loads, as it ignores the new fields.
       #   Rollback: api to 8bfe412.
-      tag: "73f147f"
+      # 69a3f30 = #887, api only (73f147f..69a3f30 is #887 plus #886, whose
+      #   only code change is a test). Investor app v2 PR 2b, decision D3:
+      #   GET /investor/holdings[/{id}] adds acquired_by and contract_ref from
+      #   the investor's own ownership row. No migration, no new env.
+      #   Watch: /investor/holdings answers 200 for an investor.
+      #   Rollback: api to 73f147f.
+      tag: "69a3f30"
     workers:
       tag: "8bfe412"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
