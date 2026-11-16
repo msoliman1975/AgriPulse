@@ -4362,9 +4362,30 @@ global:
       #   Watch: POST /plan-templates/{id}/apply answers 404 or 405; the Agri
       #   Operation plan wizard still lists manuals (appliable answers 200).
       #   Rollback: api and workers to 13a8eca.
-      tag: "09e94e2"
+      # 8bfe412 = #883, api and workers (09e94e2..8bfe412 is #883 plus the
+      #   test-only #881 and docs-only #882). Investor app v2 PR 1, crop
+      #   image (ADR 0004). public 0114 adds nullable crops.image_s3_key and
+      #   crop_varieties.image_s3_key. New admin routes
+      #   /admin/crops/{id}/image and /admin/crop-varieties/{id}/image
+      #   (upload-init, finalize, DELETE; platform.manage_crops, audited);
+      #   the light worker's new task crop_images.make_renditions writes
+      #   64/128/256 px WebP with Pillow under platform/crop-images/; the
+      #   public, unauthenticated GET /api/v1/public/crop-images/... serves
+      #   them with a one-year immutable cache. crop_image_url /
+      #   crop_icon_url added to the crop catalogue, block crop reads, farm
+      #   crop map labels, the plan board and investor holdings. New env
+      #   API_PUBLIC_BASE_URL (chart default https://api.<envHost>).
+      #   Watch: migrate PreSync succeeds (public head 0114, tenant head
+      #   unchanged at 0109); light worker logs register
+      #   crop_images.make_renditions; GET
+      #   /api/v1/public/crop-images/crops/<uuid>/<uuid>/64.webp answers 404
+      #   with Cache-Control no-store (not 401); /investor/holdings answers
+      #   200 with crop_image_url null until a crop has an image.
+      #   Rollback: api and workers to 09e94e2. The columns can stay; the old
+      #   image never reads them.
+      tag: "8bfe412"
     workers:
-      tag: "09e94e2"
+      tag: "8bfe412"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -5215,7 +5236,15 @@ global:
       #   api so the two lists stay in step.
       #   Watch: the Beta designer opens and its tabs work.
       #   Rollback: this tag alone back to 13a8eca.
-      tag: "09e94e2"
+      # 8bfe412 = #883, frontend: a crop image upload in the crop catalogue
+      #   inspector (crops and varieties), and crop avatars (picture or a
+      #   lettered fallback) in the catalogue tree, the block crop panel and
+      #   the plan board. Needs the api at 8bfe412 for the image fields and
+      #   routes; on an older api the avatars fall back to letters.
+      #   Watch: the Beta designer opens and its tabs work; the crop
+      #   catalogue and a block page render; the plan board loads.
+      #   Rollback: frontend to 09e94e2.
+      tag: "8bfe412"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
