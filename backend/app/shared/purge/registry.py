@@ -203,6 +203,15 @@ BLOCK_OWNED: tuple[OwnedTable, ...] = (
         order=10,
         note="owned transitively through plan_activities",
     ),
+    # Activity photos (tenant 0110): leaves of plan_activities, with an object
+    # behind each row, so the storage keys are collected before the cascade.
+    OwnedTable(
+        "plan_activity_photos",
+        where_sql="activity_id IN (SELECT id FROM plan_activities WHERE block_id = ANY(:ids))",
+        order=10,
+        storage_key_column="s3_key",
+        note="owned transitively through plan_activities",
+    ),
     # -- rows the leaves point at -------------------------------------------
     OwnedTable("block_crops", owner_column="block_id", order=20),
     OwnedTable("grid_configs", owner_column="block_id", order=20),
@@ -423,6 +432,12 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
         "activity_resources",
         where_sql="activity_id IN (SELECT id FROM plan_activities WHERE farm_id = ANY(:ids))",
         order=10,
+    ),
+    OwnedTable(
+        "plan_activity_photos",
+        where_sql="activity_id IN (SELECT id FROM plan_activities WHERE farm_id = ANY(:ids))",
+        order=10,
+        storage_key_column="s3_key",
     ),
     OwnedTable("signal_assignments", owner_column="farm_id", order=20),
     OwnedTable("scouting_visits", owner_column="farm_id", order=20),

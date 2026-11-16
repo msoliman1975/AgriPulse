@@ -174,6 +174,7 @@ export const ar: Messages = {
   "pin.errFailed": "تعذر تغيير الرمز. تحقق من الشبكة وحاول مرة أخرى.",
 
   "work.why": "لماذا هذه المهمة",
+  "work.activityPhotosHint": "اختياري. تصل صور العمل المنجز إلى فريق المزرعة، وإلى مستثمري الحصة ما لم يخفوها.",
   "work.photos": "صور",
   "work.takePhoto": "التقط صورة",
   "work.choosePhoto": "اختر من المعرض",

@@ -197,6 +197,7 @@ export const en = {
   "pin.errFailed": "Could not change your PIN. Check your signal and try again.",
 
   "work.why": "Why you are going",
+  "work.activityPhotosHint": "Optional. Photos of the finished work go to the farm team and, unless they hide them, to the holding's investors.",
   "work.photos": "Photos",
   "work.takePhoto": "Take photo",
   "work.choosePhoto": "Choose photos",

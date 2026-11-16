@@ -142,7 +142,12 @@
     "deleteBody": "{{type}} on {{date}} will be removed from the plan. This can't be undone from the UI.",
     "start": "Start",
     "skip": "Skip",
-    "complete": "Complete"
+    "complete": "Complete",
+    "photos": "Photos",
+    "hideFromInvestors": "Hide from investors",
+    "hiddenFromInvestors": "Hidden from investors",
+    "photoToggleFailed": "Could not change who sees this photo. Try again.",
+    "photoAlt": "Field photo {{index}}"
   },
   "severity": {
     "info": "info",

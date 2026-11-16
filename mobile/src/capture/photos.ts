@@ -12,7 +12,12 @@
  * edge is enough to see leaf spotting or a cracked emitter.
  */
 
-import { initAttachmentUpload, initFlagPhotoUpload, uploadAttachment } from "@/api/client";
+import {
+  initActivityPhotoUpload,
+  initAttachmentUpload,
+  initFlagPhotoUpload,
+  uploadAttachment,
+} from "@/api/client";
 
 /** Long edge, in pixels, after shrinking. */
 const MAX_EDGE = 1600;
@@ -91,6 +96,23 @@ export async function uploadFlagPhoto(args: { file: File; farmId: string }): Pro
     content_type: blob.type || "image/jpeg",
     content_length: blob.size,
     filename: args.file.name || "photo.jpg",
+  });
+  await uploadAttachment(upload, blob);
+  return upload.attachment_s3_key;
+}
+
+/**
+ * The same shrink-then-PUT, for a photograph of a completed activity. The key
+ * goes on the complete call, which attaches it in the same transaction.
+ */
+export async function uploadActivityPhoto(args: {
+  file: File;
+  activityId: string;
+}): Promise<string> {
+  const blob = await shrink(args.file);
+  const upload = await initActivityPhotoUpload(args.activityId, {
+    content_type: blob.type || "image/jpeg",
+    content_length: blob.size,
   });
   await uploadAttachment(upload, blob);
   return upload.attachment_s3_key;

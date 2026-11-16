@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   type ActivityCreatePayload,
+  type ActivityPhoto,
   type ActivityUpdatePayload,
   type Plan,
   type PlanActivity,
@@ -14,6 +15,7 @@ import {
   listActivities,
   listCalendar,
   listPlans,
+  setActivityPhotoHidden,
   updateActivity,
   updatePlan,
   type PlanUpdatePayload,
@@ -114,13 +116,25 @@ export function useUpdateActivity() {
   });
 }
 
-export function useDeleteActivity() {
+export function useSetActivityPhotoHidden(farmId: string) {
   const qc = useQueryClient();
   return useMutation<
-    void,
+    ActivityPhoto,
     Error,
-    { activityId: string; farmId: string; planId: string | null }
+    { activityId: string; photoId: string; hidden: boolean }
   >({
+    mutationFn: ({ activityId, photoId, hidden }) =>
+      setActivityPhotoHidden(activityId, photoId, hidden),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["board", farmId] });
+      void qc.invalidateQueries({ queryKey: ["plans", "activities"] });
+    },
+  });
+}
+
+export function useDeleteActivity() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { activityId: string; farmId: string; planId: string | null }>({
     mutationFn: ({ activityId }) => deleteActivity(activityId),
     onSuccess: (_, { farmId, planId }) => {
       if (planId) {

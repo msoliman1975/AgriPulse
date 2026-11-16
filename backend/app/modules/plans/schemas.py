@@ -110,6 +110,43 @@ class ActivityUpdateRequest(BaseModel):
     dosage: str | None = Field(default=None, max_length=128)
     notes: str | None = Field(default=None, max_length=4000)
     state: Literal["start", "complete", "skip"] | None = None
+    # Photos uploaded through POST /activities/{id}/photos/init, attached as
+    # the activity is completed (build plan 3.3). Only with state=complete.
+    attachment_s3_keys: list[str] | None = Field(default=None, max_length=10)
+
+
+class ActivityPhotoResponse(BaseModel):
+    """A photo on an activity, for staff. ``url`` is a short-lived view link."""
+
+    id: UUID
+    url: str | None = None
+    taken_at: datetime | None = None
+    created_at: datetime
+    created_by: UUID | None = None
+    #: Decision D5: shown to investors unless staff hide it.
+    hidden_from_investors: bool = False
+
+
+class ActivityPhotoInitRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    content_type: str = Field(min_length=1, max_length=64)
+    content_length: int = Field(ge=1, le=15 * 1024 * 1024)
+
+
+class ActivityPhotoInitResponse(BaseModel):
+    """PUT the file to ``upload_url`` with ``upload_headers``; send ``s3_key`` on complete."""
+
+    s3_key: str
+    upload_url: str
+    upload_headers: dict[str, str]
+    expires_at: datetime
+
+
+class ActivityPhotoUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    hidden_from_investors: bool
 
 
 class ActivityResponse(BaseModel):
@@ -146,6 +183,8 @@ class ActivityResponse(BaseModel):
     # moved away from the plan's default (tenant 0102).
     allocation_id: UUID | None = None
     date_overridden: bool = False
+    # Field photos (tenant 0110), oldest first.
+    photos: list[ActivityPhotoResponse] = Field(default_factory=list)
 
 
 class CalendarResponse(BaseModel):
