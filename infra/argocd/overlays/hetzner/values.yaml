@@ -4443,7 +4443,15 @@ global:
       #   Watch: the route answers 200 for an investor and 404 for another
       #   investor's holding.
       #   Rollback: api to 2f3fb84.
-      tag: "d8f0143"
+      # ab9f5ba = #901, api only (d8f0143..ab9f5ba is #897-#901: the investor
+      #   app PRs 7-9 touch mobile-investor/ only, plus Status docs). The one
+      #   api change: INVESTOR_APP_LATEST_VERSION defaults to 0.2.0 (the
+      #   minimum stays 0.1.0). No migration, no new env. Workers and frontend
+      #   unchanged.
+      #   Watch: GET /investor/app-version answers latest_version 0.2.0 to an
+      #   investor; 0.1.0 apps keep working (no "Update required").
+      #   Rollback: api to d8f0143.
+      tag: "ab9f5ba"
     workers:
       tag: "8bfe412"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added

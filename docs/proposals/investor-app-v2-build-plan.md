@@ -148,10 +148,10 @@ zoom and pan, Details tab with site photo and ribbon (PR 7), Activities tab
 | 4 | Investor activities + site photo | 3.4 | unit: allowlist; integration: ownership window, other investor's holding 404, hidden photos excluded | api |
 | 5 | Harvest records | 3.5 | integration: CRUD, caps enforced, audit; vitest | api + frontend |
 | 6 | Investor harvest | 3.6 | unit: split per D1; integration: ownership window, no block totals in response | api |
-| 7 | App: list, map, details | deployed | [#897](https://github.com/msoliman1975/AgriPulse/pull/897), merged `9bfc0e0` | App PR: tests, typecheck and build run locally (CI had no `mobile-investor` job until PR 10; the `mobile` job is Scout). Map already zoomed and panned (MapLibre): rotation and tilt now off, "Back to my holding" button. D6 counts each block activity once across holdings |
-| 8 | App: Activities tab | deployed | [#899](https://github.com/msoliman1975/AgriPulse/pull/899), merged `f4500ee` | App PR, verified locally as PR 7. Shares the activities cache with the list's D6 stat. Known gap: Android back with a photo open closes the holding |
-| 9 | App: Harvest tab | deployed | [#900](https://github.com/msoliman1975/AgriPulse/pull/900), merged `cf22fc5` | App PR, verified locally as PR 7. Money in the response currency (code in English, symbol in Arabic) |
-| 10 | Release | in review | | 0.2.0 in package.json, version.ts, build.gradle (versionCode 2); api `INVESTOR_APP_LATEST_VERSION` 0.2.0, minimum stays 0.1.0 until `INVESTOR_APP_DOWNLOAD_URL` is set; new CI job `mobile-investor` builds the APK (artifact `investor-debug-apk`) |
+| 7 | App: list, map, details | 3.7 | vitest (`mobile-investor`) incl. RTL | APK (not deployed by ArgoCD) |
+| 8 | App: Activities tab | 3.7 | vitest | APK |
+| 9 | App: Harvest tab | 3.7 | vitest | APK |
+| 10 | Release | Version bump in its three places, `INVESTOR_APP_MIN_VERSION` / `LATEST_VERSION` on the api, APK build notes in `mobile-investor/README.md` | n/a | api |
 
 Order: PR 1 first (no open decisions). Then PR 2, 3, 5 can go in any order;
 4 after 3; 6 after 5; app PRs after their backend PRs are deployed.
@@ -199,7 +199,7 @@ The loop is self-paced. Each iteration:
 | 4 | Investor activities + site photo | deployed | [#891](https://github.com/msoliman1975/AgriPulse/pull/891), merged `d61349b` | api `d61349b` (rollback `a19ce55`); season = active plan's calendar year; `thumb_url` = full image until activity photos get renditions |
 | 5 | Harvest records | deployed | [#893](https://github.com/msoliman1975/AgriPulse/pull/893), merged `2f3fb84` | api and frontend `2f3fb84` (rollback api `d61349b`, frontend `a19ce55`); tenant 0111; harvest.manage: TenantOwner, TenantAdmin, FarmManager; harvest.read adds PlatformSupport, InvestmentManager, Agronomist, Viewer (owner to confirm) |
 | 6 | Investor harvest | deployed | [#895](https://github.com/msoliman1975/AgriPulse/pull/895), merged `d8f0143` | api `d8f0143` (rollback `2f3fb84`); D1 uses the block's `plant_count` from its planting layout |
-| 7 | App: list, map, details | deployed | [#897](https://github.com/msoliman1975/AgriPulse/pull/897), merged `9bfc0e0` | APK built by the CI `mobile` job; reaches investors with the PR 10 release. Map already zoomed and panned (MapLibre): rotation and tilt now off, "Back to my holding" button. D6 counts each block activity once across holdings |
-| 8 | App: Activities tab | deployed | [#899](https://github.com/msoliman1975/AgriPulse/pull/899), merged `f4500ee` | APK built by the CI `mobile` job; reaches investors with the PR 10 release. Shares the activities cache with the list's D6 stat. Known gap: Android back with a photo open closes the holding |
-| 9 | App: Harvest tab | not started | | |
-| 10 | Release | waiting on 7–9 | | |
+| 7 | App: list, map, details | deployed | [#897](https://github.com/msoliman1975/AgriPulse/pull/897), merged `9bfc0e0` | App PR: tests, typecheck and build run locally (CI had no `mobile-investor` job until PR 10; the `mobile` job is Scout). Map already zoomed and panned (MapLibre): rotation and tilt now off, "Back to my holding" button. D6 counts each block activity once across holdings |
+| 8 | App: Activities tab | deployed | [#899](https://github.com/msoliman1975/AgriPulse/pull/899), merged `f4500ee` | App PR, verified locally as PR 7. Shares the activities cache with the list's D6 stat. Known gap: Android back with a photo open closes the holding |
+| 9 | App: Harvest tab | deployed | [#900](https://github.com/msoliman1975/AgriPulse/pull/900), merged `cf22fc5` | App PR, verified locally as PR 7. Money in the response currency (code in English, symbol in Arabic) |
+| 10 | Release | deployed | [#901](https://github.com/msoliman1975/AgriPulse/pull/901), merged `ab9f5ba` | api `ab9f5ba` (rollback `d8f0143`): `INVESTOR_APP_LATEST_VERSION` 0.2.0, minimum stays 0.1.0 until `INVESTOR_APP_DOWNLOAD_URL` is set. App 0.2.0 (versionCode 2) APK built by the new CI `mobile-investor` job (artifact `investor-debug-apk`) |
