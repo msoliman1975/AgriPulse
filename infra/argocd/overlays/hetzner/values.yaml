@@ -4434,7 +4434,16 @@ global:
       #   GET /blocks/{id}/harvest-lots answers 200 for a farm manager.
       #   Rollback: api to d61349b. The table can stay; the old image never
       #   reads it.
-      tag: "2f3fb84"
+      # d8f0143 = #895, api only (2f3fb84..d8f0143 is #895 plus the #894
+      #   promotion). Investor app v2 PR 6 (D1, D2): GET
+      #   /investor/holdings/{id}/harvest?season= returns the holding's share
+      #   of each pick inside the ownership (trees / block plant_count, else
+      #   area), gross revenue and totals; never block totals or the share.
+      #   No migration, no new env. Workers and frontend unchanged.
+      #   Watch: the route answers 200 for an investor and 404 for another
+      #   investor's holding.
+      #   Rollback: api to 2f3fb84.
+      tag: "d8f0143"
     workers:
       tag: "8bfe412"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
