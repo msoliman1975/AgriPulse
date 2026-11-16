@@ -29,8 +29,17 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.plans.errors import PlanNotFoundError
+from app.modules.plans.photos import (
+    ActivityPhotoNotFoundError,
+    ActivityPhotoRejectedError,
+    ActivityPhotosService,
+)
 from app.modules.plans.schemas import (
     ActivityCreateRequest,
+    ActivityPhotoInitRequest,
+    ActivityPhotoInitResponse,
+    ActivityPhotoResponse,
+    ActivityPhotoUpdateRequest,
     ActivityResponse,
     ActivityUpdateRequest,
     BoardResponse,
@@ -55,6 +64,34 @@ def _service(
     tenant_session: AsyncSession = Depends(get_db_session),
 ) -> PlansServiceImpl:
     return get_plans_service(tenant_session=tenant_session)
+
+
+def _photos(tenant_session: AsyncSession = Depends(get_db_session)) -> ActivityPhotosService:
+    return ActivityPhotosService(tenant_session)
+
+
+def _photo_rejected(exc: Exception) -> Exception:
+    from app.core.errors import APIError
+
+    return APIError(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        title="Photo not accepted",
+        detail=str(exc),
+        type_="https://agripulse.cloud/problems/activity-photo-rejected",
+    )
+
+
+def _tenant_id(context: RequestContext) -> UUID:
+    if context.tenant_id is None:
+        from app.core.errors import APIError
+
+        raise APIError(
+            status_code=status.HTTP_403_FORBIDDEN,
+            title="Tenant context required",
+            detail="This endpoint requires a tenant-scoped JWT.",
+            type_="https://agripulse.cloud/problems/tenant-required",
+        )
+    return context.tenant_id
 
 
 def _ensure_tenant(context: RequestContext) -> str:
@@ -245,12 +282,13 @@ async def list_activities(
     plan_id: UUID,
     context: RequestContext = Depends(get_current_context),
     service: PlansServiceImpl = Depends(_service),
+    photos: ActivityPhotosService = Depends(_photos),
 ) -> list[dict[str, Any]]:
     _ensure_tenant(context)
     plan = await service.get_plan(plan_id=plan_id)
     if not has_capability(context, "plan.read", farm_id=plan["farm_id"]):
         raise PlanNotFoundError(plan_id)
-    return list(await service.list_activities(plan_id=plan_id))
+    return await photos.with_photos(list(await service.list_activities(plan_id=plan_id)))
 
 
 @router.patch(
@@ -263,7 +301,9 @@ async def update_activity(
     payload: ActivityUpdateRequest,
     context: RequestContext = Depends(get_current_context),
     service: PlansServiceImpl = Depends(_service),
+    photos: ActivityPhotosService = Depends(_photos),
 ) -> dict[str, Any]:
+    from app.modules.audit import get_audit_service
     from app.modules.plans.errors import ActivityNotFoundError
 
     schema = _ensure_tenant(context)
@@ -274,7 +314,14 @@ async def update_activity(
     farm_id = activity["farm_id"]
 
     state_action = payload.state
-    metadata_changes = payload.model_dump(exclude={"state"}, exclude_unset=True)
+    # Photos ride on the complete action and its capability, never on the
+    # metadata edit (which needs plan.manage that field workers lack).
+    photo_keys = payload.attachment_s3_keys or []
+    metadata_changes = payload.model_dump(
+        exclude={"state", "attachment_s3_keys"}, exclude_unset=True
+    )
+    if photo_keys and state_action != "complete":
+        raise _photo_rejected(ValueError("Photos are attached with the complete action."))
 
     # State transitions and metadata edits gate on different capabilities:
     #   * `complete` / `skip` (and `start` as the same flow's prelude) ->
@@ -288,13 +335,116 @@ async def update_activity(
     if metadata_changes and not has_capability(context, "plan.manage", farm_id=farm_id):
         raise ActivityNotFoundError(activity_id)
 
-    return await service.update_activity(
+    updated = await service.update_activity(
         activity_id=activity_id,
         metadata_changes=metadata_changes,
         state_action=state_action,
         actor_user_id=context.user_id,
         tenant_schema=schema,
     )
+    if photo_keys:
+        # Same transaction as the completion: a refused photo rolls it back.
+        try:
+            photo_ids = await photos.attach(
+                tenant_id=_tenant_id(context),
+                farm_id=farm_id,
+                activity_id=activity_id,
+                keys=photo_keys,
+                actor_user_id=context.user_id,
+            )
+        except ActivityPhotoRejectedError as exc:
+            raise _photo_rejected(exc) from exc
+        await get_audit_service().record(
+            tenant_schema=schema,
+            event_type="plans.activity_photos_attached",
+            actor_user_id=context.user_id,
+            subject_kind="plan_activity",
+            subject_id=activity_id,
+            farm_id=farm_id,
+            details={"photo_ids": [str(i) for i in photo_ids]},
+        )
+    return (await photos.with_photos([updated]))[0]
+
+
+@router.post(
+    "/activities/{activity_id}/photos/init",
+    response_model=ActivityPhotoInitResponse,
+    summary="Start a photo upload for an activity (presigned PUT); attach it on complete.",
+)
+async def init_activity_photo(
+    activity_id: UUID,
+    payload: ActivityPhotoInitRequest,
+    context: RequestContext = Depends(get_current_context),
+    service: PlansServiceImpl = Depends(_service),
+    photos: ActivityPhotosService = Depends(_photos),
+) -> dict[str, Any]:
+    from app.modules.plans.errors import ActivityNotFoundError
+
+    _ensure_tenant(context)
+    activity = await service.get_activity(activity_id=activity_id)
+    # Whoever may complete the activity may photograph it; anyone else gets
+    # the same 404 as for a missing activity.
+    if activity is None or not has_capability(
+        context, "plan_activity.complete", farm_id=activity["farm_id"]
+    ):
+        raise ActivityNotFoundError(activity_id)
+    try:
+        return photos.init_upload(
+            tenant_id=_tenant_id(context),
+            farm_id=activity["farm_id"],
+            activity_id=activity_id,
+            content_type=payload.content_type,
+            content_length=payload.content_length,
+        )
+    except ActivityPhotoRejectedError as exc:
+        raise _photo_rejected(exc) from exc
+
+
+@router.patch(
+    "/activities/{activity_id}/photos/{photo_id}",
+    response_model=ActivityPhotoResponse,
+    summary="Hide a photo from investors, or show it again (decision D5).",
+)
+async def update_activity_photo(
+    activity_id: UUID,
+    photo_id: UUID,
+    payload: ActivityPhotoUpdateRequest,
+    context: RequestContext = Depends(get_current_context),
+    service: PlansServiceImpl = Depends(_service),
+    photos: ActivityPhotosService = Depends(_photos),
+) -> dict[str, Any]:
+    from app.core.errors import APIError
+    from app.modules.audit import get_audit_service
+    from app.modules.plans.errors import ActivityNotFoundError
+
+    schema = _ensure_tenant(context)
+    activity = await service.get_activity(activity_id=activity_id)
+    if activity is None or not has_capability(context, "plan.manage", farm_id=activity["farm_id"]):
+        raise ActivityNotFoundError(activity_id)
+    try:
+        photo = await photos.set_hidden(
+            activity_id=activity_id, photo_id=photo_id, hidden=payload.hidden_from_investors
+        )
+    except ActivityPhotoNotFoundError as exc:
+        raise APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Photo not found",
+            detail=f"No photo {photo_id} on activity {activity_id}.",
+            type_="https://agripulse.cloud/problems/activity-photo-not-found",
+        ) from exc
+    await get_audit_service().record(
+        tenant_schema=schema,
+        event_type="plans.activity_photo_visibility_changed",
+        actor_user_id=context.user_id,
+        subject_kind="plan_activity_photo",
+        subject_id=photo_id,
+        farm_id=activity["farm_id"],
+        details={
+            "activity_id": str(activity_id),
+            "hidden_from_investors": payload.hidden_from_investors,
+        },
+    )
+    return photo
 
 
 @router.delete(
@@ -391,6 +541,9 @@ async def get_board(
     weeks: int = Query(default=8, ge=1, le=40),
     context: RequestContext = Depends(requires_capability("plan.read", farm_id_param="farm_id")),
     service: PlansServiceImpl = Depends(_service),
+    photos: ActivityPhotosService = Depends(_photos),
 ) -> dict[str, Any]:
     _ensure_tenant(context)
-    return await service.get_board(farm_id=farm_id, week_start=week_start, weeks=weeks)
+    board = await service.get_board(farm_id=farm_id, week_start=week_start, weeks=weeks)
+    board["activities"] = await photos.with_photos(list(board["activities"]))
+    return board

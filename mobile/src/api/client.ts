@@ -292,11 +292,43 @@ export interface SignalDefinition {
  * call was rejected and "Mark done" had never once worked. The argument here
  * is named `action` so the next reader cannot make the same swap.
  */
-export function completeActivity(activityId: string, action: "complete" | "skip") {
+export function completeActivity(
+  activityId: string,
+  action: "complete" | "skip",
+  attachmentKeys: string[] = [],
+) {
+  // Photos travel only with `complete`: the API attaches them in the same
+  // transaction, and refuses them on any other verb.
+  const body =
+    action === "complete" && attachmentKeys.length > 0
+      ? { state: action, attachment_s3_keys: attachmentKeys }
+      : { state: action };
   return request<{ id: string; status: string }>(`/activities/${activityId}`, {
     method: "PATCH",
-    body: JSON.stringify({ state: action }),
+    body: JSON.stringify(body),
   });
+}
+
+/** Presigned PUT for one photo of an activity, attached when it is completed. */
+export async function initActivityPhotoUpload(
+  activityId: string,
+  body: { content_type: string; content_length: number },
+): Promise<AttachmentUpload> {
+  const r = await request<{
+    s3_key: string;
+    upload_url: string;
+    upload_headers: Record<string, string>;
+    expires_at: string;
+  }>(`/activities/${activityId}/photos/init`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return {
+    attachment_s3_key: r.s3_key,
+    upload_url: r.upload_url,
+    upload_headers: r.upload_headers,
+    expires_at: r.expires_at,
+  };
 }
 
 export interface TemplateMember {

@@ -63,6 +63,19 @@ export interface PlanActivity {
   title_ar?: string | null;
   allocation_id?: string | null;
   date_overridden?: boolean;
+  /** Field photos attached when the activity was completed (oldest first). */
+  photos?: ActivityPhoto[];
+}
+
+/** A photo on an activity. `url` is a short-lived view link. */
+export interface ActivityPhoto {
+  id: string;
+  url: string | null;
+  taken_at: string | null;
+  created_at: string;
+  created_by: string | null;
+  /** Decision D5: shown in the investor app unless staff hide it. */
+  hidden_from_investors: boolean;
 }
 
 export interface PlanCreatePayload {
@@ -100,6 +113,8 @@ export interface ActivityUpdatePayload {
   dosage?: string | null;
   notes?: string | null;
   state?: "start" | "complete" | "skip";
+  /** Photo keys from `initActivityPhotoUpload`; only with `state: "complete"`. */
+  attachment_s3_keys?: string[];
 }
 
 // --- Plans ---------------------------------------------------------------
@@ -151,6 +166,36 @@ export async function updateActivity(
   payload: ActivityUpdatePayload,
 ): Promise<PlanActivity> {
   const { data } = await apiClient.patch<PlanActivity>(`/v1/activities/${activityId}`, payload);
+  return data;
+}
+
+export interface ActivityPhotoUpload {
+  s3_key: string;
+  upload_url: string;
+  upload_headers: Record<string, string>;
+  expires_at: string;
+}
+
+export async function initActivityPhotoUpload(
+  activityId: string,
+  file: { type: string; size: number },
+): Promise<ActivityPhotoUpload> {
+  const { data } = await apiClient.post<ActivityPhotoUpload>(
+    `/v1/activities/${activityId}/photos/init`,
+    { content_type: file.type, content_length: file.size },
+  );
+  return data;
+}
+
+export async function setActivityPhotoHidden(
+  activityId: string,
+  photoId: string,
+  hidden: boolean,
+): Promise<ActivityPhoto> {
+  const { data } = await apiClient.patch<ActivityPhoto>(
+    `/v1/activities/${activityId}/photos/${photoId}`,
+    { hidden_from_investors: hidden },
+  );
   return data;
 }
 

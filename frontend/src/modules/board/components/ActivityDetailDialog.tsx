@@ -13,6 +13,7 @@ import { useCapability } from "@/rbac/useCapability";
 import { useDeleteActivity, useUpdateActivity } from "@/queries/plans";
 import { useAttachResource, useDetachResource } from "@/queries/board";
 import { useResources } from "@/queries/resources";
+import { ActivityPhotos } from "./ActivityPhotos";
 
 const ACTIVITY_TYPES: ActivityType[] = [
   "irrigation",
@@ -89,7 +90,15 @@ export function ActivityDetailDialog({
       ) : null}
 
       {mode === "view" ? (
-        <ViewBody activity={activity} />
+        <>
+          <ViewBody activity={activity} />
+          <ActivityPhotos
+            activityId={activity.id}
+            farmId={_farmId}
+            photos={activity.photos ?? []}
+            canManage={canManage}
+          />
+        </>
       ) : mode === "edit" ? (
         <EditBody
           activity={activity}

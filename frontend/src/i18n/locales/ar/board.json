@@ -142,7 +142,12 @@
     "deleteBody": "ستتم إزالة {{type}} في {{date}} من الخطة. لا يمكن التراجع من الواجهة.",
     "start": "بدء",
     "skip": "تخطّي",
-    "complete": "إكمال"
+    "complete": "إكمال",
+    "photos": "الصور",
+    "hideFromInvestors": "إخفاء عن المستثمرين",
+    "hiddenFromInvestors": "مخفية عن المستثمرين",
+    "photoToggleFailed": "تعذر تغيير من يرى هذه الصورة. حاول مرة أخرى.",
+    "photoAlt": "صورة ميدانية {{index}}"
   },
   "severity": {
     "info": "معلومة",

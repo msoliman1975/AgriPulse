@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
   ApiError,
@@ -12,6 +12,7 @@ import {
   type VisitOutcome,
   type WorkItem,
 } from "@/api/client";
+import { MAX_PHOTOS, uploadActivityPhoto } from "@/capture/photos";
 import { CaptureForm } from "@/components/CaptureForm";
 import { dueIn, t, type Lang, type MessageKey } from "@/i18n";
 import { destinationOf, directionsUrl, type Destination } from "@/work/where";
@@ -274,6 +275,18 @@ function BoardActions({
   const [count, setCount] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Optional photos of the work, sent with "Mark done" (build plan 3.3).
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [progress, setProgress] = useState<string | null>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+
+  function addFiles(list: FileList | null): void {
+    if (!list) return;
+    // Copied out of the live FileList before the input is cleared.
+    const picked = Array.from(list);
+    setPhotos((prev) => [...prev, ...picked].slice(0, MAX_PHOTOS));
+  }
 
   if (status === "completed" || status === "skipped") {
     return <p className="hint">{t(lang, "work.alreadyClosed")}</p>;
@@ -283,13 +296,24 @@ function BoardActions({
     setBusy(true);
     setError(null);
     try {
-      await completeActivity(activityId, action);
+      // Photographs first: the bytes are in storage before the complete
+      // call names them, so a failed upload never completes the activity.
+      const keys: string[] = [];
+      if (action === "complete") {
+        for (const [i, file] of photos.entries()) {
+          setProgress(`${i + 1}/${photos.length}`);
+          keys.push(await uploadActivityPhoto({ file, activityId }));
+        }
+      }
+      setProgress(null);
+      await completeActivity(activityId, action, keys);
       onDone();
     } catch (e) {
       // Show what the API said. A fixed string hid a 422 about the `state`
       // verb for as long as this screen has existed.
       setError(e instanceof ApiError && e.message ? e.message : t(lang, "work.actionFailed"));
     } finally {
+      setProgress(null);
       setBusy(false);
     }
   }
@@ -303,6 +327,71 @@ function BoardActions({
       {count > 0 ? (
         <p className="hint">
           {t(lang, "work.recordedCount")} {count}
+        </p>
+      ) : null}
+      <label>
+        {t(lang, "work.photos")} {photos.length}/{MAX_PHOTOS}
+      </label>
+      <p className="hint">{t(lang, "work.activityPhotosHint")}</p>
+      <div className="thumbs">
+        {photos.map((f, i) => (
+          <button
+            key={`${f.name}-${i}`}
+            type="button"
+            className="thumb"
+            disabled={busy}
+            onClick={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}
+            aria-label={t(lang, "work.removePhoto")}
+          >
+            <img src={URL.createObjectURL(f)} alt="" />
+            <span className="x">✕</span>
+          </button>
+        ))}
+      </div>
+      <div className="row">
+        <button
+          type="button"
+          disabled={busy || photos.length >= MAX_PHOTOS}
+          onClick={() => cameraRef.current?.click()}
+        >
+          {t(lang, "work.takePhoto")}
+        </button>
+        <button
+          type="button"
+          className="link"
+          disabled={busy || photos.length >= MAX_PHOTOS}
+          onClick={() => galleryRef.current?.click()}
+        >
+          {t(lang, "work.choosePhoto")}
+        </button>
+      </div>
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        data-testid="activity-photo-camera"
+        onChange={(e) => {
+          addFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+      <input
+        ref={galleryRef}
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+        data-testid="activity-photo-gallery"
+        onChange={(e) => {
+          addFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+      {progress ? (
+        <p className="hint">
+          {t(lang, "work.uploading")} {progress}
         </p>
       ) : null}
       {/* Two ways to close, because "I did it" and "it did not need doing"
