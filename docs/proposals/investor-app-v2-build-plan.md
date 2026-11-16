@@ -196,10 +196,10 @@ The loop is self-paced. Each iteration:
 | 2 | Investor API additions | deployed | [#885](https://github.com/msoliman1975/AgriPulse/pull/885), merged `73f147f` | api `73f147f` (rollback `8bfe412`); workers and frontend unchanged at `8bfe412` |
 | 2b | Ownership facts | deployed | [#887](https://github.com/msoliman1975/AgriPulse/pull/887), merged `69a3f30` | api `69a3f30` (rollback `73f147f`) |
 | 3 | Activity photos | deployed | [#889](https://github.com/msoliman1975/AgriPulse/pull/889), merged `a19ce55` | api and frontend `a19ce55` (rollback api `69a3f30`, frontend `8bfe412`); tenant 0110; Scout photo step ships with the next Scout APK; route is `/activities/{id}/photos/init` |
-| 4 | Investor activities + site photo | not started | | |
+| 4 | Investor activities + site photo | deployed | [#891](https://github.com/msoliman1975/AgriPulse/pull/891), merged `d61349b` | api `d61349b` (rollback `a19ce55`); season = active plan's calendar year; `thumb_url` = full image until activity photos get renditions |
 | 5 | Harvest records | not started | | |
 | 6 | Investor harvest | waiting on 5 | | |
-| 7 | App: list, map, details | waiting on 1, 2 | | |
-| 8 | App: Activities tab | waiting on 4 | | |
+| 7 | App: list, map, details | not started | | |
+| 8 | App: Activities tab | not started | | |
 | 9 | App: Harvest tab | waiting on 6 | | |
 | 10 | Release | waiting on 7–9 | | |
