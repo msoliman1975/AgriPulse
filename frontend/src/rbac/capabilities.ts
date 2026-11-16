@@ -39,6 +39,8 @@ export type Capability =
   | "farm.read"
   | "farm.update"
   | "fertilization.record"
+  | "harvest.manage"
+  | "harvest.read"
   | "holding.assign_owner"
   | "holding.manage"
   | "holding.read"
@@ -147,6 +149,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "imagery.read",
     "index.read",
     "plan.read",
+    "harvest.read",
     "plan_template.read",
     "plan_allocation.read",
     "platform.observe_pipeline",
@@ -209,7 +212,9 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "notification.read_inbox",
     "notification.write_inbox",
     "plan.manage",
+    "harvest.manage",
     "plan.read",
+    "harvest.read",
     "plan_activity.complete",
     "plan_allocation.manage",
     "crop_document.download",
@@ -303,7 +308,9 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "notification.read_inbox",
     "notification.write_inbox",
     "plan.manage",
+    "harvest.manage",
     "plan.read",
+    "harvest.read",
     "plan_activity.complete",
     "plan_allocation.manage",
     "crop_document.download",
@@ -363,6 +370,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
   InvestmentManager: new Set<Capability>([
     "farm.read",
     "block.read",
+    "harvest.read",
     "investor.read",
     "investor.manage",
     "investor.invite",
@@ -412,7 +420,9 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "notification.read_inbox",
     "notification.write_inbox",
     "plan.manage",
+    "harvest.manage",
     "plan.read",
+    "harvest.read",
     "plan_activity.complete",
     "plan_allocation.manage",
     "plan_template.read",
@@ -461,6 +471,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "notification.read_inbox",
     "notification.write_inbox",
     "plan.read",
+    "harvest.read",
     "plan_activity.complete",
     "plan_template.read",
     "plan_allocation.read",
@@ -556,6 +567,7 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "notification.read_inbox",
     "notification.write_inbox",
     "plan.read",
+    "harvest.read",
     "plan_template.read",
     "plan_allocation.read",
     "recommendation.read",

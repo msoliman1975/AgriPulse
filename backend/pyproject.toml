@@ -395,6 +395,7 @@ source_modules = [
   "app.modules.billing",
   "app.modules.crop_documents",
   "app.modules.crop_images",
+  "app.modules.harvest",
 ]
 forbidden_modules = [
   "app.modules.farms.repository",
@@ -848,5 +849,20 @@ forbidden_modules = [
   "app.modules.billing.tasks",
   "app.modules.billing.emails",
   "app.modules.billing.turnstile",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "harvest internals are private"
+type = "forbidden"
+source_modules = [
+  "app.modules.investors",
+  "app.modules.farms",
+  "app.modules.plans",
+]
+forbidden_modules = [
+  "app.modules.harvest.repository",
+  "app.modules.harvest.router",
+  "app.modules.harvest.schemas",
 ]
 allow_indirect_imports = true
