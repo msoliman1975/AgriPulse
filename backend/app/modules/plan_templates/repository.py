@@ -6,7 +6,6 @@ the apply engine land in PR-E2/E3.
 
 from __future__ import annotations
 
-from datetime import date
 from typing import Any
 from uuid import UUID
 
@@ -567,27 +566,6 @@ class PlanTemplatesRepository:
         )
         return plan_id
 
-    async def delete_template_scheduled(
-        self, *, plan_id: UUID, block_id: UUID, template_id: UUID
-    ) -> int:
-        """Idempotent regen: drop this template's still-scheduled rows for the
-        block. Preserves manual rows + completed/in-progress template rows."""
-        assert self._tenant is not None
-        res = await self._tenant.execute(
-            text(
-                "DELETE FROM plan_activities "
-                "WHERE plan_id = :plan AND block_id = :block "
-                "  AND applied_template_id = :tpl AND status = 'scheduled' "
-                "  AND source = 'template'"
-            ).bindparams(
-                bindparam("plan", type_=PG_UUID(as_uuid=True)),
-                bindparam("block", type_=PG_UUID(as_uuid=True)),
-                bindparam("tpl", type_=PG_UUID(as_uuid=True)),
-            ),
-            {"plan": plan_id, "block": block_id, "tpl": template_id},
-        )
-        return int(getattr(res, "rowcount", 0) or 0)
-
     async def input_names(self, input_ids: set[UUID]) -> dict[UUID, str]:
         """English names of catalogue inputs (public 0107), for applied plans."""
         if not input_ids:
@@ -597,83 +575,6 @@ class PlanTemplatesRepository:
             {"ids": list(input_ids)},
         )
         return {r.id: r.name_en for r in rows}
-
-    async def insert_plan_activity(
-        self,
-        *,
-        plan_id: UUID,
-        farm_id: UUID,
-        block_id: UUID,
-        template_id: UUID,
-        template_activity_id: UUID,
-        activity_type: str,
-        scheduled_date: date,
-        duration_days: int,
-        anchored_stage_code: str | None,
-        title: str | None = None,
-        title_ar: str | None = None,
-        product_name: str | None,
-        dosage: str | None,
-        notes: str | None,
-        start_time: Any,
-        actor_user_id: UUID | None,
-        notes_ar: str | None = None,
-        input_id: UUID | None = None,
-        dose_value: Any = None,
-        dose_value_max: Any = None,
-        dose_unit: str | None = None,
-    ) -> None:
-        assert self._tenant is not None
-        await self._tenant.execute(
-            text(
-                """
-                INSERT INTO plan_activities
-                    (plan_id, farm_id, block_id, activity_type, scheduled_date,
-                     duration_days, start_time, product_name, dosage, notes,
-                     status, source, applied_template_id, template_activity_id,
-                     anchored_stage_code, title, title_ar, created_by, updated_by,
-                     input_id, dose_value, dose_value_max, dose_unit, notes_ar)
-                VALUES
-                    (:plan, :farm, :block, :atype, :sched, :dur, :stime, :pname,
-                     :dosage, :notes, 'scheduled', 'template', :tpl, :tact,
-                     :stage, :title, :title_ar, :actor, :actor,
-                     :input_id, :dose_value, :dose_value_max, :dose_unit, :notes_ar)
-                """
-            ).bindparams(
-                bindparam("plan", type_=PG_UUID(as_uuid=True)),
-                bindparam("farm", type_=PG_UUID(as_uuid=True)),
-                bindparam("block", type_=PG_UUID(as_uuid=True)),
-                bindparam("tpl", type_=PG_UUID(as_uuid=True)),
-                bindparam("tact", type_=PG_UUID(as_uuid=True)),
-                bindparam("actor", type_=PG_UUID(as_uuid=True)),
-                bindparam("input_id", type_=PG_UUID(as_uuid=True)),
-            ),
-            {
-                "plan": plan_id,
-                "farm": farm_id,
-                "block": block_id,
-                "atype": activity_type,
-                "sched": scheduled_date,
-                "dur": duration_days,
-                "stime": start_time,
-                "pname": product_name,
-                "dosage": dosage,
-                "notes": notes,
-                "tpl": template_id,
-                "tact": template_activity_id,
-                "stage": anchored_stage_code,
-                "title": title,
-                "title_ar": title_ar,
-                "notes_ar": notes_ar,
-                "actor": actor_user_id,
-                "input_id": input_id,
-                "dose_value": dose_value,
-                "dose_value_max": dose_value_max,
-                "dose_unit": dose_unit,
-            },
-        )
-
-    # ---- Saved plans / allocations (tenant; Agri Operation PR 3) -------
 
     async def get_allocation(self, *, allocation_id: UUID) -> dict[str, Any] | None:
         assert self._tenant is not None
