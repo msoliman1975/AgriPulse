@@ -23,7 +23,7 @@ from app.modules.plan_templates.schemas import AllocationWriteRequest
 from app.modules.plan_templates.service import get_plan_templates_service
 from app.modules.plans.service import get_plans_service
 from app.modules.tenancy.service import get_tenant_service
-from tests.integration.plan_templates.test_apply import _seed_block
+from tests.integration.plan_templates._seed import _seed_block
 
 pytestmark = [pytest.mark.integration]
 

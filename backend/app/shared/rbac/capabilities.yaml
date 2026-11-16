@@ -359,11 +359,7 @@ capabilities:
     scope: farm
     status: active
   plan_template.read:
-    description: View appliable plan templates + preview their schedule for a farm.
-    scope: farm
-    status: active
-  plan_template.apply:
-    description: Apply a plan template to a farm's matching-crop blocks.
+    description: View the operation manuals that match a farm's crops.
     scope: farm
     status: active
   plan_allocation.read:

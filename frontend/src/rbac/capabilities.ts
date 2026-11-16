@@ -63,7 +63,6 @@ export type Capability =
   | "plan_activity.complete"
   | "plan_allocation.manage"
   | "plan_allocation.read"
-  | "plan_template.apply"
   | "plan_template.manage"
   | "plan_template.read"
   | "platform.impersonate_tenant"
@@ -212,7 +211,6 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan.manage",
     "plan.read",
     "plan_activity.complete",
-    "plan_template.apply",
     "plan_allocation.manage",
     "crop_document.download",
     "plan_template.read",
@@ -307,7 +305,6 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan.manage",
     "plan.read",
     "plan_activity.complete",
-    "plan_template.apply",
     "plan_allocation.manage",
     "crop_document.download",
     "plan_template.read",
@@ -417,7 +414,6 @@ export const ROLE_CAPABILITIES: Record<string, ReadonlySet<Capability | "*">> = 
     "plan.manage",
     "plan.read",
     "plan_activity.complete",
-    "plan_template.apply",
     "plan_allocation.manage",
     "plan_template.read",
     "plan_allocation.read",
