@@ -4398,7 +4398,22 @@ global:
       #   the investor's own ownership row. No migration, no new env.
       #   Watch: /investor/holdings answers 200 for an investor.
       #   Rollback: api to 73f147f.
-      tag: "69a3f30"
+      # a19ce55 = #889, api (69a3f30..a19ce55 is #889 plus the #888
+      #   promotion). Investor app v2 PR 3, activity photos (decision D5).
+      #   tenant 0110 adds plan_activity_photos (additive, PreSync). New:
+      #   POST /activities/{id}/photos/init (presigned PUT under
+      #   tenants/<t>/farms/<f>/activity-photos/<activity>/,
+      #   plan_activity.complete); PATCH /activities/{id} takes
+      #   attachment_s3_keys with state=complete; PATCH
+      #   /activities/{id}/photos/{photo_id} hides a photo from investors
+      #   (plan.manage). Photos (presigned view links) on board and plan
+      #   activity reads. Workers unchanged at 8bfe412.
+      #   Watch: migrate PreSync succeeds (tenant head 0110 in every
+      #   tenant); GET /farms/{id}/board answers 200 with a photos list on
+      #   each activity; completing an activity without photos still works.
+      #   Rollback: api to 69a3f30. The table can stay; the old image
+      #   never reads it.
+      tag: "a19ce55"
     workers:
       tag: "8bfe412"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
@@ -5259,7 +5274,14 @@ global:
       #   Watch: the Beta designer opens and its tabs work; the crop
       #   catalogue and a block page render; the plan board loads.
       #   Rollback: frontend to 09e94e2.
-      tag: "8bfe412"
+      # a19ce55 = #889, frontend: photos in the board's activity drawer,
+      #   with a "Hide from investors" switch for plan.manage. Needs the api
+      #   at a19ce55 (photos field and route); on an older api the drawer
+      #   simply shows no photos.
+      #   Watch: the Beta designer opens and its tabs work; the plan board
+      #   loads and an activity drawer opens.
+      #   Rollback: frontend to 8bfe412.
+      tag: "a19ce55"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
