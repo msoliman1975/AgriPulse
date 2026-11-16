@@ -898,6 +898,8 @@ class InvestorsRepository:
                    -- photo and the block's activities. The response
                    -- allowlist never returns them.
                    b.farm_id, h.block_id,
+                   -- Internal: the D1 harvest split (PR 6). Never returned.
+                   b.plant_count AS block_plant_count, b.area_m2 AS block_area_m2,
                    crop.crop_name_en, crop.crop_name_ar,
                    crop.variety_name_en, crop.variety_name_ar, crop.planting_date,
                    crop.stage_name_en, crop.stage_name_ar,

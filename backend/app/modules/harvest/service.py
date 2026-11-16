@@ -12,6 +12,7 @@ Public surface: `HarvestService`, `get_harvest_service`, the errors, and
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from uuid import UUID
@@ -70,6 +71,18 @@ class HarvestService:
         if row is None:
             raise HarvestLotNotFoundError(str(lot_id))
         return _public(row)
+
+    async def picks_between(
+        self, *, block_id: UUID, from_date: date, to_date: date | None
+    ) -> list[dict[str, Any]]:
+        """Raw picks for a read-only view such as the investor app (PR 6).
+
+        Includes ``notes_internal``: callers that face outside staff must
+        build their own allowlisted response from these rows.
+        """
+        return await self._repo.list_between(
+            block_id=block_id, from_date=from_date, to_date=to_date
+        )
 
     async def list_for_block(self, block_id: UUID) -> list[dict[str, Any]]:
         await self.farm_for_block(block_id)

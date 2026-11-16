@@ -507,6 +507,37 @@ class InvestorAppSitePhotoResponse(BaseModel):
     photo: InvestorAppSitePhoto | None = None
 
 
+class InvestorAppHarvestPick(BaseModel):
+    """One pick, already scaled to the investor's holding (decision D1)."""
+
+    pick_no: int
+    label: str | None = None
+    label_ar: str | None = None
+    harvested_on: date
+    weight_kg: Decimal
+    price_per_kg: Decimal | None = None
+    #: Gross: the holding's weight x price, no costs (decision D2).
+    revenue: Decimal | None = None
+
+
+class InvestorAppHarvestResponse(BaseModel):
+    """GET /investor/holdings/{holding_id}/harvest.
+
+    The holding's share of each pick and the season's totals. Never the
+    block's own totals and never the share itself.
+    """
+
+    holding_id: UUID
+    season: str | None = None
+    #: Seasons with picks inside the ownership, newest first, for the picker.
+    seasons: list[str] = Field(default_factory=list)
+    currency: str | None = None
+    picks: list[InvestorAppHarvestPick] = Field(default_factory=list)
+    total_weight_kg: Decimal = Decimal("0")
+    total_revenue: Decimal | None = None
+    average_price_per_kg: Decimal | None = None
+
+
 class InvestorAppVersionResponse(BaseModel):
     """What the Android app compares its own version with at start."""
 
