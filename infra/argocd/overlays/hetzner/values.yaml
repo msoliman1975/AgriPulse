@@ -4383,7 +4383,16 @@ global:
       #   200 with crop_image_url null until a crop has an image.
       #   Rollback: api and workers to 09e94e2. The columns can stay; the old
       #   image never reads them.
-      tag: "8bfe412"
+      # 73f147f = #885, api only (8bfe412..73f147f is #885 plus the #884
+      #   promotion). Investor app v2 PR 2: GET /investor/me adds status,
+      #   investor_type, email and phone (the investor's own); GET
+      #   /investor/holdings[/{id}] adds stage_code, stages (the season's
+      #   stages with expected_start / expected_end) and expected_harvest_on.
+      #   No migration, no new env. Workers stay on 8bfe412 (no worker change).
+      #   Watch: /investor/holdings answers 200 for an investor; the investor
+      #   app (current APK) still loads, as it ignores the new fields.
+      #   Rollback: api to 8bfe412.
+      tag: "73f147f"
     workers:
       tag: "8bfe412"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
