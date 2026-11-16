@@ -41,6 +41,14 @@ export function formatDate(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
 }
 
+/**
+ * A left-to-right isolate (U+2066 ... U+2069) around a date or code put
+ * inside Arabic text, so "2025-05-31" does not come out as "31-05-2025".
+ */
+export function ltr(s: string): string {
+  return s ? `\u2066${s}\u2069` : s;
+}
+
 export function formatDateTime(lang: Lang, ms: number): string {
   return new Intl.DateTimeFormat(locale(lang), {
     year: "numeric",

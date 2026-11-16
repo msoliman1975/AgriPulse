@@ -38,6 +38,18 @@ function positions(coords: unknown, out: number[][] = []): number[][] {
   return out;
 }
 
+/** [[west, south], [east, north]] of a geometry, or null when empty. */
+export function holdingBounds(g: Geometry): [[number, number], [number, number]] | null {
+  const pts = positions(g.coordinates);
+  if (pts.length === 0) return null;
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  return [
+    [Math.min(...xs), Math.min(...ys)],
+    [Math.max(...xs), Math.max(...ys)],
+  ];
+}
+
 const PHOTO = "latest-photo";
 
 /** Add, show or hide the latest-photo layer, just above the Esri base. */
@@ -76,6 +88,7 @@ export function HoldingMap({
   photoBounds = null,
   showPhoto = true,
   onBaseDate,
+  resetLabel = "Reset",
 }: {
   holding: Geometry;
   block: Geometry;
@@ -83,6 +96,8 @@ export function HoldingMap({
   photoBounds?: Bounds | null;
   showPhoto?: boolean;
   onBaseDate?: (date: string | null) => void;
+  /** Text of the button that brings the holding back into view. */
+  resetLabel?: string;
 }): ReactNode {
   const ref = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -100,6 +115,12 @@ export function HoldingMap({
     const map = new maplibregl.Map({
       container: el,
       attributionControl: { compact: true },
+      // Pinch / scroll zoom and drag pan stay on (MapLibre's defaults); the
+      // map never turns or tilts, so north stays up and the outline reads.
+      dragRotate: false,
+      pitchWithRotate: false,
+      touchPitch: false,
+      maxZoom: 20,
       style: {
         version: 8,
         sources: {
@@ -142,23 +163,16 @@ export function HoldingMap({
         ],
       },
     });
+    map.touchZoomRotate.disableRotation();
+    map.keyboard.disableRotation();
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
     // Open on the holding; the dimmed block around it shows where it sits.
-    const pts = positions(holding.coordinates);
-    if (pts.length > 0) {
-      const xs = pts.map((p) => p[0]);
-      const ys = pts.map((p) => p[1]);
-      const lon = (Math.min(...xs) + Math.max(...xs)) / 2;
-      const lat = (Math.min(...ys) + Math.max(...ys)) / 2;
-      void fetchCaptureDate(lon, lat).then((d) => onBaseDateRef.current?.(d));
-      map.fitBounds(
-        [
-          [Math.min(...xs), Math.min(...ys)],
-          [Math.max(...xs), Math.max(...ys)],
-        ],
-        { padding: 56, duration: 0, maxZoom: 19 },
-      );
+    const box = holdingBounds(holding);
+    if (box) {
+      const [[w, s], [e, n]] = box;
+      void fetchCaptureDate((w + e) / 2, (s + n) / 2).then((d) => onBaseDateRef.current?.(d));
+      map.fitBounds(box, { padding: 56, duration: 0, maxZoom: 19 });
     }
     mapRef.current = map;
     map.on("load", () => {
@@ -183,5 +197,17 @@ export function HoldingMap({
     // photoBounds arrives with photoTileUrl, so the URL is enough to re-run.
   }, [photoTileUrl, showPhoto]);
 
-  return <div ref={ref} className="map" />;
+  const reset = (): void => {
+    const box = holdingBounds(holding);
+    if (box) mapRef.current?.fitBounds(box, { padding: 56, maxZoom: 19 });
+  };
+
+  return (
+    <div className="map-box">
+      <div ref={ref} className="map" />
+      <button type="button" className="map-reset" onClick={reset}>
+        {resetLabel}
+      </button>
+    </div>
+  );
 }
