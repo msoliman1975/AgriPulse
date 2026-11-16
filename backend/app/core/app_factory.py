@@ -161,6 +161,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     from app.modules.farms.router import router as farms_router
     from app.modules.field_flags.router import router as field_flags_router
     from app.modules.grid.router import router as grid_router
+    from app.modules.harvest.router import router as harvest_router
     from app.modules.health.admin_router import router as health_definitions_router
     from app.modules.iam.router import router as iam_router
     from app.modules.imagery.router import router as imagery_router
@@ -270,6 +271,7 @@ def _register_module_routers(app: FastAPI) -> None:  # noqa: PLR0915
     app.include_router(reference_values_router)
     app.include_router(crop_documents_router)
     app.include_router(crop_images_router)
+    app.include_router(harvest_router)
     app.include_router(inputs_router)
     app.include_router(health_definitions_router)
     app.include_router(platform_admins_router)

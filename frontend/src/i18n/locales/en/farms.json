@@ -403,5 +403,31 @@
       "ar": "Arabic",
       "other": "Other language"
     }
+  },
+  "harvest": {
+    "heading": "Harvest",
+    "add": "Add pick",
+    "loading": "Loading picks…",
+    "loadFailed": "The picks could not be loaded.",
+    "empty": "No picks recorded on this block yet.",
+    "pick": "Pick",
+    "pickN": "Pick {{n}}",
+    "date": "Date",
+    "weight": "Weight (kg)",
+    "price": "Price per kg",
+    "revenue": "Revenue",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirmDelete": "Remove this pick",
+    "cancel": "Cancel",
+    "label": "Label",
+    "labelAr": "Label (Arabic)",
+    "notes": "Internal notes",
+    "save": "Save",
+    "saving": "Saving…",
+    "saveFailed": "The pick could not be saved. Check the pick number and try again.",
+    "needDateWeight": "Enter a date and a weight above zero.",
+    "unitsHint": "Revenue is weight × price, before costs. Internal notes are never shown to investors.",
+    "totals": "Total: {{weight}} kg · {{revenue}} {{currency}}"
   }
 }

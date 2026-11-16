@@ -203,6 +203,8 @@ BLOCK_OWNED: tuple[OwnedTable, ...] = (
         order=10,
         note="owned transitively through plan_activities",
     ),
+    # Harvest picks (tenant 0111): a leaf; points at block_crops (order 20).
+    OwnedTable("harvest_lots", owner_column="block_id", order=10),
     # Activity photos (tenant 0110): leaves of plan_activities, with an object
     # behind each row, so the storage keys are collected before the cascade.
     OwnedTable(
@@ -433,6 +435,7 @@ FARM_OWNED: tuple[OwnedTable, ...] = (
         where_sql="activity_id IN (SELECT id FROM plan_activities WHERE farm_id = ANY(:ids))",
         order=10,
     ),
+    OwnedTable("harvest_lots", owner_column="farm_id", order=10),
     OwnedTable(
         "plan_activity_photos",
         where_sql="activity_id IN (SELECT id FROM plan_activities WHERE farm_id = ANY(:ids))",

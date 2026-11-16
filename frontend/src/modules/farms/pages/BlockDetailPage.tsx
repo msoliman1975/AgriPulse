@@ -27,6 +27,7 @@ import { ArchiveButton } from "../components/ArchiveButton";
 import { AttachmentsTab } from "../components/AttachmentsTab";
 import { CropDocumentsCard } from "../components/CropDocumentsCard";
 import { CropPicker } from "../components/CropPicker";
+import { HarvestCard } from "../components/HarvestCard";
 import { MapPreview } from "../components/MapPreview";
 
 export function BlockDetailPage(): JSX.Element {
@@ -40,6 +41,7 @@ export function BlockDetailPage(): JSX.Element {
   const canReadIndex = useCapability("index.read", { farmId });
   const canReadWeather = useCapability("weather.read", { farmId });
   const canReadDocuments = useCapability("crop_document.download", { farmId });
+  const canReadHarvest = useCapability("harvest.read", { farmId });
 
   const [block, setBlock] = useState<BlockDetail | null>(null);
   const [farmNames, setFarmNames] = useState<{ name: string; name_ar: string | null } | null>(null);
@@ -286,6 +288,8 @@ export function BlockDetailPage(): JSX.Element {
           </ul>
         )}
       </Card>
+
+      {canReadHarvest ? <HarvestCard blockId={block.id} farmId={farmId} /> : null}
 
       {canReadDocuments ? <CropDocumentsCard blockId={block.id} /> : null}
 

@@ -358,6 +358,15 @@ capabilities:
     description: Mark a scheduled activity as completed or skipped.
     scope: farm
     status: active
+  # --- Harvest (investor app v2, build plan 3.5) ---
+  harvest.read:
+    description: View a block's harvest picks (date, weight, price).
+    scope: farm
+    status: active
+  harvest.manage:
+    description: Record, correct or remove a block's harvest picks.
+    scope: farm
+    status: active
   plan_template.read:
     description: View the operation manuals that match a farm's crops.
     scope: farm

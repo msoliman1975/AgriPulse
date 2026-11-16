@@ -38,6 +38,7 @@ roles:
       - alert.read
       - alert_rule.read
       - plan.read
+      - harvest.read
       - plan_template.read
       - plan_allocation.read
       - recommendation.read
@@ -113,9 +114,11 @@ roles:
       - alert_rule.read
       - alert_rule.manage
       - plan.read
+      - harvest.read
       - plan_template.read
       - plan_allocation.read
       - plan.manage
+      - harvest.manage
       - plan_allocation.manage
       - crop_document.download
       - plan_activity.complete
@@ -207,9 +210,11 @@ roles:
       - alert_rule.read
       - alert_rule.manage
       - plan.read
+      - harvest.read
       - plan_template.read
       - plan_allocation.read
       - plan.manage
+      - harvest.manage
       - plan_allocation.manage
       - crop_document.download
       - plan_activity.complete
@@ -264,6 +269,7 @@ roles:
     capabilities:
       - farm.read
       - block.read
+      - harvest.read
       - investor.read
       - investor.manage
       - investor.invite
@@ -320,9 +326,11 @@ roles:
       - alert.snooze
       - alert_rule.read
       - plan.read
+      - harvest.read
       - plan_template.read
       - plan_allocation.read
       - plan.manage
+      - harvest.manage
       - plan_allocation.manage
       - plan_activity.complete
       - resource.read
@@ -368,6 +376,7 @@ roles:
       - alert.snooze
       - alert_rule.read
       - plan.read
+      - harvest.read
       - plan_template.read
       - plan_allocation.read
       - plan_activity.complete
@@ -469,6 +478,7 @@ roles:
       - signal.read
       - alert.read
       - plan.read
+      - harvest.read
       - plan_template.read
       - plan_allocation.read
       - resource.read
