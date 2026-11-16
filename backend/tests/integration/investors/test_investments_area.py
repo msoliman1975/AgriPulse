@@ -247,11 +247,18 @@ async def test_investor_holding_carries_the_dated_stage_list(
     mine, investor = await _sold_holding(env)
     async with _client(env.admin_context) as c:
         crops = (await c.get("/api/v1/crops")).json()
+        # A seeded crop with a well-formed calendar. Other files running in
+        # parallel create crops too, some with partial stage lists, so the
+        # pick must not depend on whichever sorts first.
         crop = next(
             x
-            for x in crops
-            if (x.get("phenology_stages") or {}).get("stages")
-            and x["classification_depth"] == "crop_only"
+            for x in sorted(crops, key=lambda x: x["code"])
+            if x["classification_depth"] == "crop_only"
+            and (x.get("phenology_stages") or {}).get("stages")
+            and all(
+                isinstance(st.get("order"), int) and st.get("advance")
+                for st in x["phenology_stages"]["stages"]
+            )
         )
         r = await c.post(
             f"/api/v1/blocks/{env.block_id}/crop-assignments",
