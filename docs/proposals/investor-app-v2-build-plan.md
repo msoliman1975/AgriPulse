@@ -148,10 +148,10 @@ zoom and pan, Details tab with site photo and ribbon (PR 7), Activities tab
 | 4 | Investor activities + site photo | 3.4 | unit: allowlist; integration: ownership window, other investor's holding 404, hidden photos excluded | api |
 | 5 | Harvest records | 3.5 | integration: CRUD, caps enforced, audit; vitest | api + frontend |
 | 6 | Investor harvest | 3.6 | unit: split per D1; integration: ownership window, no block totals in response | api |
-| 7 | App: list, map, details | 3.7 | vitest (`mobile-investor`) incl. RTL | APK (not deployed by ArgoCD) |
-| 8 | App: Activities tab | 3.7 | vitest | APK |
-| 9 | App: Harvest tab | 3.7 | vitest | APK |
-| 10 | Release | Version bump in its three places, `INVESTOR_APP_MIN_VERSION` / `LATEST_VERSION` on the api, APK build notes in `mobile-investor/README.md` | n/a | api |
+| 7 | App: list, map, details | deployed | [#897](https://github.com/msoliman1975/AgriPulse/pull/897), merged `9bfc0e0` | App PR: tests, typecheck and build run locally (CI had no `mobile-investor` job until PR 10; the `mobile` job is Scout). Map already zoomed and panned (MapLibre): rotation and tilt now off, "Back to my holding" button. D6 counts each block activity once across holdings |
+| 8 | App: Activities tab | deployed | [#899](https://github.com/msoliman1975/AgriPulse/pull/899), merged `f4500ee` | App PR, verified locally as PR 7. Shares the activities cache with the list's D6 stat. Known gap: Android back with a photo open closes the holding |
+| 9 | App: Harvest tab | deployed | [#900](https://github.com/msoliman1975/AgriPulse/pull/900), merged `cf22fc5` | App PR, verified locally as PR 7. Money in the response currency (code in English, symbol in Arabic) |
+| 10 | Release | in review | | 0.2.0 in package.json, version.ts, build.gradle (versionCode 2); api `INVESTOR_APP_LATEST_VERSION` 0.2.0, minimum stays 0.1.0 until `INVESTOR_APP_DOWNLOAD_URL` is set; new CI job `mobile-investor` builds the APK (artifact `investor-debug-apk`) |
 
 Order: PR 1 first (no open decisions). Then PR 2, 3, 5 can go in any order;
 4 after 3; 6 after 5; app PRs after their backend PRs are deployed.
