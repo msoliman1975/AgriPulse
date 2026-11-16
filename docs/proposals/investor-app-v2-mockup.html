@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Investor Portfolio</title>
+<style>
+  :root{
+    --bg:#f7f6f1; --panel:#ffffff; --panel-2:#fbfaf6; --line:#e8e5db; --line-strong:#d8d4c6;
+    --ink:#1f2420; --muted:#6c7268; --muted-2:#8a8f83;
+    --primary:#356b30; --primary-soft:#dceadb; --primary-dark:#264f22;
+    --accent:#1f6f9a; --accent-soft:#dbeaf1;
+    --warn:#c98a18; --warn-soft:#f7e7c2; --crit:#b24430; --crit-soft:#f3d2c9;
+    --new:#8d4ab0; --new-soft:#ece0f2;
+    --stage-post:#cfd1ca; --stage-flow:#f0c75b; --stage-frset:#b8d4a3; --stage-frdev:#84b078;
+    --stage-ripen:#d6a546; --stage-flush:#6fa08a; --stage-veg:#a9d9cf;
+    --shadow:0 1px 2px rgba(0,0,0,.04), 0 6px 18px rgba(20,40,15,.06);
+    --radius-card:12px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#151b13; --panel:#1c231a; --panel-2:#212a1f; --line:#333d2f; --line-strong:#404b3b;
+      --ink:#eef0ea; --muted:#a7ae9e; --muted-2:#8b9382;
+      --primary:#6fae67; --primary-soft:#25361f; --primary-dark:#9cd194;
+      --accent:#5fa8cc; --accent-soft:#1f3440;
+      --warn:#dba63f; --warn-soft:#3a2f14; --crit:#e08066; --crit-soft:#3d211a;
+      --new:#c48fe0; --new-soft:#332a3d;
+      --stage-post:#4a4d45; --stage-flow:#c9a13f; --stage-frset:#6f8f5e; --stage-frdev:#4d6b45;
+      --stage-ripen:#b3853a; --stage-flush:#4f7a68; --stage-veg:#4a7368;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#151b13; --panel:#1c231a; --panel-2:#212a1f; --line:#333d2f; --line-strong:#404b3b;
+    --ink:#eef0ea; --muted:#a7ae9e; --muted-2:#8b9382;
+    --primary:#6fae67; --primary-soft:#25361f; --primary-dark:#9cd194;
+    --accent:#5fa8cc; --accent-soft:#1f3440;
+    --warn:#dba63f; --warn-soft:#3a2f14; --crit:#e08066; --crit-soft:#3d211a;
+    --new:#c48fe0; --new-soft:#332a3d;
+    --stage-post:#4a4d45; --stage-flow:#c9a13f; --stage-frset:#6f8f5e; --stage-frdev:#4d6b45;
+    --stage-ripen:#b3853a; --stage-flush:#4f7a68; --stage-veg:#4a7368;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:"Inter","Cairo",ui-sans-serif,system-ui,"Segoe UI",sans-serif; font-size:14px; line-height:1.45;}
+  h1,h2,h3,p{margin:0;}
+  button{font-family:inherit;}
+
+  .page{display:flex; flex-direction:column; align-items:center; padding:22px 16px 60px; min-height:100vh;}
+  .page-top{width:100%; max-width:980px; display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; flex-wrap:wrap;}
+  .page-top h1{font-size:16px; font-weight:800;}
+  .legend{display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--muted);}
+  .legend .sw{display:inline-flex; align-items:center; gap:4px; background:var(--new-soft); color:var(--new); font-weight:700; padding:2px 7px; border-radius:5px; font-size:10.5px;}
+  .lang-toggle{display:inline-flex; border:1px solid var(--line-strong); border-radius:999px; overflow:hidden; flex-shrink:0;}
+  .lang-toggle button{appearance:none; border:none; background:var(--panel); color:var(--muted); padding:6px 14px; font-size:12.5px; font-weight:700; cursor:pointer;}
+  .lang-toggle button.active{background:var(--primary); color:#fff;}
+
+  .stage-wrap{display:flex; gap:28px; flex-wrap:wrap; justify-content:center; width:100%;}
+
+  .device{
+    width:380px; height:788px; border-radius:46px; background:#0c0f0b; padding:12px;
+    box-shadow:var(--shadow), 0 30px 60px rgba(0,0,0,.25); flex-shrink:0;
+  }
+  .screen{
+    width:100%; height:100%; border-radius:36px; background:var(--panel); overflow:hidden; position:relative;
+    display:flex; flex-direction:column;
+  }
+  .statusbar{
+    height:30px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between;
+    padding:0 22px; font-size:12px; font-weight:700; color:var(--ink);
+  }
+  .notch{position:absolute; top:0; inset-inline-start:50%; transform:translateX(-50%); width:120px; height:22px; background:#0c0f0b; border-radius:0 0 16px 16px; z-index:5;}
+  :root[dir="rtl"] .notch, [dir="rtl"] .notch { transform: translateX(50%); }
+
+  .app-header{
+    flex-shrink:0; padding:6px 16px 12px; border-bottom:1px solid var(--line); background:var(--panel);
+  }
+  .app-header .row{display:flex; align-items:center; gap:10px;}
+  .app-title{font-size:19px; font-weight:800;}
+  .app-sub{font-size:12px; color:var(--muted); margin-top:2px;}
+  .back-btn{
+    width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:var(--panel-2); border:1px solid var(--line); color:var(--ink); flex-shrink:0; cursor:pointer;
+  }
+  [dir="rtl"] .back-icon{ transform:scaleX(-1); }
+  .avatar{width:32px;height:32px;border-radius:50%;background:var(--primary-dark);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700; flex-shrink:0;}
+
+  .scrollarea{flex:1; min-height:0; overflow-y:auto; padding:14px 16px 24px; -webkit-overflow-scrolling:touch;}
+
+  .portfolio-stats{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:16px;}
+  .pstat{background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:9px 8px; text-align:center;}
+  .pstat .n{font-size:15px; font-weight:800; font-variant-numeric:tabular-nums;}
+  .pstat .l{font-size:9.5px; color:var(--muted); margin-top:2px;}
+
+  .group-label{font-size:11px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); margin:16px 2px 8px;}
+  .group-label:first-child{margin-top:0;}
+
+  .holding-card{
+    display:flex; gap:11px; align-items:center; background:var(--panel); border:1px solid var(--line);
+    border-radius:12px; padding:11px 12px; margin-bottom:9px; cursor:pointer;
+  }
+  .holding-card:active{background:var(--panel-2);}
+  .holding-thumb{
+    width:46px; height:46px; border-radius:9px; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:16px;
+  }
+  .holding-main{flex:1; min-width:0;}
+  .holding-name{font-size:13.5px; font-weight:700;}
+  .holding-sub{font-size:11.3px; color:var(--muted); margin-top:1px;}
+  .holding-meta{display:flex; gap:7px; align-items:center; margin-top:5px; flex-wrap:wrap;}
+  .pill{display:inline-flex; align-items:center; gap:3px; border-radius:999px; padding:2px 8px; font-size:10px; font-weight:700;}
+  .chev{color:var(--muted-2); flex-shrink:0;}
+  [dir="rtl"] .chev{transform:scaleX(-1);}
+
+  .tabstrip{display:flex; gap:2px; padding:0 10px; border-bottom:1px solid var(--line); background:var(--panel); flex-shrink:0;}
+  .tabbtn{
+    flex:1; appearance:none; border:none; background:none; padding:10px 2px; font-size:11.8px; font-weight:700;
+    color:var(--muted); border-bottom:2.5px solid transparent; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px;
+  }
+  .tabbtn.active{color:var(--primary); border-bottom-color:var(--primary);}
+  .tabbtn .newdot{width:5px;height:5px;border-radius:50%;background:var(--new); position:relative; top:-6px; inset-inline-start:2px;}
+
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); padding:13px 14px; margin-bottom:12px;}
+  .card-title{font-size:12px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; margin-bottom:9px; display:flex; align-items:center; gap:7px;}
+
+  .kv-row{display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid var(--line); font-size:12.6px;}
+  .kv-row:last-child{border-bottom:none;}
+  .kv-row .k{color:var(--muted);}
+  .kv-row .v{font-weight:700; text-align:end;}
+
+  .map-visual{
+    position:relative; height:220px; border-radius:10px; overflow:hidden; margin-bottom:10px;
+    background:linear-gradient(135deg,#4a6b3a,#38512c 55%,#2c3f22);
+    touch-action:none; cursor:grab; -webkit-user-select:none; user-select:none;
+  }
+  .map-visual.grabbing{cursor:grabbing;}
+  .map-visual .map-inner{position:absolute; inset:0; width:100%; height:100%; transform-origin:0 0; will-change:transform;}
+  .map-visual .map-inner svg{display:block; width:100%; height:100%;}
+  .map-zoom-controls{position:absolute; inset-inline-end:8px; bottom:8px; display:flex; flex-direction:column; gap:4px; z-index:2;}
+  .map-zoom-btn{
+    width:28px; height:28px; border-radius:7px; background:rgba(20,24,16,.72); color:#fff; border:1px solid rgba(255,255,255,.25);
+    display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:700; cursor:pointer; line-height:1;
+  }
+  .map-zoom-btn:active{background:rgba(20,24,16,.9);}
+  .map-scale-badge{
+    position:absolute; inset-inline-start:8px; bottom:8px; background:rgba(20,24,16,.65); color:#fff; font-size:9.5px;
+    font-weight:700; border-radius:5px; padding:2px 6px; z-index:2; pointer-events:none;
+  }
+  .map-caption{font-size:10.5px; color:var(--muted-2); text-align:center;}
+  .map-hint{font-size:10px; color:var(--muted-2); text-align:center; margin-top:3px;}
+  .photo-visual{border-radius:10px; overflow:hidden; margin-bottom:7px; line-height:0;}
+  .activity-photo{position:relative; width:40px; height:40px; border-radius:8px; overflow:hidden; flex-shrink:0; line-height:0;}
+  .activity-photo .camera-badge{position:absolute; bottom:2px; inset-inline-end:2px; color:#fff; opacity:.9; filter:drop-shadow(0 1px 1px rgba(0,0,0,.6));}
+
+  .stage-ribbon{position:relative; height:22px; border-radius:6px; overflow:hidden; display:flex; border:1px solid var(--line); margin:4px 0 6px;}
+  .stage-ribbon .seg{height:100%;}
+  .stage-marker{position:absolute; top:-4px; width:2px; height:30px; background:var(--ink);}
+  .stage-labels{display:flex; justify-content:space-between; font-size:9.5px; color:var(--muted-2); margin-bottom:10px;}
+
+  .activity-item{display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--line);}
+  .activity-item:last-child{border-bottom:none;}
+  .activity-dot{width:22px;height:22px;border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; margin-top:1px;}
+  .activity-dot.upcoming{background:var(--line-strong); color:var(--muted);}
+  .activity-main{flex:1; min-width:0;}
+  .activity-title{font-size:12.6px; font-weight:700;}
+  .activity-title.upcoming{color:var(--muted);}
+  .activity-date{font-size:11px; color:var(--muted); margin-top:1px;}
+  .status-pill{font-size:9.5px; font-weight:700; padding:1.5px 6px; border-radius:5px; flex-shrink:0; align-self:flex-start; margin-top:1px;}
+
+  .progress-line{display:flex; align-items:center; gap:8px; margin-bottom:12px;}
+  .progress-track{flex:1; height:6px; border-radius:4px; background:var(--line); overflow:hidden;}
+  .progress-fill{height:100%; background:var(--primary); border-radius:4px;}
+  .progress-text{font-size:11px; font-weight:700; color:var(--muted); flex-shrink:0;}
+
+  .harvest-lot{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--line);}
+  .harvest-lot:last-child{border-bottom:none;}
+  .lot-icon{width:30px;height:30px;border-radius:8px;background:var(--primary-soft); color:var(--primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .lot-main{flex:1; min-width:0;}
+  .lot-title{font-size:12.6px; font-weight:700;}
+  .lot-date{font-size:11px; color:var(--muted);}
+  .lot-nums{text-align:end; flex-shrink:0;}
+  .lot-weight{font-size:12.6px; font-weight:800; font-variant-numeric:tabular-nums;}
+  .lot-revenue{font-size:11px; color:var(--primary); font-weight:700; font-variant-numeric:tabular-nums;}
+
+  .chart{display:flex; align-items:flex-end; gap:8px; height:84px; margin:6px 0 4px; padding:0 2px;}
+  .chart .colwrap{flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; height:100%; justify-content:flex-end;}
+  .chart .bar{width:100%; max-width:28px; border-radius:4px 4px 0 0; background:var(--primary);}
+  .chart .lbl{font-size:9px; color:var(--muted-2); font-weight:700;}
+
+  .big-stat-row{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:4px;}
+  .big-stat{text-align:center;}
+  .big-stat .n{font-size:16px; font-weight:800; font-variant-numeric:tabular-nums;}
+  .big-stat .l{font-size:9.5px; color:var(--muted); margin-top:2px;}
+
+  .empty-note{padding:18px 10px; text-align:center; color:var(--muted); font-size:12px;}
+  .new-banner{
+    display:flex; align-items:center; gap:7px; background:var(--new-soft); color:var(--new); border-radius:8px;
+    padding:7px 10px; font-size:11px; font-weight:700; margin-bottom:11px;
+  }
+
+  @media (max-width:420px){
+    .device{width:100%; max-width:380px; height:80vh;}
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="page-top">
+    <h1 id="pageTitle">AgriPulse Investor App — mobile UX</h1>
+    <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+      <div class="legend"><span class="sw">●</span><span id="legendText">= new in this design, not built yet</span></div>
+      <div class="lang-toggle" role="group" aria-label="Language / اللغة">
+        <button type="button" id="btn-en" class="active">EN</button>
+        <button type="button" id="btn-ar">AR</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage-wrap">
+    <div class="device">
+      <div class="screen" id="screenRoot" dir="ltr">
+        <div class="notch"></div>
+        <div class="statusbar"><span id="clockLabel">9:41</span><span>●●● 🔆 100%</span></div>
+        <div id="appBody" style="flex:1; display:flex; flex-direction:column; min-height:0;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ================= STRINGS ================= */
+  var S = {
+    en: {
+      listTitle:"My Holdings", listSub:"holdings", area:"feddan", trees:"trees",
+      groupCurrent:"Current", groupFuture:"Future", groupPrevious:"Previous",
+      tabMap:"Map", tabDetails:"Details", tabActivities:"Activities", tabHarvest:"Harvest",
+      fCode:"Holding code", fFarm:"Farm", fBlock:"Block", fArea:"Area", fTrees:"Trees",
+      fCrop:"Crop", fVariety:"Variety", fStage:"Growth stage", fStageSince:"Stage started",
+      fStageEnd:"Expected end", fSeason:"Season", fPlanted:"Planting date", fTreeAge:"Tree age",
+      fOwnerSince:"Owner since", fOwnerUntil:"Owned until",
+      fAcquiredBy:"Acquired by", fContractRef:"Contract ref.",
+      investorCode:"Investor code", investorEmail:"Email", investorPhone:"Phone",
+      newBadge:"NEW", mapCaption:"Satellite view — your holding outlined inside the block boundary",
+      photoTitle:"Site photo", photoCaption:function(d){ return "Latest photo on file · "+d; }, photoBadge:"On-site photo attached",
+      activitiesDoneOf:function(d,t){ return d+" of "+t+" activities completed this season"; },
+      statusDone:"Completed", statusProgress:"In progress", statusUpcoming:"Upcoming",
+      harvestTotalWeight:"Total weight", harvestTotalRevenue:"Total revenue", harvestAvgPrice:"Avg. price",
+      perKg:"/kg", weightOf:"Weight", priceOf:"Price", revenueOf:"Revenue",
+      noActivitiesFuture:"Ownership hasn't started yet — no activity to show.",
+      noHarvestYet:function(d){ return "No harvest recorded yet this season — expected around "+d+"."; },
+      noHarvestFuture:"Ownership hasn't started yet.",
+      finalSeasonNote:"Ownership ended — showing the final season on record.",
+      ownershipEndsLabel:"Ownership begins",
+      weightByLot:"Weight by pick", backAria:"Back",
+    },
+    ar: {
+      listTitle:"ممتلكاتي", listSub:"ملكية", area:"فدان", trees:"شجرة",
+      groupCurrent:"حالياً", groupFuture:"مستقبلاً", groupPrevious:"سابقاً",
+      tabMap:"الخريطة", tabDetails:"التفاصيل", tabActivities:"الأنشطة", tabHarvest:"الحصاد",
+      fCode:"رمز الملكية", fFarm:"المزرعة", fBlock:"الكتلة", fArea:"المساحة", fTrees:"عدد الأشجار",
+      fCrop:"المحصول", fVariety:"الصنف", fStage:"مرحلة النمو", fStageSince:"بداية المرحلة",
+      fStageEnd:"الانتهاء المتوقع", fSeason:"الموسم", fPlanted:"تاريخ الزراعة", fTreeAge:"عمر الأشجار",
+      fOwnerSince:"مملوكة منذ", fOwnerUntil:"مملوكة حتى",
+      fAcquiredBy:"طريقة الاقتناء", fContractRef:"رقم العقد",
+      investorCode:"رمز المستثمر", investorEmail:"البريد الإلكتروني", investorPhone:"الهاتف",
+      newBadge:"جديد", mapCaption:"عرض الأقمار الصناعية — حدود ملكيتك داخل حدود الكتلة",
+      photoTitle:"صورة الموقع", photoCaption:function(d){ return "آخر صورة مسجلة · "+d; }, photoBadge:"صورة ميدانية مرفقة",
+      activitiesDoneOf:function(d,t){ return "اكتمل "+d+" من "+t+" نشاطاً هذا الموسم"; },
+      statusDone:"مكتمل", statusProgress:"قيد التنفيذ", statusUpcoming:"قادم",
+      harvestTotalWeight:"الوزن الإجمالي", harvestTotalRevenue:"الإيراد الإجمالي", harvestAvgPrice:"متوسط السعر",
+      perKg:"/كجم", weightOf:"الوزن", priceOf:"السعر", revenueOf:"الإيراد",
+      noActivitiesFuture:"لم تبدأ الملكية بعد — لا يوجد نشاط لعرضه.",
+      noHarvestYet:function(d){ return "لا يوجد حصاد مسجل هذا الموسم بعد — متوقع حوالي "+d+"."; },
+      noHarvestFuture:"لم تبدأ الملكية بعد.",
+      finalSeasonNote:"انتهت الملكية — يُعرض آخر موسم مسجل.",
+      ownershipEndsLabel:"تبدأ الملكية في",
+      weightByLot:"الوزن حسب القطفة", backAria:"رجوع",
+    }
+  };
+
+  var CROPS = { mango: { en:"Mango", ar:"مانجو" } };
+  var VARIETIES = {
+    keitt:{en:"Keitt", ar:"كيت"}, alphonso:{en:"Alphonso", ar:"ألفونسو"},
+    zebda:{en:"Zebda", ar:"زبدة"}, sukkary:{en:"Sukkary", ar:"السكري"}, yasmina:{en:"Yasmina", ar:"ياسمينة"}
+  };
+
+  var STAGES = [
+    {code:"pre_flowering",      en:"Pre-flowering", ar:"ما قبل التزهير", color:"var(--stage-post)",  weeks:[1,9]},
+    {code:"flowering",          en:"Flowering",      ar:"التزهير",        color:"var(--stage-flow)",  weeks:[10,15]},
+    {code:"fruit_set",          en:"Fruit set",      ar:"العقد",          color:"var(--stage-frset)", weeks:[16,22]},
+    {code:"fruit_development",  en:"Fruit development", ar:"تطور الثمار", color:"var(--stage-frdev)", weeks:[23,31]},
+    {code:"maturation",         en:"Maturation / harvest", ar:"النضج والحصاد", color:"var(--stage-ripen)", weeks:[32,42]},
+    {code:"post_harvest_flush", en:"Post-harvest flush", ar:"النمو بعد الحصاد", color:"var(--stage-flush)", weeks:[43,50]},
+    {code:"veg_flush",          en:"Vegetative flush", ar:"الدفعة الخضرية", color:"var(--stage-veg)", weeks:[51,52]}
+  ];
+  function stageByCode(code){ for(var i=0;i<STAGES.length;i++){ if(STAGES[i].code===code) return STAGES[i]; } return STAGES[0]; }
+
+  var ACT_LABEL = {
+    soil_prep:{en:"Post-harvest land prep", ar:"تجهيز الأرض بعد الحصاد"},
+    fert_ph:{en:"Post-harvest fertilizing", ar:"تسميد بعد الحصاد"},
+    pruning:{en:"Post-harvest pruning", ar:"تقليم ما بعد الحصاد"},
+    pbz:{en:"PBZ flowering induction", ar:"معاملة PBZ لتحريض التزهير"},
+    irrig_cut:{en:"Irrigation cut-back", ar:"تقليل الري لتحريض التزهير"},
+    spray_mildew:{en:"Protective spray — mildew", ar:"رش وقائي — البياض الدقيقي"},
+    fert_bloom:{en:"Pre-bloom fertilizing", ar:"تسميد ما قبل التزهير"},
+    scout:{en:"Scout fruit set", ar:"مسح العقد"},
+    thinning:{en:"Fruit thinning", ar:"خف الثمار"},
+    irrig_dev:{en:"Irrigation — sizing", ar:"ري — تكوين الحجم"},
+    fert_dev:{en:"Fruit-development fertilizing", ar:"تسميد تطور الثمار"},
+    spray_fly:{en:"Spray — fruit fly", ar:"رش — ذبابة الفاكهة"},
+    harvest1:{en:"Harvest — first pick", ar:"الحصاد — القطفة الأولى"},
+    harvest2:{en:"Harvest — second pick", ar:"الحصاد — القطفة الثانية"}
+  };
+  // photo:true = a field photo was captured when this activity ran (shown as a thumbnail).
+  function act(key, weeksAgo, status, photo){ return {key:key, weeksAgo:weeksAgo, status:status, photo:!!photo}; }
+
+  /* ---- abstract photo placeholder (no remote images allowed) ---- */
+  function photoSvg(seed, size){
+    var hueA = (seed*7)%40+70, hueB = (seed*13)%30+90;
+    var blots = "";
+    for(var i=0;i<6;i++){
+      var x = (seed*31+i*53)%100, y = (seed*17+i*41)%100, r = 8+((seed+i*9)%10);
+      blots += '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="hsla('+hueB+',38%,34%,.5)"/>';
+    }
+    return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" style="display:block;">' +
+      '<rect width="100" height="100" fill="hsl('+hueA+',32%,42%)"/>' + blots +
+      '<rect width="100" height="100" fill="url(#vig)"/>' +
+      '<defs><radialGradient id="vig" cx="50%" cy="40%" r="75%">' +
+        '<stop offset="60%" stop-color="black" stop-opacity="0"/><stop offset="100%" stop-color="black" stop-opacity=".3"/>' +
+      '</radialGradient></defs></svg>';
+  }
+  function cameraBadge(){
+    return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M4 8h3l2-2h6l2 2h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.4"/></svg>';
+  }
+
+  /* ================= HOLDINGS DATA ================= */
+  var HOLDINGS = [
+    { id:"h1", group:"current", code:"BF-N1-H1", photoSeed:14,
+      farm:{en:"Bashayer Farm",ar:"مزرعة بشاير"}, block:{en:"Block N1",ar:"كتلة N1"},
+      crop:"mango", variety:"keitt", area:1.55, trees:62, treeAge:7, season:"2026",
+      plantingDate:"10 Mar 2019", ownerSince:"3 Mar 2024", ownerUntil:null, photoDate:"21 Oct 2026",
+      stageCode:"fruit_development", stageSince:"18 Aug 2026", stageEnd:"6 Oct 2026",
+      acquiredBy:"purchase", contractRef:"HC-2024-0091",
+      activities:[ act("soil_prep",22,"done"), act("fert_ph",20,"done"), act("pruning",19,"done",true),
+        act("pbz",17,"done",true), act("irrig_cut",15,"done"), act("spray_mildew",13,"done",true),
+        act("fert_bloom",10,"done"), act("scout",7,"done",true), act("thinning",5,"done"),
+        act("irrig_dev",2,"progress"), act("fert_dev",1,"progress"), act("spray_fly",0,"upcoming"),
+        act("harvest1",0,"upcoming") ],
+      harvestLots:[], expectedHarvestDate:"28 Sep 2026" },
+
+    { id:"h2", group:"current", code:"BF-S1-H2", photoSeed:33,
+      farm:{en:"Bashayer Farm",ar:"مزرعة بشاير"}, block:{en:"Block S1",ar:"كتلة S1"},
+      crop:"mango", variety:"alphonso", area:3.12, trees:125, treeAge:11, season:"2026",
+      plantingDate:"2 Feb 2015", ownerSince:"14 Jan 2023", ownerUntil:null, photoDate:"9 Nov 2026",
+      stageCode:"flowering", stageSince:"2 Feb 2026", stageEnd:"20 Mar 2026",
+      acquiredBy:"purchase", contractRef:"HC-2023-0044",
+      activities:[ act("soil_prep",30,"done"), act("fert_ph",28,"done",true), act("pruning",27,"done",true),
+        act("pbz",24,"done",true), act("irrig_cut",20,"progress"), act("spray_mildew",18,"upcoming") ],
+      harvestLots:[], expectedHarvestDate:"12 Jul 2026" },
+
+    { id:"h3", group:"current", code:"NV-A4-H1", photoSeed:58,
+      farm:{en:"Nile Valley Farm",ar:"مزرعة وادي النيل"}, block:{en:"Block A4",ar:"كتلة A4"},
+      crop:"mango", variety:"zebda", area:4.0, trees:160, treeAge:10, season:"2026",
+      plantingDate:"1 Feb 2016", ownerSince:"1 Jun 2022", ownerUntil:null, photoDate:"26 Sep 2026",
+      stageCode:"maturation", stageSince:"28 Jul 2026", stageEnd:"25 Oct 2026",
+      acquiredBy:"transfer", contractRef:"HC-2022-0117",
+      activities:[ act("soil_prep",40,"done"), act("fert_ph",38,"done"), act("pruning",37,"done",true),
+        act("pbz",34,"done",true), act("irrig_cut",30,"done"), act("spray_mildew",27,"done",true),
+        act("fert_bloom",22,"done"), act("scout",18,"done",true), act("thinning",16,"done"),
+        act("irrig_dev",12,"done"), act("fert_dev",11,"done"), act("spray_fly",6,"done",true),
+        act("harvest1",2,"done",true), act("harvest2",0,"progress") ],
+      harvestLots:[
+        {label:{en:"First pick",ar:"القطفة الأولى"}, date:"5 Sep 2026", weightKg:1850, pricePerKg:22.0},
+        {label:{en:"Second pick",ar:"القطفة الثانية"}, date:"22 Sep 2026", weightKg:1420, pricePerKg:23.5}
+      ], expectedHarvestDate:null },
+
+    { id:"h4", group:"future", code:"BF-N2-H1", photoSeed:71,
+      farm:{en:"Bashayer Farm",ar:"مزرعة بشاير"}, block:{en:"Block N2",ar:"كتلة N2"},
+      crop:"mango", variety:"sukkary", area:2.0, trees:80, treeAge:5, season:"2027",
+      plantingDate:"15 Apr 2021", ownerSince:"1 Dec 2026", ownerUntil:null, photoDate:null,
+      stageCode:"post_harvest_flush", stageSince:"—", stageEnd:"—",
+      acquiredBy:"purchase", contractRef:"HC-2026-0205",
+      activities:[], harvestLots:[], expectedHarvestDate:null },
+
+    { id:"h5", group:"previous", code:"BF-S2-H1", photoSeed:92,
+      farm:{en:"Bashayer Farm",ar:"مزرعة بشاير"}, block:{en:"Block S2",ar:"كتلة S2"},
+      crop:"mango", variety:"yasmina", area:1.8, trees:72, treeAge:9, season:"2025",
+      plantingDate:"20 Jan 2017", ownerSince:"10 May 2021", ownerUntil:"30 Nov 2025", photoDate:"2 Nov 2025",
+      stageCode:"post_harvest_flush", stageSince:"—", stageEnd:"—",
+      acquiredBy:"inheritance", contractRef:"HC-2021-0063",
+      activities:[ act("soil_prep",60,"done"), act("fert_ph",58,"done"), act("harvest1",40,"done",true) ],
+      harvestLots:[ {label:{en:"Final pick",ar:"القطفة الأخيرة"}, date:"14 Sep 2025", weightKg:1210, pricePerKg:20.5} ],
+      expectedHarvestDate:null }
+  ];
+
+  // From `investors` (public.investors) — the signed-in investor's own
+  // record. Fields mirror the real schema: code, investor_type, full_name
+  // [_ar], email, phone, preferred_language, status. share_pct and other
+  // investors' data are staff-only and never reach this app.
+  var INVESTOR = {
+    code:"INV-00142", investorType:"person",
+    fullName:{en:"Ahmed Samir", ar:"أحمد سمير"},
+    email:"ahmed.samir@example.com", phone:"+20 100 123 4567",
+    preferredLanguage:"en", status:"active"
+  };
+  var INVESTOR_TYPE_LABEL = { person:{en:"Individual investor", ar:"مستثمر فردي"}, company:{en:"Company", ar:"شركة"} };
+  var INVESTOR_STATUS_LABEL = { active:{en:"Active", ar:"نشط"}, invited:{en:"Invited", ar:"مدعو"}, suspended:{en:"Suspended", ar:"معلق"} };
+  // From `holding_ownerships.acquired_by` — how this specific holding was acquired.
+  var ACQUIRED_LABEL = {
+    purchase:{en:"Purchase", ar:"شراء"}, transfer:{en:"Transfer", ar:"تحويل ملكية"},
+    inheritance:{en:"Inheritance", ar:"وراثة"}, other:{en:"Other", ar:"أخرى"}
+  };
+
+  /* ================= STATE / NAV ================= */
+  var lang = "en";
+  var currentHoldingId = null;
+  var currentTab = "map";
+
+  function t(key){ var v = S[lang][key]; return typeof v === "function" ? v : v; }
+  function L(obj){ return obj[lang]; }
+
+  function fmtNum(n){ return n.toLocaleString(lang === "ar" ? "en-US" : "en-US"); }
+  function fmtMoney(n){ return Math.round(n).toLocaleString("en-US") + " " + (lang==="ar" ? "ج.م" : "EGP"); }
+
+  function holdingById(id){ for(var i=0;i<HOLDINGS.length;i++){ if(HOLDINGS[i].id===id) return HOLDINGS[i]; } return null; }
+
+  function renderApp(){
+    document.getElementById("screenRoot").setAttribute("dir", lang === "ar" ? "rtl" : "ltr");
+    document.getElementById("screenRoot").setAttribute("lang", lang);
+    if(currentHoldingId) renderDetail(); else renderList();
+  }
+
+  /* ---- List screen ---- */
+  function renderList(){
+    var totalArea = HOLDINGS.filter(function(h){return h.group==="current";}).reduce(function(s,h){return s+h.area;},0);
+    var currentCount = HOLDINGS.filter(function(h){return h.group==="current";}).length;
+
+    var initials = L(INVESTOR.fullName).split(" ").map(function(w){return w[0];}).join("").slice(0,2).toUpperCase();
+    var body = document.getElementById("appBody");
+    body.innerHTML =
+      '<div class="app-header"><div class="row"><div style="flex:1;">' +
+        '<div class="app-title">'+S[lang].listTitle+'</div>' +
+        '<div class="app-sub">'+L(INVESTOR.fullName)+' · '+INVESTOR.code+' · '+INVESTOR_STATUS_LABEL[INVESTOR.status][lang]+'</div>' +
+      '</div><div class="avatar">'+initials+'</div></div></div>' +
+      '<div class="scrollarea" id="listScroll"></div>';
+
+    var scroll = document.getElementById("listScroll");
+    scroll.innerHTML =
+      '<div class="portfolio-stats">' +
+        '<div class="pstat"><div class="n">'+currentCount+'</div><div class="l">'+S[lang].groupCurrent+'</div></div>' +
+        '<div class="pstat"><div class="n">'+totalArea.toFixed(1)+'</div><div class="l">'+S[lang].area+'</div></div>' +
+        '<div class="pstat"><div class="n">6</div><div class="l">'+S[lang].fSeason+' 2026</div></div>' +
+      '</div>';
+
+    var groups = [["current",S[lang].groupCurrent], ["future",S[lang].groupFuture], ["previous",S[lang].groupPrevious]];
+    groups.forEach(function(g){
+      var items = HOLDINGS.filter(function(h){ return h.group === g[0]; });
+      if(!items.length) return;
+      var html = '<div class="group-label">'+g[1]+'</div>';
+      items.forEach(function(h){
+        var stage = stageByCode(h.stageCode);
+        var variety = VARIETIES[h.variety];
+        html += '<div class="holding-card" data-id="'+h.id+'">' +
+          '<div class="holding-thumb" style="background:'+stage.color+'">🌳</div>' +
+          '<div class="holding-main">' +
+            '<div class="holding-name">'+h.code+'</div>' +
+            '<div class="holding-sub">'+L(h.farm)+' › '+L(h.block)+' · '+CROPS.mango[lang]+' '+variety[lang]+'</div>' +
+            '<div class="holding-meta">' +
+              '<span class="pill" style="background:var(--panel-2); color:var(--muted); border:1px solid var(--line);">'+h.area.toFixed(2)+' '+S[lang].area+'</span>' +
+              (g[0]==="current" ? '<span class="pill" style="background:'+stage.color+'22; color:var(--ink);">'+stage[lang]+'</span>' : '') +
+            '</div>' +
+          '</div>' +
+          '<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>' +
+        '</div>';
+      });
+      scroll.insertAdjacentHTML("beforeend", html);
+    });
+
+    Array.prototype.forEach.call(scroll.querySelectorAll(".holding-card"), function(card){
+      card.addEventListener("click", function(){
+        currentHoldingId = card.dataset.id; currentTab = "map"; renderApp();
+      });
+    });
+  }
+
+  /* ---- Detail screen ---- */
+  function renderDetail(){
+    var h = holdingById(currentHoldingId);
+    var body = document.getElementById("appBody");
+    body.innerHTML =
+      '<div class="app-header"><div class="row">' +
+        '<button class="back-btn" id="backBtn" aria-label="'+S[lang].backAria+'"><svg class="back-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M15 18l-6-6 6-6"/></svg></button>' +
+        '<div style="flex:1;"><div class="app-title" style="font-size:15px;">'+h.code+'</div>' +
+        '<div class="app-sub">'+L(h.farm)+' › '+L(h.block)+'</div></div>' +
+      '</div></div>' +
+      '<div class="tabstrip" id="tabstrip">' +
+        tabBtn("map", S[lang].tabMap, false) + tabBtn("details", S[lang].tabDetails, false) +
+        tabBtn("activities", S[lang].tabActivities, true) + tabBtn("harvest", S[lang].tabHarvest, true) +
+      '</div>' +
+      '<div class="scrollarea" id="detailScroll"></div>';
+
+    document.getElementById("backBtn").addEventListener("click", function(){ currentHoldingId = null; renderApp(); });
+    Array.prototype.forEach.call(document.querySelectorAll("#tabstrip .tabbtn"), function(b){
+      b.addEventListener("click", function(){ currentTab = b.dataset.tab; renderApp(); });
+    });
+
+    var scroll = document.getElementById("detailScroll");
+    if(currentTab === "map"){ scroll.innerHTML = renderMapTab(h); wireMapZoom("mapZoomWrap"); }
+    else if(currentTab === "details") scroll.innerHTML = renderDetailsTab(h);
+    else if(currentTab === "activities") scroll.innerHTML = renderActivitiesTab(h);
+    else scroll.innerHTML = renderHarvestTab(h);
+  }
+
+  /* ---- map imagery: a vector field sketch (no remote tiles — the CSP here
+     only allows data:/inline images, so a real satellite/road basemap can't
+     load). What IS real: pinch/scroll zoom and drag-pan on the field itself,
+     which the shipped app doesn't have today (its map is one static image). */
+  function buildMapSvg(h){
+    var block = [[20,30],[280,20],[270,180],[15,170]];
+    var holding = [[90,70],[220,62],[210,150],[85,140]];
+    var toPts = function(p){ return p.map(function(xy){ return xy.join(","); }).join(" "); };
+    var dots = "";
+    var count = Math.min(h.trees, 48);
+    var cols = Math.ceil(Math.sqrt(count*1.6)), rows = Math.ceil(count/cols);
+    var bx0=85, bx1=220, by0=62, by1=150;
+    var seed = h.photoSeed || 10;
+    var i = 0;
+    for(var r=0; r<rows && i<count; r++){
+      for(var c=0; c<cols && i<count; c++){
+        var jitterX = ((seed*7+i*13)%9)-4, jitterY = ((seed*11+i*17)%9)-4;
+        var x = bx0 + (c+0.5)/cols*(bx1-bx0) + jitterX;
+        var y = by0 + (r+0.5)/rows*(by1-by0) + jitterY;
+        dots += '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="3.4" fill="#2f4a24" stroke="#5c7d46" stroke-width=".6"/>';
+        i++;
+      }
+    }
+    return '<defs><clipPath id="treeClip-'+h.id+'"><polygon points="'+toPts(holding)+'"/></clipPath></defs>' +
+      '<polygon points="'+toPts(block)+'" fill="rgba(255,255,255,.06)" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-dasharray="4 3"/>' +
+      '<polygon points="'+toPts(holding)+'" fill="rgba(240,199,91,.3)" stroke="#fff" stroke-width="2"/>' +
+      '<g clip-path="url(#treeClip-'+h.id+')">'+dots+'</g>' +
+      '<text x="150" y="108" font-size="11" fill="#1f2420" text-anchor="middle" font-weight="700">'+h.code+'</text>';
+  }
+
+  function tabBtn(key, label, isNew){
+    var active = currentTab === key;
+    return '<button class="tabbtn'+(active?" active":"")+'" data-tab="'+key+'">'+label+(isNew?'<span class="newdot" title="'+S[lang].newBadge+'"></span>':'')+'</button>';
+  }
+
+  function renderMapTab(h){
+    return '<div class="card">' +
+      '<div class="map-visual" id="mapZoomWrap">' +
+        '<div class="map-inner" id="mapZoomInner"><svg viewBox="0 0 300 200">'+buildMapSvg(h)+'</svg></div>' +
+        '<div class="map-zoom-controls">' +
+          '<button class="map-zoom-btn" id="mapZoomIn" aria-label="Zoom in">+</button>' +
+          '<button class="map-zoom-btn" id="mapZoomOut" aria-label="Zoom out">−</button>' +
+          '<button class="map-zoom-btn" id="mapZoomReset" aria-label="Reset" style="font-size:11px;">⤾</button>' +
+        '</div>' +
+        '<div class="map-scale-badge" id="mapScaleBadge">1.0×</div>' +
+      '</div>' +
+      '<div class="map-caption">'+S[lang].mapCaption+'</div>' +
+      '<div class="map-hint">'+(lang==="ar" ? "قرّب بعجلة الفأرة أو حركة القرص، واسحب للتحريك" : "Scroll or pinch to zoom, drag to pan")+'</div>' +
+    '</div>';
+  }
+
+  function wireMapZoom(wrapId){
+    var wrap = document.getElementById(wrapId);
+    var inner = document.getElementById("mapZoomInner");
+    var badge = document.getElementById("mapScaleBadge");
+    if(!wrap || !inner) return;
+    var MIN_S = 1, MAX_S = 4.5;
+    var scale = 1, tx = 0, ty = 0;
+    var dragging = false, lastX = 0, lastY = 0;
+    var pointers = {}; // active pointerId -> {x,y}
+    var pinchStartDist = null, pinchStartScale = 1, pinchMidStart = null;
+
+    function apply(){
+      inner.style.transform = "translate("+tx+"px,"+ty+"px) scale("+scale+")";
+      badge.textContent = scale.toFixed(1)+"×";
+    }
+    function clampPan(){
+      var rect = wrap.getBoundingClientRect();
+      var maxX = rect.width*(scale-1), maxY = rect.height*(scale-1);
+      tx = Math.min(0, Math.max(-maxX, tx));
+      ty = Math.min(0, Math.max(-maxY, ty));
+    }
+    function zoomAt(clientX, clientY, factor){
+      var rect = wrap.getBoundingClientRect();
+      var px = clientX - rect.left, py = clientY - rect.top;
+      var newScale = Math.min(MAX_S, Math.max(MIN_S, scale*factor));
+      var ratio = newScale/scale;
+      tx = px - ratio*(px - tx);
+      ty = py - ratio*(py - ty);
+      scale = newScale;
+      if(scale <= 1.001){ scale = 1; tx = 0; ty = 0; }
+      clampPan(); apply();
+    }
+
+    wrap.addEventListener("wheel", function(e){
+      e.preventDefault();
+      zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.18 : 1/1.18);
+    }, {passive:false});
+
+    wrap.addEventListener("dblclick", function(e){
+      zoomAt(e.clientX, e.clientY, scale > 1.3 ? (1/scale) : 2.4);
+      wrap.classList.remove("grabbing");
+    });
+
+    wrap.addEventListener("pointerdown", function(e){
+      wrap.setPointerCapture(e.pointerId);
+      pointers[e.pointerId] = {x:e.clientX, y:e.clientY};
+      var ids = Object.keys(pointers);
+      if(ids.length === 1){
+        dragging = true; lastX = e.clientX; lastY = e.clientY; wrap.classList.add("grabbing");
+      } else if(ids.length === 2){
+        dragging = false;
+        var p = ids.map(function(id){ return pointers[id]; });
+        pinchStartDist = Math.hypot(p[0].x-p[1].x, p[0].y-p[1].y);
+        pinchStartScale = scale;
+        pinchMidStart = {x:(p[0].x+p[1].x)/2, y:(p[0].y+p[1].y)/2};
+      }
+    });
+    wrap.addEventListener("pointermove", function(e){
+      if(!(e.pointerId in pointers)) return;
+      pointers[e.pointerId] = {x:e.clientX, y:e.clientY};
+      var ids = Object.keys(pointers);
+      if(ids.length === 2 && pinchStartDist){
+        var p = ids.map(function(id){ return pointers[id]; });
+        var dist = Math.hypot(p[0].x-p[1].x, p[0].y-p[1].y);
+        var factor = (dist/pinchStartDist) * (pinchStartScale/scale);
+        zoomAt(pinchMidStart.x, pinchMidStart.y, factor);
+      } else if(dragging && scale > 1){
+        tx += e.clientX - lastX; ty += e.clientY - lastY;
+        lastX = e.clientX; lastY = e.clientY;
+        clampPan(); apply();
+      }
+    });
+    function endPointer(e){
+      delete pointers[e.pointerId];
+      if(Object.keys(pointers).length < 2) pinchStartDist = null;
+      if(Object.keys(pointers).length === 0){ dragging = false; wrap.classList.remove("grabbing"); }
+    }
+    wrap.addEventListener("pointerup", endPointer);
+    wrap.addEventListener("pointercancel", endPointer);
+    wrap.addEventListener("pointerleave", function(e){ if(dragging) endPointer(e); });
+
+    document.getElementById("mapZoomIn").addEventListener("click", function(){
+      var r = wrap.getBoundingClientRect(); zoomAt(r.left+r.width/2, r.top+r.height/2, 1.4);
+    });
+    document.getElementById("mapZoomOut").addEventListener("click", function(){
+      var r = wrap.getBoundingClientRect(); zoomAt(r.left+r.width/2, r.top+r.height/2, 1/1.4);
+    });
+    document.getElementById("mapZoomReset").addEventListener("click", function(){
+      scale = 1; tx = 0; ty = 0; apply();
+    });
+    apply();
+  }
+
+  function renderDetailsTab(h){
+    var stage = stageByCode(h.stageCode);
+    var variety = VARIETIES[h.variety];
+    var ribbon = "", total = 52;
+    STAGES.forEach(function(s){
+      var w = (s.weeks[1]-s.weeks[0]+1)/total*100;
+      ribbon += '<div class="seg" style="width:'+w+'%; background:'+s.color+'"></div>';
+    });
+
+    var rows = [
+      [S[lang].fCrop, CROPS.mango[lang]+" — "+variety[lang]],
+      [S[lang].fArea, h.area.toFixed(2)+" "+S[lang].area],
+      [S[lang].fTrees, h.trees+" ("+h.treeAge+"y)"],
+      [S[lang].fSeason, h.season],
+      [S[lang].fPlanted, h.plantingDate],
+      [S[lang].fOwnerSince, h.ownerSince]
+    ];
+    if(h.ownerUntil) rows.push([S[lang].fOwnerUntil, h.ownerUntil]);
+    if(h.acquiredBy) rows.push([S[lang].fAcquiredBy, ACQUIRED_LABEL[h.acquiredBy][lang]]);
+    if(h.contractRef) rows.push([S[lang].fContractRef, h.contractRef]);
+    if(h.group === "future") rows.push([S[lang].ownershipEndsLabel, h.ownerSince]);
+
+    var html = "";
+    if(h.photoDate){
+      html += '<div class="card"><div class="card-title">'+S[lang].photoTitle+'</div>' +
+        '<div class="photo-visual">'+photoSvg(h.photoSeed, 320)+'</div>' +
+        '<div class="map-caption">'+S[lang].photoCaption(h.photoDate)+'</div></div>';
+    }
+    html += '<div class="card"><div class="card-title">'+S[lang].fStage+'</div>';
+    if(h.group !== "future"){
+      html += '<div style="font-size:13.5px; font-weight:800; margin-bottom:2px;">'+stage[lang]+'</div>' +
+        '<div class="stage-ribbon">'+ribbon+'</div>' +
+        '<div class="kv-row"><span class="k">'+S[lang].fStageSince+'</span><span class="v">'+h.stageSince+'</span></div>' +
+        '<div class="kv-row"><span class="k">'+S[lang].fStageEnd+'</span><span class="v">'+h.stageEnd+'</span></div>';
+    } else {
+      html += '<div class="empty-note">'+S[lang].noActivitiesFuture+'</div>';
+    }
+    html += '</div><div class="card">';
+    rows.forEach(function(r){ html += '<div class="kv-row"><span class="k">'+r[0]+'</span><span class="v">'+r[1]+'</span></div>'; });
+    html += '</div>';
+    return html;
+  }
+
+  function renderActivitiesTab(h){
+    var bannerText = lang==="en" ? "not yet built — proposed addition" : "مُقترحة — غير مبنية بعد";
+    if(!h.activities.length){
+      return '<div class="new-banner">✦ '+S[lang].newBadge+' — '+bannerText+'</div>' +
+        '<div class="card"><div class="empty-note">'+S[lang].noActivitiesFuture+'</div></div>';
+    }
+    var done = h.activities.filter(function(a){ return a.status==="done"; }).length;
+    var html = '<div class="new-banner">✦ '+S[lang].newBadge+' — '+(lang==="en"?"not yet built — proposed addition":"مُقترحة — غير مبنية بعد")+'</div>';
+    html += '<div class="progress-line"><div class="progress-track"><div class="progress-fill" style="width:'+Math.round(done/h.activities.length*100)+'%"></div></div>' +
+      '<div class="progress-text">'+Math.round(done/h.activities.length*100)+'%</div></div>';
+    html += '<div class="card" style="padding-top:4px;">';
+    var sorted = h.activities.slice().sort(function(a,b){ return a.weeksAgo - b.weeksAgo; }).reverse();
+    sorted.forEach(function(a){
+      var label = ACT_LABEL[a.key][lang];
+      var dateTxt = a.weeksAgo === 0 && a.status!=="done" ? S[lang].statusUpcoming : (a.weeksAgo+"w");
+      var dotColor = a.status==="done" ? "var(--primary)" : a.status==="progress" ? "var(--warn)" : null;
+      var icon = a.status==="done" ? "✓" : a.status==="progress" ? "●" : "";
+      var showPhoto = a.photo && a.status !== "upcoming";
+      html += '<div class="activity-item">' +
+        '<div class="activity-dot'+(a.status==="upcoming"?" upcoming":"")+'" style="'+(dotColor?('background:'+dotColor):'')+'">'+icon+'</div>' +
+        '<div class="activity-main"><div class="activity-title'+(a.status==="upcoming"?" upcoming":"")+'">'+label+'</div>' +
+        '<div class="activity-date">'+(a.status==="done" ? a.weeksAgo+(lang==="en"?"w ago":" أسبوع مضى") : (a.status==="progress" ? S[lang].statusProgress : S[lang].statusUpcoming))+'</div></div>' +
+        (showPhoto ? '<div class="activity-photo" title="'+S[lang].photoBadge+'">'+photoSvg(h.photoSeed + a.weeksAgo, 40) +
+          '<span class="camera-badge">'+cameraBadge()+'</span></div>' : '') +
+      '</div>';
+    });
+    html += '</div>';
+    html += '<div class="card"><div class="card-title">'+S[lang].activitiesDoneOf(done, h.activities.length)+'</div></div>';
+    return html;
+  }
+
+  function renderHarvestTab(h){
+    var bannerText = lang==="en" ? "not yet built — weight &amp; revenue need new backend fields" : "مُقترحة — الوزن والإيراد يحتاجان حقولاً جديدة في النظام";
+    var html = '<div class="new-banner">✦ '+S[lang].newBadge+' — '+bannerText+'</div>';
+
+    if(!h.harvestLots.length){
+      var note = h.group === "future" ? S[lang].noHarvestFuture : (h.expectedHarvestDate ? S[lang].noHarvestYet(h.expectedHarvestDate) : S[lang].noHarvestFuture);
+      html += '<div class="card"><div class="empty-note">'+note+'</div></div>';
+      return html;
+    }
+
+    var totalWeight = h.harvestLots.reduce(function(s,l){ return s+l.weightKg; }, 0);
+    var totalRevenue = h.harvestLots.reduce(function(s,l){ return s+l.weightKg*l.pricePerKg; }, 0);
+    var avgPrice = totalRevenue / totalWeight;
+
+    if(h.group === "previous"){ html += '<div class="card"><div class="empty-note" style="padding:10px;">'+S[lang].finalSeasonNote+'</div></div>'; }
+
+    html += '<div class="card"><div class="big-stat-row">' +
+      '<div class="big-stat"><div class="n">'+fmtNum(totalWeight)+'</div><div class="l">'+S[lang].harvestTotalWeight+' (kg)</div></div>' +
+      '<div class="big-stat"><div class="n">'+fmtMoney(totalRevenue)+'</div><div class="l">'+S[lang].harvestTotalRevenue+'</div></div>' +
+      '<div class="big-stat"><div class="n">'+avgPrice.toFixed(1)+'</div><div class="l">'+S[lang].harvestAvgPrice+S[lang].perKg+'</div></div>' +
+    '</div></div>';
+
+    var maxW = Math.max.apply(null, h.harvestLots.map(function(l){return l.weightKg;}));
+    html += '<div class="card"><div class="card-title">'+S[lang].weightByLot+'</div><div class="chart">';
+    h.harvestLots.forEach(function(l){
+      html += '<div class="colwrap"><div class="bar" style="height:'+Math.max(8,(l.weightKg/maxW*84))+'px"></div><div class="lbl">'+L(l.label)+'</div></div>';
+    });
+    html += '</div></div>';
+
+    html += '<div class="card">';
+    h.harvestLots.forEach(function(l){
+      html += '<div class="harvest-lot"><div class="lot-icon">🧺</div>' +
+        '<div class="lot-main"><div class="lot-title">'+L(l.label)+'</div><div class="lot-date">'+l.date+' · '+l.pricePerKg.toFixed(1)+' '+(lang==="ar"?"ج.م":"EGP")+S[lang].perKg+'</div></div>' +
+        '<div class="lot-nums"><div class="lot-weight">'+fmtNum(l.weightKg)+' kg</div><div class="lot-revenue">'+fmtMoney(l.weightKg*l.pricePerKg)+'</div></div>' +
+      '</div>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  /* ---- language toggle ---- */
+  var btnEn = document.getElementById("btn-en"), btnAr = document.getElementById("btn-ar");
+  function setLang(l){
+    lang = l;
+    btnEn.classList.toggle("active", l==="en");
+    btnAr.classList.toggle("active", l==="ar");
+    try { localStorage.setItem("investorAppLang", l); } catch(e){}
+    renderApp();
+  }
+  btnEn.addEventListener("click", function(){ setLang("en"); });
+  btnAr.addEventListener("click", function(){ setLang("ar"); });
+
+  var saved = null;
+  try { saved = localStorage.getItem("investorAppLang"); } catch(e){}
+  renderApp();
+  if(saved === "ar") setLang("ar");
+})();
+</script>
+</body>
+</html>
