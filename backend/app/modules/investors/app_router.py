@@ -7,6 +7,10 @@ Mounted under /api/v1:
   GET /investor/holdings/{holding_id}    investor_app.use
   GET /investor/holdings/{holding_id}/latest-photo
                                          investor_app.use
+  GET /investor/holdings/{holding_id}/activities
+                                         investor_app.use
+  GET /investor/holdings/{holding_id}/site-photo
+                                         investor_app.use
   GET /investor/app-version              investor_app.use
 
 The caller never names an investor: the row is found from the token's user.
@@ -30,9 +34,11 @@ from app.core.settings import get_settings
 from app.modules.imagery.service import get_imagery_service
 from app.modules.investors.router import _ensure_tenant
 from app.modules.investors.schemas import (
+    InvestorAppActivity,
     InvestorAppHoldingResponse,
     InvestorAppMeResponse,
     InvestorAppPhotoResponse,
+    InvestorAppSitePhotoResponse,
     InvestorAppVersionResponse,
 )
 from app.modules.investors.service import InvestorsService, get_investors_service
@@ -122,6 +128,41 @@ async def investor_holding_latest_photo(
             else None
         ),
     }
+
+
+@router.get("/holdings/{holding_id}/activities", response_model=list[InvestorAppActivity])
+async def investor_holding_activities(
+    holding_id: UUID,
+    context: RequestContext = Depends(requires_capability("investor_app.use")),
+    service: InvestorsService = Depends(_service),
+) -> list[dict[str, Any]]:
+    """The season's activities on the holding's block, inside the ownership.
+
+    Decision D4: title, type, date, status and photos only; skipped ones are
+    left out. Decision D5: photos staff hid from investors never appear.
+    """
+    return await service.app_holding_activities(
+        user_id=context.user_id,
+        keycloak_subject=context.keycloak_subject,
+        email=context.email,
+        holding_id=holding_id,
+    )
+
+
+@router.get("/holdings/{holding_id}/site-photo", response_model=InvestorAppSitePhotoResponse)
+async def investor_holding_site_photo(
+    holding_id: UUID,
+    context: RequestContext = Depends(requires_capability("investor_app.use")),
+    service: InvestorsService = Depends(_service),
+) -> dict[str, Any]:
+    """The newest on-site photo of the holding's block: a block photo or a
+    visible activity photo, up to the end of the ownership."""
+    return await service.app_holding_site_photo(
+        user_id=context.user_id,
+        keycloak_subject=context.keycloak_subject,
+        email=context.email,
+        holding_id=holding_id,
+    )
 
 
 @router.get("/app-version", response_model=InvestorAppVersionResponse)

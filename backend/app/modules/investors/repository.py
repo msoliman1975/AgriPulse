@@ -894,9 +894,10 @@ class InvestorsRepository:
                    b.code AS block_code, b.name AS block_name, b.name_ar AS block_name_ar,
                    ST_AsGeoJSON(b.boundary)::jsonb AS block_boundary,
                    f.name AS farm_name, f.name_ar AS farm_name_ar,
-                   -- Internal: lets the app route find the farm's latest
-                   -- photo. The response allowlist never returns it.
-                   b.farm_id,
+                   -- Internal: lets the app routes find the farm's latest
+                   -- photo and the block's activities. The response
+                   -- allowlist never returns them.
+                   b.farm_id, h.block_id,
                    crop.crop_name_en, crop.crop_name_ar,
                    crop.variety_name_en, crop.variety_name_ar, crop.planting_date,
                    crop.stage_name_en, crop.stage_name_ar,
@@ -962,6 +963,72 @@ class InvestorsRepository:
             params,
             tuple(uuid_params),
         )
+
+    # ---- Investor app: activities and site photo (build plan 3.4) ---------
+
+    async def investor_block_activities(
+        self, *, block_id: UUID, from_date: date, to_date: date
+    ) -> list[dict[str, Any]]:
+        """Activities on the block in [from_date, to_date], with visible photos.
+
+        D4: no product, dosage or notes, and skipped activities are left out.
+        D5: a photo staff hid from investors never comes back.
+        """
+        return await self._rows(
+            """
+            SELECT a.id, a.activity_type, a.title, a.title_ar, a.scheduled_date,
+                   a.status, a.completed_at,
+                   COALESCE(
+                     (SELECT json_agg(json_build_object(
+                               's3_key', p.s3_key, 'taken_at', p.taken_at)
+                             ORDER BY p.created_at, p.id)
+                        FROM plan_activity_photos p
+                       WHERE p.activity_id = a.id
+                         AND p.deleted_at IS NULL
+                         AND NOT p.hidden_from_investors),
+                     '[]'::json
+                   ) AS photos
+              FROM plan_activities a
+             WHERE a.block_id = :block_id
+               AND a.deleted_at IS NULL
+               AND a.status <> 'skipped'
+               AND a.scheduled_date BETWEEN :from_date AND :to_date
+             ORDER BY a.scheduled_date, a.id
+            """,
+            {"block_id": block_id, "from_date": from_date, "to_date": to_date},
+            ("block_id",),
+        )
+
+    async def investor_block_site_photo(
+        self, *, block_id: UUID, until: date | None
+    ) -> dict[str, Any] | None:
+        """The newest photo of the block: a block attachment of kind ``photo``
+        or a visible activity photo, taken on or before ``until`` when set."""
+        rows = await self._rows(
+            """
+            SELECT s3_key, taken_at FROM (
+                SELECT ba.s3_key, COALESCE(ba.taken_at, ba.created_at) AS taken_at
+                  FROM block_attachments ba
+                 WHERE ba.block_id = :block_id
+                   AND ba.kind = 'photo'
+                   AND ba.deleted_at IS NULL
+                UNION ALL
+                SELECT p.s3_key, COALESCE(p.taken_at, p.created_at) AS taken_at
+                  FROM plan_activity_photos p
+                  JOIN plan_activities a ON a.id = p.activity_id
+                 WHERE a.block_id = :block_id
+                   AND a.deleted_at IS NULL
+                   AND p.deleted_at IS NULL
+                   AND NOT p.hidden_from_investors
+            ) photos
+             WHERE CAST(:until AS date) IS NULL OR taken_at::date <= CAST(:until AS date)
+             ORDER BY taken_at DESC
+             LIMIT 1
+            """,
+            {"block_id": block_id, "until": until},
+            ("block_id",),
+        )
+        return rows[0] if rows else None
 
     # ---- Block detection ---------------------------------------------------
 

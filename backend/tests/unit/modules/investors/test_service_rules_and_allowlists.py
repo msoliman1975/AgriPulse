@@ -225,3 +225,57 @@ def test_investor_app_holding_turns_image_keys_into_urls() -> None:
     assert out["crop_image_url"].endswith(f"/crops/{_FARM}/{_HOLDING}/256.webp")
     assert out["crop_icon_url"].endswith(f"/crops/{_FARM}/{_HOLDING}/64.webp")
     assert set(out) <= set(InvestorAppHoldingResponse.model_fields)
+
+
+# ---- Build plan v2, PR 4: activities and site photo (D4, D5) ---------------
+
+
+def test_investor_app_activity_fields_are_pinned() -> None:
+    from app.modules.investors.schemas import InvestorAppActivity, InvestorAppActivityPhoto
+
+    # D4: title and type, date, status, photos. Never product, dosage or notes.
+    assert set(InvestorAppActivity.model_fields) == {
+        "id",
+        "activity_type",
+        "title",
+        "title_ar",
+        "scheduled_date",
+        "status",
+        "completed_at",
+        "photos",
+    }
+    assert set(InvestorAppActivityPhoto.model_fields) == {"thumb_url", "url", "taken_at"}
+
+
+def test_investor_app_site_photo_fields_are_pinned() -> None:
+    from app.modules.investors.schemas import InvestorAppSitePhoto, InvestorAppSitePhotoResponse
+
+    assert set(InvestorAppSitePhotoResponse.model_fields) == {"holding_id", "photo"}
+    assert set(InvestorAppSitePhoto.model_fields) == {"url", "taken_at"}
+
+
+def test_season_is_the_active_plans_year_else_this_year() -> None:
+    from datetime import date
+
+    from app.modules.investors.service import season_window
+
+    today = date(2026, 11, 16)
+    assert season_window("2026", today) == (date(2026, 1, 1), date(2026, 12, 31))
+    assert season_window("2025/26", today) == (date(2025, 1, 1), date(2025, 12, 31))
+    assert season_window(None, today) == (date(2026, 1, 1), date(2026, 12, 31))
+    assert season_window("winter", today) == (date(2026, 1, 1), date(2026, 12, 31))
+
+
+def test_activities_window_is_clipped_to_the_ownership() -> None:
+    from datetime import date
+
+    from app.modules.investors.service import ownership_window
+
+    today = date(2026, 11, 16)
+    current = {"current_season": "2026", "start_date": date(2026, 3, 1), "end_date": None}
+    assert ownership_window(current, today) == (date(2026, 3, 1), date(2026, 12, 31))
+    past = {"current_season": "2026", "start_date": date(2025, 1, 1), "end_date": date(2026, 6, 30)}
+    assert ownership_window(past, today) == (date(2026, 1, 1), date(2026, 6, 30))
+    # Ended before this season began: nothing to show.
+    gone = {"current_season": "2026", "start_date": date(2024, 1, 1), "end_date": date(2025, 5, 1)}
+    assert ownership_window(gone, today) is None
