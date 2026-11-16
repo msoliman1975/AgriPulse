@@ -4422,7 +4422,19 @@ global:
       #   Watch: both routes answer 200 for an investor and 404 for another
       #   investor's holding; /investor/holdings unchanged.
       #   Rollback: api to a19ce55.
-      tag: "d61349b"
+      # 2f3fb84 = #893, api (d61349b..2f3fb84 is #893 plus the #892
+      #   promotion). Investor app v2 PR 5, harvest records. tenant 0111 adds
+      #   harvest_lots (additive, PreSync). New module harvest: GET/POST
+      #   /blocks/{id}/harvest-lots, PATCH/DELETE /harvest-lots/{id}; new
+      #   capabilities harvest.read (TenantOwner, TenantAdmin, FarmManager,
+      #   Agronomist, Viewer, InvestmentManager, PlatformSupport) and
+      #   harvest.manage (TenantOwner, TenantAdmin, FarmManager). Audited.
+      #   Workers unchanged at 8bfe412.
+      #   Watch: migrate PreSync succeeds (tenant head 0111 in every tenant);
+      #   GET /blocks/{id}/harvest-lots answers 200 for a farm manager.
+      #   Rollback: api to d61349b. The table can stay; the old image never
+      #   reads it.
+      tag: "2f3fb84"
     workers:
       tag: "8bfe412"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
@@ -5290,7 +5302,13 @@ global:
       #   Watch: the Beta designer opens and its tabs work; the plan board
       #   loads and an activity drawer opens.
       #   Rollback: frontend to 8bfe412.
-      tag: "a19ce55"
+      # 2f3fb84 = #893, frontend: a Harvest card on the block page (list,
+      #   totals, add/edit/delete for harvest.manage) and the two new
+      #   capabilities in the RBAC mirror. Needs the api at 2f3fb84.
+      #   Watch: the Beta designer opens and its tabs work; a block page
+      #   renders with the Harvest card.
+      #   Rollback: frontend to a19ce55.
+      tag: "2f3fb84"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
