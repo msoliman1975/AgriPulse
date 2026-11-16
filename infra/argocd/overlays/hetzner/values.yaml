@@ -4353,9 +4353,18 @@ global:
       #   catalogue edit without Arabic answers 422 arabic-required.
       #   Rollback: api and workers to 2f112c5. The new tables and columns can
       #   stay; the old image never reads them.
-      tag: "13a8eca"
+      # 09e94e2 = #879, api and workers (13a8eca..09e94e2 is #879 plus the
+      #   docs-only #878). Removes POST /plan-templates/{id}/preview and
+      #   /apply (the one-shot Apply template flow; saved plans replaced it and
+      #   the frontend stopped calling them in #871) and the
+      #   plan_template.apply capability. GET /plan-templates/appliable and
+      #   the saved-plan routes are unchanged. No migration.
+      #   Watch: POST /plan-templates/{id}/apply answers 404 or 405; the Agri
+      #   Operation plan wizard still lists manuals (appliable answers 200).
+      #   Rollback: api and workers to 13a8eca.
+      tag: "09e94e2"
     workers:
-      tag: "13a8eca"
+      tag: "09e94e2"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
     #   by #673, all found by using the deployed build:
     #
@@ -5201,7 +5210,12 @@ global:
       #   Watch: the Beta designer opens and its tabs work; the crop catalogue
       #   shows Documents; a block page renders.
       #   Rollback: frontend to 2f112c5 together with the api.
-      tag: "13a8eca"
+      # 09e94e2 = #879, frontend: only the capability list drops
+      #   plan_template.apply (nothing in the UI checked it). Moves with the
+      #   api so the two lists stay in step.
+      #   Watch: the Beta designer opens and its tabs work.
+      #   Rollback: this tag alone back to 13a8eca.
+      tag: "09e94e2"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
