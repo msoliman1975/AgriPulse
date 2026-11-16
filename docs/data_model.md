@@ -359,6 +359,7 @@ The crop catalog. Curated by platform admins. About 20 entries seeded for Egypt 
 | `relevant_indices` | TEXT[] | NOT NULL, DEFAULT `ARRAY['ndvi']` | `['ndvi','ndre','ndwi']` etc. — used to pre-compute indices |
 | `phenology_stages` | JSONB | | Array of `{stage, start_gdd, end_gdd, ...}` for P2 phenology models |
 | `default_thresholds` | JSONB | | Platform-curated rule thresholds (NDVI deviation cutoffs, frost threshold, irrigation deficit triggers, etc.). Inherited by every variety; varieties may override per key. |
+| `image_s3_key` | TEXT | CHECK (NULL or `LIKE 'platform/crop-images/%'`) | Crop image original (public 0114). Square WebP renditions (64/128/256 px) sit next to it; APIs return `crop_image_url` / `crop_icon_url`, never the key. See ADR 0004. |
 | `is_active` | BOOLEAN | NOT NULL, DEFAULT TRUE | |
 | audit cols | | | |
 
@@ -380,6 +381,7 @@ Variety-level detail under a crop. Optional — most crops will have only their 
 | `attributes` | JSONB | NOT NULL, DEFAULT `'{}'` | `{maturity_days: 240, market: 'export'}` |
 | `default_thresholds` | JSONB | | Variety-level override of `crops.default_thresholds`. Shallow-merged at read time — variety wins per key. |
 | `phenology_stages_override` | JSONB | | When non-NULL, replaces `crops.phenology_stages` wholesale for this variety (the array is too irregular to merge keywise). |
+| `image_s3_key` | TEXT | same CHECK as `crops` | Overrides the crop's image for this variety (public 0114). |
 | `is_active` | BOOLEAN | NOT NULL, DEFAULT TRUE | |
 | audit cols | | | |
 

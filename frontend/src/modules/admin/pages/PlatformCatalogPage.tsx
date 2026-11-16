@@ -38,6 +38,7 @@ import { Toolbar } from "@/components/Toolbar";
 import { queryState } from "@/components/asyncState";
 import { AttributesPanel } from "@/modules/admin/components/catalog/CatalogAttributes";
 import { CreateCropForm, CreateNodeForm } from "@/modules/admin/components/catalog/CatalogCreate";
+import { CatalogImage } from "@/modules/admin/components/catalog/CatalogImage";
 import { DocumentsPanel } from "@/modules/admin/components/catalog/CatalogDocuments";
 import { HealthPanel } from "@/modules/admin/components/catalog/CatalogHealth";
 import { ReferenceValuesPanel } from "@/modules/admin/components/catalog/CatalogReferenceValues";
@@ -271,6 +272,8 @@ function Inspector({
           {canManage ? <RetireButton chain={chain} /> : null}
         </div>
       </header>
+
+      <CatalogImage chain={chain} canManage={canManage} />
 
       {adding && childLevel ? (
         <CreateNodeForm

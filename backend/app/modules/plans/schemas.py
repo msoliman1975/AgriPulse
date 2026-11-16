@@ -213,6 +213,9 @@ class BoardBlockResponse(BaseModel):
     name: str | None
     name_ar: str | None = None
     unit_type: str
+    # The image of the crop the block grows today, variety override first.
+    crop_image_url: str | None = None
+    crop_icon_url: str | None = None
 
 
 class BoardResourceChip(BaseModel):

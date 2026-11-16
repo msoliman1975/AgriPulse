@@ -35,6 +35,10 @@ export interface BlockCropAssignment {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  /** The crop's picture (variety override first): 256 px / 64 px WebP on a
+   *  public, cacheable URL. Null when the crop has no image. */
+  crop_image_url?: string | null;
+  crop_icon_url?: string | null;
 }
 
 export interface BlockCropAssignPayload {
@@ -86,6 +90,11 @@ export interface FarmCropAssignment {
   effective_from: string;
   effective_to: string | null;
   status: BlockCropStatus;
+  crop_variety_id?: string | null;
+  /** The crop's picture (variety override first): 256 px / 64 px WebP on a
+   *  public, cacheable URL. Null when the crop has no image. */
+  crop_image_url?: string | null;
+  crop_icon_url?: string | null;
 }
 
 /**

@@ -109,6 +109,7 @@ from app.shared.storage import (
     StorageClient,
     StorageObjectMissingError,
     build_attachment_key,
+    crop_image_urls,
     get_storage_client,
 )
 
@@ -2066,7 +2067,29 @@ class FarmServiceImpl:
         return result
 
     async def list_block_crops(self, *, block_id: UUID) -> list[dict[str, Any]]:
-        return await self._repo.list_block_crops(block_id=block_id)
+        rows = await self._repo.list_block_crops(block_id=block_id)
+        return await self._with_crop_images(rows)
+
+    async def _with_crop_images(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Add ``crop_image_url`` / ``crop_icon_url`` (variety override first) to each row.
+
+        Rows need ``crop_id`` and ``crop_variety_id``. Two queries for any
+        number of rows.
+        """
+        crops, varieties = await self._repo.crop_image_keys(
+            crop_ids=[r["crop_id"] for r in rows],
+            variety_ids=[r["crop_variety_id"] for r in rows if r.get("crop_variety_id")],
+        )
+        return [
+            {
+                **r,
+                **crop_image_urls(
+                    crops.get(r["crop_id"]),
+                    varieties.get(r["crop_variety_id"]) if r.get("crop_variety_id") else None,
+                ),
+            }
+            for r in rows
+        ]
 
     async def list_farm_crop_assignments(self, *, farm_id: UUID, on: _date) -> list[dict[str, Any]]:
         """The crop each block on the farm carried on `on`.
@@ -2132,13 +2155,14 @@ class FarmServiceImpl:
                     "variety_name_ar": (variety[1] or variety[0]) if variety else None,
                     "strain_name_en": strain[0] if strain else None,
                     "strain_name_ar": (strain[1] or strain[0]) if strain else None,
+                    "crop_variety_id": assignment.crop_variety_id,
                     "season_label": assignment.season_label,
                     "effective_from": assignment.effective_from,
                     "effective_to": assignment.effective_to,
                     "status": assignment.status,
                 }
             )
-        return out
+        return await self._with_crop_images(out)
 
     # ---- Bulk crop assignment ---------------------------------------------
     #

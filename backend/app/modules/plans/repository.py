@@ -260,18 +260,38 @@ class PlansRepository:
         return (await self._session.execute(stmt)).scalars().first() is not None
 
     async def list_active_blocks(self, *, farm_id: UUID) -> tuple[dict[str, Any], ...]:
-        """Active blocks (active_to NULL or future-dated)."""
+        """Active blocks (active_to NULL or future-dated).
+
+        Each row also carries the image keys of the crop the block grows
+        today (``crop_image_key``, ``variety_image_key``), for the board's
+        crop avatar. Today's assignment is the one whose half-open validity
+        range contains the date, as ``farms.validity.is_active_on`` says.
+        """
         rows = (
             (
                 await self._session.execute(
                     text(
                         """
-                        SELECT id, code, name, name_ar, unit_type
-                        FROM blocks
-                        WHERE farm_id = :farm_id
-                          AND deleted_at IS NULL
-                          AND (active_to IS NULL OR active_to > current_date)
-                        ORDER BY code
+                        SELECT b.id, b.code, b.name, b.name_ar, b.unit_type,
+                               cur.crop_image_key, cur.variety_image_key
+                        FROM blocks b
+                        LEFT JOIN LATERAL (
+                            SELECT c.image_s3_key AS crop_image_key,
+                                   v.image_s3_key AS variety_image_key
+                              FROM block_crops bc
+                              JOIN public.crops c ON c.id = bc.crop_id
+                              LEFT JOIN public.crop_varieties v ON v.id = bc.crop_variety_id
+                             WHERE bc.block_id = b.id
+                               AND bc.deleted_at IS NULL
+                               AND bc.effective_from <= current_date
+                               AND (bc.effective_to IS NULL OR bc.effective_to > current_date)
+                             ORDER BY bc.effective_from DESC
+                             LIMIT 1
+                        ) cur ON true
+                        WHERE b.farm_id = :farm_id
+                          AND b.deleted_at IS NULL
+                          AND (b.active_to IS NULL OR b.active_to > current_date)
+                        ORDER BY b.code
                         """
                     ).bindparams(bindparam("farm_id", type_=PG_UUID(as_uuid=True))),
                     {"farm_id": farm_id},

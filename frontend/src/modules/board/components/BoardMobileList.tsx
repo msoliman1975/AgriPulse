@@ -8,6 +8,7 @@ import { localizedName } from "@/lib/localizedField";
 
 import { ActivityChip } from "./ActivityChip";
 import { Card } from "@/components/Card";
+import { CropAvatar } from "@/components/CropAvatar";
 
 interface BoardMobileListProps {
   blocks: BoardBlock[];
@@ -48,13 +49,18 @@ export function BoardMobileList({
         return (
           <Card noPadding key={block.id}>
             <header className="flex items-center justify-between border-b border-ap-line p-3">
-              <div>
-                <div className="font-medium text-ap-ink">{block.code}</div>
-                {block.name ? (
-                  <div className="text-xs text-ap-muted">
-                    {localizedName(i18n.language, block.name, block.name_ar)}
-                  </div>
+              <div className="flex items-center gap-2">
+                {block.crop_icon_url ? (
+                  <CropAvatar name={block.code} imageUrl={block.crop_icon_url} size="sm" />
                 ) : null}
+                <div>
+                  <div className="font-medium text-ap-ink">{block.code}</div>
+                  {block.name ? (
+                    <div className="text-xs text-ap-muted">
+                      {localizedName(i18n.language, block.name, block.name_ar)}
+                    </div>
+                  ) : null}
+                </div>
               </div>
               {canManage && onBlockAddClick ? (
                 <button

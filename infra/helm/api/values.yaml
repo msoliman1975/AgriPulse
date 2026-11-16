@@ -156,6 +156,8 @@ env:
   # They are separate on purpose: the verification link must point at the
   # API, because `app.<envHost>/api/*` serves the SPA and a link built from
   # the app origin would return HTML and verify nothing.
+  # Public API origin for URLs opened outside the API client (crop images).
+  API_PUBLIC_BASE_URL: "https://api.{{ .Values.global.envHost }}"
   TRIAL_API_BASE_URL: "https://api.{{ .Values.global.envHost }}"
   TRIAL_APP_BASE_URL: "https://app.{{ .Values.global.envHost }}"
   # The marketing site, which hosts the form and the status page. Its own

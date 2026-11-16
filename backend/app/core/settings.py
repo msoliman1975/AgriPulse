@@ -563,6 +563,11 @@ class Settings(BaseSettings):
     # Trailing slashes are stripped when the link is built.
     app_base_url: str = "http://localhost:5173"
 
+    # The API's own public origin, for URLs a client opens without the API
+    # client: crop images in an <img> tag (`/api/v1/public/crop-images/...`).
+    # Not the app origin: `app.<host>/api/*` serves the SPA's index.html.
+    api_public_base_url: str = "http://localhost:8000"
+
     # --- AgriPulse Investor app (Android) --------------------------------
     # A direct APK does not update itself, so the app asks for these at
     # start. Below the minimum it shows "Update required"; the link is where

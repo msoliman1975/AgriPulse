@@ -96,6 +96,9 @@ class Crop(Base, TimestampedMixin):
     classification_depth: Mapped[str] = mapped_column(
         Text, nullable=False, server_default=text("'crop_only'")
     )
+    # S3 key of the uploaded crop image (public 0114); renditions sit next to
+    # it. Read through ``app.shared.storage.crop_image_urls``, never served raw.
+    image_s3_key: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class CropVariety(Base, TimestampedMixin):
@@ -131,6 +134,8 @@ class CropVariety(Base, TimestampedMixin):
     gdd_method: Mapped[str | None] = mapped_column(Text, nullable=True)
     gdd_start_kind: Mapped[str | None] = mapped_column(Text, nullable=True)
     gdd_start_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Overrides the crop's image when set (public 0114).
+    image_s3_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("TRUE"))
 
 

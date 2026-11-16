@@ -47,6 +47,7 @@ from app.modules.investors.stage_dates import stage_expected_end
 from app.shared import clock
 from app.shared.auth.context import TenantRole
 from app.shared.db.ids import uuid7
+from app.shared.storage import crop_image_urls
 
 _MAX_VERTICES = 2000
 
@@ -934,8 +935,10 @@ class InvestorsService:
 
 
 def _with_stage_end(row: dict[str, Any]) -> dict[str, Any]:
-    """Swap the stage's advance rule for the date it is expected to end."""
+    """Swap the stage's advance rule for the date it is expected to end,
+    and the crop image keys for their public URLs."""
     out = dict(row)
+    out.update(crop_image_urls(out.pop("crop_image_key", None), out.pop("variety_image_key", None)))
     advance = out.pop("stage_advance", None)
     out["stage_expected_end"] = (
         stage_expected_end(advance, planting_date=out.get("planting_date"), today=clock.today())
