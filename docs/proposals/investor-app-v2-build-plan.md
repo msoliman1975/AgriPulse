@@ -199,7 +199,7 @@ The loop is self-paced. Each iteration:
 | 4 | Investor activities + site photo | deployed | [#891](https://github.com/msoliman1975/AgriPulse/pull/891), merged `d61349b` | api `d61349b` (rollback `a19ce55`); season = active plan's calendar year; `thumb_url` = full image until activity photos get renditions |
 | 5 | Harvest records | deployed | [#893](https://github.com/msoliman1975/AgriPulse/pull/893), merged `2f3fb84` | api and frontend `2f3fb84` (rollback api `d61349b`, frontend `a19ce55`); tenant 0111; harvest.manage: TenantOwner, TenantAdmin, FarmManager; harvest.read adds PlatformSupport, InvestmentManager, Agronomist, Viewer (owner to confirm) |
 | 6 | Investor harvest | deployed | [#895](https://github.com/msoliman1975/AgriPulse/pull/895), merged `d8f0143` | api `d8f0143` (rollback `2f3fb84`); D1 uses the block's `plant_count` from its planting layout |
-| 7 | App: list, map, details | not started | | |
+| 7 | App: list, map, details | deployed | [#897](https://github.com/msoliman1975/AgriPulse/pull/897), merged `9bfc0e0` | APK built by the CI `mobile` job; reaches investors with the PR 10 release. Map already zoomed and panned (MapLibre): rotation and tilt now off, "Back to my holding" button. D6 counts each block activity once across holdings |
 | 8 | App: Activities tab | not started | | |
 | 9 | App: Harvest tab | not started | | |
 | 10 | Release | waiting on 7–9 | | |
