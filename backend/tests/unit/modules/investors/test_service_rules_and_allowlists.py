@@ -124,6 +124,11 @@ def test_investor_app_holding_fields_are_pinned() -> None:
         # Build plan v2, PR 1: the crop's public picture, nothing tenant-specific.
         "crop_image_url",
         "crop_icon_url",
+        # Build plan v2, PR 2: the stage code, the dated stage list and the
+        # expected harvest start.
+        "stage_code",
+        "stages",
+        "expected_harvest_on",
         "stage_name_en",
         "stage_name_ar",
         "stage_started_on",
@@ -144,6 +149,36 @@ def test_investor_app_me_fields_are_pinned() -> None:
         "full_name_ar",
         "preferred_language",
         "company_name",
+        # Build plan v2, PR 2: their own status, type and contact details.
+        "status",
+        "investor_type",
+        "email",
+        "phone",
+    }
+
+
+def test_investor_app_me_leaves_out_staff_only_fields() -> None:
+    staff_only = {
+        "notes_internal",
+        "national_id_type",
+        "national_id_last4",
+        "relationship_manager_id",
+        "user_id",
+        "id",
+    }
+    assert staff_only.isdisjoint(InvestorAppMeResponse.model_fields)
+
+
+def test_investor_app_stage_fields_are_pinned() -> None:
+    from app.modules.investors.schemas import InvestorAppStage
+
+    # Names and dates only: never the advance rule, Kc or thresholds.
+    assert set(InvestorAppStage.model_fields) == {
+        "code",
+        "name_en",
+        "name_ar",
+        "expected_start",
+        "expected_end",
     }
 
 
@@ -166,10 +201,24 @@ def test_investor_app_holding_turns_image_keys_into_urls() -> None:
         "stage_advance": None,
         "stage_name_en": None,
         "stage_name_ar": None,
+        "stage_list": [
+            {
+                "code": "harvest",
+                "name_en": "Harvest",
+                "name_ar": "الحصاد",
+                "order": 1,
+                "kc": "0.9",
+                "advance": {"mode": "calendar_doy", "start_doy": "09-10", "end_doy": "10-14"},
+            }
+        ],
     }
     out = _with_stage_end(row)
+    assert "stage_list" not in out
+    assert out["stages"][0]["code"] == "harvest"
+    assert set(out["stages"][0]) == {"code", "name_en", "name_ar", "expected_start", "expected_end"}
+    assert out["expected_harvest_on"] == out["stages"][0]["expected_start"]
     assert "crop_image_key" not in out
     assert "variety_image_key" not in out
     assert out["crop_image_url"].endswith(f"/crops/{_FARM}/{_HOLDING}/256.webp")
     assert out["crop_icon_url"].endswith(f"/crops/{_FARM}/{_HOLDING}/64.webp")
-    assert set(out) <= set(InvestorAppHoldingResponse.model_fields) | {"stage_expected_end"}
+    assert set(out) <= set(InvestorAppHoldingResponse.model_fields)

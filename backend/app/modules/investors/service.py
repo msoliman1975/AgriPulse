@@ -43,7 +43,11 @@ from app.modules.investors.errors import (
     OwnershipNotFoundError,
 )
 from app.modules.investors.repository import InvestorsRepository
-from app.modules.investors.stage_dates import stage_expected_end
+from app.modules.investors.stage_dates import (
+    expected_harvest_on,
+    season_stages,
+    stage_expected_end,
+)
 from app.shared import clock
 from app.shared.auth.context import TenantRole
 from app.shared.db.ids import uuid7
@@ -939,6 +943,12 @@ def _with_stage_end(row: dict[str, Any]) -> dict[str, Any]:
     and the crop image keys for their public URLs."""
     out = dict(row)
     out.update(crop_image_urls(out.pop("crop_image_key", None), out.pop("variety_image_key", None)))
+    # The season's stages with their expected dates, and when picking starts.
+    stages = season_stages(
+        out.pop("stage_list", None), planting_date=out.get("planting_date"), today=clock.today()
+    )
+    out["stages"] = stages
+    out["expected_harvest_on"] = expected_harvest_on(stages)
     advance = out.pop("stage_advance", None)
     out["stage_expected_end"] = (
         stage_expected_end(advance, planting_date=out.get("planting_date"), today=clock.today())

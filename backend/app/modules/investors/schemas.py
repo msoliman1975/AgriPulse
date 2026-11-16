@@ -401,6 +401,26 @@ class InvestorAppMeResponse(BaseModel):
     full_name_ar: str | None = None
     preferred_language: Language
     company_name: str | None = None
+    # Build plan v2, PR 2: what the investor's own Account screen shows. Their
+    # own contact details, nothing staff-only (no notes, no national id).
+    status: InvestorStatus
+    investor_type: InvestorType
+    email: str
+    phone: str | None = None
+
+
+class InvestorAppStage(BaseModel):
+    """One stage of the crop's season, with the dates expected this season.
+
+    Null dates when the stage cannot be dated (GDD or manual advance); the
+    app then gives such stages equal widths on the ribbon.
+    """
+
+    code: str
+    name_en: str | None = None
+    name_ar: str | None = None
+    expected_start: date | None = None
+    expected_end: date | None = None
 
 
 class InvestorAppHoldingResponse(BaseModel):
@@ -424,13 +444,19 @@ class InvestorAppHoldingResponse(BaseModel):
     # public URL. Not sensitive: the same image for every tenant.
     crop_image_url: str | None = None
     crop_icon_url: str | None = None
-    # The block crop's current stage, by name only.
+    # The block crop's current stage: its code (to find it in `stages`) and
+    # its names.
+    stage_code: str | None = None
     stage_name_en: str | None = None
     stage_name_ar: str | None = None
     # The day the block entered that stage, and the day it is expected to end
     # (None when the stage has no fixed end, such as a manual one).
     stage_started_on: date | None = None
     stage_expected_end: date | None = None
+    # The variety's (else the crop's) stages in order, dated for this season,
+    # for the stage ribbon; and the expected first day of picking.
+    stages: list[InvestorAppStage] = Field(default_factory=list)
+    expected_harvest_on: date | None = None
     # The farm's active plan's season, for example "2026".
     current_season: str | None = None
     start_date: date

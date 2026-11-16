@@ -224,8 +224,58 @@ async def test_investor_responses_carry_no_staff_fields(scouting_env: ScoutingFi
         who = (await c.get("/api/v1/investor/me")).json()
     for leaked in ("share_pct", "notes_internal", "contract_ref", "block_area_m2", "status"):
         assert leaked not in one, leaked
-    for leaked in ("email", "notes_internal", "national_id_last4", "user_id"):
+    # Build plan v2 (PR 2) shows investors their own status, type and contact
+    # details on the Account screen; staff-only fields stay out.
+    for leaked in ("notes_internal", "national_id_last4", "national_id_type", "user_id", "id"):
         assert leaked not in who, leaked
+    assert who["email"] == investor["email"]
+    assert who["status"] == "active"
+    assert who["investor_type"] == investor["investor_type"]
+    assert "phone" in who
+    # The stage ribbon's inputs are always present, even with no crop yet.
+    assert isinstance(one["stages"], list)
+    assert "stage_code" in one
+    assert "expected_harvest_on" in one
+
+
+@pytest.mark.asyncio
+async def test_investor_holding_carries_the_dated_stage_list(
+    scouting_env: ScoutingFixture,
+) -> None:
+    """Build plan v2, PR 2: stage code, the season's stages and the harvest start."""
+    env = scouting_env
+    mine, investor = await _sold_holding(env)
+    async with _client(env.admin_context) as c:
+        crops = (await c.get("/api/v1/crops")).json()
+        crop = next(
+            x
+            for x in crops
+            if (x.get("phenology_stages") or {}).get("stages")
+            and x["classification_depth"] == "crop_only"
+        )
+        r = await c.post(
+            f"/api/v1/blocks/{env.block_id}/crop-assignments",
+            json={"crop_id": crop["id"], "season_label": "2026", "planting_date": "2026-03-01"},
+        )
+        assert r.status_code == 201, r.text
+    body = await _login(env, investor["id"])
+    me = make_context(
+        user_id=UUID(body["investor"]["user_id"]),
+        tenant_id=env.tenant_id,
+        tenant_role=TenantRole.INVESTOR,
+    )
+    async with _client(me) as c:
+        one = (await c.get(f"/api/v1/investor/holdings/{mine['id']}")).json()
+
+    expected_codes = [
+        st["code"] for st in sorted(crop["phenology_stages"]["stages"], key=lambda st: st["order"])
+    ]
+    assert [st["code"] for st in one["stages"]] == expected_codes
+    for st in one["stages"]:
+        assert set(st) == {"code", "name_en", "name_ar", "expected_start", "expected_end"}
+    # Dated stages run forward in time.
+    starts = [st["expected_start"] for st in one["stages"] if st["expected_start"]]
+    assert starts == sorted(starts)
 
 
 @pytest.mark.asyncio
