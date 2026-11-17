@@ -87,6 +87,7 @@ export function FarmEditPage(): JSX.Element {
             name_ar: farm.name_ar,
             description: farm.description,
             description_ar: farm.description_ar,
+            country_code: farm.country_code,
             governorate: farm.governorate,
             district: farm.district,
             nearest_city: farm.nearest_city,

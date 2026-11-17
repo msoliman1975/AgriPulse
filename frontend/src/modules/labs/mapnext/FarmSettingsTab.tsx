@@ -27,7 +27,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
+import { listCountries } from "@/api/countries";
 import { getFarm, updateFarm, type FarmUpdatePayload, type WaterSource } from "@/api/farms";
+import { useTreeImpactConfirm } from "@/modules/farms/treeImpact/useTreeImpactConfirm";
 
 import { FarmDecisionTreesPanel } from "./FarmDecisionTreesPanel";
 import { FarmSubscriptionsPanel } from "./FarmSubscriptionsPanel";
@@ -81,7 +83,8 @@ export function FarmSettingsTab({
 }: FarmSettingsTabProps): ReactNode {
   const { t } = useTranslation("farmConsole");
   // Label wording reused from the farm edit form so the two agree.
-  const { t: tf } = useTranslation("farms");
+  const { t: tf, i18n } = useTranslation("farms");
+  const isAr = i18n.language === "ar";
   const navigate = useNavigate();
   const qc = useQueryClient();
   const farmQ = useQuery({
@@ -89,6 +92,15 @@ export function FarmSettingsTab({
     queryFn: () => getFarm(farmId),
     staleTime: 30_000,
   });
+  // Same key as the create-farm flow, so the catalog is fetched once.
+  const countriesQ = useQuery({
+    queryKey: ["countries", "list"],
+    queryFn: () => listCountries(),
+    staleTime: 5 * 60_000,
+  });
+  // The farm's country is one of the axes decision trees target, so a change
+  // to it is previewed exactly as on the legacy farm edit page.
+  const treeImpact = useTreeImpactConfirm();
   const [form, setForm] = useState<FarmUpdatePayload | null>(null);
   const f = farmQ.data;
   const state: FarmUpdatePayload =
@@ -97,6 +109,7 @@ export function FarmSettingsTab({
       ? {
           name: f.name,
           name_ar: f.name_ar,
+          country_code: f.country_code ?? null,
           description_ar: f.description_ar,
           governorate: f.governorate,
           district: f.district,
@@ -128,7 +141,14 @@ export function FarmSettingsTab({
           id={DETAILS_FORM_ID}
           onSubmit={(e) => {
             e.preventDefault();
-            mut.mutate(state);
+            void (async () => {
+              const next = state.country_code ?? null;
+              if (next !== (f.country_code ?? null)) {
+                const ok = await treeImpact.confirm(farmId, { country_code: next });
+                if (!ok) return;
+              }
+              mut.mutate(state);
+            })();
           }}
         >
           <label className="mb-3 block">
@@ -164,6 +184,29 @@ export function FarmSettingsTab({
               value={state.description_ar ?? ""}
               onChange={(e) => set({ description_ar: e.target.value || null })}
             />
+          </label>
+          <label className="mb-3 block">
+            <span className="mb-1 block text-xs font-semibold text-ap-muted">
+              {tf("form.country")}
+            </span>
+            <select
+              className={inputCls}
+              value={state.country_code ?? ""}
+              onChange={(e) => set({ country_code: e.target.value || null })}
+            >
+              <option value="">{tf("form.countryNone")}</option>
+              {/* A farm on a since-retired country keeps showing it rather
+                  than silently reading as "None". */}
+              {state.country_code &&
+              !(countriesQ.data ?? []).some((c) => c.code === state.country_code) ? (
+                <option value={state.country_code}>{state.country_code}</option>
+              ) : null}
+              {(countriesQ.data ?? []).map((c) => (
+                <option key={c.code} value={c.code}>
+                  {isAr ? c.name_ar : c.name_en}
+                </option>
+              ))}
+            </select>
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="mb-3 block">
@@ -247,7 +290,9 @@ export function FarmSettingsTab({
       {/* 5 — Decision trees: which of them run on this farm. Sits after the
           data sections because it is a choice ABOUT that data, and it saves
           on change like the three above it. */}
-      <FarmDecisionTreesPanel farmId={farmId} />
+      {/* Keyed on the saved country: the panel fetches once on mount, and a
+          country change moves which trees match this farm. */}
+      <FarmDecisionTreesPanel key={f.country_code ?? ""} farmId={farmId} />
 
       {/* 6 — Health: what "healthy" means on this farm. A resolution tier,
           so it has no Apply and no preview; see the panel's header. Mounted
@@ -262,7 +307,7 @@ export function FarmSettingsTab({
         <button
           type="submit"
           form={DETAILS_FORM_ID}
-          disabled={mut.isPending}
+          disabled={mut.isPending || treeImpact.checking}
           className="h-9 rounded-lg bg-ap-primary px-4 text-sm font-semibold text-white disabled:opacity-60"
         >
           {mut.isPending ? t("manage.saving") : t("settingsFarm.saveDetails")}
@@ -316,6 +361,7 @@ export function FarmSettingsTab({
           ) : null}
         </section>
       ) : null}
+      {treeImpact.dialog}
     </div>
   );
 }
