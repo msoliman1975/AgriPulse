@@ -14,6 +14,11 @@
  *     version and would quietly answer about the previous body;
  *   * a block with no grid returns no cells, which is a fact about the block.
  *
+ * Targeting is reported, not enforced. A block the tree does not target is
+ * still folded (testing one on purpose is fair), but the picker marks it and
+ * the result opens with a warning that production would skip the block, so
+ * cards on a block with no country or crop never read as cards it would get.
+ *
  * Every row carries a "why" button, the healthy and the errored ones included.
  * "Why did this cell find nothing" and "where did this walk fall over" are the
  * same question as "why this card", and the walk answers all three.
@@ -31,7 +36,11 @@ import { StatusBanner } from "@/components/StatusBanner";
 import { Table, Tbody, Td, Th, Thead, Tr } from "@/components/Table";
 import { mapAsyncState, type AsyncState } from "@/components/asyncState";
 import { localizedField } from "@/lib/localizedField";
-import type { BetaCandidateBlock, BetaDryRunResponse } from "@/api/decisionTreesBeta";
+import type {
+  BetaCandidateBlock,
+  BetaDryRunResponse,
+  BetaDryRunTargeting,
+} from "@/api/decisionTreesBeta";
 
 import { useFindingStatusLabel } from "../lib/useStatusLabel";
 
@@ -51,6 +60,13 @@ interface BetaDryRunPanelProps {
   error?: string | null;
   /** Open the walk explainer on one row. Left out hides the column. */
   onShowDetails?: (cell: BetaDryRunResponse["cells"][number]) => void;
+}
+
+/** The axis a verdict rejected on, as a key under `dryRun.notTargeted`. */
+function axisKey(targeting: BetaDryRunTargeting): "crop" | "country" | "soil" | "other" {
+  return targeting.axis === "crop" || targeting.axis === "country" || targeting.axis === "soil"
+    ? targeting.axis
+    : "other";
 }
 
 export function BetaDryRunPanel({
@@ -102,11 +118,16 @@ export function BetaDryRunPanel({
                   className={SELECT_CLASS}
                 >
                   <option value="">{t("dryRun.pickBlock")}</option>
-                  {rows.map((b) => (
-                    <option key={b.block_id} value={b.block_id}>
-                      {localizedField(i18n.language, b.label, b.label_ar)}
-                    </option>
-                  ))}
+                  {rows.map((b) => {
+                    const label = localizedField(i18n.language, b.label, b.label_ar);
+                    return (
+                      <option key={b.block_id} value={b.block_id}>
+                        {b.targeting && !b.targeting.matched
+                          ? t("dryRun.notTargetedOption", { label })
+                          : label}
+                      </option>
+                    );
+                  })}
                 </select>
               )}
             </Field>
@@ -118,6 +139,21 @@ export function BetaDryRunPanel({
       </AsyncBoundary>
 
       {error ? <StatusBanner kind="crit">{error}</StatusBanner> : null}
+
+      {result?.targeting && !result.targeting.matched ? (
+        <StatusBanner kind="warn">
+          <strong className="font-semibold">{t("dryRun.notTargeted.title")}</strong>{" "}
+          {t(
+            result.targeting.actual
+              ? `dryRun.notTargeted.${axisKey(result.targeting)}`
+              : `dryRun.notTargeted.${axisKey(result.targeting)}Missing`,
+            {
+              required: result.targeting.required.join(", "),
+              actual: result.targeting.actual ?? "",
+            },
+          )}
+        </StatusBanner>
+      ) : null}
 
       {result === null ? (
         <EmptyState message={t("dryRun.empty")} />

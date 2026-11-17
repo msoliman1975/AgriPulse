@@ -79,10 +79,13 @@ function response(overrides: Partial<BetaDryRunResponse> = {}): BetaDryRunRespon
   };
 }
 
-function renderPanel(result: BetaDryRunResponse | null) {
+function renderPanel(
+  result: BetaDryRunResponse | null,
+  blocks: AsyncState<BetaCandidateBlock[]> = BLOCKS,
+) {
   render(
     <BetaDryRunPanel
-      blocks={BLOCKS}
+      blocks={blocks}
       blockId="b1"
       onBlockChange={vi.fn()}
       onRun={vi.fn()}
@@ -140,6 +143,64 @@ describe("<BetaDryRunPanel>", () => {
     renderPanel(response({ cells: [], cells_evaluated: 0, cells_carded: 0 }));
     expect(
       screen.getByText("This block has no grid, so there are no cells to fold."),
+    ).toBeInTheDocument();
+  });
+});
+
+// Targeting is reported, not enforced: a block with no country or crop still
+// folds, and the screen has to say production would never run the tree there.
+describe("<BetaDryRunPanel> targeting", () => {
+  it("warns when production would skip the block for a missing country", () => {
+    renderPanel(
+      response({
+        targeting: { matched: false, axis: "country", required: ["EG"], actual: null },
+      }),
+    );
+    expect(screen.getByText("Production would skip this block.")).toBeInTheDocument();
+    expect(
+      screen.getByText(/The tree targets country EG; this block's farm has no country set\./),
+    ).toBeInTheDocument();
+    // The cells are still shown, so the author can read them on purpose.
+    expect(screen.getByText("1 of 2 cells produce a card.")).toBeInTheDocument();
+  });
+
+  it("names the block's own value when it has one", () => {
+    renderPanel(
+      response({
+        targeting: { matched: false, axis: "crop", required: ["date_palm"], actual: "mango" },
+      }),
+    );
+    expect(
+      screen.getByText(/The tree targets crop date_palm; this block's crop is mango\./),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing when the block is targeted", () => {
+    renderPanel(response({ targeting: { matched: true, axis: null, required: [], actual: null } }));
+    expect(screen.queryByText("Production would skip this block.")).toBeNull();
+  });
+
+  it("marks untargeted blocks in the picker", () => {
+    renderPanel(null, {
+      status: "success",
+      data: [
+        {
+          block_id: "b1",
+          label: "Bashier / 009",
+          label_ar: null,
+          targeting: { matched: true, axis: null, required: [], actual: null },
+        },
+        {
+          block_id: "b2",
+          label: "Bashier / 010",
+          label_ar: null,
+          targeting: { matched: false, axis: "country", required: ["EG"], actual: null },
+        },
+      ],
+    });
+    expect(screen.getByRole("option", { name: "Bashier / 009" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Bashier / 010 (not targeted)" }),
     ).toBeInTheDocument();
   });
 });

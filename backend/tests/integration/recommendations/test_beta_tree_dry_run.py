@@ -320,9 +320,9 @@ async def test_dry_run_prefers_the_definition_it_is_handed(admin_session: Any) -
 async def test_dry_run_reports_targeting_without_enforcing_it(admin_session: Any) -> None:
     """A tree the sweep would skip must not look like one that runs.
 
-    The block picker filters to targeted blocks, so the designer cannot
-    reach this case — but an API caller can, and "works in the dry run, does
-    nothing in production" is the gap this endpoint closes.
+    The designer's picker lists untargeted blocks too (marked), so an
+    author can fold one on purpose; "works in the dry run, does nothing in
+    production" is the gap this verdict closes.
     """
     seeded = await _seed(admin_session)
     service = FoldingTreeAuthorService(public_session=admin_session, tenant_id=seeded["tenant_id"])
@@ -346,6 +346,50 @@ async def test_dry_run_reports_targeting_without_enforcing_it(admin_session: Any
     assert report["targeting"]["matched"] is False
     assert report["targeting"]["axis"] == "crop"
     assert report["cells_evaluated"] == 2, "evaluated anyway, so the author can see it"
+
+
+@pytest.mark.asyncio
+async def test_dry_run_blocks_carry_the_targeting_verdict(admin_session: Any) -> None:
+    """The picker's rows say whether production would run the tree there.
+
+    Judged against the version the dry run walks, with the sweep's own
+    matcher, so the picker and the result can never disagree.
+    """
+    seeded = await _seed(admin_session)
+    service = FoldingTreeAuthorService(public_session=admin_session, tenant_id=seeded["tenant_id"])
+
+    open_code = f"beta_blocks_open_{uuid4().hex[:8]}"
+    open_tree = await service.create_tree(
+        code=open_code, definition=_definition(open_code), notes=None, actor_user_id=None
+    )
+    narrow_code = f"beta_blocks_narrow_{uuid4().hex[:8]}"
+    narrow = _definition(narrow_code)
+    narrow["crop_paths"] = ["date_palm"]
+    narrow_tree = await service.create_tree(
+        code=narrow_code, definition=narrow, notes=None, actor_user_id=None
+    )
+    await admin_session.commit()
+    await admin_session.execute(text(f'SET search_path TO "{seeded["schema"]}", public'))
+
+    def _row(rows: list[dict[str, Any]]) -> dict[str, Any]:
+        return next(r for r in rows if r["block_id"] == seeded["block_id"])
+
+    untargeted = await service.dry_run_blocks(
+        tree_id=open_tree["id"], tenant_session=admin_session, tenant_schema=seeded["schema"]
+    )
+    assert _row(untargeted)["targeting"]["matched"] is True
+
+    rows = await service.dry_run_blocks(
+        tree_id=narrow_tree["id"], tenant_session=admin_session, tenant_schema=seeded["schema"]
+    )
+    row = _row(rows)
+    assert row["targeting"]["matched"] is False
+    assert row["targeting"]["axis"] == "crop"
+    assert row["targeting"]["required"] == ["date_palm"]
+    assert row["label"], "every row carries a display label"
+    # Targeted blocks come first; an untargeted one never sits above them.
+    flags = [r["targeting"]["matched"] for r in rows]
+    assert flags == sorted(flags, reverse=True)
 
 
 @pytest.mark.asyncio

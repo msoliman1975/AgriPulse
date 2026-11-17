@@ -139,6 +139,8 @@ function useInvalidateTree() {
   return (code: string) => {
     void qc.invalidateQueries({ queryKey: [...KEY, "detail", code] });
     void qc.invalidateQueries({ queryKey: [...KEY, "list"] });
+    // A saved or published targeting change moves which blocks are targeted.
+    void qc.invalidateQueries({ queryKey: [...KEY, "dry_run_blocks"] });
   };
 }
 
@@ -189,11 +191,11 @@ export function useDiscardBetaDraft() {
  * Disabled outside a tenant: farms and blocks are tenant-scoped, so a
  * platform caller would get a 403 and a picker with nothing in it.
  */
-export function useDryRunBlocks(scope: AuthoringScope) {
+export function useDryRunBlocks(scope: AuthoringScope, treeId: string) {
   return useQuery<BetaCandidateBlock[]>({
-    queryKey: [...KEY, "dry_run_blocks"] as const,
-    queryFn: listDryRunBlocks,
-    enabled: scope === "tenant",
+    queryKey: [...KEY, "dry_run_blocks", treeId] as const,
+    queryFn: () => listDryRunBlocks(treeId),
+    enabled: scope === "tenant" && Boolean(treeId),
     staleTime: 60_000,
   });
 }

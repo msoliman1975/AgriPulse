@@ -48,6 +48,7 @@ from app.modules.recommendations.folding_compiler import FoldingCompileError
 from app.modules.recommendations.schemas import (
     BetaCellWalkRequest,
     BetaCellWalkResponse,
+    BetaDryRunBlock,
     BetaDryRunRequest,
     BetaDryRunResponse,
     BetaRunResultRow,
@@ -2000,6 +2001,34 @@ async def dry_run_beta_tree(
             version_id=payload.version_id,
             tenant_session=tenant_session,
             tenant_schema=tenant_schema,
+        )
+    except Exception as exc:
+        mapped = _map_beta_error(exc)
+        if mapped is not None:
+            raise mapped from exc
+        raise
+
+
+@router.get(
+    _BETA_PREFIX + "/{tree_id}/dry-run/blocks",
+    response_model=list[BetaDryRunBlock],
+    summary="Blocks the dry run can fold, each with the tree's targeting verdict.",
+)
+async def list_beta_dry_run_blocks(
+    tree_id: UUID,
+    context: RequestContext = Depends(requires_capability("decision_tree.read")),
+    service: FoldingTreeAuthorService = Depends(_beta_service),
+    tenant_session: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, Any]]:
+    """Targeted blocks first; the rest are listed and marked, not hidden.
+
+    Same tenant rule as the dry run: blocks are the tenant's.
+    """
+    _ensure_authoring_scope(context)
+    tenant_schema = _ensure_tenant(context)
+    try:
+        return await service.dry_run_blocks(
+            tree_id=tree_id, tenant_session=tenant_session, tenant_schema=tenant_schema
         )
     except Exception as exc:
         mapped = _map_beta_error(exc)
