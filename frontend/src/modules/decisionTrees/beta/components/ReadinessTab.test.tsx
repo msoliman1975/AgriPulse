@@ -14,6 +14,7 @@ import { setupTestI18n } from "@/i18n/testing";
 import {
   READINESS_KINDS,
   READINESS_STATUSES,
+  readinessFixPath,
   type TreeReadiness,
   type TreeReadinessSummary,
 } from "../lib/readinessApi";
@@ -106,7 +107,8 @@ describe("ReadinessTab", () => {
     expect(screen.getByText("Block one")).toBeInTheDocument();
     expect(screen.getByText("Block two")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Open block" });
-    expect(link).toHaveAttribute("href", "/farms/f1/blocks/b1");
+    // The link carries the way back to this tab.
+    expect(link).toHaveAttribute("href", "/farms/f1/blocks/b1?returnTo=%2F%3Ftab%3Dreadiness");
     expect(get).toHaveBeenCalledWith("/v1/platform/decision-trees/beta/t1/readiness");
     expect(get).toHaveBeenCalledTimes(1);
   });
@@ -139,5 +141,56 @@ describe("readiness copy", () => {
       expect(r.fix[k]).toBeTruthy();
     }
     expect(Object.keys(en.readiness).sort()).toEqual(Object.keys(ar.readiness).sort());
+  });
+});
+
+// Each fix link has to land on a page that can actually set the missing item.
+describe("readinessFixPath", () => {
+  const block = TENANT.blocks[0];
+  const back = "/decision-trees-beta/x?tab=readiness";
+  const q = `?returnTo=${encodeURIComponent(back)}`;
+
+  it.each(["soil_texture", "salinity_class"])("sends %s to the block edit form", (key) => {
+    expect(readinessFixPath(block, { kind: "block_field", key }, back)).toBe(
+      `/farms/f1/blocks/b1/edit${q}`,
+    );
+  });
+
+  it("sends growth stage, crop fields and heat units to the crop settings", () => {
+    for (const req of [
+      { kind: "block_field" as const, key: "growth_stage" },
+      { kind: "crop_attribute" as const, key: "palm_phase" },
+      { kind: "heat_units" as const, key: "total" },
+    ]) {
+      expect(readinessFixPath(block, req, back)).toBe(`/farms/f1/blocks/b1${q}#crop-settings`);
+    }
+  });
+
+  it("links nowhere for a crop reference value, which the block cannot set", () => {
+    expect(readinessFixPath(block, { kind: "reference", key: "kc_mid" }, back)).toBeNull();
+  });
+
+  it("links nowhere without a farm", () => {
+    expect(readinessFixPath({ ...block, farm_id: null }, { kind: "signal", key: "x" })).toBeNull();
+  });
+});
+
+describe("ReadinessTab reference values", () => {
+  beforeEach(async () => {
+    await setupTestI18n("en");
+    get.mockReset();
+    get.mockResolvedValue({
+      data: {
+        ...TENANT,
+        blocks: [{ ...TENANT.blocks[0], missing: [{ kind: "reference", key: "kc_mid" }] }],
+      },
+    });
+  });
+
+  it("says where a reference value is set instead of linking to the block", async () => {
+    render(wrap(<ReadinessTab treeId="t1" scope="tenant" canFix />));
+    expect(await screen.findByText("Set in the crop catalogue (platform)")).toBeInTheDocument();
+    expect(screen.getByText(/Crop reference value/)).toBeInTheDocument();
+    expect(screen.queryByRole("link")).toBeNull();
   });
 });

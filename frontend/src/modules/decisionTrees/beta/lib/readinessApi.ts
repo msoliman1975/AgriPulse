@@ -19,6 +19,7 @@ const BETA_TREES = "/v1/platform/decision-trees/beta";
 export type ReadinessKind =
   | "block_field"
   | "crop_attribute"
+  | "reference"
   | "heat_units"
   | "signal"
   | "index"
@@ -29,6 +30,7 @@ export type ReadinessKind =
 export const READINESS_KINDS: readonly ReadinessKind[] = [
   "block_field",
   "crop_attribute",
+  "reference",
   "heat_units",
   "signal",
   "water_balance",
@@ -115,7 +117,10 @@ export function useTreeReadiness(treeId: string | null, enabled: boolean) {
     queryKey: [...KEY, "tenant", treeId] as const,
     queryFn: () => getTreeReadiness(treeId!),
     enabled: enabled && Boolean(treeId),
-    staleTime: 60_000,
+    // Always re-read on mount and on focus. The fix links send the user to
+    // another page to set the missing data; with a minute of staleness the
+    // list they came back to still said "Missing" for what they just set.
+    staleTime: 0,
   });
 }
 
@@ -128,13 +133,34 @@ export function useTreeReadinessSummary(treeId: string | null, enabled: boolean)
   });
 }
 
+/** Block fields set on the block edit form. `growth_stage` is not one: it
+ *  belongs to the current crop assignment, like crop attributes. */
+const EDIT_FORM_FIELDS = new Set(["soil_texture", "salinity_class"]);
+
 /**
- * Where a tenant admin fixes a missing item. What is set on the block (its
- * fields, its crop) is fixed on the block's edit page; everything else
- * (scout records, imagery, weather, the grid) shows on the block itself.
+ * Where a tenant admin fixes a missing item, or null when the block cannot.
+ *
+ *   * soil texture, salinity class: the block edit form;
+ *   * growth stage, crop attributes, heat-unit start: the current crop's
+ *     settings on the block page (`#crop-settings`);
+ *   * crop reference values: nowhere on the block. They are set per crop in
+ *     the platform crop catalogue, so the row says so instead of linking;
+ *   * scout records, imagery, weather, water balance, the grid: the block.
+ *
+ * `returnTo` (the designer's own URL) rides along so the page offers the way
+ * back and the edit form returns there on save.
  */
-export function readinessFixPath(block: ReadinessBlock, kind: ReadinessKind): string | null {
-  if (!block.farm_id) return null;
+export function readinessFixPath(
+  block: ReadinessBlock,
+  req: ReadinessRequirement,
+  returnTo: string | null = null,
+): string | null {
+  if (!block.farm_id || req.kind === "reference") return null;
   const base = `/farms/${block.farm_id}/blocks/${block.block_id}`;
-  return kind === "block_field" || kind === "crop_attribute" ? `${base}/edit` : base;
+  const query = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : "";
+  if (req.kind === "block_field" && EDIT_FORM_FIELDS.has(req.key)) return `${base}/edit${query}`;
+  if (req.kind === "block_field" || req.kind === "crop_attribute" || req.kind === "heat_units") {
+    return `${base}${query}#crop-settings`;
+  }
+  return `${base}${query}`;
 }

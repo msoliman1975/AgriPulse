@@ -545,6 +545,7 @@
     "kind": {
       "block_field": "Block field",
       "crop_attribute": "Crop attribute",
+      "reference": "Crop reference value",
       "heat_units": "Heat units",
       "signal": "Scout record",
       "index": "Satellite index",
@@ -554,8 +555,9 @@
     },
     "fix": {
       "block_field": "Edit block",
-      "crop_attribute": "Edit block",
-      "heat_units": "Open block",
+      "crop_attribute": "Set crop field",
+      "reference": "Set in the crop catalogue (platform)",
+      "heat_units": "Set heat-unit start",
       "signal": "Open block",
       "index": "Open block",
       "weather": "Open block",

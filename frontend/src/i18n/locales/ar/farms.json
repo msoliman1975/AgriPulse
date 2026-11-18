@@ -187,7 +187,8 @@
     "plantCount_few": "{{count}} نباتات",
     "plantCount_many": "{{count}} نباتًا",
     "plantCount_other": "{{count}} نبات",
-    "spacingLayout": "{{row}} × {{inRow}} م ({{density}} لكل هكتار)"
+    "spacingLayout": "{{row}} × {{inRow}} م ({{density}} لكل هكتار)",
+    "backToReadiness": "العودة إلى الجاهزية"
   },
   "autoGrid": {
     "heading": "تقسيم آلي إلى شبكة",

@@ -8,7 +8,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import { Card } from "@/components/Card";
 import { FIELD_CONTROL_CLASS } from "@/components/Field";
@@ -145,6 +145,10 @@ function BlockList({
   const { t, i18n } = useTranslation("decisionTreesBeta");
   const ar = i18n.language.startsWith("ar");
   const [filter, setFilter] = useState<ReadinessStatus | "all">("all");
+  // The fix links carry this page's URL, opened on the Readiness tab, so the
+  // block pages offer the way back and the edit form returns here on save.
+  const location = useLocation();
+  const returnTo = `${location.pathname}?tab=readiness`;
   const shown = useMemo(
     () => (filter === "all" ? blocks : blocks.filter((b) => b.status === filter)),
     [blocks, filter],
@@ -194,7 +198,7 @@ function BlockList({
               {b.missing.length > 0 ? (
                 <ul className="flex flex-col gap-1 ps-2 text-[12px] text-ap-muted">
                   {b.missing.map((req) => {
-                    const fix = canFix ? readinessFixPath(b, req.kind) : null;
+                    const fix = canFix ? readinessFixPath(b, req, returnTo) : null;
                     return (
                       <li key={`${req.kind}:${req.key}`} className="flex flex-wrap gap-2">
                         <span>
@@ -204,6 +208,10 @@ function BlockList({
                           <Link className="text-ap-accent underline" to={fix}>
                             {t(`readiness.fix.${req.kind}`)}
                           </Link>
+                        ) : canFix && req.kind === "reference" ? (
+                          // Set per crop in the platform catalogue, not on
+                          // the block, so there is nothing here to link to.
+                          <span className="italic">{t("readiness.fix.reference")}</span>
                         ) : null}
                       </li>
                     );

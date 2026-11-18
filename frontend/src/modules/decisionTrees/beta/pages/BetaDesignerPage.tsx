@@ -21,7 +21,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 
 import { AsyncBoundary } from "@/components/AsyncBoundary";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -113,7 +113,12 @@ export function BetaDesignerPage(): ReactNode {
   const discard = useDiscardBetaDraft();
   const dryRun = useBetaDryRun();
 
-  const [tab, setTab] = useState<Tab>("canvas");
+  // `?tab=readiness` is how a Readiness fix link returns here; any other
+  // value opens the canvas as before.
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() =>
+    searchParams.get("tab") === "readiness" ? "readiness" : "canvas",
+  );
   const [draftYaml, setDraftYaml] = useState<string | null>(null);
   const [hydratedFrom, setHydratedFrom] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
