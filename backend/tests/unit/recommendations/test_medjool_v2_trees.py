@@ -223,28 +223,61 @@ def test_has_a_bilingual_readiness_note(code: str) -> None:
     assert not re.search(r"[A-Za-z]", d["readiness_note_ar"]), d["readiness_note_ar"]
 
 
-def test_canopy_band_backup_is_off_for_every_palm_size() -> None:
-    """D32: no measured Medjool bands, so tree 01 judges only against history."""
-    nodes = DEFS["date_palm_medjool_canopy_diagnosis"]["nodes"]
-    for size in ("small", "medium", "large", "none"):
-        band = nodes[f"n_b_{size}"]["set"]
-        assert all(band[k] == -1000 for k in band if k.endswith("_floor")), size
-        assert band["bsi_ceiling"] == 1000, size
-    params = DEFS["date_palm_medjool_canopy_diagnosis"]["parameters"]
-    assert not [p for p in params if p.endswith(("_floor", "_ceiling"))]
+# The Medjool index workbook v2.0 bands (owner sheet Medjool_Index_Bands_EN,
+# 17 Nov 2026), edge per palm size: floor, or ceiling for BSI.
+_BANDS = {
+    "ndvi": ("floor", 0.1, 0.3, 0.5),
+    "savi": ("floor", 0.08, 0.25, 0.45),
+    "msavi": ("floor", 0.05, 0.22, 0.42),
+    "bsi": ("ceiling", 0.3, 0.05, -0.05),
+    "ndmi": ("floor", -0.15, -0.05, 0.1),
+    "ndre": ("floor", 0.1, 0.2, 0.4),
+    "gndvi": ("floor", 0.2, 0.3, 0.5),
+}
 
 
-@pytest.mark.parametrize(
-    "code", ["date_palm_medjool_young_planting", "date_palm_medjool_data_readiness"]
-)
-def test_other_band_checks_are_off(code: str) -> None:
-    """D32: trees 12 and 13 read no workbook band either."""
-    d = DEFS[code]
-    assert not [p for p in d["parameters"] if p.endswith(("_floor", "_ceiling"))]
-    for node in d["nodes"].values():
-        right = (node.get("condition") or {}).get("tree", {}).get("right")
-        if isinstance(right, int | float) and abs(right) == 1000:
-            assert "band off" in node["label_en"]
+def test_canopy_band_backup_uses_the_workbook_bands() -> None:
+    """Tree 01 falls back on the workbook band for the palm's size."""
+    d = DEFS["date_palm_medjool_canopy_diagnosis"]
+    for i, size in enumerate(("small", "medium", "large")):
+        band = d["nodes"][f"n_b_{size}"]["set"]
+        for idx, (edge, *values) in _BANDS.items():
+            name = f"{size}_{idx}_{edge}"
+            assert band[f"{idx}_{edge}"] == {"source": "params", "name": name}
+            assert d["parameters"][name]["default"] == values[i], name
+    # With palm size unknown there is no band to compare against.
+    band = d["nodes"]["n_b_none"]["set"]
+    assert all(band[k] == -1000 for k in band if k.endswith("_floor"))
+    assert band["bsi_ceiling"] == 1000
+
+
+def test_other_band_checks_use_the_workbook_bands() -> None:
+    """Trees 12 and 13 read the same workbook bands, as parameters."""
+    young = DEFS["date_palm_medjool_young_planting"]
+    assert young["parameters"]["small_bsi_ceiling"]["default"] == 0.3
+    assert young["parameters"]["small_msavi_floor"]["default"] == 0.05
+    assert young["nodes"]["n_bsi"]["condition"]["tree"]["right"] == {
+        "source": "params",
+        "name": "small_bsi_ceiling",
+    }
+    assert young["nodes"]["n_msavi"]["condition"]["tree"]["right"] == {
+        "source": "params",
+        "name": "small_msavi_floor",
+    }
+    ready = DEFS["date_palm_medjool_data_readiness"]
+    assert ready["parameters"]["medium_ndvi_floor"]["default"] == 0.3
+    assert ready["parameters"]["large_ndvi_floor"]["default"] == 0.5
+    assert ready["nodes"]["n_large_ndvi"]["condition"]["tree"]["right"] == {
+        "source": "params",
+        "name": "medium_ndvi_floor",
+    }
+    assert ready["nodes"]["n_small_ndvi"]["condition"]["tree"]["right"] == {
+        "source": "params",
+        "name": "large_ndvi_floor",
+    }
+    for d in (young, ready):
+        for node in d["nodes"].values():
+            assert "band off" not in node["label_en"]
 
 
 # ---------------------------------------------------------------- fuzz
