@@ -104,147 +104,168 @@
       "default": 0.1,
       "min": -2.0,
       "max": 3.0,
-      "description": "NDVI floor for a small Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "NDVI floor for a small Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر NDVI لنخيل المجدول الصغير: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "small_savi_floor": {
       "type": "number",
       "default": 0.08,
       "min": -2.0,
       "max": 3.0,
-      "description": "SAVI floor for a small Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "SAVI floor for a small Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر SAVI لنخيل المجدول الصغير: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "small_msavi_floor": {
       "type": "number",
       "default": 0.05,
       "min": -2.0,
       "max": 3.0,
-      "description": "MSAVI floor for a small Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "MSAVI floor for a small Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر MSAVI لنخيل المجدول الصغير: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "small_bsi_ceiling": {
       "type": "number",
       "default": 0.3,
       "min": -2.0,
       "max": 3.0,
-      "description": "BSI ceiling for a small Medjool palm: a reading above it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "BSI ceiling for a small Medjool palm: a reading above it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأعلى لمؤشر BSI لنخيل المجدول الصغير: القراءة فوقه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "small_ndmi_floor": {
       "type": "number",
       "default": -0.15,
       "min": -2.0,
       "max": 3.0,
-      "description": "NDMI floor for a small Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "NDMI floor for a small Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر NDMI لنخيل المجدول الصغير: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "small_ndre_floor": {
       "type": "number",
       "default": 0.1,
       "min": -2.0,
       "max": 3.0,
-      "description": "NDRE floor for a small Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "NDRE floor for a small Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر NDRE لنخيل المجدول الصغير: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "small_gndvi_floor": {
       "type": "number",
       "default": 0.2,
       "min": -2.0,
       "max": 3.0,
-      "description": "GNDVI floor for a small Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "GNDVI floor for a small Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر GNDVI لنخيل المجدول الصغير: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "medium_ndvi_floor": {
       "type": "number",
       "default": 0.3,
       "min": -2.0,
       "max": 3.0,
-      "description": "NDVI floor for a medium Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "NDVI floor for a medium Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر NDVI لنخيل المجدول المتوسط: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "medium_savi_floor": {
       "type": "number",
       "default": 0.25,
       "min": -2.0,
       "max": 3.0,
-      "description": "SAVI floor for a medium Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "SAVI floor for a medium Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر SAVI لنخيل المجدول المتوسط: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "medium_msavi_floor": {
       "type": "number",
       "default": 0.22,
       "min": -2.0,
       "max": 3.0,
-      "description": "MSAVI floor for a medium Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "MSAVI floor for a medium Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر MSAVI لنخيل المجدول المتوسط: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "medium_bsi_ceiling": {
       "type": "number",
       "default": 0.05,
       "min": -2.0,
       "max": 3.0,
-      "description": "BSI ceiling for a medium Medjool palm: a reading above it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "BSI ceiling for a medium Medjool palm: a reading above it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأعلى لمؤشر BSI لنخيل المجدول المتوسط: القراءة فوقه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "medium_ndmi_floor": {
       "type": "number",
       "default": -0.05,
       "min": -2.0,
       "max": 3.0,
-      "description": "NDMI floor for a medium Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "NDMI floor for a medium Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر NDMI لنخيل المجدول المتوسط: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "medium_ndre_floor": {
       "type": "number",
       "default": 0.2,
       "min": -2.0,
       "max": 3.0,
-      "description": "NDRE floor for a medium Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "NDRE floor for a medium Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر NDRE لنخيل المجدول المتوسط: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "medium_gndvi_floor": {
       "type": "number",
       "default": 0.3,
       "min": -2.0,
       "max": 3.0,
-      "description": "GNDVI floor for a medium Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "GNDVI floor for a medium Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر GNDVI لنخيل المجدول المتوسط: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "large_ndvi_floor": {
       "type": "number",
       "default": 0.5,
       "min": -2.0,
       "max": 3.0,
-      "description": "NDVI floor for a large Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "NDVI floor for a large Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر NDVI لنخيل المجدول الكبير: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "large_savi_floor": {
       "type": "number",
       "default": 0.45,
       "min": -2.0,
       "max": 3.0,
-      "description": "SAVI floor for a large Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "SAVI floor for a large Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر SAVI لنخيل المجدول الكبير: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "large_msavi_floor": {
       "type": "number",
       "default": 0.42,
       "min": -2.0,
       "max": 3.0,
-      "description": "MSAVI floor for a large Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "MSAVI floor for a large Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر MSAVI لنخيل المجدول الكبير: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "large_bsi_ceiling": {
       "type": "number",
       "default": -0.05,
       "min": -2.0,
       "max": 3.0,
-      "description": "BSI ceiling for a large Medjool palm: a reading above it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "BSI ceiling for a large Medjool palm: a reading above it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأعلى لمؤشر BSI لنخيل المجدول الكبير: القراءة فوقه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "large_ndmi_floor": {
       "type": "number",
       "default": 0.1,
       "min": -2.0,
       "max": 3.0,
-      "description": "NDMI floor for a large Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "NDMI floor for a large Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر NDMI لنخيل المجدول الكبير: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "large_ndre_floor": {
       "type": "number",
       "default": 0.4,
       "min": -2.0,
       "max": 3.0,
-      "description": "NDRE floor for a large Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "NDRE floor for a large Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر NDRE لنخيل المجدول الكبير: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "large_gndvi_floor": {
       "type": "number",
       "default": 0.5,
       "min": -2.0,
       "max": 3.0,
-      "description": "GNDVI floor for a large Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "GNDVI floor for a large Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر GNDVI لنخيل المجدول الكبير: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     }
   },
   "nodes": {

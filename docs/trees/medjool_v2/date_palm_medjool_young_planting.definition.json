@@ -35,14 +35,16 @@
       "default": 0.3,
       "min": -2.0,
       "max": 3.0,
-      "description": "BSI ceiling for a small Medjool palm: a reading above it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "BSI ceiling for a small Medjool palm: a reading above it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأعلى لمؤشر BSI لنخيل المجدول الصغير: القراءة فوقه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "small_msavi_floor": {
       "type": "number",
       "default": 0.05,
       "min": -2.0,
       "max": 3.0,
-      "description": "MSAVI floor for a small Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "MSAVI floor for a small Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر MSAVI لنخيل المجدول الصغير: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     }
   },
   "nodes": {
