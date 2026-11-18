@@ -1237,6 +1237,10 @@ class BetaDryRunCell(BaseModel):
     rule_code: str | None = None
     stopped_at: str | None = None
     error: str | None = None
+    #: Block data the walk read and found empty (dotted refs). A cell with no
+    #: card and a non-empty list is not known to be healthy: a condition that
+    #: reads nothing counts as not met.
+    missing_inputs: list[str] = Field(default_factory=list)
 
 
 class BetaDryRunBlock(BaseModel):
@@ -1268,6 +1272,8 @@ class BetaDryRunResponse(BaseModel):
     #: Of the carded cells, how many composed their text instead of matching
     #: a combination rule.
     cells_composed: int = 0
+    #: Cells with no card, no error, and empty block data on the walk.
+    cells_missing_data: int = 0
     #: How many of this block's cells walked through each node. Empty unless
     #: the caller asked for it; the estate report is what asks. Counts, not
     #: paths: the question is coverage, and a path per cell to answer it would

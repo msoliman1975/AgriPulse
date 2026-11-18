@@ -26,6 +26,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { AsyncBoundary } from "@/components/AsyncBoundary";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Button } from "@/components/Button";
+import { LinkButton } from "@/components/LinkButton";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
@@ -435,6 +436,21 @@ export function BetaDesignerPage(): ReactNode {
               actions={
                 <>
                   {dirty ? <Pill kind="warn">{t("designer.unsaved")}</Pill> : null}
+                  {/* What real runs did with this tree. Run results groups
+                      cards by block; the traces page is the per-run audit,
+                      including blocks the tree skipped and why. Both read
+                      a tenant's runs, so the traces link is tenant-only. */}
+                  <LinkButton variant="ghost" to={`${base}/${tree.code}/runs`}>
+                    {t("designer.runResults")}
+                  </LinkButton>
+                  {scope === "tenant" ? (
+                    <LinkButton
+                      variant="ghost"
+                      to={`/decision-tree-traces?tree=${encodeURIComponent(tree.code)}`}
+                    >
+                      {t("designer.traces")}
+                    </LinkButton>
+                  ) : null}
                   <Button
                     variant="secondary"
                     onClick={onSave}

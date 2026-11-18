@@ -19,6 +19,11 @@
  * the result opens with a warning that production would skip the block, so
  * cards on a block with no country or crop never read as cards it would get.
  *
+ * "No card" is not always healthy. A condition that reads a value the block
+ * does not have counts as not met, so a walk over missing data often ends
+ * with nothing registered. Those cells say "No card · data missing" and name
+ * what was empty, and the summary counts them.
+ *
  * Every row carries a "why" button, the healthy and the errored ones included.
  * "Why did this cell find nothing" and "where did this walk fall over" are the
  * same question as "why this card", and the walk answers all three.
@@ -168,6 +173,11 @@ export function BetaDryRunPanel({
               cards: result.cells_carded,
               total: result.cells_evaluated,
             })}
+            {(result.cells_missing_data ?? 0) > 0 ? (
+              <span className="ms-2 text-ap-warn">
+                {t("dryRun.missingData", { count: result.cells_missing_data })}
+              </span>
+            ) : null}
             {result.cells_errored > 0 ? (
               // An errored cell is not a healthy one. The summary counted
               // cards and total only, so a walk that fell over read as a cell
@@ -202,7 +212,19 @@ export function BetaDryRunPanel({
                       : cell.cell_id}
                   </Td>
                   <Td className="px-2 py-2">
-                    {cell.identity.length === 0 ? (
+                    {cell.identity.length === 0 &&
+                    cell.error === null &&
+                    (cell.missing_inputs?.length ?? 0) > 0 ? (
+                      <span className="flex flex-col gap-1">
+                        <Pill kind="warn">{t("dryRun.noCardMissing")}</Pill>
+                        <span className="text-meta text-ap-muted">
+                          {t("dryRun.missingList")}{" "}
+                          <span dir="ltr" className="font-mono">
+                            {(cell.missing_inputs ?? []).join(", ")}
+                          </span>
+                        </span>
+                      </span>
+                    ) : cell.identity.length === 0 ? (
                       <span className="text-ap-muted">{t("dryRun.noCard")}</span>
                     ) : (
                       <span dir="ltr" className="flex flex-wrap gap-1 font-mono text-xs">
