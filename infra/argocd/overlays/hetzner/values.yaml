@@ -4451,7 +4451,17 @@ global:
       #   Watch: GET /investor/app-version answers latest_version 0.2.0 to an
       #   investor; 0.1.0 apps keep working (no "Update required").
       #   Rollback: api to d8f0143.
-      tag: "ab9f5ba"
+      # 0ba1b1e = #905, api (ab9f5ba..0ba1b1e is #902-#905; only #905 touches
+      #   backend/). New read-only route GET
+      #   /platform/decision-trees/beta/{tree_id}/dry-run/blocks: the tenant's
+      #   active blocks, each with the sweep's targeting verdict against the
+      #   version the dry run walks. No migration, no new env, no capability.
+      #   Workers unchanged at 8bfe412.
+      #   Watch: the route answers 200 for a tenant caller with
+      #   decision_tree.read; the existing dry-run route is unchanged.
+      #   Rollback: api to ab9f5ba, together with the frontend (the new
+      #   picker needs the route).
+      tag: "0ba1b1e"
     workers:
       tag: "8bfe412"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
@@ -5325,7 +5335,22 @@ global:
       #   Watch: the Beta designer opens and its tabs work; a block page
       #   renders with the Harvest card.
       #   Rollback: frontend to a19ce55.
-      tag: "2f3fb84"
+      # 0ba1b1e = #904 + #905, frontend (2f3fb84..0ba1b1e touches frontend/
+      #   only in these two).
+      #   #904: a Country select in the console's Farm settings -> Farm tab,
+      #   with the decision-tree impact preview before a change; and the
+      #   legacy /farms/:id/edit page now loads the farm's country (it showed
+      #   "None" and a save would have cleared it).
+      #   #905: the Beta designer's Dry run picker reads the new
+      #   dry-run/blocks route, lists targeted blocks first and marks the rest
+      #   "(not targeted)"; a result on an untargeted block opens with a
+      #   "Production would skip this block" warning naming the axis.
+      #   Needs the api at 0ba1b1e (the picker's route); on an older api the
+      #   picker fails to load.
+      #   Watch: the Beta designer opens and its tabs work, the Dry run picker
+      #   loads; console Farm settings shows Country.
+      #   Rollback: frontend to 2f3fb84, together with the api.
+      tag: "0ba1b1e"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
