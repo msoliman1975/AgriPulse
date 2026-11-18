@@ -504,16 +504,26 @@ export interface BetaDryRunResponse {
 /**
  * Walk the tree's stored draft over one block.
  *
- * The route takes a block and nothing else, so the draft has to be saved
- * first. The designer disables the run while the editor is dirty rather than
- * running the previous body and labelling the answer as the author's edit.
+ * `versionId` names the version to walk; the designer passes its latest saved
+ * version. Left out, the server walks the PUBLISHED version when there is one,
+ * so a tree published once and edited since dry-ran the old body (and judged
+ * targeting against it) while the screen said "the draft".
+ *
+ * The draft has to be saved first. The designer disables the run while the
+ * editor is dirty rather than running the previous body and labelling the
+ * answer as the author's edit.
  *
  * A block with no grid returns no cells. That is an answer, not a failure,
  * and the panel says which one it is.
  */
-export async function betaDryRun(treeId: string, blockId: string): Promise<BetaDryRunResponse> {
+export async function betaDryRun(
+  treeId: string,
+  blockId: string,
+  versionId: string | null = null,
+): Promise<BetaDryRunResponse> {
   const { data } = await apiClient.post<BetaDryRunResponse>(`${BETA_TREES}/${treeId}/dry-run`, {
     block_id: blockId,
+    version_id: versionId,
   });
   // Defensive on the two lists the table walks. A field this client expects
   // and the server does not send used to reach the table as `undefined` and
@@ -541,9 +551,13 @@ export async function betaDryRun(treeId: string, blockId: string): Promise<BetaD
  * Tenant-scoped: a platform caller has no blocks, and the designer says so in
  * words instead — see `dryRun.platformScope`.
  */
-export async function listDryRunBlocks(treeId: string): Promise<BetaCandidateBlock[]> {
+export async function listDryRunBlocks(
+  treeId: string,
+  versionId: string | null = null,
+): Promise<BetaCandidateBlock[]> {
   const { data } = await apiClient.get<BetaCandidateBlock[]>(
     `${BETA_TREES}/${treeId}/dry-run/blocks`,
+    { params: versionId ? { version_id: versionId } : undefined },
   );
   return Array.isArray(data) ? data : [];
 }

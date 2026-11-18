@@ -43,12 +43,16 @@ BLOCKS = [
 
 
 def _service(
-    monkeypatch: pytest.MonkeyPatch, compiled: dict[str, Any] | None
+    monkeypatch: pytest.MonkeyPatch,
+    compiled: dict[str, Any] | None,
+    calls: list[dict[str, Any]] | None = None,
 ) -> FoldingTreeAuthorService:
     service = FoldingTreeAuthorService.__new__(FoldingTreeAuthorService)
     service._public = None  # type: ignore[assignment]
 
-    async def resolve(**_: Any) -> Any:
+    async def resolve(**kwargs: Any) -> Any:
+        if calls is not None:
+            calls.append(kwargs)
         if compiled is None:
             raise BetaDryRunUnavailableError("This tree has no version to run.")
         return {"code": "t"}, compiled, uuid4()
@@ -97,3 +101,17 @@ async def test_a_tree_with_no_version_lists_blocks_without_a_verdict(
     rows = await service.dry_run_blocks(tree_id=uuid4(), tenant_session=None)  # type: ignore[arg-type]
     assert [r["label"] for r in rows] == ["Farm / bare", "Farm / eg_palm", "Farm / sa_palm"]
     assert all(r["targeting"] is None for r in rows)
+
+
+async def test_the_version_asked_for_is_the_one_judged(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The designer dry-runs its latest saved draft, which may be newer than
+    the published version. The picker must judge targeting against that same
+    draft, or a targeting edit would not show until it was published."""
+    calls: list[dict[str, Any]] = []
+    service = _service(monkeypatch, {"country_codes": ["EG"]}, calls)
+    version_id = uuid4()
+    await service.dry_run_blocks(
+        tree_id=uuid4(), tenant_session=None, version_id=version_id  # type: ignore[arg-type]
+    )
+    assert calls[0]["version_id"] == version_id
+    assert calls[0]["definition"] is None

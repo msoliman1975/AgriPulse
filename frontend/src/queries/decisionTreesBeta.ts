@@ -191,18 +191,28 @@ export function useDiscardBetaDraft() {
  * Disabled outside a tenant: farms and blocks are tenant-scoped, so a
  * platform caller would get a 403 and a picker with nothing in it.
  */
-export function useDryRunBlocks(scope: AuthoringScope, treeId: string) {
+export function useDryRunBlocks(
+  scope: AuthoringScope,
+  treeId: string,
+  versionId: string | null = null,
+) {
   return useQuery<BetaCandidateBlock[]>({
-    queryKey: [...KEY, "dry_run_blocks", treeId] as const,
-    queryFn: () => listDryRunBlocks(treeId),
+    // The version is in the key: saving a draft makes a new latest version,
+    // and the verdicts are judged against it.
+    queryKey: [...KEY, "dry_run_blocks", treeId, versionId] as const,
+    queryFn: () => listDryRunBlocks(treeId, versionId),
     enabled: scope === "tenant" && Boolean(treeId),
     staleTime: 60_000,
   });
 }
 
 export function useBetaDryRun() {
-  return useMutation<BetaDryRunResponse, Error, { treeId: string; blockId: string }>({
-    mutationFn: ({ treeId, blockId }) => betaDryRun(treeId, blockId),
+  return useMutation<
+    BetaDryRunResponse,
+    Error,
+    { treeId: string; blockId: string; versionId?: string | null }
+  >({
+    mutationFn: ({ treeId, blockId, versionId }) => betaDryRun(treeId, blockId, versionId ?? null),
   });
 }
 
