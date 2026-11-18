@@ -204,3 +204,26 @@ describe("<BetaDryRunPanel> targeting", () => {
     ).toBeInTheDocument();
   });
 });
+
+// A cell with no card is not always healthy: a condition that reads missing
+// data counts as not met, so the walk can end with nothing registered.
+describe("<BetaDryRunPanel> missing data", () => {
+  it("marks the cell and names what was empty", () => {
+    const body = response({ cells_missing_data: 1 });
+    body.cells[0].missing_inputs = ["indices.ndvi.baseline_deviation", "block.soil_texture"];
+    renderPanel(body);
+    expect(screen.getByText(/^No card · data missing$/)).toBeInTheDocument();
+    expect(
+      screen.getByText("indices.ndvi.baseline_deviation, block.soil_texture"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/^1 cell has no card only because data was missing\.$/),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the plain label when nothing was missing", () => {
+    renderPanel(response());
+    expect(screen.queryByText(/^No card · data missing$/)).toBeNull();
+    expect(screen.queryByText(/because data was missing/)).toBeNull();
+  });
+});

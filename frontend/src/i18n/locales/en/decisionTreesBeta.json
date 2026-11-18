@@ -318,7 +318,11 @@
       "soilMissing": "The tree targets soil {{required}}; this block has no soil texture set. The cells below show what the tree would say if it ran here.",
       "other": "The tree's targeting ({{required}}) does not include this block. The cells below show what the tree would say if it ran here.",
       "otherMissing": "The tree's targeting ({{required}}) does not include this block. The cells below show what the tree would say if it ran here."
-    }
+    },
+    "noCardMissing": "No card · data missing",
+    "missingList": "Empty:",
+    "missingData_one": "{{count}} cell has no card only because data was missing.",
+    "missingData_other": "{{count}} cells have no card only because data was missing."
   },
   "publish": {
     "title": "Publish checks",

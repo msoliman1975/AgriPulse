@@ -689,6 +689,13 @@ class FoldingTreeAuthorService:
             "cells_carded": len(carded),
             "cells_errored": sum(1 for c in cells if c["error"] is not None),
             "cells_composed": sum(1 for c in carded if c["composed"]),
+            # No card, no error, and the walk read empty block data: the cell
+            # is not known to be healthy, only not shown to be otherwise.
+            "cells_missing_data": sum(
+                1
+                for c in cells
+                if not c["identity"] and c["error"] is None and c.get("missing_inputs")
+            ),
             "node_counts": dict(node_counts),
             "cells": cells,
         }
@@ -1162,6 +1169,28 @@ def _fold_one_cell(
     return row
 
 
+# Value refs that are the tree's own state, not block data: a parameter, a
+# variable a `set` node writes, or a finding the walk registered. One of these
+# being empty says nothing about whether the block's data was there.
+_TREE_STATE_PREFIXES = ("params.", "vars.", "findings.")
+
+
+def _missing_inputs(walk: Any) -> list[str]:
+    """Block data the walk read and found empty, as sorted dotted refs.
+
+    A condition that reads nothing counts as not met (the engine will not fire
+    on missing data), so a walk over a block with no data often ends with no
+    finding at all. Without this list that cell reads exactly like a healthy
+    one. ``condition_snapshot`` keeps ``None`` for a ref that did not resolve.
+    """
+    missing: set[str] = set()
+    for step in walk.path:
+        for key, value in (step.condition_snapshot or {}).items():
+            if value is None and not str(key).startswith(_TREE_STATE_PREFIXES):
+                missing.add(str(key))
+    return sorted(missing)
+
+
 def _walk_one_cell(
     folding_engine: Any,
     *,
@@ -1203,6 +1232,7 @@ def _walk_one_cell(
         "rule_code": None,
         "stopped_at": walk.stopped_at,
         "error": walk.error,
+        "missing_inputs": _missing_inputs(walk),
     }
     if not walk.ok:
         return row, walk, None

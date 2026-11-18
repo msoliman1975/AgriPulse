@@ -473,6 +473,10 @@ export interface BetaDryRunCell {
   /** The node the walk ended on. A cell that stopped anywhere else errored. */
   stopped_at: string | null;
   error: string | null;
+  /** Block data the walk read and found empty, as dotted refs. A cell with
+   *  no card and something here is not known to be healthy: a condition that
+   *  reads nothing counts as not met. Absent on an older api. */
+  missing_inputs?: string[];
 }
 
 /** One finding a walk registered, with the nodes that registered it. */
@@ -498,6 +502,8 @@ export interface BetaDryRunResponse {
   cells_errored: number;
   /** Of the carded cells, how many composed their text. */
   cells_composed: number;
+  /** Cells with no card and no error whose walk read empty block data. */
+  cells_missing_data?: number;
   cells: BetaDryRunCell[];
 }
 
@@ -534,6 +540,7 @@ export async function betaDryRun(
       ...cell,
       identity: Array.isArray(cell.identity) ? cell.identity : [],
       findings: Array.isArray(cell.findings) ? cell.findings : [],
+      missing_inputs: Array.isArray(cell.missing_inputs) ? cell.missing_inputs : [],
     })),
   };
 }
