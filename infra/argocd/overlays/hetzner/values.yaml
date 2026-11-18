@@ -5364,7 +5364,19 @@ global:
       #   Watch: the Beta designer opens and its tabs work; a dry run on a
       #   tree with a newer draft reports that draft's version.
       #   Rollback: frontend to 0ba1b1e.
-      tag: "3d67a6b"
+      # d36a75b = #909, frontend only (api stays 3d67a6b, workers 8bfe412).
+      #   Beta designer Readiness fix links land where the item can be set:
+      #   soil texture / salinity -> block edit form, which now returns to
+      #   the Readiness tab on save (?returnTo=, in-app paths only); growth
+      #   stage, crop attributes, heat-unit start -> new crop settings on
+      #   the block page (#crop-settings); crop reference values -> "set in
+      #   the crop catalogue", no link. Readiness re-reads on every mount
+      #   (was cached 60 s, so a fix still read "Missing").
+      #   Watch: the Beta designer opens and its tabs work; a block page
+      #   with a current crop shows growth stage, heat-unit start and crop
+      #   fields; the block edit form saves.
+      #   Rollback: frontend to 3d67a6b.
+      tag: "d36a75b"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
