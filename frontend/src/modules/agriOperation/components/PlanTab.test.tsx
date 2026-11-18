@@ -181,10 +181,15 @@ describe("Plan tab", () => {
     expect(await screen.findByText("Same start date for all blocks")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
-    // Step 4: move the bar one day with the keyboard; the preview re-runs with the override.
-    const bar = await screen.findByRole("button", { name: /Spray A, 2027-02-01/ });
-    fireEvent.keyDown(bar, { key: "ArrowRight" });
-    await screen.findByRole("button", { name: /Spray A, 2027-02-02 \(moved\)/ });
+    // Step 4: the week list shows the task in its week; pick a day one later.
+    // The preview re-runs with the override.
+    const date = await screen.findByLabelText<HTMLInputElement>("Date for Spray A");
+    expect(date.value).toBe("2027-02-01");
+    fireEvent.change(date, { target: { value: "2027-02-02" } });
+    await waitFor(() =>
+      expect(screen.getByLabelText<HTMLInputElement>("Date for Spray A").value).toBe("2027-02-02"),
+    );
+    expect(screen.getByText("(moved)")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Apply to blocks" }));
     expect(await screen.findByText("Plan applied")).toBeTruthy();

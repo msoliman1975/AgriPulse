@@ -13,6 +13,7 @@ import type { OperationManual } from "@/api/agriOperation";
 import type { PlanTemplateActivity } from "@/api/planTemplates";
 import { localizedField } from "@/lib/localizedField";
 import { STAGE_COLORS, stageName, TYPE_CLASS } from "../lib/manualStyle";
+import { repeatLabel, weekSpanLabel } from "../lib/repeat";
 import { activityWeek, seasonLayout, stripEvidenceTags, type StageWindow } from "../lib/weeks";
 
 interface ManualViewProps {
@@ -115,7 +116,13 @@ export function ManualView({ manual, varietyPath }: ManualViewProps): ReactNode 
           >
             <ul>
               {(byStage.groups.get(w.code) ?? []).map((a) => (
-                <ActivityRow key={a.id} activity={a} week={activityWeek(a, layout)} stage={w} />
+                <ActivityRow
+                  key={a.id}
+                  activity={a}
+                  week={activityWeek(a, layout)}
+                  totalWeeks={layout.totalWeeks}
+                  stage={w}
+                />
               ))}
             </ul>
           </Card>
@@ -128,7 +135,13 @@ export function ManualView({ manual, varietyPath }: ManualViewProps): ReactNode 
           </p>
           <ul>
             {byStage.other.map((a) => (
-              <ActivityRow key={a.id} activity={a} week={activityWeek(a, layout)} stage={null} />
+              <ActivityRow
+                key={a.id}
+                activity={a}
+                week={activityWeek(a, layout)}
+                totalWeeks={layout.totalWeeks}
+                stage={null}
+              />
             ))}
           </ul>
         </Card>
@@ -229,10 +242,12 @@ function anchorText(
 function ActivityRow({
   activity,
   week,
+  totalWeeks,
   stage,
 }: {
   activity: PlanTemplateActivity;
   week: number | null;
+  totalWeeks: number;
   stage: StageWindow | null;
 }): ReactNode {
   const { t, i18n } = useTranslation("agriOperation");
@@ -247,8 +262,8 @@ function ActivityRow({
     <li className="border-b border-ap-line last:border-b-0">
       <details className="group">
         <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-2.5 hover:bg-ap-bg">
-          <span className="w-14 shrink-0 text-xs font-semibold tabular-nums text-ap-muted">
-            {week !== null ? t("manual.weekShort", { n: week }) : "—"}
+          <span className="w-20 shrink-0 text-xs font-semibold tabular-nums text-ap-muted">
+            {weekSpanLabel(week, activity.duration_days, totalWeeks, t)}
           </span>
           <span
             className={clsx(
@@ -261,7 +276,12 @@ function ActivityRow({
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium text-ap-ink">{title}</span>
             <span className="block truncate text-xs text-ap-muted">
-              {anchorText(activity, stage, lang, t)}
+              {[
+                anchorText(activity, stage, lang, t),
+                repeatLabel(activity.repeat_count, activity.repeat_unit, t),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </span>
           </span>
           <span

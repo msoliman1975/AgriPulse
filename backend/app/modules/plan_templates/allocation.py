@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, timedelta
+from math import floor
 from typing import Any
 from uuid import UUID
 
@@ -55,6 +56,56 @@ class AllocatedActivity:
     dose_unit: str | None = None
     # D26: the Arabic notes travel with the English ones (tenant 0108).
     notes_ar: str | None = None
+    # Time `occurrence` of `occurrences` for a repeating manual task (0115).
+    activity_code: str | None = None
+    occurrence: int = 1
+    occurrences: int = 1
+    repeat_count: int | None = None
+    repeat_unit: str | None = None
+
+
+# Days a repeat unit spans. A month is the mean calendar month.
+_UNIT_DAYS = {"week": 7.0, "month": 365.25 / 12}
+# A guard, not a rule: no manual task should need more times than this in one
+# window (daily for a little over a year).
+MAX_OCCURRENCES = 400
+
+
+def occurrence_offsets(
+    duration_days: int, repeat_count: int | None, repeat_unit: str | None
+) -> list[int]:
+    """Day offsets from the window start for each time a task is done.
+
+    No repeat: once, at the start. ``week``/``month``: ``repeat_count`` times
+    per unit, evenly spaced, for as long as the window lasts. ``season``:
+    ``repeat_count`` times spread evenly over the whole window.
+    """
+    window = max(1, int(duration_days or 1))
+    if not repeat_count or not repeat_unit:
+        return [0]
+    if repeat_unit == "season":
+        step = window / repeat_count
+        return sorted({floor(i * step) for i in range(repeat_count)})
+    unit_days = _UNIT_DAYS.get(repeat_unit)
+    if unit_days is None:
+        return [0]
+    step = unit_days / repeat_count
+    offsets: list[int] = []
+    i = 0
+    while len(offsets) < MAX_OCCURRENCES:
+        day = floor(i * step)
+        if day >= window:
+            break
+        if not offsets or day != offsets[-1]:
+            offsets.append(day)
+        i += 1
+    return offsets or [0]
+
+
+def occurrence_key(code: str, n: int) -> str:
+    """The first time keeps the code (so edits, exclusions and moves saved
+    before repeats existed still apply); later times are ``<code>#<n>``."""
+    return code if n == 1 else f"{code}#{n}"
 
 
 def _edited_notes_ar(edits: dict[str, Any], manual_notes_ar: str | None) -> str | None:
@@ -136,33 +187,45 @@ def resolve_allocation(
 
     out: list[AllocatedActivity] = []
     for r in resolved:
-        key = str(r.activity_code or by_id[r.template_activity_id].get("code"))
-        edits = activity_edits.get(key, {})
-        override = overrides.get(key)
-        out.append(
-            AllocatedActivity(
-                activity_key=key,
-                source="template",
-                template_activity_id=r.template_activity_id,
-                activity_type=r.activity_type,
-                title=r.title,
-                title_ar=r.title_ar,
-                scheduled_date=date.fromisoformat(override) if override else r.scheduled_date,
-                duration_days=r.duration_days,
-                anchored_stage_code=r.anchored_stage_code,
-                product_name=edits.get("product_name", r.product_name),
-                dosage=edits.get("dosage", r.dosage),
-                notes=edits.get("notes", r.notes),
-                notes_ar=_edited_notes_ar(edits, r.notes_ar),
-                start_time=r.start_time,
-                date_overridden=bool(override),
-                default_date=r.scheduled_date,
-                input_id=r.input_id,
-                dose_value=r.dose_value,
-                dose_value_max=r.dose_value_max,
-                dose_unit=r.dose_unit,
+        code = str(r.activity_code or by_id[r.template_activity_id].get("code"))
+        edits = activity_edits.get(code, {})
+        offsets = occurrence_offsets(r.duration_days, r.repeat_count, r.repeat_unit)
+        repeats = len(offsets) > 1
+        for n, day in enumerate(offsets, start=1):
+            key = occurrence_key(code, n)
+            planned = r.scheduled_date + timedelta(days=day)
+            override = overrides.get(key)
+            out.append(
+                AllocatedActivity(
+                    activity_key=key,
+                    source="template",
+                    template_activity_id=r.template_activity_id,
+                    activity_type=r.activity_type,
+                    title=r.title,
+                    title_ar=r.title_ar,
+                    scheduled_date=date.fromisoformat(override) if override else planned,
+                    # One time of a repeating task is a one-day job; a task
+                    # done once keeps its window.
+                    duration_days=1 if repeats else r.duration_days,
+                    anchored_stage_code=r.anchored_stage_code,
+                    product_name=edits.get("product_name", r.product_name),
+                    dosage=edits.get("dosage", r.dosage),
+                    notes=edits.get("notes", r.notes),
+                    notes_ar=_edited_notes_ar(edits, r.notes_ar),
+                    start_time=r.start_time,
+                    date_overridden=bool(override),
+                    default_date=planned,
+                    input_id=r.input_id,
+                    dose_value=r.dose_value,
+                    dose_value_max=r.dose_value_max,
+                    dose_unit=r.dose_unit,
+                    activity_code=code,
+                    occurrence=n,
+                    occurrences=len(offsets),
+                    repeat_count=r.repeat_count,
+                    repeat_unit=r.repeat_unit,
+                )
             )
-        )
 
     stages_by_code = {s["code"]: s for s in (stages or [])}
     for c in custom_activities:
@@ -209,4 +272,12 @@ def resolve_allocation(
     return out, skipped
 
 
-__all__ = ["EDITABLE_FIELDS", "AllocatedActivity", "custom_key", "resolve_allocation"]
+__all__ = [
+    "EDITABLE_FIELDS",
+    "MAX_OCCURRENCES",
+    "AllocatedActivity",
+    "custom_key",
+    "occurrence_key",
+    "occurrence_offsets",
+    "resolve_allocation",
+]

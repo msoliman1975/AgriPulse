@@ -33,6 +33,13 @@ a plan template (`public.plan_templates`, `/api/v1/plan-templates`).
     `planting_date + start_day`). This is the normal anchor.
   - `start`: `block_start_date + offset_days`.
   - `milestone`: `block_start_date + milestone.day_from_start + offset_days`.
+- **Repeats** (public 0115). An activity can repeat inside its window:
+  `repeat_count` times per `repeat_unit` (`week`, `month`, or `season` = the
+  whole window). A saved plan schedules each time as its own task and board
+  card: the first keeps the activity code as its key, later ones are
+  `<code>#2`, `<code>#3` …, and each can be moved on its own. The Medjool 1.7
+  values come from each task's "How often" line (`data/0115_activity_repeat.json`
+  says how ranges were read: the lower bound; "most soils" for soil types).
 - **Revisions.** Each publish bumps `revision`, stamps `published_at` and
   stores a snapshot of the published activities. Saved plans keep the
   snapshot they were built from, so a farm can see what changed since.
@@ -85,11 +92,14 @@ Capabilities `plan_template.read`, `plan_allocation.read` and
 `plan_allocation.manage`.
 
 1. **Agri Operation** (`/agri-operation/:farmId`, also linked from the board
-   header). The **Catalog** tab lists the manuals for the farm's crops, by
-   variety, read-only.
+   header). The **Catalog** tab lists the manuals for the farm's crops, read-only;
+   pick a crop, a variety (it filters the manuals and lays out its weeks), then
+   a manual.
 2. The **Plan** tab lists saved plans. **New plan** runs four steps: blocks;
    operations (leave out, edit product/dosage/notes, add your own); season
-   and start date; the calendar (preview). **Save** applies it to the board.
+   and start date; the calendar (preview), every week with its dates and
+   all its tasks, a repeating task once per time with a date field for the
+   exact day. **Save** applies it to the board.
 3. Editing a saved plan and saving again regenerates its still-scheduled
    activities; completed and in-progress ones are kept, and dates moved on
    the board are remembered (`date_overrides`).

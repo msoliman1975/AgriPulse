@@ -42,6 +42,9 @@ class ResolvedActivity:
     dose_value: Any = None
     dose_value_max: Any = None
     dose_unit: str | None = None
+    # How often the task repeats inside its window (public 0115).
+    repeat_count: int | None = None
+    repeat_unit: str | None = None
 
 
 def stage_start_date(
@@ -134,6 +137,8 @@ def resolve_schedule(
                 dose_value=a.get("dose_value"),
                 dose_value_max=a.get("dose_value_max"),
                 dose_unit=a.get("dose_unit"),
+                repeat_count=a.get("repeat_count"),
+                repeat_unit=a.get("repeat_unit"),
             )
         )
 

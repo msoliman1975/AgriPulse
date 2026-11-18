@@ -76,6 +76,8 @@ export function newActivity(stageCode: string | null, sortOrder: number): Activi
     notes_ar: null,
     evidence_tier: null,
     source_tree_code: null,
+    repeat_count: null,
+    repeat_unit: null,
     input_id: null,
     dose_value: null,
     dose_value_max: null,
@@ -121,6 +123,8 @@ export function draftFromDetail(d: PlanTemplateDetail): ManualDraft {
       notes_ar: a.notes_ar ?? null,
       evidence_tier: a.evidence_tier ?? null,
       source_tree_code: a.source_tree_code ?? null,
+      repeat_count: a.repeat_count ?? null,
+      repeat_unit: a.repeat_unit ?? null,
       input_id: a.input_id ?? null,
       dose_value: a.dose_value == null ? null : Number(a.dose_value),
       dose_value_max: a.dose_value_max == null ? null : Number(a.dose_value_max),
@@ -170,6 +174,9 @@ export function toWriteRequest(d: ManualDraft): PlanTemplateWriteRequest {
       notes_ar: text(a.notes_ar),
       evidence_tier: a.evidence_tier ?? null,
       source_tree_code: text(a.source_tree_code),
+      // A repeat needs both a count and a unit (the API refuses half of one).
+      repeat_count: a.repeat_count && a.repeat_unit ? a.repeat_count : null,
+      repeat_unit: a.repeat_count && a.repeat_unit ? a.repeat_unit : null,
       input_id: a.input_id || null,
       // A dose is saved only with a unit; the API refuses one without.
       dose_value: a.dose_unit ? (a.dose_value ?? null) : null,

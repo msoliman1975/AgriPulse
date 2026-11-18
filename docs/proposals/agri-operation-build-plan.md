@@ -59,6 +59,11 @@ The code keeps the `plan_templates` names; users see **"Operation manual"**
 | G1 | Crops | Mango and date palm |
 | G2 | Launch | GA for every farm |
 | G3 | Devices | Desktop first; phones read-only for saved plans |
+| I1 | Calendar step (2026-11-18) | Every week shown in full, with its dates and all its tasks |
+| I2 | Repeating tasks (2026-11-18) | Record each time: a task done N times per week/month/season is scheduled once per time, each its own board card |
+| I3 | Monthly tasks (2026-11-18) | Appear in the week the manual recommends; the farm picks the exact day in the calendar step |
+| I4 | Catalog (2026-11-18) | A Variety selector between Crop and Manual |
+| I5 | Medjool 1.3 Arabic (2026-11-18) | Left as is: 1.3 is archived; the published 1.7 manuals already carry the manual's Arabic edition |
 
 ## 3. Design
 
@@ -194,6 +199,7 @@ the promotion procedure in `CLAUDE.md`.
 | 8 | Platform manual editor | `platform/operation-manuals`, `ManualView` edit mode (inline, H3), anchors (H4), variety switcher (H5), publish dialog (H6), validation parity checklist | vitest: parity checklist covers every old-editor capability | frontend |
 | 9 | Decision-tree dedupe | F1 lookup + `recommendations.plan_activity_id` column, Action Center "Already planned" | unit + integration on the engine path | api + workers + frontend |
 | 10 | Cleanup | Remove old editor and `ApplyTemplateDialog` once PR 8 parity is confirmed in prod; runbook `docs/runbooks/phenology-and-plan-templates.md` rewritten; telemetry taxonomy | full suites | frontend |
+| 11 | Weeks, repeats and variety | I1-I4: `repeat_count` / `repeat_unit` on manual activities (public 0115, filled for Medjool 1.7 from each task's "How often" line), saved plans schedule each time (`<code>#<n>` keys), calendar step as a week list with a date per task, Catalog Variety selector, editor Repeat field | unit (spacing, keys, moves, diff), integration (0115 values, CHECK, authoring), vitest (week list, variety filter, editor save) | api + workers + frontend |
 
 Deploy waves: after PR 1, after PR 2–4 (backend complete), after PR 5–7
 (farm launch), after PR 8, after PR 9, after PR 10.
@@ -248,3 +254,4 @@ The loop is self-paced. Each iteration:
 | 8 | Platform manual editor | merged | [#863](https://github.com/msoliman1975/AgriPulse/pull/863) | 7a27d30 via [#865](https://github.com/msoliman1975/AgriPulse/pull/865), verified 2026-11-14 (frontend + Beta designer; Operation manuals list and editor opened read-only) |
 | 9 | Decision-tree dedupe | merged | [#867](https://github.com/msoliman1975/AgriPulse/pull/867) | fa5460d via [#869](https://github.com/msoliman1975/AgriPulse/pull/869), verified 2026-11-14 (frontend + Beta designer; no new platform alerts. The Action Center is tenant-scoped, so the platform client cannot call it; check Already planned with a tenant login) |
 | 10 | Cleanup | merged | [#871](https://github.com/msoliman1975/AgriPulse/pull/871) | 13a8eca via [#877](https://github.com/msoliman1975/AgriPulse/pull/877) (promoted with other work), verified 2026-11-15 (frontend + Beta designer; /platform/plan-templates redirects to Operation manuals; crop picker shows Mango / Keitt) |
+| 11 | Weeks, repeats and variety | in review | | |

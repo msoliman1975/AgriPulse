@@ -283,7 +283,9 @@ class PlanTemplatesService:
         manual_codes = {a["code"] for a in tree["activities"]}
         referenced = set(excluded) | set(edits)
         for per_block in payload.date_overrides.values():
-            referenced |= {k for k in per_block if not k.startswith("custom:")}
+            # An occurrence key is "<code>#<n>" (a repeating task); its code
+            # is the part before the "#".
+            referenced |= {k.split("#")[0] for k in per_block if not k.startswith("custom:")}
 
         blocks: list[dict[str, Any]] = []
         rejected: list[dict[str, Any]] = []

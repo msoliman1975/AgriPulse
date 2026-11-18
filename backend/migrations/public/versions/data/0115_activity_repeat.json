@@ -1,0 +1,29 @@
+{
+  "_basis": "How often each Medjool 1.7 task repeats inside its window, read from the task's 'How often' line (manual 1.7, sections 12.2 and 8.8). A range uses its lower bound (1–2× per week -> 1 per week; every 7–15 days -> 2 per month); a soil-type list uses 'most soils' (2–3× per week -> 2). Tasks done once, per plant/bunch/spathe, or with no number in the sources are not listed: they stay single tasks. The full range stays in the note.",
+  "medjool-organic-bearing-eg-1-7": {
+    "irrigation-1": [1, "week", "1× per week"],
+    "trap_service-1": [2, "month", "1× every 7–15 days"],
+    "observation-1": [1, "month", "1× per month cold months, 2× warm season"],
+    "hilling-1": [1, "month", "Monthly, with the farm inspection"],
+    "observation-5": [1, "week", "Weekly rainfall record"],
+    "observation-2": [7, "week", "Daily (7×/week)"],
+    "irrigation-3": [1, "week", "1–2× per week"],
+    "irrigation-4": [2, "week", "most soils every 2–3 days (2–3×/week)"],
+    "spraying-5": [1, "month", "1 release per month"],
+    "observation-3": [2, "month", "Every 2 weeks"],
+    "irrigation-5": [1, "week", "1–2× per week"],
+    "bending-1": [1, "week", "Check 1×/week"],
+    "irrigation-6": [2, "week", "2× per week"],
+    "harvesting-1": [2, "season", "2–3 picks in total"],
+    "observation-7": [1, "week", "Weekly during harvest"],
+    "irrigation-7": [1, "week", "1–2× per week"],
+    "irrigation-2": [1, "week", "1× per week"]
+  },
+  "medjool-organic-new-planting-eg-1-7": {
+    "trap_service-1": [2, "month", "1× every 7–15 days"],
+    "irrigation-3": [2, "week", "most soils every 2–3 days (2–3×/week)"],
+    "irrigation-4": [2, "week", "most soils every 2–3 days (2–3×/week)"],
+    "irrigation-5": [1, "week", "winter 1×/week; summer most soils 2–3×/week"],
+    "irrigation-6": [1, "week", "winter 1×/week · summer 2×/week · spring/autumn 1–2×/week"]
+  }
+}
