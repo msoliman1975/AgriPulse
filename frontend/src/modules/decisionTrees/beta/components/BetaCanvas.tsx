@@ -15,6 +15,11 @@
  * A switch node draws its ordered cases and its default inside the box, so an
  * author reads the bands without opening the node.
  *
+ * "Expand" lifts the same surface into a full-window layer (Esc or the
+ * button closes it) so a big, deep tree has the whole screen, and turns on
+ * the level bands: one shaded band per depth, labelled "Level n · k nodes",
+ * from the layout's own `depth`. The bands can be toggled in either view.
+ *
  * `dir="ltr"` on the viewport is load-bearing: text anchored in SVG flips
  * under RTL, and a node id or a band bound would read backwards in Arabic.
  * The surrounding page stays RTL.
@@ -43,6 +48,7 @@ import {
   type BetaPositionedEdge,
   type BetaPositionedNode,
 } from "../lib/betaLayout";
+import { levelBands, type LevelBand } from "../lib/levelBands";
 import {
   caseOp,
   caseOperand,
@@ -145,11 +151,51 @@ export function BetaCanvas({
     return { width: rect.width, height: rect.height };
   }, []);
 
+  const [expanded, setExpanded] = useState(false);
+  const [showLevels, setShowLevels] = useState(false);
+  const bands = useMemo(() => levelBands(layout), [layout]);
+  const spanX = useMemo(() => {
+    if (layout.nodes.length === 0) return { left: 0, right: 0 };
+    return {
+      left: Math.min(...layout.nodes.map((n) => n.x)),
+      right: Math.max(...layout.nodes.map((n) => n.x + n.width)),
+    };
+  }, [layout.nodes]);
+
   const fitToScreen = useCallback(() => {
     const size = viewportSize();
     if (size.width === 0 || size.height === 0) return;
     setView(fitToViewport({ width: layout.width, height: layout.height }, size));
   }, [layout.width, layout.height, viewportSize]);
+
+  // Expanding turns the levels on (the reason to expand a deep tree is to
+  // read it whole), refits once the layer has its size, and Esc closes it.
+  const toggleExpanded = useCallback(() => {
+    setExpanded((was) => {
+      if (!was) setShowLevels(true);
+      return !was;
+    });
+  }, []);
+  const modeChanged = useRef(false);
+  useEffect(() => {
+    // The first run is the mount, which the fit-once effect below handles.
+    if (!modeChanged.current) {
+      modeChanged.current = true;
+      return;
+    }
+    const frame = requestAnimationFrame(() => fitToScreen());
+    if (!expanded) return () => cancelAnimationFrame(frame);
+    const onKey = (evt: KeyboardEvent): void => {
+      if (evt.key === "Escape") setExpanded(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("keydown", onKey);
+    };
+    // Refit on the change of mode only, not on every edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded]);
 
   // Fit once, when there is first something to fit. After that the view is
   // the author's; re-fitting on every edit would pull it out from under them.
@@ -290,7 +336,17 @@ export function BetaCanvas({
     moving && moving.nodeId === nodeId ? { dx: moving.dx, dy: moving.dy } : { dx: 0, dy: 0 };
 
   return (
-    <Card noPadding className="overflow-hidden">
+    <Card
+      noPadding
+      className={
+        expanded
+          ? "fixed inset-0 z-50 flex flex-col overflow-hidden rounded-none"
+          : "overflow-hidden"
+      }
+      role={expanded ? "dialog" : undefined}
+      aria-modal={expanded ? true : undefined}
+      aria-label={expanded ? t("canvas.expandedAria") : undefined}
+    >
       <div className="flex flex-wrap items-center gap-2 border-b border-ap-line px-3 py-2">
         <Button variant="secondary" size="sm" onClick={fitToScreen}>
           {t("canvas.fitToScreen")}
@@ -314,6 +370,17 @@ export function BetaCanvas({
         >
           +
         </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          aria-pressed={showLevels}
+          onClick={() => setShowLevels((v) => !v)}
+        >
+          {showLevels ? t("canvas.hideLevels") : t("canvas.showLevels")}
+        </Button>
+        <Button variant="secondary" size="sm" onClick={toggleExpanded}>
+          {expanded ? t("canvas.collapse") : t("canvas.expand")}
+        </Button>
         {onResetLayout && layout.nodes.some((n) => n.pinned) ? (
           <Button variant="secondary" size="sm" onClick={onResetLayout}>
             {t("canvas.resetLayout")}
@@ -321,6 +388,7 @@ export function BetaCanvas({
         ) : null}
         <span className="ms-auto text-meta text-ap-muted">
           {t("canvas.nodeCount", { count: layout.nodes.length })} ·{" "}
+          {t("canvas.levelCount", { count: bands.length })} ·{" "}
           {onMoveNode ? t("canvas.hintDraggable") : t("canvas.hint")}
         </span>
       </div>
@@ -329,8 +397,8 @@ export function BetaCanvas({
         dir="ltr"
         role="application"
         aria-label={t("canvas.aria")}
-        className="relative overflow-hidden bg-ap-bg"
-        style={{ height, touchAction: "none" }}
+        className={`relative overflow-hidden bg-ap-bg ${expanded ? "min-h-0 flex-1" : ""}`}
+        style={expanded ? { touchAction: "none" } : { height, touchAction: "none" }}
       >
         {layout.nodes.length === 0 ? (
           <p className="p-12 text-center text-sm text-ap-muted">{t("canvas.empty")}</p>
@@ -344,6 +412,9 @@ export function BetaCanvas({
             onClick={onBackgroundClick}
           >
             <g transform={`translate(${view.tx} ${view.ty}) scale(${view.scale})`}>
+              {showLevels ? (
+                <LevelBands bands={bands} left={spanX.left} right={spanX.right} />
+              ) : null}
               {layout.edges.map((edge) => {
                 const from = offsetOf(edge.from);
                 const to = offsetOf(edge.to);
@@ -417,15 +488,79 @@ export function BetaCanvas({
           </svg>
         )}
       </div>
-      <button
-        type="button"
-        aria-label={t("canvas.resizeGrip")}
-        onPointerDown={(evt) => setResizeStart({ y: evt.clientY, height })}
-        className="flex h-3 w-full cursor-ns-resize items-center justify-center border-t border-ap-line bg-ap-panel hover:bg-ap-line/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ap-primary"
-      >
-        <span className="h-0.5 w-10 rounded-full bg-ap-line" aria-hidden="true" />
-      </button>
+      {expanded ? null : (
+        <button
+          type="button"
+          aria-label={t("canvas.resizeGrip")}
+          onPointerDown={(evt) => setResizeStart({ y: evt.clientY, height })}
+          className="flex h-3 w-full cursor-ns-resize items-center justify-center border-t border-ap-line bg-ap-panel hover:bg-ap-line/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ap-primary"
+        >
+          <span className="h-0.5 w-10 rounded-full bg-ap-line" aria-hidden="true" />
+        </button>
+      )}
     </Card>
+  );
+}
+
+// ---- Level bands ------------------------------------------------------
+
+/** How far the bands reach past the outermost nodes, and the label's room. */
+const BAND_MARGIN = 24;
+const BAND_LABEL_WIDTH = 132;
+
+/**
+ * One shaded band per depth behind the graph, with "Level n" and its node
+ * count at the left. Bands alternate two tints so neighbouring levels read
+ * apart; they take no pointer events, so panning and clicks pass through.
+ */
+function LevelBands({
+  bands,
+  left,
+  right,
+}: {
+  bands: LevelBand[];
+  left: number;
+  right: number;
+}): JSX.Element {
+  const { t } = useTranslation("decisionTreesBeta");
+  const x = left - BAND_MARGIN - BAND_LABEL_WIDTH;
+  const width = right - left + 2 * BAND_MARGIN + BAND_LABEL_WIDTH;
+  return (
+    <g pointerEvents="none" data-testid="level-bands">
+      {bands.map((band, i) => (
+        <g key={band.depth}>
+          <rect
+            x={x}
+            y={band.top - 12}
+            width={width}
+            height={band.bottom - band.top + 24}
+            rx={8}
+            className="text-ap-line"
+            fill="currentColor"
+            fillOpacity={i % 2 === 0 ? 0.35 : 0.15}
+          />
+          <text
+            x={x + 12}
+            y={band.top + 6}
+            className="text-ap-ink"
+            fill="currentColor"
+            fontSize={13}
+            fontWeight={600}
+          >
+            {t("canvas.level", { level: band.depth + 1 })}
+          </text>
+          <text
+            x={x + 12}
+            y={band.top + 24}
+            className="text-ap-muted"
+            fill="currentColor"
+            fontSize={11}
+          >
+            {t("canvas.nodeCount", { count: band.count })}
+          </text>
+        </g>
+      ))}
+    </g>
   );
 }
 

@@ -76,7 +76,9 @@
       "intro": "A block runs this tree only when its crop, its farm's country and its soil texture all match. Leave an axis empty to match any. A crop matches its varieties too: mango covers mango.alphonso.",
       "any": "Any",
       "publishNote": "Saved with the draft. Farms start or stop running the tree when this version is published."
-    }
+    },
+    "runResults": "Run results",
+    "traces": "Evaluation traces"
   },
   "canvas": {
     "aria": "Beta tree canvas",
@@ -119,7 +121,15 @@
       "stop": "Ends the walk and folds"
     },
     "hintDraggable": "Click a node to edit it, drag a node to move it. Ctrl and scroll to zoom, drag the background to pan.",
-    "resetLayout": "Back to automatic layout"
+    "resetLayout": "Back to automatic layout",
+    "expand": "Expand",
+    "collapse": "Exit full view",
+    "expandedAria": "Tree canvas, full view (Esc to close)",
+    "showLevels": "Show levels",
+    "hideLevels": "Hide levels",
+    "level": "Level {{level}}",
+    "levelCount_one": "{{count}} level",
+    "levelCount_other": "{{count}} levels"
   },
   "node": {
     "title": "Node",

@@ -11,6 +11,7 @@
 // skip reason is rendered inline there rather than behind the drilldown.
 
 import { useMemo, useState, type ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import type { EvalRun, EvalTrace, EvalTraceStatus } from "@/api/decisionTrees";
@@ -50,7 +51,12 @@ export function DecisionTreeTracesPage(): ReactNode {
 
   const [runId, setRunId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterValues>({});
-  const [search, setSearch] = useState("");
+  // `?tree=<code>` opens the page on one tree's traces: the Beta designer
+  // links here that way. The server filters by code, so a busy run's 500-row
+  // page is that tree's rows rather than whichever 500 came first.
+  const [searchParams] = useSearchParams();
+  const treeCode = searchParams.get("tree")?.trim() || undefined;
+  const [search, setSearch] = useState(treeCode ?? "");
   const [openTraceId, setOpenTraceId] = useState<string | null>(null);
 
   const runsQ = useEvalRuns(50);
@@ -64,6 +70,7 @@ export function DecisionTreeTracesPage(): ReactNode {
   const tracesQ = useEvalTraces(
     {
       run_id: selectedRunId ?? undefined,
+      tree_code: treeCode,
       status: statusFilter.length ? statusFilter : undefined,
       limit: 500,
     },
