@@ -23,14 +23,16 @@
       "default": 0.3,
       "min": -2.0,
       "max": 3.0,
-      "description": "NDVI floor for a medium Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "NDVI floor for a medium Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر NDVI لنخيل المجدول المتوسط: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     },
     "large_ndvi_floor": {
       "type": "number",
       "default": 0.5,
       "min": -2.0,
       "max": 3.0,
-      "description": "NDVI floor for a large Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence."
+      "description": "NDVI floor for a large Medjool palm: a reading below it is outside the band. Medjool index workbook v2.0 (3 m PlanetScope), inferential band, Low confidence.",
+      "description_ar": "الحد الأدنى لمؤشر NDVI لنخيل المجدول الكبير: القراءة دونه خارج النطاق. دليل مؤشرات المجدول الإصدار 2.0 (صور 3 م)، نطاق استدلالي منخفض الثقة."
     }
   },
   "nodes": {

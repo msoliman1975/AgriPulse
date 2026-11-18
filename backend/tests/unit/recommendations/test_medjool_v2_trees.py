@@ -422,3 +422,11 @@ def test_random_inputs_never_error_and_reach_findings() -> None:
     assert not errors, errors.most_common(5)
     # Every tree registers something on some input, so no branch is dead.
     assert set(found) == set(DEFS), set(DEFS) - set(found)
+
+
+@pytest.mark.parametrize("code", sorted(DEFS))
+def test_passes_the_platform_arabic_check(code: str) -> None:
+    """D26: the API refuses a platform tree with English text and no Arabic."""
+    from app.modules.recommendations.folding_arabic import check_tree_arabic
+
+    assert check_tree_arabic(DEFS[code], None) == []

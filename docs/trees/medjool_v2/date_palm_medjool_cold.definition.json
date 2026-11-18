@@ -23,21 +23,24 @@
       "default": -12.0,
       "min": -20.0,
       "max": 0.0,
-      "description": "Minimum at which the outer crown dries (manual 10.4 #6)"
+      "description": "Minimum at which the outer crown dries (manual 10.4 #6)",
+      "description_ar": "الحد الأدنى للحرارة الذي يجف عنده القلب الخارجي (الدليل 10.4 بند 6)"
     },
     "leaf_damage_c": {
       "type": "number",
       "default": -6.0,
       "min": -20.0,
       "max": 0.0,
-      "description": "Minimum at which leaflet tips yellow and dry (manual 10.4 #6)"
+      "description": "Minimum at which leaflet tips yellow and dry (manual 10.4 #6)",
+      "description_ar": "الحد الأدنى للحرارة الذي تصفرّ عنده أطراف الخوص وتجف (الدليل 10.4 بند 6)"
     },
     "cold_irrigate_c": {
       "type": "number",
       "default": -5.0,
       "min": -15.0,
       "max": 5.0,
-      "description": "Forecast minimum at which to irrigate ahead of cold (manual 10.4 #6)"
+      "description": "Forecast minimum at which to irrigate ahead of cold (manual 10.4 #6)",
+      "description_ar": "الحد الأدنى المتوقع للحرارة الذي يُروى عنده قبل البرد (الدليل 10.4 بند 6)"
     }
   },
   "nodes": {
