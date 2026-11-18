@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { archiveBlock, getBlock, type BlockDetail } from "@/api/blocks";
@@ -26,7 +26,11 @@ import { AreaDisplay } from "../components/AreaDisplay";
 import { ArchiveButton } from "../components/ArchiveButton";
 import { AttachmentsTab } from "../components/AttachmentsTab";
 import { CropDocumentsCard } from "../components/CropDocumentsCard";
+import { CropAttributesCard } from "../components/CropAttributesCard";
 import { CropPicker } from "../components/CropPicker";
+import { GrowthStageControl } from "../components/GrowthStageControl";
+import { HeatUnitStartControl } from "../components/HeatUnitStartControl";
+import { safeReturnTo } from "../lib/returnTo";
 import { HarvestCard } from "../components/HarvestCard";
 import { MapPreview } from "../components/MapPreview";
 
@@ -34,6 +38,7 @@ export function BlockDetailPage(): JSX.Element {
   const { farmId = "", blockId = "" } = useParams<{ farmId: string; blockId: string }>();
   const { t, i18n } = useTranslation("farms");
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const canEdit = useCapability("block.update_metadata", { farmId });
   const canArchive = useCapability("block.delete", { farmId });
   const canAssignCrop = useCapability("crop_assignment.create", { farmId });
@@ -56,6 +61,14 @@ export function BlockDetailPage(): JSX.Element {
   const [cropSelectionComplete, setCropSelectionComplete] = useState(false);
   const [seasonLabel, setSeasonLabel] = useState("");
   const [plantingDate, setPlantingDate] = useState("");
+
+  // A Readiness fix link lands on `#crop-settings`. The section renders only
+  // after the block and its crops load, so scroll once they have.
+  const hasCropSettings = Boolean(block) && history.some((h) => h.is_current);
+  useEffect(() => {
+    if (!hasCropSettings || window.location.hash !== "#crop-settings") return;
+    document.getElementById("crop-settings")?.scrollIntoView?.({ block: "start" });
+  }, [hasCropSettings]);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,6 +151,9 @@ export function BlockDetailPage(): JSX.Element {
   }
 
   const current = history.find((h) => h.is_current);
+  // Set when a decision tree's Readiness tab sent the user here to fix
+  // something; the header then offers the way back.
+  const returnTo = safeReturnTo(searchParams.get("returnTo"));
 
   return (
     <Page>
@@ -188,8 +204,18 @@ export function BlockDetailPage(): JSX.Element {
         }
         actions={
           <>
+            {returnTo ? (
+              <LinkButton variant="ghost" to={returnTo}>
+                {t("block.backToReadiness")}
+              </LinkButton>
+            ) : null}
             {canEdit ? (
-              <LinkButton variant="ghost" to={`/farms/${farmId}/blocks/${block.id}/edit`}>
+              <LinkButton
+                variant="ghost"
+                to={`/farms/${farmId}/blocks/${block.id}/edit${
+                  returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""
+                }`}
+              >
                 {t("block.edit")}
               </LinkButton>
             ) : null}
@@ -218,6 +244,18 @@ export function BlockDetailPage(): JSX.Element {
         ) : (
           <p className="mt-2 text-sm text-ap-muted">{t("block.noCrop")}</p>
         )}
+        {/* Growth stage, heat-unit start and crop fields belong to the
+            current assignment. They were reachable only from the console's
+            crop panel, so a decision tree's Readiness link for a missing
+            growth stage or crop attribute landed on a page that could not set
+            it. Same components, so the two places cannot drift. */}
+        {current ? (
+          <div id="crop-settings" className="mt-4 flex flex-col gap-3">
+            <GrowthStageControl blockId={block.id} farmId={farmId} assignment={current} />
+            <HeatUnitStartControl blockId={block.id} farmId={farmId} assignment={current} />
+            <CropAttributesCard blockCropId={current.id} farmId={farmId} />
+          </div>
+        ) : null}
 
         {canAssignCrop ? (
           <form

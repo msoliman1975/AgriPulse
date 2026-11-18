@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { getBlock, updateBlock, type BlockDetail } from "@/api/blocks";
@@ -9,11 +9,17 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { Page } from "@/components/Page";
 import { PageHeader } from "@/components/PageHeader";
 import { BlockForm, type BlockFormValues } from "../components/BlockForm";
+import { safeReturnTo } from "../lib/returnTo";
 
 export function BlockEditPage(): JSX.Element {
   const { farmId = "", blockId = "" } = useParams<{ farmId: string; blockId: string }>();
   const { t } = useTranslation("farms");
   const navigate = useNavigate();
+  // A Readiness fix link sends the user here with its own URL, so saving
+  // lands them back on the list they were fixing, which then re-reads.
+  const [searchParams] = useSearchParams();
+  const returnTo = safeReturnTo(searchParams.get("returnTo"));
+  const doneTo = returnTo ?? `/farms/${farmId}/blocks/${blockId}`;
   const [block, setBlock] = useState<BlockDetail | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +56,7 @@ export function BlockEditPage(): JSX.Element {
     setError(null);
     try {
       await updateBlock(blockId, values);
-      navigate(`/farms/${farmId}/blocks/${blockId}`);
+      navigate(doneTo);
     } catch (err) {
       setError(isApiError(err) ? (err.problem.detail ?? err.problem.title) : String(err));
     } finally {
@@ -100,7 +106,7 @@ export function BlockEditPage(): JSX.Element {
           initialBoundary={block.boundary}
           submitLabel={t("form.submitBlockUpdate")}
           onSubmit={handleSubmit}
-          onCancel={() => navigate(`/farms/${farmId}/blocks/${blockId}`)}
+          onCancel={() => navigate(doneTo)}
           busy={busy}
           error={error}
         />

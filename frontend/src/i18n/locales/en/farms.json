@@ -183,7 +183,8 @@
     },
     "plantCount_one": "{{count}} plant",
     "plantCount_other": "{{count}} plants",
-    "spacingLayout": "{{row}} × {{inRow}} m ({{density}} per ha)"
+    "spacingLayout": "{{row}} × {{inRow}} m ({{density}} per ha)",
+    "backToReadiness": "Back to readiness"
   },
   "autoGrid": {
     "heading": "Auto-grid blocks",
