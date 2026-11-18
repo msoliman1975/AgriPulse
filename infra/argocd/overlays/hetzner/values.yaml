@@ -4468,7 +4468,13 @@ global:
       #   Watch: the route still answers (403 tenant-required for a platform
       #   token, 200 for a tenant caller).
       #   Rollback: api to 0ba1b1e (it ignores the new parameter safely).
-      tag: "3d67a6b"
+      # 02004cd = #911, api (3d67a6b..02004cd touches backend/ only there).
+      #   Beta dry-run cells carry `missing_inputs` (block data the walk read
+      #   and found empty) and the response `cells_missing_data`. Additive
+      #   response fields; no migration, no new env. Workers stay 8bfe412.
+      #   Watch: POST .../beta/{tree_id}/dry-run still answers.
+      #   Rollback: api to 3d67a6b (the frontend renders without the fields).
+      tag: "02004cd"
     workers:
       tag: "8bfe412"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
@@ -5376,7 +5382,15 @@ global:
       #   with a current crop shows growth stage, heat-unit start and crop
       #   fields; the block edit form saves.
       #   Rollback: frontend to 3d67a6b.
-      tag: "d36a75b"
+      # 02004cd = #911, frontend: the Beta canvas gets "Expand" (full-window,
+      #   Esc closes) and "Show levels" (a labelled band per depth); the
+      #   designer links to Run results and Evaluation traces
+      #   (/decision-tree-traces?tree=<code>, which now filters by tree); the
+      #   Dry run marks "No card · data missing" cells and counts them.
+      #   Watch: the Beta designer opens and its tabs work; Expand and Show
+      #   levels on a large tree; the traces link opens filtered.
+      #   Rollback: frontend to d36a75b.
+      tag: "02004cd"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
