@@ -4461,7 +4461,14 @@ global:
       #   decision_tree.read; the existing dry-run route is unchanged.
       #   Rollback: api to ab9f5ba, together with the frontend (the new
       #   picker needs the route).
-      tag: "0ba1b1e"
+      # 3d67a6b = #907, api (0ba1b1e..3d67a6b touches backend/ only there).
+      #   GET .../beta/{tree_id}/dry-run/blocks takes an optional ?version_id=
+      #   so the picker judges targeting against the version the designer
+      #   dry-runs. No migration, no new env. Workers unchanged at 8bfe412.
+      #   Watch: the route still answers (403 tenant-required for a platform
+      #   token, 200 for a tenant caller).
+      #   Rollback: api to 0ba1b1e (it ignores the new parameter safely).
+      tag: "3d67a6b"
     workers:
       tag: "8bfe412"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
@@ -5350,7 +5357,14 @@ global:
       #   Watch: the Beta designer opens and its tabs work, the Dry run picker
       #   loads; console Farm settings shows Country.
       #   Rollback: frontend to 2f3fb84, together with the api.
-      tag: "0ba1b1e"
+      # 3d67a6b = #907, frontend: the Beta designer's Dry run walks the
+      #   latest SAVED version (draft or published) and the picker judges
+      #   targeting against it. Before, a tree published once and edited
+      #   since was dry-run against the published body.
+      #   Watch: the Beta designer opens and its tabs work; a dry run on a
+      #   tree with a newer draft reports that draft's version.
+      #   Rollback: frontend to 0ba1b1e.
+      tag: "3d67a6b"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
