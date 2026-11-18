@@ -2016,19 +2016,25 @@ async def dry_run_beta_tree(
 )
 async def list_beta_dry_run_blocks(
     tree_id: UUID,
+    version_id: UUID | None = Query(default=None),
     context: RequestContext = Depends(requires_capability("decision_tree.read")),
     service: FoldingTreeAuthorService = Depends(_beta_service),
     tenant_session: AsyncSession = Depends(get_db_session),
 ) -> list[dict[str, Any]]:
     """Targeted blocks first; the rest are listed and marked, not hidden.
 
-    Same tenant rule as the dry run: blocks are the tenant's.
+    ``version_id`` judges the blocks against that version, the one the
+    designer is about to dry-run. Same tenant rule as the dry run: blocks are
+    the tenant's.
     """
     _ensure_authoring_scope(context)
     tenant_schema = _ensure_tenant(context)
     try:
         return await service.dry_run_blocks(
-            tree_id=tree_id, tenant_session=tenant_session, tenant_schema=tenant_schema
+            tree_id=tree_id,
+            tenant_session=tenant_session,
+            tenant_schema=tenant_schema,
+            version_id=version_id,
         )
     except Exception as exc:
         mapped = _map_beta_error(exc)

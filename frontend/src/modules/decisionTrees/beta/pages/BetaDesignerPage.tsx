@@ -142,8 +142,11 @@ export function BetaDesignerPage(): ReactNode {
   // the dump is what makes it editable by the structural helpers.
   const tree = treeQ.data ?? null;
   const treeId = tree?.id ?? "";
-  const blocksQ = useDryRunBlocks(scope, treeId);
   const latest = tree ? latestVersion(tree) : null;
+  // The dry run walks the newest SAVED version, draft or published, which is
+  // the body the editor opens on. Left to the server's default it walked the
+  // published version, so a draft edited after publishing was never tested.
+  const blocksQ = useDryRunBlocks(scope, treeId, latest?.id ?? null);
   const draft = tree ? draftVersion(tree) : null;
   useEffect(() => {
     if (!latest) return;
@@ -394,7 +397,7 @@ export function BetaDesignerPage(): ReactNode {
     if (!blockId || !treeId || dirty) return;
     setActionError(null);
     dryRun.mutate(
-      { treeId, blockId },
+      { treeId, blockId, versionId: latest?.id ?? null },
       {
         onSuccess: setDryRunResult,
         onError: (err) => setActionError(resolveErrorMessage(err, t("dryRun.failed"))),

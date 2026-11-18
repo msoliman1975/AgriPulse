@@ -699,6 +699,7 @@ class FoldingTreeAuthorService:
         tree_id: UUID,
         tenant_session: AsyncSession,
         tenant_schema: str | None = None,
+        version_id: UUID | None = None,
     ) -> list[dict[str, Any]]:
         """Every active block the dry run can be pointed at, with its targeting.
 
@@ -706,7 +707,8 @@ class FoldingTreeAuthorService:
         for the tree, so an author could fold a block production would never
         run the tree on and read the answer as if it would. Each row now
         carries the same verdict the sweep reaches, judged against the version
-        the dry run walks (``_resolve_run_body`` with nothing handed in), and
+        the dry run walks (``version_id`` when given, the designer passes its
+        latest saved version; else ``_resolve_run_body``'s default), and
         targeted blocks come first. Untargeted ones stay listed: folding one
         on purpose is a fair test, as long as the screen says what it is.
 
@@ -717,7 +719,10 @@ class FoldingTreeAuthorService:
 
         try:
             _tree, compiled, _version = await self._resolve_run_body(
-                tree_id=tree_id, definition=None, version_id=None, tenant_schema=tenant_schema
+                tree_id=tree_id,
+                definition=None,
+                version_id=version_id,
+                tenant_schema=tenant_schema,
             )
         except BetaDryRunUnavailableError:
             compiled = None
