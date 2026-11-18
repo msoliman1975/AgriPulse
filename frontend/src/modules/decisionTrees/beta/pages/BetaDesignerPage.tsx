@@ -112,7 +112,6 @@ export function BetaDesignerPage(): ReactNode {
   const publish = usePublishBetaTree();
   const discard = useDiscardBetaDraft();
   const dryRun = useBetaDryRun();
-  const blocksQ = useDryRunBlocks(scope);
 
   const [tab, setTab] = useState<Tab>("canvas");
   const [draftYaml, setDraftYaml] = useState<string | null>(null);
@@ -143,6 +142,7 @@ export function BetaDesignerPage(): ReactNode {
   // the dump is what makes it editable by the structural helpers.
   const tree = treeQ.data ?? null;
   const treeId = tree?.id ?? "";
+  const blocksQ = useDryRunBlocks(scope, treeId);
   const latest = tree ? latestVersion(tree) : null;
   const draft = tree ? draftVersion(tree) : null;
   useEffect(() => {

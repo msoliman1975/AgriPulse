@@ -274,7 +274,7 @@
     "running": "Running…",
     "failed": "The dry run did not finish.",
     "empty": "Pick a block and run.",
-    "noBlocks": "No block is in this tree's targeting.",
+    "noBlocks": "This tenant has no active blocks to run on.",
     "summary": "{{cards}} of {{total}} cells produce a card.",
     "columns": {
       "cell": "Cell",
@@ -296,7 +296,19 @@
     "blocksFailed": "The block list could not be read.",
     "errored_one": "{{count}} cell errored.",
     "errored_other": "{{count}} cells errored.",
-    "stoppedAt": "Ended at {{node}}."
+    "stoppedAt": "Ended at {{node}}.",
+    "notTargetedOption": "{{label}} (not targeted)",
+    "notTargeted": {
+      "title": "Production would skip this block.",
+      "crop": "The tree targets crop {{required}}; this block's crop is {{actual}}. The cells below show what the tree would say if it ran here.",
+      "cropMissing": "The tree targets crop {{required}}; this block has no crop. The cells below show what the tree would say if it ran here.",
+      "country": "The tree targets country {{required}}; this block's farm is in {{actual}}. The cells below show what the tree would say if it ran here.",
+      "countryMissing": "The tree targets country {{required}}; this block's farm has no country set. The cells below show what the tree would say if it ran here.",
+      "soil": "The tree targets soil {{required}}; this block's soil is {{actual}}. The cells below show what the tree would say if it ran here.",
+      "soilMissing": "The tree targets soil {{required}}; this block has no soil texture set. The cells below show what the tree would say if it ran here.",
+      "other": "The tree's targeting ({{required}}) does not include this block. The cells below show what the tree would say if it ran here.",
+      "otherMissing": "The tree's targeting ({{required}}) does not include this block. The cells below show what the tree would say if it ran here."
+    }
   },
   "publish": {
     "title": "Publish checks",

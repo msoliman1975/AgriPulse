@@ -50,19 +50,12 @@ import type {
 import type { BetaTreeDoc } from "@/modules/decisionTrees/beta/lib/betaTree";
 import type { AuthoringScope } from "@/modules/decisionTrees/lib/authoringScope";
 
-import { listBlocks } from "./blocks";
 import { apiClient } from "./client";
 import { isApiError, type ProblemDetails } from "./errors";
-import { listFarms } from "./farms";
 
 const BETA_TREES = "/v1/platform/decision-trees/beta";
 const PLATFORM_FINDINGS = "/v1/decision-tree-findings";
 const TENANT_FINDINGS = "/v1/tenant/decision-tree-findings";
-
-/** How many farms the dry-run block picker walks. A tenant with more farms
- *  than this picks the block from the farm console instead; the picker is a
- *  convenience, not the block catalogue. */
-const DRY_RUN_FARM_LIMIT = 20;
 
 // ---- Decision engine switch ------------------------------------------
 
@@ -430,10 +423,25 @@ export function readValidationErrors(error: unknown): BetaValidationError[] | nu
 
 // ---- Dry run ---------------------------------------------------------
 
+/**
+ * Whether the tree's crop / country / soil targeting admits a block — the
+ * same verdict the production sweep reaches. `axis` names the first axis that
+ * rejected it; `actual` is the block's value there (null when it has none).
+ */
+export interface BetaDryRunTargeting {
+  matched: boolean;
+  /** "crop", "country" or "soil" today; typed open so a new axis still renders. */
+  axis: string | null;
+  required: string[];
+  actual: string | null;
+}
+
 export interface BetaCandidateBlock {
   block_id: string;
   label: string;
   label_ar: string | null;
+  /** Null when the tree has no version yet, so there is nothing to judge. */
+  targeting?: BetaDryRunTargeting | null;
 }
 
 /**
@@ -480,6 +488,8 @@ export interface BetaDryRunResponse {
   block_id: string;
   scope: string;
   version_id: string | null;
+  /** Reported, never enforced: the run folds the block either way. */
+  targeting?: BetaDryRunTargeting | null;
   cells_evaluated: number;
   /** Cells whose fold produced a card. The rest are healthy or errored. */
   cells_carded: number;
@@ -519,29 +529,23 @@ export async function betaDryRun(treeId: string, blockId: string): Promise<BetaD
 }
 
 /**
- * Blocks the dry run can be pointed at.
+ * Blocks the dry run can be pointed at, each with the tree's targeting verdict.
  *
- * There is no candidate-block route on the contract, so this reads the
- * caller's own farms and their blocks. Both are tenant-scoped: a platform
- * caller has no farms, and asking anyway would land a 403 in an empty
- * picker. The designer says so in words instead — see `dryRun.platformScope`.
+ * This used to list the caller's own farms and blocks with no regard for the
+ * tree, so a block with no country or crop folded under an EG-only tree and
+ * read as if production would run the tree there. The server now judges every
+ * active block against the version the dry run walks, with the sweep's own
+ * matcher, and lists targeted blocks first. Untargeted ones stay so an author
+ * can fold one on purpose; the picker and the result mark them.
+ *
+ * Tenant-scoped: a platform caller has no blocks, and the designer says so in
+ * words instead — see `dryRun.platformScope`.
  */
-export async function listDryRunBlocks(): Promise<BetaCandidateBlock[]> {
-  const farms = await listFarms({ limit: DRY_RUN_FARM_LIMIT });
-  const perFarm = await Promise.all(
-    farms.items.map(async (farm) => {
-      const page = await listBlocks(farm.id, { limit: 200 });
-      return page.items.map((block) => ({
-        block_id: block.id,
-        label: `${farm.name} / ${block.name ?? block.code}`,
-        label_ar:
-          farm.name_ar || block.name_ar
-            ? `${farm.name_ar ?? farm.name} / ${block.name_ar ?? block.name ?? block.code}`
-            : null,
-      }));
-    }),
+export async function listDryRunBlocks(treeId: string): Promise<BetaCandidateBlock[]> {
+  const { data } = await apiClient.get<BetaCandidateBlock[]>(
+    `${BETA_TREES}/${treeId}/dry-run/blocks`,
   );
-  return perFarm.flat().sort((a, b) => a.label.localeCompare(b.label));
+  return Array.isArray(data) ? data : [];
 }
 
 // ---- One cell's walk -------------------------------------------------

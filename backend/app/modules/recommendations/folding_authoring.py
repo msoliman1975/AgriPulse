@@ -693,6 +693,70 @@ class FoldingTreeAuthorService:
             "cells": cells,
         }
 
+    async def dry_run_blocks(
+        self,
+        *,
+        tree_id: UUID,
+        tenant_session: AsyncSession,
+        tenant_schema: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Every active block the dry run can be pointed at, with its targeting.
+
+        The picker used to list the caller's farms and blocks with no regard
+        for the tree, so an author could fold a block production would never
+        run the tree on and read the answer as if it would. Each row now
+        carries the same verdict the sweep reaches, judged against the version
+        the dry run walks (``_resolve_run_body`` with nothing handed in), and
+        targeted blocks come first. Untargeted ones stay listed: folding one
+        on purpose is a fair test, as long as the screen says what it is.
+
+        A tree with no version yet has nothing to judge against, so its rows
+        carry no verdict rather than failing the whole list.
+        """
+        from app.modules.recommendations.service import evaluate_targeting
+
+        try:
+            _tree, compiled, _version = await self._resolve_run_body(
+                tree_id=tree_id, definition=None, version_id=None, tenant_schema=tenant_schema
+            )
+        except BetaDryRunUnavailableError:
+            compiled = None
+
+        repo = RecommendationsRepository(tenant_session=tenant_session, public_session=self._public)
+        rows: list[dict[str, Any]] = []
+        for b in await repo.list_blocks_for_targeting():
+            targeting: dict[str, Any] | None = None
+            if compiled is not None:
+                verdict = evaluate_targeting(
+                    compiled,
+                    crop_path=b.get("crop_path"),
+                    crop_id=b.get("crop_id"),
+                    country_code=b.get("country_code"),
+                    soil_texture=b.get("soil_texture"),
+                )
+                targeting = {
+                    "matched": verdict.matched,
+                    "axis": verdict.axis,
+                    "required": list(verdict.required),
+                    "actual": verdict.actual,
+                }
+            farm = b.get("farm_name") or ""
+            block_label = b.get("block_name") or b.get("block_code")
+            # Arabic falls back per part, as on the legacy candidate picker.
+            farm_ar = b.get("farm_name_ar") or farm
+            block_label_ar = b.get("block_name_ar") or block_label
+            rows.append(
+                {
+                    "block_id": b["block_id"],
+                    "label": f"{farm} / {block_label}" if farm else block_label,
+                    "label_ar": f"{farm_ar} / {block_label_ar}" if farm_ar else block_label_ar,
+                    "targeting": targeting,
+                }
+            )
+        # Stable: the repository's farm / block order holds within each group.
+        rows.sort(key=lambda r: r["targeting"] is not None and not r["targeting"]["matched"])
+        return rows
+
     async def _resolve_run_body(
         self,
         *,
@@ -1024,11 +1088,11 @@ class FoldingTreeAuthorService:
                 tenant_session, self._public, block_crop_id=block_crop_id, farm_id=farm_id
             ),
         )
-        # Targeting is reported, never enforced. The block picker already
-        # filters to blocks this tree targets, so an author cannot reach a
-        # non-matching block from the designer — but an API caller can, and a
-        # tree that folds here and is skipped by the sweep is exactly the gap
-        # this endpoint exists to close.
+        # Targeting is reported, never enforced: an author may fold an
+        # untargeted block on purpose. The designer's picker marks those
+        # blocks (``dry_run_blocks``) and the result says production would
+        # skip the block, so a tree that folds here but is skipped by the
+        # sweep never reads as one that runs.
         country_code = (
             await repo.get_farm_country_code(farm_id=farm_id) if farm_id is not None else None
         )

@@ -1239,6 +1239,16 @@ class BetaDryRunCell(BaseModel):
     error: str | None = None
 
 
+class BetaDryRunBlock(BaseModel):
+    """One block the beta dry run can be pointed at, and whether the tree
+    targets it. ``targeting`` is null only when the tree has no version yet."""
+
+    block_id: UUID
+    label: str
+    label_ar: str | None = None
+    targeting: DryRunTargeting | None = None
+
+
 class BetaDryRunResponse(BaseModel):
     """What a beta dry run found across one block's cells. Nothing written."""
 
