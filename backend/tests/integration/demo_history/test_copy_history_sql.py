@@ -271,3 +271,35 @@ async def test_history_lands_on_the_target_blocks_once(admin_session: Any) -> No
     assert second["tables"]["block_grid_aggregates"] == 0
     assert second["tables"]["imagery_farm_subscriptions"] == 0
     assert second["tables"]["imagery_farm_ingestion_jobs"] == 0
+
+
+@pytest.mark.asyncio
+async def test_the_active_window_only_ever_moves_back(admin_session: Any) -> None:
+    from datetime import date
+
+    from app.modules.demo_history.active_window import open_active_window
+
+    t = await _tenant(admin_session, "WIN", {"M1": _BLOCK, "M2": _OTHER})
+    async with AsyncSessionLocal()() as s, s.begin():
+        await s.execute(
+            text(f'UPDATE "{t["schema"]}".blocks SET active_from = :d WHERE code = :c'),
+            {"d": date(2020, 1, 1), "c": "M2"},
+        )
+
+    first = await open_active_window(AsyncSessionLocal(), t["schema"], "WIN", date(2023, 8, 1))
+    second = await open_active_window(AsyncSessionLocal(), t["schema"], "WIN", date(2023, 8, 1))
+
+    # The farm and M1 (created today) move; M2, already active since 2020, keeps its date.
+    assert first["farms"] == 1
+    assert first["blocks"] == 1
+    assert second["farms"] == 0
+    assert second["blocks"] == 0
+    async with AsyncSessionLocal()() as s, s.begin():
+        rows = dict(
+            (
+                await s.execute(
+                    text(f'SELECT code, active_from FROM "{t["schema"]}".blocks ORDER BY code')
+                )
+            ).all()
+        )
+    assert rows == {"M1": date(2023, 8, 1), "M2": date(2020, 1, 1)}
