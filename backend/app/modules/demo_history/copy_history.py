@@ -22,8 +22,13 @@ What is copied, per block matched by code:
   per block and per cell, with the standard deviations stored on them;
 * `block_index_baselines`, so z-scores are available from the first day.
 
-And per farm: `weather_observations`, `weather_derived_daily`,
-`weather_index_daily` and `weather_index_baselines`.
+And per farm: the farm-boundary imagery (`imagery_farm_subscriptions`,
+`imagery_farm_ingestion_jobs` and `farm_scene_rasters`, which is what the
+map serves once a farm fetches for its whole boundary), and
+`weather_observations`, `weather_derived_daily`, `weather_index_daily` and
+`weather_index_baselines`. A farm raster is served only while its
+`aoi_hash` matches the farm's boundary, so the report says whether the two
+farms' hashes are equal.
 
 Engine outputs are not copied: no recommendations, alerts, verdicts, risk
 rows or water balance. The replay writes those for the build farm.
@@ -296,6 +301,98 @@ async def _copy_jobs(session: AsyncSession, src: str, dst: str) -> int:
     return _rows(result)
 
 
+def _farm_subs_sql(schema: str) -> str:
+    return f'SELECT id, product_id FROM "{schema}".imagery_farm_subscriptions WHERE farm_id = :f'  # noqa: S608
+
+
+async def _copy_farm_imagery(
+    session: AsyncSession, src: str, dst: str, *, src_farm: UUID, dst_farm: UUID
+) -> dict[str, Any]:
+    """The farm-boundary imagery: subscription, scene records, rasters.
+
+    The source's farm subscription is mirrored onto the target farm, active
+    flag and fetch switch included, unless the target already has one for
+    the product. Scene records attach to it; rasters keep the source's
+    `aoi_hash`, which is what their object keys are built from.
+    """
+    counts: dict[str, Any] = {}
+    hashes = {}
+    for schema, farm in ((src, src_farm), (dst, dst_farm)):
+        sql = f'SELECT aoi_hash FROM "{schema}".farms WHERE id = :f'  # noqa: S608
+        hashes[schema] = (await session.execute(text(sql), {"f": farm})).scalar_one_or_none()
+    counts["farm_aoi_hash_matches"] = hashes[src] is not None and hashes[src] == hashes[dst]
+
+    source_subs = (
+        await session.execute(
+            text(_farm_subs_sql(src)),
+            {"f": src_farm},
+        )
+    ).all()
+    target_subs = {
+        r.product_id: r.id
+        for r in await session.execute(
+            text(_farm_subs_sql(dst)),
+            {"f": dst_farm},
+        )
+    }
+    sub_map: dict[UUID, UUID] = {}
+    fresh: dict[UUID, UUID] = {}
+    for row in source_subs:
+        existing = target_subs.get(row.product_id)
+        if existing is not None:
+            sub_map[UUID(str(row.id))] = UUID(str(existing))
+        else:
+            fresh[UUID(str(row.id))] = uuid4()
+            sub_map[UUID(str(row.id))] = fresh[UUID(str(row.id))]
+    counts["imagery_farm_subscriptions"] = 0
+    if fresh:
+        await _fill_map(session, "_fsub_new", fresh)
+        cols = await _columns(session, dst, "imagery_farm_subscriptions")
+        select = _select_list(cols, {"id": "m"}, constants={"farm_id": "CAST(:dst_farm AS uuid)"})
+        result = await session.execute(
+            text(
+                f'INSERT INTO "{dst}".imagery_farm_subscriptions ({_quoted(cols)}) '  # noqa: S608
+                f'SELECT {select} FROM "{src}".imagery_farm_subscriptions s '
+                "JOIN _fsub_new m ON m.src = s.id ON CONFLICT DO NOTHING"
+            ),
+            {"dst_farm": str(dst_farm)},
+        )
+        counts["imagery_farm_subscriptions"] = _rows(result)
+
+    await _fill_map(session, "_fsub", sub_map)
+    job_cols = [c for c in await _columns(session, dst, "imagery_farm_ingestion_jobs") if c != "id"]
+    select = _select_list(
+        job_cols, {"subscription_id": "m"}, constants={"farm_id": "CAST(:dst_farm AS uuid)"}
+    )
+    result = await session.execute(
+        text(
+            f'INSERT INTO "{dst}".imagery_farm_ingestion_jobs ({_quoted(job_cols)}) '  # noqa: S608
+            f'SELECT {select} FROM "{src}".imagery_farm_ingestion_jobs s '
+            "JOIN _fsub m ON m.src = s.subscription_id "
+            "WHERE s.farm_id = :src_farm "
+            f'AND NOT EXISTS (SELECT 1 FROM "{dst}".imagery_farm_ingestion_jobs x '
+            "  WHERE x.farm_id = CAST(:dst_farm AS uuid) AND x.product_id = s.product_id "
+            "  AND x.scene_id = s.scene_id) "
+            "ON CONFLICT DO NOTHING"
+        ).bindparams(bindparam("src_farm", type_=PG_UUID(as_uuid=True))),
+        {"src_farm": src_farm, "dst_farm": str(dst_farm)},
+    )
+    counts["imagery_farm_ingestion_jobs"] = _rows(result)
+
+    raster_cols = [c for c in await _columns(session, dst, "farm_scene_rasters") if c != "id"]
+    select = _select_list(raster_cols, {}, constants={"farm_id": "CAST(:dst_farm AS uuid)"})
+    result = await session.execute(
+        text(
+            f'INSERT INTO "{dst}".farm_scene_rasters ({_quoted(raster_cols)}) '  # noqa: S608
+            f'SELECT {select} FROM "{src}".farm_scene_rasters s WHERE s.farm_id = :src_farm '
+            "ON CONFLICT DO NOTHING"
+        ).bindparams(bindparam("src_farm", type_=PG_UUID(as_uuid=True))),
+        {"src_farm": src_farm, "dst_farm": str(dst_farm)},
+    )
+    counts["farm_scene_rasters"] = _rows(result)
+    return counts
+
+
 async def _copy_block_table(
     session: AsyncSession, src: str, dst: str, table: str, remap: tuple[str, ...]
 ) -> int:
@@ -375,6 +472,9 @@ async def copy_history(
         await _fill_map(session, "_blk", block_map)
         report["tables"].update(await _copy_grids(session, src, dst, block_map))
         report["tables"]["imagery_ingestion_jobs"] = await _copy_jobs(session, src, dst)
+        report["tables"].update(
+            await _copy_farm_imagery(session, src, dst, src_farm=src_farm, dst_farm=dst_farm)
+        )
         for table, remap in _BLOCK_TABLES:
             report["tables"][table] = await _copy_block_table(session, src, dst, table, remap)
         for table in _FARM_TABLES:

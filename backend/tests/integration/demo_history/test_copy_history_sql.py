@@ -143,6 +143,33 @@ async def _seed_source(admin_session: Any, src: dict[str, Any]) -> list[UUID]:
         ),
         {"f": str(src["farm_id"]), "d": _SCENE.date()},
     )
+    farm_sub = (
+        await admin_session.execute(
+            text(
+                "INSERT INTO imagery_farm_subscriptions (farm_id, product_id) "
+                "VALUES (:f, :p) RETURNING id"
+            ),
+            {"f": str(src["farm_id"]), "p": str(product)},
+        )
+    ).scalar_one()
+    await admin_session.execute(
+        text(
+            "INSERT INTO imagery_farm_ingestion_jobs "
+            "(subscription_id, farm_id, product_id, scene_id, scene_datetime, status) "
+            "VALUES (:s, :f, :p, 'S2A_FARM', :t, 'succeeded')"
+        ),
+        {"s": str(farm_sub), "f": str(src["farm_id"]), "p": str(product), "t": _SCENE},
+    )
+    await admin_session.execute(
+        text(
+            "INSERT INTO farm_scene_rasters "
+            "(farm_id, product_id, scene_datetime, scene_id, stac_item_id, aoi_hash, "
+            " blocks_merged, indices) "
+            "SELECT id, :p, :t, 'S2A_FARM', 'p/s2/S2A_FARM/' || aoi_hash, aoi_hash, 1, "
+            "       '[\"ndvi\"]'::jsonb FROM farms WHERE id = :f"
+        ),
+        {"f": str(src["farm_id"]), "p": str(product), "t": _SCENE},
+    )
     await admin_session.execute(text("SET search_path TO public"))
     await admin_session.commit()
     return cells
@@ -182,6 +209,20 @@ async def test_history_lands_on_the_target_blocks_once(admin_session: Any) -> No
     assert first["tables"]["imagery_ingestion_jobs"] == 1
     assert first["tables"]["weather_observations"] == 1
     assert first["tables"]["weather_derived_daily"] == 1
+    assert first["tables"]["farm_aoi_hash_matches"] is True
+    assert first["tables"]["imagery_farm_subscriptions"] == 1
+    assert first["tables"]["imagery_farm_ingestion_jobs"] == 1
+    assert first["tables"]["farm_scene_rasters"] == 1
+    assert (
+        await _count(
+            dst["schema"],
+            "SELECT count(*) FROM {s}.imagery_farm_ingestion_jobs j "
+            "JOIN {s}.imagery_farm_subscriptions s ON s.id = j.subscription_id "
+            "AND s.farm_id = j.farm_id WHERE j.farm_id = :f",
+            f=str(dst["farm_id"]),
+        )
+        == 1
+    )
 
     target_block = dst["blocks"]["M1"]
     # Every cell row points at the target's own block and cells.
@@ -222,7 +263,11 @@ async def test_history_lands_on_the_target_blocks_once(admin_session: Any) -> No
     second = await copy_history(
         AsyncSessionLocal(), source=source, target_schema=dst["schema"], target_farm_code="DST"
     )
-    assert set(second["tables"].values()) - {len(cells)} == {0}
+    assert {v for k, v in second["tables"].items() if k != "farm_aoi_hash_matches"} - {
+        len(cells)
+    } == {0}
     assert second["tables"]["cells_mapped"] == len(cells)
     assert second["tables"]["grid_configs"] == 0
     assert second["tables"]["block_grid_aggregates"] == 0
+    assert second["tables"]["imagery_farm_subscriptions"] == 0
+    assert second["tables"]["imagery_farm_ingestion_jobs"] == 0
