@@ -5673,20 +5673,25 @@ workloads:
 # Medjool Oasis, palm-medjool demo tenant (farm MDJ-DEMO), see
 # backend/app/modules/demo_history/scenarios/medjool_oasis.py. Progress is
 # read from GET /api/v1/admin/tenants/01a1edfe-861d-7e8e-9f0f-dfe26fc33fd0/sidecar.
-# `imageTag` pins the job alone to 65d88a5 (#917); the api, workers and
-# frontend stay where they are.
+# `imageTag` pins the job alone to a demo build (#917, #919); the api,
+# workers and frontend stay where they are.
 #
-# mdj-r1: copy-history-dry-run. Copies Al Ashraf's M-block history in a
-#   transaction, reports the rows per table, rolls back. Changes nothing.
-#   Next: mdj-r2 copy-history, then incidents-dry-run, then rebuild over
+# mdj-r1 (2026-11-19 10:55, 66 s): copy-history-dry-run. 13 blocks matched,
+#   292 cells, 846,800 cell rows, 37,638 block rows, 61,701 baselines and the
+#   farm's weather, but 0 scene records: Al Ashraf fetches imagery for the
+#   farm boundary, which #919 adds to the copy.
+# mdj-r2: copy-history-dry-run again on 99c12c4 (#919), to see the farm
+#   scene records and rasters and whether the two farms' boundary hashes
+#   match. Changes nothing.
+#   Next: copy-history, then incidents-dry-run, then rebuild over
 #   2024-10-15..2026-10-15.
 #   Rollback: enabled: false (the dry run writes only its progress events).
 demoBuildJob:
   enabled: true
-  runId: "mdj-r1"
-  schedule: "55 10 19 11 *"
+  runId: "mdj-r2"
+  schedule: "15 12 19 11 *"
   activeDeadlineSeconds: 3600
-  imageTag: "65d88a5"
+  imageTag: "99c12c4"
   tenantSchema: "tenant_01a1edfe861d7e8e9f0fdfe26fc33fd0"
   scenario: "medjool_oasis"
   mode: "copy-history-dry-run"
