@@ -6,6 +6,8 @@ import {
   MIN_SCALE,
   clampScale,
   fitToViewport,
+  fitToWidth,
+  panBy,
   screenToWorld,
   worldToScreen,
   zoomAt,
@@ -107,5 +109,36 @@ describe("zoomPercent", () => {
   it("rounds to whole percent", () => {
     expect(zoomPercent({ scale: 0.835, tx: 0, ty: 0 })).toBe(84);
     expect(zoomPercent(IDENTITY_VIEWPORT)).toBe(100);
+  });
+});
+
+describe("fitToWidth", () => {
+  // A tall, narrow tree: 69 levels deep, a few nodes wide.
+  const tall = { width: 800, height: 9000 };
+
+  it("fills the width and starts at the top, where fitting both axes would shrink it", () => {
+    const view = fitToWidth(tall, { width: 1448, height: 900 });
+    expect(view.scale).toBe(1);
+    expect(view.ty).toBe(24);
+    expect(view.tx).toBe((1448 - 800) / 2);
+    expect(fitToViewport(tall, { width: 1448, height: 900 }).scale).toBe(MIN_SCALE);
+  });
+
+  it("scales a wide tree down to the width", () => {
+    const view = fitToWidth({ width: 2000, height: 500 }, { width: 1048, height: 600 });
+    expect(view.scale).toBeCloseTo(0.5);
+    expect(view.tx).toBeCloseTo(24);
+  });
+
+  it("leaves the view alone when there is nothing to fit", () => {
+    expect(fitToWidth({ width: 0, height: 0 }, { width: 800, height: 600 })).toEqual(
+      IDENTITY_VIEWPORT,
+    );
+  });
+});
+
+describe("panBy", () => {
+  it("moves the content opposite to the scroll", () => {
+    expect(panBy({ scale: 0.5, tx: 10, ty: 20 }, 5, 100)).toEqual({ scale: 0.5, tx: 5, ty: -80 });
   });
 });

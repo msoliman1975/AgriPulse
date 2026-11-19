@@ -107,4 +107,34 @@ describe("<BetaCanvas> expand and levels", () => {
     fireEvent.click(screen.getByRole("button", { name: "Exit full view" }));
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  it("offers Fit to width beside Fit to screen", () => {
+    renderCanvas();
+    expect(screen.getByRole("button", { name: "Fit to width" })).toBeInTheDocument();
+  });
+
+  it("pans on a plain wheel in the full view, and leaves the page to scroll inline", () => {
+    renderCanvas();
+    const surface = screen.getByRole("application");
+    const graph = (): string | null =>
+      surface.querySelector("svg > g")?.getAttribute("transform") ?? null;
+
+    const inline = new WheelEvent("wheel", { deltaY: 120, bubbles: true, cancelable: true });
+    const before = graph();
+    act(() => {
+      surface.dispatchEvent(inline);
+    });
+    expect(inline.defaultPrevented).toBe(false);
+    expect(graph()).toBe(before);
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand" }));
+    const expandedSurface = screen.getByRole("application");
+    const start = expandedSurface.querySelector("svg > g")?.getAttribute("transform");
+    const full = new WheelEvent("wheel", { deltaY: 120, bubbles: true, cancelable: true });
+    act(() => {
+      expandedSurface.dispatchEvent(full);
+    });
+    expect(full.defaultPrevented).toBe(true);
+    expect(expandedSurface.querySelector("svg > g")?.getAttribute("transform")).not.toBe(start);
+  });
 });

@@ -145,7 +145,8 @@
     "levelCount_two": "مستويان",
     "levelCount_few": "{{count}} مستويات",
     "levelCount_many": "{{count}} مستوى",
-    "levelCount_other": "{{count}} مستوى"
+    "levelCount_other": "{{count}} مستوى",
+    "fitToWidth": "ملء العرض"
   },
   "node": {
     "title": "العقدة",

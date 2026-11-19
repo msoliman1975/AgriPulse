@@ -129,7 +129,8 @@
     "hideLevels": "Hide levels",
     "level": "Level {{level}}",
     "levelCount_one": "{{count}} level",
-    "levelCount_other": "{{count}} levels"
+    "levelCount_other": "{{count}} levels",
+    "fitToWidth": "Fit to width"
   },
   "node": {
     "title": "Node",

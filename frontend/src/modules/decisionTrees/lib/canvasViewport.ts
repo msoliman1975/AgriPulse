@@ -98,6 +98,30 @@ export function fitToViewport(content: Size, viewport: Size, padding = 24): View
   };
 }
 
+/**
+ * Fill the viewport's width and start at the top.
+ *
+ * `fitToViewport` fits both axes, so a tall, narrow tree (dozens of levels,
+ * a handful of nodes wide) ends at the minimum zoom with unreadable labels.
+ * This fits the width only, never above 100%, and puts the top of the tree at
+ * the top: the author then pans down a tree that is readable all the way.
+ */
+export function fitToWidth(content: Size, viewport: Size, padding = 24): Viewport {
+  if (!(content.width > 0) || !(viewport.width > 0)) return IDENTITY_VIEWPORT;
+  const usableW = Math.max(1, viewport.width - padding * 2);
+  const scale = clampScale(Math.min(usableW / content.width, 1));
+  return {
+    scale,
+    tx: (viewport.width - content.width * scale) / 2,
+    ty: padding,
+  };
+}
+
+/** Move the view by a screen-pixel delta (a wheel or trackpad scroll). */
+export function panBy(view: Viewport, dx: number, dy: number): Viewport {
+  return { ...view, tx: view.tx - dx, ty: view.ty - dy };
+}
+
 /** Percentage shown in the toolbar, e.g. 0.835 -> 84. */
 export function zoomPercent(view: Viewport): number {
   return Math.round(view.scale * 100);
