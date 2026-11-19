@@ -267,8 +267,11 @@ demoBuildJob:
   schedule: "0 0 1 1 *"
   tenantSchema: ""
   scenario: ""
-  # incidents-dry-run | incidents | replay | all
+  # copy-history-dry-run | copy-history | incidents-dry-run | incidents |
+  # replay | all | reset | rebuild | irrigation
   mode: "incidents-dry-run"
+  # Optional api image tag for the job alone. Empty runs the api's image.
+  imageTag: ""
   from: ""
   to: ""
   activeDeadlineSeconds: 172800

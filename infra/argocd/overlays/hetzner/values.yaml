@@ -5666,13 +5666,27 @@ workloads:
 # (r3's output, the live sweep's cards and the grid anomaly alerts), then
 # replays from the first index day. About 1006 days, about 42 h, so the
 # deadline is 72 h.
+#
+# Ewais Grove ran as r1-r4 (r4: rebuild 2024-01-01..2026-10-02, fired
+# 2026-10-03). Its CronJob is replaced by the Medjool runs below.
+#
+# Medjool Oasis, palm-medjool demo tenant (farm MDJ-DEMO), see
+# backend/app/modules/demo_history/scenarios/medjool_oasis.py. Progress is
+# read from GET /api/v1/admin/tenants/01a1edfe-861d-7e8e-9f0f-dfe26fc33fd0/sidecar.
+# `imageTag` pins the job alone to 65d88a5 (#917); the api, workers and
+# frontend stay where they are.
+#
+# mdj-r1: copy-history-dry-run. Copies Al Ashraf's M-block history in a
+#   transaction, reports the rows per table, rolls back. Changes nothing.
+#   Next: mdj-r2 copy-history, then incidents-dry-run, then rebuild over
+#   2024-10-15..2026-10-15.
+#   Rollback: enabled: false (the dry run writes only its progress events).
 demoBuildJob:
   enabled: true
-  runId: "r4"
-  schedule: "45 18 3 10 *"
-  activeDeadlineSeconds: 259200
-  tenantSchema: "tenant_01a0eec13ae9703dbfa8a7cfafe11675"
-  scenario: "ewais_grove"
-  mode: "rebuild"
-  from: "2024-01-01"
-  to: "2026-10-02"
+  runId: "mdj-r1"
+  schedule: "55 10 19 11 *"
+  activeDeadlineSeconds: 3600
+  imageTag: "65d88a5"
+  tenantSchema: "tenant_01a1edfe861d7e8e9f0fdfe26fc33fd0"
+  scenario: "medjool_oasis"
+  mode: "copy-history-dry-run"
