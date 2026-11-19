@@ -5711,17 +5711,19 @@ workloads:
 # mdj-r2 (2026-11-19 12:15, 53 s): copy-history-dry-run on 99c12c4 (#919).
 #   Adds 2 farm imagery subscriptions, 451 farm scene records and 431 farm
 #   rasters; the farms' boundary hashes match, so the rasters are served.
-# mdj-r3: copy-history, the real copy, same image. One transaction; rows the
-#   demo farm already has are skipped and Al Ashraf is only read.
-#   Next: incidents-dry-run, then rebuild over 2024-10-15..2026-10-15.
-#   Rollback: the copied rows belong to the demo tenant only; delete them
-#   there or rebuild the tenant. Nothing outside it changes.
+# mdj-r3 (2026-11-19 20:45, 63 s): copy-history, committed. Same counts as
+#   mdj-r2. The index caggs were refreshed after it (admin task), so the
+#   demo blocks chart Aug 2023 - Nov 2026 and the farm lists 297 scenes.
+# mdj-r4: incidents-dry-run. Applies the 7 index incidents and the cold
+#   snap in a transaction, reports the rows each moved, rolls back.
+#   Next: rebuild over 2024-10-15..2026-10-15 (incidents, reset, replay).
+#   Rollback: enabled: false (the dry run writes only its progress events).
 demoBuildJob:
   enabled: true
-  runId: "mdj-r3"
-  schedule: "45 20 19 11 *"
+  runId: "mdj-r4"
+  schedule: "15 22 19 11 *"
   activeDeadlineSeconds: 3600
   imageTag: "99c12c4"
   tenantSchema: "tenant_01a1edfe861d7e8e9f0fdfe26fc33fd0"
   scenario: "medjool_oasis"
-  mode: "copy-history"
+  mode: "incidents-dry-run"
