@@ -273,6 +273,76 @@ async def test_telemetry_older_than_the_compression_threshold_also_dies(
     )
 
 
+_WATERMARK_NOT_AHEAD = text(
+    """
+    SELECT _timescaledb_functions.cagg_watermark(ca.mat_hypertable_id)
+               <= _timescaledb_functions.to_unix_microsec(now()),
+           _timescaledb_functions.to_timestamp(
+               _timescaledb_functions.cagg_watermark(ca.mat_hypertable_id))::text
+      FROM _timescaledb_catalog.continuous_agg ca
+     WHERE ca.user_view_schema = 'public' AND ca.user_view_name = :v
+    """
+)
+
+
+@pytest.mark.asyncio
+async def test_purging_recent_telemetry_does_not_hide_events_written_after_it(
+    admin_session: AsyncSession,
+) -> None:
+    """A purge must not move the aggregates' watermark past the clock.
+
+    The refresh window is padded by a week on each side, so for a tenant with
+    recent events it ends in the future. Unclamped, Timescale materialises
+    today's bucket for every tenant with rows in it, the watermark jumps to
+    tomorrow, and real-time aggregation (which only reads raw rows newer than
+    the watermark) stops showing anything written for the rest of the day: the
+    usage dashboard freezes after every tenant purge.
+
+    The bystander row is what makes this deterministic. Without a row in
+    today's bucket there is nothing to materialise there and the bug hides,
+    which is why it only surfaced in CI when another file on the same xdist
+    worker had left today-dated events behind before this one ran.
+    """
+    purged, bystander, newcomer = uuid4(), uuid4(), uuid4()
+    now = datetime.now(UTC)
+    try:
+        await admin_session.execute(_INSERT, _events(purged, now - timedelta(days=1)))
+        await admin_session.execute(_INSERT, _events(bystander, now - timedelta(minutes=5))[:1])
+        await admin_session.commit()
+
+        refreshed, _report = await _purge(admin_session, purged)
+        assert refreshed, "the purge refreshed nothing, so this test proves nothing"
+
+        for view, _src in PUBLIC_CAGGS:
+            not_ahead, watermark = (
+                await admin_session.execute(_WATERMARK_NOT_AHEAD, {"v": view})
+            ).one()
+            assert not_ahead, (
+                f"{view}'s watermark is {watermark}, ahead of now(): the purge "
+                "materialised a bucket that is still filling."
+            )
+
+        await admin_session.execute(_INSERT, _events(newcomer, datetime.now(UTC))[:1])
+        await admin_session.commit()
+        events = (
+            await admin_session.execute(
+                text("SELECT sum(events) FROM public.usage_daily WHERE tenant_id = :t"),
+                {"t": newcomer},
+            )
+        ).scalar_one_or_none()
+        assert events == 1, (
+            "an event written right after a tenant purge is invisible through "
+            "usage_daily: the purge's refresh moved the watermark past it."
+        )
+    finally:
+        await admin_session.rollback()
+        await admin_session.execute(
+            text("DELETE FROM public.usage_events WHERE tenant_id = ANY(:ts)"),
+            {"ts": [purged, bystander, newcomer]},
+        )
+        await admin_session.commit()
+
+
 @pytest.mark.asyncio
 async def test_a_tenant_with_no_telemetry_skips_the_refresh(
     admin_session: AsyncSession,

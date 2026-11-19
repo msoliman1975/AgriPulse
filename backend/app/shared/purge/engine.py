@@ -478,10 +478,63 @@ def _bucket_aligned(window: tuple[datetime, datetime]) -> tuple[datetime, dateti
     few extra buckets from a source table that has just had rows removed; the
     cost of under-refreshing is a purged tenant still showing on the dashboard
     with the orphan scanner reporting clean.
+
+    The padded end routinely lands in the future, so callers must not pass this
+    straight to Timescale: see `_clamped_window`.
     """
     start, end = window
     start = start.replace(hour=0, minute=0, second=0, microsecond=0) - _WIDEST_BUCKET
     end = end.replace(hour=0, minute=0, second=0, microsecond=0) + _WIDEST_BUCKET
+    return start, end
+
+
+# What a refresh may materialise, per view: whole buckets that end no later
+# than `now() - end_offset` of that view's own refresh policy.
+#
+# Read from the database rather than restated here, so it cannot drift from
+# the migrations (usage_* and block_index_daily stop at 1 hour,
+# block_index_weekly at 1 day). A view with no policy falls back to now(), which
+# still never lets a refresh reach into the future.
+_POLICY_HORIZON = text(
+    """
+    SELECT now() - COALESCE((j.config ->> 'end_offset')::interval, interval '0')
+      FROM timescaledb_information.continuous_aggregates ca
+      LEFT JOIN timescaledb_information.jobs j
+        ON j.proc_name = 'policy_refresh_continuous_aggregate'
+       AND j.hypertable_schema = ca.materialization_hypertable_schema
+       AND j.hypertable_name = ca.materialization_hypertable_name
+     WHERE ca.view_schema = :schema AND ca.view_name = :view
+    """
+)
+
+
+async def _clamped_window(
+    conn: Any, schema: str, view: str, window: tuple[datetime, datetime]
+) -> tuple[datetime, datetime] | None:
+    """`_bucket_aligned(window)`, with the end clamped to the view's policy horizon.
+
+    Why the clamp is required: `_bucket_aligned` pads the end by a week, so a
+    purge of recent data asks for a window that ends in the future. Timescale
+    then materialises the current, still-filling bucket for EVERY tenant that
+    has data in it, and the aggregate's watermark jumps to that bucket's end.
+    Real-time aggregation only reads raw rows newer than the watermark, so every
+    event written after the purge, for the rest of that bucket, is invisible:
+    the usage dashboard freezes for the rest of the day (block_index_weekly: the
+    rest of the week) until the policy's window finally reaches it.
+
+    Clamping loses nothing for the purge. A bucket past the horizon has never
+    been materialised (the policy does not reach it either), so readers get it
+    from the raw rows, which the purge has already deleted.
+
+    Returns None when the clamped window is empty: nothing materialised can hold
+    the purged rows, so there is nothing to recompute.
+    """
+    start, end = _bucket_aligned(window)
+    horizon = (await conn.execute(_POLICY_HORIZON, {"schema": schema, "view": view})).scalar()
+    if horizon is not None:
+        end = min(end, horizon)
+    if start >= end:
+        return None
     return start, end
 
 
@@ -514,13 +567,16 @@ async def refresh_caggs(
     """
     if window is None:
         return []
-    start, end = _bucket_aligned(window)
     refreshed: list[str] = []
     engine = create_async_engine(engine_url, isolation_level="AUTOCOMMIT")
     try:
         async with engine.connect() as conn:
             for view, _source in BLOCK_CAGGS:
                 try:
+                    bounds = await _clamped_window(conn, tenant_schema, view, window)
+                    if bounds is None:
+                        continue
+                    start, end = bounds
                     await conn.execute(
                         text(
                             f'CALL refresh_continuous_aggregate(\'"{tenant_schema}"."{view}"\', '
@@ -577,13 +633,16 @@ async def refresh_public_caggs(
     """
     if window is None:
         return []
-    start, end = _bucket_aligned(window)
     refreshed: list[str] = []
     engine = create_async_engine(engine_url, isolation_level="AUTOCOMMIT")
     try:
         async with engine.connect() as conn:
             for view, _source in PUBLIC_CAGGS:
                 try:
+                    bounds = await _clamped_window(conn, "public", view, window)
+                    if bounds is None:
+                        continue
+                    start, end = bounds
                     await conn.execute(
                         text(
                             f"CALL refresh_continuous_aggregate('public.\"{view}\"', "
