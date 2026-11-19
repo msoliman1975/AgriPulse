@@ -4474,7 +4474,22 @@ global:
       #   response fields; no migration, no new env. Workers stay 8bfe412.
       #   Watch: POST .../beta/{tree_id}/dry-run still answers.
       #   Rollback: api to 3d67a6b (the frontend renders without the fields).
-      tag: "02004cd"
+      # 0e266d9 = #914, api (Agri Operation PR 11; 02004cd..0e266d9 also holds
+      #   #913 and #915, which change only docs/trees definitions and their
+      #   tests: not in the image, no runtime effect). Public 0115 adds
+      #   plan_template_activities.repeat_count / repeat_unit (nullable, CHECK
+      #   both-or-neither) and fills 22 tasks of the two Medjool 1.7 manuals
+      #   from their "How often" lines; each published manual it changes gets
+      #   revision + 1 and its snapshot updated, so farms with a saved plan see
+      #   "manual updated". Saved plans now schedule each time of a repeating
+      #   task (keys <code>#<n>, one-day cards). Additive; runs on PreSync.
+      #   Workers stay 8bfe412: they never read the new columns.
+      #   Watch: migrate PreSync succeeds (public head 0115); the Medjool 1.7
+      #   bearing authoring-view shows irrigation-6 repeat 2/week and revision
+      #   2; the manual list and authoring view answer 200.
+      #   Rollback: api to 02004cd together with the frontend (the old editor
+      #   would drop the repeat on save). The columns can stay.
+      tag: "0e266d9"
     workers:
       tag: "8bfe412"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
@@ -5390,7 +5405,16 @@ global:
       #   Watch: the Beta designer opens and its tabs work; Expand and Show
       #   levels on a large tree; the traces link opens filtered.
       #   Rollback: frontend to d36a75b.
-      tag: "02004cd"
+      # 0e266d9 = #914, frontend (Agri Operation PR 11): the plan wizard's
+      #   calendar step is a week list (every week with its dates and all its
+      #   tasks, a repeating task once per time, a date field per task); the
+      #   Catalog tab gets a Variety selector; manual rows show the weeks a
+      #   task spans and how often; the manual editor gets "How often" and its
+      #   save carries the repeat. Needs the api at 0e266d9.
+      #   Watch: the Beta designer opens and its tabs work; Operation manuals
+      #   opens a Medjool 1.7 manual with "How often" filled.
+      #   Rollback: frontend to 02004cd together with the api.
+      tag: "0e266d9"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
