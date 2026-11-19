@@ -5714,16 +5714,26 @@ workloads:
 # mdj-r3 (2026-11-19 20:45, 63 s): copy-history, committed. Same counts as
 #   mdj-r2. The index caggs were refreshed after it (admin task), so the
 #   demo blocks chart Aug 2023 - Nov 2026 and the farm lists 297 scenes.
-# mdj-r4: incidents-dry-run. Applies the 7 index incidents and the cold
-#   snap in a transaction, reports the rows each moved, rolls back.
-#   Next: rebuild over 2024-10-15..2026-10-15 (incidents, reset, replay).
-#   Rollback: enabled: false (the dry run writes only its progress events).
+# mdj-r4 (2026-11-19 22:15, 10 s): incidents-dry-run. All 7 index
+#   incidents moved rows (cell/block: M31 gaps 836/124, M5 N-2025 598/32,
+#   M2 lateral 572/44, M2 iron 456/19, M5 N-2026 680/34, M31 heat 1584/72,
+#   pump 142/4) and the cold snap moved 96 weather hours over 5 days.
+# mdj-r5: rebuild = apply the incidents, delete derived history (engine
+#   output, team work, hindcasts, and any cards the live sweep opened),
+#   then replay 2024-10-15..2026-10-15 in weekly chunks. 731 days on 13
+#   blocks; the Ewais Grove replay ran ~150 s a day on 36 blocks, so allow
+#   72 h. Progress: one sidecar event per chunk.
+#   A failed chunk stops the run and names the restart day; restart with
+#   mode replay from that day, never re-replay a finished range.
+#   Rollback: enabled: false stops nothing already running; delete the Job.
 demoBuildJob:
   enabled: true
-  runId: "mdj-r4"
-  schedule: "15 22 19 11 *"
-  activeDeadlineSeconds: 3600
+  runId: "mdj-r5"
+  schedule: "15 23 19 11 *"
+  activeDeadlineSeconds: 259200
   imageTag: "99c12c4"
   tenantSchema: "tenant_01a1edfe861d7e8e9f0fdfe26fc33fd0"
   scenario: "medjool_oasis"
-  mode: "incidents-dry-run"
+  mode: "rebuild"
+  from: "2024-10-15"
+  to: "2026-10-15"
