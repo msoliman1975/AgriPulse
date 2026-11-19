@@ -19,6 +19,8 @@
  * button closes it) so a big, deep tree has the whole screen, and turns on
  * the level bands: one shaded band per depth, labelled "Level n · k nodes",
  * from the layout's own `depth`. The bands can be toggled in either view.
+ * "Fit to width" fills the width from the top, for a tree too tall to fit
+ * whole at a readable zoom; in the full view a plain wheel then pans it.
  *
  * `dir="ltr"` on the viewport is load-bearing: text anchored in SVG flips
  * under RTL, and a node id or a band bound would read backwards in Arabic.
@@ -37,6 +39,8 @@ import {
   IDENTITY_VIEWPORT,
   ZOOM_STEP,
   fitToViewport,
+  fitToWidth,
+  panBy,
   zoomAt,
   zoomAtCentre,
   zoomPercent,
@@ -168,6 +172,12 @@ export function BetaCanvas({
     setView(fitToViewport({ width: layout.width, height: layout.height }, size));
   }, [layout.width, layout.height, viewportSize]);
 
+  const fitWidth = useCallback(() => {
+    const size = viewportSize();
+    if (size.width === 0) return;
+    setView(fitToWidth({ width: layout.width, height: layout.height }, size));
+  }, [layout.width, layout.height, viewportSize]);
+
   // Expanding turns the levels on (the reason to expand a deep tree is to
   // read it whole), refits once the layer has its size, and Esc closes it.
   const toggleExpanded = useCallback(() => {
@@ -208,13 +218,24 @@ export function BetaCanvas({
     fitToScreen();
   }, [layout.nodes.length, fitToScreen, viewportSize]);
 
-  // Ctrl/Cmd + wheel zooms about the cursor; a plain wheel still scrolls the
-  // page. Registered natively because the listener must be non-passive.
+  // Ctrl/Cmd + wheel zooms about the cursor. A plain wheel scrolls the page
+  // inline, but in the full view there is no page behind it, so there it pans
+  // the tree (shift + wheel, or a sideways trackpad swipe, pans across).
+  // Registered natively because the listener must be non-passive.
+  const expandedRef = useRef(expanded);
+  expandedRef.current = expanded;
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const onWheel = (evt: WheelEvent): void => {
-      if (!evt.ctrlKey && !evt.metaKey) return;
+      if (!evt.ctrlKey && !evt.metaKey) {
+        if (!expandedRef.current) return;
+        evt.preventDefault();
+        const dx = evt.shiftKey ? evt.deltaY : evt.deltaX;
+        const dy = evt.shiftKey ? 0 : evt.deltaY;
+        setView((v) => panBy(v, dx, dy));
+        return;
+      }
       evt.preventDefault();
       const rect = el.getBoundingClientRect();
       const factor = Math.exp(-evt.deltaY * 0.002);
@@ -350,6 +371,9 @@ export function BetaCanvas({
       <div className="flex flex-wrap items-center gap-2 border-b border-ap-line px-3 py-2">
         <Button variant="secondary" size="sm" onClick={fitToScreen}>
           {t("canvas.fitToScreen")}
+        </Button>
+        <Button variant="secondary" size="sm" onClick={fitWidth}>
+          {t("canvas.fitToWidth")}
         </Button>
         <Button
           variant="secondary"
