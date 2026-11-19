@@ -5680,18 +5680,20 @@ workloads:
 #   292 cells, 846,800 cell rows, 37,638 block rows, 61,701 baselines and the
 #   farm's weather, but 0 scene records: Al Ashraf fetches imagery for the
 #   farm boundary, which #919 adds to the copy.
-# mdj-r2: copy-history-dry-run again on 99c12c4 (#919), to see the farm
-#   scene records and rasters and whether the two farms' boundary hashes
-#   match. Changes nothing.
-#   Next: copy-history, then incidents-dry-run, then rebuild over
-#   2024-10-15..2026-10-15.
-#   Rollback: enabled: false (the dry run writes only its progress events).
+# mdj-r2 (2026-11-19 12:15, 53 s): copy-history-dry-run on 99c12c4 (#919).
+#   Adds 2 farm imagery subscriptions, 451 farm scene records and 431 farm
+#   rasters; the farms' boundary hashes match, so the rasters are served.
+# mdj-r3: copy-history, the real copy, same image. One transaction; rows the
+#   demo farm already has are skipped and Al Ashraf is only read.
+#   Next: incidents-dry-run, then rebuild over 2024-10-15..2026-10-15.
+#   Rollback: the copied rows belong to the demo tenant only; delete them
+#   there or rebuild the tenant. Nothing outside it changes.
 demoBuildJob:
   enabled: true
-  runId: "mdj-r2"
-  schedule: "15 12 19 11 *"
+  runId: "mdj-r3"
+  schedule: "55 12 19 11 *"
   activeDeadlineSeconds: 3600
   imageTag: "99c12c4"
   tenantSchema: "tenant_01a1edfe861d7e8e9f0fdfe26fc33fd0"
   scenario: "medjool_oasis"
-  mode: "copy-history-dry-run"
+  mode: "copy-history"
