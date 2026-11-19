@@ -4474,7 +4474,25 @@ global:
       #   response fields; no migration, no new env. Workers stay 8bfe412.
       #   Watch: POST .../beta/{tree_id}/dry-run still answers.
       #   Rollback: api to 3d67a6b (the frontend renders without the fields).
-      tag: "02004cd"
+      # 247de3c = #913, #914, #915, #917, #919, #922, api (02004cd..247de3c).
+      #   Shipped together on the owner's call: prod images are built from
+      #   main, so #922 (fit to width) could not go out alone.
+      #   #914: public 0115 (PreSync) adds activity repeat_count/repeat_unit
+      #   with a both-or-neither CHECK and fills them for the two Medjool 1.7
+      #   manuals; a published manual it changes gets a new revision, so
+      #   farms with a saved plan see "manual updated". Plan resolver spaces
+      #   each time of a repeating task. Additive; the old api ignores it.
+      #   #917, #919: demo_history copy-history modes. Run only by the
+      #   demo-build CronJob, which pins its own imageTag (99c12c4) and is
+      #   unaffected by this tag.
+      #   #913, #915: docs/trees definitions and a test only; nothing the
+      #   api loads, so no live tree changes. #922: frontend only.
+      #   Workers stay 8bfe412.
+      #   Watch: migrate PreSync succeeds (public head 0115); Agri Operation
+      #   plan and catalog load; a saved Medjool plan shows "manual updated".
+      #   Rollback: api to 02004cd. 0115's columns can stay; the old image
+      #   never reads them.
+      tag: "247de3c"
     workers:
       tag: "8bfe412"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
@@ -5390,7 +5408,17 @@ global:
       #   Watch: the Beta designer opens and its tabs work; Expand and Show
       #   levels on a large tree; the traces link opens filtered.
       #   Rollback: frontend to d36a75b.
-      tag: "02004cd"
+      # 247de3c = #914 + #922, frontend (02004cd..247de3c touches frontend/
+      #   only in these two).
+      #   #914: Agri Operation's calendar step is a week list (every week,
+      #   each time of a repeating task, a date field per task), and the
+      #   Catalog tab gets a Variety selector. Needs the api at 247de3c.
+      #   #922: Beta canvas "Fit to width" (fills the width from the top),
+      #   and a plain wheel pans the full view.
+      #   Watch: the Beta designer opens and its tabs work; Agri Operation
+      #   plan and catalog load.
+      #   Rollback: frontend to 02004cd, together with the api.
+      tag: "247de3c"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
