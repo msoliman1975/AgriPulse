@@ -124,6 +124,16 @@ imagery is dense from 2018.
 This is the slowest step and it spends provider quota. Run it once and
 keep the database.
 
+**Or copy it.** When the build farm has the same block boundaries as a
+farm that was already backfilled, give the scenario a `COPY_SOURCE` and
+run `demo_build --mode copy-history` (dry run first with
+`copy-history-dry-run`). It copies the grids, scene records, index rows
+per block and per cell, baselines and the farm's weather, matching blocks
+by code. Raster keys come from the AOI hash, so identical boundaries read
+the same files and nothing in object storage is written. The Medjool
+Oasis scenario builds this way from Al Ashraf. See
+`demo_history.copy_history`.
+
 Status: exists.
 
 ### Step 6 - Check the backfill before going further

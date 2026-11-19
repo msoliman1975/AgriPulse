@@ -20,9 +20,11 @@ from sqlalchemy import text
 from app.modules.demo_history.incidents import (
     Incident,
     Shift,
+    WeatherIncident,
     already_applied,
     apply_incident,
     apply_scenario,
+    apply_weather_incident,
 )
 from app.modules.grid.service import get_grid_service
 from app.modules.tenancy.service import get_tenant_service
@@ -218,3 +220,75 @@ async def test_a_dry_run_changes_nothing(farm: dict[str, Any]) -> None:
     async with AsyncSessionLocal()() as s, s.begin():
         await s.execute(text(f'SET LOCAL search_path TO "{farm["schema"]}", public'))
         assert await already_applied(s, farm["farm_id"]) == set()
+
+
+_COLD = WeatherIncident(
+    code="t_cold",
+    title="test cold snap",
+    start=date(2025, 2, 23),
+    full=date(2025, 2, 24),
+    until=date(2025, 2, 24),
+    gone=date(2025, 2, 25),
+    min_temp_c=-6.5,
+)
+
+
+@pytest.mark.asyncio
+async def test_a_cold_snap_moves_the_hours_and_rebuilds_the_days(farm: dict[str, Any]) -> None:
+    schema, farm_id = farm["schema"], farm["farm_id"]
+    days = (date(2025, 2, 23), date(2025, 2, 24), date(2025, 2, 25))
+    async with AsyncSessionLocal()() as s, s.begin():
+        await s.execute(text(f'SET LOCAL search_path TO "{schema}", public'))
+        for n, day in enumerate(days):
+            # 5 C at 04:00, 20 C at 13:00, 10 C otherwise.
+            for hour in range(24):
+                temp = 5 if hour == 4 else 20 if hour == 13 else 10
+                await s.execute(
+                    text(
+                        "INSERT INTO weather_observations (time, farm_id, provider_code, air_temp_c) "
+                        "VALUES (:t, :f, 'open_meteo', :v)"
+                    ),
+                    {
+                        "t": datetime(day.year, day.month, day.day, hour, tzinfo=UTC),
+                        "f": str(farm_id),
+                        "v": temp,
+                    },
+                )
+            await s.execute(
+                text(
+                    "INSERT INTO weather_derived_daily (farm_id, date, temp_min_c, temp_max_c, "
+                    " temp_mean_c, gdd_base10, gdd_cumulative_base10_season) "
+                    "VALUES (:f, :d, 5, 20, 10.21, 0.21, :cum)"
+                ),
+                {"f": str(farm_id), "d": day, "cum": Decimal("100") + n},
+            )
+
+    async with AsyncSessionLocal()() as session:
+        await session.begin()
+        await session.execute(text(f'SET LOCAL search_path TO "{schema}", public'))
+        counts = await apply_weather_incident(session, farm_id, _COLD)
+        await session.commit()
+
+    # Only the full-strength day moves: the ramp is zero on the start day.
+    assert counts["weather_hours"] == 24
+    assert counts["weather_days"] == 2
+    async with AsyncSessionLocal()() as s, s.begin():
+        rows = {
+            r.date: r
+            for r in await s.execute(
+                text(
+                    f"SELECT date, temp_min_c, temp_max_c, gdd_base10, "
+                    f'gdd_cumulative_base10_season AS cum FROM "{schema}".weather_derived_daily '
+                    "WHERE farm_id = :f"
+                ),
+                {"f": str(farm_id)},
+            )
+        }
+    cold = rows[date(2025, 2, 24)]
+    assert float(cold.temp_min_c) == pytest.approx(-6.5)
+    # The warmest hour keeps half the drop: 20 - 11.5 * 0.5.
+    assert float(cold.temp_max_c) == pytest.approx(14.25)
+    assert float(cold.gdd_base10) == 0
+    # The season total loses the 0.21 degree days the cold day no longer has.
+    assert float(rows[date(2025, 2, 25)].cum) == pytest.approx(102 - 0.21)
+    assert float(rows[date(2025, 2, 23)].temp_min_c) == 5

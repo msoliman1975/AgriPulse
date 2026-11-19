@@ -94,3 +94,56 @@ def test_replay_modes_need_a_range() -> None:
         ["--tenant-schema", "t", "--scenario", "s", "--mode", "incidents-dry-run"]
     )
     assert args.start is None
+
+
+def test_medjool_scenario_steps_carry_its_policy_and_dated_edits() -> None:
+    from app.modules.demo_history import people
+    from app.modules.demo_history.scenarios import medjool_oasis
+
+    steps = {s.name: s for s in demo_build.scenario_steps(medjool_oasis)}
+
+    team = steps["demo.team_work"].run
+    assert team.func is people.act_for_tenant  # type: ignore[attr-defined]
+    assert team.keywords["policy"] is medjool_oasis.TEAM_POLICY  # type: ignore[attr-defined]
+    irrigation = steps["demo.irrigation_work"].run
+    assert irrigation.keywords["policy"] is medjool_oasis.TEAM_POLICY  # type: ignore[attr-defined]
+    edits = steps["demo.attribute_changes"].run
+    assert edits.keywords["changes"] == medjool_oasis.ATTRIBUTE_CHANGES  # type: ignore[attr-defined]
+
+
+def test_a_scenario_without_a_policy_keeps_the_default_steps() -> None:
+    class Bare:
+        FARM_CODE = "X"
+        INCIDENTS = ()
+
+    from app.modules.demo_history.steps import DEMO_BUILD_STEPS
+
+    assert demo_build.scenario_steps(Bare) == DEMO_BUILD_STEPS
+
+
+def test_medjool_scenario_stays_inside_its_span_and_blocks() -> None:
+    from app.modules.demo_history.scenarios import medjool_oasis
+
+    start, end = medjool_oasis.SPAN
+    events: list[Any] = [*medjool_oasis.INCIDENTS, *medjool_oasis.WEATHER_INCIDENTS]
+    assert len({e.code for e in events}) == len(events)
+    for event in events:
+        assert start <= event.start
+        assert event.gone <= end
+    for incident in medjool_oasis.INCIDENTS:
+        assert set(incident.blocks) <= {"M2", "M5", "M28", "M31"}
+    for change in medjool_oasis.ATTRIBUTE_CHANGES:
+        assert start <= change.on <= end
+
+
+def test_attribute_changes_do_nothing_on_other_days() -> None:
+    from app.modules.demo_history import people
+    from app.shared import clock
+
+    change = people.AttributeChange(
+        on=date(2026, 3, 1), block="M5", attributes={"palm_phase": "bearing"}
+    )
+    with clock.simulate(datetime(2026, 2, 28, 15, tzinfo=UTC)):
+        assert people.attribute_changes_for_tenant("tenant_x", (change,)) == {
+            "attribute_changes": 0
+        }
