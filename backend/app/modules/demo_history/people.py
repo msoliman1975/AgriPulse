@@ -15,8 +15,9 @@ Every choice is a hash of the row id, never a random draw. Rebuilding
 the same tenant from the same inputs gives the same history, which is
 what makes a bad demo reproducible.
 
-The policy is written for mango on drip in Egypt and says so in its
-reasons and product names. It is demo content, not product behaviour.
+The words the team writes come from a `TeamPolicy`. `MANGO_POLICY` is
+written for mango on drip in Egypt and is the default; a scenario passes
+its own. It is demo content, not product behaviour.
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ from sqlalchemy import text
 
 from app.core.logging import get_logger
 from app.modules.alerts.service import get_alerts_service
+from app.modules.farms.service import get_farm_service
 from app.modules.irrigation.service import get_irrigation_service
 from app.modules.plans.service import get_plans_service
 from app.modules.recommendations.service import get_recommendations_service
@@ -55,25 +57,45 @@ _ACTIVITY_FOR_ACTION: dict[str, str] = {
     "harvest_window": "harvesting",
 }
 
-# What the crew writes on the board for each kind of job.
-_PRODUCT_FOR_ACTIVITY: dict[str, tuple[str | None, str | None]] = {
-    "irrigation": (None, "Add 2 h to each drip cycle for 5 days"),
-    "fertilizing": ("Potassium sulphate 50% K2O", "25 kg per feddan through the drip"),
-    "spraying": ("Sulphur 80% WG", "250 g per 100 L, full cover"),
-    "pruning": (None, "Open the canopy centre, remove dead wood"),
-    "harvesting": (None, "Pick at colour break, morning only"),
-    "observation": (None, "Walk the block, check emitters and 10 trees"),
-}
 
-_DISMISS_REASONS: tuple[str, ...] = (
-    "Checked in the field. Emitters run and the trees look normal.",
-    "Already covered by this week's program.",
-    "Cloud shadow on the image. The block was fine on the ground.",
-    "Seen by the agronomist. We will watch it at the next pass.",
+@dataclass(frozen=True)
+class TeamPolicy:
+    """The words the team writes: products on the board, reasons, notes.
+
+    Only text differs between crops. Who acts, when, and how often they
+    schedule, defer or dismiss is the same everywhere, so a scenario swaps
+    the policy and keeps the behaviour.
+    """
+
+    #: What the crew writes on the board for each kind of job.
+    product_for_activity: dict[str, tuple[str | None, str | None]]
+    dismiss_reasons: tuple[str, ...]
+    defer_note: str
+    skip_note: str
+    irrigation_skip_note: str
+
+
+MANGO_POLICY = TeamPolicy(
+    product_for_activity={
+        "irrigation": (None, "Add 2 h to each drip cycle for 5 days"),
+        "fertilizing": ("Potassium sulphate 50% K2O", "25 kg per feddan through the drip"),
+        "spraying": ("Sulphur 80% WG", "250 g per 100 L, full cover"),
+        "pruning": (None, "Open the canopy centre, remove dead wood"),
+        "harvesting": (None, "Pick at colour break, morning only"),
+        "observation": (None, "Walk the block, check emitters and 10 trees"),
+    },
+    dismiss_reasons=(
+        "Checked in the field. Emitters run and the trees look normal.",
+        "Already covered by this week's program.",
+        "Cloud shadow on the image. The block was fine on the ground.",
+        "Seen by the agronomist. We will watch it at the next pass.",
+    ),
+    defer_note="Waiting for the next image before acting.",
+    skip_note="Crew moved to another block. Rescheduled on the board.",
+    irrigation_skip_note="Well maintenance this evening. Next cycle tomorrow.",
 )
 
 _DEFER_DAYS = 7
-_SKIP_NOTE = "Crew moved to another block. Rescheduled on the board."
 
 
 def _roll(*parts: object) -> float:
@@ -104,10 +126,9 @@ class Team:
 
 
 _IRRIGATION_SKIP_SHARE = 0.04
-_IRRIGATION_SKIP_NOTE = "Well maintenance this evening. Next cycle tomorrow."
 
 
-def irrigate_for_tenant(tenant_schema: str) -> dict[str, int]:
+def irrigate_for_tenant(tenant_schema: str, policy: TeamPolicy = MANGO_POLICY) -> dict[str, int]:
     """The field operator logs the day's irrigation, in the evening.
 
     Every schedule the engine wrote for today is applied at its
@@ -116,10 +137,10 @@ def irrigate_for_tenant(tenant_schema: str) -> dict[str, int]:
     water balance never sees a drop of irrigation, and the water-balance
     report shows a farm nobody waters.
     """
-    return _run(_irrigate_async(tenant_schema))
+    return _run(_irrigate_async(tenant_schema, policy))
 
 
-async def _irrigate_async(tenant_schema: str) -> dict[str, int]:
+async def _irrigate_async(tenant_schema: str, policy: TeamPolicy) -> dict[str, int]:
     counts = {"applied": 0, "skipped": 0}
     today = clock.today()
     factory = AsyncSessionLocal()
@@ -163,7 +184,7 @@ async def _irrigate_async(tenant_schema: str) -> dict[str, int]:
                         schedule_id=sid,
                         action="skip" if skip else "apply",
                         applied_volume_mm=volume,
-                        notes=_IRRIGATION_SKIP_NOTE if skip else None,
+                        notes=policy.irrigation_skip_note if skip else None,
                         actor_user_id=team.operator,
                         tenant_schema=tenant_schema,
                     )
@@ -171,9 +192,9 @@ async def _irrigate_async(tenant_schema: str) -> dict[str, int]:
     return counts
 
 
-def act_for_tenant(tenant_schema: str) -> dict[str, int]:
+def act_for_tenant(tenant_schema: str, policy: TeamPolicy = MANGO_POLICY) -> dict[str, int]:
     """One day of the team's work in `tenant_schema`, on the clock's day."""
-    return _run(_act_async(tenant_schema))
+    return _run(_act_async(tenant_schema, policy))
 
 
 def _run[T](coro: Coroutine[Any, Any, T]) -> T:
@@ -192,7 +213,7 @@ async def _begin(session: Any, tenant_schema: str) -> None:
     await session.execute(text("SELECT set_config('app.current_tenant_id', :v, TRUE)"), {"v": safe})
 
 
-async def _act_async(tenant_schema: str) -> dict[str, int]:
+async def _act_async(tenant_schema: str, policy: TeamPolicy) -> dict[str, int]:
     counts = {
         "scheduled": 0,
         "deferred": 0,
@@ -221,11 +242,15 @@ async def _act_async(tenant_schema: str) -> dict[str, int]:
         )
 
     for rec in recs:
-        outcome = await _decide_recommendation(factory, tenant_schema, team, rec, today)
+        outcome = await _decide_recommendation(
+            factory, tenant_schema, team, rec, today=today, policy=policy
+        )
         if outcome:
             counts[outcome] += 1
     for act in activities:
-        outcome = await _work_activity(factory, tenant_schema, team, act, today)
+        outcome = await _work_activity(
+            factory, tenant_schema, team, act, today=today, policy=policy
+        )
         if outcome:
             counts[outcome] += 1
     for alert in alerts:
@@ -326,7 +351,13 @@ async def _active_alerts(session: Any) -> list[dict[str, Any]]:
 
 
 async def _decide_recommendation(
-    factory: Any, tenant_schema: str, team: Team, rec: dict[str, Any], today: date
+    factory: Any,
+    tenant_schema: str,
+    team: Team,
+    rec: dict[str, Any],
+    *,
+    today: date,
+    policy: TeamPolicy,
 ) -> str | None:
     rid = rec["id"]
     until = rec["deferred_until"]
@@ -358,7 +389,14 @@ async def _decide_recommendation(
                 )
                 if action == "schedule":
                     await _schedule(
-                        session, svc, tenant_schema, team, rec, activity or "observation", today
+                        session,
+                        svc,
+                        tenant_schema,
+                        team,
+                        rec,
+                        activity_type=activity or "observation",
+                        today=today,
+                        policy=policy,
                     )
                     return "scheduled"
                 if action == "defer":
@@ -367,12 +405,12 @@ async def _decide_recommendation(
                         action="defer",
                         dismissal_reason=None,
                         deferred_until=at + timedelta(days=_DEFER_DAYS),
-                        outcome_notes="Waiting for the next image before acting.",
+                        outcome_notes=policy.defer_note,
                         actor_user_id=actor,
                         tenant_schema=tenant_schema,
                     )
                     return "deferred"
-                reasons = _DISMISS_REASONS
+                reasons = policy.dismiss_reasons
                 await svc.transition_recommendation(
                     recommendation_id=rid,
                     action="dismiss",
@@ -391,13 +429,15 @@ async def _schedule(
     tenant_schema: str,
     team: Team,
     rec: dict[str, Any],
+    *,
     activity_type: str,
     today: date,
+    policy: TeamPolicy,
 ) -> None:
     """Board activity plus apply, as the schedule route does it."""
     rid = rec["id"]
     when = today + timedelta(days=int(_roll(rid, "lead") * 2))
-    product, dosage = _PRODUCT_FOR_ACTIVITY.get(activity_type, (None, None))
+    product, dosage = policy.product_for_activity.get(activity_type, (None, None))
     plans = get_plans_service(tenant_session=session)
     activity = await plans.create_flat_activity(
         farm_id=rec["farm_id"],
@@ -426,7 +466,13 @@ async def _schedule(
 
 
 async def _work_activity(
-    factory: Any, tenant_schema: str, team: Team, act: dict[str, Any], today: date
+    factory: Any,
+    tenant_schema: str,
+    team: Team,
+    act: dict[str, Any],
+    *,
+    today: date,
+    policy: TeamPolicy,
 ) -> str | None:
     aid = act["id"]
     if act["status"] == "scheduled" and act["scheduled_date"] == today:
@@ -447,7 +493,7 @@ async def _work_activity(
             plans = get_plans_service(tenant_session=session)
             await plans.update_activity(
                 activity_id=aid,
-                metadata_changes={"notes": _SKIP_NOTE} if state_action == "skip" else {},
+                metadata_changes={"notes": policy.skip_note} if state_action == "skip" else {},
                 state_action=state_action,
                 actor_user_id=team.operator,
                 tenant_schema=tenant_schema,
@@ -482,3 +528,69 @@ async def _handle_alert(
                     tenant_schema=tenant_schema,
                 )
     return outcome
+
+
+@dataclass(frozen=True)
+class AttributeChange:
+    """A dated change to a block's crop record, made by the agronomist.
+
+    A palm moves from one phase to the next on a day somebody notices it
+    and updates the record. Doing it through the service on that simulated
+    day writes the attribute log, the audit row and the timeline entry the
+    way a real edit would.
+    """
+
+    on: date
+    block: str
+    attributes: dict[str, Any]
+
+
+def attribute_changes_for_tenant(
+    tenant_schema: str, changes: tuple[AttributeChange, ...]
+) -> dict[str, int]:
+    """Apply the changes dated today, on the block's current assignment."""
+    today = clock.today()
+    due = tuple(c for c in changes if c.on == today)
+    if not due:
+        return {"attribute_changes": 0}
+    return _run(_attribute_changes_async(tenant_schema, due, today))
+
+
+async def _attribute_changes_async(
+    tenant_schema: str, due: tuple[AttributeChange, ...], today: date
+) -> dict[str, int]:
+    factory = AsyncSessionLocal()
+    applied = 0
+    for change in due:
+        with clock.simulate(_at(today, (change.block, "attributes"), 14, 16)):
+            async with factory() as session, session.begin():
+                await _begin(session, tenant_schema)
+                team = await _load_team(session, tenant_schema)
+                block_crop_id = (
+                    await session.execute(
+                        text(
+                            """
+                            SELECT bc.id FROM block_crops bc
+                              JOIN blocks b ON b.id = bc.block_id
+                             WHERE b.code = :code AND b.deleted_at IS NULL
+                               AND bc.deleted_at IS NULL
+                               AND bc.effective_from <= :today
+                               AND (bc.effective_to IS NULL OR bc.effective_to > :today)
+                             ORDER BY bc.effective_from DESC
+                             LIMIT 1
+                            """
+                        ),
+                        {"code": change.block, "today": today},
+                    )
+                ).scalar_one_or_none()
+                if block_crop_id is None:
+                    raise RuntimeError(f"block {change.block} has no current crop assignment")
+                async with factory() as public_session:
+                    svc = get_farm_service(tenant_session=session, public_session=public_session)
+                    await svc.set_block_crop_attributes(
+                        block_crop_id=block_crop_id,
+                        submitted=dict(change.attributes),
+                        actor_user_id=team.agronomist,
+                    )
+        applied += 1
+    return {"attribute_changes": applied}

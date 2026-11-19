@@ -123,7 +123,7 @@ def ensure_build_tenant(tenant_schema: str) -> None:
         )
     if not tenant_schema.startswith(prefix):
         raise ReplayNotAllowedError(
-            f"{tenant_schema!r} is not a build tenant. Its schema must start " f"with {prefix!r}."
+            f"{tenant_schema!r} is not a build tenant. Its schema must start with {prefix!r}."
         )
 
 

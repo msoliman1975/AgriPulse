@@ -22,6 +22,10 @@ Modes:
   work, hindcasts) and keep its inputs. See `demo_history.reset`.
 * ``rebuild``: ``incidents``, ``reset``, then ``replay``. Applied
   incidents are skipped, so a scenario that gained one applies only that.
+* ``copy-history-dry-run``: copy the scenario's ``COPY_SOURCE`` history
+  onto its farm in a transaction, report the rows, roll back.
+* ``copy-history``: copy it. Rows the farm already has are skipped, so a
+  second run adds nothing. See `demo_history.copy_history`.
 * ``irrigation``: redo the irrigation history over the range: clear its
   schedules, then replay only yesterday's water balance, the day's
   schedule and the operator's evening log. For days replayed while the
@@ -38,6 +42,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import functools
 import importlib
 import logging
 import sys
@@ -51,6 +56,8 @@ from uuid import UUID
 from sqlalchemy import text
 
 from app.modules.audit.service import get_audit_service
+from app.modules.demo_history import people
+from app.modules.demo_history.copy_history import copy_history
 from app.modules.demo_history.incidents import apply_scenario
 from app.modules.demo_history.reset import clear_irrigation, reset_build_tenant
 from app.modules.demo_history.runner import ReplayNotAllowedError, ensure_build_tenant, replay
@@ -60,6 +67,8 @@ from app.shared.db.session import AsyncSessionLocal, dispose_engine
 logger = logging.getLogger("demo_build")
 
 _MODES = (
+    "copy-history-dry-run",
+    "copy-history",
     "incidents-dry-run",
     "incidents",
     "replay",
@@ -135,8 +144,67 @@ class Reporter:
         )
 
 
+def _scenario(args: argparse.Namespace) -> Any:
+    return importlib.import_module(f"app.modules.demo_history.scenarios.{args.scenario}")
+
+
+def scenario_steps(scenario: Any, base: tuple[Step, ...] = DEMO_BUILD_STEPS) -> tuple[Step, ...]:
+    """The build steps, with the scenario's own team words and dated edits.
+
+    A scenario without a `TEAM_POLICY` keeps the default (mango) wording,
+    and one without `ATTRIBUTE_CHANGES` adds no step, so Ewais Grove builds
+    exactly as before.
+    """
+    policy = getattr(scenario, "TEAM_POLICY", None)
+    steps: list[Step] = []
+    for base_step in base:
+        step = base_step
+        if policy is not None and step.name == "demo.team_work":
+            step = Step(
+                step.name,
+                step.hour,
+                functools.partial(people.act_for_tenant, policy=policy),
+                step.weekday,
+            )
+        elif policy is not None and step.name == "demo.irrigation_work":
+            step = Step(
+                step.name,
+                step.hour,
+                functools.partial(people.irrigate_for_tenant, policy=policy),
+                step.weekday,
+            )
+        steps.append(step)
+    changes = tuple(getattr(scenario, "ATTRIBUTE_CHANGES", ()))
+    if changes:
+        steps.append(
+            Step(
+                "demo.attribute_changes",
+                15,
+                functools.partial(people.attribute_changes_for_tenant, changes=changes),
+            )
+        )
+    return tuple(steps)
+
+
+def _copy(args: argparse.Namespace, report: Reporter, *, dry_run: bool) -> None:
+    scenario = _scenario(args)
+    source = getattr(scenario, "COPY_SOURCE", None)
+    if source is None:
+        raise ValueError(f"scenario {args.scenario} has no COPY_SOURCE")
+    result = _run_async(
+        copy_history(
+            AsyncSessionLocal(),
+            source=source,
+            target_schema=args.tenant_schema,
+            target_farm_code=scenario.FARM_CODE,
+            dry_run=dry_run,
+        )
+    )
+    report("history_copy_dry_run" if dry_run else "history_copied", result=result)
+
+
 def _incidents(args: argparse.Namespace, report: Reporter, *, dry_run: bool) -> None:
-    scenario = importlib.import_module(f"app.modules.demo_history.scenarios.{args.scenario}")
+    scenario = _scenario(args)
     results: list[dict[str, Any]] = _run_async(
         apply_scenario(AsyncSessionLocal(), args.tenant_schema, scenario, dry_run=dry_run)
     )
@@ -199,6 +267,8 @@ def main(argv: list[str] | None = None) -> int:
     report = Reporter(_run_async(_tenant_id(args.tenant_schema)), args.mode)
     report("started", scenario=args.scenario, start=str(args.start), end=str(args.end))
     try:
+        if args.mode in ("copy-history-dry-run", "copy-history"):
+            _copy(args, report, dry_run=args.mode == "copy-history-dry-run")
         if args.mode == "incidents-dry-run":
             _incidents(args, report, dry_run=True)
         if args.mode in ("incidents", "all", "rebuild"):
@@ -211,9 +281,14 @@ def main(argv: list[str] | None = None) -> int:
                 clear_irrigation(AsyncSessionLocal(), args.tenant_schema, args.start, args.end)
             )
             report("irrigation_cleared", cleared=cleared)
-            if not _replay(args, report, IRRIGATION_STEPS):
+            irrigation = tuple(
+                step
+                for step in scenario_steps(_scenario(args))
+                if step.name in {s.name for s in IRRIGATION_STEPS}
+            )
+            if not _replay(args, report, irrigation):
                 return 1
-        elif args.mode in _REPLAYS and not _replay(args, report):
+        elif args.mode in _REPLAYS and not _replay(args, report, scenario_steps(_scenario(args))):
             return 1
     except Exception as exc:
         report(

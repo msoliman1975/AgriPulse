@@ -11,8 +11,9 @@ strength on `full`, holds until `until`, and is gone on `gone`. The
 change ramps linearly in and out, so a chart shows a decline and a
 recovery rather than a step.
 
-Only index rows move: `block_grid_aggregates` per cell and
-`block_index_aggregates` per block. A block's shift is the cell shift
+Index incidents move index rows only: `block_grid_aggregates` per cell
+and `block_index_aggregates` per block. A `WeatherIncident` moves the
+farm's own hourly temperatures and rebuilds the daily rows from them. A block's shift is the cell shift
 times the share of the block's cells that the incident covers, so a
 stripe of four cells in a block of thirty-three moves the block mean by
 four thirty-thirds. Rasters in object storage are never touched. Their
@@ -110,6 +111,40 @@ class Incident:
         if day <= self.until:
             return 1.0
         return (self.gone - day).days / (self.gone - self.until).days
+
+
+@dataclass(frozen=True)
+class WeatherIncident:
+    """A cold spell on one farm's weather, over a span of days.
+
+    The farm's hourly air temperature is pulled down so the coldest hour
+    of each day reaches `min_temp_c` at full strength. The night takes the
+    whole drop and the warmest hour keeps `1 - day_share` of it, so the day
+    stays warmer than the night, as it does in a real cold outbreak. The
+    daily summary the trees read (minimum, maximum, mean, degree days) is
+    rebuilt from the moved hours.
+
+    Weather rows live in the tenant's own schema, keyed by its own farm,
+    so nothing here can reach another tenant's weather.
+    """
+
+    code: str
+    title: str
+    start: date
+    full: date
+    until: date
+    gone: date
+    min_temp_c: float
+    day_share: float = 0.5
+
+    def __post_init__(self) -> None:
+        if not (self.start <= self.full <= self.until < self.gone):
+            raise ValueError(f"{self.code}: dates must satisfy start <= full <= until < gone")
+        if not 0 <= self.day_share <= 1:
+            raise ValueError(f"{self.code}: day_share must be in [0, 1]")
+
+    def weight(self, day: date) -> float:
+        return Incident.weight(self, day)  # type: ignore[arg-type]
 
 
 def bounds_for(index_code: str) -> tuple[float, float]:
@@ -348,6 +383,149 @@ async def _shift_block(
     return int(getattr(result, "rowcount", 0) or 0)
 
 
+async def apply_weather_incident(
+    session: AsyncSession, farm_id: UUID, inc: WeatherIncident
+) -> dict[str, int]:
+    """Move the farm's hourly temperatures, then rebuild the daily rows."""
+    params: dict[str, Any] = {
+        "farm": farm_id,
+        "target": inc.min_temp_c,
+        "day_share": inc.day_share,
+        **_date_params(inc),  # type: ignore[arg-type]
+    }
+    moved = await session.execute(
+        text(
+            f"""
+            WITH day AS (
+                SELECT (time AT TIME ZONE 'UTC')::date AS d, provider_code,
+                       min(air_temp_c) AS tmin, max(air_temp_c) AS tmax
+                  FROM weather_observations
+                 WHERE farm_id = :farm
+                   AND time >= :start_ts AND time < :gone_ts
+                   AND air_temp_c IS NOT NULL
+                 GROUP BY 1, 2
+            ), w AS (
+                SELECT d, provider_code, tmin, tmax, {_WEIGHT_SQL} AS k FROM day
+            )
+            UPDATE weather_observations o
+               SET air_temp_c = o.air_temp_c
+                   + LEAST(0, CAST(:target AS numeric) - w.tmin) * w.k
+                     * (1 - CAST(:day_share AS numeric)
+                            * COALESCE((o.air_temp_c - w.tmin) / NULLIF(w.tmax - w.tmin, 0), 0))
+              FROM w
+             WHERE o.farm_id = :farm
+               AND (o.time AT TIME ZONE 'UTC')::date = w.d
+               AND o.provider_code = w.provider_code
+               AND o.air_temp_c IS NOT NULL
+               AND w.k > 0
+            """  # noqa: S608 - only _WEIGHT_SQL is interpolated
+        ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+        params,
+    )
+    hours = int(getattr(moved, "rowcount", 0) or 0)
+
+    # Rebuild the moved days' summaries from the hours, keeping how the
+    # derivation computes them: the mean is the hourly mean and degree days
+    # are the mean above the base.
+    old = {
+        r.date: r.gdd
+        for r in await session.execute(
+            text(
+                "SELECT date, gdd_base10 AS gdd FROM weather_derived_daily "
+                "WHERE farm_id = :farm AND date >= :start AND date < :gone"
+            ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+            params,
+        )
+    }
+    rebuilt = await session.execute(
+        text(
+            """
+            UPDATE weather_derived_daily d
+               SET temp_min_c = h.tmin, temp_max_c = h.tmax, temp_mean_c = h.tmean,
+                   gdd_base10 = GREATEST(0, h.tmean - 10),
+                   gdd_base15 = GREATEST(0, h.tmean - 15)
+              FROM (
+                    SELECT (time AT TIME ZONE 'UTC')::date AS day,
+                           round(min(air_temp_c), 2) AS tmin,
+                           round(max(air_temp_c), 2) AS tmax,
+                           round(avg(air_temp_c), 2) AS tmean
+                      FROM weather_observations
+                     WHERE farm_id = :farm
+                       AND time >= :start_ts AND time < :gone_ts
+                       AND air_temp_c IS NOT NULL
+                     GROUP BY 1
+                   ) h
+             WHERE d.farm_id = :farm AND d.date = h.day
+            RETURNING d.date, d.gdd_base10
+            """
+        ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+        params,
+    )
+    delta = {r.date: (r.gdd_base10 or 0) - (old.get(r.date) or 0) for r in rebuilt}
+
+    # The season's running total drops by what the cold days lost, from the
+    # first moved day until the total resets for a new season.
+    seasonal = 0
+    if delta:
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT date, gdd_cumulative_base10_season AS cum "
+                    "FROM weather_derived_daily WHERE farm_id = :farm AND date >= :start "
+                    "ORDER BY date"
+                ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                params,
+            )
+        ).all()
+        running = 0
+        previous = None
+        for row in rows:
+            if previous is not None and row.cum is not None and row.cum < previous:
+                break  # a new season starts from zero
+            previous = row.cum
+            running += delta.get(row.date, 0)
+            if running and row.cum is not None:
+                await session.execute(
+                    text(
+                        "UPDATE weather_derived_daily "
+                        "SET gdd_cumulative_base10_season = GREATEST(0, CAST(:v AS numeric)) "
+                        "WHERE farm_id = :farm AND date = :d"
+                    ).bindparams(bindparam("farm", type_=PG_UUID(as_uuid=True))),
+                    {"v": row.cum + running, "farm": farm_id, "d": row.date},
+                )
+                seasonal += 1
+
+    counts = {"weather_hours": hours, "weather_days": len(delta), "season_rows": seasonal}
+    await _audit(session, farm_id, inc, counts)
+    _log.info("demo_history_weather_incident_applied", code=inc.code, **counts)
+    return counts
+
+
+async def _audit(
+    session: AsyncSession, farm_id: UUID, inc: Incident | WeatherIncident, counts: dict[str, int]
+) -> None:
+    await session.execute(
+        text(
+            """
+            INSERT INTO audit_events
+                (time, id, event_type, actor_user_id, actor_kind, subject_kind,
+                 subject_id, farm_id, details)
+            VALUES (clock_timestamp(), :id, :ev, NULL, 'system', 'farm',
+                    :farm, :farm, CAST(:details AS jsonb))
+            """
+        ).bindparams(
+            bindparam("id", type_=PG_UUID(as_uuid=True)),
+            bindparam("farm", type_=PG_UUID(as_uuid=True)),
+        ),
+        {
+            "id": uuid4(),
+            "ev": AUDIT_EVENT,
+            "farm": farm_id,
+            "details": _details_json(inc, counts),
+        },
+    )
+
+
 async def already_applied(session: AsyncSession, farm_id: UUID) -> set[str]:
     rows = await session.execute(
         text(
@@ -375,42 +553,30 @@ async def apply_incident(session: AsyncSession, farm_id: UUID, inc: Incident) ->
             if cells:
                 counts["cell_rows"] += await _shift_cells(session, inc, block_id, cells, shift)
             counts["block_rows"] += await _shift_block(session, inc, block_id, share, shift)
-    await session.execute(
-        text(
-            """
-            INSERT INTO audit_events
-                (time, id, event_type, actor_user_id, actor_kind, subject_kind,
-                 subject_id, farm_id, details)
-            VALUES (clock_timestamp(), :id, :ev, NULL, 'system', 'farm',
-                    :farm, :farm, CAST(:details AS jsonb))
-            """
-        ).bindparams(
-            bindparam("id", type_=PG_UUID(as_uuid=True)),
-            bindparam("farm", type_=PG_UUID(as_uuid=True)),
-        ),
-        {
-            "id": uuid4(),
-            "ev": AUDIT_EVENT,
-            "farm": farm_id,
-            "details": _details_json(inc, counts),
-        },
-    )
+    await _audit(session, farm_id, inc, counts)
     _log.info("demo_history_incident_applied", code=inc.code, **counts)
     return counts
 
 
-def _details_json(inc: Incident, counts: dict[str, int]) -> str:
+def _details_json(inc: Incident | WeatherIncident, counts: dict[str, int]) -> str:
+    what: dict[str, Any]
+    if isinstance(inc, WeatherIncident):
+        what = {"weather": {"min_temp_c": inc.min_temp_c, "day_share": inc.day_share}}
+    else:
+        what = {
+            "blocks": list(inc.blocks),
+            "cells": inc.cells,
+            "shifts": {s.index_code: [s.mode, s.value] for s in inc.shifts},
+        }
     return json.dumps(
         {
             "code": inc.code,
             "title": inc.title,
-            "blocks": list(inc.blocks),
-            "cells": inc.cells,
+            **what,
             "start": inc.start.isoformat(),
             "full": inc.full.isoformat(),
             "until": inc.until.isoformat(),
             "gone": inc.gone.isoformat(),
-            "shifts": {s.index_code: [s.mode, s.value] for s in inc.shifts},
             **counts,
         }
     )
@@ -421,7 +587,8 @@ async def apply_scenario(
 ) -> list[dict[str, Any]]:
     """Apply every incident of `scenario` that has not been applied yet.
 
-    `scenario` is a module with `FARM_CODE` and `INCIDENTS`. Each incident
+    `scenario` is a module with `FARM_CODE` and `INCIDENTS`, and optionally
+    `WEATHER_INCIDENTS`. Each incident
     commits on its own with its audit row, so a failure part way leaves the
     earlier ones applied and a second call applies only what is left.
     Returns one entry per incident: its code, whether it was skipped, and
@@ -441,14 +608,18 @@ async def apply_scenario(
         done = await already_applied(session, farm_id)
 
     results: list[dict[str, Any]] = []
-    for inc in scenario.INCIDENTS:
+    weather = tuple(getattr(scenario, "WEATHER_INCIDENTS", ()))
+    for inc in (*scenario.INCIDENTS, *weather):
         if inc.code in done:
             results.append({"code": inc.code, "skipped": True})
             continue
         async with session_factory() as session:
             await session.begin()
             await session.execute(text(f"SET LOCAL search_path TO {safe}, public"))
-            counts = await apply_incident(session, farm_id, inc)
+            if isinstance(inc, WeatherIncident):
+                counts = await apply_weather_incident(session, farm_id, inc)
+            else:
+                counts = await apply_incident(session, farm_id, inc)
             if dry_run:
                 await session.rollback()
             else:
