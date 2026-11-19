@@ -131,3 +131,76 @@ def test_custom_key_without_prefix_gets_one() -> None:
         custom_activities=[{"key": "abc", "activity_type": "pruning", "title": "X", "week": 1}]
     )
     assert any(a.activity_key == "custom:abc" for a in acts)
+
+
+# ---- Repeating tasks (public 0115): each time is its own task ----------------
+
+
+def test_occurrence_offsets_spacing() -> None:
+    from app.modules.plan_templates.allocation import occurrence_offsets
+
+    # Once.
+    assert occurrence_offsets(56, None, None) == [0]
+    # 2x a week over 4 weeks: every 3-4 days, 8 times.
+    assert occurrence_offsets(28, 2, "week") == [0, 3, 7, 10, 14, 17, 21, 24]
+    # Daily for a week.
+    assert occurrence_offsets(7, 7, "week") == [0, 1, 2, 3, 4, 5, 6]
+    # Monthly over a year: 12 times, about a month apart.
+    monthly = occurrence_offsets(365, 1, "month")
+    assert len(monthly) == 12
+    assert monthly[1] == 30
+    assert monthly[-1] == 334
+    # Twice a month over 91 days.
+    assert occurrence_offsets(91, 2, "month") == [0, 15, 30, 45, 60, 76]
+    # 2 times in the season, spread over the window.
+    assert occurrence_offsets(35, 2, "season") == [0, 17]
+    # A window shorter than the spacing still gets its first time.
+    assert occurrence_offsets(5, 1, "month") == [0]
+
+
+def test_a_repeating_task_is_scheduled_once_per_time() -> None:
+    manual = [
+        _act("irrigation-1", "irrigation", duration_days=21, repeat_count=1, repeat_unit="week"),
+        _act("pruning-1", "pruning", duration_days=21),
+    ]
+    acts, _ = _resolve(activities=manual)
+    irrigation = [a for a in acts if a.activity_code == "irrigation-1"]
+    assert [a.activity_key for a in irrigation] == [
+        "irrigation-1",
+        "irrigation-1#2",
+        "irrigation-1#3",
+    ]
+    assert [a.scheduled_date for a in irrigation] == [
+        date(2026, 1, 1),
+        date(2026, 1, 8),
+        date(2026, 1, 15),
+    ]
+    assert [(a.occurrence, a.occurrences) for a in irrigation] == [(1, 3), (2, 3), (3, 3)]
+    # Each time is a one-day job; a task done once keeps its window.
+    assert {a.duration_days for a in irrigation} == {1}
+    (pruning,) = (a for a in acts if a.activity_code == "pruning-1")
+    assert (pruning.activity_key, pruning.duration_days, pruning.occurrences) == (
+        "pruning-1",
+        21,
+        1,
+    )
+
+
+def test_each_time_moves_alone_and_edits_apply_to_every_time() -> None:
+    manual = [
+        _act("irrigation-1", "irrigation", duration_days=21, repeat_count=1, repeat_unit="week")
+    ]
+    acts, _ = _resolve(
+        activities=manual,
+        overrides={"irrigation-1#2": "2026-01-10"},
+        activity_edits={"irrigation-1": {"notes": "Drip only"}},
+    )
+    by_key = {a.activity_key: a for a in acts}
+    assert by_key["irrigation-1#2"].scheduled_date == date(2026, 1, 10)
+    assert by_key["irrigation-1#2"].date_overridden is True
+    assert by_key["irrigation-1#2"].default_date == date(2026, 1, 8)
+    assert by_key["irrigation-1"].date_overridden is False
+    assert {a.notes for a in acts} == {"Drip only"}
+    # Leaving the task out leaves out every time.
+    none, _ = _resolve(activities=manual, excluded_codes={"irrigation-1"})
+    assert none == []

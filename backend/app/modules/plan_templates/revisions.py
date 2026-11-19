@@ -28,6 +28,8 @@ SNAPSHOT_FIELDS = (
     "notes_ar",
     "evidence_tier",
     "source_tree_code",
+    "repeat_count",
+    "repeat_unit",
 )
 
 

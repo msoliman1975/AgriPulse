@@ -179,6 +179,9 @@ describe("ManualEditorPage", () => {
     fireEvent.change(within(flowering).getByLabelText("Product (Arabic)"), {
       target: { value: "أسيتاميبريد" },
     });
+    // How often: twice a week inside the window (public 0115).
+    fireEvent.change(within(flowering).getByLabelText("Repeat"), { target: { value: "week" } });
+    fireEvent.change(within(flowering).getByLabelText("Times"), { target: { value: "2" } });
     fireEvent.click(save);
 
     await waitFor(() => expect(api.updatePlanTemplate).toHaveBeenCalled());
@@ -190,6 +193,8 @@ describe("ManualEditorPage", () => {
       product_name_ar: "أسيتاميبريد",
       stage_code: "flowering",
       offset_days: 7,
+      repeat_count: 2,
+      repeat_unit: "week",
     });
   });
 

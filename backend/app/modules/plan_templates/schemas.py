@@ -37,6 +37,10 @@ DoseUnit = Literal[
 TemplateStatus = Literal["draft", "published", "archived"]
 ActivityAnchor = Literal["start", "milestone", "stage"]
 EvidenceTier = Literal["eg_fao", "eg", "generic", "manual"]
+# How often a manual task repeats inside its window (public 0115).
+RepeatUnit = Literal["week", "month", "season"]
+# 7 a week is daily; a higher count would schedule several visits a day.
+MAX_REPEAT_COUNT = 31
 ACTIVITY_CODE_PATTERN = r"^[a-z0-9][a-z0-9_-]{0,63}$"
 
 
@@ -76,6 +80,8 @@ class PlanTemplateActivityResponse(BaseModel):
     notes_ar: str | None = None
     evidence_tier: EvidenceTier | None = None
     source_tree_code: str | None = None
+    repeat_count: int | None = None
+    repeat_unit: RepeatUnit | None = None
     start_time: time | None = None
     sort_order: int = 0
 
@@ -182,8 +188,18 @@ class PlanTemplateActivityInput(BaseModel):
     notes_ar: str | None = None
     evidence_tier: EvidenceTier | None = None
     source_tree_code: str | None = Field(default=None, max_length=128)
+    # How often the task repeats inside its window: repeat_count times per
+    # repeat_unit. Both empty: once. A saved plan schedules each occurrence.
+    repeat_count: int | None = Field(default=None, ge=1, le=MAX_REPEAT_COUNT)
+    repeat_unit: RepeatUnit | None = None
     start_time: time | None = None
     sort_order: int = 0
+
+    @model_validator(mode="after")
+    def _repeat_shape(self) -> Self:
+        if (self.repeat_count is None) != (self.repeat_unit is None):
+            raise ValueError("a repeat needs both a count and a unit")
+        return self
 
     @model_validator(mode="after")
     def _dose_shape(self) -> Self:
@@ -323,6 +339,14 @@ class AllocatedActivityPreview(BaseModel):
     product_name: str | None = None
     dosage: str | None = None
     notes: str | None = None
+    # A repeating manual task is scheduled once per time (public 0115): this
+    # is time `occurrence` of `occurrences`, keyed "<code>#<n>" from the
+    # second on. A task done once has 1 of 1.
+    activity_code: str | None = None
+    occurrence: int = 1
+    occurrences: int = 1
+    repeat_count: int | None = None
+    repeat_unit: str | None = None
 
 
 class AllocationBlockSchedule(BaseModel):

@@ -78,6 +78,8 @@ def _activity_dict(a: PlanTemplateActivity) -> dict[str, Any]:
         "notes_ar": a.notes_ar,
         "evidence_tier": a.evidence_tier,
         "source_tree_code": a.source_tree_code,
+        "repeat_count": a.repeat_count,
+        "repeat_unit": a.repeat_unit,
         "start_time": a.start_time,
         "sort_order": a.sort_order,
     }
@@ -103,6 +105,8 @@ _ACTIVITY_CONTENT_FIELDS = (
     "notes_ar",
     "evidence_tier",
     "source_tree_code",
+    "repeat_count",
+    "repeat_unit",
     "start_time",
     "sort_order",
 )

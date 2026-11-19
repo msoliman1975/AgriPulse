@@ -6,14 +6,18 @@
   "catalog": {
     "crop": "Crop",
     "manual": "Operation manual",
-    "variety": "Show weeks for",
+    "variety": "Variety",
     "cropCalendar": "Crop calendar (no variety)",
     "published": "Published",
     "cycle": "{{weeks}}-week cycle",
     "activities_one": "{{count}} activity",
     "activities_other": "{{count}} activities",
     "readOnly": "Written by the AgriPulse agronomy team. You can change any of it for your own plan without changing the manual.",
-    "empty": "No operation manual is published for your crops yet. The agronomy team adds manuals crop by crop."
+    "empty": "No operation manual is published for your crops yet. The agronomy team adds manuals crop by crop.",
+    "allVarieties": "All varieties",
+    "forVariety": "For {{variety}}",
+    "allVarietiesCovered": "All varieties",
+    "showWeeksFor": "Show weeks for"
   },
   "manual": {
     "noActivities": "This manual has no activities yet.",
@@ -33,7 +37,13 @@
     "notes": "Notes",
     "source": "Source",
     "sourceManual": "Operation manual",
-    "sourceTree": "Decision tree {{code}}"
+    "sourceTree": "Decision tree {{code}}",
+    "weekSpan": "Wk {{from}}–{{to}}",
+    "repeat": {
+      "week": "{{count}}× a week",
+      "month": "{{count}}× a month",
+      "season": "{{count}} times in the window"
+    }
   },
   "evidence": {
     "eg_fao": "FAO Egypt",
@@ -135,18 +145,21 @@
       "summary_other": "{{count}} activities across {{blocks}} blocks",
       "empty": "Nothing to schedule.",
       "starts": "Starts {{date}}",
-      "hint": "Drag a bar, or select it and use the arrow keys or type a date. A dot marks a moved date; it stays moved when you edit the plan later.",
-      "readOnlyHint": "Dates as they will be applied.",
-      "barLabel": "{{title}}, {{date}} {{moved}}",
+      "hint": "Every week of the plan with all its tasks. A task that repeats appears once for each time, in the week the manual recommends; set its exact day with the date field. A moved task keeps its date when you edit the plan later.",
+      "readOnlyHint": "Dates as they will be applied, week by week.",
       "moved": "(moved)",
-      "selected": "{{title}} on {{block}}",
-      "defaultDay": "Manual date: {{date}}",
-      "date": "Date",
+      "defaultDay": "manual date {{date}}",
       "reset": "Back to the manual date",
-      "close": "Close",
       "rejected": "Some blocks no longer grow this crop and variety. Go back and remove them.",
       "previewFailed": "Couldn't work out the dates.",
-      "saveFailed": "Couldn't save the plan."
+      "saveFailed": "Couldn't save the plan.",
+      "week": "Week {{n}}",
+      "weekRange": "{{from}} – {{to}}",
+      "noTasks": "No tasks",
+      "weekTasks_one": "{{count}} task",
+      "weekTasks_other": "{{count}} tasks",
+      "occurrence": "time {{n}} of {{total}}",
+      "dateFor": "Date for {{title}}"
     },
     "done": {
       "applied": "Plan applied",
@@ -244,6 +257,15 @@
     "firstPublish": "First publish: there is no earlier version to compare.",
     "noChanges": "No activity changes since the last publish.",
     "farmsWillSee": "Those farms will see what changed on their plan and can update it.",
-    "confirmPublish": "Publish"
+    "confirmPublish": "Publish",
+    "repeat": "How often",
+    "repeatUnit": "Repeat",
+    "repeatCount": "Times",
+    "repeatOnce": "Once",
+    "repeatPer": {
+      "week": "Times a week",
+      "month": "Times a month",
+      "season": "Times in the window"
+    }
   }
 }

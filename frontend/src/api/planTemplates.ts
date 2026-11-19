@@ -62,7 +62,15 @@ export interface ManualActivityContent {
   notes_ar?: string | null;
   evidence_tier?: EvidenceTier | null;
   source_tree_code?: string | null;
+  /** How often the task repeats inside its window: `repeat_count` times per
+   *  `repeat_unit`. Both empty: once. A saved plan schedules each time. */
+  repeat_count?: number | null;
+  repeat_unit?: RepeatUnit | null;
 }
+
+/** public 0115. */
+export const REPEAT_UNITS = ["week", "month", "season"] as const;
+export type RepeatUnit = (typeof REPEAT_UNITS)[number];
 
 export interface PlanTemplateActivity extends ManualActivityContent {
   id: string;

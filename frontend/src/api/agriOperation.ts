@@ -187,6 +187,13 @@ export interface AllocatedActivityPreview {
   product_name: string | null;
   dosage: string | null;
   notes: string | null;
+  /** A repeating manual task is scheduled once per time: this is time
+   *  `occurrence` of `occurrences`. Optional: older api builds omit them. */
+  activity_code?: string | null;
+  occurrence?: number;
+  occurrences?: number;
+  repeat_count?: number | null;
+  repeat_unit?: string | null;
 }
 
 export interface AllocationBlockSchedule {

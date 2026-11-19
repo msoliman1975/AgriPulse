@@ -13,7 +13,13 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import type { PhenologyStage } from "@/api/agriOperation";
 import { listInputs } from "@/api/inputs";
-import { ACTIVITY_TYPES, type EvidenceTier, type PlanActivityType } from "@/api/planTemplates";
+import {
+  ACTIVITY_TYPES,
+  REPEAT_UNITS,
+  type EvidenceTier,
+  type PlanActivityType,
+  type RepeatUnit,
+} from "@/api/planTemplates";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Page } from "@/components/Page";
@@ -328,7 +334,7 @@ export function ManualEditorPage(): ReactNode {
 
       {varieties.length > 1 ? (
         <label className={clsx(LABEL, "w-fit")}>
-          {t("catalog.variety")}
+          {t("catalog.showWeeksFor")}
           <select
             className={clsx(INPUT, "min-w-48")}
             value={variety?.path ?? ""}
@@ -834,6 +840,47 @@ function ActivityEditorRow({
               }
             />
           </label>
+          {/* How often the task repeats inside its window (public 0115). A
+              saved plan puts each time on the board as its own task. */}
+          <div className={LABEL}>
+            {t("editor.repeat")}
+            <div className="flex gap-2">
+              <select
+                className={INPUT}
+                aria-label={t("editor.repeatUnit")}
+                value={a.repeat_unit ?? ""}
+                onChange={(e) => {
+                  const unit = (e.target.value || null) as RepeatUnit | null;
+                  onChange({
+                    repeat_unit: unit,
+                    repeat_count: unit ? (a.repeat_count ?? 1) : null,
+                  });
+                }}
+              >
+                <option value="">{t("editor.repeatOnce")}</option>
+                {REPEAT_UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    {t(`editor.repeatPer.${u}`)}
+                  </option>
+                ))}
+              </select>
+              {a.repeat_unit ? (
+                <input
+                  className={clsx(INPUT, "w-16")}
+                  type="number"
+                  min={1}
+                  max={31}
+                  aria-label={t("editor.repeatCount")}
+                  value={a.repeat_count ?? 1}
+                  onChange={(e) =>
+                    onChange({
+                      repeat_count: Math.min(31, Math.max(1, Number(e.target.value) || 1)),
+                    })
+                  }
+                />
+              ) : null}
+            </div>
+          </div>
           <div className="sm:col-span-2 lg:col-span-4">
             <ActivityInputFields row={a} inputs={inputs} onChange={(patch) => onChange(patch)} />
           </div>

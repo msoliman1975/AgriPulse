@@ -24,7 +24,14 @@ vi.mock("@/api/agriOperation", async (importOriginal) => ({
 }));
 vi.mock("@/api/crops", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  listCrops: vi.fn(async () => [{ code: "mango", name_en: "Mango", name_ar: "مانجو" }]),
+  listCrops: vi.fn(async () => [
+    { id: "c-mango", code: "mango", name_en: "Mango", name_ar: "مانجو" },
+  ]),
+  listCropVarieties: vi.fn(async () => [
+    { id: "v-alph", path: "mango.alphonso", name_en: "Alphonso", name_ar: null, is_active: true },
+    { id: "v-keitt", path: "mango.keitt", name_en: "Keitt", name_ar: null, is_active: true },
+    { id: "v-zebda", path: "mango.zebda", name_en: "Zebda", name_ar: null, is_active: true },
+  ]),
 }));
 
 const summary = {
@@ -132,7 +139,7 @@ describe("AgriOperationPage catalog", () => {
 
     expect(await screen.findByRole("heading", { name: "Mango — Keitt (Egypt)" })).toBeTruthy();
     expect(api.getFarmManual).toHaveBeenCalledWith("f1", "t-keitt");
-    expect(screen.getByText("52-week cycle · EG · 2 activities")).toBeTruthy();
+    expect(screen.getByText("52-week cycle · EG · 2 activities · For Keitt")).toBeTruthy();
 
     const pre = screen.getByRole("heading", { name: "Pre-flowering" }).closest("section")!;
     expect(within(pre).getByText("PBZ treatment for flowering induction")).toBeTruthy();
@@ -164,5 +171,36 @@ describe("AgriOperationPage catalog", () => {
     renderPage();
     expect(await screen.findByText(/No operation manual is published/)).toBeTruthy();
     expect(api.getFarmManual).not.toHaveBeenCalled();
+  });
+
+  it("filters the manuals by variety", async () => {
+    const alphonso = {
+      ...summary,
+      id: "t-alph",
+      code: "mango-alphonso-eg",
+      name: "Mango — Alphonso (Egypt)",
+      crop_path: "mango.alphonso",
+    };
+    api.listManualCatalog.mockResolvedValue([summary, alphonso]);
+    api.getFarmManual.mockResolvedValue(manual);
+    renderPage();
+
+    const variety = await screen.findByRole<HTMLSelectElement>("combobox", { name: "Variety" });
+    // Only varieties a manual covers are offered (no crop-level manual here).
+    await waitFor(() =>
+      expect([...variety.options].map((o) => o.text)).toEqual([
+        "All varieties",
+        "Alphonso",
+        "Keitt",
+      ]),
+    );
+    const manualSelect = screen.getByRole<HTMLSelectElement>("combobox", {
+      name: "Operation manual",
+    });
+    expect(manualSelect.options).toHaveLength(2);
+
+    fireEvent.change(variety, { target: { value: "mango.alphonso" } });
+    await waitFor(() => expect(api.getFarmManual).toHaveBeenLastCalledWith("f1", "t-alph"));
+    expect([...manualSelect.options].map((o) => o.text)).toEqual(["Mango — Alphonso (Egypt)"]);
   });
 });

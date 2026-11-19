@@ -175,6 +175,10 @@ class PlanTemplateActivity(Base, TimestampedMixin):
     evidence_tier: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Decision tree that covers the same work (E2, F1).
     source_tree_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # How often the task repeats inside its window (public 0115): repeat_count
+    # times per repeat_unit (week | month | season). Both null: done once.
+    repeat_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    repeat_unit: Mapped[str | None] = mapped_column(Text, nullable=True)
     start_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
 
