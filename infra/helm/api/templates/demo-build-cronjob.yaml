@@ -54,7 +54,14 @@ spec:
             kubernetes.io/arch: amd64
           containers:
             - name: demo-build
-              image: {{ include "agripulse-api.imageRef" . | quote }}
+              {{- /* `imageTag` pins the job alone to a build, so demo code can
+                     run before the api itself is promoted. Empty follows the
+                     api image. */}}
+              {{- $image := include "agripulse-api.imageRef" . }}
+              {{- with .Values.demoBuildJob.imageTag }}
+              {{- $image = printf "%s:%s" $.Values.image.repository . }}
+              {{- end }}
+              image: {{ $image | quote }}
               imagePullPolicy: {{ .Values.image.pullPolicy }}
               workingDir: /app
               command:
