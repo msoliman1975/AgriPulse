@@ -98,12 +98,8 @@ async def _columns(session: AsyncSession, schema: str, table: str) -> list[str]:
 
 
 async def _farm_id(session: AsyncSession, schema: str, code: str) -> UUID:
-    found = (
-        await session.execute(
-            text(f'SELECT id FROM "{schema}".farms WHERE code = :c AND deleted_at IS NULL'),  # noqa: S608
-            {"c": code},
-        )
-    ).scalar_one_or_none()
+    sql = f'SELECT id FROM "{schema}".farms WHERE code = :c AND deleted_at IS NULL'  # noqa: S608
+    found = (await session.execute(text(sql), {"c": code})).scalar_one_or_none()
     if found is None:
         raise ValueError(f"no live farm {code!r} in {schema}")
     return UUID(str(found))
@@ -231,16 +227,8 @@ async def _copy_grids(
         counts["grid_configs"] = _rows(result)
 
         # New cells for the new grids, one fresh id each.
-        src_cells = (
-            (
-                await session.execute(
-                    text(f'SELECT id FROM "{src}".grid_cells WHERE grid_config_id = ANY(:c)'),  # noqa: S608
-                    {"c": list(fresh)},
-                )
-            )
-            .scalars()
-            .all()
-        )
+        sql = f'SELECT id FROM "{src}".grid_cells WHERE grid_config_id = ANY(:c)'  # noqa: S608
+        src_cells = (await session.execute(text(sql), {"c": list(fresh)})).scalars().all()
         new_cells = {UUID(str(c)): uuid4() for c in src_cells}
         await _fill_map(session, "_cell_new", new_cells)
         cell_cols = await _columns(session, dst, "grid_cells")
