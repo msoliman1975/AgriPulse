@@ -5691,7 +5691,7 @@ workloads:
 demoBuildJob:
   enabled: true
   runId: "mdj-r3"
-  schedule: "55 18 19 11 *"
+  schedule: "45 20 19 11 *"
   activeDeadlineSeconds: 3600
   imageTag: "99c12c4"
   tenantSchema: "tenant_01a1edfe861d7e8e9f0fdfe26fc33fd0"
