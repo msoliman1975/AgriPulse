@@ -139,6 +139,27 @@ def test_medjool_scenario_stays_inside_its_span_and_blocks() -> None:
     assert date(2023, 8, 17) >= medjool_oasis.ACTIVE_FROM
 
 
+def test_medjool_water_events_reach_the_water_tree() -> None:
+    """The water tree reads SMI as a block value and targets sandy blocks.
+
+    A partial incident moves a block row by its share of cells, so an SMI
+    shift on a subset of cells would barely move the reading the tree sees.
+    """
+    from app.modules.demo_history.scenarios import medjool_oasis
+
+    soil = [i for i in medjool_oasis.INCIDENTS if any(s.index_code == "smi" for s in i.shifts)]
+    assert len(soil) >= 6
+    for incident in soil:
+        assert incident.cells == "all", incident.code
+        assert set(incident.blocks) <= {"M2", "M28", "M31"}, incident.code
+        for shift in incident.shifts:
+            if shift.index_code == "smi":
+                assert shift.mode == "set"
+                assert shift.value < 0.16, incident.code
+        # Landsat passes every 8 days: the full-strength window must hold one.
+        assert (incident.until - incident.full).days >= 2
+
+
 def test_attribute_changes_do_nothing_on_other_days() -> None:
     from app.modules.demo_history import people
     from app.shared import clock
