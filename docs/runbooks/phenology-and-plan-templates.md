@@ -97,14 +97,18 @@ Capabilities `plan_template.read`, `plan_allocation.read` and
    a manual. Each stage is laid out week by week (Week 1, Week 2 …, no dates),
    each week with every task active in it: a repeating task with its count
    that week, a task done once over several weeks in each of them as "once in
-   weeks a–b (Recommended)".
+   weeks a–b (Recommended)". A manual timed from the start date only (the Medjool
+   new planting) is laid out by year instead, with Week 1 the week of its
+   first task (planting can fall later, e.g. Week 9).
 2. The **Plan** tab lists saved plans. **New plan** runs four steps: blocks;
    operations (leave out, edit product/dosage/notes, add your own); season
    and start date; the calendar (preview), grouped by growth stage (the
    stage dates of the first block, from the preview's `stages`), every week
    with its dates and all its tasks, a repeating task once per time with a
    date field for the exact day. A task whose window covers a week with no
-   time in it is listed there too, muted and without a date field. **Save** applies it to the board.
+   time in it is listed there too, muted and without a date field. Week 1
+   is the week of the plan's first task, even when that comes before the
+   start date. **Save** applies it to the board.
 3. Editing a saved plan and saving again regenerates its still-scheduled
    activities; completed and in-progress ones are kept, and dates moved on
    the board are remembered (`date_overrides`).

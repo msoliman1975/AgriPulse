@@ -53,7 +53,7 @@ export function ManualView({ manual, varietyPath }: ManualViewProps): ReactNode 
 
   return (
     <div className="flex flex-col gap-4">
-      {layout.windows.length > 0 ? (
+      {plan.mode === "stages" && layout.windows.length > 0 ? (
         <StageRibbon
           layout={layout.windows}
           total={layout.totalWeeks}
@@ -62,23 +62,27 @@ export function ManualView({ manual, varietyPath }: ManualViewProps): ReactNode 
         />
       ) : null}
 
-      <div className="flex flex-wrap gap-2" role="group" aria-label={t("manual.filterStages")}>
-        <FilterButton active={stageFilter === null} onClick={() => setStageFilter(null)}>
-          {t("manual.allStages")}
-        </FilterButton>
-        {plan.groups
-          .flatMap((g) => (g.window ? [g.window] : []))
-          .map((w) => (
-            <FilterButton
-              key={w.code}
-              active={stageFilter === w.code}
-              onClick={() => setStageFilter(w.code)}
-            >
-              <span className={clsx("inline-block h-2.5 w-2.5 rounded-sm", colorOf(w.code))} />
-              {stageName(w.stage, lang)}
-            </FilterButton>
-          ))}
-      </div>
+      {plan.mode === "start" ? (
+        <p className="text-xs text-ap-muted">{t("manual.fromFirstTaskHint")}</p>
+      ) : (
+        <div className="flex flex-wrap gap-2" role="group" aria-label={t("manual.filterStages")}>
+          <FilterButton active={stageFilter === null} onClick={() => setStageFilter(null)}>
+            {t("manual.allStages")}
+          </FilterButton>
+          {plan.groups
+            .flatMap((g) => (g.window ? [g.window] : []))
+            .map((w) => (
+              <FilterButton
+                key={w.code}
+                active={stageFilter === w.code}
+                onClick={() => setStageFilter(w.code)}
+              >
+                <span className={clsx("inline-block h-2.5 w-2.5 rounded-sm", colorOf(w.code))} />
+                {stageName(w.stage, lang)}
+              </FilterButton>
+            ))}
+        </div>
+      )}
 
       {plan.groups
         .filter((g) => (g.window ? visible(g.window.code) : stageFilter === null))
@@ -89,7 +93,7 @@ export function ManualView({ manual, varietyPath }: ManualViewProps): ReactNode 
           return (
             <Card
               as="section"
-              key={w?.code ?? "other-weeks"}
+              key={w?.code ?? (g.year ? `year-${g.year}` : "other-weeks")}
               noPadding
               title={
                 w ? (
@@ -97,6 +101,8 @@ export function ManualView({ manual, varietyPath }: ManualViewProps): ReactNode 
                     <span className={clsx("h-4 w-1.5 rounded-sm", colorOf(w.code))} aria-hidden />
                     {stageName(w.stage, lang)}
                   </span>
+                ) : g.year ? (
+                  t("manual.yearN", { n: g.year })
                 ) : (
                   t("manual.otherWeeks")
                 )
