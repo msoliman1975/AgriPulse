@@ -132,7 +132,7 @@ describe("AgriOperationPage catalog", () => {
     api.getFarmManual.mockReset();
   });
 
-  it("opens the first manual and lists its activities by stage", async () => {
+  it("opens the first manual and lists its activities by stage and week", async () => {
     api.listManualCatalog.mockResolvedValue([summary]);
     api.getFarmManual.mockResolvedValue(manual);
     renderPage();
@@ -142,11 +142,13 @@ describe("AgriOperationPage catalog", () => {
     expect(screen.getByText("52-week cycle · EG · 2 activities · For Keitt")).toBeTruthy();
 
     const pre = screen.getByRole("heading", { name: "Pre-flowering" }).closest("section")!;
-    expect(within(pre).getByText("PBZ treatment for flowering induction")).toBeTruthy();
-    expect(within(pre).getByText("Wk 1")).toBeTruthy();
+    // Stage -> Week N (no dates) -> the tasks of that week.
+    const week1 = within(pre).getByRole("heading", { name: "Week 1" }).closest("li")!;
+    expect(within(week1).getByText("PBZ treatment for flowering induction")).toBeTruthy();
     const flowering = screen.getByRole("heading", { name: "Flowering" }).closest("section")!;
-    expect(within(flowering).getByText("Wk 10")).toBeTruthy();
-    expect(within(flowering).getByText("Flowering +7 days")).toBeTruthy();
+    const week10 = within(flowering).getByRole("heading", { name: "Week 10" }).closest("li")!;
+    expect(within(week10).getByText("Spray against mango leafhopper")).toBeTruthy();
+    expect(within(week10).getByText("Flowering +7 days")).toBeTruthy();
 
     // The stage filter narrows to one stage.
     fireEvent.click(screen.getByRole("button", { name: /Flowering/ }));

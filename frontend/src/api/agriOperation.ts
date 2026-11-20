@@ -194,6 +194,18 @@ export interface AllocatedActivityPreview {
   occurrences?: number;
   repeat_count?: number | null;
   repeat_unit?: string | null;
+  /** The window the manual gives the task (first and last day). */
+  window_start?: string | null;
+  window_end?: string | null;
+}
+
+/** A stage of one block as dates, so the calendar step can group weeks. */
+export interface BlockStageDates {
+  code: string;
+  name_en: string | null;
+  name_ar: string | null;
+  start_date: string;
+  end_date: string;
 }
 
 export interface AllocationBlockSchedule {
@@ -203,6 +215,8 @@ export interface AllocationBlockSchedule {
   start_date: string;
   activities: AllocatedActivityPreview[];
   skipped: Record<string, unknown>[];
+  /** Optional: older api builds omit it. */
+  stages?: BlockStageDates[];
 }
 
 export interface RejectedBlock {

@@ -38,12 +38,20 @@
     "source": "Source",
     "sourceManual": "Operation manual",
     "sourceTree": "Decision tree {{code}}",
-    "weekSpan": "Wk {{from}}–{{to}}",
     "repeat": {
       "week": "{{count}}× a week",
       "month": "{{count}}× a month",
       "season": "{{count}} times in the window"
-    }
+    },
+    "weekN": "Week {{n}}",
+    "otherWeeks": "Other weeks",
+    "noTasksThisWeek": "No tasks",
+    "weekTasks_one": "{{count}} task",
+    "weekTasks_other": "{{count}} tasks",
+    "timesThisWeek_one": "Once this week",
+    "timesThisWeek_other": "{{count}}× this week",
+    "notThisWeek": "Not this week ({{rate}})",
+    "onceInWeeks": "Once in weeks {{from}}–{{to}} (Recommended)"
   },
   "evidence": {
     "eg_fao": "FAO Egypt",
@@ -159,7 +167,12 @@
       "weekTasks_one": "{{count}} task",
       "weekTasks_other": "{{count}} tasks",
       "occurrence": "time {{n}} of {{total}}",
-      "dateFor": "Date for {{title}}"
+      "dateFor": "Date for {{title}}",
+      "otherWeeks": "Other weeks",
+      "stageWeeks": "Weeks {{from}} – {{to}}",
+      "onceInWeeks": "Once in weeks {{from}}–{{to}} (Recommended)",
+      "nextOn": "next on {{date}}",
+      "plannedOn": "planned for {{date}}"
     },
     "done": {
       "applied": "Plan applied",

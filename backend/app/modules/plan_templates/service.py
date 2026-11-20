@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
 from app.modules.audit import AuditService, get_audit_service
-from app.modules.plan_templates.allocation import resolve_allocation
+from app.modules.plan_templates.allocation import resolve_allocation, stage_dates
 from app.modules.plan_templates.apply import format_dose
 from app.modules.plan_templates.arabic import missing_manual_arabic
 from app.modules.plan_templates.errors import (
@@ -329,6 +329,14 @@ class PlanTemplatesService:
                     "start_date": blk.start_date,
                     "activities": activities,
                     "skipped": skipped,
+                    # Each stage's dates for this block, so the calendar step
+                    # can group its weeks by stage.
+                    "stages": stage_dates(
+                        stages,
+                        is_perennial=is_perennial,
+                        planting_date=bc["planting_date"],
+                        season_year=payload.season_year,
+                    ),
                 }
             )
         return {

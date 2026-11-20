@@ -62,6 +62,10 @@ class AllocatedActivity:
     occurrences: int = 1
     repeat_count: int | None = None
     repeat_unit: str | None = None
+    # The window the manual gives the task (first day, last day): a task done
+    # once can fall on any day in it; a repeating one has its times inside it.
+    window_start: date | None = None
+    window_end: date | None = None
 
 
 # Days a repeat unit spans. A month is the mean calendar month.
@@ -100,6 +104,61 @@ def occurrence_offsets(
             offsets.append(day)
         i += 1
     return offsets or [0]
+
+
+def stage_dates(
+    stages: list[dict[str, Any]] | None,
+    *,
+    is_perennial: bool,
+    planting_date: date | None,
+    season_year: int,
+) -> list[dict[str, Any]]:
+    """The calendar dates of each stage for one block, by the same rule the
+    schedule uses (``stage_start_date``), so the calendar step can group its
+    weeks by stage. A stage ends the day before the next one starts; the last
+    ends on its own end rule, or 30 days on. Stages that don't resolve to a
+    date for this block are left out."""
+    dated: list[tuple[date, dict[str, Any]]] = []
+    for s in stages or []:
+        start = stage_start_date(
+            s.get("advance") or {},
+            is_perennial=is_perennial,
+            planting_date=planting_date,
+            season_year=season_year,
+        )
+        if start is not None:
+            dated.append((start, s))
+    dated.sort(key=lambda x: x[0])
+    out: list[dict[str, Any]] = []
+    for i, (start, s) in enumerate(dated):
+        if i + 1 < len(dated):
+            end = dated[i + 1][0] - timedelta(days=1)
+        else:
+            end = _own_end(s.get("advance") or {}, start, planting_date) or (
+                start + timedelta(days=29)
+            )
+        out.append(
+            {
+                "code": s.get("code"),
+                "name_en": s.get("name_en"),
+                "name_ar": s.get("name_ar"),
+                "start_date": start,
+                "end_date": max(start, end),
+            }
+        )
+    return out
+
+
+def _own_end(advance: dict[str, Any], start: date, planting_date: date | None) -> date | None:
+    end_doy = advance.get("end_doy")
+    if isinstance(end_doy, str) and "-" in end_doy:
+        month, day = (int(p) for p in end_doy.split("-"))
+        end = date(start.year, month, day)
+        return end if end >= start else date(start.year + 1, month, day)
+    end_day = advance.get("end_day")
+    if isinstance(end_day, int) and planting_date is not None:
+        return planting_date + timedelta(days=end_day)
+    return None
 
 
 def occurrence_key(code: str, n: int) -> str:
@@ -224,6 +283,8 @@ def resolve_allocation(
                     occurrences=len(offsets),
                     repeat_count=r.repeat_count,
                     repeat_unit=r.repeat_unit,
+                    window_start=r.scheduled_date,
+                    window_end=r.scheduled_date + timedelta(days=max(1, r.duration_days) - 1),
                 )
             )
 
@@ -280,4 +341,5 @@ __all__ = [
     "occurrence_key",
     "occurrence_offsets",
     "resolve_allocation",
+    "stage_dates",
 ]
