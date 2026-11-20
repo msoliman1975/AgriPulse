@@ -5778,12 +5778,23 @@ workloads:
 #   A failed chunk stops the run and names the restart day; restart with
 #   mode replay from that day, never re-replay a finished range.
 #   Rollback: delete the Job; everything it writes is in the demo tenant.
+#   Finished 2026-11-20 06:20: 9,503 block-days, 6,251 recommendations,
+#   260 grid alerts, 6,511 Action Center items across the two seasons.
+# mdj-r7: rebuild on 7a0383a (#939). Applies the seven new water incidents
+#   (soil side of the lateral break, M31 first summer and pump failure; M28
+#   canal rotation, M31 emitter clogging, M2 sub-main pressure, M2 khalal
+#   heat wave), keeps the twelve already applied, then resets and replays
+#   2024-10-15..2026-10-15 so the water tree (v3, published after mdj-r6)
+#   evaluates. The demo tenant's bands were moved to p5/p95 before it, and
+#   M5/M31 palm phases were set back to their starting values.
+#   Watch: water findings on M2, M28 and M31 on the incident dates.
+#   Rollback: delete the Job; everything it writes is in the demo tenant.
 demoBuildJob:
   enabled: true
-  runId: "mdj-r6"
-  schedule: "30 1 20 11 *"
+  runId: "mdj-r7"
+  schedule: "30 21 20 11 *"
   activeDeadlineSeconds: 259200
-  imageTag: "fb1cb29"
+  imageTag: "7a0383a"
   tenantSchema: "tenant_01a1edfe861d7e8e9f0fdfe26fc33fd0"
   scenario: "medjool_oasis"
   mode: "rebuild"
