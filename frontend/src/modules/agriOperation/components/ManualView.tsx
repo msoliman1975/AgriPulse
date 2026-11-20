@@ -1,7 +1,9 @@
 // The operation manual, laid out the way an agronomist reads it: a ribbon of
-// phenology stages across the season, then the activities grouped by stage,
-// each with its week, type, title, and (expanded) product, dosage, notes,
-// source and evidence. Read-only here; the platform editor reuses the layout.
+// phenology stages across the season, then each stage week by week (Week 1,
+// Week 2 … no dates until a plan gives a start), each week with every task
+// active in it: a repeating task says how many times it falls that week, a
+// task done once over several weeks is listed in each of them. A row opens to
+// product, dosage, notes, source and evidence. Read-only here.
 
 import clsx from "clsx";
 
@@ -13,8 +15,9 @@ import type { OperationManual } from "@/api/agriOperation";
 import type { PlanTemplateActivity } from "@/api/planTemplates";
 import { localizedField } from "@/lib/localizedField";
 import { STAGE_COLORS, stageName, TYPE_CLASS } from "../lib/manualStyle";
-import { repeatLabel, weekSpanLabel } from "../lib/repeat";
-import { activityWeek, seasonLayout, stripEvidenceTags, type StageWindow } from "../lib/weeks";
+import { manualWeeks, type ManualWeekTask } from "../lib/manualWeeks";
+import { repeatLabel } from "../lib/repeat";
+import { seasonLayout, stripEvidenceTags, type StageWindow } from "../lib/weeks";
 
 interface ManualViewProps {
   manual: OperationManual;
@@ -40,25 +43,7 @@ export function ManualView({ manual, varietyPath }: ManualViewProps): ReactNode 
       ) % STAGE_COLORS.length
     ];
 
-  const byStage = useMemo(() => {
-    const groups = new Map<string, PlanTemplateActivity[]>();
-    const other: PlanTemplateActivity[] = [];
-    for (const a of manual.activities) {
-      if (
-        a.anchor === "stage" &&
-        a.stage_code &&
-        layout.windows.some((w) => w.code === a.stage_code)
-      ) {
-        groups.set(a.stage_code, [...(groups.get(a.stage_code) ?? []), a]);
-      } else {
-        other.push(a);
-      }
-    }
-    for (const list of groups.values()) {
-      list.sort((x, y) => (activityWeek(x, layout) ?? 0) - (activityWeek(y, layout) ?? 0));
-    }
-    return { groups, other };
-  }, [manual.activities, layout]);
+  const plan = useMemo(() => manualWeeks(layout, manual.activities), [layout, manual.activities]);
 
   if (manual.activities.length === 0) {
     return <p className="text-sm text-ap-muted">{t("manual.noActivities")}</p>;
@@ -81,8 +66,8 @@ export function ManualView({ manual, varietyPath }: ManualViewProps): ReactNode 
         <FilterButton active={stageFilter === null} onClick={() => setStageFilter(null)}>
           {t("manual.allStages")}
         </FilterButton>
-        {layout.windows
-          .filter((w) => byStage.groups.has(w.code))
+        {plan.groups
+          .flatMap((g) => (g.window ? [g.window] : []))
           .map((w) => (
             <FilterButton
               key={w.code}
@@ -95,51 +80,78 @@ export function ManualView({ manual, varietyPath }: ManualViewProps): ReactNode 
           ))}
       </div>
 
-      {layout.windows
-        .filter((w) => byStage.groups.has(w.code) && visible(w.code))
-        .map((w) => (
-          <Card
-            as="section"
-            key={w.code}
-            noPadding
-            title={
-              <span className="inline-flex items-center gap-2">
-                <span className={clsx("h-4 w-1.5 rounded-sm", colorOf(w.code))} aria-hidden />
-                {stageName(w.stage, lang)}
-              </span>
-            }
-            actions={
-              <span className="text-xs text-ap-muted">
-                {t("manual.weeks", { from: w.startWeek, to: w.endWeek })}
-              </span>
-            }
-          >
-            <ul>
-              {(byStage.groups.get(w.code) ?? []).map((a) => (
-                <ActivityRow
-                  key={a.id}
-                  activity={a}
-                  week={activityWeek(a, layout)}
-                  totalWeeks={layout.totalWeeks}
-                  stage={w}
-                />
-              ))}
-            </ul>
-          </Card>
-        ))}
+      {plan.groups
+        .filter((g) => (g.window ? visible(g.window.code) : stageFilter === null))
+        .map((g) => {
+          const w = g.window;
+          const from = g.weeks[0]?.week ?? 1;
+          const to = g.weeks[g.weeks.length - 1]?.week ?? from;
+          return (
+            <Card
+              as="section"
+              key={w?.code ?? "other-weeks"}
+              noPadding
+              title={
+                w ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className={clsx("h-4 w-1.5 rounded-sm", colorOf(w.code))} aria-hidden />
+                    {stageName(w.stage, lang)}
+                  </span>
+                ) : (
+                  t("manual.otherWeeks")
+                )
+              }
+              actions={
+                <span className="text-xs text-ap-muted">{t("manual.weeks", { from, to })}</span>
+              }
+            >
+              <ol>
+                {g.weeks.map((wk) => (
+                  <li key={wk.week} className="border-b border-ap-line last:border-b-0">
+                    <div className="flex items-baseline gap-3 bg-ap-bg px-4 py-1.5">
+                      <h4 className="text-sm font-semibold text-ap-ink">
+                        {t("manual.weekN", { n: wk.week })}
+                      </h4>
+                      <span className="ms-auto text-xs text-ap-muted">
+                        {wk.tasks.length === 0
+                          ? t("manual.noTasksThisWeek")
+                          : t("manual.weekTasks", { count: wk.tasks.length })}
+                      </span>
+                    </div>
+                    {wk.tasks.length > 0 ? (
+                      <ul>
+                        {wk.tasks.map((task) => (
+                          <ActivityRow
+                            key={task.activity.id}
+                            activity={task.activity}
+                            when={whenThisWeek(task, t)}
+                            muted={task.timesThisWeek === 0}
+                            stage={
+                              layout.windows.find((x) => x.code === task.activity.stage_code) ??
+                              null
+                            }
+                          />
+                        ))}
+                      </ul>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          );
+        })}
 
-      {byStage.other.length > 0 && stageFilter === null ? (
+      {plan.unplaced.length > 0 && stageFilter === null ? (
         <Card as="section" noPadding title={t("manual.fromStart")}>
           <p className="border-b border-ap-line px-4 py-2 text-xs text-ap-muted">
             {t("manual.fromStartHint")}
           </p>
           <ul>
-            {byStage.other.map((a) => (
+            {plan.unplaced.map((a) => (
               <ActivityRow
                 key={a.id}
                 activity={a}
-                week={activityWeek(a, layout)}
-                totalWeeks={layout.totalWeeks}
+                when={repeatLabel(a.repeat_count, a.repeat_unit, t)}
                 stage={null}
               />
             ))}
@@ -239,15 +251,34 @@ function anchorText(
   return t("manual.anchorStart", { days: offset });
 }
 
+/** How a task sits in one week: how many times it falls there, that it falls
+ *  in other weeks of its window, or that it is done once somewhere in it. */
+function whenThisWeek(
+  task: ManualWeekTask,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string | null {
+  const a = task.activity;
+  if (task.timesThisWeek !== null) {
+    const rate = repeatLabel(a.repeat_count, a.repeat_unit, t);
+    return task.timesThisWeek > 0
+      ? [t("manual.timesThisWeek", { count: task.timesThisWeek }), rate].filter(Boolean).join(" · ")
+      : t("manual.notThisWeek", { rate });
+  }
+  if (task.lastWeek > task.firstWeek) {
+    return t("manual.onceInWeeks", { from: task.firstWeek, to: task.lastWeek });
+  }
+  return null;
+}
+
 function ActivityRow({
   activity,
-  week,
-  totalWeeks,
+  when,
+  muted,
   stage,
 }: {
   activity: PlanTemplateActivity;
-  week: number | null;
-  totalWeeks: number;
+  when: string | null;
+  muted?: boolean;
   stage: StageWindow | null;
 }): ReactNode {
   const { t, i18n } = useTranslation("agriOperation");
@@ -259,12 +290,9 @@ function ActivityRow({
   const dosage = localizedField(lang, activity.dosage, activity.dosage_ar);
   const notes = stripEvidenceTags(localizedField(lang, activity.notes, activity.notes_ar));
   return (
-    <li className="border-b border-ap-line last:border-b-0">
+    <li className={clsx("border-t border-ap-line", muted && "opacity-60")}>
       <details className="group">
         <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-2.5 hover:bg-ap-bg">
-          <span className="w-20 shrink-0 text-xs font-semibold tabular-nums text-ap-muted">
-            {weekSpanLabel(week, activity.duration_days, totalWeeks, t)}
-          </span>
           <span
             className={clsx(
               "shrink-0 rounded px-2 py-0.5 text-meta font-semibold",
@@ -276,12 +304,7 @@ function ActivityRow({
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium text-ap-ink">{title}</span>
             <span className="block truncate text-xs text-ap-muted">
-              {[
-                anchorText(activity, stage, lang, t),
-                repeatLabel(activity.repeat_count, activity.repeat_unit, t),
-              ]
-                .filter(Boolean)
-                .join(" · ")}
+              {[when, anchorText(activity, stage, lang, t)].filter(Boolean).join(" · ")}
             </span>
           </span>
           <span

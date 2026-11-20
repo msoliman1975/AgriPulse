@@ -94,12 +94,17 @@ Capabilities `plan_template.read`, `plan_allocation.read` and
 1. **Agri Operation** (`/agri-operation/:farmId`, also linked from the board
    header). The **Catalog** tab lists the manuals for the farm's crops, read-only;
    pick a crop, a variety (it filters the manuals and lays out its weeks), then
-   a manual.
+   a manual. Each stage is laid out week by week (Week 1, Week 2 …, no dates),
+   each week with every task active in it: a repeating task with its count
+   that week, a task done once over several weeks in each of them as "once in
+   weeks a–b (Recommended)".
 2. The **Plan** tab lists saved plans. **New plan** runs four steps: blocks;
    operations (leave out, edit product/dosage/notes, add your own); season
-   and start date; the calendar (preview), every week with its dates and
-   all its tasks, a repeating task once per time with a date field for the
-   exact day. **Save** applies it to the board.
+   and start date; the calendar (preview), grouped by growth stage (the
+   stage dates of the first block, from the preview's `stages`), every week
+   with its dates and all its tasks, a repeating task once per time with a
+   date field for the exact day. A task whose window covers a week with no
+   time in it is listed there too, muted and without a date field. **Save** applies it to the board.
 3. Editing a saved plan and saving again regenerates its still-scheduled
    activities; completed and in-progress ones are kept, and dates moved on
    the board are remembered (`date_overrides`).

@@ -42,12 +42,20 @@
     "source": "المصدر",
     "sourceManual": "دليل التشغيل",
     "sourceTree": "شجرة القرار {{code}}",
-    "weekSpan": "أسبوع {{from}}–{{to}}",
     "repeat": {
       "week": "{{count}}× أسبوعيًا",
       "month": "{{count}}× شهريًا",
       "season": "{{count}} مرات خلال الفترة"
-    }
+    },
+    "weekN": "الأسبوع {{n}}",
+    "otherWeeks": "أسابيع أخرى",
+    "noTasksThisWeek": "لا مهام",
+    "weekTasks_one": "مهمة واحدة",
+    "weekTasks_other": "{{count}} مهام",
+    "timesThisWeek_one": "مرة هذا الأسبوع",
+    "timesThisWeek_other": "{{count}}× هذا الأسبوع",
+    "notThisWeek": "ليس هذا الأسبوع ({{rate}})",
+    "onceInWeeks": "مرة واحدة في الأسابيع {{from}}–{{to}} (موصى بها)"
   },
   "evidence": {
     "eg_fao": "الفاو مصر",
@@ -167,7 +175,12 @@
       "weekTasks_one": "مهمة واحدة",
       "weekTasks_other": "{{count}} مهام",
       "occurrence": "المرة {{n}} من {{total}}",
-      "dateFor": "تاريخ {{title}}"
+      "dateFor": "تاريخ {{title}}",
+      "otherWeeks": "أسابيع أخرى",
+      "stageWeeks": "الأسابيع {{from}} – {{to}}",
+      "onceInWeeks": "مرة واحدة في الأسابيع {{from}}–{{to}} (موصى بها)",
+      "nextOn": "التالية في {{date}}",
+      "plannedOn": "مخططة في {{date}}"
     },
     "done": {
       "applied": "تم تطبيق الخطة",

@@ -347,6 +347,17 @@ class AllocatedActivityPreview(BaseModel):
     occurrences: int = 1
     repeat_count: int | None = None
     repeat_unit: str | None = None
+    # The window the manual gives the task (first and last day).
+    window_start: date | None = None
+    window_end: date | None = None
+
+
+class BlockStageDates(BaseModel):
+    code: str
+    name_en: str | None = None
+    name_ar: str | None = None
+    start_date: date
+    end_date: date
 
 
 class AllocationBlockSchedule(BaseModel):
@@ -356,6 +367,8 @@ class AllocationBlockSchedule(BaseModel):
     start_date: date
     activities: list[AllocatedActivityPreview] = Field(default_factory=list)
     skipped: list[dict[str, Any]] = Field(default_factory=list)
+    # The block's stages as dates (the calendar step groups weeks by them).
+    stages: list[BlockStageDates] = Field(default_factory=list)
 
 
 class AllocationPreviewResponse(BaseModel):

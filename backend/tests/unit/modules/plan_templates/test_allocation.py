@@ -204,3 +204,42 @@ def test_each_time_moves_alone_and_edits_apply_to_every_time() -> None:
     # Leaving the task out leaves out every time.
     none, _ = _resolve(activities=manual, excluded_codes={"irrigation-1"})
     assert none == []
+
+
+# ---- Stage dates and task windows (the calendar groups weeks by stage) -------
+
+
+def test_stage_dates_follow_the_schedule_rule() -> None:
+    from app.modules.plan_templates.allocation import stage_dates
+
+    stages = [
+        {
+            "code": "flowering",
+            "name_en": "Flowering",
+            "advance": {"mode": "calendar_doy", "start_doy": "02-15"},
+        },
+        {
+            "code": "fruit_set",
+            "name_en": "Fruit set",
+            "advance": {"mode": "calendar_doy", "start_doy": "04-01", "end_doy": "05-31"},
+        },
+    ]
+    got = stage_dates(stages, is_perennial=True, planting_date=None, season_year=2026)
+    assert [(s["code"], s["start_date"], s["end_date"]) for s in got] == [
+        ("flowering", date(2026, 2, 15), date(2026, 3, 31)),
+        ("fruit_set", date(2026, 4, 1), date(2026, 5, 31)),
+    ]
+    # An annual stage without a planting date has no date and is left out.
+    annual = [{"code": "veg", "advance": {"mode": "days_from_planting", "start_day": 0}}]
+    assert stage_dates(annual, is_perennial=False, planting_date=None, season_year=2026) == []
+
+
+def test_each_time_carries_the_task_window() -> None:
+    manual = [
+        _act("irrigation-1", "irrigation", duration_days=21, repeat_count=1, repeat_unit="week"),
+        _act("pruning-1", "pruning", duration_days=21),
+    ]
+    acts, _ = _resolve(activities=manual)
+    windows = {(a.activity_key, a.window_start, a.window_end) for a in acts}
+    assert ("irrigation-1#3", date(2026, 1, 1), date(2026, 1, 21)) in windows
+    assert ("pruning-1", date(2026, 1, 1), date(2026, 1, 21)) in windows
