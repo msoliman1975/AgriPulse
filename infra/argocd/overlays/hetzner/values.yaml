@@ -4492,7 +4492,18 @@ global:
       #   plan and catalog load; a saved Medjool plan shows "manual updated".
       #   Rollback: api to 02004cd. 0115's columns can stay; the old image
       #   never reads them.
-      tag: "247de3c"
+      # 8531034 = #929, api only (247de3c..8531034 is #926 and #929; #926 is
+      #   demo_history code run only by the demo-build CronJob, which pins its
+      #   own imageTag). New platform route POST
+      #   /admin/tenants/{tenant_id}/farms:backfill-country
+      #   (platform.manage_tenants): sets a country on every farm in one
+      #   tenant that has none, dry_run by default, each farm through
+      #   update_farm (farms.farm_updated audit) plus one
+      #   farms.country_backfilled row per run. No migration, no new env.
+      #   Frontend stays 247de3c, workers 8bfe412.
+      #   Watch: the route answers a dry run for a platform token.
+      #   Rollback: api to 247de3c.
+      tag: "8531034"
     workers:
       tag: "8bfe412"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
