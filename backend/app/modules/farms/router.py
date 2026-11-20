@@ -75,6 +75,8 @@ from app.modules.farms.schemas import (
     CropVarietyResponse,
     CropVarietyStrainResponse,
     CropVarietyUpdateRequest,
+    FarmCountryBackfillRequest,
+    FarmCountryBackfillResponse,
     FarmCreateRequest,
     FarmCropAssignmentResponse,
     FarmDetailResponse,
@@ -2017,3 +2019,59 @@ async def admin_update_strain(
         fields=payload.model_dump(exclude_unset=True),
         actor_user_id=context.user_id,
     )
+
+
+# ---------- Platform admin: backfill farm countries --------------------------
+#
+# A platform caller's token names no tenant, so the farm routes above cannot
+# act for one. This route takes the tenant in the path, opens that tenant's
+# schema, and sets the country on every farm that has none, through the same
+# update path (and audit row) an edit in the UI takes.
+
+
+@router.post(
+    "/admin/tenants/{tenant_id}/farms:backfill-country",
+    response_model=FarmCountryBackfillResponse,
+    summary="Set a country on every farm in one tenant that has none (platform; audited).",
+)
+async def backfill_farm_country(
+    tenant_id: UUID,
+    payload: FarmCountryBackfillRequest,
+    request: Request,
+    context: RequestContext = Depends(requires_capability("platform.manage_tenants")),
+    public_session: AsyncSession = Depends(get_admin_db_session),
+) -> dict[str, Any]:
+    from sqlalchemy import text as sql_text
+
+    from app.core.errors import APIError
+    from app.shared.db.session import AsyncSessionLocal, sanitize_tenant_schema
+
+    schema = (
+        await public_session.execute(
+            sql_text(
+                "SELECT schema_name FROM public.tenants WHERE id = :tid AND deleted_at IS NULL"
+            ),
+            {"tid": tenant_id},
+        )
+    ).scalar_one_or_none()
+    if schema is None:
+        raise APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            title="Tenant not found",
+            detail=f"No active tenant with id {tenant_id}.",
+            type_="https://agripulse.cloud/problems/tenant-not-found",
+        )
+
+    safe = sanitize_tenant_schema(str(schema))
+    factory = AsyncSessionLocal()
+    async with factory() as tenant_session, tenant_session.begin():
+        await tenant_session.execute(sql_text(f"SET LOCAL search_path TO {safe}, public"))
+        service = get_farm_service(tenant_session=tenant_session, public_session=public_session)
+        result = await service.backfill_farm_country(
+            country_code=payload.country_code,
+            dry_run=payload.dry_run,
+            actor_user_id=context.user_id,
+            tenant_schema=str(schema),
+            correlation_id=_correlation_id(request),
+        )
+    return {"tenant_id": tenant_id, **result}
