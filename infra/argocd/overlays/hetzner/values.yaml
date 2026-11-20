@@ -4503,7 +4503,15 @@ global:
       #   Frontend stays 247de3c, workers 8bfe412.
       #   Watch: the route answers a dry run for a platform token.
       #   Rollback: api to 247de3c.
-      tag: "8531034"
+      # dcc1744 = #931, api (8531034..dcc1744 touches backend/ only there).
+      #   Agri Operation plan preview: each allocated activity carries
+      #   window_start/window_end, and each block schedule carries `stages`
+      #   (stage start/end dates by the schedule's own rule). Additive
+      #   response fields; no migration, no new env. Workers stay 8bfe412.
+      #   Watch: Agri Operation's calendar step (POST .../plan-allocations
+      #   preview) still answers.
+      #   Rollback: api to 8531034, together with the frontend.
+      tag: "dcc1744"
     workers:
       tag: "8bfe412"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
@@ -5429,7 +5437,17 @@ global:
       #   Watch: the Beta designer opens and its tabs work; Agri Operation
       #   plan and catalog load.
       #   Rollback: frontend to 02004cd, together with the api.
-      tag: "247de3c"
+      # dcc1744 = #931, frontend (247de3c..dcc1744 touches frontend/ only
+      #   there). Agri Operation reads stage -> week -> tasks: the Catalog
+      #   lays each stage out as Week 1, Week 2 ... (no dates) with every
+      #   task active that week; the calendar step groups its dated weeks by
+      #   stage and lists a multi-week task in each week of its window.
+      #   Needs the api at dcc1744 for stage groups (an older api just gives
+      #   ungrouped weeks).
+      #   Watch: the Beta designer opens and its tabs work; Agri Operation
+      #   plan and catalog load.
+      #   Rollback: frontend to 247de3c.
+      tag: "dcc1744"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
