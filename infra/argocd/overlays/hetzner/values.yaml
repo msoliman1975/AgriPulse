@@ -5701,7 +5701,7 @@ workloads:
 # Medjool Oasis, palm-medjool demo tenant (farm MDJ-DEMO), see
 # backend/app/modules/demo_history/scenarios/medjool_oasis.py. Progress is
 # read from GET /api/v1/admin/tenants/01a1edfe-861d-7e8e-9f0f-dfe26fc33fd0/sidecar.
-# `imageTag` pins the job alone to a demo build (#917, #919); the api,
+# `imageTag` pins the job alone to a demo build (#917, #919, #926); the api,
 # workers and frontend stay where they are.
 #
 # mdj-r1 (2026-11-19 10:55, 66 s): copy-history-dry-run. 13 blocks matched,
@@ -5718,20 +5718,23 @@ workloads:
 #   incidents moved rows (cell/block: M31 gaps 836/124, M5 N-2025 598/32,
 #   M2 lateral 572/44, M2 iron 456/19, M5 N-2026 680/34, M31 heat 1584/72,
 #   pump 142/4) and the cold snap moved 96 weather hours over 5 days.
-# mdj-r5: rebuild = apply the incidents, delete derived history (engine
-#   output, team work, hindcasts, and any cards the live sweep opened),
-#   then replay 2024-10-15..2026-10-15 in weekly chunks. 731 days on 13
-#   blocks; the Ewais Grove replay ran ~150 s a day on 36 blocks, so allow
-#   72 h. Progress: one sidecar event per chunk.
+# mdj-r5 (2026-11-19 23:15, ~55 s a week): rebuild. Incidents applied and
+#   the replay ran, but every sweep found no block: the demo farm and blocks
+#   were drawn with active_from 2026-11-16, after every replayed day, so
+#   recommendations.evaluate processed 0 blocks. Its output is cleared by
+#   the next rebuild; applied incidents are kept and not applied twice.
+# mdj-r6: rebuild on fb1cb29 (#926), which first moves the farm's and its
+#   blocks' active_from back to 2023-08-01 (scenario ACTIVE_FROM), then
+#   resets and replays 2024-10-15..2026-10-15. Scheduled after mdj-r5 ends.
 #   A failed chunk stops the run and names the restart day; restart with
 #   mode replay from that day, never re-replay a finished range.
-#   Rollback: enabled: false stops nothing already running; delete the Job.
+#   Rollback: delete the Job; everything it writes is in the demo tenant.
 demoBuildJob:
   enabled: true
-  runId: "mdj-r5"
-  schedule: "15 23 19 11 *"
+  runId: "mdj-r6"
+  schedule: "30 1 20 11 *"
   activeDeadlineSeconds: 259200
-  imageTag: "99c12c4"
+  imageTag: "fb1cb29"
   tenantSchema: "tenant_01a1edfe861d7e8e9f0fdfe26fc33fd0"
   scenario: "medjool_oasis"
   mode: "rebuild"
