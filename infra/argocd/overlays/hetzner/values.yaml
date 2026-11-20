@@ -4511,7 +4511,17 @@ global:
       #   Watch: Agri Operation's calendar step (POST .../plan-allocations
       #   preview) still answers.
       #   Rollback: api to 8531034, together with the frontend.
-      tag: "dcc1744"
+      # 521c767 = #933, api only (dcc1744..521c767 touches backend/ only
+      #   there). A tenant purge's refresh of usage_daily/usage_flow_daily
+      #   now stops at now - 1 hour, where the aggregates' own policy stops.
+      #   Before, its padded window ran into the future, materialised today
+      #   and moved the watermark ahead of the clock, so every usage event
+      #   after a purge was missing from the usage dashboard for the rest of
+      #   the day. No migration, no new env. Frontend stays dcc1744, workers
+      #   8bfe412.
+      #   Watch: the usage dashboard shows today's events.
+      #   Rollback: api to dcc1744.
+      tag: "521c767"
     workers:
       tag: "8bfe412"
     # 9e6753e = #674, frontend only. Four fixes to the authoring scopes added
