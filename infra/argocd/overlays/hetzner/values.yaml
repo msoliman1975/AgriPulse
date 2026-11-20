@@ -5457,7 +5457,17 @@ global:
       #   Watch: the Beta designer opens and its tabs work; Agri Operation
       #   plan and catalog load.
       #   Rollback: frontend to 247de3c.
-      tag: "dcc1744"
+      # 869390e = #936, frontend (dcc1744..869390e touches frontend/ only
+      #   there). Agri Operation: Week 1 is the week of the first task. A
+      #   manual timed from the start date only (Medjool new planting) is
+      #   laid out by year from its first task (holes Week 1, planting Week
+      #   9) instead of 52 empty calendar weeks; the calendar step numbers
+      #   weeks from the plan's first task (no negative weeks). Frontend
+      #   only; api and workers unchanged.
+      #   Watch: the Beta designer opens and its tabs work; Agri Operation
+      #   catalog shows the new-planting manual by year.
+      #   Rollback: frontend to dcc1744.
+      tag: "869390e"
     tileServer:
       tag: "676746a"
 # Top-level env merges into every service chart's own env map (api + workers
