@@ -1514,3 +1514,31 @@ class AttachmentResponse(BaseModel):
     download_url_expires_at: datetime
     created_at: datetime
     updated_at: datetime
+
+
+class FarmCountryBackfillRequest(BaseModel):
+    """POST /admin/tenants/{tenant_id}/farms:backfill-country.
+
+    ``dry_run`` defaults to true: the call lists the farms it would set and
+    writes nothing until it is sent again with ``dry_run: false``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    country_code: str = Field(min_length=2, max_length=2)
+    dry_run: bool = True
+
+
+class FarmCountryBackfillFarm(BaseModel):
+    farm_id: UUID
+    code: str | None = None
+    name: str | None = None
+
+
+class FarmCountryBackfillResponse(BaseModel):
+    tenant_id: UUID
+    country_code: str
+    dry_run: bool
+    #: Farms that had no country: the ones set, or on a dry run, to be set.
+    count: int
+    farms: list[FarmCountryBackfillFarm] = Field(default_factory=list)

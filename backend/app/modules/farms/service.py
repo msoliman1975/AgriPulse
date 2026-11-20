@@ -577,6 +577,16 @@ class FarmService(Protocol):
         correlation_id: UUID | None = None,
     ) -> None: ...
 
+    async def backfill_farm_country(
+        self,
+        *,
+        country_code: str,
+        dry_run: bool,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]: ...
+
     async def list_countries(self) -> list[dict[str, Any]]: ...
 
     async def list_countries_admin(self, *, include_inactive: bool) -> list[dict[str, Any]]: ...
@@ -3255,6 +3265,58 @@ class FarmServiceImpl:
             return
         if not await self._repo.country_code_exists(code=code, active_only=True):
             raise UnknownCountryCodeError(code)
+
+    async def backfill_farm_country(
+        self,
+        *,
+        country_code: str,
+        dry_run: bool,
+        actor_user_id: UUID | None,
+        tenant_schema: str,
+        correlation_id: UUID | None = None,
+    ) -> dict[str, Any]:
+        """Set ``country_code`` on every farm in this tenant that has none.
+
+        Only farms whose country is empty are touched; a farm that already
+        names a country keeps it. Each farm goes through ``update_farm``, so
+        it gets the same ``farms.farm_updated`` audit row and the same
+        FarmUpdatedV1 event as an edit in the UI, and one
+        ``farms.country_backfilled`` row records the run itself: who, which
+        code, and every farm id it set.
+
+        ``dry_run`` lists the farms and writes nothing.
+        """
+        code = country_code.strip().upper()
+        await self._ensure_country_code(code)
+        farms = await self._repo.list_farms_without_country()
+        listed = [{"farm_id": f["id"], "code": f.get("code"), "name": f.get("name")} for f in farms]
+        if dry_run or not farms:
+            return {"country_code": code, "dry_run": dry_run, "count": len(listed), "farms": listed}
+
+        for farm in farms:
+            await self.update_farm(
+                farm_id=farm["id"],
+                changes={"country_code": code},
+                new_boundary=None,
+                actor_user_id=actor_user_id,
+                tenant_schema=tenant_schema,
+                preferred_unit="feddan",
+                correlation_id=correlation_id,
+            )
+        await self._audit.record(
+            tenant_schema=tenant_schema,
+            event_type="farms.country_backfilled",
+            actor_user_id=actor_user_id,
+            subject_kind="tenant",
+            subject_id=None,
+            details={
+                "country_code": code,
+                "count": len(farms),
+                "farm_ids": [str(f["id"]) for f in farms],
+            },
+            correlation_id=correlation_id,
+        )
+        return {"country_code": code, "dry_run": False, "count": len(listed), "farms": listed}
 
     async def list_countries(self) -> list[dict[str, Any]]:
         return await self._repo.list_countries()

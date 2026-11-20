@@ -1080,6 +1080,25 @@ class FarmsRepository:
             await self._public.execute(select(Country).where(Country.id == country_id))
         ).scalar_one_or_none()
 
+    async def list_farms_without_country(self) -> list[dict[str, Any]]:
+        """Every farm in this tenant with no ``country_code``, archived ones
+        included (an archived farm keeps its data and can be reactivated).
+        Soft-deleted farms are left alone."""
+        rows = (
+            (
+                await self._tenant.execute(
+                    text(
+                        "SELECT id, code, name FROM farms "
+                        "WHERE country_code IS NULL AND deleted_at IS NULL "
+                        "ORDER BY code, id"
+                    )
+                )
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]
+
     async def country_code_exists(self, *, code: str, active_only: bool = False) -> bool:
         stmt = select(Country.id).where(Country.code == code)
         if active_only:
