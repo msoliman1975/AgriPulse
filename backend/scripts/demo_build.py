@@ -26,6 +26,10 @@ Modes:
   onto its farm in a transaction, report the rows, roll back.
 * ``copy-history``: copy it. Rows the farm already has are skipped, so a
   second run adds nothing. See `demo_history.copy_history`.
+Every replaying mode first moves the farm's ``active_from`` back to the
+scenario's ``ACTIVE_FROM`` when it names one, so the blocks exist on the
+replayed days. See `demo_history.active_window`.
+
 * ``irrigation``: redo the irrigation history over the range: clear its
   schedules, then replay only yesterday's water balance, the day's
   schedule and the operator's evening log. For days replayed while the
@@ -57,6 +61,7 @@ from sqlalchemy import text
 
 from app.modules.audit.service import get_audit_service
 from app.modules.demo_history import people
+from app.modules.demo_history.active_window import open_active_window
 from app.modules.demo_history.copy_history import copy_history
 from app.modules.demo_history.incidents import apply_scenario
 from app.modules.demo_history.reset import clear_irrigation, reset_build_tenant
@@ -203,6 +208,25 @@ def _copy(args: argparse.Namespace, report: Reporter, *, dry_run: bool) -> None:
     report("history_copy_dry_run" if dry_run else "history_copied", result=result)
 
 
+def _open_window(args: argparse.Namespace, report: Reporter) -> None:
+    """Make the farm's blocks exist on every replayed day.
+
+    A scenario names `ACTIVE_FROM` when its farm was drawn after the span it
+    replays; without it every sweep finds no block. Moving the date earlier
+    twice changes nothing the second time.
+    """
+    scenario = _scenario(args)
+    active_from = getattr(scenario, "ACTIVE_FROM", None)
+    if active_from is None:
+        return
+    if args.start is not None and active_from > args.start:
+        raise ValueError(f"ACTIVE_FROM {active_from} is after the replay start {args.start}")
+    opened = _run_async(
+        open_active_window(AsyncSessionLocal(), args.tenant_schema, scenario.FARM_CODE, active_from)
+    )
+    report("active_window_opened", **opened)
+
+
 def _incidents(args: argparse.Namespace, report: Reporter, *, dry_run: bool) -> None:
     scenario = _scenario(args)
     results: list[dict[str, Any]] = _run_async(
@@ -276,6 +300,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.mode in ("reset", "rebuild"):
             cleared = _run_async(reset_build_tenant(AsyncSessionLocal(), args.tenant_schema))
             report("reset", cleared=cleared)
+        if args.mode in _REPLAYS:
+            _open_window(args, report)
         if args.mode == "irrigation":
             cleared = _run_async(
                 clear_irrigation(AsyncSessionLocal(), args.tenant_schema, args.start, args.end)

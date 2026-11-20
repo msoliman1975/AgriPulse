@@ -58,6 +58,12 @@ FARM_CODE = "MDJ-DEMO"
 
 SPAN = (date(2024, 10, 15), date(2026, 10, 15))
 
+# The farm and its blocks were drawn on 2026-11-16. The copied history
+# starts on 2023-08-17, so the blocks are made active from 2023-08-01 and
+# every replayed day finds them. Without this the first rebuild evaluated
+# no block at all.
+ACTIVE_FROM = date(2023, 8, 1)
+
 COPY_SOURCE = CopySource(
     schema="tenant_01a1e2bf2d617d20aff8e268bda2db0b",
     farm_code="Al001",

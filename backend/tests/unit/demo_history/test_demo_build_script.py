@@ -134,6 +134,9 @@ def test_medjool_scenario_stays_inside_its_span_and_blocks() -> None:
         assert set(incident.blocks) <= {"M2", "M5", "M28", "M31"}
     for change in medjool_oasis.ATTRIBUTE_CHANGES:
         assert start <= change.on <= end
+    # The blocks must exist on the first replayed day, and before the copied
+    # history begins, or the sweeps find nothing.
+    assert date(2023, 8, 17) >= medjool_oasis.ACTIVE_FROM
 
 
 def test_attribute_changes_do_nothing_on_other_days() -> None:
