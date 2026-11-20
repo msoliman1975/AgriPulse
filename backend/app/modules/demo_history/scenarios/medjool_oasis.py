@@ -27,13 +27,18 @@ The trees this is written for:
 * Rain at pollination and ripening, heat units, and the seasonal
   operations calendar, from the real weather and growth stages. Rain fell
   in March 2025, March 2026 and on 26-27 September 2026.
+* Tree crops - water and irrigation, per cell, on the sandy blocks (M2,
+  M28, M31; M5 is sandy loam and outside its targeting). It reads leaf
+  water (NDMI) and soil moisture (SMI) and opens an irrigate card when the
+  two agree. Incidents 12 to 18 give it seven water events.
 
 Readings on this farm are low because a 10 m pixel over palms at 8 x 8 m
 on sand is mostly soil: NDVI 0.074 to 0.110 (block means, 5th to 95th
 percentile), MSAVI 0.073 to 0.104, BSI 0.185 to 0.223, NDMI -0.138 to
--0.092, NDRE 0.016 to 0.055, GNDVI 0.233 to 0.290. The shifts below are
+-0.092, NDRE 0.016 to 0.055, GNDVI 0.233 to 0.290. Block SMI on the sandy
+blocks runs 0.16 to 0.76 (5th to 95th percentile). The shifts below are
 sized against that spread, so an incident moves a cell well past the
-tenant's history-derived floors (about the 10th percentile) and its
+tenant's history-derived floors (the 5th percentile) and its
 z-score past -2, and a chart shows it plainly without leaving the range
 the farm can produce.
 
@@ -178,6 +183,120 @@ INCIDENTS: tuple[Incident, ...] = (
         until=date(2026, 7, 11),
         gone=date(2026, 7, 16),
         shifts=(Shift("ndmi", -0.09),),
+    ),
+    # Water and irrigation. The water tree raises an irrigate card only when
+    # leaf water (NDMI, per cell) and soil moisture (SMI) agree; either one
+    # alone is a finding to watch. SMI comes from Landsat, every 8 days, and
+    # has no per-cell value at 40 m, so every cell reads the block's SMI.
+    # The soil shifts below therefore move the block rows (cells "all"),
+    # and each window spans at least one Landsat pass at full strength.
+    #
+    # 12-14. The soil side of the three water incidents above. Those are
+    # already applied on the build tenant and an applied incident never runs
+    # again, so the soil drop is its own entry over the same dates.
+    Incident(
+        code="mdj-12-m2-lateral-break-soil",
+        title="M2 drip lateral break, soil drying on the line",
+        blocks=("M2",),
+        start=date(2025, 6, 8),
+        full=date(2025, 6, 12),
+        until=date(2025, 6, 26),
+        gone=date(2025, 7, 15),
+        shifts=(Shift("smi", 0.12, mode="set"),),
+    ),
+    Incident(
+        code="mdj-13-m31-first-summer-soil",
+        title="M31 first summer, sand drying between cycles",
+        blocks=("M31",),
+        start=date(2026, 6, 5),
+        full=date(2026, 6, 20),
+        until=date(2026, 7, 15),
+        gone=date(2026, 8, 5),
+        shifts=(Shift("smi", 0.1, mode="set"),),
+    ),
+    Incident(
+        code="mdj-14-pump-failure-soil",
+        title="Well pump failure, soil dries on M28 and M2",
+        blocks=("M28", "M2"),
+        start=date(2026, 7, 8),
+        full=date(2026, 7, 9),
+        until=date(2026, 7, 11),
+        gone=date(2026, 7, 16),
+        shifts=(Shift("smi", 0.08, mode="set"),),
+    ),
+    # 15. The canal water rotation stretches the irrigation interval on M28
+    #     in the May 2025 heat. Leaf and soil water fall together until the
+    #     rotation ends.
+    Incident(
+        code="mdj-15-m28-canal-rotation",
+        title="M28 canal rotation, irrigation interval stretched",
+        blocks=("M28",),
+        start=date(2025, 5, 10),
+        full=date(2025, 5, 15),
+        until=date(2025, 5, 28),
+        gone=date(2025, 6, 10),
+        shifts=(Shift("ndmi", -0.06), Shift("smi", 0.12, mode="set")),
+    ),
+    # 16. Emitters clog with carbonate on the south rows of M31 in the
+    #     July heat. An acid flush in late August clears them.
+    Incident(
+        code="mdj-16-m31-emitter-clogging",
+        title="M31 emitters clogged on the south rows",
+        blocks=("M31",),
+        cells="rows:81142-81145",
+        start=date(2025, 7, 20),
+        full=date(2025, 8, 1),
+        until=date(2025, 8, 20),
+        gone=date(2025, 9, 5),
+        shifts=(Shift("ndmi", -0.07),),
+    ),
+    # A block row moves by the share of cells an incident covers, so the
+    # soil side of a partial incident is its own entry over the whole block.
+    Incident(
+        code="mdj-16-m31-emitter-clogging-soil",
+        title="M31 emitters clogged, soil drying",
+        blocks=("M31",),
+        start=date(2025, 7, 20),
+        full=date(2025, 8, 1),
+        until=date(2025, 8, 20),
+        gone=date(2025, 9, 5),
+        shifts=(Shift("smi", 0.12, mode="set"),),
+    ),
+    # 17. Pressure falls at the far (east) end of the M2 sub-main after a
+    #     valve fails half open. The last columns go short until it is
+    #     replaced.
+    Incident(
+        code="mdj-17-m2-submain-pressure",
+        title="M2 low pressure at the end of the sub-main",
+        blocks=("M2",),
+        cells="cols:9715-9716",
+        start=date(2025, 9, 12),
+        full=date(2025, 9, 15),
+        until=date(2025, 9, 30),
+        gone=date(2025, 10, 12),
+        shifts=(Shift("ndmi", -0.07),),
+    ),
+    Incident(
+        code="mdj-17-m2-submain-pressure-soil",
+        title="M2 low sub-main pressure, soil drying",
+        blocks=("M2",),
+        start=date(2025, 9, 12),
+        full=date(2025, 9, 15),
+        until=date(2025, 9, 30),
+        gone=date(2025, 10, 12),
+        shifts=(Shift("smi", 0.12, mode="set"),),
+    ),
+    # 18. A heat wave at khalal in August 2026. The M2 schedule is not
+    #     raised in time and the whole block runs short for two weeks.
+    Incident(
+        code="mdj-18-m2-khalal-heat-wave",
+        title="M2 heat wave at khalal, schedule not raised",
+        blocks=("M2",),
+        start=date(2026, 8, 10),
+        full=date(2026, 8, 15),
+        until=date(2026, 8, 28),
+        gone=date(2026, 9, 10),
+        shifts=(Shift("ndmi", -0.06), Shift("smi", 0.12, mode="set")),
     ),
 )
 
