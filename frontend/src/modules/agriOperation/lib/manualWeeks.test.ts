@@ -62,12 +62,49 @@ describe("manualWeeks", () => {
     ]);
   });
 
-  it("keeps tasks with no week apart", () => {
+  it("keeps start-date tasks apart in a manual laid out by stage", () => {
     const perennial = seasonLayout(
       [{ code: "flower", advance: { mode: "calendar_doy", start_doy: "01-15" } }],
       true,
     );
-    const { unplaced } = manualWeeks(perennial, [act("x", { anchor: "start", stage_code: null })]);
+    const { mode, unplaced } = manualWeeks(perennial, [
+      act("s", { stage_code: "flower" }),
+      act("x", { anchor: "start", stage_code: null }),
+    ]);
+    expect(mode).toBe("stages");
     expect(unplaced.map((a) => a.code)).toEqual(["x"]);
+  });
+
+  it("counts a start-date manual from its first task, by year", () => {
+    const perennial = seasonLayout(
+      [{ code: "flower", advance: { mode: "calendar_doy", start_doy: "01-15" } }],
+      true,
+    );
+    const r = manualWeeks(perennial, [
+      act("holes", { anchor: "start", stage_code: null, offset_days: -56, duration_days: 28 }),
+      act("plant", { anchor: "start", stage_code: null, offset_days: 0, duration_days: 7 }),
+      act("irr", {
+        anchor: "start",
+        stage_code: null,
+        offset_days: 365,
+        duration_days: 14,
+        repeat_count: 1,
+        repeat_unit: "week",
+      }),
+    ]);
+    expect(r.mode).toBe("start");
+    expect(r.unplaced).toEqual([]);
+    expect(r.groups.map((g) => [g.year, g.weeks[0]?.week, g.weeks.at(-1)?.week])).toEqual([
+      [1, 1, 52],
+      [2, 53, 62],
+    ]);
+    const weeks = r.groups.flatMap((g) => g.weeks);
+    const codes = (n: number) => weeks.find((w) => w.week === n)?.tasks.map((t) => t.activity.code);
+    // Holes are dug in weeks 1-4; planting falls in week 9; year-2 irrigation weekly.
+    expect(codes(1)).toEqual(["holes"]);
+    expect(codes(4)).toEqual(["holes"]);
+    expect(codes(5)).toEqual([]);
+    expect(codes(9)).toEqual(["plant"]);
+    expect(weeks.find((w) => w.week === 61)?.tasks[0]?.timesThisWeek).toBe(1);
   });
 });

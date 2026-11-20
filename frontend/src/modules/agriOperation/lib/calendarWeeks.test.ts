@@ -48,12 +48,16 @@ describe("calendarWeeks", () => {
     ]);
   });
 
-  it("counts weeks before the start as negative and merges blocks by date", () => {
+  it("counts Week 1 from the first task, even before the start, and merges blocks", () => {
     const weeks = calendarWeeks([
       block("b1", "2027-03-01", [act("soil_prep-1", "2027-02-15")]),
       block("b2", "2027-03-08", [act("planting-1", "2027-03-01")]),
     ]);
-    expect(weeks.map((w) => w.number)).toEqual([-2, -1, 1]);
+    expect(weeks.map((w) => [w.number, w.from])).toEqual([
+      [1, "2027-02-15"],
+      [2, "2027-02-22"],
+      [3, "2027-03-01"],
+    ]);
     expect(weeks[2]?.items.map((i) => i.blockId)).toEqual(["b2"]);
     expect(weeks[0]?.items.map((i) => i.activity.activity_key)).toEqual(["soil_prep-1"]);
   });

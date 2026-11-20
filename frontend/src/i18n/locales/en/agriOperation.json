@@ -51,7 +51,9 @@
     "timesThisWeek_one": "Once this week",
     "timesThisWeek_other": "{{count}}× this week",
     "notThisWeek": "Not this week ({{rate}})",
-    "onceInWeeks": "Once in weeks {{from}}–{{to}} (Recommended)"
+    "onceInWeeks": "Once in weeks {{from}}–{{to}} (Recommended)",
+    "yearN": "Year {{n}}",
+    "fromFirstTaskHint": "Timed from the date you give each block, not from a growth stage. Week 1 is the week of the first task, which can come before planting."
   },
   "evidence": {
     "eg_fao": "FAO Egypt",
