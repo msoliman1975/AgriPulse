@@ -274,6 +274,50 @@ async def test_telemetry_older_than_the_compression_threshold_also_dies(
 
 
 @pytest.mark.asyncio
+async def test_a_purge_leaves_fresh_events_visible_to_everyone_else(
+    admin_session: AsyncSession,
+) -> None:
+    """The purge refresh must not materialise today.
+
+    Its window is widened outward and padded, so for a purge of recent events
+    it reached into the future. Materialising today's bucket moved the
+    aggregate's watermark past the clock, and real-time aggregation only reads
+    raw rows newer than the watermark: every event written after a purge
+    vanished from `usage_daily` until the next day. In CI that is what made
+    test_usage_caggs_realtime fail whenever this file ran first on another
+    worker against the same database.
+    """
+    purged = uuid4()
+    await admin_session.execute(_INSERT, _events(purged, datetime.now(UTC) - timedelta(days=1)))
+    await admin_session.commit()
+    refreshed, _report = await _purge(admin_session, purged)
+    assert refreshed, "the purge captured no window, so nothing was refreshed"
+
+    bystander = uuid4()
+    await admin_session.execute(
+        _INSERT, _events(bystander, datetime.now(UTC) - timedelta(minutes=2))
+    )
+    await admin_session.commit()
+    try:
+        seen = (
+            await admin_session.execute(
+                text("SELECT sum(events) FROM public.usage_daily WHERE tenant_id = :t"),
+                {"t": bystander},
+            )
+        ).scalar_one_or_none()
+        assert seen == 2, (
+            f"two events written after the purge read as {seen} through usage_daily: "
+            "the purge refresh materialised today and moved the watermark ahead "
+            "of the clock."
+        )
+    finally:
+        await admin_session.execute(
+            text("DELETE FROM public.usage_events WHERE tenant_id = :t"), {"t": bystander}
+        )
+        await admin_session.commit()
+
+
+@pytest.mark.asyncio
 async def test_a_tenant_with_no_telemetry_skips_the_refresh(
     admin_session: AsyncSession,
 ) -> None:

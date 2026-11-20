@@ -34,6 +34,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
+from app.shared import clock
 from app.shared.purge.registry import (
     BLOCK_CAGGS,
     BLOCK_OWNED,
@@ -458,6 +459,10 @@ class PurgeEngine:
 # (block_index_weekly). See `_bucket_aligned` for why the margin exists.
 _WIDEST_BUCKET = timedelta(days=7)
 
+# The usage aggregates' own refresh policy stops one hour short of now
+# (public 0083: end_offset => 1 hour). A purge refresh must stop there too.
+_PUBLIC_CAGG_END_OFFSET = timedelta(hours=1)
+
 
 def _bucket_aligned(window: tuple[datetime, datetime]) -> tuple[datetime, datetime]:
     """Widen a refresh window outward so it covers WHOLE buckets.
@@ -578,6 +583,17 @@ async def refresh_public_caggs(
     if window is None:
         return []
     start, end = _bucket_aligned(window)
+    # Never materialise past where the production policy stops. The outward
+    # padding above reaches into tomorrow for a purge of recent events, and
+    # materialising today's bucket moves the aggregate's watermark ahead of
+    # the clock. Real-time aggregation only reads raw rows newer than the
+    # watermark, so every event written for the rest of the day then vanished
+    # from `usage_daily` (the policy never re-materialises today, so nothing
+    # put it back). Today stays served from raw rows, which the purge has
+    # already deleted, so the purged tenant still disappears.
+    end = min(end, clock.now() - _PUBLIC_CAGG_END_OFFSET)
+    if start >= end:
+        return []
     refreshed: list[str] = []
     engine = create_async_engine(engine_url, isolation_level="AUTOCOMMIT")
     try:
