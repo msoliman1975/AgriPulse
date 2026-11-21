@@ -5789,6 +5789,13 @@ workloads:
 #   M5/M31 palm phases were set back to their starting values.
 #   Watch: water findings on M2, M28 and M31 on the incident dates.
 #   Rollback: delete the Job; everything it writes is in the demo tenant.
+#   Finished 2026-11-21 03:05 (20,059 s). All 9 new incident entries moved
+#   rows. 9,503 block-days, 4,959 recommendations, 141 grid alerts, 5,100
+#   Action Center items. 68 water irrigate cards, one or more in each
+#   water incident's month; the rest are real SMI dips (Oct-Dec 2024) and
+#   the other sandy blocks. With p5/p95 bands, canopy 1,901 and feeding
+#   1,097 items (from 2,675 and 1,698), and the incident months stand out
+#   more against each block's monthly median.
 demoBuildJob:
   enabled: true
   runId: "mdj-r7"
